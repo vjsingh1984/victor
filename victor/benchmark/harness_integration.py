@@ -231,9 +231,7 @@ class HighLevelEvaluationRunner:
                     self.profile, self.model, agent_config
                 )
             else:
-                self._agent = await BenchmarkAgent.create(
-                    self.provider, self.model, agent_config
-                )
+                self._agent = await BenchmarkAgent.create(self.provider, self.model, agent_config)
 
         return self._agent
 

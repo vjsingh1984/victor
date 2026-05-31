@@ -112,9 +112,7 @@ class BuildFormatter(ToolFormatter):
                 warning_str = warning.get("message", str(warning))
                 lines.append(f"  [yellow]{i+1}.[/] {warning_str}")
             if len(warnings) > max_warnings:
-                lines.append(
-                    f"  [dim]... and {len(warnings) - max_warnings} more warnings[/]"
-                )
+                lines.append(f"  [dim]... and {len(warnings) - max_warnings} more warnings[/]")
             lines.append("")
 
         # Errors
@@ -135,9 +133,7 @@ class BuildFormatter(ToolFormatter):
                 else:
                     lines.append(f"  [red]{i+1}.[/] {error}")
             if len(errors) > max_errors:
-                lines.append(
-                    f"  [dim]... and {len(errors) - max_errors} more errors[/]"
-                )
+                lines.append(f"  [dim]... and {len(errors) - max_errors} more errors[/]")
             lines.append("")
 
         # Compilation steps
@@ -150,13 +146,9 @@ class BuildFormatter(ToolFormatter):
                 step_duration = step.get("duration_ms", 0)
 
                 if step_success:
-                    lines.append(
-                        f"  [green]✓[/] {step_name} [dim]({step_duration:.2f}s)[/]"
-                    )
+                    lines.append(f"  [green]✓[/] {step_name} [dim]({step_duration:.2f}s)[/]")
                 else:
-                    lines.append(
-                        f"  [red]✗[/] {step_name} [dim]({step_duration:.2f}s)[/]"
-                    )
+                    lines.append(f"  [red]✗[/] {step_name} [dim]({step_duration:.2f}s)[/]")
 
         content = "\n".join(lines)
         summary = self._extract_summary(data)

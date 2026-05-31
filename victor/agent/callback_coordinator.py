@@ -64,9 +64,7 @@ class CallbackCoordinator:
         add_message: Callable,
     ) -> None:
         """Called when tool execution completes (from ToolPipeline)."""
-        tool_service = (
-            self._get_tool_service() if self._get_tool_service is not None else None
-        )
+        tool_service = self._get_tool_service() if self._get_tool_service is not None else None
         if tool_service is not None and hasattr(tool_service, "on_tool_complete"):
             tool_service.on_tool_complete(
                 result=result,
@@ -81,9 +79,7 @@ class CallbackCoordinator:
             )
             return
 
-        raise RuntimeError(
-            "ToolService is unavailable or does not expose on_tool_complete"
-        )
+        raise RuntimeError("ToolService is unavailable or does not expose on_tool_complete")
 
     def on_streaming_session_complete(self, session: "StreamingSession") -> None:
         """Called when streaming session completes (from StreamingController)."""

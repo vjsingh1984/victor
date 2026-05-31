@@ -55,9 +55,7 @@ async def test_before_tool_output_compacts_and_persists_event():
     assert result["compaction_event_id"] == "compact_tool"
     assert result["reason"] == "pre_tool_output"
     store.record_compaction_event.assert_called_once()
-    assert (
-        store.record_compaction_event.call_args.kwargs["session_id"] == "session_root"
-    )
+    assert store.record_compaction_event.call_args.kwargs["session_id"] == "session_root"
 
 
 @pytest.mark.asyncio
@@ -169,9 +167,7 @@ async def test_after_agent_turn_uses_injected_async_summarizer_for_compaction_ev
     )
 
     assert result["summary"] == "LLM summary: review api.py | found issue in db.py"
-    assert (
-        store.record_compaction_event.call_args.kwargs["summary"] == result["summary"]
-    )
+    assert store.record_compaction_event.call_args.kwargs["summary"] == result["summary"]
     assert summarizer.summarize.await_count == 1
 
 
@@ -271,9 +267,7 @@ async def test_after_agent_turn_does_not_mix_sibling_contexts():
         min_messages=1,
     )
 
-    assert registry.get_or_create(root).get_messages() == [
-        {"role": "user", "content": "root"}
-    ]
+    assert registry.get_or_create(root).get_messages() == [{"role": "user", "content": "root"}]
     assert len(registry.get_or_create(child).get_messages()) == 1
 
 

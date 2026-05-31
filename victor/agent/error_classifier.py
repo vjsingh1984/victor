@@ -56,9 +56,7 @@ class ToolCallSignature:
     arguments_hash: int
 
     @classmethod
-    def from_call(
-        cls, tool_name: str, arguments: dict[str, Any]
-    ) -> "ToolCallSignature":
+    def from_call(cls, tool_name: str, arguments: dict[str, Any]) -> "ToolCallSignature":
         """Create signature from tool call parameters."""
         # Create a hashable representation of arguments
         # Sort keys for consistent hashing
@@ -77,10 +75,7 @@ class ToolCallSignature:
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, ToolCallSignature):
             return False
-        return (
-            self.tool_name == other.tool_name
-            and self.arguments_hash == other.arguments_hash
-        )
+        return self.tool_name == other.tool_name and self.arguments_hash == other.arguments_hash
 
 
 class ToolErrorClassifier:
@@ -112,9 +107,7 @@ class ToolErrorClassifier:
         re.compile(r"Access denied\b", re.IGNORECASE),
         re.compile(r"403\b.*?Forbidden", re.IGNORECASE),  # HTTP 403 Forbidden
         # Module/import errors
-        re.compile(
-            r"ModuleNotFoundError:?\s*No module named\s+[\'\"].*?[\'\"]", re.IGNORECASE
-        ),
+        re.compile(r"ModuleNotFoundError:?\s*No module named\s+[\'\"].*?[\'\"]", re.IGNORECASE),
         re.compile(r"ImportError:?\s*No module named\s+[\'\"].*?[\'\"]", re.IGNORECASE),
         re.compile(
             r"cannot import name\s+[\'\"].*?[\'\"]\s+from\s+[\'\"].*?[\'\"]",
@@ -256,17 +249,13 @@ class ToolErrorClassifier:
         # Check for permanent patterns first (highest priority)
         for pattern in self.PERMANENT_PATTERNS:
             if pattern.search(error_message):
-                logger.debug(
-                    f"Error classified as PERMANENT: matched pattern '{pattern.pattern}'"
-                )
+                logger.debug(f"Error classified as PERMANENT: matched pattern '{pattern.pattern}'")
                 return ErrorType.PERMANENT
 
         # Check for transient patterns
         for pattern in self.TRANSIENT_PATTERNS:
             if pattern.search(error_message):
-                logger.debug(
-                    f"Error classified as TRANSIENT: matched pattern '{pattern.pattern}'"
-                )
+                logger.debug(f"Error classified as TRANSIENT: matched pattern '{pattern.pattern}'")
                 return ErrorType.TRANSIENT
 
         # LLM augmentation: when no pattern matches, consult LLM if available
@@ -400,12 +389,9 @@ def get_error_classifier(runtime_intelligence: Any = None) -> ToolErrorClassifie
     global _global_classifier
     if _global_classifier is None or (
         runtime_intelligence is not None
-        and getattr(_global_classifier, "_runtime_intelligence", None)
-        is not runtime_intelligence
+        and getattr(_global_classifier, "_runtime_intelligence", None) is not runtime_intelligence
     ):
-        _global_classifier = ToolErrorClassifier(
-            runtime_intelligence=runtime_intelligence
-        )
+        _global_classifier = ToolErrorClassifier(runtime_intelligence=runtime_intelligence)
     return _global_classifier
 
 

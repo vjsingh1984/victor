@@ -136,9 +136,7 @@ async def main():
     await agent.initialize()
 
     try:
-        result = await agent.run_with_retry(
-            "What is async/await in Python?", temperature=0.3
-        )
+        result = await agent.run_with_retry("What is async/await in Python?", temperature=0.3)
         print(f"Result: {result}")
 
         metrics = await agent.get_metrics()

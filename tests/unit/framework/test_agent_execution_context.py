@@ -70,14 +70,10 @@ async def test_agent_run_prefers_execution_context_chat_service():
     )
     legacy_chat_service = SimpleNamespace(
         chat=AsyncMock(
-            side_effect=AssertionError(
-                "legacy orchestrator-bound service should not be used"
-            )
+            side_effect=AssertionError("legacy orchestrator-bound service should not be used")
         )
     )
-    execution_context = SimpleNamespace(
-        services=SimpleNamespace(chat=runtime_chat_service)
-    )
+    execution_context = SimpleNamespace(services=SimpleNamespace(chat=runtime_chat_service))
     orchestrator = _make_orchestrator(
         execution_context=execution_context,
         chat_service=legacy_chat_service,
@@ -118,9 +114,7 @@ async def test_agent_session_initialize_prefers_execution_context_services():
     result = await session.send("test prompt")
     await session.close()
 
-    session_service.create_session.assert_awaited_once_with(
-        metadata={"origin": "framework"}
-    )
+    session_service.create_session.assert_awaited_once_with(metadata={"origin": "framework"})
     runtime_chat_service.reset_conversation.assert_called_once_with()
     runtime_chat_service.chat.assert_awaited_once_with("test prompt")
     session_service.close_session.assert_awaited_once_with("session-123")

@@ -62,12 +62,8 @@ def build_prompt_strategy(
         return PrefPOStrategy(
             max_guidance_items=getattr(prefpo_settings, "max_guidance_items", 2),
             min_failure_count=getattr(prefpo_settings, "min_failure_count", 1),
-            max_prompt_growth_chars=getattr(
-                prefpo_settings, "max_prompt_growth_chars", 240
-            ),
+            max_prompt_growth_chars=getattr(prefpo_settings, "max_prompt_growth_chars", 240),
         )
 
-    logger.warning(
-        "Unknown prompt optimization strategy '%s' - skipping", strategy_name
-    )
+    logger.warning("Unknown prompt optimization strategy '%s' - skipping", strategy_name)
     return None

@@ -120,9 +120,7 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
             },
         )
 
-    @router.post(
-        "/completions", response_model=CompletionResponse, tags=["Completions"]
-    )
+    @router.post("/completions", response_model=CompletionResponse, tags=["Completions"])
     async def completions(request: CompletionRequest) -> CompletionResponse:
         """Get fast code completions with FIM support."""
         start_time = time.perf_counter()

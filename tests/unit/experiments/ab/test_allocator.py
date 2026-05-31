@@ -107,8 +107,7 @@ class TestRandomAllocator:
 
         allocator1 = RandomAllocator(seed=42)
         allocations1 = [
-            await allocator1.allocate_variant(f"user_{i}", sample_experiment)
-            for i in range(10)
+            await allocator1.allocate_variant(f"user_{i}", sample_experiment) for i in range(10)
         ]
 
         # Reset random state before second test
@@ -116,8 +115,7 @@ class TestRandomAllocator:
 
         allocator2 = RandomAllocator(seed=42)
         allocations2 = [
-            await allocator2.allocate_variant(f"user_{i}", sample_experiment)
-            for i in range(10)
+            await allocator2.allocate_variant(f"user_{i}", sample_experiment) for i in range(10)
         ]
 
         assert allocations1 == allocations2

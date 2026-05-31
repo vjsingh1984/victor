@@ -208,9 +208,7 @@ class TestIntentFiltering:
         assert "shell" in tool_names
         assert "write" not in tool_names
 
-    def test_filter_tools_display_only_intent_keeps_shell_for_sqllite_db_review(
-        self, tool_planner
-    ):
+    def test_filter_tools_display_only_intent_keeps_shell_for_sqllite_db_review(self, tool_planner):
         """Observed typo variants like 'sqllite db' should still preserve shell."""
         from victor.agent.action_authorizer import ActionIntent
 
@@ -309,9 +307,7 @@ class TestIntentFiltering:
 class TestToolPlannerInitialization:
     """Tests for ToolPlanner initialization."""
 
-    def test_initialization_with_valid_dependencies(
-        self, mock_tool_registrar, mock_settings
-    ):
+    def test_initialization_with_valid_dependencies(self, mock_tool_registrar, mock_settings):
         """Test successful initialization with valid dependencies."""
         tool_planner = ToolPlanner(
             tool_registrar=mock_tool_registrar,
@@ -321,9 +317,7 @@ class TestToolPlannerInitialization:
         assert tool_planner.tool_registrar is mock_tool_registrar
         assert tool_planner.settings is mock_settings
 
-    def test_initialization_stores_dependencies(
-        self, mock_tool_registrar, mock_settings
-    ):
+    def test_initialization_stores_dependencies(self, mock_tool_registrar, mock_settings):
         """Test that initialization stores all dependencies."""
         tool_planner = ToolPlanner(
             tool_registrar=mock_tool_registrar,

@@ -56,9 +56,7 @@ class GEPATierManager:
 
         self._auto_switch: bool = getattr(config, "auto_tier_switch", True)
         self._convergence_window: int = getattr(config, "convergence_window", 10)
-        self._convergence_threshold: float = getattr(
-            config, "convergence_threshold", 0.02
-        )
+        self._convergence_threshold: float = getattr(config, "convergence_threshold", 0.02)
         self._regression_threshold: float = -0.1
 
         # Per-section convergence tracking
@@ -158,9 +156,7 @@ class GEPATierManager:
             "auto_switch": self._auto_switch,
             "tier_switches": self._tier_switches,
             "total_evolutions": self._total_evolutions,
-            "convergence_windows": {
-                name: list(window) for name, window in self._deltas.items()
-            },
+            "convergence_windows": {name: list(window) for name, window in self._deltas.items()},
         }
 
     def _create_service(self, tier: str) -> GEPAService:
@@ -185,8 +181,7 @@ class GEPATierManager:
             provider = provider_cls(base_url=base_url) if base_url else provider_cls()
         except Exception as e:
             logger.warning(
-                "Failed to create %s provider for GEPA %s tier: %s. "
-                "Falling back to Ollama.",
+                "Failed to create %s provider for GEPA %s tier: %s. " "Falling back to Ollama.",
                 provider_name,
                 tier,
                 e,
@@ -197,9 +192,7 @@ class GEPATierManager:
                 provider = OllamaProvider()
                 model = "qwen3:8b"
             except Exception:
-                raise RuntimeError(
-                    f"Cannot create any provider for GEPA {tier} tier"
-                ) from e
+                raise RuntimeError(f"Cannot create any provider for GEPA {tier} tier") from e
 
         return GEPAService(
             provider=provider,

@@ -25,9 +25,7 @@ def load_delegate_follow_up_contract_file(contract_path: Path) -> dict[str, Any]
         ) from e
 
     if not isinstance(contract, dict):
-        raise DelegateFollowUpContractError(
-            "Delegate follow-up contract must be a JSON object"
-        )
+        raise DelegateFollowUpContractError("Delegate follow-up contract must be a JSON object")
 
     return contract
 

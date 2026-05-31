@@ -114,9 +114,7 @@ class TestRuleBasedCompactionSummarizer:
                 content="I'll read it",
                 tool_calls=[{"name": "read_file", "id": "call_1"}],
             ),
-            Message(
-                role="tool", tool_call_id="call_1", tool_name="read_file", content="..."
-            ),
+            Message(role="tool", tool_call_id="call_1", tool_name="read_file", content="..."),
             Message(
                 role="assistant",
                 content="Now I'll write to it",
@@ -166,9 +164,7 @@ class TestRuleBasedCompactionSummarizer:
         summary = summarizer.summarize(messages)
         summary_dict = json.loads(summary)
         # Should have pending work items
-        assert (
-            len(summary_dict["pending_work"]) >= 0
-        )  # May or may not detect pending work
+        assert len(summary_dict["pending_work"]) >= 0  # May or may not detect pending work
 
     def test_truncation(self, summarizer):
         """Test content truncation in summaries."""
@@ -206,9 +202,7 @@ class TestRuleBasedCompactionSummarizer:
 
         # Create 100 messages
         messages = [
-            Message(
-                role="user", content=f"Message {i} about fixing bugs in src/file{i}.py"
-            )
+            Message(role="user", content=f"Message {i} about fixing bugs in src/file{i}.py")
             for i in range(100)
         ]
 
@@ -225,8 +219,7 @@ class TestRuleBasedCompactionSummarizer:
 
         # Create messages with more than 8 files
         messages = [
-            Message(role="user", content=f"Check src/file{i}.py for bugs")
-            for i in range(20)
+            Message(role="user", content=f"Check src/file{i}.py for bugs") for i in range(20)
         ]
 
         summary = summarizer.summarize(messages)
@@ -334,9 +327,7 @@ class TestEdgeCases:
         assert len(summary_dict["key_timeline"]) > 0
         # Timeline entries should be truncated
         for entry in summary_dict["key_timeline"]:
-            assert (
-                len(entry["content"]) <= 160 + 20
-            )  # Allow some margin for JSON encoding
+            assert len(entry["content"]) <= 160 + 20  # Allow some margin for JSON encoding
 
     def test_mixed_tool_call_formats(self, summarizer):
         """Test handling different tool call formats."""

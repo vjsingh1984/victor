@@ -54,9 +54,7 @@ class VerticalValidator:
         python_files = [
             f
             for f in python_files
-            if "__pycache__" not in str(f)
-            and ".venv" not in str(f)
-            and "tests" not in f.parts
+            if "__pycache__" not in str(f) and ".venv" not in str(f) and "tests" not in f.parts
         ]
 
         if not python_files:
@@ -121,9 +119,7 @@ class VerticalValidator:
                 )
             )
 
-    def _check_import(
-        self, file_path: Path, module: str, lineno: int, lines: List[str]
-    ) -> None:
+    def _check_import(self, file_path: Path, module: str, lineno: int, lines: List[str]) -> None:
         """Check if import is allowed.
 
         Args:
@@ -158,9 +154,7 @@ class VerticalValidator:
                     )
                 )
 
-    def _check_decorator(
-        self, file_path: Path, node: ast.ClassDef, lines: List[str]
-    ) -> None:
+    def _check_decorator(self, file_path: Path, node: ast.ClassDef, lines: List[str]) -> None:
         """Check if class has @register_vertical decorator.
 
         Args:

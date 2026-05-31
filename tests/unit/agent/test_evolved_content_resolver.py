@@ -72,9 +72,7 @@ class TestEvolvedContentResolver:
         """Different prompt identities must not share one cached section."""
 
         class _Injector:
-            def get_section_payload(
-                self, section_name, provider="", model="", task_type="default"
-            ):
+            def get_section_payload(self, section_name, provider="", model="", task_type="default"):
                 return {
                     "text": f"{section_name}:{provider}:{model}:{task_type}",
                     "provider": provider,

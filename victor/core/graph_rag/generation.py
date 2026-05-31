@@ -201,9 +201,7 @@ class GraphAwarePromptBuilder:
             sections[section_name] = ContextSection(
                 title=section_name,
                 nodes=type_nodes,
-                priority=self._get_section_priority(
-                    node_type, hop_distances, type_nodes
-                ),
+                priority=self._get_section_priority(node_type, hop_distances, type_nodes),
             )
 
         # Add edges to relevant sections
@@ -290,9 +288,7 @@ class GraphAwarePromptBuilder:
 
         # Boost if contains close nodes (low hop distance)
         if nodes:
-            avg_distance = sum(hop_distances.get(n.node_id, 99) for n in nodes) / len(
-                nodes
-            )
+            avg_distance = sum(hop_distances.get(n.node_id, 99) for n in nodes) / len(nodes)
             proximity_boost = max(0, 1 - avg_distance / 3)
             return base * 0.7 + proximity_boost * 0.3
 

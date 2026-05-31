@@ -32,9 +32,7 @@ async def test_compact_context_if_recommended_uses_service_policy():
     assert result.messages_removed == 3
     assert result.recommendation == {"should_compact": True}
     service.get_compaction_recommendation.assert_called_once()
-    service.compact_context.assert_awaited_once_with(
-        strategy="semantic", min_messages=4
-    )
+    service.compact_context.assert_awaited_once_with(strategy="semantic", min_messages=4)
 
 
 @pytest.mark.asyncio
@@ -89,9 +87,7 @@ def test_get_messages_filters_dict_messages_by_role():
         ]
     )
 
-    assert service.get_messages(role="assistant") == [
-        {"role": "assistant", "content": "done"}
-    ]
+    assert service.get_messages(role="assistant") == [{"role": "assistant", "content": "done"}]
 
 
 def test_clear_messages_retains_system_dict_messages():

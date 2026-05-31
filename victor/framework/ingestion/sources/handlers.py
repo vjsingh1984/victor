@@ -109,9 +109,7 @@ def extract_text_from_html(html_content: str) -> str:
             html_content,
             flags=re.DOTALL | re.IGNORECASE,
         )
-        text = re.sub(
-            r"<style[^>]*>.*?</style>", "", text, flags=re.DOTALL | re.IGNORECASE
-        )
+        text = re.sub(r"<style[^>]*>.*?</style>", "", text, flags=re.DOTALL | re.IGNORECASE)
         # Remove all tags
         text = re.sub(r"<[^>]+>", " ", text)
         # Clean up entities and whitespace
@@ -335,9 +333,7 @@ class URLHandler:
             # Check content size
             if len(content) > self._max_size:
                 content = content[: self._max_size]
-                logger.warning(
-                    f"Truncated content from {source} to {self._max_size} bytes"
-                )
+                logger.warning(f"Truncated content from {source} to {self._max_size} bytes")
 
         # Determine document type from content-type header and URL
         if "text/html" in content_type or "application/xhtml" in content_type:
@@ -447,9 +443,7 @@ class DirectoryHandler:
                 # Check exclusions
                 should_exclude = False
                 for exclude in self._exclude_patterns:
-                    if any(
-                        part.startswith(exclude.rstrip("*")) for part in file_path.parts
-                    ):
+                    if any(part.startswith(exclude.rstrip("*")) for part in file_path.parts):
                         should_exclude = True
                         break
 

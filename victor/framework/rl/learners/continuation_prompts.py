@@ -71,9 +71,7 @@ class ContinuationPromptLearner(BaseLearner):
         Args:
             outcome: Outcome with continuation prompts data
         """
-        context_key = self._get_context_key(
-            outcome.provider, outcome.model, outcome.task_type
-        )
+        context_key = self._get_context_key(outcome.provider, outcome.model, outcome.task_type)
 
         cursor = self.db.cursor()
 
@@ -83,10 +81,7 @@ class ContinuationPromptLearner(BaseLearner):
             f" WHERE learner_id = ? AND task_type = ?",
             (self.name, context_key),
         )
-        row_map = {
-            r["stat_key"]: r["stat_value"]
-            for r in (dict(row) for row in cursor.fetchall())
-        }
+        row_map = {r["stat_key"]: r["stat_value"] for r in (dict(row) for row in cursor.fetchall())}
 
         # Load current_max_prompts from rl_param
         cursor.execute(
@@ -96,9 +91,7 @@ class ContinuationPromptLearner(BaseLearner):
         )
         param_row = cursor.fetchone()
         default_max = outcome.metadata.get("max_prompts_configured", 6)
-        current_max_prompts = (
-            int(param_row["param_value"]) if param_row else default_max
-        )
+        current_max_prompts = int(param_row["param_value"]) if param_row else default_max
 
         total_sessions = int(row_map.get("total_sessions", 0))
         successful_sessions = int(row_map.get("successful_sessions", 0))
@@ -123,9 +116,7 @@ class ContinuationPromptLearner(BaseLearner):
         avg_quality_score = quality_sum / (1 + (total_sessions - 1) * decay)
         avg_prompts_used = prompts_sum / (1 + (total_sessions - 1) * decay)
 
-        current_max_prompts = outcome.metadata.get(
-            "max_prompts_configured", current_max_prompts
-        )
+        current_max_prompts = outcome.metadata.get("max_prompts_configured", current_max_prompts)
 
         stats = {
             "context_key": context_key,
@@ -139,9 +130,7 @@ class ContinuationPromptLearner(BaseLearner):
 
         if total_sessions >= 3:
             self._update_max_prompts(stats)
-            current_max_prompts = (
-                stats.get("recommended_max_prompts") or current_max_prompts
-            )
+            current_max_prompts = stats.get("recommended_max_prompts") or current_max_prompts
 
         ts = outcome.timestamp
         for stat_key, stat_value in (
@@ -266,10 +255,7 @@ class ContinuationPromptLearner(BaseLearner):
             f" WHERE learner_id = ? AND task_type = ?",
             (self.name, context_key),
         )
-        row_map = {
-            r["stat_key"]: r["stat_value"]
-            for r in (dict(row) for row in cursor.fetchall())
-        }
+        row_map = {r["stat_key"]: r["stat_value"] for r in (dict(row) for row in cursor.fetchall())}
 
         cursor.execute(
             f"SELECT param_value FROM {Tables.RL_PARAM}"

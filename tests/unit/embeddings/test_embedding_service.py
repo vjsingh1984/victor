@@ -295,9 +295,7 @@ class TestEmbeddingGeneration:
         expected = np.ones(384, dtype=np.float32)
 
         with (
-            patch.object(
-                service, "embed_text_sync", return_value=expected
-            ) as mock_sync,
+            patch.object(service, "embed_text_sync", return_value=expected) as mock_sync,
             patch(
                 "victor.storage.embeddings.service.asyncio.get_event_loop",
                 side_effect=AssertionError,
@@ -336,9 +334,7 @@ class TestEmbeddingGeneration:
         expected = np.ones((2, 384), dtype=np.float32)
 
         with (
-            patch.object(
-                service, "embed_batch_sync", return_value=expected
-            ) as mock_sync,
+            patch.object(service, "embed_batch_sync", return_value=expected) as mock_sync,
             patch(
                 "victor.storage.embeddings.service.asyncio.get_event_loop",
                 side_effect=AssertionError,
@@ -413,9 +409,7 @@ class TestEmbeddingFallback:
             return original_import(name, *args, **kwargs)
 
         with patch.object(builtins, "__import__", side_effect=mock_import):
-            with pytest.raises(
-                ImportError, match="sentence-transformers not installed"
-            ):
+            with pytest.raises(ImportError, match="sentence-transformers not installed"):
                 service._ensure_model_loaded()
 
 

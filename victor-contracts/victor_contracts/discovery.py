@@ -358,9 +358,7 @@ class ProtocolRegistry:
         except Exception as e:
             logger.debug(f"Failed to track metadata for {name}: {e}")
 
-    def _handle_load_error(
-        self, name: str, protocol_type: str, error: Exception
-    ) -> None:
+    def _handle_load_error(self, name: str, protocol_type: str, error: Exception) -> None:
         """Handle a load error.
 
         Args:
@@ -380,9 +378,7 @@ class ProtocolRegistry:
         )
 
         if self._strict:
-            raise RuntimeError(
-                f"Failed to load {protocol_type} '{name}': {error}"
-            ) from error
+            raise RuntimeError(f"Failed to load {protocol_type} '{name}': {error}") from error
         else:
             logger.warning(f"Failed to load {protocol_type} '{name}': {error}")
 
@@ -464,9 +460,7 @@ class ProtocolRegistry:
         """Get all registered verticals."""
         return self._verticals.copy()
 
-    def get_protocol_metadata(
-        self, name: Optional[str] = None
-    ) -> Dict[str, ProtocolMetadata]:
+    def get_protocol_metadata(self, name: Optional[str] = None) -> Dict[str, ProtocolMetadata]:
         """Get metadata about discovered protocols.
 
         Args:
@@ -524,9 +518,7 @@ class ProtocolRegistry:
         Returns:
             List of protocol names that had load errors.
         """
-        return [
-            name for name, meta in self._protocol_metadata.items() if not meta.is_loaded
-        ]
+        return [name for name, meta in self._protocol_metadata.items() if not meta.is_loaded]
 
 
 # Global registry instance
@@ -649,9 +641,7 @@ def collect_verticals_from_candidate(
             for vertical_class in context.verticals
         }
 
-    raise TypeError(
-        "Entry point must resolve to a VictorPlugin or an SDK VerticalBase subclass"
-    )
+    raise TypeError("Entry point must resolve to a VictorPlugin or an SDK VerticalBase subclass")
 
 
 # Convenience functions for common operations
@@ -683,9 +673,7 @@ def discover_protocols(
     elif protocol_type == "safety_provider":
         return {f"safety_{i}": p for i, p in enumerate(registry.get_safety_providers())}
     elif protocol_type == "workflow_provider":
-        return {
-            f"workflow_{i}": p for i, p in enumerate(registry.get_workflow_providers())
-        }
+        return {f"workflow_{i}": p for i, p in enumerate(registry.get_workflow_providers())}
     elif protocol_type == "prompt_provider":
         return {f"prompt_{i}": p for i, p in enumerate(registry.get_prompt_providers())}
     elif protocol_type == "team_provider":
@@ -760,9 +748,7 @@ def get_discovery_summary() -> str:
         for name in registry.get_failed_loads():
             meta = metadata.get(name)
             load_error = (
-                meta.load_error
-                if meta and hasattr(meta, "load_error")
-                else "unknown error"
+                meta.load_error if meta and hasattr(meta, "load_error") else "unknown error"
             )
             lines.append(f"  - {name}: {load_error}")
 

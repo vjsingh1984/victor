@@ -71,9 +71,7 @@ class TestQueryServiceFileReaders:
         assert len(filtered) == 1
         assert filtered[0].id == "e2"
 
-    async def test_get_sessions_from_json_skips_invalid_and_returns_valid(
-        self, tmp_path
-    ) -> None:
+    async def test_get_sessions_from_json_skips_invalid_and_returns_valid(self, tmp_path) -> None:
         service = QueryService(project_root=tmp_path)
         sessions_dir = service.paths.sessions_dir
         sessions_dir.mkdir(parents=True, exist_ok=True)
@@ -101,9 +99,7 @@ class TestQueryServiceFileReaders:
         assert sessions[0].id == "session-good"
         assert sessions[0].message_count == 3
 
-    async def test_query_events_from_jsonl_applies_additional_filters(
-        self, tmp_path
-    ) -> None:
+    async def test_query_events_from_jsonl_applies_additional_filters(self, tmp_path) -> None:
         service = QueryService(project_root=tmp_path)
         logs_dir = tmp_path / ".victor" / "logs"
         logs_dir.mkdir(parents=True, exist_ok=True)

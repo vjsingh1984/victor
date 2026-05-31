@@ -140,10 +140,7 @@ class SafetyEnforcer:
                     f"Blocked by safety rule: {rule.name} - {rule.description}",
                 )
 
-            if (
-                rule_level == SafetyLevel.LOW.value
-                and config_level == SafetyLevel.HIGH.value
-            ):
+            if rule_level == SafetyLevel.LOW.value and config_level == SafetyLevel.HIGH.value:
                 return (
                     False,
                     f"Blocked by safety rule: {rule.name} - {rule.description}",
@@ -154,9 +151,7 @@ class SafetyEnforcer:
     def get_rules_by_level(self, level: Any) -> list[SafetyRule]:
         """Return all rules at the requested level."""
         level_value = self._level_value(level)
-        return [
-            rule for rule in self.rules if self._level_value(rule.level) == level_value
-        ]
+        return [rule for rule in self.rules if self._level_value(rule.level) == level_value]
 
 
 __all__ = [

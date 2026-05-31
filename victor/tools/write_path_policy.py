@@ -70,9 +70,7 @@ class WritePathPolicy:
         except ValueError:
             pass
 
-        if resolved.parent == cwd and re.match(
-            r"^(ANALYSIS|CHECKPOINT)-.*\.md$", resolved.name
-        ):
+        if resolved.parent == cwd and re.match(r"^(ANALYSIS|CHECKPOINT)-.*\.md$", resolved.name):
             return WritePathTier.PREFIXED_ROOT
 
         return WritePathTier.SOURCE_CODE

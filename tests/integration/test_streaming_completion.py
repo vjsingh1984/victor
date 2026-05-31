@@ -148,9 +148,7 @@ class TestStreamingCompletion:
             # Tool call chunk
             chunk1 = MagicMock()
             chunk1.content = ""
-            chunk1.tool_calls = [
-                {"name": "code_search", "arguments": {"query": "test"}}
-            ]
+            chunk1.tool_calls = [{"name": "code_search", "arguments": {"query": "test"}}]
             chunk1.is_final = False
             yield chunk1
 
@@ -349,9 +347,7 @@ class TestThinkingModeTransitions:
         renderer.on_content(test_content)
 
         # Verify: Content is in content_buffer (single source of truth)
-        assert (
-            test_content in renderer._content_buffer
-        ), "Content should be in content_buffer"
+        assert test_content in renderer._content_buffer, "Content should be in content_buffer"
 
         # Finalize (simulates stream end)
         renderer.finalize()

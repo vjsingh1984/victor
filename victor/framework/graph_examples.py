@@ -34,9 +34,7 @@ class AgentStateModel(BaseModel):
         validate_assignment=True,
     )
 
-    messages: List[str] = Field(
-        default_factory=list, description="Conversation messages"
-    )
+    messages: List[str] = Field(default_factory=list, description="Conversation messages")
     task: str = Field(default="", description="Current task being processed")
     result: Optional[str] = Field(default=None, description="Task result")
 

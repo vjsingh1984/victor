@@ -31,9 +31,7 @@ def _make_db() -> sqlite3.Connection:
 
 
 def _make_learner() -> UserFeedbackLearner:
-    return UserFeedbackLearner(
-        name="user_feedback", db_connection=_make_db(), learning_rate=0.1
-    )
+    return UserFeedbackLearner(name="user_feedback", db_connection=_make_db(), learning_rate=0.1)
 
 
 # ---------------------------------------------------------------------------
@@ -124,9 +122,7 @@ class TestUserFeedbackLearner:
         learner = _make_learner()
         for rating in [0.6, 0.8, 1.0]:
             learner.record_outcome(
-                create_outcome_with_user_feedback(
-                    session_id=f"s{rating}", rating=rating
-                )
+                create_outcome_with_user_feedback(session_id=f"s{rating}", rating=rating)
             )
         stats = learner.get_feedback_stats()
         assert stats["total_feedback"] == 3
@@ -170,13 +166,9 @@ class TestUserFeedbackLearner:
 
     def test_persists_summary_to_db(self):
         learner = _make_learner()
-        learner.record_outcome(
-            create_outcome_with_user_feedback(session_id="s1", rating=0.9)
-        )
+        learner.record_outcome(create_outcome_with_user_feedback(session_id="s1", rating=0.9))
         cursor = learner.db.cursor()
-        cursor.execute(
-            "SELECT * FROM rl_user_feedback_summary WHERE context_key = 's1'"
-        )
+        cursor.execute("SELECT * FROM rl_user_feedback_summary WHERE context_key = 's1'")
         row = cursor.fetchone()
         assert row is not None
         assert abs(dict(row)["avg_rating"] - 0.9) < 1e-6

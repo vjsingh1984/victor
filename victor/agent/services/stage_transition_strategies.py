@@ -285,6 +285,5 @@ def create_transition_strategy(
     if strategy_type == "hybrid":
         return HybridTransitionStrategy(edge_model_enabled=edge_model_enabled)
     raise ValueError(
-        f"Unknown strategy type: {strategy_type}. "
-        f"Valid types: heuristic, edge_model, hybrid"
+        f"Unknown strategy type: {strategy_type}. " f"Valid types: heuristic, edge_model, hybrid"
     )

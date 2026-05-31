@@ -212,8 +212,7 @@ class SdkCapabilityNegotiator:
             available=False,
             optional=normalized.optional,
             known=True,
-            reason="; ".join(reasons)
-            or "Capability requirement could not be satisfied.",
+            reason="; ".join(reasons) or "Capability requirement could not be satisfied.",
             min_version=normalized.min_version,
             metadata={"binding_type": "unresolved"},
         )
@@ -240,9 +239,7 @@ class SdkCapabilityNegotiator:
 _RUNTIME_CAPABILITY_REGISTRY: Optional[RuntimeCapabilityRegistry] = None
 
 
-def get_runtime_capability_registry(
-    *, reset: bool = False
-) -> RuntimeCapabilityRegistry:
+def get_runtime_capability_registry(*, reset: bool = False) -> RuntimeCapabilityRegistry:
     """Return the shared runtime capability registry."""
 
     global _RUNTIME_CAPABILITY_REGISTRY

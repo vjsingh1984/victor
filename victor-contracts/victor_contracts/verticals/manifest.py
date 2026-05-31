@@ -125,17 +125,11 @@ class ExtensionManifest:
 
     def get_extension_dependencies(self) -> Set[str]:
         """Get the set of required extension dependencies (excluding optional)."""
-        return {
-            dep.extension_name
-            for dep in self.extension_dependencies
-            if not dep.optional
-        }
+        return {dep.extension_name for dep in self.extension_dependencies if not dep.optional}
 
     def has_extension_dependency(self, extension_name: str) -> bool:
         """Check if this vertical depends on a specific extension."""
-        return any(
-            dep.extension_name == extension_name for dep in self.extension_dependencies
-        )
+        return any(dep.extension_name == extension_name for dep in self.extension_dependencies)
 
     def __post_init__(self) -> None:
         """Validate manifest parameters after initialization."""
@@ -149,9 +143,7 @@ class ExtensionManifest:
 
         # Validate load_priority is non-negative
         if self.load_priority < 0:
-            raise ValueError(
-                f"load_priority must be non-negative, got {self.load_priority}"
-            )
+            raise ValueError(f"load_priority must be non-negative, got {self.load_priority}")
 
         # Log if both requires and excludes have the same feature
         overlap = self.requires_features & self.excludes_features

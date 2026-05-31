@@ -373,9 +373,7 @@ class TestExtract:
     @pytest.mark.asyncio
     async def test_extract_missing_file(self):
         """Test handling of missing file parameter."""
-        result = await extract(
-            file="", start_line=1, end_line=5, function_name="extracted"
-        )
+        result = await extract(file="", start_line=1, end_line=5, function_name="extracted")
 
         assert result["success"] is False
         assert "Missing" in result["error"]
@@ -383,9 +381,7 @@ class TestExtract:
     @pytest.mark.asyncio
     async def test_extract_missing_function_name(self):
         """Test handling of missing function_name."""
-        result = await extract(
-            file="test.py", start_line=1, end_line=5, function_name=""
-        )
+        result = await extract(file="test.py", start_line=1, end_line=5, function_name="")
 
         assert result["success"] is False
         assert "Missing" in result["error"]
@@ -943,9 +939,7 @@ def func():
     return result
 """)
 
-        result = await inline(
-            file=str(test_file), variable_name="computed", preview=False
-        )
+        result = await inline(file=str(test_file), variable_name="computed", preview=False)
 
         assert result["success"] is True
         content = test_file.read_text()

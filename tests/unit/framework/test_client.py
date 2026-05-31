@@ -111,12 +111,8 @@ def test_session_config_normalizes_provider_override_and_applies_endpoint() -> N
 
 
 def test_session_config_rejects_endpoint_for_cloud_provider() -> None:
-    with pytest.raises(
-        ValueError, match="--endpoint is only supported for local providers"
-    ):
-        SessionConfig.from_cli_flags(
-            provider="openai", endpoint="https://custom.example"
-        )
+    with pytest.raises(ValueError, match="--endpoint is only supported for local providers"):
+        SessionConfig.from_cli_flags(provider="openai", endpoint="https://custom.example")
 
 
 def test_victor_client_bootstrap_container_uses_bootstrap_factory_result() -> None:
@@ -306,9 +302,7 @@ async def test_victor_client_stream_delegates_to_shared_stream_helper() -> None:
 
 
 @pytest.mark.asyncio
-async def test_victor_client_create_session_reuses_agent_session_and_closes_service() -> (
-    None
-):
+async def test_victor_client_create_session_reuses_agent_session_and_closes_service() -> None:
     config = SessionConfig.from_cli_flags(tool_budget=4)
     client = VictorClient(config, container=object())
 

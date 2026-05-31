@@ -523,9 +523,7 @@ class TestRetryStrategy:
             attempts[0] += 1
             if attempts[0] == 1:
                 error = APIConnectionError(
-                    request=httpx.Request(
-                        "POST", "https://api.openai.com/v1/chat/completions"
-                    )
+                    request=httpx.Request("POST", "https://api.openai.com/v1/chat/completions")
                 )
                 error.__cause__ = OSError("connection reset by peer")
                 raise error
@@ -708,23 +706,15 @@ class TestRequestQueue:
             # Submit all requests quickly to queue them before processing
             # The priority queue will order them: CRITICAL (0) < NORMAL (2) < LOW (3)
             tasks = [
-                single_worker_manager.submit(
-                    record("low"), priority=RequestPriority.LOW
-                ),
-                single_worker_manager.submit(
-                    record("critical"), priority=RequestPriority.CRITICAL
-                ),
-                single_worker_manager.submit(
-                    record("normal"), priority=RequestPriority.NORMAL
-                ),
+                single_worker_manager.submit(record("low"), priority=RequestPriority.LOW),
+                single_worker_manager.submit(record("critical"), priority=RequestPriority.CRITICAL),
+                single_worker_manager.submit(record("normal"), priority=RequestPriority.NORMAL),
             ]
 
             await asyncio.gather(*tasks)
 
             # Critical should be processed first (priority 0), then normal (2), then low (3)
-            assert (
-                order[0] == "critical"
-            ), f"Expected 'critical' first, got order: {order}"
+            assert order[0] == "critical", f"Expected 'critical' first, got order: {order}"
             assert order[1] == "normal", f"Expected 'normal' second, got order: {order}"
             assert order[2] == "low", f"Expected 'low' third, got order: {order}"
         finally:
@@ -824,9 +814,7 @@ class TestResilientProvider:
         assert stats["primary_successes"] == 2
 
     @pytest.mark.asyncio
-    async def test_recovered_primary_retry_attaches_response_diagnostics(
-        self, mock_provider
-    ):
+    async def test_recovered_primary_retry_attaches_response_diagnostics(self, mock_provider):
         """Recovered provider retries should be visible on response metadata."""
         mock_provider.chat = AsyncMock(
             side_effect=[
@@ -1235,9 +1223,7 @@ class TestSharedInfrastructureIntegration:
                 execution_order[0] == "critical_1"
             ), f"Expected critical first, got: {execution_order}"
             # Verify batch was processed last
-            assert (
-                execution_order[-1] == "batch_1"
-            ), f"Expected batch last, got: {execution_order}"
+            assert execution_order[-1] == "batch_1", f"Expected batch last, got: {execution_order}"
 
         finally:
             await manager.shutdown()

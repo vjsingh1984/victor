@@ -88,9 +88,7 @@ class EmbeddingRegistry:
                 # Check if victor-coding is actually installed
                 import importlib.util
 
-                victor_coding_installed = (
-                    importlib.util.find_spec("victor_coding") is not None
-                )
+                victor_coding_installed = importlib.util.find_spec("victor_coding") is not None
 
                 if victor_coding_installed:
                     # victor-coding IS installed but the bridge isn't registered in victor's registry

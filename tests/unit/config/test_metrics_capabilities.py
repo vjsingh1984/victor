@@ -64,9 +64,7 @@ class TestProviderMetricsCapabilities:
             cache_read_cost_per_mtok=0.30,
             cache_write_cost_per_mtok=3.75,
         )
-        costs = caps.calculate_cost(
-            1000, 500, cache_read_tokens=200, cache_write_tokens=100
-        )
+        costs = caps.calculate_cost(1000, 500, cache_read_tokens=200, cache_write_tokens=100)
         assert costs["input_cost"] == pytest.approx(0.003, rel=1e-6)
         assert costs["output_cost"] == pytest.approx(0.0075, rel=1e-6)
         # cache_cost = (200/1M * 0.30) + (100/1M * 3.75) = 0.00006 + 0.000375 = 0.000435
@@ -118,9 +116,7 @@ class TestGetMetricsCapabilities:
         caps = get_metrics_capabilities("openai", "gpt-4o")
         assert caps.provider == "openai"
         assert caps.supports_prompt_tokens is True
-        assert (
-            caps.supports_cache_tokens is False
-        )  # OpenAI doesn't support cache tokens
+        assert caps.supports_cache_tokens is False  # OpenAI doesn't support cache tokens
         assert caps.cost_enabled is True
         assert caps.input_cost_per_mtok == 2.5
         assert caps.output_cost_per_mtok == 10.0

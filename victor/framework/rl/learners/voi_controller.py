@@ -89,12 +89,10 @@ class VoIController(BaseLearner):
 
         # Create indexes for faster lookups
         self.db.execute(
-            "CREATE INDEX IF NOT EXISTS idx_voi_history_agent "
-            "ON rl_voi_history(agent_id)"
+            "CREATE INDEX IF NOT EXISTS idx_voi_history_agent " "ON rl_voi_history(agent_id)"
         )
         self.db.execute(
-            "CREATE INDEX IF NOT EXISTS idx_voi_history_timestamp "
-            "ON rl_voi_history(timestamp)"
+            "CREATE INDEX IF NOT EXISTS idx_voi_history_timestamp " "ON rl_voi_history(timestamp)"
         )
 
     def compute_voi(
@@ -121,9 +119,7 @@ class VoIController(BaseLearner):
 
         # Get agent reliability weight
         if reliability_weight is None:
-            reliability_weight = self.reliability_learner.get_reliability_weight(
-                agent_id
-            )
+            reliability_weight = self.reliability_learner.get_reliability_weight(agent_id)
 
         # Expected information gain depends on:
         # 1. Current uncertainty (entropy)
@@ -187,9 +183,7 @@ class VoIController(BaseLearner):
         agent_vois = []
 
         for agent_id in agent_ids:
-            reliability = self.reliability_learner.get_expected_reliability_weight(
-                agent_id
-            )
+            reliability = self.reliability_learner.get_expected_reliability_weight(agent_id)
             voi = self.compute_voi(
                 task_analysis,
                 agent_id,
@@ -288,15 +282,11 @@ class VoIController(BaseLearner):
         return {
             "query_count": query_count,
             "beneficial_count": beneficial_count,
-            "beneficial_rate": (
-                beneficial_count / query_count if query_count > 0 else 0.0
-            ),
+            "beneficial_rate": (beneficial_count / query_count if query_count > 0 else 0.0),
             "avg_predicted_voi": avg_predicted,
             "avg_actual_gain": avg_actual,
             "avg_cost": avg_cost,
-            "voi_accuracy": (
-                1.0 - abs(avg_predicted - avg_actual) if avg_actual else 0.0
-            ),
+            "voi_accuracy": (1.0 - abs(avg_predicted - avg_actual) if avg_actual else 0.0),
         }
 
     def get_all_voi_stats(self) -> Dict[str, Dict[str, Any]]:
@@ -322,9 +312,7 @@ class VoIController(BaseLearner):
             stats[agent_id] = {
                 "query_count": query_count,
                 "beneficial_count": beneficial_count,
-                "beneficial_rate": (
-                    beneficial_count / query_count if query_count > 0 else 0.0
-                ),
+                "beneficial_rate": (beneficial_count / query_count if query_count > 0 else 0.0),
                 "avg_predicted_voi": avg_predicted,
                 "avg_actual_gain": avg_actual,
             }
@@ -345,15 +333,11 @@ class VoIController(BaseLearner):
         was_beneficial = outcome.metadata.get("was_beneficial", False)
 
         if not agent_id:
-            logger.warning(
-                f"Missing agent_id in outcome metadata: " f"{outcome.metadata.keys()}"
-            )
+            logger.warning(f"Missing agent_id in outcome metadata: " f"{outcome.metadata.keys()}")
             return
 
         # Record the query outcome
-        self.record_query_outcome(
-            agent_id, predicted_voi, actual_gain, query_cost, was_beneficial
-        )
+        self.record_query_outcome(agent_id, predicted_voi, actual_gain, query_cost, was_beneficial)
 
     def get_recommendation(self, context: Dict[str, Any]) -> Optional[RLRecommendation]:
         """Get VoI recommendation for given context.

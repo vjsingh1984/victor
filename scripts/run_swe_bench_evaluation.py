@@ -89,9 +89,7 @@ def progress_callback(progress: TaskProgress, stage: EvaluationStage) -> None:
     }
 
     icon = status_icons.get(stage, "⏳")
-    duration = (
-        f" ({progress.duration_seconds:.1f}s)" if progress.duration_seconds > 0 else ""
-    )
+    duration = f" ({progress.duration_seconds:.1f}s)" if progress.duration_seconds > 0 else ""
 
     print(f"{icon} [{progress.instance_id}] {stage.value}{duration}")
 
@@ -246,25 +244,15 @@ Examples:
 
     # Cache options
     cache_group = parser.add_argument_group("Cache Options")
-    cache_group.add_argument(
-        "--workspace-cache", type=Path, help="Directory for workspace cache"
-    )
-    cache_group.add_argument(
-        "--baseline-cache", type=Path, help="Directory for baseline cache"
-    )
-    cache_group.add_argument(
-        "--no-cache", action="store_true", help="Disable all caching"
-    )
+    cache_group.add_argument("--workspace-cache", type=Path, help="Directory for workspace cache")
+    cache_group.add_argument("--baseline-cache", type=Path, help="Directory for baseline cache")
+    cache_group.add_argument("--no-cache", action="store_true", help="Disable all caching")
 
     # Logging options
     log_group = parser.add_argument_group("Logging Options")
-    log_group.add_argument(
-        "--verbose", "-v", action="store_true", help="Enable verbose logging"
-    )
+    log_group.add_argument("--verbose", "-v", action="store_true", help="Enable verbose logging")
     log_group.add_argument("--log-file", type=Path, help="Write logs to file")
-    log_group.add_argument(
-        "--quiet", "-q", action="store_true", help="Suppress progress output"
-    )
+    log_group.add_argument("--quiet", "-q", action="store_true", help="Suppress progress output")
 
     return parser.parse_args()
 

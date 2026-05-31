@@ -270,9 +270,7 @@ class BaseSafetyExtension(SafetyExtensionProtocol):
             rule: SafetyRule to register
         """
         self._coordinator.register_rule(rule)
-        logger.debug(
-            f"Registered custom rule '{rule.rule_id}' for '{self.get_vertical_name()}'"
-        )
+        logger.debug(f"Registered custom rule '{rule.rule_id}' for '{self.get_vertical_name()}'")
 
 
 __all__ = [

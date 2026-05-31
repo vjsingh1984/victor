@@ -63,9 +63,7 @@ class AgentNodeExecutor:
         """
         self._context = context
 
-    async def execute(
-        self, node: "AgentNode", state: "WorkflowState"
-    ) -> "WorkflowState":
+    async def execute(self, node: "AgentNode", state: "WorkflowState") -> "WorkflowState":
         """Execute an agent node.
 
         Args:
@@ -143,9 +141,7 @@ class AgentNodeExecutor:
                 vertical=vertical,
             )
             if not result.success:
-                logger.error(
-                    f"Constraint activation failed for node '{node.id}': {result.error}"
-                )
+                logger.error(f"Constraint activation failed for node '{node.id}': {result.error}")
             else:
                 logger.debug(f"Constraints activated for node '{node.id}'")
 
@@ -158,9 +154,7 @@ class AgentNodeExecutor:
                 task=goal,
                 tool_budget=node.tool_budget,
                 allowed_tools=node.allowed_tools,
-                timeout_seconds=(
-                    int(node.timeout_seconds) if node.timeout_seconds else 300
-                ),
+                timeout_seconds=(int(node.timeout_seconds) if node.timeout_seconds else 300),
                 disable_embeddings=getattr(node, "disable_embeddings", False),
             )
         except Exception as e:
@@ -269,9 +263,7 @@ class AgentNodeExecutor:
         }
 
         if role not in role_map:
-            raise ValueError(
-                f"Unknown agent role: {role}. Must be one of {list(role_map.keys())}"
-            )
+            raise ValueError(f"Unknown agent role: {role}. Must be one of {list(role_map.keys())}")
 
         return role_map[role]
 

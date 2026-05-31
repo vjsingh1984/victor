@@ -255,9 +255,7 @@ class NamespacedCacheProtocol(CacheProtocol[K, V], Protocol):
         # Different values, same key, different namespaces
     """
 
-    def get(
-        self, key: K, default: Optional[V] = None, namespace: str = "default"
-    ) -> Optional[V]:
+    def get(self, key: K, default: Optional[V] = None, namespace: str = "default") -> Optional[V]:
         """Get a value from the cache.
 
         Args:
@@ -640,11 +638,7 @@ class TTLCache(BaseCache[K, V]):
         evicted = None
 
         # Check size limit
-        if (
-            self.max_size > 0
-            and len(self._cache) >= self.max_size
-            and key not in self._cache
-        ):
+        if self.max_size > 0 and len(self._cache) >= self.max_size and key not in self._cache:
             # Evict a random entry (simple FIFO-like eviction)
             # For smarter eviction, use LRUCache instead
             evict_key = next(iter(self._cache))
@@ -676,9 +670,7 @@ class TTLCache(BaseCache[K, V]):
             Number of entries removed
         """
         with self._lock:
-            expired_keys = [
-                key for key, entry in self._cache.items() if entry.is_expired()
-            ]
+            expired_keys = [key for key, entry in self._cache.items() if entry.is_expired()]
             for key in expired_keys:
                 del self._cache[key]
             return len(expired_keys)

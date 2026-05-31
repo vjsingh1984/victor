@@ -66,9 +66,7 @@ class TestChatBayesianIntegration:
 
     def test_session_config_custom_thresholds(self):
         """Test custom complexity thresholds."""
-        config = SessionConfig.from_cli_flags(
-            simple_threshold=0.5, complex_threshold=0.9
-        )
+        config = SessionConfig.from_cli_flags(simple_threshold=0.5, complex_threshold=0.9)
 
         assert config.bayesian.simple_threshold == 0.5
         assert config.bayesian.complex_threshold == 0.9
@@ -97,9 +95,7 @@ class TestChatBayesianIntegration:
 
         for query in simple_queries:
             analysis = complexity_detector.analyze(query)
-            assert (
-                analysis.level == ComplexityLevel.SIMPLE
-            ), f"Query should be SIMPLE: {query}"
+            assert analysis.level == ComplexityLevel.SIMPLE, f"Query should be SIMPLE: {query}"
             assert (
                 complexity_detector.should_use_bayesian(query) is False
             ), f"Should not use Bayesian: {query}"
@@ -117,12 +113,8 @@ class TestChatBayesianIntegration:
             analysis = complexity_detector.analyze(query)
             # These may be SIMPLE, MODERATE, or COMPLEX depending on the query
             # The key is they should be analyzed without error
-            assert (
-                analysis.level in ComplexityLevel
-            ), f"Query should have valid level: {query}"
-            assert (
-                0.0 <= analysis.confidence <= 1.0
-            ), f"Query should have valid confidence: {query}"
+            assert analysis.level in ComplexityLevel, f"Query should have valid level: {query}"
+            assert 0.0 <= analysis.confidence <= 1.0, f"Query should have valid confidence: {query}"
 
     def test_complexity_detector_complex_queries(self, complexity_detector):
         """Test complex queries are analyzed correctly."""
@@ -135,12 +127,8 @@ class TestChatBayesianIntegration:
         for query in complex_queries:
             analysis = complexity_detector.analyze(query)
             # Just verify it analyzes without error and returns valid results
-            assert (
-                analysis.level in ComplexityLevel
-            ), f"Query should have valid level: {query}"
-            assert (
-                0.0 <= analysis.confidence <= 1.0
-            ), f"Query should have valid confidence: {query}"
+            assert analysis.level in ComplexityLevel, f"Query should have valid level: {query}"
+            assert 0.0 <= analysis.confidence <= 1.0, f"Query should have valid confidence: {query}"
             assert len(analysis.reasons) > 0, f"Query should have reasons: {query}"
             # Long queries should at least be detected as long
             assert len(query) > 100, f"Test queries should be long: {query}"

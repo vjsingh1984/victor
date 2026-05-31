@@ -60,9 +60,7 @@ class _FakeInnerProvider(BaseEmbeddingProvider):
     async def embed_batch(self, texts: list[str]) -> list[list[float]]:
         return [[float(len(text))] for text in texts]
 
-    async def index_document(
-        self, doc_id: str, content: str, metadata: dict[str, Any]
-    ) -> None:
+    async def index_document(self, doc_id: str, content: str, metadata: dict[str, Any]) -> None:
         self.indexed_documents.append(
             {"id": doc_id, "content": content, "metadata": dict(metadata)}
         )
@@ -105,17 +103,13 @@ class _FakeInnerProvider(BaseEmbeddingProvider):
 
     async def delete_document(self, doc_id: str) -> None:
         self.deleted_doc_ids.append(doc_id)
-        self.indexed_documents = [
-            doc for doc in self.indexed_documents if doc["id"] != doc_id
-        ]
+        self.indexed_documents = [doc for doc in self.indexed_documents if doc["id"] != doc_id]
 
     async def delete_by_file(self, file_path: str) -> int:
         before = len(self.indexed_documents)
         self.deleted_files.append(file_path)
         self.indexed_documents = [
-            doc
-            for doc in self.indexed_documents
-            if doc["metadata"].get("file_path") != file_path
+            doc for doc in self.indexed_documents if doc["metadata"].get("file_path") != file_path
         ]
         return before - len(self.indexed_documents)
 
@@ -161,10 +155,7 @@ def test_codebase_index_manifest_round_trip(tmp_path) -> None:
 
     changed_language_manifest = dict(manifest)
     changed_language_manifest["language_overrides"] = {".component": "svelte"}
-    assert (
-        has_compatible_codebase_index_manifest(tmp_path, changed_language_manifest)
-        is False
-    )
+    assert has_compatible_codebase_index_manifest(tmp_path, changed_language_manifest) is False
 
 
 def test_enable_structural_codebase_embeddings_rewrites_vector_store(
@@ -233,17 +224,13 @@ def test_collect_bridge_symbols_preserves_parent_scoped_symbol_identity() -> Non
 
 
 @pytest.mark.asyncio
-async def test_structural_bridge_indexes_grounded_file_chunks(
-    tmp_path, monkeypatch
-) -> None:
+async def test_structural_bridge_indexes_grounded_file_chunks(tmp_path, monkeypatch) -> None:
     pytest.importorskip("victor_coding.codebase.embeddings.base")
     provider_class = get_structural_codebase_embedding_provider_class()
     assert provider_class is not None
 
     fake_store_name = "test_bridge_store"
-    monkeypatch.setitem(
-        EmbeddingRegistry._providers, fake_store_name, _FakeInnerProvider
-    )
+    monkeypatch.setitem(EmbeddingRegistry._providers, fake_store_name, _FakeInnerProvider)
     monkeypatch.setattr(EmbeddingRegistry, "_provider_cache", {}, raising=False)
     _FakeInnerProvider.instances.clear()
 
@@ -311,21 +298,15 @@ async def test_structural_bridge_indexes_grounded_file_chunks(
     fake_provider = _FakeInnerProvider.instances[0]
 
     assert fake_provider.deleted_files == []
-    assert any(
-        "def parse_json(data):" in doc["content"]
-        for doc in fake_provider.indexed_documents
-    )
+    assert any("def parse_json(data):" in doc["content"] for doc in fake_provider.indexed_documents)
     assert all(
-        "function parse_json" not in doc["content"]
-        for doc in fake_provider.indexed_documents
+        "function parse_json" not in doc["content"] for doc in fake_provider.indexed_documents
     )
     assert any(
         doc["metadata"].get("qualified_name") == "parse_json"
         for doc in fake_provider.indexed_documents
     )
-    assert any(
-        result.metadata["chunking_strategy"] == "symbol_span" for result in results
-    )
+    assert any(result.metadata["chunking_strategy"] == "symbol_span" for result in results)
     assert any(result.metadata["file_path"] == "src/parser.py" for result in results)
 
 
@@ -338,9 +319,7 @@ async def test_structural_bridge_replaces_by_file_for_incremental_updates(
     assert provider_class is not None
 
     fake_store_name = "test_bridge_incremental"
-    monkeypatch.setitem(
-        EmbeddingRegistry._providers, fake_store_name, _FakeInnerProvider
-    )
+    monkeypatch.setitem(EmbeddingRegistry._providers, fake_store_name, _FakeInnerProvider)
     monkeypatch.setattr(EmbeddingRegistry, "_provider_cache", {}, raising=False)
     _FakeInnerProvider.instances.clear()
 

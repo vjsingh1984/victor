@@ -285,9 +285,7 @@ class TestRLEvictionPolicy:
         assert isinstance(to_evict, list)
         assert len(to_evict) <= 2
 
-    def test_get_entries_to_evict_prefers_old_unused(
-        self, policy: RLEvictionPolicy
-    ) -> None:
+    def test_get_entries_to_evict_prefers_old_unused(self, policy: RLEvictionPolicy) -> None:
         """Test eviction prefers old unused entries."""
         entries = [
             CacheEntryState(key="old_unused", hit_count=0, entry_age_seconds=1200),

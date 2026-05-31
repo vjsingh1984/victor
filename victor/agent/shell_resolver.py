@@ -71,9 +71,7 @@ def _shell_alias_resolver(
     if mc is not None:
         config = mc.config
         if config.allow_all_tools and "shell" not in config.disallowed_tools:
-            logger.debug(
-                f"Resolved '{tool_name}' to 'shell' (BUILD mode allows all tools)"
-            )
+            logger.debug(f"Resolved '{tool_name}' to 'shell' (BUILD mode allows all tools)")
             return ToolNames.SHELL
 
     if tools.is_tool_enabled(ToolNames.SHELL):
@@ -81,7 +79,5 @@ def _shell_alias_resolver(
         return ToolNames.SHELL
 
     canonical = get_canonical_name(tool_name)
-    logger.debug(
-        f"Shell tool not enabled for '{tool_name}', using canonical '{canonical}'"
-    )
+    logger.debug(f"Shell tool not enabled for '{tool_name}', using canonical '{canonical}'")
     return canonical

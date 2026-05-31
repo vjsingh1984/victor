@@ -92,9 +92,7 @@ def _session_feedback_input(
         "status": task_result.status.value,
         "completion_score": task_result.completion_score,
         "failure_category": (
-            task_result.failure_category.value
-            if task_result.failure_category is not None
-            else None
+            task_result.failure_category.value if task_result.failure_category is not None else None
         ),
         "failure_details": dict(task_result.failure_details),
         "benchmark": config.benchmark.value,
@@ -132,9 +130,7 @@ def _artifact_record_from_task_result(
         "status": task_result.status.value,
         "completion_score": task_result.completion_score,
         "failure_category": (
-            task_result.failure_category.value
-            if task_result.failure_category is not None
-            else None
+            task_result.failure_category.value if task_result.failure_category is not None else None
         ),
         "failure_details": dict(task_result.failure_details),
         "topology_summary": topology_summary,
@@ -273,8 +269,7 @@ class SWEBenchValidatedSessionTruthEmitter:
         provider = _optional_metadata_text(context.metadata.get("provider"))
         model = _optional_metadata_text(context.metadata.get("model"))
         section_name = _optional_metadata_text(
-            context.metadata.get("section_name")
-            or context.metadata.get("prompt_section_name")
+            context.metadata.get("section_name") or context.metadata.get("prompt_section_name")
         )
         prompt_candidate_hash = _optional_metadata_text(
             context.metadata.get("prompt_candidate_hash")
@@ -284,9 +279,7 @@ class SWEBenchValidatedSessionTruthEmitter:
             path=artifact_path,
             record={
                 "instance_id": context.task_id,
-                "repo": getattr(
-                    getattr(validation_result, "baseline", None), "repo", None
-                ),
+                "repo": getattr(getattr(validation_result, "baseline", None), "repo", None),
                 "provider": provider,
                 "model": model,
                 "prompt_candidate_hash": prompt_candidate_hash,
@@ -298,9 +291,7 @@ class SWEBenchValidatedSessionTruthEmitter:
                     if hasattr(validation_result, "to_dict")
                     else {
                         "success": getattr(validation_result, "success", False),
-                        "partial_success": getattr(
-                            validation_result, "partial_success", False
-                        ),
+                        "partial_success": getattr(validation_result, "partial_success", False),
                         "score": getattr(validation_result, "score", 0.0),
                     }
                 ),
@@ -322,9 +313,7 @@ class ValidatedSessionTruthEmitterRegistry:
     def register(self, emitter: ValidatedSessionTruthEmitter) -> None:
         self._emitters.append(emitter)
 
-    def resolve(
-        self, benchmark: BenchmarkType
-    ) -> Optional[ValidatedSessionTruthEmitter]:
+    def resolve(self, benchmark: BenchmarkType) -> Optional[ValidatedSessionTruthEmitter]:
         for emitter in self._emitters:
             if emitter.supports(benchmark):
                 return emitter

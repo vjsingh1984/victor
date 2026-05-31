@@ -140,9 +140,7 @@ class RepositoryProfile:
         return " ".join(guidance)
 
 
-def detect_repository_profile(
-    root: Path, *, max_files: int = 2500
-) -> RepositoryProfile:
+def detect_repository_profile(root: Path, *, max_files: int = 2500) -> RepositoryProfile:
     """Detect repository languages and manifests quickly.
 
     Args:

@@ -341,9 +341,7 @@ class LookupTables:
         return None
 
     @classmethod
-    def _extract_text(
-        cls, decision_type: DecisionType, context: Dict[str, Any]
-    ) -> Optional[str]:
+    def _extract_text(cls, decision_type: DecisionType, context: Dict[str, Any]) -> Optional[str]:
         """Extract relevant text from context based on decision type."""
         # Common context keys to check
         text_keys = [
@@ -471,9 +469,7 @@ class PatternMatcher:
             "done",
         ),
         (
-            re.compile(
-                r"\bThe\s+(task|job|work)\s+is\s+(complete|done)\b", re.IGNORECASE
-            ),
+            re.compile(r"\bThe\s+(task|job|work)\s+is\s+(complete|done)\b", re.IGNORECASE),
             True,
             0.95,
             "done",
@@ -501,17 +497,13 @@ class PatternMatcher:
         ),
         # Working patterns
         (
-            re.compile(
-                r"\b(I'm|I am)\s+(working|proceeding|continuing)\b", re.IGNORECASE
-            ),
+            re.compile(r"\b(I'm|I am)\s+(working|proceeding|continuing)\b", re.IGNORECASE),
             False,
             0.88,
             "working",
         ),
         (
-            re.compile(
-                r"\bLet('s| us)\s+(proceed|continue|start|begin)\b", re.IGNORECASE
-            ),
+            re.compile(r"\bLet('s| us)\s+(proceed|continue|start|begin)\b", re.IGNORECASE),
             False,
             0.88,
             "working",
@@ -536,9 +528,7 @@ class PatternMatcher:
             "stuck",
         ),
         (
-            re.compile(
-                r"\b(Can't|Cannot|Unable)\s+(proceed|continue|do)\b", re.IGNORECASE
-            ),
+            re.compile(r"\b(Can't|Cannot|Unable)\s+(proceed|continue|do)\b", re.IGNORECASE),
             False,
             0.90,
             "stuck",
@@ -572,9 +562,7 @@ class PatternMatcher:
             "finalizing",
         ),
         (
-            re.compile(
-                r"\b(One|One more|Last|Final)\s+(step|thing|task)\b", re.IGNORECASE
-            ),
+            re.compile(r"\b(One|One more|Last|Final)\s+(step|thing|task)\b", re.IGNORECASE),
             False,
             0.88,
             "finalizing",
@@ -585,9 +573,7 @@ class PatternMatcher:
     INTENT_PATTERNS: List[Tuple[re.Pattern, str, float]] = [
         # Completion intent
         (
-            re.compile(
-                r"\b(Here('s| is)|I've provided|I have provided)\b", re.IGNORECASE
-            ),
+            re.compile(r"\b(Here('s| is)|I've provided|I have provided)\b", re.IGNORECASE),
             "completion",
             0.88,
         ),
@@ -627,24 +613,18 @@ class PatternMatcher:
             0.85,
         ),
         (
-            re.compile(
-                r"\b(Which|What|How)\s+(one|approach|way|method)\b", re.IGNORECASE
-            ),
+            re.compile(r"\b(Which|What|How)\s+(one|approach|way|method)\b", re.IGNORECASE),
             "asking_input",
             0.88,
         ),
         (
-            re.compile(
-                r"\b(Any|Any particular)\s+(preference|choice)\b", re.IGNORECASE
-            ),
+            re.compile(r"\b(Any|Any particular)\s+(preference|choice)\b", re.IGNORECASE),
             "asking_input",
             0.88,
         ),
         # Stuck loop
         (
-            re.compile(
-                r"\b(I'm|I am)\s+(stuck|confused|uncertain|unsure)\b", re.IGNORECASE
-            ),
+            re.compile(r"\b(I'm|I am)\s+(stuck|confused|uncertain|unsure)\b", re.IGNORECASE),
             "stuck_loop",
             0.92,
         ),
@@ -654,9 +634,7 @@ class PatternMatcher:
             0.88,
         ),
         (
-            re.compile(
-                r"\b(Having|Facing)\s+(trouble|difficulty|issues)\b", re.IGNORECASE
-            ),
+            re.compile(r"\b(Having|Facing)\s+(trouble|difficulty|issues)\b", re.IGNORECASE),
             "stuck_loop",
             0.88,
         ),
@@ -666,9 +644,7 @@ class PatternMatcher:
     TASK_TYPE_PATTERNS: List[Tuple[re.Pattern, str, float]] = [
         # Analysis tasks
         (
-            re.compile(
-                r"\b(Analyze|Examine|Review|Investigate|Explore|Study)\b", re.IGNORECASE
-            ),
+            re.compile(r"\b(Analyze|Examine|Review|Investigate|Explore|Study)\b", re.IGNORECASE),
             "analysis",
             0.90,
         ),
@@ -749,9 +725,7 @@ class PatternMatcher:
             0.90,
         ),
         (
-            re.compile(
-                r"\b(Permission denied|Unauthorized|Authentication)\b", re.IGNORECASE
-            ),
+            re.compile(r"\b(Permission denied|Unauthorized|Authentication)\b", re.IGNORECASE),
             "permanent",
             0.92,
         ),
@@ -1017,9 +991,7 @@ class EnsembleVoter:
 
         winning_key = max(class_scores, key=lambda k: class_scores[k])
         best_result = class_best[winning_key]
-        agreement_count = sum(
-            1 for r, _ in votes if _decision_class_key(r.decision) == winning_key
-        )
+        agreement_count = sum(1 for r, _ in votes if _decision_class_key(r.decision) == winning_key)
 
         # Confidence = aggregate weighted score, boosted slightly when multiple signals agree
         aggregate_confidence = min(class_scores[winning_key], 0.95)
@@ -1031,17 +1003,13 @@ class EnsembleVoter:
         if hasattr(decision, "confidence") and hasattr(decision, "model_copy"):
             # Pydantic v2 - use model_copy to create a new instance
             try:
-                decision = decision.model_copy(
-                    update={"confidence": boosted_confidence}
-                )
+                decision = decision.model_copy(update={"confidence": boosted_confidence})
             except Exception:
                 # If model_copy fails, just use the original decision
                 pass
 
         agree_label = (
-            f"{agreement_count}/{len(votes)} signals agree"
-            if agreement_count > 1
-            else "1 signal"
+            f"{agreement_count}/{len(votes)} signals agree" if agreement_count > 1 else "1 signal"
         )
         return LookupResult(
             decision=decision,

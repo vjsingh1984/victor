@@ -305,9 +305,7 @@ class TestTeamSpecIntegration:
         assert len(spec.members) == 4
         assert spec.leader is approver
 
-    def test_team_spec_leader_detection(
-        self, sample_team_template, sample_persona_traits
-    ):
+    def test_team_spec_leader_detection(self, sample_team_template, sample_persona_traits):
         """Test leader detection in TeamSpec."""
         template = sample_team_template
 
@@ -346,9 +344,7 @@ class TestTeamSpecIntegration:
 
         assert spec.leader is None
 
-    def test_team_spec_get_members_by_role(
-        self, sample_team_template, sample_persona_traits
-    ):
+    def test_team_spec_get_members_by_role(self, sample_team_template, sample_persona_traits):
         """Test filtering team members by role."""
         template = sample_team_template
 
@@ -377,13 +373,9 @@ class TestTeamSpecIntegration:
         assert len(reviewers) == 2
         assert len(approvers) == 0
 
-    def test_team_spec_validate_slots(
-        self, sample_team_template, sample_persona_traits
-    ):
+    def test_team_spec_validate_slots(self, sample_team_template, sample_persona_traits):
         """Test slot validation in TeamSpec."""
-        template = (
-            sample_team_template  # Requires 1 researcher, 2 reviewers, 1 approver
-        )
+        template = sample_team_template  # Requires 1 researcher, 2 reviewers, 1 approver
 
         # Create team with missing roles
         spec = TeamSpec(
@@ -511,8 +503,7 @@ class TestCodingPersonasIntegration:
         assert len(hints) > 0
         # Should contain style-related hints
         assert any(
-            keyword in hints.lower()
-            for keyword in ["data", "evidence", "detail", "careful"]
+            keyword in hints.lower() for keyword in ["data", "evidence", "detail", "careful"]
         )
 
     def test_coding_persona_to_dict(self):
@@ -792,9 +783,7 @@ class TestCrossComponentIntegration:
         assert member.expertise_level == ExpertiseLevel.EXPERT
         assert member.persona.communication_style == CommunicationStyle.TECHNICAL
 
-    def test_team_spec_full_serialization(
-        self, sample_team_template, sample_persona_traits
-    ):
+    def test_team_spec_full_serialization(self, sample_team_template, sample_persona_traits):
         """Test full TeamSpec serialization with nested objects."""
         template = sample_team_template
 
@@ -839,8 +828,7 @@ class TestCrossComponentIntegration:
             description=coding_persona.generate_backstory(),
             communication_style=(
                 CommunicationStyle.TECHNICAL
-                if coding_persona.traits.communication_style
-                == CodingCommunicationStyle.ANALYTICAL
+                if coding_persona.traits.communication_style == CodingCommunicationStyle.ANALYTICAL
                 else CommunicationStyle.TECHNICAL
             ),
             strengths=coding_persona.strengths,

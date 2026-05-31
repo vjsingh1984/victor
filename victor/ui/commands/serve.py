@@ -123,9 +123,7 @@ def _serve(
         )
     )
 
-    run_sync(
-        _run_fastapi_server(host, port, profile, mode, enable_hitl, hitl_auth_token)
-    )
+    run_sync(_run_fastapi_server(host, port, profile, mode, enable_hitl, hitl_auth_token))
 
 
 async def _run_fastapi_server(
@@ -151,9 +149,7 @@ async def _run_fastapi_server(
             workspace_root=str(Path.cwd()),
             enable_hitl=enable_hitl,
             hitl_auth_token=hitl_auth_token,
-            session_config=SessionConfig.from_cli_flags(
-                agent_profile=profile, mode=mode
-            ),
+            session_config=SessionConfig.from_cli_flags(agent_profile=profile, mode=mode),
         )
 
         config = uvicorn.Config(
@@ -282,9 +278,7 @@ def serve_hitl(
         )
     )
 
-    run_sync(
-        _run_hitl_server(host, port, require_auth, auth_token, persistent, db_path)
-    )
+    run_sync(_run_hitl_server(host, port, require_auth, auth_token, persistent, db_path))
 
 
 async def _run_hitl_server(

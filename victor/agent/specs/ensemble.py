@@ -189,9 +189,7 @@ class Ensemble(ABC):
 
         try:
             if orchestrator:
-                output = await self._run_with_orchestrator(
-                    agent, task, context, orchestrator
-                )
+                output = await self._run_with_orchestrator(agent, task, context, orchestrator)
             else:
                 output = f"[{agent.name}] Completed: {task}"
 
@@ -201,8 +199,7 @@ class Ensemble(ABC):
                 output=output,
                 started_at=start_time,
                 completed_at=datetime.now(timezone.utc),
-                duration_ms=(datetime.now(timezone.utc) - start_time).total_seconds()
-                * 1000,
+                duration_ms=(datetime.now(timezone.utc) - start_time).total_seconds() * 1000,
             )
 
         except Exception as e:
@@ -226,9 +223,7 @@ class Ensemble(ABC):
         prompt_parts = [f"Task: {task}"]
 
         if "previous_output" in context:
-            prompt_parts.append(
-                f"\nPrevious agent output:\n{context['previous_output']}"
-            )
+            prompt_parts.append(f"\nPrevious agent output:\n{context['previous_output']}")
 
         if agent.system_prompt:
             prompt_parts.insert(0, agent.system_prompt)
@@ -294,9 +289,7 @@ class Pipeline(Ensemble):
         current_context["original_task"] = task
 
         for agent in self.agents:
-            agent_result = await self._execute_agent(
-                agent, task, current_context, orchestrator
-            )
+            agent_result = await self._execute_agent(agent, task, current_context, orchestrator)
             result.agent_results.append(agent_result)
 
             if not agent_result.success:
@@ -375,8 +368,7 @@ class Parallel(Ensemble):
 
         # Execute all agents concurrently
         tasks = [
-            self._execute_agent(agent, task, context or {}, orchestrator)
-            for agent in self.agents
+            self._execute_agent(agent, task, context or {}, orchestrator) for agent in self.agents
         ]
         agent_results = await asyncio.gather(*tasks, return_exceptions=True)
 

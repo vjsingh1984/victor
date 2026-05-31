@@ -148,9 +148,7 @@ class ToolExecutionContext:
     provider_capabilities: Dict[str, Any] = field(default_factory=dict)
 
     # Permissions
-    user_permissions: Set[Permission] = field(
-        default_factory=lambda: {Permission.READ_FILES}
-    )
+    user_permissions: Set[Permission] = field(default_factory=lambda: {Permission.READ_FILES})
 
     # File state tracking
     open_files: Dict[str, str] = field(default_factory=dict)  # path -> content

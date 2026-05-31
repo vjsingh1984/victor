@@ -106,9 +106,7 @@ def test_similarity_comparison(
             )
 
             # Standard cosine similarity
-            standard_similarities = EmbeddingService.cosine_similarity_matrix(
-                query_emb, corpus_emb
-            )
+            standard_similarities = EmbeddingService.cosine_similarity_matrix(query_emb, corpus_emb)
 
             # Weighted cosine similarity
             weighted_similarities = EmbeddingService.weighted_cosine_similarity(
@@ -128,9 +126,7 @@ def test_similarity_comparison(
                 {
                     "message_id": msg["id"],
                     "message_content": (
-                        query_text[:100] + "..."
-                        if len(query_text) > 100
-                        else query_text
+                        query_text[:100] + "..." if len(query_text) > 100 else query_text
                     ),
                     "task_type": task_type.value,
                     "standard_best_score": standard_best_score,
@@ -166,9 +162,7 @@ def generate_report(
     min_improvement = min([r["improvement"] for r in results])
 
     # Find best examples
-    best_improvements = sorted(results, key=lambda x: x["improvement"], reverse=True)[
-        :10
-    ]
+    best_improvements = sorted(results, key=lambda x: x["improvement"], reverse=True)[:10]
     worst_degradations = sorted(results, key=lambda x: x["improvement"])[:10]
 
     # Group by task type
@@ -196,15 +190,9 @@ def generate_report(
 
         f.write("## Summary\n\n")
         f.write(f"- **Total comparisons**: {total_comparisons}\n")
-        f.write(
-            f"- **Improved**: {improved_count} ({improved_count/total_comparisons*100:.1f}%)\n"
-        )
-        f.write(
-            f"- **Degraded**: {degraded_count} ({degraded_count/total_comparisons*100:.1f}%)\n"
-        )
-        f.write(
-            f"- **Neutral**: {neutral_count} ({neutral_count/total_comparisons*100:.1f}%)\n\n"
-        )
+        f.write(f"- **Improved**: {improved_count} ({improved_count/total_comparisons*100:.1f}%)\n")
+        f.write(f"- **Degraded**: {degraded_count} ({degraded_count/total_comparisons*100:.1f}%)\n")
+        f.write(f"- **Neutral**: {neutral_count} ({neutral_count/total_comparisons*100:.1f}%)\n\n")
 
         f.write("### Statistics\n\n")
         f.write(f"- **Average improvement**: {avg_improvement:+.4f}\n")
@@ -254,24 +242,16 @@ def generate_report(
             f.write(
                 "The weighted cosine similarity with key term boosting is working as expected.\n"
             )
-            f.write(
-                "It improves classification accuracy for most cases while maintaining\n"
-            )
+            f.write("It improves classification accuracy for most cases while maintaining\n")
             f.write("backward compatibility.\n")
         elif improved_count > degraded_count:
             f.write("⚠️ **Weighted similarity shows moderate improvement**\n\n")
-            f.write(
-                "The weighted cosine similarity provides some benefit but may need tuning.\n"
-            )
+            f.write("The weighted cosine similarity provides some benefit but may need tuning.\n")
             f.write("Consider adjusting the key term weights or boost formula.\n")
         else:
             f.write("❌ **Weighted similarity needs review**\n\n")
-            f.write(
-                "The weighted cosine similarity is not providing the expected benefit.\n"
-            )
-            f.write(
-                "Review the key term weights and consider alternative approaches.\n"
-            )
+            f.write("The weighted cosine similarity is not providing the expected benefit.\n")
+            f.write("Review the key term weights and consider alternative approaches.\n")
 
     print(f"\n✅ Report written to: {output_path}")
 
@@ -338,9 +318,7 @@ def main():
     # Print summary
     improved = sum(1 for r in results if r["improved"])
     total = len(results)
-    print(
-        f"\n📊 Summary: {improved}/{total} ({improved/total*100:.1f}%) comparisons improved"
-    )
+    print(f"\n📊 Summary: {improved}/{total} ({improved/total*100:.1f}%) comparisons improved")
 
     return 0
 

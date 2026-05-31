@@ -67,9 +67,7 @@ class TestEmbeddingSettings:
 
     def test_extra_config_passthrough(self):
         """Test provider-specific extra config is preserved."""
-        settings = EmbeddingSettings(
-            codebase_embedding_extra_config={"table_name": "custom"}
-        )
+        settings = EmbeddingSettings(codebase_embedding_extra_config={"table_name": "custom"})
         assert settings.codebase_embedding_extra_config == {"table_name": "custom"}
 
     def test_chunk_settings_validation(self):
@@ -127,9 +125,7 @@ class TestEmbeddingSettings:
         assert settings.semantic_max_query_expansions == 1
 
         # Invalid max expansions (zero)
-        with pytest.raises(
-            ValueError, match="semantic_max_query_expansions must be >= 1"
-        ):
+        with pytest.raises(ValueError, match="semantic_max_query_expansions must be >= 1"):
             EmbeddingSettings(semantic_max_query_expansions=0)
 
     def test_hybrid_search_weights_validation(self):
@@ -191,15 +187,11 @@ class TestToolSelectionSettings:
         assert settings.tool_deduplication_window_size == 100
 
         # Invalid window size (zero)
-        with pytest.raises(
-            ValueError, match="tool_deduplication_window_size must be >= 1"
-        ):
+        with pytest.raises(ValueError, match="tool_deduplication_window_size must be >= 1"):
             ToolSelectionSettings(tool_deduplication_window_size=0)
 
         # Invalid window size (too large)
-        with pytest.raises(
-            ValueError, match="tool_deduplication_window_size must be <= 100"
-        ):
+        with pytest.raises(ValueError, match="tool_deduplication_window_size must be <= 100"):
             ToolSelectionSettings(tool_deduplication_window_size=101)
 
     def test_fallback_max_tools_validation(self):

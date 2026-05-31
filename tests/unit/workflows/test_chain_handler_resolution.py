@@ -453,9 +453,7 @@ class TestEdgeCases:
     """Unit tests for edge cases and boundary conditions."""
 
     @pytest.mark.asyncio
-    async def test_chain_returns_none(
-        self, executor, reset_chain_registry, mock_context
-    ):
+    async def test_chain_returns_none(self, executor, reset_chain_registry, mock_context):
         """Handle chains that return None."""
         from victor.framework.chain_registry import chain
         from victor.tools.composition import RunnableLambda
@@ -478,9 +476,7 @@ class TestEdgeCases:
         assert result.output is None
 
     @pytest.mark.asyncio
-    async def test_chain_returns_non_dict(
-        self, executor, reset_chain_registry, mock_context
-    ):
+    async def test_chain_returns_non_dict(self, executor, reset_chain_registry, mock_context):
         """Handle chains that return non-dict values."""
         from victor.framework.chain_registry import chain
         from victor.tools.composition import RunnableLambda
@@ -550,9 +546,7 @@ class TestEdgeCases:
 
         @chain("empty_test:process")
         def process_chain():
-            return RunnableLambda(
-                lambda x: {"processed": True, "input_keys": list(x.keys())}
-            )
+            return RunnableLambda(lambda x: {"processed": True, "input_keys": list(x.keys())})
 
         handler = executor._resolve_chain_handler("chain:empty_test:process")
         node = ComputeNode(

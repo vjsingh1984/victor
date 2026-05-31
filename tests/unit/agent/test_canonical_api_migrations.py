@@ -90,9 +90,7 @@ def test_tool_builders_initialize_plugin_system_prefers_canonical_registrar_meth
     )
 
     def _legacy_load_plugin_tools():
-        raise AssertionError(
-            "ToolBuilders should not call ToolRegistrar private plugin helpers"
-        )
+        raise AssertionError("ToolBuilders should not call ToolRegistrar private plugin helpers")
 
     registrar._load_plugin_tools = _legacy_load_plugin_tools
 
@@ -155,9 +153,7 @@ def test_tool_builders_share_tool_timeout_setting_for_executor_and_pipeline():
             search_router=None,
         )
 
-        assert (
-            mock_tool_executor_cls.call_args.kwargs["default_timeout_seconds"] == 12.5
-        )
+        assert mock_tool_executor_cls.call_args.kwargs["default_timeout_seconds"] == 12.5
         called_config = mock_tool_pipeline_cls.call_args.kwargs["config"]
         assert called_config.per_tool_timeout_seconds == 12.5
         assert mock_tool_executor_cls.return_value is mock_executor

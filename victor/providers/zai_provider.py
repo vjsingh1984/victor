@@ -289,17 +289,13 @@ class ZAIProvider(HttpxOpenAICompatProvider):
             params["thinking"] = {"type": "enabled"}
         return params
 
-    def _extract_response_metadata(
-        self, message: Dict[str, Any]
-    ) -> Optional[Dict[str, Any]]:
+    def _extract_response_metadata(self, message: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Capture reasoning_content from thinking-mode responses."""
         if "reasoning_content" in message:
             return {"reasoning_content": message.get("reasoning_content")}
         return None
 
-    def _extract_stream_metadata(
-        self, delta: Dict[str, Any]
-    ) -> Optional[Dict[str, Any]]:
+    def _extract_stream_metadata(self, delta: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Capture reasoning_content from thinking-mode streaming deltas."""
         rc = delta.get("reasoning_content")
         if rc:

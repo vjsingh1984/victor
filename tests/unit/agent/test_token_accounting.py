@@ -24,9 +24,7 @@ class TestRecordActualUsage:
     """ConversationController.record_actual_usage() correctness."""
 
     def _controller(self):
-        return ConversationController(
-            config=ConversationConfig(chars_per_token_estimate=4)
-        )
+        return ConversationController(config=ConversationConfig(chars_per_token_estimate=4))
 
     def test_initial_state_uses_char_estimate(self):
         """Before any actual usage is recorded, falls back to char division."""
@@ -244,12 +242,8 @@ class TestConversationStoreTokenSchema:
         session_id = "test-session-token"
         store.create_session(session_id)
 
-        store.update_session_token_usage(
-            session_id, prompt_tokens=100, completion_tokens=50
-        )
-        store.update_session_token_usage(
-            session_id, prompt_tokens=200, completion_tokens=80
-        )
+        store.update_session_token_usage(session_id, prompt_tokens=100, completion_tokens=50)
+        store.update_session_token_usage(session_id, prompt_tokens=200, completion_tokens=80)
 
         conn = sqlite3.connect(str(db_path))
         row = conn.execute(
@@ -266,9 +260,7 @@ class TestConversationStoreTokenSchema:
         from victor.agent.conversation.store import ConversationStore
 
         store = ConversationStore(db_path=tmp_path / "test.db")
-        store.update_session_token_usage(
-            "nonexistent", prompt_tokens=50, completion_tokens=20
-        )
+        store.update_session_token_usage("nonexistent", prompt_tokens=50, completion_tokens=20)
 
     def test_migration_adds_token_columns_to_existing_db(self, tmp_path):
         """Existing DB without token columns gets them added via migration."""

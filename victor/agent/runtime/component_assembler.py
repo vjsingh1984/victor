@@ -59,9 +59,7 @@ class ComponentAssembler:
         orchestrator.tool_registrar._load_tool_configurations()
         orchestrator.tools.register_before_hook(orchestrator._log_tool_call)
 
-        orchestrator.plugin_manager = factory.initialize_plugin_system(
-            orchestrator.tool_registrar
-        )
+        orchestrator.plugin_manager = factory.initialize_plugin_system(orchestrator.tool_registrar)
 
         # Argument normalizer, middleware, safety, auto-committer
         orchestrator.argument_normalizer = factory.create_argument_normalizer(provider)
@@ -135,9 +133,7 @@ class ComponentAssembler:
             memory_session_id=orchestrator._memory_session_id,
             system_prompt=orchestrator._system_prompt,
             context_reminder_manager=(
-                orchestrator.reminder_manager
-                if hasattr(orchestrator, "reminder_manager")
-                else None
+                orchestrator.reminder_manager if hasattr(orchestrator, "reminder_manager") else None
             ),
             hierarchical_manager=(factory.create_hierarchical_compaction_manager()),
         )
@@ -147,24 +143,18 @@ class ComponentAssembler:
         # across both streaming and non-streaming paths
         from victor.core.feature_flags import get_feature_flag_manager, FeatureFlag
 
-        if get_feature_flag_manager().is_enabled(
-            FeatureFlag.USE_STAGE_TRANSITION_COORDINATOR
-        ):
+        if get_feature_flag_manager().is_enabled(FeatureFlag.USE_STAGE_TRANSITION_COORDINATOR):
             from victor.agent.services import (
                 StageTransitionCoordinator,
                 HybridTransitionStrategy,
             )
 
             # Check if edge model is enabled for the hybrid strategy
-            edge_model_enabled = get_feature_flag_manager().is_enabled(
-                FeatureFlag.USE_EDGE_MODEL
-            )
+            edge_model_enabled = get_feature_flag_manager().is_enabled(FeatureFlag.USE_EDGE_MODEL)
 
             orchestrator.transition_coordinator = StageTransitionCoordinator(
                 state_machine=orchestrator.conversation_state,
-                strategy=HybridTransitionStrategy(
-                    edge_model_enabled=edge_model_enabled
-                ),
+                strategy=HybridTransitionStrategy(edge_model_enabled=edge_model_enabled),
                 cooldown_seconds=2.0,  # Phase 1 cooldown
                 min_tools_for_transition=5,  # Allow more work per turn
             )
@@ -198,9 +188,7 @@ class ComponentAssembler:
                 else None
             ),
             usage_analytics=(
-                orchestrator._usage_analytics
-                if hasattr(orchestrator, "_usage_analytics")
-                else None
+                orchestrator._usage_analytics if hasattr(orchestrator, "_usage_analytics") else None
             ),
             reminder_manager=(
                 orchestrator._reminder_manager
@@ -211,14 +199,10 @@ class ComponentAssembler:
 
         # [CANONICAL] Update SessionService with lifecycle_manager after it's created
         if hasattr(orchestrator, "_session_service") and orchestrator._session_service:
-            orchestrator._session_service.set_lifecycle_manager(
-                orchestrator._lifecycle_manager
-            )
+            orchestrator._session_service.set_lifecycle_manager(orchestrator._lifecycle_manager)
 
         # Tool deduplication and pipeline
-        orchestrator._deduplication_tracker = (
-            factory.create_tool_deduplication_tracker()
-        )
+        orchestrator._deduplication_tracker = factory.create_tool_deduplication_tracker()
         orchestrator._tool_pipeline = factory.create_tool_pipeline(
             tools=orchestrator.tools,
             tool_executor=orchestrator.tool_executor,
@@ -251,9 +235,7 @@ class ComponentAssembler:
             hasattr(orchestrator, "_pending_semantic_cache")
             and orchestrator._pending_semantic_cache is not None
         ):
-            orchestrator._tool_pipeline.set_semantic_cache(
-                orchestrator._pending_semantic_cache
-            )
+            orchestrator._tool_pipeline.set_semantic_cache(orchestrator._pending_semantic_cache)
             logger.info("[AgentOrchestrator] Semantic tool result cache enabled")
             orchestrator._pending_semantic_cache = None
 
@@ -300,9 +282,7 @@ class ComponentAssembler:
         pruning_learner = None
         if orchestrator._rl_coordinator is not None:
             try:
-                pruning_learner = orchestrator._rl_coordinator.get_learner(
-                    "context_pruning"
-                )
+                pruning_learner = orchestrator._rl_coordinator.get_learner("context_pruning")
             except (KeyError, AttributeError, TypeError) as e:
                 logger.debug("context_pruning learner unavailable: %s", e)
 
@@ -340,8 +320,7 @@ class ComponentAssembler:
         )
 
         max_context_tokens = int(
-            getattr(getattr(orchestrator, "settings", None), "max_context_tokens", 0)
-            or 0
+            getattr(getattr(orchestrator, "settings", None), "max_context_tokens", 0) or 0
         )
         if max_context_tokens <= 0:
             max_context_chars = getattr(
@@ -356,9 +335,7 @@ class ComponentAssembler:
                     max_context_tokens = 100000
 
         lifecycle_summarizer = None
-        create_compaction_summarizer = getattr(
-            factory, "create_compaction_summarizer", None
-        )
+        create_compaction_summarizer = getattr(factory, "create_compaction_summarizer", None)
         if callable(create_compaction_summarizer):
             try:
                 strategy = create_compaction_summarizer(
@@ -384,8 +361,7 @@ class ComponentAssembler:
             min_messages_to_keep=6,
             overflow_threshold_percent=90.0,
             default_compaction_strategy=str(
-                getattr(orchestrator.settings, "context_compaction_strategy", "tiered")
-                or "tiered"
+                getattr(orchestrator.settings, "context_compaction_strategy", "tiered") or "tiered"
             ),
             conversation_store=getattr(orchestrator, "memory_manager", None),
             compaction_summarizer=lifecycle_summarizer,

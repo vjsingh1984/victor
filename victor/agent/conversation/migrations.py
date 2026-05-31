@@ -95,9 +95,7 @@ class MigrationRunner:
 
                 ensure_schema_version_table(conn)
 
-            cursor.execute(
-                "SELECT version FROM schema_version ORDER BY version DESC LIMIT 1"
-            )
+            cursor.execute("SELECT version FROM schema_version ORDER BY version DESC LIMIT 1")
             result = cursor.fetchone()
             return result[0] if result else None
         finally:
@@ -109,9 +107,7 @@ class MigrationRunner:
 
         for migration in self.migrations:
             if current_version is None or migration.version > current_version:
-                logger.info(
-                    f"Running migration {migration.version}: {migration.description}"
-                )
+                logger.info(f"Running migration {migration.version}: {migration.description}")
                 self._apply_migration(migration)
 
     def _apply_migration(self, migration: Migration) -> None:
@@ -343,9 +339,7 @@ def _backfill_agent_lineage_from_metadata(cursor: sqlite3.Cursor) -> int:
         updated += 1
 
     if updated:
-        logger.info(
-            "Backfilled message lineage columns from metadata for %s rows", updated
-        )
+        logger.info("Backfilled message lineage columns from metadata for %s rows", updated)
     return updated
 
 
@@ -384,9 +378,7 @@ def _ensure_compaction_events_table(cursor: sqlite3.Cursor) -> bool:
         "metadata": "TEXT",
     }
 
-    cursor.execute(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='compaction_events'"
-    )
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='compaction_events'")
     if cursor.fetchone() is not None:
         cursor.execute("PRAGMA table_info(compaction_events)")
         existing_columns = {row[1] for row in cursor.fetchall()}
@@ -394,9 +386,7 @@ def _ensure_compaction_events_table(cursor: sqlite3.Cursor) -> bool:
         for column_name, column_type in required_columns.items():
             if column_name in existing_columns:
                 continue
-            cursor.execute(
-                f"ALTER TABLE compaction_events ADD COLUMN {column_name} {column_type}"
-            )
+            cursor.execute(f"ALTER TABLE compaction_events ADD COLUMN {column_name} {column_type}")
             changed = True
         _create_compaction_event_indexes(cursor)
         return changed
@@ -484,9 +474,7 @@ def _migrate_model_sizes_table(cursor: sqlite3.Cursor) -> bool:
         # Migrate data (use midpoint of range as num_parameters)
         for row_id, name, min_params, max_params in existing_rows:
             # Calculate midpoint as num_parameters
-            midpoint = (
-                int((min_params + max_params) / 2) if min_params is not None else 0
-            )
+            midpoint = int((min_params + max_params) / 2) if min_params is not None else 0
             cursor.execute(
                 "INSERT INTO model_sizes (id, name, family_id, num_parameters) VALUES (?, ?, ?, ?)",
                 (row_id, name, None, midpoint),
@@ -495,9 +483,7 @@ def _migrate_model_sizes_table(cursor: sqlite3.Cursor) -> bool:
         # Drop old table
         cursor.execute("DROP TABLE model_sizes_old")
 
-        logger.info(
-            f"Successfully migrated {len(existing_rows)} rows in model_sizes table"
-        )
+        logger.info(f"Successfully migrated {len(existing_rows)} rows in model_sizes table")
         return True
 
     logger.debug("model_sizes table schema is already up-to-date")
@@ -559,9 +545,7 @@ def _migrate_model_families_table(cursor: sqlite3.Cursor) -> bool:
         # Drop old table
         cursor.execute("DROP TABLE model_families_old")
 
-        logger.info(
-            f"Successfully migrated {len(existing_rows)} rows in model_families table"
-        )
+        logger.info(f"Successfully migrated {len(existing_rows)} rows in model_families table")
         return True
 
     logger.debug("model_families table schema is already up-to-date")
@@ -776,20 +760,14 @@ def migrate_database(db_path: str) -> None:
 
         # Only record the version if the core tables already exist (existing DB)
         cursor = conn.cursor()
-        cursor.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='messages'"
-        )
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='messages'")
         if cursor.fetchone() is None:
             # Fresh DB — schema version will be set by _apply_normalized_schema
-            logger.debug(
-                "Skipping schema version record for fresh database (no tables yet)"
-            )
+            logger.debug("Skipping schema version record for fresh database (no tables yet)")
             return
 
         # Check if version 0.3.0 is already recorded
-        cursor.execute(
-            "SELECT version FROM schema_version WHERE version = ?", ("0.3.0",)
-        )
+        cursor.execute("SELECT version FROM schema_version WHERE version = ?", ("0.3.0",))
         if cursor.fetchone() is None:
             # Insert version record for existing DB that was just migrated
             cursor.execute(

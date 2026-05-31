@@ -138,9 +138,7 @@ class TestFrameworkStrategy:
         mock_factory = MagicMock()
         mock_factory.create = AsyncMock(return_value=mock_agent)
 
-        with patch(
-            "victor.framework.agent_factory.AgentFactory", return_value=mock_factory
-        ):
+        with patch("victor.framework.agent_factory.AgentFactory", return_value=mock_factory):
             result = await strategy.create_agent(mock_context)
 
         assert result is mock_agent
@@ -162,12 +160,8 @@ class TestFrameworkStrategy:
         mock_context.max_iterations = 50
         mock_context.mode = "plan"
 
-        with patch(
-            "victor.framework.agent_factory.AgentFactory", return_value=mock_factory
-        ):
-            with patch(
-                "victor.agent.mode_controller.get_mode_controller"
-            ) as mock_get_controller:
+        with patch("victor.framework.agent_factory.AgentFactory", return_value=mock_factory):
+            with patch("victor.agent.mode_controller.get_mode_controller") as mock_get_controller:
                 mock_controller = MagicMock()
                 mock_get_controller.return_value = mock_controller
 
@@ -190,12 +184,8 @@ class TestFrameworkStrategy:
 
         mock_context.mode = "plan"
 
-        with patch(
-            "victor.framework.agent_factory.AgentFactory", return_value=mock_factory
-        ):
-            with patch(
-                "victor.agent.mode_controller.get_mode_controller"
-            ) as mock_get_controller:
+        with patch("victor.framework.agent_factory.AgentFactory", return_value=mock_factory):
+            with patch("victor.agent.mode_controller.get_mode_controller") as mock_get_controller:
                 mock_controller = MagicMock()
                 mock_get_controller.return_value = mock_controller
 
@@ -241,9 +231,7 @@ class TestLegacyStrategy:
         mock_agent = MagicMock()
         mock_agent.unified_tracker = MagicMock()
 
-        with patch(
-            "victor.agent.orchestrator.AgentOrchestrator"
-        ) as mock_orchestrator_class:
+        with patch("victor.agent.orchestrator.AgentOrchestrator") as mock_orchestrator_class:
             mock_orchestrator_class.from_settings = AsyncMock(return_value=mock_agent)
 
             result = await strategy.create_agent(mock_context)
@@ -292,9 +280,7 @@ class TestAgentCreationFactory:
         mock_factory = MagicMock()
         mock_factory.create = AsyncMock(return_value=mock_agent)
 
-        with patch(
-            "victor.framework.agent_factory.AgentFactory", return_value=mock_factory
-        ):
+        with patch("victor.framework.agent_factory.AgentFactory", return_value=mock_factory):
             result = await factory.create_agent(mock_context)
 
         assert result is mock_agent
@@ -305,9 +291,7 @@ class TestAgentCreationFactory:
         strategy = LegacyStrategy()
         mock_agent = MagicMock()
 
-        with patch(
-            "victor.agent.orchestrator.AgentOrchestrator"
-        ) as mock_orchestrator_class:
+        with patch("victor.agent.orchestrator.AgentOrchestrator") as mock_orchestrator_class:
             mock_orchestrator_class.from_settings = AsyncMock(return_value=mock_agent)
 
             result = await factory.create_agent(mock_context, strategy=strategy)
@@ -418,9 +402,7 @@ class TestStrategyLogging:
         mock_factory = MagicMock()
         mock_factory.create = AsyncMock(return_value=mock_agent)
 
-        with patch(
-            "victor.framework.agent_factory.AgentFactory", return_value=mock_factory
-        ):
+        with patch("victor.framework.agent_factory.AgentFactory", return_value=mock_factory):
             await factory.create_agent(mock_context)
 
         # Verify logging occurred from the factory

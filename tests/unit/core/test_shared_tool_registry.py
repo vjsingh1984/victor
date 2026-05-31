@@ -276,9 +276,7 @@ class TestSharedToolRegistryWithToolRegistrar:
 
         # The graph tool is split into specialized sub-tools; at least one should be registered
         graph_tools = [name for name in tool_names if name.startswith("graph")]
-        assert (
-            len(graph_tools) > 0
-        ), f"No graph tools found; registered tools: {tool_names}"
+        assert len(graph_tools) > 0, f"No graph tools found; registered tools: {tool_names}"
 
 
 class TestSharedToolRegistryAirgappedMode:

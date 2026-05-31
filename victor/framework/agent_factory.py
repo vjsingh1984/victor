@@ -183,9 +183,7 @@ class AgentFactory:
         # Step 2: Bootstrap container with vertical
         try:
             # Use stored vertical name (preserves original name even if vertical not found)
-            vertical_name = self._vertical_name or (
-                self._vertical.name if self._vertical else None
-            )
+            vertical_name = self._vertical_name or (self._vertical.name if self._vertical else None)
             ensure_bootstrapped(self._settings, vertical=vertical_name)
         except Exception as e:
             raise InitializationError(
@@ -239,15 +237,11 @@ class AgentFactory:
             self._wire_observability()
 
         # Step 6: Apply overrides
-        if self._tool_budget is not None and hasattr(
-            self._orchestrator, "unified_tracker"
-        ):
+        if self._tool_budget is not None and hasattr(self._orchestrator, "unified_tracker"):
             self._orchestrator.unified_tracker.set_tool_budget(
                 self._tool_budget, user_override=True
             )
-        if self._max_iterations is not None and hasattr(
-            self._orchestrator, "unified_tracker"
-        ):
+        if self._max_iterations is not None and hasattr(self._orchestrator, "unified_tracker"):
             self._orchestrator.unified_tracker.set_max_iterations(
                 self._max_iterations, user_override=True
             )
@@ -337,9 +331,7 @@ class AgentFactory:
 
             apply_vertical_configuration(self._orchestrator, self._vertical)
         except ImportError:
-            logger.debug(
-                "vertical_service not available, skipping vertical application"
-            )
+            logger.debug("vertical_service not available, skipping vertical application")
         except Exception as e:
             logger.warning(f"Vertical application failed: {e}")
 
@@ -350,9 +342,7 @@ class AgentFactory:
         try:
             from victor.framework._internal import setup_observability_integration
 
-            setup_observability_integration(
-                self._orchestrator, session_id=self._session_id
-            )
+            setup_observability_integration(self._orchestrator, session_id=self._session_id)
         except Exception as e:
             logger.debug(f"Observability wiring failed: {e}")
 
@@ -380,9 +370,7 @@ class AgentFactory:
 
             coordinator = get_rl_coordinator()
             provider = getattr(self._settings, "provider", None)
-            provider_name = (
-                getattr(provider, "default_provider", "") if provider else ""
-            )
+            provider_name = getattr(provider, "default_provider", "") if provider else ""
             model_name = getattr(provider, "default_model", "") if provider else ""
             coordinator.maybe_background_evolve(provider_name, model_name)
         except Exception as e:

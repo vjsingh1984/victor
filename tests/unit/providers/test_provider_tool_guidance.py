@@ -187,9 +187,7 @@ class TestOllamaToolGuidance:
         """Ollama should have lower exploration depth."""
         assert ollama_strategy.get_max_exploration_depth("complex") <= 10
 
-    def test_ollama_guidance_canonicalizes_available_tool_preview(
-        self, ollama_strategy
-    ):
+    def test_ollama_guidance_canonicalizes_available_tool_preview(self, ollama_strategy):
         """Model-facing tool previews should use canonical core tool names."""
         prompt = ollama_strategy.get_guidance_prompt(
             task_type="analysis",
@@ -241,9 +239,7 @@ class TestOpenAIToolGuidance:
 
     def test_openai_alias_boost_matches_canonical(self, openai_strategy):
         """Legacy tool aliases should resolve to the canonical boost class."""
-        assert openai_strategy.get_tool_boost(
-            "read_file"
-        ) == openai_strategy.get_tool_boost("read")
+        assert openai_strategy.get_tool_boost("read_file") == openai_strategy.get_tool_boost("read")
 
 
 class TestToolGuidanceRegistry:

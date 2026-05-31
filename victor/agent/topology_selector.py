@@ -97,29 +97,21 @@ class TopologySelector:
         heuristic_scores = {
             TopologyAction.DIRECT_RESPONSE: self._score_direct_response(decision_input),
             TopologyAction.SINGLE_AGENT: self._score_single_agent(decision_input),
-            TopologyAction.PARALLEL_EXPLORATION: self._score_parallel_exploration(
-                decision_input
-            ),
+            TopologyAction.PARALLEL_EXPLORATION: self._score_parallel_exploration(decision_input),
             TopologyAction.TEAM_PLAN: self._score_team_plan(decision_input),
             TopologyAction.ESCALATE_MODEL: self._score_escalate_model(decision_input),
             TopologyAction.SAFE_STOP: self._score_safe_stop(decision_input),
         }
-        selected_action, score_breakdown, policy_metadata = (
-            self._apply_learned_policy_overlay(
-                decision_input,
-                heuristic_scores,
-            )
+        selected_action, score_breakdown, policy_metadata = self._apply_learned_policy_overlay(
+            decision_input,
+            heuristic_scores,
         )
-        ordered = sorted(
-            score_breakdown.items(), key=lambda item: item[1], reverse=True
-        )
+        ordered = sorted(score_breakdown.items(), key=lambda item: item[1], reverse=True)
         best_action, best_score = ordered[0]
         second_action, second_score = ordered[1]
         final_action = selected_action or best_action
 
-        confidence = self._normalize_confidence(
-            score_breakdown.get(final_action, best_score)
-        )
+        confidence = self._normalize_confidence(score_breakdown.get(final_action, best_score))
         fallback_action = self._resolve_fallback_action(
             final_action=final_action,
             score_breakdown=score_breakdown,
@@ -147,9 +139,7 @@ class TopologySelector:
                 decision_input,
                 policy_metadata=policy_metadata,
             ),
-            score_breakdown={
-                action.value: round(score, 4) for action, score in ordered
-            },
+            score_breakdown={action.value: round(score, 4) for action, score in ordered},
             grounding_requirements=grounding,
             fallback_action=fallback_action,
             telemetry_tags=self._build_telemetry_tags(decision_input, policy_metadata),
@@ -220,9 +210,7 @@ class TopologySelector:
             score -= 0.05
         return score
 
-    def _score_parallel_exploration(
-        self, decision_input: TopologyDecisionInput
-    ) -> float:
+    def _score_parallel_exploration(self, decision_input: TopologyDecisionInput) -> float:
         score = 0.1
         if self._is_high(decision_input.expected_breadth):
             score += 0.35
@@ -369,9 +357,7 @@ class TopologySelector:
 
         if action == TopologyAction.ESCALATE_MODEL:
             remote_candidates = [
-                provider
-                for provider in candidates
-                if not self._is_local_provider(provider)
+                provider for provider in candidates if not self._is_local_provider(provider)
             ]
             learned_provider = self._preferred_provider_from_feedback(
                 decision_input,
@@ -396,9 +382,7 @@ class TopologySelector:
             if local_candidates:
                 return local_candidates[0]
 
-        learned_provider = self._preferred_provider_from_feedback(
-            decision_input, candidates
-        )
+        learned_provider = self._preferred_provider_from_feedback(decision_input, candidates)
         if learned_provider is not None:
             return learned_provider
 
@@ -415,15 +399,10 @@ class TopologySelector:
         formations = decision_input.available_team_formations
         if not formations:
             return "adaptive"
-        learned_formation = self._preferred_formation_from_feedback(
-            decision_input, formations
-        )
+        learned_formation = self._preferred_formation_from_feedback(decision_input, formations)
         if learned_formation is not None:
             return learned_formation
-        if (
-            self._is_high(decision_input.expected_depth)
-            and "hierarchical" in formations
-        ):
+        if self._is_high(decision_input.expected_depth) and "hierarchical" in formations:
             return "hierarchical"
         if "adaptive" in formations:
             return "adaptive"
@@ -559,19 +538,17 @@ class TopologySelector:
     ) -> str:
         del decision_input  # reserved for future rationale enrichment
         if action == TopologyAction.DIRECT_RESPONSE:
-            rationale = (
-                "Low-complexity, low-depth request favors a direct response path."
-            )
+            rationale = "Low-complexity, low-depth request favors a direct response path."
         elif action == TopologyAction.SINGLE_AGENT:
             rationale = "Manageable complexity and good observability favor a single-agent loop."
         elif action == TopologyAction.PARALLEL_EXPLORATION:
-            rationale = (
-                "Breadth-heavy search with enough budget favors parallel exploration."
-            )
+            rationale = "Breadth-heavy search with enough budget favors parallel exploration."
         elif action == TopologyAction.TEAM_PLAN:
             rationale = "High depth and coordination needs favor an explicit team plan."
         elif action == TopologyAction.ESCALATE_MODEL:
-            rationale = "Low confidence or weak observability favors escalating to a stronger model path."
+            rationale = (
+                "Low confidence or weak observability favors escalating to a stronger model path."
+            )
         else:
             rationale = (
                 "High privacy sensitivity combined with remote-only execution pressure favors a "
@@ -598,14 +575,10 @@ class TopologySelector:
         self,
         decision_input: TopologyDecisionInput,
         heuristic_scores: Dict[TopologyAction, float],
-    ) -> Tuple[
-        Optional[TopologyAction], Dict[TopologyAction, float], Dict[str, object]
-    ]:
+    ) -> Tuple[Optional[TopologyAction], Dict[TopologyAction, float], Dict[str, object]]:
         """Apply a guarded learned-policy override for close topology choices."""
         score_breakdown = dict(heuristic_scores)
-        ordered = sorted(
-            score_breakdown.items(), key=lambda item: item[1], reverse=True
-        )
+        ordered = sorted(score_breakdown.items(), key=lambda item: item[1], reverse=True)
         heuristic_best_action, heuristic_best_score = ordered[0]
         metadata: Dict[str, object] = {
             "selection_policy": "heuristic",
@@ -637,9 +610,7 @@ class TopologySelector:
         )
         if support < thresholds.min_support:
             return heuristic_best_action, score_breakdown, metadata
-        conflict = self._coerce_unit_float(
-            context.get("learned_topology_conflict_score")
-        )
+        conflict = self._coerce_unit_float(context.get("learned_topology_conflict_score"))
         if conflict > thresholds.max_conflict or thresholds.disabled:
             return heuristic_best_action, score_breakdown, metadata
 
@@ -708,15 +679,12 @@ class TopologySelector:
             experiment_memory_preferred_policy=experiment_memory_preferred_policy,
         )
         effective_reward_delta = (
-            optimization_reward_delta
-            if optimization_reward_delta is not None
-            else reward_delta
+            optimization_reward_delta if optimization_reward_delta is not None else reward_delta
         )
         if (
             experiment_memory_match_count > 0
             and experiment_memory_bias is not None
-            and experiment_memory_bias
-            <= self.config.experiment_memory_disable_bias_threshold
+            and experiment_memory_bias <= self.config.experiment_memory_disable_bias_threshold
         ):
             return LearnedOverrideThresholds(
                 score_gap=thresholds.score_gap,
@@ -743,8 +711,7 @@ class TopologySelector:
             return thresholds
         if (
             feasibility_delta is not None
-            and feasibility_delta
-            <= self.config.learned_override_disable_feasibility_delta
+            and feasibility_delta <= self.config.learned_override_disable_feasibility_delta
         ):
             return LearnedOverrideThresholds(
                 score_gap=thresholds.score_gap,
@@ -763,8 +730,7 @@ class TopologySelector:
             )
         if (
             effective_reward_delta is not None
-            and effective_reward_delta
-            <= self.config.learned_override_disable_reward_delta
+            and effective_reward_delta <= self.config.learned_override_disable_reward_delta
         ):
             return LearnedOverrideThresholds(
                 score_gap=thresholds.score_gap,
@@ -782,16 +748,12 @@ class TopologySelector:
                 disabled=True,
             )
 
-        tuning_signal = (
-            effective_reward_delta if effective_reward_delta is not None else 0.0
-        )
+        tuning_signal = effective_reward_delta if effective_reward_delta is not None else 0.0
         if feasibility_delta is not None:
             if effective_reward_delta is None:
                 tuning_signal = feasibility_delta
             else:
-                tuning_signal = (effective_reward_delta * 0.7) + (
-                    feasibility_delta * 0.3
-                )
+                tuning_signal = (effective_reward_delta * 0.7) + (feasibility_delta * 0.3)
         if experiment_memory_match_count > 0 and experiment_memory_bias is not None:
             experiment_memory_signal = self._clamp_float(
                 experiment_memory_bias * self.config.experiment_memory_bias_tuning_gain,
@@ -799,9 +761,7 @@ class TopologySelector:
                 self.config.learned_override_reward_delta_cap,
             )
             if has_live_policy_signal:
-                tuning_signal = (tuning_signal * 0.75) + (
-                    experiment_memory_signal * 0.25
-                )
+                tuning_signal = (tuning_signal * 0.75) + (experiment_memory_signal * 0.25)
             else:
                 tuning_signal = experiment_memory_signal
         bounded_delta = self._clamp_float(
@@ -869,12 +829,8 @@ class TopologySelector:
             "learned_override_threshold_profile": thresholds.profile,
             "learned_override_effective_score_gap": round(thresholds.score_gap, 4),
             "learned_override_effective_min_support": round(thresholds.min_support, 4),
-            "learned_override_effective_min_agreement": round(
-                thresholds.min_agreement, 4
-            ),
-            "learned_override_effective_max_conflict": round(
-                thresholds.max_conflict, 4
-            ),
+            "learned_override_effective_min_agreement": round(thresholds.min_agreement, 4),
+            "learned_override_effective_max_conflict": round(thresholds.max_conflict, 4),
             "learned_override_disabled": thresholds.disabled,
         }
         if thresholds.reward_delta is not None:
@@ -900,9 +856,7 @@ class TopologySelector:
                 4,
             )
         if thresholds.experiment_memory_match_count > 0:
-            metadata["experiment_memory_match_count"] = (
-                thresholds.experiment_memory_match_count
-            )
+            metadata["experiment_memory_match_count"] = thresholds.experiment_memory_match_count
         if thresholds.experiment_memory_preferred_policy is not None:
             metadata["experiment_memory_preferred_selection_policy"] = (
                 thresholds.experiment_memory_preferred_policy
@@ -911,9 +865,7 @@ class TopologySelector:
 
     def _feedback_support(self, context: Dict[str, object]) -> float:
         """Estimate how strongly learned feedback should influence routing."""
-        explicit_support = self._coerce_unit_float(
-            context.get("learned_topology_support")
-        )
+        explicit_support = self._coerce_unit_float(context.get("learned_topology_support"))
         if explicit_support > 0.0:
             return explicit_support
         coverage = self._coerce_unit_float(context.get("topology_feedback_coverage"))
@@ -937,9 +889,7 @@ class TopologySelector:
         ]
         if agreement_values:
             support *= max(agreement_values)
-        conflict = self._coerce_unit_float(
-            context.get("learned_topology_conflict_score")
-        )
+        conflict = self._coerce_unit_float(context.get("learned_topology_conflict_score"))
         if conflict > 0.0:
             support *= max(0.0, 1.0 - (0.75 * conflict))
         return max(0.0, min(1.0, support))
@@ -1006,9 +956,7 @@ class TopologySelector:
         ):
             return heuristic_best_action
 
-        ordered = sorted(
-            score_breakdown.items(), key=lambda item: item[1], reverse=True
-        )
+        ordered = sorted(score_breakdown.items(), key=lambda item: item[1], reverse=True)
         best_action, best_score = ordered[0]
         second_action, second_score = ordered[1]
         return self._select_fallback_action(
@@ -1030,9 +978,7 @@ class TopologySelector:
             "task_complexity": decision_input.task_complexity,
             "privacy_sensitivity": decision_input.privacy_sensitivity,
             "latency_sensitivity": decision_input.latency_sensitivity,
-            "selection_policy": str(
-                policy_metadata.get("selection_policy") or "heuristic"
-            ),
+            "selection_policy": str(policy_metadata.get("selection_policy") or "heuristic"),
         }
         threshold_profile = policy_metadata.get("learned_override_threshold_profile")
         if isinstance(threshold_profile, str) and threshold_profile:
@@ -1045,14 +991,10 @@ class TopologySelector:
             tags["learned_action"] = learned_action.value
         return tags
 
-    def _grounding_policy_metadata(
-        self, policy_metadata: Dict[str, object]
-    ) -> Dict[str, str]:
+    def _grounding_policy_metadata(self, policy_metadata: Dict[str, object]) -> Dict[str, str]:
         """Expose selector provenance on grounded execution metadata."""
         metadata = {
-            "selection_policy": str(
-                policy_metadata.get("selection_policy") or "heuristic"
-            ),
+            "selection_policy": str(policy_metadata.get("selection_policy") or "heuristic"),
         }
         for key in (
             "learned_override_threshold_profile",
@@ -1134,9 +1076,7 @@ class TopologySelector:
     def _is_remote_only(self, provider_candidates: List[str]) -> bool:
         if not provider_candidates:
             return False
-        return all(
-            not self._is_local_provider(provider) for provider in provider_candidates
-        )
+        return all(not self._is_local_provider(provider) for provider in provider_candidates)
 
     def _is_local_provider(self, provider_name: str) -> bool:
         normalized = provider_name.strip().lower()

@@ -228,9 +228,7 @@ class TaskCompletionDecision(BaseModel):
     """Is the task done?"""
 
     is_complete: bool = Field(description="Whether the task appears complete")
-    confidence: float = Field(
-        ge=0.0, le=1.0, description="Confidence in the assessment"
-    )
+    confidence: float = Field(ge=0.0, le=1.0, description="Confidence in the assessment")
     phase: TaskPhase = Field(
         default=TaskPhase.WORKING, description="Current phase of task execution"
     )
@@ -240,18 +238,14 @@ class IntentDecision(BaseModel):
     """What is the model doing?"""
 
     intent: IntentType = Field(description="Classified intent of the model's response")
-    confidence: float = Field(
-        ge=0.0, le=1.0, description="Confidence in the classification"
-    )
+    confidence: float = Field(ge=0.0, le=1.0, description="Confidence in the classification")
 
 
 class TaskTypeDecision(BaseModel):
     """What kind of task is this, and what deliverables are expected?"""
 
     task_type: TaskCategoryType = Field(description="Classified type of the task")
-    confidence: float = Field(
-        ge=0.0, le=1.0, description="Confidence in the classification"
-    )
+    confidence: float = Field(ge=0.0, le=1.0, description="Confidence in the classification")
     deliverables: list[DeliverableType] = Field(
         default_factory=list,
         description="Expected deliverable types (empty = infer from task_type)",
@@ -262,18 +256,14 @@ class QuestionTypeDecision(BaseModel):
     """Should we auto-continue past this question?"""
 
     question_type: QuestionType = Field(description="Type of question being asked")
-    confidence: float = Field(
-        ge=0.0, le=1.0, description="Confidence in the classification"
-    )
+    confidence: float = Field(ge=0.0, le=1.0, description="Confidence in the classification")
 
 
 class LoopDetection(BaseModel):
     """Is the model stuck in a loop?"""
 
     is_loop: bool = Field(description="Whether a loop is detected")
-    loop_type: LoopType = Field(
-        default=LoopType.NONE, description="Type of loop detected"
-    )
+    loop_type: LoopType = Field(default=LoopType.NONE, description="Type of loop detected")
 
 
 class ErrorClassDecision(BaseModel):
@@ -282,9 +272,7 @@ class ErrorClassDecision(BaseModel):
     error_type: ErrorType = Field(
         default=ErrorType.TRANSIENT, description="Classification of the error"
     )
-    confidence: float = Field(
-        ge=0.0, le=1.0, description="Confidence in the classification"
-    )
+    confidence: float = Field(ge=0.0, le=1.0, description="Confidence in the classification")
 
 
 class ToolSelectionDecision(BaseModel):
@@ -321,9 +309,7 @@ class ContinuationDecision(BaseModel):
     """What action should we take next?"""
 
     action: ContinuationAction = Field(description="Recommended next action")
-    reason: str = Field(
-        max_length=100, description="Brief reason for the recommendation"
-    )
+    reason: str = Field(max_length=100, description="Brief reason for the recommendation")
 
 
 class SkillSelectionDecision(BaseModel):
@@ -363,9 +349,7 @@ class CompactionDecision(BaseModel):
     recommended_tier: TierType = Field(
         default=TierType.BALANCED, description="Recommended tier for compaction"
     )
-    estimated_tokens: int = Field(
-        description="Estimated token count of content to compact"
-    )
+    estimated_tokens: int = Field(description="Estimated token count of content to compact")
     confidence: float = Field(ge=0.0, le=1.0, description="Confidence in the decision")
     reason: str = Field(max_length=200, description="Brief explanation of the decision")
 
@@ -391,9 +375,7 @@ class SystemPromptOptimizationDecision(BaseModel):
     add_context_reminder: bool = Field(
         description="Whether to add a reminder about recent compaction"
     )
-    add_failure_hints: bool = Field(
-        description="Whether to include hints based on recent failures"
-    )
+    add_failure_hints: bool = Field(description="Whether to include hints based on recent failures")
     adjust_for_complexity: bool = Field(
         description="Whether to tailor prompt based on task complexity"
     )

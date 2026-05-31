@@ -353,9 +353,7 @@ class TestAnalyzeAction:
             assert call_args[1]["include_coverage"] is False
 
     @pytest.mark.asyncio
-    async def test_analyze_includes_issues_in_output(
-        self, tool, sample_analysis_result
-    ):
+    async def test_analyze_includes_issues_in_output(self, tool, sample_analysis_result):
         """Test analysis output includes issues."""
         with patch("victor.tools.pipeline_tool.PipelineManager") as MockManager:
             mock_manager = AsyncMock()
@@ -739,15 +737,11 @@ class TestIntegrationStyle:
     """Integration-style tests combining multiple aspects."""
 
     @pytest.mark.asyncio
-    async def test_full_analysis_workflow(
-        self, tool, sample_analysis_result, sample_coverage
-    ):
+    async def test_full_analysis_workflow(self, tool, sample_analysis_result, sample_coverage):
         """Test a full analysis workflow."""
         with patch("victor.tools.pipeline_tool.PipelineManager") as MockManager:
             mock_manager = AsyncMock()
-            mock_manager.detect_platforms.return_value = [
-                PipelinePlatform.GITHUB_ACTIONS
-            ]
+            mock_manager.detect_platforms.return_value = [PipelinePlatform.GITHUB_ACTIONS]
             mock_manager.analyze_pipelines.return_value = sample_analysis_result
             mock_manager.get_coverage.return_value = sample_coverage
             MockManager.return_value = mock_manager

@@ -168,10 +168,7 @@ def discover_tools(
                     ):
                         try:
                             tool_instance = obj()
-                            if (
-                                allowed_tools is None
-                                or tool_instance.name in allowed_tools
-                            ):
+                            if allowed_tools is None or tool_instance.name in allowed_tools:
                                 registry.register(tool_instance)
                                 registered_count += 1
                         except Exception:
@@ -217,11 +214,7 @@ def list_available_tools():
         print("-" * 40)
         for name in sorted(other_tools):
             tool = all_tools[name]
-            desc = (
-                tool.description[:50] + "..."
-                if len(tool.description) > 50
-                else tool.description
-            )
+            desc = tool.description[:50] + "..." if len(tool.description) > 50 else tool.description
             print(f"  {name:25} {desc}")
 
     print()
@@ -233,9 +226,7 @@ async def run_demo():
     print("Victor MCP Toolkit Demo")
     print("=" * 70)
     print()
-    print(
-        "Victor can be run as an MCP server, exposing its 33 tool modules to external"
-    )
+    print("Victor can be run as an MCP server, exposing its 33 tool modules to external")
     print("clients like Claude Desktop, VS Code, or any MCP-compatible application.")
     print()
 
@@ -384,9 +375,7 @@ async def run_stdio_server(
         filter_vertical: Optional vertical name to filter tools by
     """
     # Discover tools with filters
-    registry = discover_tools(
-        filter_tools=filter_tools, filter_vertical=filter_vertical
-    )
+    registry = discover_tools(filter_tools=filter_tools, filter_vertical=filter_vertical)
     tools_count = len(registry.list_tools())
 
     # Create MCP server

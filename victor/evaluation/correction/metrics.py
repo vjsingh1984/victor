@@ -84,9 +84,7 @@ class CorrectionMetrics:
     ) -> None:
         """Record a validation event."""
         self.total_validations += 1
-        self.language_validations[language] = (
-            self.language_validations.get(language, 0) + 1
-        )
+        self.language_validations[language] = self.language_validations.get(language, 0) + 1
 
         if not result.syntax_valid:
             self.syntax_errors += 1
@@ -124,12 +122,8 @@ class CorrectionMetrics:
 
         # Timing
         self.total_correction_time_ms += attempt.duration_ms
-        self.min_correction_time_ms = min(
-            self.min_correction_time_ms, attempt.duration_ms
-        )
-        self.max_correction_time_ms = max(
-            self.max_correction_time_ms, attempt.duration_ms
-        )
+        self.min_correction_time_ms = min(self.min_correction_time_ms, attempt.duration_ms)
+        self.max_correction_time_ms = max(self.max_correction_time_ms, attempt.duration_ms)
 
         # Test failure tracking
         if (

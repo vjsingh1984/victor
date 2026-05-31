@@ -193,9 +193,7 @@ class TestPlanningGate:
             },  # Long, no action keyword
         )
 
-        assert (
-            result is True
-        ), "long query without action keywords should use LLM planning"
+        assert result is True, "long query without action keywords should use LLM planning"
 
     def test_get_statistics(self):
         """Test statistics tracking works."""
@@ -204,9 +202,7 @@ class TestPlanningGate:
         # Make some decisions
         gate.should_use_llm_planning("create_simple", 2, None, 0)  # Fast path
         gate.should_use_llm_planning("edit", 5, None, 0)  # Slow path
-        gate.should_use_llm_planning(
-            "action", 1, 0.1, 0
-        )  # Fast path (matches FAST_PATTERNS)
+        gate.should_use_llm_planning("action", 1, 0.1, 0)  # Fast path (matches FAST_PATTERNS)
         gate.should_use_llm_planning("design", 10, 0.8, 100)  # Slow path
 
         stats = gate.get_statistics()

@@ -80,9 +80,7 @@ class HybridLoopEvaluator(LoopEvaluator):
             try:
                 from victor.core.feature_flags import FeatureFlag, is_feature_enabled
 
-                self._use_agentic = is_feature_enabled(
-                    FeatureFlag.USE_STATEGRAPH_AGENTIC_LOOP
-                )
+                self._use_agentic = is_feature_enabled(FeatureFlag.USE_STATEGRAPH_AGENTIC_LOOP)
             except Exception:
                 self._use_agentic = False
         return self._use_agentic

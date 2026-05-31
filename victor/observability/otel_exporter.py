@@ -323,9 +323,7 @@ class AsyncBatchingExporter(BaseExporter):
         batch_size: int = 100,
         flush_interval: float = 5.0,
         max_queue_size: int = 10000,
-        on_export_error: Optional[
-            Callable[[Exception, List[MessagingEvent]], None]
-        ] = None,
+        on_export_error: Optional[Callable[[Exception, List[MessagingEvent]], None]] = None,
     ) -> None:
         """Initialize async batching exporter.
 

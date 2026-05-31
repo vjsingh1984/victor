@@ -75,9 +75,7 @@ class TestConfigValidateCommand:
         }
 
         with (
-            patch(
-                "victor.ui.commands.config.load_settings", return_value=mock_settings
-            ),
+            patch("victor.ui.commands.config.load_settings", return_value=mock_settings),
             patch(
                 "victor.ui.commands.config.validate_configuration",
                 return_value=_VALID_RESULT,
@@ -106,9 +104,7 @@ class TestConfigValidateCommand:
         }
 
         with (
-            patch(
-                "victor.ui.commands.config.load_settings", return_value=mock_settings
-            ),
+            patch("victor.ui.commands.config.load_settings", return_value=mock_settings),
             patch(
                 "victor.ui.commands.config.validate_configuration",
                 return_value=_VALID_RESULT,
@@ -124,9 +120,7 @@ class TestConfigValidateCommand:
         mock_settings.get_config_dir.return_value = Path("/nonexistent/path/.victor")
 
         with (
-            patch(
-                "victor.ui.commands.config.load_settings", return_value=mock_settings
-            ),
+            patch("victor.ui.commands.config.load_settings", return_value=mock_settings),
             patch(
                 "victor.ui.commands.config.validate_configuration",
                 return_value=_VALID_RESULT,
@@ -134,9 +128,7 @@ class TestConfigValidateCommand:
         ):
             result = runner.invoke(app, ["config", "validate", "--verbose"])
             assert result.exit_code == 1
-            assert (
-                "not found" in result.output.lower() or "init" in result.output.lower()
-            )
+            assert "not found" in result.output.lower() or "init" in result.output.lower()
 
     def test_config_validate_invalid_yaml(self, tmp_path):
         """Test handling of invalid YAML file."""
@@ -150,9 +142,7 @@ class TestConfigValidateCommand:
         mock_settings.get_config_dir.return_value = config_dir
 
         with (
-            patch(
-                "victor.ui.commands.config.load_settings", return_value=mock_settings
-            ),
+            patch("victor.ui.commands.config.load_settings", return_value=mock_settings),
             patch(
                 "victor.ui.commands.config.validate_configuration",
                 return_value=_VALID_RESULT,
@@ -174,9 +164,7 @@ class TestConfigValidateCommand:
         mock_settings.get_config_dir.return_value = config_dir
 
         with (
-            patch(
-                "victor.ui.commands.config.load_settings", return_value=mock_settings
-            ),
+            patch("victor.ui.commands.config.load_settings", return_value=mock_settings),
             patch(
                 "victor.ui.commands.config.validate_configuration",
                 return_value=_VALID_RESULT,
@@ -206,9 +194,7 @@ class TestConfigValidateCommand:
         mock_settings.get_provider_settings.return_value = {}
 
         with (
-            patch(
-                "victor.ui.commands.config.load_settings", return_value=mock_settings
-            ),
+            patch("victor.ui.commands.config.load_settings", return_value=mock_settings),
             patch(
                 "victor.ui.commands.config.validate_configuration",
                 return_value=_VALID_RESULT,
@@ -238,9 +224,7 @@ class TestConfigValidateCommand:
         mock_settings.get_provider_settings.return_value = {}
 
         with (
-            patch(
-                "victor.ui.commands.config.load_settings", return_value=mock_settings
-            ),
+            patch("victor.ui.commands.config.load_settings", return_value=mock_settings),
             patch(
                 "victor.ui.commands.config.validate_configuration",
                 return_value=_VALID_RESULT,
@@ -248,10 +232,7 @@ class TestConfigValidateCommand:
         ):
             result = runner.invoke(app, ["config", "validate", "--verbose"])
             assert result.exit_code == 1
-            assert (
-                "max_tokens" in result.output.lower()
-                or "invalid" in result.output.lower()
-            )
+            assert "max_tokens" in result.output.lower() or "invalid" in result.output.lower()
 
     def test_config_validate_unknown_provider(self, tmp_path):
         """Test detection of unknown provider."""
@@ -273,9 +254,7 @@ class TestConfigValidateCommand:
         mock_settings.get_provider_settings.return_value = {}
 
         with (
-            patch(
-                "victor.ui.commands.config.load_settings", return_value=mock_settings
-            ),
+            patch("victor.ui.commands.config.load_settings", return_value=mock_settings),
             patch(
                 "victor.ui.commands.config.validate_configuration",
                 return_value=_VALID_RESULT,
@@ -283,10 +262,7 @@ class TestConfigValidateCommand:
         ):
             result = runner.invoke(app, ["config", "validate", "--verbose"])
             assert result.exit_code == 1
-            assert (
-                "unknown" in result.output.lower()
-                or "provider" in result.output.lower()
-            )
+            assert "unknown" in result.output.lower() or "provider" in result.output.lower()
 
     def test_config_validate_cloud_provider_missing_api_key(self, tmp_path):
         """Test warning for cloud provider without API key."""
@@ -305,14 +281,10 @@ class TestConfigValidateCommand:
                 max_tokens=4096,
             )
         }
-        mock_settings.get_provider_settings.return_value = {
-            "api_key": None
-        }  # No API key
+        mock_settings.get_provider_settings.return_value = {"api_key": None}  # No API key
 
         with (
-            patch(
-                "victor.ui.commands.config.load_settings", return_value=mock_settings
-            ),
+            patch("victor.ui.commands.config.load_settings", return_value=mock_settings),
             patch(
                 "victor.ui.commands.config.validate_configuration",
                 return_value=_VALID_RESULT,
@@ -321,9 +293,7 @@ class TestConfigValidateCommand:
             result = runner.invoke(app, ["config", "validate", "--verbose"])
             # Should pass with warning (exit code 0)
             assert result.exit_code == 0
-            assert (
-                "api key" in result.output.lower() or "warning" in result.output.lower()
-            )
+            assert "api key" in result.output.lower() or "warning" in result.output.lower()
 
     def test_config_validate_cloud_provider_with_api_key(self, tmp_path):
         """Test cloud provider with API key configured."""
@@ -345,9 +315,7 @@ class TestConfigValidateCommand:
         mock_settings.get_provider_settings.return_value = {"api_key": "sk-test-key"}
 
         with (
-            patch(
-                "victor.ui.commands.config.load_settings", return_value=mock_settings
-            ),
+            patch("victor.ui.commands.config.load_settings", return_value=mock_settings),
             patch(
                 "victor.ui.commands.config.validate_configuration",
                 return_value=_VALID_RESULT,
@@ -385,9 +353,7 @@ class TestConfigValidateCommand:
         mock_settings.get_provider_settings.return_value = {"api_key": "sk-test"}
 
         with (
-            patch(
-                "victor.ui.commands.config.load_settings", return_value=mock_settings
-            ),
+            patch("victor.ui.commands.config.load_settings", return_value=mock_settings),
             patch(
                 "victor.ui.commands.config.validate_configuration",
                 return_value=_VALID_RESULT,

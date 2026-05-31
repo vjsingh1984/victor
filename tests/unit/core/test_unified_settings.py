@@ -188,9 +188,7 @@ class TestVictorSettingsPrecedence:
         with open(profiles_yaml, "w") as f:
             yaml.dump(profiles_data, f)
 
-        settings = VictorSettings.from_sources(
-            profile_name="secure", config_dir=tmp_path
-        )
+        settings = VictorSettings.from_sources(profile_name="secure", config_dir=tmp_path)
 
         assert settings.prompt_policy.prompt_policy_identity == "Secure Victor"
         assert settings.prompt_policy.prompt_policy_max_section_chars == 9000
@@ -353,9 +351,7 @@ class TestVictorSettingsTypeSafety:
         assert isinstance(settings.server.server_api_key, SecretStr)
         assert settings.server.server_api_key.get_secret_value() == "server-token"
         assert isinstance(settings.server.server_session_secret, SecretStr)
-        assert (
-            settings.server.server_session_secret.get_secret_value() == "session-secret"
-        )
+        assert settings.server.server_session_secret.get_secret_value() == "session-secret"
 
     def test_field_types_validated(self):
         """Test that field types are validated."""
@@ -400,9 +396,7 @@ class TestVictorSettingsEdgeCases:
             config_dir=tmp_path,
         )
 
-        assert (
-            settings.provider.default_provider == "ollama"
-        )  # Default, not from profile
+        assert settings.provider.default_provider == "ollama"  # Default, not from profile
 
     def test_invalid_yaml_graceful_handling(self, tmp_path):
         """Test that invalid YAML is handled gracefully."""
@@ -426,9 +420,7 @@ class TestVictorSettingsEdgeCases:
         """Test that model_copy works for overriding values via provider group."""
         original = VictorSettings(default_provider="ollama")
         assert original.provider.default_provider == "ollama"
-        updated_provider = original.provider.model_copy(
-            update={"default_provider": "anthropic"}
-        )
+        updated_provider = original.provider.model_copy(update={"default_provider": "anthropic"})
         assert updated_provider.default_provider == "anthropic"
 
 

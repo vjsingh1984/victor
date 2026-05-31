@@ -211,15 +211,8 @@ class TestResponseSanitizerEdgeCases:
         assert "I'll analyze the codebase structure." in result
         assert "Then I will summarize the findings." in result
 
-    def test_has_tool_format_confusion_detects_plaintext_shell_commands(
-        self, sanitizer
-    ):
-        text = (
-            "I'll inspect the repository first.\n"
-            "ls rust\n"
-            "scripts ls\n"
-            "victor/tools ls\n"
-        )
+    def test_has_tool_format_confusion_detects_plaintext_shell_commands(self, sanitizer):
+        text = "I'll inspect the repository first.\n" "ls rust\n" "scripts ls\n" "victor/tools ls\n"
         assert sanitizer.has_tool_format_confusion(text) is True
 
     def test_sanitize_logs_warning_on_significant_removal(self, sanitizer, caplog):
@@ -228,10 +221,7 @@ class TestResponseSanitizerEdgeCases:
 
         caplog.set_level(logging.WARNING)
         # Create text > 100 chars that will be mostly garbage
-        garbage = (
-            "<function>test</function>" * 10
-            + '{"name": "tool", "arguments": {"x": "test"}}'
-        )
+        garbage = "<function>test</function>" * 10 + '{"name": "tool", "arguments": {"x": "test"}}'
         assert len(garbage) > 100
         result = sanitizer.sanitize(garbage)
         # Result should be shorter after removing garbage
@@ -256,9 +246,7 @@ class TestResponseSanitizerEdgeCases:
 
 def test_create_streaming_filter_enforces_patched_thinking_limit() -> None:
     """Factory-created filters should honor the active thinking cap on all backends."""
-    with patch(
-        "victor.agent.response_sanitizer.StreamingContentFilter.MAX_THINKING_CONTENT", 5
-    ):
+    with patch("victor.agent.response_sanitizer.StreamingContentFilter.MAX_THINKING_CONTENT", 5):
         content_filter = create_streaming_filter(suppress_thinking=False)
 
         content_filter.process_chunk("<think>")

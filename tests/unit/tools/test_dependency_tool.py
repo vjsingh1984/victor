@@ -217,14 +217,10 @@ class TestDependencyGenerate:
         """Test generating requirements file."""
         with patch(
             "victor.tools.dependency_tool.run_pip_async",
-            new_callable=lambda: async_pip_mock(
-                True, "requests==2.28.0\npytest==7.2.0"
-            ),
+            new_callable=lambda: async_pip_mock(True, "requests==2.28.0\npytest==7.2.0"),
         ):
             with patch("pathlib.Path.write_text"):
-                result = await dependency(
-                    action="generate", output="test_requirements.txt"
-                )
+                result = await dependency(action="generate", output="test_requirements.txt")
 
                 assert result["success"] is True
                 assert "file" in result
@@ -259,13 +255,9 @@ class TestDependencyUpdate:
         """Test actually updating packages."""
         with patch(
             "victor.tools.dependency_tool.run_pip_async",
-            new_callable=lambda: async_pip_mock(
-                True, "Successfully installed requests-2.28.0"
-            ),
+            new_callable=lambda: async_pip_mock(True, "Successfully installed requests-2.28.0"),
         ):
-            result = await dependency(
-                action="update", packages=["requests"], dry_run=False
-            )
+            result = await dependency(action="update", packages=["requests"], dry_run=False)
 
             assert result["success"] is True
             assert "updated" in result
@@ -285,9 +277,7 @@ class TestDependencyUpdate:
             "victor.tools.dependency_tool.run_pip_async",
             new_callable=lambda: async_pip_mock(False, "", "Error"),
         ):
-            result = await dependency(
-                action="update", packages=["invalid-package"], dry_run=False
-            )
+            result = await dependency(action="update", packages=["invalid-package"], dry_run=False)
 
             assert result["success"] is False
             assert "error" in result
@@ -371,9 +361,7 @@ class TestDependencyCheck:
     async def test_dependency_check_file_not_found(self):
         """Test checking non-existent requirements file."""
         with patch("pathlib.Path.exists", return_value=False):
-            result = await dependency(
-                action="check", requirements_file="nonexistent.txt"
-            )
+            result = await dependency(action="check", requirements_file="nonexistent.txt")
 
             assert result["success"] is False
             assert "not found" in result["error"]
@@ -395,9 +383,7 @@ class TestDependencyCheck:
                 new_callable=lambda: async_pip_mock(True, json.dumps(mock_installed)),
             ),
         ):
-            result = await dependency(
-                action="check", requirements_file="requirements.txt"
-            )
+            result = await dependency(action="check", requirements_file="requirements.txt")
 
             assert result["success"] is True
             assert "satisfied_count" in result

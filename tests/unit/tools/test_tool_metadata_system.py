@@ -369,9 +369,7 @@ class TestToolMetadataRegistry:
         registry.register_tool(tool)
 
         tools_with_keyword = registry.get_by_keyword("explicit")
-        assert any(
-            entry.name == "explicit_metadata_tool" for entry in tools_with_keyword
-        )
+        assert any(entry.name == "explicit_metadata_tool" for entry in tools_with_keyword)
 
     def test_unregister_tool_removes_from_cache(self):
         """unregister_tool should remove metadata from cache."""
@@ -491,9 +489,7 @@ class TestToolMetadataRegistry:
         assert metadata is not None
         assert metadata.category == "testing"
         assert (
-            CanonicalToolMetadataRegistry.get_instance().get_metadata(
-                "explicit_metadata_tool"
-            )
+            CanonicalToolMetadataRegistry.get_instance().get_metadata("explicit_metadata_tool")
             is not None
         )
 
@@ -608,10 +604,7 @@ class TestSemanticToolSelectorIntegration:
         text = SemanticToolSelector._create_tool_text(tool)
 
         # Should include explicit metadata
-        assert (
-            "testing explicit metadata" in text.lower()
-            or "validating contract" in text.lower()
-        )
+        assert "testing explicit metadata" in text.lower() or "validating contract" in text.lower()
         assert "explicit" in text.lower()
 
     @pytest.mark.asyncio
@@ -641,9 +634,7 @@ class TestSemanticToolSelectorIntegration:
         # Mock embedding service
         selector = SemanticToolSelector(cache_embeddings=False)
 
-        with patch.object(
-            selector, "_get_embedding", new_callable=AsyncMock
-        ) as mock_embed:
+        with patch.object(selector, "_get_embedding", new_callable=AsyncMock) as mock_embed:
             import numpy as np
 
             mock_embed.return_value = np.zeros(384, dtype=np.float32)
@@ -705,18 +696,14 @@ class TestPluginToolSupport:
                     use_cases=["extending victor", "custom functionality"],
                 )
 
-            async def execute(
-                self, context: Dict[str, Any], **kwargs: Any
-            ) -> ToolResult:
+            async def execute(self, context: Dict[str, Any], **kwargs: Any) -> ToolResult:
                 return ToolResult(success=True, output="plugin result")
 
         registry.register_tool(PluginTool())
 
         # Should be searchable
         assert "my_plugin" in registry.get_tools_by_category("plugins")
-        assert any(
-            entry.name == "my_plugin" for entry in registry.get_by_keyword("plugin")
-        )
+        assert any(entry.name == "my_plugin" for entry in registry.get_by_keyword("plugin"))
         assert "my_plugin" in registry.get_tools_matching_text("extension")
 
 

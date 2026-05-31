@@ -41,9 +41,7 @@ class StateRuntimeAdapter:
 
     def get_current_stage(self) -> ConversationStage:
         """Get the current conversation stage."""
-        if self._state_machine is not None and hasattr(
-            self._state_machine, "get_stage"
-        ):
+        if self._state_machine is not None and hasattr(self._state_machine, "get_stage"):
             return self._state_machine.get_stage()
         return self._controller.stage
 
@@ -64,9 +62,7 @@ class StateRuntimeAdapter:
         if current == stage:
             return True
 
-        machine = self._state_machine or getattr(
-            self._controller, "_state_machine", None
-        )
+        machine = self._state_machine or getattr(self._controller, "_state_machine", None)
         if machine is None:
             return False
 

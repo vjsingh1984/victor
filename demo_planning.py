@@ -95,9 +95,7 @@ def demo_config_options():
         ("Aggressive", TaskComplexity.SIMPLE, 2, False),
     ]
 
-    print(
-        f"\n{'Profile':<15} {'Min Complexity':<15} {'Min Keywords':<15} {'Show Plan'}"
-    )
+    print(f"\n{'Profile':<15} {'Min Complexity':<15} {'Min Keywords':<15} {'Show Plan'}")
     print("-" * 70)
 
     for profile, complexity, keywords, show_plan in configs:

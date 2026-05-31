@@ -62,9 +62,7 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
             get_model_switcher().switch(request.provider, request.model)
         except Exception:
             logger.debug("Model switcher update skipped", exc_info=True)
-        return JSONResponse(
-            {"success": True, "provider": request.provider, "model": request.model}
-        )
+        return JSONResponse({"success": True, "provider": request.provider, "model": request.model})
 
     @router.post("/mode/switch")
     async def switch_mode(request: SwitchModeRequest) -> JSONResponse:
@@ -145,9 +143,7 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
             {
                 "profiles": [
                     profile.to_dict()
-                    for profile in list_runtime_profiles(
-                        getattr(server, "_settings", None)
-                    )
+                    for profile in list_runtime_profiles(getattr(server, "_settings", None))
                 ]
             }
         )
@@ -260,9 +256,7 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
     @router.get("/capabilities/recommend")
     async def get_capability_recommendations(
         task_type: str = Query(..., description="Task type or short task label"),
-        complexity: str = Query(
-            ..., description="Task complexity, e.g. low, medium, high"
-        ),
+        complexity: str = Query(..., description="Task complexity, e.g. low, medium, high"),
         mode: str = Query("build", description="Mode policy to apply"),
         vertical: Optional[str] = Query(None, description="Filter by vertical"),
     ) -> JSONResponse:

@@ -153,9 +153,7 @@ class VerticalMetadata:
                                 "api_version",
                                 getattr(vertical_class, "VERTICAL_API_VERSION", 1),
                             ),
-                            module_path=getattr(
-                                vertical_class, "__module__", "<unknown>"
-                            ),
+                            module_path=getattr(vertical_class, "__module__", "<unknown>"),
                             qualname=getattr(
                                 vertical_class, "__qualname__", vertical_class.__name__
                             ),

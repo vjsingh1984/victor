@@ -54,8 +54,7 @@ class TestChatRefactoredCompliance:
 
         # Check for proper imports
         assert (
-            "from victor.framework.session_runner import create_victor_client"
-            in content
+            "from victor.framework.session_runner import create_victor_client" in content
         ), "chat_refactored.py MUST import create_victor_client"
         assert (
             "from victor.framework.session_config import SessionConfig" in content

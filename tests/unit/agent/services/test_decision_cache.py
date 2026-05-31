@@ -613,9 +613,7 @@ class TestIntegration:
 
         assert cache.get(DecisionType.TASK_COMPLETION, context) == "completion_result"
         assert cache.get(DecisionType.INTENT_CLASSIFICATION, context) == "intent_result"
-        assert (
-            cache.get(DecisionType.TASK_TYPE_CLASSIFICATION, context) == "type_result"
-        )
+        assert cache.get(DecisionType.TASK_TYPE_CLASSIFICATION, context) == "type_result"
 
     def test_cache_invalidation_by_type(self):
         """Test invalidating specific decision type."""

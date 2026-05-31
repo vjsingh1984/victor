@@ -152,9 +152,7 @@ class TestPlanningCoordinatorRendererIntegration:
         """PlanningCoordinator should work without renderer."""
         mock_orchestrator = MagicMock()
 
-        coordinator = PlanningCoordinator(
-            mock_orchestrator, renderer=None
-        )  # No renderer
+        coordinator = PlanningCoordinator(mock_orchestrator, renderer=None)  # No renderer
 
         assert coordinator.renderer is None
 

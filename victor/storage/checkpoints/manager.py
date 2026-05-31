@@ -132,13 +132,10 @@ class ConversationCheckpointManager:
         )
 
         # Cleanup old checkpoints if needed
-        await self.backend.cleanup_old_checkpoints(
-            session_id, self.max_checkpoints_per_session
-        )
+        await self.backend.cleanup_old_checkpoints(session_id, self.max_checkpoints_per_session)
 
         logger.info(
-            f"Checkpoint saved: {checkpoint_id[:20]}... "
-            f"({description or 'no description'})"
+            f"Checkpoint saved: {checkpoint_id[:20]}... " f"({description or 'no description'})"
         )
 
         return checkpoint_id
@@ -203,9 +200,7 @@ class ConversationCheckpointManager:
             tags=["fork", f"from:{data.metadata.session_id}"],
         )
 
-        logger.info(
-            f"Forked session {new_session_id} from checkpoint {checkpoint_id[:20]}..."
-        )
+        logger.info(f"Forked session {new_session_id} from checkpoint {checkpoint_id[:20]}...")
 
         return new_session_id, forked_state
 
@@ -250,9 +245,7 @@ class ConversationCheckpointManager:
             diff.stage_changes = [data_a.metadata.stage, data_b.metadata.stage]
 
         # Compare messages
-        diff.messages_added = max(
-            0, data_b.metadata.message_count - data_a.metadata.message_count
-        )
+        diff.messages_added = max(0, data_b.metadata.message_count - data_a.metadata.message_count)
         diff.messages_removed = max(
             0, data_a.metadata.message_count - data_b.metadata.message_count
         )
@@ -266,9 +259,7 @@ class ConversationCheckpointManager:
         # Compare observed files
         files_a = set(state_a.get("observed_files", []))
         files_b = set(state_b.get("observed_files", []))
-        self._compute_set_diff(
-            files_a, files_b, "observed_file", diff.files_observed_diff
-        )
+        self._compute_set_diff(files_a, files_b, "observed_file", diff.files_observed_diff)
 
         # Compare modified files
         mod_a = set(state_a.get("modified_files", []))
@@ -435,8 +426,7 @@ class ConversationCheckpointManager:
             fork_marker = " (fork)" if entry.get("is_fork") else ""
 
             lines.append(
-                f"{prefix} [{entry['id'][:8]}...] "
-                f"{entry['timestamp'][:19]}{fork_marker}"
+                f"{prefix} [{entry['id'][:8]}...] " f"{entry['timestamp'][:19]}{fork_marker}"
             )
             lines.append(
                 f"│  Stage: {entry['stage']}, "

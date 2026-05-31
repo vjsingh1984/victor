@@ -45,9 +45,7 @@ class MCPVertical(VerticalBase):
     """
 
     name = "mcp"
-    description = (
-        "Model Context Protocol integration for external tool and resource providers"
-    )
+    description = "Model Context Protocol integration for external tool and resource providers"
     version = "1.0.0"
 
     # Vertical metadata
@@ -132,9 +130,7 @@ When you need to use a tool or resource, check if it's available through MCP and
         # Connect to all servers
         await self._registry.connect_all()
 
-        logger.info(
-            f"MCP Vertical initialized with {len(self._discovered_servers)} servers"
-        )
+        logger.info(f"MCP Vertical initialized with {len(self._discovered_servers)} servers")
 
     async def _discover_mcp_servers(self) -> None:
         """Discover MCP servers from entry points."""

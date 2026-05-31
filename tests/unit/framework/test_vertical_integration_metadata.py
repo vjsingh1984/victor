@@ -43,9 +43,7 @@ def test_vertical_applied_payload_includes_manifest_metadata() -> None:
     pipeline = VerticalIntegrationPipeline()
     result = IntegrationResult(vertical_name="telemetry_vertical")
 
-    payload = pipeline._build_vertical_applied_payload(
-        object(), result, cache_hit=False
-    )
+    payload = pipeline._build_vertical_applied_payload(object(), result, cache_hit=False)
 
     assert payload["vertical"] == "telemetry_vertical"
     assert payload["vertical_manifest_version"] == "9.8.7"

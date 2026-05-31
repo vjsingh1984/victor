@@ -74,9 +74,7 @@ class RustSimilarityComputer(InstrumentedAccelerator):
             b_f32 = [float(x) for x in b]
             return victor_native.cosine_similarity(a_f32, b_f32)
 
-    def batch_cosine(
-        self, query: List[float], corpus: List[List[float]]
-    ) -> List[float]:
+    def batch_cosine(self, query: List[float], corpus: List[List[float]]) -> List[float]:
         """Compute cosine similarity of query against corpus.
 
         Delegates to Rust parallel + SIMD implementation.
@@ -127,9 +125,7 @@ class RustSimilarityComputer(InstrumentedAccelerator):
                 corpus_normalized = victor_native.batch_normalize_vectors(corpus_f32)
                 result = []
                 for query in queries_f32:
-                    row = victor_native.batch_cosine_similarity_normalized(
-                        query, corpus_normalized
-                    )
+                    row = victor_native.batch_cosine_similarity_normalized(query, corpus_normalized)
                     result.append(row)
                 return result
             else:

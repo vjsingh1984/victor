@@ -266,9 +266,7 @@ class TestConvenienceFunctions:
         """File-dependency questions should recommend the graph tool."""
         from victor.agent.search_router import suggest_search_tool
 
-        tool = suggest_search_tool(
-            "show file dependencies for victor/agent/orchestrator.py"
-        )
+        tool = suggest_search_tool("show file dependencies for victor/agent/orchestrator.py")
         assert tool == "graph"
 
     def test_suggest_search_tool_graph_architecture_summary(self):
@@ -289,9 +287,7 @@ class TestConvenienceFunctions:
         """File-scoped architecture questions should recommend the graph tool."""
         from victor.agent.search_router import suggest_search_tool
 
-        tool = suggest_search_tool(
-            "summarize architecture around victor/agent/orchestrator.py"
-        )
+        tool = suggest_search_tool("summarize architecture around victor/agent/orchestrator.py")
         assert tool == "graph"
 
     def test_is_keyword_query(self):
@@ -607,9 +603,7 @@ class TestRealWorldQueries:
         from victor.agent.search_router import SearchRouter
 
         router = SearchRouter()
-        result = router.route(
-            "summarize architecture around victor/agent/orchestrator.py"
-        )
+        result = router.route("summarize architecture around victor/agent/orchestrator.py")
 
         assert result.tool_name == "graph"
         assert result.tool_arguments == {

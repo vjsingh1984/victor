@@ -53,9 +53,7 @@ def demo(
 
     result = asyncio.run(agent.run(prompts[example]))
 
-    console.print(
-        Panel(result.content, title="[bold green]Response[/bold green]", expand=False)
-    )
+    console.print(Panel(result.content, title="[bold green]Response[/bold green]", expand=False))
 
 
 @app.command()

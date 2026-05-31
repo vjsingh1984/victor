@@ -47,9 +47,7 @@ class TestInitSynthesizer:
         """
         mock_provider = AsyncMock()
         mock_provider.name = "test-provider"
-        mock_provider.chat.return_value = MagicMock(
-            content="# init.md\n\nProject overview."
-        )
+        mock_provider.chat.return_value = MagicMock(content="# init.md\n\nProject overview.")
 
         mock_agent = MagicMock()
         mock_agent.provider = mock_provider
@@ -101,9 +99,7 @@ class TestInitSynthesizer:
         """Provider calls should not receive model=None as an explicit override."""
         mock_provider = AsyncMock()
         mock_provider.name = "test-provider"
-        mock_provider.chat.return_value = MagicMock(
-            content="# init.md\n\nProject overview."
-        )
+        mock_provider.chat.return_value = MagicMock(content="# init.md\n\nProject overview.")
 
         mock_agent = MagicMock()
         mock_agent.provider = mock_provider
@@ -177,9 +173,7 @@ class TestInitSynthesizer:
         """Unreachable local Ollama should fail fast before chat retries."""
         mock_provider = MagicMock()
         mock_provider.base_url = "http://localhost:11434"
-        mock_provider.list_models = AsyncMock(
-            side_effect=RuntimeError("connect failed")
-        )
+        mock_provider.list_models = AsyncMock(side_effect=RuntimeError("connect failed"))
 
         synthesizer = InitSynthesizer()
 
@@ -204,9 +198,7 @@ class TestInitSynthesizer:
     async def test_run_with_fresh_agent_uses_resolved_default_model(self):
         """Fresh provider path should resolve the configured default model."""
         mock_provider = MagicMock()
-        mock_provider.list_models = AsyncMock(
-            return_value=[{"name": "profile-default"}]
-        )
+        mock_provider.list_models = AsyncMock(return_value=[{"name": "profile-default"}])
         mock_provider.chat = AsyncMock(return_value=MagicMock(content="# init"))
         mock_provider.close = AsyncMock()
         mock_provider.base_url = "http://localhost:11434"
@@ -225,13 +217,9 @@ class TestInitSynthesizer:
         mock_settings.get_provider_settings.return_value = {}
 
         with patch("victor.providers.registry.ProviderRegistry.create", mock_create):
-            with patch(
-                "victor.config.settings.load_settings", return_value=mock_settings
-            ):
+            with patch("victor.config.settings.load_settings", return_value=mock_settings):
                 synthesizer = InitSynthesizer()
-                result = await synthesizer._run_with_fresh_agent(
-                    "prompt", "ollama", None
-                )
+                result = await synthesizer._run_with_fresh_agent("prompt", "ollama", None)
 
         assert result == "# init"
         assert mock_provider.chat.call_args.kwargs["model"] == "profile-default"
@@ -269,11 +257,9 @@ class TestInitSynthesizer:
 
         with patch("victor.config.settings.load_settings", return_value=mock_settings):
             synthesizer = InitSynthesizer()
-            provider, model, provider_init_model = (
-                synthesizer._resolve_provider_request(
-                    "zai-coding",
-                    None,
-                )
+            provider, model, provider_init_model = synthesizer._resolve_provider_request(
+                "zai-coding",
+                None,
             )
 
         assert provider == "zai"
@@ -303,9 +289,7 @@ class TestInitSynthesizer:
         assert bootstrap.request_model == "glm-5.1"
         assert bootstrap.temperature == 0.4
         assert bootstrap.max_tokens == 8192
-        assert bootstrap.provider_init_kwargs["base_url"].endswith(
-            "/api/coding/paas/v4/"
-        )
+        assert bootstrap.provider_init_kwargs["base_url"].endswith("/api/coding/paas/v4/")
         assert bootstrap.provider_init_kwargs["coding_plan"] is True
         assert bootstrap.provider_init_kwargs["max_retries"] == 0
         assert "model" not in bootstrap.provider_init_kwargs
@@ -316,15 +300,11 @@ class TestInitSynthesizer:
         mock_settings.default_provider = "openai"
         mock_settings.default_model = "gpt-5"
         mock_settings.load_profiles.return_value = {}
-        mock_settings.provider = MagicMock(
-            default_provider="openai", default_model="gpt-5"
-        )
+        mock_settings.provider = MagicMock(default_provider="openai", default_model="gpt-5")
 
         with patch("victor.config.settings.load_settings", return_value=mock_settings):
             synthesizer = InitSynthesizer()
-            fallback = synthesizer._resolve_local_fallback_selection(
-                exclude_provider="zai"
-            )
+            fallback = synthesizer._resolve_local_fallback_selection(exclude_provider="zai")
 
         assert fallback == ("ollama", None)
 
@@ -392,9 +372,7 @@ class TestInitSynthesizerToolsFallback:
             MockAgent.create = AsyncMock(return_value=mock_agent_instance)
 
             synthesizer = InitSynthesizer()
-            result = await synthesizer.synthesize_with_tools(
-                provider="ollama", model="qwen3:8b"
-            )
+            result = await synthesizer.synthesize_with_tools(provider="ollama", model="qwen3:8b")
 
             # Should create with vertical="coding" for tool access
             create_kwargs = MockAgent.create.call_args[1]
@@ -454,12 +432,10 @@ class TestInitSynthesizerEvolvableSection:
         provider = SimpleNamespace(name="zai")
         agent = SimpleNamespace(provider=provider, model="glm-5.1")
 
-        resolved_provider, resolved_model = (
-            synthesizer._resolve_prompt_optimization_identity(
-                agent=agent,
-                provider="zai-coding",
-                model=None,
-            )
+        resolved_provider, resolved_model = synthesizer._resolve_prompt_optimization_identity(
+            agent=agent,
+            provider="zai-coding",
+            model=None,
         )
 
         assert resolved_provider == "zai"
@@ -482,9 +458,7 @@ class TestInitSynthesizerGEPAWiring:
         mock_agent.model = None
 
         synthesizer = InitSynthesizer()
-        with patch.object(
-            InitSynthesizer, "_get_evolved_rules", return_value=evolved_rules
-        ):
+        with patch.object(InitSynthesizer, "_get_evolved_rules", return_value=evolved_rules):
             result = await synthesizer.synthesize("raw data", agent=mock_agent)
 
         call_kwargs = mock_provider.chat.call_args
@@ -528,9 +502,7 @@ class TestInitSynthesizerGEPAWiring:
         mock_agent.model = None
 
         synthesizer = InitSynthesizer()
-        with patch.object(
-            InitSynthesizer, "_get_evolved_rules", return_value=evolved_rules
-        ):
+        with patch.object(InitSynthesizer, "_get_evolved_rules", return_value=evolved_rules):
             await synthesizer.synthesize("UNIQUE_DATA_XYZ", agent=mock_agent)
 
         call_kwargs = mock_provider.chat.call_args

@@ -28,7 +28,5 @@ class ExplorationSettings(BaseModel):
     max_continuation_prompts_default: int = 3
     max_continuation_prompts_action: int = 5
     max_continuation_prompts_analysis: int = 6
-    continuation_prompt_overrides: Dict[str, Dict[str, int]] = Field(
-        default_factory=dict
-    )
+    continuation_prompt_overrides: Dict[str, Dict[str, int]] = Field(default_factory=dict)
     enable_continuation_rl_learning: bool = True

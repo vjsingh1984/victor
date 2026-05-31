@@ -223,9 +223,7 @@ class TaskDefinition:
         return self._func(*args, **kwargs)
 
     def __repr__(self) -> str:
-        return (
-            f"<TaskDefinition '{self.__name__}' " f"description={self.description!r}>"
-        )
+        return f"<TaskDefinition '{self.__name__}' " f"description={self.description!r}>"
 
 
 # ---------------------------------------------------------------------------

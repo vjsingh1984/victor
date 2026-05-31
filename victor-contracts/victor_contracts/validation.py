@@ -60,9 +60,7 @@ def validate_vertical_package(package_name: str) -> ValidationReport:
     try:
         dist = distribution(package_name)
     except PackageNotFoundError:
-        report.add_issue(
-            "package_not_found", f"Package '{package_name}' is not installed"
-        )
+        report.add_issue("package_not_found", f"Package '{package_name}' is not installed")
         return report
 
     entry_points = [ep for ep in dist.entry_points if ep.group == "victor.plugins"]

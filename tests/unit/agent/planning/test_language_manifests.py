@@ -86,9 +86,7 @@ class TestRustManifestHandler:
         assert selection.explicit is True
         assert "Cargo.toml" in selection.paths
 
-    def test_select_for_step_resolves_missing_root_to_nested(
-        self, tmp_path: Path
-    ) -> None:
+    def test_select_for_step_resolves_missing_root_to_nested(self, tmp_path: Path) -> None:
         _touch(tmp_path / "rust" / "Cargo.toml", "[workspace]")
 
         selection = RustManifestHandler().select_for_step(
@@ -221,9 +219,7 @@ class TestGoManifestHandler:
 
     def test_select_for_step_explicit_go_mod(self, tmp_path: Path) -> None:
         _touch(tmp_path / "go.mod", "module example.com/app")
-        selection = GoManifestHandler().select_for_step(
-            "Read go.mod for module info", tmp_path
-        )
+        selection = GoManifestHandler().select_for_step("Read go.mod for module info", tmp_path)
         assert selection.explicit is True
         assert "go.mod" in selection.paths
 
@@ -354,9 +350,7 @@ class TestRegistry:
 
 
 class TestConvenienceFunctions:
-    def test_select_language_manifests_unknown_language_returns_empty(
-        self, tmp_path: Path
-    ) -> None:
+    def test_select_language_manifests_unknown_language_returns_empty(self, tmp_path: Path) -> None:
         result = select_language_manifests("cobol", "some step text", root=tmp_path)
         assert isinstance(result, ManifestSelection)
         assert result.paths == []
@@ -374,9 +368,7 @@ class TestConvenienceFunctions:
         paths = discover_language_manifests("go", root=tmp_path)
         assert "go.mod" in list(paths)
 
-    def test_discover_language_manifests_max_files_limits_scan(
-        self, tmp_path: Path
-    ) -> None:
+    def test_discover_language_manifests_max_files_limits_scan(self, tmp_path: Path) -> None:
         for i in range(5):
             _touch(tmp_path / f"mod{i}" / "go.mod", "module example.com")
         paths = discover_language_manifests("go", root=tmp_path, max_files=2)

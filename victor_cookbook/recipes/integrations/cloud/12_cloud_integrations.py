@@ -15,8 +15,7 @@ async def aws_lambda_agent():
 
     agent = Agent.create(tools=["web_fetch"], temperature=0.3)
 
-    result = await agent.run(
-        """Generate complete AWS Lambda deployment for Victor agent.
+    result = await agent.run("""Generate complete AWS Lambda deployment for Victor agent.
 
         Requirements:
         - Lambda handler for agent requests
@@ -31,8 +30,7 @@ async def aws_lambda_agent():
         2. requirements.txt for Lambda layer
         3. SAM template for deployment
         4. Deployment instructions
-        5. Testing examples"""
-    )
+        5. Testing examples""")
 
     return result.content
 
@@ -68,8 +66,7 @@ async def gcp_cloud_functions_agent():
 
     agent = Agent.create(tools=["web_fetch"], temperature=0.3)
 
-    result = await agent.run(
-        """Generate Google Cloud Functions deployment for Victor agent.
+    result = await agent.run("""Generate Google Cloud Functions deployment for Victor agent.
 
         Requirements:
         - HTTP-triggered function (2nd gen)
@@ -82,8 +79,7 @@ async def gcp_cloud_functions_agent():
         2. requirements.txt
         3. gcloud deploy commands
         4. IAM configuration
-        5. Testing examples"""
-    )
+        5. Testing examples""")
 
     return result.content
 
@@ -150,8 +146,7 @@ async def gcp_vertex_agent():
 
     agent = Agent.create(tools=["web_fetch"], temperature=0.3)
 
-    result = await agent.run(
-        """Generate Victor provider adapter for Google Cloud Vertex AI.
+    result = await agent.run("""Generate Victor provider adapter for Google Cloud Vertex AI.
 
         Support models:
         - Gemini Pro
@@ -168,8 +163,7 @@ async def gcp_vertex_agent():
         Provide:
         1. Provider adapter class
         2. Authentication setup
-        3. Usage examples"""
-    )
+        3. Usage examples""")
 
     return result.content
 
@@ -203,8 +197,7 @@ async def aws_sqs_agent():
 
     agent = Agent.create(tools=["web_fetch"], temperature=0.3)
 
-    result = await agent.run(
-        """Generate SQS message processing system with Victor agents.
+    result = await agent.run("""Generate SQS message processing system with Victor agents.
 
         Features:
         - Poll SQS queue for messages
@@ -218,8 +211,7 @@ async def aws_sqs_agent():
         1. Message processor class
         2. Async SQS client wrapper
         3. Monitoring and logging
-        4. Deployment as container/ECS"""
-    )
+        4. Deployment as container/ECS""")
 
     return result.content
 
@@ -282,8 +274,7 @@ async def aws_dynamodb_agent():
 
     agent = Agent.create(tools=["web_fetch"], temperature=0.3)
 
-    result = await agent.run(
-        """Generate DynamoDB integration for Victor state management.
+    result = await agent.run("""Generate DynamoDB integration for Victor state management.
 
         Features:
         - Store conversation history
@@ -296,8 +287,7 @@ async def aws_dynamodb_agent():
         1. DynamoDB storage adapter
         2. Table schema design
         3. Query patterns
-        4. Caching layer"""
-    )
+        4. Caching layer""")
 
     return result.content
 
@@ -308,8 +298,7 @@ async def azure_cosmosdb_agent():
 
     agent = Agent.create(tools=["web_fetch"], temperature=0.3)
 
-    result = await agent.run(
-        """Generate Cosmos DB integration for Victor state management.
+    result = await agent.run("""Generate Cosmos DB integration for Victor state management.
 
         API: SQL (Core) API
 
@@ -324,8 +313,7 @@ async def azure_cosmosdb_agent():
         1. Cosmos DB client wrapper
         2. Container design
         3. Query patterns
-        4. Performance tips"""
-    )
+        4. Performance tips""")
 
     return result.content
 
@@ -336,8 +324,7 @@ async def gcp_firestore_agent():
 
     agent = Agent.create(tools=["web_fetch"], temperature=0.3)
 
-    result = await agent.run(
-        """Generate Firestore integration for Victor state management.
+    result = await agent.run("""Generate Firestore integration for Victor state management.
 
         Features:
         - Document structure for conversations
@@ -350,8 +337,7 @@ async def gcp_firestore_agent():
         1. Firestore client wrapper
         2. Data model design
         3. Query patterns
-        4. Offline support"""
-    )
+        4. Offline support""")
 
     return result.content
 

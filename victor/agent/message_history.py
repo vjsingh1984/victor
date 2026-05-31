@@ -151,9 +151,7 @@ class MessageHistory:
 
         if not isinstance(value, _TrackedList):
             has_str = (
-                any(isinstance(v, str) for v in value)
-                if hasattr(value, "__iter__")
-                else False
+                any(isinstance(v, str) for v in value) if hasattr(value, "__iter__") else False
             )
             logger.info(
                 "MESSAGES REPLACED with %s (len=%d, has_str=%s) from:\n%s",
@@ -198,9 +196,7 @@ class MessageHistory:
         # Instrumentation: check for non-Message items after each add
         non_msg = sum(1 for m in self._messages if not isinstance(m, Message))
         if non_msg > 0:
-            types = {
-                type(m).__name__ for m in self._messages if not isinstance(m, Message)
-            }
+            types = {type(m).__name__ for m in self._messages if not isinstance(m, Message)}
             logger.debug(
                 "NON-MESSAGE DETECTED after add_message(%s): %d non-Message items, types=%s, "
                 "total=%d, caller=%s",
@@ -235,9 +231,7 @@ class MessageHistory:
             logger.warning("Converting raw string to Message in history")
             self._messages.append(Message(role="assistant", content=message))
         else:
-            logger.error(
-                "Dropping non-Message object from history: %s", type(message).__name__
-            )
+            logger.error("Dropping non-Message object from history: %s", type(message).__name__)
             return
         self._trim_history()
 
@@ -274,9 +268,7 @@ class MessageHistory:
         Returns:
             The created Message object
         """
-        return self.add_message(
-            "tool", content, tool_call_id=tool_call_id, name=tool_name
-        )
+        return self.add_message("tool", content, tool_call_id=tool_call_id, name=tool_name)
 
     def ensure_system_prompt(self) -> None:
         """Ensure system prompt is added to the beginning of conversation."""
@@ -392,7 +384,5 @@ class MessageHistory:
             manager._messages.append(Message(**msg_data))
         preview_messages = data.get("preview_messages", [])
         if isinstance(preview_messages, list):
-            manager._preview_messages = [
-                msg for msg in preview_messages if isinstance(msg, dict)
-            ]
+            manager._preview_messages = [msg for msg in preview_messages if isinstance(msg, dict)]
         return manager

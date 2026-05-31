@@ -58,9 +58,7 @@ class TestErrorCategory:
         assert ErrorCategory.PROVIDER_CONNECTION.value == "provider_connection"
         assert ErrorCategory.PROVIDER_AUTH.value == "provider_auth"
         assert ErrorCategory.PROVIDER_RATE_LIMIT.value == "provider_rate_limit"
-        assert (
-            ErrorCategory.PROVIDER_INVALID_RESPONSE.value == "provider_invalid_response"
-        )
+        assert ErrorCategory.PROVIDER_INVALID_RESPONSE.value == "provider_invalid_response"
 
     def test_tool_categories(self):
         """Test tool error categories exist."""
@@ -205,9 +203,7 @@ class TestProviderRateLimitError:
 
     def test_with_retry_after(self):
         """Test rate limit error with retry time."""
-        error = ProviderRateLimitError(
-            "Rate limited", provider="anthropic", retry_after=60
-        )
+        error = ProviderRateLimitError("Rate limited", provider="anthropic", retry_after=60)
         assert error.category == ErrorCategory.PROVIDER_RATE_LIMIT
         assert error.retry_after == 60
         assert "60 seconds" in error.recovery_hint

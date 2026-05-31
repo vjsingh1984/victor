@@ -93,10 +93,7 @@ class TestCreditTrackingService:
 
         signals = service.assign_turn_credit()
         assert len(signals) == 2
-        assert all(
-            signal.metadata and signal.metadata.tool_name == "read"
-            for signal in signals
-        )
+        assert all(signal.metadata and signal.metadata.tool_name == "read" for signal in signals)
 
     def test_assign_turn_credit_empty(self):
         service = CreditTrackingService()
@@ -224,12 +221,8 @@ class TestCreditTrackingService:
     def test_get_agent_credit_summary(self):
         service = CreditTrackingService()
 
-        service.record_tool_result(
-            "search", True, 40.0, agent_id="researcher_1", team_id="team_1"
-        )
-        service.record_tool_result(
-            "read", True, 50.0, agent_id="researcher_1", team_id="team_1"
-        )
+        service.record_tool_result("search", True, 40.0, agent_id="researcher_1", team_id="team_1")
+        service.record_tool_result("read", True, 50.0, agent_id="researcher_1", team_id="team_1")
         service.record_tool_result(
             "edit",
             False,
@@ -245,16 +238,12 @@ class TestCreditTrackingService:
         assert summary["researcher_1"]["call_count"] == 2.0
         assert summary["researcher_1"]["team_id"] == "team_1"
         assert summary["executor_1"]["call_count"] == 1.0
-        assert (
-            summary["executor_1"]["avg_credit"] < summary["researcher_1"]["avg_credit"]
-        )
+        assert summary["executor_1"]["avg_credit"] < summary["researcher_1"]["avg_credit"]
 
     def test_generate_agent_guidance(self):
         service = CreditTrackingService()
 
-        service.record_tool_result(
-            "search", True, 40.0, agent_id="researcher_1", team_id="team_1"
-        )
+        service.record_tool_result("search", True, 40.0, agent_id="researcher_1", team_id="team_1")
         service.record_tool_result(
             "edit",
             False,
@@ -263,9 +252,7 @@ class TestCreditTrackingService:
             agent_id="executor_1",
             team_id="team_1",
         )
-        service.record_tool_result(
-            "read", True, 50.0, agent_id="researcher_1", team_id="team_1"
-        )
+        service.record_tool_result("read", True, 50.0, agent_id="researcher_1", team_id="team_1")
         service.record_tool_result(
             "shell",
             False,

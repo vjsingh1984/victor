@@ -66,9 +66,7 @@ class PlanningChatRuntime:
             runtime.add_message(
                 "assistant",
                 response.content,
-                metadata={
-                    MESSAGE_SOURCE_METADATA_KEY: MessageSource.AGENT_RESPONSE.value
-                },
+                metadata={MESSAGE_SOURCE_METADATA_KEY: MessageSource.AGENT_RESPONSE.value},
             )
 
         return response

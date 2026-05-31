@@ -191,9 +191,7 @@ class TestBrowserToolInitialization:
         BrowserTool()
 
         # Mock ImportError for playwright
-        with mock.patch.dict(
-            "sys.modules", {"playwright": None, "playwright.async_api": None}
-        ):
+        with mock.patch.dict("sys.modules", {"playwright": None, "playwright.async_api": None}):
             # This should not raise, but return False
             # Note: actual test would need async context
             pass
@@ -289,9 +287,7 @@ class TestBrowserToolJavaScriptSafety:
         for script in dangerous_scripts:
             result = await tool.evaluate(script)
             assert result.success is False
-            assert (
-                "blocked" in result.error.lower() or "dangerous" in result.error.lower()
-            )
+            assert "blocked" in result.error.lower() or "dangerous" in result.error.lower()
 
     @pytest.mark.asyncio
     async def test_evaluate_disabled_javascript(self):

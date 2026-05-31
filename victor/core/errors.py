@@ -794,9 +794,7 @@ class ErrorHandler:
             original_exception=type(exception).__name__,
         )
 
-    def _categorize_exception(
-        self, exception: Exception
-    ) -> tuple[ErrorCategory, Optional[str]]:
+    def _categorize_exception(self, exception: Exception) -> tuple[ErrorCategory, Optional[str]]:
         """Categorize a standard exception and provide recovery hint."""
         # File errors
         if isinstance(exception, (FileNotFoundError, builtins_FileNotFoundError)):
@@ -934,9 +932,7 @@ def _handle_error_impl(
     Raises:
         VictorError: If reraise is True
     """
-    error_info = handler.handle(
-        e, context={"function": func_name, "args_count": args_count}
-    )
+    error_info = handler.handle(e, context={"function": func_name, "args_count": args_count})
     if reraise:
         raise VictorError(
             str(e),

@@ -89,9 +89,7 @@ class ExecutorConfig:
     max_iterations: int = 25
     timeout: Optional[float] = None
     interrupt_nodes: List[str] = field(default_factory=list)
-    default_profile: Optional[str] = (
-        None  # Default profile for nodes without explicit profile
-    )
+    default_profile: Optional[str] = None  # Default profile for nodes without explicit profile
 
 
 @dataclass
@@ -324,9 +322,7 @@ class StateGraphExecutor:
             # Extract user state (exclude internal fields)
             # Convert Pydantic model to dict for compatibility
             state_dict = (
-                result.state.to_dict()
-                if hasattr(result.state, "to_dict")
-                else result.state
+                result.state.to_dict() if hasattr(result.state, "to_dict") else result.state
             )
             user_state = {k: v for k, v in state_dict.items() if not k.startswith("_")}
 
@@ -376,9 +372,7 @@ class StateGraphExecutor:
         # Stream execution
         async for node_id, current_state in compiled.stream(state, thread_id=thread_id):
             # Filter internal fields for user
-            user_state = {
-                k: v for k, v in current_state.items() if not k.startswith("_")
-            }
+            user_state = {k: v for k, v in current_state.items() if not k.startswith("_")}
             yield (node_id, user_state)
 
 
@@ -560,16 +554,12 @@ class CompiledWorkflowExecutor:
         # Support both initial_state and initial_context parameters
         context_data = initial_context or initial_state or {}
 
-        logger.info(
-            f"Executing workflow '{getattr(workflow_or_graph, 'name', 'unknown')}'..."
-        )
+        logger.info(f"Executing workflow '{getattr(workflow_or_graph, 'name', 'unknown')}'...")
 
         start_time = time.time()
 
         # Check if this is a WorkflowDefinition (not yet compiled)
-        if hasattr(workflow_or_graph, "start_node") and hasattr(
-            workflow_or_graph, "nodes"
-        ):
+        if hasattr(workflow_or_graph, "start_node") and hasattr(workflow_or_graph, "nodes"):
             # Execute WorkflowDefinition directly
             context = WorkflowContext(data=context_data.copy())
             context.metadata.update(
@@ -616,8 +606,7 @@ class CompiledWorkflowExecutor:
                     error=str(e),
                     total_duration=time.time() - start_time,
                     total_tool_calls=sum(
-                        result.tool_calls_used
-                        for result in context.node_results.values()
+                        result.tool_calls_used for result in context.node_results.values()
                     ),
                 )
 
@@ -682,9 +671,7 @@ class CompiledWorkflowExecutor:
                 context.add_result(result)
                 executed.add(node_id)
 
-                if not result.success and not workflow.metadata.get(
-                    "continue_on_failure", False
-                ):
+                if not result.success and not workflow.metadata.get("continue_on_failure", False):
                     break
 
                 # Save checkpoint after each node if checkpointer is available
@@ -743,9 +730,7 @@ class CompiledWorkflowExecutor:
     ) -> AsyncIterator[Any]:
         """Stream execution events from a compiled workflow."""
         if hasattr(compiled_graph, "stream"):
-            async for event in compiled_graph.stream(
-                initial_state, thread_id=thread_id
-            ):
+            async for event in compiled_graph.stream(initial_state, thread_id=thread_id):
                 yield event
 
     async def _execute_agent_node(
@@ -776,9 +761,7 @@ class CompiledWorkflowExecutor:
             task=task,
             tool_budget=getattr(node, "tool_budget", 15),
             allowed_tools=getattr(node, "allowed_tools", None),
-            timeout_seconds=int(
-                getattr(node, "timeout_seconds", None) or self.default_timeout
-            ),
+            timeout_seconds=int(getattr(node, "timeout_seconds", None) or self.default_timeout),
             disable_embeddings=getattr(node, "disable_embeddings", False),
         )
 
@@ -787,11 +770,7 @@ class CompiledWorkflowExecutor:
 
         return NodeResult(
             node_id=node.id,
-            status=(
-                ExecutorNodeStatus.COMPLETED
-                if result.success
-                else ExecutorNodeStatus.FAILED
-            ),
+            status=(ExecutorNodeStatus.COMPLETED if result.success else ExecutorNodeStatus.FAILED),
             output=result.summary,
             error=result.error,
             tool_calls_used=getattr(result, "tool_calls_used", 0),
@@ -854,9 +833,7 @@ class CompiledWorkflowExecutor:
                 workflow = context.metadata.get("workflow")
                 parallel_nodes = []
                 for node_id in getattr(node, "parallel_nodes", []):
-                    candidate = (
-                        workflow.get_node(node_id) if workflow is not None else None
-                    )
+                    candidate = workflow.get_node(node_id) if workflow is not None else None
                     if candidate is not None:
                         parallel_nodes.append(candidate)
 
@@ -874,10 +851,7 @@ class CompiledWorkflowExecutor:
                         return await self._execute_node(parallel_node, context)
 
                 results = await asyncio.gather(
-                    *(
-                        execute_with_semaphore(parallel_node)
-                        for parallel_node in parallel_nodes
-                    ),
+                    *(execute_with_semaphore(parallel_node) for parallel_node in parallel_nodes),
                     return_exceptions=True,
                 )
 
@@ -904,19 +878,9 @@ class CompiledWorkflowExecutor:
 
                 return NodeResult(
                     node_id=node.id,
-                    status=(
-                        ExecutorNodeStatus.COMPLETED
-                        if success
-                        else ExecutorNodeStatus.FAILED
-                    ),
-                    output={
-                        "results": [
-                            result.output for result in node_results if result.output
-                        ]
-                    },
-                    tool_calls_used=sum(
-                        result.tool_calls_used for result in node_results
-                    ),
+                    status=(ExecutorNodeStatus.COMPLETED if success else ExecutorNodeStatus.FAILED),
+                    output={"results": [result.output for result in node_results if result.output]},
+                    tool_calls_used=sum(result.tool_calls_used for result in node_results),
                     duration_seconds=time.time() - start_time,
                 )
 
@@ -954,9 +918,7 @@ class CompiledWorkflowExecutor:
                 duration_seconds=time.time() - start_time,
             )
 
-    def _apply_cached_result_to_context(
-        self, node: Any, context: Any, result: Any
-    ) -> None:
+    def _apply_cached_result_to_context(self, node: Any, context: Any, result: Any) -> None:
         """Replay deterministic cached side effects onto the workflow context."""
         output = getattr(result, "output", None)
         output_key = getattr(node, "output_key", None)
@@ -966,9 +928,7 @@ class CompiledWorkflowExecutor:
         elif output_key and output is not None:
             context.set(output_key, output)
 
-    def _cache_result(
-        self, node: Any, context_snapshot: Dict[str, Any], result: Any
-    ) -> None:
+    def _cache_result(self, node: Any, context_snapshot: Dict[str, Any], result: Any) -> None:
         """Store deterministic node results in the workflow cache when available."""
         if self.cache is None or not hasattr(self.cache, "set"):
             return
@@ -994,9 +954,7 @@ class CompiledWorkflowExecutor:
 
         try:
             if hasattr(chain, "invoke"):
-                output = await legacy_executor.asyncio.to_thread(
-                    chain.invoke, input_data
-                )
+                output = await legacy_executor.asyncio.to_thread(chain.invoke, input_data)
             else:
                 output = await legacy_executor.asyncio.to_thread(chain, **input_data)
         except Exception as exc:

@@ -80,18 +80,14 @@ class StateConfig:
     def __post_init__(self) -> None:
         """Validate configuration."""
         if self.initial_stage not in self.stages:
-            raise ValueError(
-                f"Initial stage '{self.initial_stage}' not in stages: {self.stages}"
-            )
+            raise ValueError(f"Initial stage '{self.initial_stage}' not in stages: {self.stages}")
 
         for stage, targets in self.transitions.items():
             if stage not in self.stages:
                 raise ValueError(f"Transition source '{stage}' not in stages")
             for target in targets:
                 if target not in self.stages:
-                    raise ValueError(
-                        f"Transition target '{target}' (from {stage}) not in stages"
-                    )
+                    raise ValueError(f"Transition target '{target}' (from {stage}) not in stages")
 
 
 @dataclass
@@ -266,9 +262,7 @@ class StateMachine:
                 return False
 
         # Perform transition
-        logger.info(
-            f"State transition: {old_stage} -> {stage} (confidence: {confidence:.2f})"
-        )
+        logger.info(f"State transition: {old_stage} -> {stage} (confidence: {confidence:.2f})")
         self._current_stage = stage
         self._last_transition_time = time.time()
         self._transition_count += 1

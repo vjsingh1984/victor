@@ -38,8 +38,8 @@ class TestToolNecessityGate:
 
         orch = MagicMock(spec=AgentOrchestrator)
         # Bind the real methods
-        orch._should_skip_tools_for_turn = (
-            AgentOrchestrator._should_skip_tools_for_turn.__get__(orch)
+        orch._should_skip_tools_for_turn = AgentOrchestrator._should_skip_tools_for_turn.__get__(
+            orch
         )
         orch._check_tool_necessity_via_edge = (
             AgentOrchestrator._check_tool_necessity_via_edge.__get__(orch)
@@ -73,9 +73,7 @@ class TestToolNecessityGate:
     def test_action_with_tool_keywords_keeps(self):
         orch = self._make_orchestrator()
         assert (
-            orch._should_skip_tools_for_turn(
-                "read the file and search for the bug in the code"
-            )
+            orch._should_skip_tools_for_turn("read the file and search for the bug in the code")
             is False
         )
 
@@ -88,17 +86,13 @@ class TestToolNecessityGate:
     def test_ambiguous_defaults_to_tools(self):
         orch = self._make_orchestrator()
         # No Q&A pattern, 1 tool signal — ambiguous → default to providing tools
-        result = orch._should_skip_tools_for_turn(
-            "I'm thinking about the database design"
-        )
+        result = orch._should_skip_tools_for_turn("I'm thinking about the database design")
         assert result is False
 
     def test_edge_model_fallback_when_unavailable(self):
         orch = self._make_orchestrator(container=None)
         # Edge model not available → falls back to heuristic
-        result = orch._check_tool_necessity_via_edge(
-            "what is python", heuristic_conf=0.85
-        )
+        result = orch._check_tool_necessity_via_edge("what is python", heuristic_conf=0.85)
         assert result is True  # heuristic_conf >= 0.7 → skip tools
 
 
@@ -124,10 +118,7 @@ class TestMCPToolCapping:
 
     def test_no_mcp_tools_unchanged(self):
         """Native-only selection passes through untouched."""
-        tools = [
-            ToolDefinition(name=f"tool_{i}", description="d", parameters={})
-            for i in range(5)
-        ]
+        tools = [ToolDefinition(name=f"tool_{i}", description="d", parameters={}) for i in range(5)]
         native_registry_tools = [MagicMock(name=f"tool_{i}") for i in range(5)]
         for t in native_registry_tools:
             t.name = t._mock_name  # Fix MagicMock name attribute
@@ -153,12 +144,8 @@ class TestMCPToolCapping:
             registry_tools.append(native)
 
         tools = [
-            ToolDefinition(name=f"native_{i}", description="d", parameters={})
-            for i in range(3)
-        ] + [
-            ToolDefinition(name=f"mcp_{i}", description="d", parameters={})
-            for i in range(6)
-        ]
+            ToolDefinition(name=f"native_{i}", description="d", parameters={}) for i in range(3)
+        ] + [ToolDefinition(name=f"mcp_{i}", description="d", parameters={}) for i in range(6)]
 
         selector = self._make_selector(registry_tools)
         result = selector._cap_mcp_tools(tools, 3)
@@ -178,10 +165,7 @@ class TestMCPToolCapping:
             mcp.name = f"mcp_{i}"
             registry_tools.append(mcp)
 
-        tools = [
-            ToolDefinition(name=f"mcp_{i}", description="d", parameters={})
-            for i in range(2)
-        ]
+        tools = [ToolDefinition(name=f"mcp_{i}", description="d", parameters={}) for i in range(2)]
         selector = self._make_selector(registry_tools)
         result = selector._cap_mcp_tools(tools, 3)
         assert len(result) == 2
@@ -199,12 +183,8 @@ class TestTokenBudgetEnforcement:
         from victor.agent.tool_selection import _enforce_token_budget
 
         tools = [
-            ToolDefinition(
-                name="a", description="d", parameters={}, schema_level="full"
-            ),
-            ToolDefinition(
-                name="b", description="d", parameters={}, schema_level="compact"
-            ),
+            ToolDefinition(name="a", description="d", parameters={}, schema_level="full"),
+            ToolDefinition(name="b", description="d", parameters={}, schema_level="compact"),
         ]
         result = _enforce_token_budget(tools, 5000)
         assert len(result) == 2
@@ -218,18 +198,10 @@ class TestTokenBudgetEnforcement:
         )
 
         tools = [
-            ToolDefinition(
-                name="a", description="d", parameters={}, schema_level="full"
-            ),
-            ToolDefinition(
-                name="b", description="d", parameters={}, schema_level="compact"
-            ),
-            ToolDefinition(
-                name="c", description="d", parameters={}, schema_level="compact"
-            ),
-            ToolDefinition(
-                name="d", description="d", parameters={}, schema_level="compact"
-            ),
+            ToolDefinition(name="a", description="d", parameters={}, schema_level="full"),
+            ToolDefinition(name="b", description="d", parameters={}, schema_level="compact"),
+            ToolDefinition(name="c", description="d", parameters={}, schema_level="compact"),
+            ToolDefinition(name="d", description="d", parameters={}, schema_level="compact"),
         ]
         # full(125) + 3*compact(210) = 335. Budget 250 forces demotion.
         result = _enforce_token_budget(tools, 250)
@@ -243,13 +215,9 @@ class TestTokenBudgetEnforcement:
         from victor.agent.tool_selection import _enforce_token_budget
 
         tools = [
-            ToolDefinition(
-                name="a", description="d", parameters={}, schema_level="full"
-            ),
+            ToolDefinition(name="a", description="d", parameters={}, schema_level="full"),
         ] + [
-            ToolDefinition(
-                name=f"s{i}", description="d", parameters={}, schema_level="stub"
-            )
+            ToolDefinition(name=f"s{i}", description="d", parameters={}, schema_level="stub")
             for i in range(20)
         ]
         # full(125) + 20*stub(640) = 765. Budget 300 → drops stubs.
@@ -265,9 +233,7 @@ class TestTokenBudgetEnforcement:
         from victor.agent.tool_selection import _enforce_token_budget
 
         tools = [
-            ToolDefinition(
-                name="a", description="d", parameters={}, schema_level="full"
-            )
+            ToolDefinition(name="a", description="d", parameters={}, schema_level="full")
             for _ in range(50)
         ]
         # Budget 0 would try to drop everything — that's why callers check > 0
@@ -280,15 +246,9 @@ class TestTokenBudgetEnforcement:
         from victor.agent.tool_selection import _estimate_tool_tokens
 
         tools = [
-            ToolDefinition(
-                name="a", description="d", parameters={}, schema_level="full"
-            ),
-            ToolDefinition(
-                name="b", description="d", parameters={}, schema_level="compact"
-            ),
-            ToolDefinition(
-                name="c", description="d", parameters={}, schema_level="stub"
-            ),
+            ToolDefinition(name="a", description="d", parameters={}, schema_level="full"),
+            ToolDefinition(name="b", description="d", parameters={}, schema_level="compact"),
+            ToolDefinition(name="c", description="d", parameters={}, schema_level="stub"),
         ]
         est = _estimate_tool_tokens(tools)
         assert est == 125 + 70 + 32  # 227
@@ -306,15 +266,9 @@ class TestSchemaPromotion:
         from victor.agent.tool_selection import promote_high_confidence_stubs
 
         tools = [
-            ToolDefinition(
-                name="a", description="d", parameters={}, schema_level="stub"
-            ),
-            ToolDefinition(
-                name="b", description="d", parameters={}, schema_level="stub"
-            ),
-            ToolDefinition(
-                name="c", description="d", parameters={}, schema_level="full"
-            ),
+            ToolDefinition(name="a", description="d", parameters={}, schema_level="stub"),
+            ToolDefinition(name="b", description="d", parameters={}, schema_level="stub"),
+            ToolDefinition(name="c", description="d", parameters={}, schema_level="full"),
         ]
         scores = {"a": 0.9, "b": 0.5, "c": 0.95}
         result = promote_high_confidence_stubs(tools, scores, threshold=0.8)
@@ -327,9 +281,7 @@ class TestSchemaPromotion:
         from victor.agent.tool_selection import promote_high_confidence_stubs
 
         tools = [
-            ToolDefinition(
-                name="a", description="d", parameters={}, schema_level="stub"
-            ),
+            ToolDefinition(name="a", description="d", parameters={}, schema_level="stub"),
         ]
         result = promote_high_confidence_stubs(tools, {}, threshold=0.8)
         assert result[0].schema_level == "stub"
@@ -339,9 +291,7 @@ class TestSchemaPromotion:
         from victor.agent.tool_selection import promote_high_confidence_stubs
 
         tools = [
-            ToolDefinition(
-                name="a", description="d", parameters={}, schema_level="compact"
-            ),
+            ToolDefinition(name="a", description="d", parameters={}, schema_level="compact"),
         ]
         scores = {"a": 0.95}
         result = promote_high_confidence_stubs(tools, scores, threshold=0.8)

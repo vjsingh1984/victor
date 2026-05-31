@@ -142,9 +142,7 @@ class TestFrameworkShimBasic:
         assert "docs/architecture/migration.md" in message
 
     @pytest.mark.asyncio
-    async def test_create_orchestrator_without_vertical(
-        self, mock_settings, mock_orchestrator
-    ):
+    async def test_create_orchestrator_without_vertical(self, mock_settings, mock_orchestrator):
         """Test basic orchestrator creation without vertical."""
         with patch(
             "victor.agent.orchestrator.AgentOrchestrator.from_settings",
@@ -163,9 +161,7 @@ class TestFrameworkShimBasic:
             )
 
     @pytest.mark.asyncio
-    async def test_create_orchestrator_with_thinking(
-        self, mock_settings, mock_orchestrator
-    ):
+    async def test_create_orchestrator_with_thinking(self, mock_settings, mock_orchestrator):
         """Test orchestrator creation with thinking enabled."""
         with patch(
             "victor.agent.orchestrator.AgentOrchestrator.from_settings",
@@ -239,9 +235,7 @@ class TestFrameworkShimObservability:
         return orch
 
     @pytest.mark.asyncio
-    async def test_observability_wired_by_default(
-        self, mock_settings, mock_orchestrator
-    ):
+    async def test_observability_wired_by_default(self, mock_settings, mock_orchestrator):
         """Test that observability is wired by default."""
         with patch(
             "victor.agent.orchestrator.AgentOrchestrator.from_settings",
@@ -273,9 +267,7 @@ class TestFrameworkShimObservability:
             assert shim.observability is None
 
     @pytest.mark.asyncio
-    async def test_observability_session_id_propagated(
-        self, mock_settings, mock_orchestrator
-    ):
+    async def test_observability_session_id_propagated(self, mock_settings, mock_orchestrator):
         """Test that session ID is propagated to observability."""
         with patch(
             "victor.agent.orchestrator.AgentOrchestrator.from_settings",
@@ -384,9 +376,7 @@ class TestFrameworkShimVertical:
             assert "edit" in enabled_tools
 
     @pytest.mark.asyncio
-    async def test_vertical_system_prompt_applied(
-        self, mock_settings, mock_orchestrator
-    ):
+    async def test_vertical_system_prompt_applied(self, mock_settings, mock_orchestrator):
         """Test that vertical system prompt is applied.
 
         With capability-based invocation, the orchestrator's set_custom_prompt
@@ -402,9 +392,7 @@ class TestFrameworkShimVertical:
             await shim.create_orchestrator()
 
             # New capability-based approach calls orchestrator.set_custom_prompt directly
-            mock_orchestrator.set_custom_prompt.assert_called_once_with(
-                "You are a test assistant."
-            )
+            mock_orchestrator.set_custom_prompt.assert_called_once_with("You are a test assistant.")
 
     @pytest.mark.asyncio
     async def test_vertical_stages_applied(self, mock_settings, mock_orchestrator):
@@ -490,9 +478,7 @@ class TestFrameworkShimVertical:
         ) as mock_from_settings:
             mock_from_settings.return_value = mock_orchestrator
 
-            with patch(
-                "victor.framework.shim.apply_vertical_configuration"
-            ) as mock_apply:
+            with patch("victor.framework.shim.apply_vertical_configuration") as mock_apply:
                 context = MagicMock()
                 context.config = MagicMock()
                 mock_result = MagicMock(
@@ -511,9 +497,7 @@ class TestFrameworkShimVertical:
                 shim = FrameworkShim(mock_settings, vertical=MockVertical)
                 await shim.create_orchestrator()
 
-                mock_apply.assert_called_once_with(
-                    mock_orchestrator, MockVertical, source="cli"
-                )
+                mock_apply.assert_called_once_with(mock_orchestrator, MockVertical, source="cli")
                 assert shim.vertical_config is context.config
 
 
@@ -571,9 +555,7 @@ class TestFrameworkShimLifecycle:
             shim.emit_session_start({"mode": "cli"})
             # session_id is automatically added to metadata
             expected_metadata = {"mode": "cli", "session_id": shim.session_id}
-            shim._observability.on_session_start.assert_called_once_with(
-                expected_metadata
-            )
+            shim._observability.on_session_start.assert_called_once_with(expected_metadata)
 
     @pytest.mark.asyncio
     async def test_emit_session_end(self, mock_settings, mock_orchestrator):
@@ -671,15 +653,11 @@ class TestListVerticalsFunction:
         """Register mock vertical for tests and ensure built-ins are present."""
         # Ensure built-in verticals are registered (they may have been cleared by other tests)
         # Try importing from external vertical packages, skip if not available
-        CodingAssistant = _try_load_vertical_attr(
-            "victor.coding.assistant", "CodingAssistant"
-        )
+        CodingAssistant = _try_load_vertical_attr("victor.coding.assistant", "CodingAssistant")
         if CodingAssistant is not None and not VerticalRegistry.get("coding"):
             VerticalRegistry.register(CodingAssistant)
 
-        DevOpsAssistant = _try_load_vertical_attr(
-            "victor.devops.assistant", "DevOpsAssistant"
-        )
+        DevOpsAssistant = _try_load_vertical_attr("victor.devops.assistant", "DevOpsAssistant")
         if DevOpsAssistant is not None and not VerticalRegistry.get("devops"):
             VerticalRegistry.register(DevOpsAssistant)
 
@@ -728,9 +706,7 @@ class TestFrameworkShimProperties:
         assert shim.orchestrator is None
 
     @pytest.mark.asyncio
-    async def test_orchestrator_property_after_create(
-        self, mock_settings, mock_orchestrator
-    ):
+    async def test_orchestrator_property_after_create(self, mock_settings, mock_orchestrator):
         """Test orchestrator property after creation."""
         with patch(
             "victor.agent.orchestrator.AgentOrchestrator.from_settings",

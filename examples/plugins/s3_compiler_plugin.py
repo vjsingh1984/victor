@@ -128,9 +128,7 @@ class S3CompilerPlugin(WorkflowCompilerPlugin):
             import boto3
 
             # Initialize S3 client with options
-            self._s3_client = boto3.client(
-                "s3", region_name=self.region, **self._options
-            )
+            self._s3_client = boto3.client("s3", region_name=self.region, **self._options)
 
         try:
             # Get object from S3

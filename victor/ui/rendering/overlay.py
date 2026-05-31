@@ -292,15 +292,11 @@ def show_plan_status_overlay(
         table.add_column("Status", no_wrap=True, width=12)
 
         for idx, step in enumerate(plan.steps[:10], 1):  # Show max 10 steps
-            status_str = (
-                step.status.value if hasattr(step.status, "value") else str(step.status)
-            )
+            status_str = step.status.value if hasattr(step.status, "value") else str(step.status)
             status_formatted = format_task_status(status_str)
 
             description = (
-                step.description[:50] + "..."
-                if len(step.description) > 50
-                else step.description
+                step.description[:50] + "..." if len(step.description) > 50 else step.description
             )
 
             table.add_row(str(idx), description, status_formatted)

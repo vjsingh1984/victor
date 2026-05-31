@@ -1054,9 +1054,7 @@ class PromptCorpusRegistry:
 
             # Verify embedding count matches corpus count
             if len(embeddings) != len(self._corpus):
-                logger.info(
-                    f"Cache size mismatch: {len(embeddings)} != {len(self._corpus)}"
-                )
+                logger.info(f"Cache size mismatch: {len(embeddings)} != {len(self._corpus)}")
                 return False
 
             # Load embeddings
@@ -1146,9 +1144,7 @@ class PromptCorpusRegistry:
         corpus_hash = self._calculate_corpus_hash()
 
         if self._cache_embeddings and self._load_from_cache(corpus_hash):
-            logger.info(
-                f"Loaded corpus embeddings from cache for {len(self._corpus)} entries"
-            )
+            logger.info(f"Loaded corpus embeddings from cache for {len(self._corpus)} entries")
             return self._corpus_embeddings
 
         service = self._get_embedding_service()
@@ -1187,9 +1183,7 @@ class PromptCorpusRegistry:
         """Match using sentence embeddings."""
         service = self._get_embedding_service()
         query_embedding = service.embed_text_sync(user_prompt)
-        similarities = service.cosine_similarity_matrix(
-            query_embedding, corpus_embeddings
-        )
+        similarities = service.cosine_similarity_matrix(query_embedding, corpus_embeddings)
 
         best_idx = int(np.argmax(similarities))
         best_similarity = float(similarities[best_idx])

@@ -253,9 +253,7 @@ class TestOrchestratorServiceProvider:
         assert container.is_registered(ResponseSanitizerProtocol)
         assert container.is_registered(ConversationStateMachineProtocol)
 
-    def test_tool_coordinator_protocol_is_not_registered_by_default(
-        self, mock_settings
-    ):
+    def test_tool_coordinator_protocol_is_not_registered_by_default(self, mock_settings):
         """ToolCoordinatorProtocol is compatibility-only, not a primary DI service."""
         from victor.agent.service_provider import OrchestratorServiceProvider
 
@@ -272,9 +270,7 @@ class TestOrchestratorServiceProvider:
 
         assert container.is_registered(ToolCoordinatorProtocol) is False
 
-    def test_service_provider_no_longer_exposes_tool_coordinator_factory(
-        self, mock_settings
-    ):
+    def test_service_provider_no_longer_exposes_tool_coordinator_factory(self, mock_settings):
         """Deprecated tool-coordinator shims are no longer created by the service provider."""
         from victor.agent.service_provider import OrchestratorServiceProvider
 

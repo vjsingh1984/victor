@@ -91,9 +91,7 @@ def _load_tiers_from_config() -> Dict[str, str]:
         return tiers
 
     except Exception as e:
-        logger.warning(
-            f"Failed to load tool tiers from {config_path}: {e}, using defaults"
-        )
+        logger.warning(f"Failed to load tool tiers from {config_path}: {e}, using defaults")
         return _DEFAULT_TIERS.copy()
 
 
@@ -259,9 +257,7 @@ def get_provider_tool_tier(tool_name: str, provider_category: str) -> str:
 
     # Check if provider category exists
     if provider_category not in _provider_tier_cache:
-        logger.debug(
-            f"Provider category '{provider_category}' not found, using global tiers"
-        )
+        logger.debug(f"Provider category '{provider_category}' not found, using global tiers")
         return get_tool_tier(tool_name)
 
     category_tiers = _provider_tier_cache[provider_category]

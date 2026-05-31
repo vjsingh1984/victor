@@ -35,9 +35,7 @@ class TestUnifiedTaskClassifierWithTriage:
         # High confidence case should use fast path
         result = classifier.classify("fix the authentication bug")
         assert result.task_type in (ClassifierTaskType.EDIT, ClassifierTaskType.ACTION)
-        assert (
-            result.confidence >= 0.5 or result.task_type == ClassifierTaskType.DEFAULT
-        )
+        assert result.confidence >= 0.5 or result.task_type == ClassifierTaskType.DEFAULT
         assert result.source in ("keyword", "triage", "llm", "edge_verification")
 
     def test_classifier_without_tiered_triage_fallback(self):

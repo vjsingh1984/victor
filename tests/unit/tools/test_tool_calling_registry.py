@@ -92,9 +92,7 @@ class TestToolCallingAdapterRegistry:
 
     def test_get_adapter_lmstudio(self):
         """Test getting LMStudio adapter (local, needs fallback parsing)."""
-        adapter = ToolCallingAdapterRegistry.get_adapter(
-            "lmstudio", model="local-model"
-        )
+        adapter = ToolCallingAdapterRegistry.get_adapter("lmstudio", model="local-model")
         assert isinstance(adapter, LMStudioToolCallingAdapter)
         assert adapter.provider_name == "lmstudio"
 
@@ -106,9 +104,7 @@ class TestToolCallingAdapterRegistry:
     def test_get_adapter_vllm_specific(self):
         """Test vLLM uses dedicated adapter when opt-in."""
         with patch.dict(os.environ, {"VICTOR_USE_PROVIDER_SPECIFIC_ADAPTERS": "true"}):
-            adapter = ToolCallingAdapterRegistry.get_adapter(
-                "vllm", model="local-model"
-            )
+            adapter = ToolCallingAdapterRegistry.get_adapter("vllm", model="local-model")
             assert isinstance(adapter, OpenAICompatToolCallingAdapter)
             assert adapter.provider_name == "vllm"
 
@@ -124,24 +120,18 @@ class TestToolCallingAdapterRegistry:
 
     def test_get_adapter_deepseek_default(self):
         """Test DeepSeek uses OpenAI adapter by default."""
-        adapter = ToolCallingAdapterRegistry.get_adapter(
-            "deepseek", model="deepseek-chat"
-        )
+        adapter = ToolCallingAdapterRegistry.get_adapter("deepseek", model="deepseek-chat")
         assert isinstance(adapter, OpenAIToolCallingAdapter)
 
     def test_get_adapter_deepseek_specific(self):
         """Test DeepSeek uses dedicated adapter when opt-in."""
         with patch.dict(os.environ, {"VICTOR_USE_PROVIDER_SPECIFIC_ADAPTERS": "true"}):
-            adapter = ToolCallingAdapterRegistry.get_adapter(
-                "deepseek", model="deepseek-chat"
-            )
+            adapter = ToolCallingAdapterRegistry.get_adapter("deepseek", model="deepseek-chat")
             assert isinstance(adapter, DeepSeekToolCallingAdapter)
 
     def test_get_adapter_cerebras(self):
         """Test Cerebras uses OpenAI adapter."""
-        adapter = ToolCallingAdapterRegistry.get_adapter(
-            "cerebras", model="gpt-oss-120b"
-        )
+        adapter = ToolCallingAdapterRegistry.get_adapter("cerebras", model="gpt-oss-120b")
         assert isinstance(adapter, OpenAIToolCallingAdapter)
 
     def test_get_adapter_zai(self):
@@ -151,9 +141,7 @@ class TestToolCallingAdapterRegistry:
 
     def test_get_adapter_unknown_provider(self):
         """Test unknown provider defaults to OpenAI adapter."""
-        adapter = ToolCallingAdapterRegistry.get_adapter(
-            "unknown_provider", model="some-model"
-        )
+        adapter = ToolCallingAdapterRegistry.get_adapter("unknown_provider", model="some-model")
         assert isinstance(adapter, OpenAIToolCallingAdapter)
 
     def test_get_adapter_case_insensitive(self):
@@ -249,9 +237,7 @@ class TestToolCallingAdapterRegistryEdgeCases:
 
     def test_get_adapter_none_config(self):
         """Test get_adapter with None config."""
-        adapter = ToolCallingAdapterRegistry.get_adapter(
-            "anthropic", model="claude-3", config=None
-        )
+        adapter = ToolCallingAdapterRegistry.get_adapter("anthropic", model="claude-3", config=None)
         assert isinstance(adapter, AnthropicToolCallingAdapter)
 
     def test_multiple_unknown_providers(self):

@@ -23,9 +23,7 @@ class TestTraceZoneEnum:
 
 
 class TestTraceZoneClassification:
-    def _make_trace(
-        self, score=0.5, success=True, has_failures=False, has_recovery=False
-    ):
+    def _make_trace(self, score=0.5, success=True, has_failures=False, has_recovery=False):
         trace = MagicMock()
         trace.completion_score = score
         trace.success = success

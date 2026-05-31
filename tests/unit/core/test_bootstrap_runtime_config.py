@@ -83,9 +83,7 @@ class TestBootstrapRuntimeConfig:
 
     def test_register_embedding_services_uses_nested_embedding_settings(self):
         """Embedding bootstrap should read the canonical embedding settings group."""
-        settings = Settings(
-            embedding={"unified_embedding_model": "nested-bootstrap-model"}
-        )
+        settings = Settings(embedding={"unified_embedding_model": "nested-bootstrap-model"})
         container = ServiceContainer()
 
         with patch(

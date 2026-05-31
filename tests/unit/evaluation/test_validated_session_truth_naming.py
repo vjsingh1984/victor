@@ -21,9 +21,7 @@ def test_naming_policy_preserves_evaluation_task_artifact_layout(tmp_path):
         source_result_path=tmp_path / "eval_guide_20260425_010101.json",
     )
 
-    assert (
-        path == tmp_path / "eval_session_guide_guide_1_eval_guide_20260425_010101.json"
-    )
+    assert path == tmp_path / "eval_session_guide_guide_1_eval_guide_20260425_010101.json"
 
 
 def test_naming_policy_preserves_swe_bench_validation_layout(tmp_path):
@@ -50,7 +48,4 @@ def test_naming_policy_can_fallback_to_evaluation_layout_for_non_swe_validation(
         source_result_path=tmp_path / "eval_dr3_eval_20260425_010101.json",
     )
 
-    assert (
-        path
-        == tmp_path / "eval_session_dr3_eval_dr3_123_eval_dr3_eval_20260425_010101.json"
-    )
+    assert path == tmp_path / "eval_session_dr3_eval_dr3_123_eval_dr3_eval_20260425_010101.json"

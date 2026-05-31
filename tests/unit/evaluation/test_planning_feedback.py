@@ -99,15 +99,10 @@ def test_aggregate_planning_feedback_exposes_policy_mix_and_delta():
         "heuristic_fast_path": 1,
         "experiment_forced_slow_path": 1,
     }
-    assert metrics["planning_force_reasons"] == {
-        "experiment_constraints: tests_pass": 1
-    }
+    assert metrics["planning_force_reasons"] == {"experiment_constraints: tests_pass": 1}
     assert metrics["planning_constraint_tags"] == {"tests_pass": 1}
     assert metrics["planning_used_llm_rate"] == 0.5
     assert metrics["planning_fast_path_rate"] == 0.5
     assert metrics["avg_completion_by_planning_policy"]["heuristic_fast_path"] == 0.25
-    assert (
-        metrics["avg_completion_by_planning_policy"]["experiment_forced_slow_path"]
-        == 0.9
-    )
+    assert metrics["avg_completion_by_planning_policy"]["experiment_forced_slow_path"] == 0.9
     assert metrics["planning_forced_slow_path_completion_delta"] == 0.65

@@ -100,9 +100,7 @@ class RoutingDecision:
         """Return stable provider-routing hints for topology selection."""
         provider_lower = self.selected_provider.lower()
         provider_locality = (
-            "local"
-            if any(hint in provider_lower for hint in LOCAL_PROVIDER_HINTS)
-            else "remote"
+            "local" if any(hint in provider_lower for hint in LOCAL_PROVIDER_HINTS) else "remote"
         )
         return {
             "provider_hint": self.selected_provider,
@@ -116,17 +114,13 @@ class RoutingDecision:
             "performance_score": self.factors.get("performance"),
             "provider_degraded": bool(self.factors.get("degraded", False)),
             "provider_degradation_penalty": self.factors.get("degradation_penalty"),
-            "provider_degradation_reasons": list(
-                self.factors.get("degradation_reasons") or []
-            ),
+            "provider_degradation_reasons": list(self.factors.get("degradation_reasons") or []),
             "provider_failure_streak": self.factors.get("failure_streak"),
             "provider_success_streak": self.factors.get("success_streak"),
             "provider_recovered_from_recent_incident": bool(
                 self.factors.get("recovered_from_recent_incident", False)
             ),
-            "provider_time_to_recover_seconds": self.factors.get(
-                "time_to_recover_seconds"
-            ),
+            "provider_time_to_recover_seconds": self.factors.get("time_to_recover_seconds"),
         }
 
 
@@ -167,9 +161,7 @@ class RoutingDecisionEngine:
         # Load routing profile
         self.profile = load_routing_profiles().get(config.profile_name)
         if not self.profile:
-            logger.warning(
-                f"Profile '{config.profile_name}' not found, using 'balanced'"
-            )
+            logger.warning(f"Profile '{config.profile_name}' not found, using 'balanced'")
             self.profile = load_routing_profiles().get("balanced")
 
         logger.debug(
@@ -284,9 +276,7 @@ class RoutingDecisionEngine:
         if max_factor[1] >= 0.8:
             rationale += f" based on {max_factor[0]} ({max_factor[1]:.2f})"
         if factors.get("degraded"):
-            reasons = ",".join(
-                str(reason) for reason in factors.get("degradation_reasons") or []
-            )
+            reasons = ",".join(str(reason) for reason in factors.get("degradation_reasons") or [])
             rationale += f"; recent degradation remains active ({reasons or 'unknown'})"
         elif factors.get("recovered_from_recent_incident"):
             rationale += "; provider has recently recovered from instability"
@@ -310,9 +300,7 @@ class RoutingDecisionEngine:
         # If user specified providers, use those
         if preferred_providers:
             candidates = [
-                p.lower()
-                for p in preferred_providers
-                if p.lower() in self.available_providers
+                p.lower() for p in preferred_providers if p.lower() in self.available_providers
             ]
             if candidates:
                 logger.debug(f"Using user-specified providers: {candidates}")
@@ -389,12 +377,8 @@ class RoutingDecisionEngine:
             factors["degradation_reasons"] = list(
                 getattr(degradation_snapshot, "degradation_reasons", ()) or ()
             )
-            factors["failure_streak"] = int(
-                getattr(degradation_snapshot, "failure_streak", 0) or 0
-            )
-            factors["success_streak"] = int(
-                getattr(degradation_snapshot, "success_streak", 0) or 0
-            )
+            factors["failure_streak"] = int(getattr(degradation_snapshot, "failure_streak", 0) or 0)
+            factors["success_streak"] = int(getattr(degradation_snapshot, "success_streak", 0) or 0)
             factors["recovered_from_recent_incident"] = bool(
                 getattr(degradation_snapshot, "recovered_from_recent_incident", False)
             )
@@ -460,9 +444,7 @@ class RoutingDecisionEngine:
         else:
             # Check if issues are critical
             critical_issues = ["api_key", "authentication", "auth"]
-            if any(
-                issue in str(health_result.issues).lower() for issue in critical_issues
-            ):
+            if any(issue in str(health_result.issues).lower() for issue in critical_issues):
                 return 0.0  # Critical failure
             else:
                 return 0.3  # Non-critical issues
@@ -550,9 +532,7 @@ class RoutingDecisionEngine:
         try:
             return self.tracker.get_degradation_snapshot(provider)
         except Exception as exc:
-            logger.debug(
-                "Provider degradation snapshot unavailable for %s: %s", provider, exc
-            )
+            logger.debug("Provider degradation snapshot unavailable for %s: %s", provider, exc)
             return None
 
     @staticmethod
@@ -564,9 +544,7 @@ class RoutingDecisionEngine:
         degraded = bool(getattr(snapshot, "degraded", False))
         recovered = bool(getattr(snapshot, "recovered_from_recent_incident", False))
         failure_streak = int(getattr(snapshot, "failure_streak", 0) or 0)
-        recent_success_rate = float(
-            getattr(snapshot, "recent_success_rate", 0.5) or 0.5
-        )
+        recent_success_rate = float(getattr(snapshot, "recent_success_rate", 0.5) or 0.5)
         reasons = set(getattr(snapshot, "degradation_reasons", ()) or ())
 
         penalty = 0.0
@@ -581,10 +559,7 @@ class RoutingDecisionEngine:
         elif recovered:
             penalty += min(
                 0.08,
-                0.02
-                * max(
-                    1, int(getattr(snapshot, "recent_incident_failure_count", 0) or 0)
-                ),
+                0.02 * max(1, int(getattr(snapshot, "recent_incident_failure_count", 0) or 0)),
             )
 
         return round(min(0.55, penalty), 4)
@@ -652,9 +627,7 @@ class SmartRoutingProvider:
         # hydrating cross-session routing history only helps when learning is
         # enabled, and it makes unit-test behavior depend on ambient DB state.
         if config.learning_enabled:
-            self.tracker = ProviderPerformanceTracker(
-                window_size=config.performance_window_size
-            )
+            self.tracker = ProviderPerformanceTracker(window_size=config.performance_window_size)
         else:
             self.tracker = ProviderPerformanceTracker(
                 window_size=config.performance_window_size,
@@ -692,16 +665,12 @@ class SmartRoutingProvider:
 
     def supports_tools(self) -> bool:
         """Check if any provider supports tools."""
-        return any(
-            getattr(p, "supports_tools", lambda: False)()
-            for p in self.providers.values()
-        )
+        return any(getattr(p, "supports_tools", lambda: False)() for p in self.providers.values())
 
     def supports_streaming(self) -> bool:
         """Check if any provider supports streaming."""
         return any(
-            getattr(p, "supports_streaming", lambda: False)()
-            for p in self.providers.values()
+            getattr(p, "supports_streaming", lambda: False)() for p in self.providers.values()
         )
 
     async def chat(

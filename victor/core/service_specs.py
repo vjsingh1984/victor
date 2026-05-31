@@ -128,9 +128,7 @@ AGENT_SINGLETON_SPECS: List[ServiceSpec] = [
     ),
     ServiceSpec(SemanticToolSelectorProtocol, "_create_semantic_tool_selector"),
     ServiceSpec(ProviderRegistryProtocol, "_create_provider_registry"),
-    ServiceSpec(
-        ConversationEmbeddingStoreProtocol, "_create_conversation_embedding_store"
-    ),
+    ServiceSpec(ConversationEmbeddingStoreProtocol, "_create_conversation_embedding_store"),
     ServiceSpec(MetricsCollectorProtocol, "_create_metrics_collector"),
     ServiceSpec(ToolCacheProtocol, "_create_tool_cache"),
     ServiceSpec(UsageLoggerProtocol, "_create_usage_logger"),
@@ -161,13 +159,9 @@ AGENT_SINGLETON_SPECS: List[ServiceSpec] = [
     ServiceSpec(ChunkRuntimeProtocol, "_create_chunk_generator"),
     ServiceSpec(ToolPlanningRuntimeProtocol, "_create_tool_planner"),
     ServiceSpec(TaskRuntimeProtocol, "_create_task_coordinator"),
-    ServiceSpec(
-        CoordinationAdvisorRuntimeProtocol, "_create_coordination_advisor_runtime"
-    ),
+    ServiceSpec(CoordinationAdvisorRuntimeProtocol, "_create_coordination_advisor_runtime"),
     ServiceSpec(CompactionSummarizerProtocol, "_create_compaction_summarizer"),
-    ServiceSpec(
-        HierarchicalCompactionProtocol, "_create_hierarchical_compaction_manager"
-    ),
+    ServiceSpec(HierarchicalCompactionProtocol, "_create_hierarchical_compaction_manager"),
     ServiceSpec(SessionContextLinkerProtocol, "_create_session_context_linker"),
     ServiceSpec(
         StateRuntimeProtocol,
@@ -211,7 +205,5 @@ WORKFLOW_TRANSIENT_SPECS: List[ServiceSpec] = [
         "_create_workflow_compiler_impl",
         ServiceLifetime.TRANSIENT,
     ),
-    ServiceSpec(
-        WorkflowExecutor, "_create_workflow_executor", ServiceLifetime.TRANSIENT
-    ),
+    ServiceSpec(WorkflowExecutor, "_create_workflow_executor", ServiceLifetime.TRANSIENT),
 ]

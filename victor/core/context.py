@@ -29,14 +29,10 @@ from typing import Iterator, Optional
 trace_id: contextvars.ContextVar[str] = contextvars.ContextVar("trace_id", default="")
 
 # Session ID for the current orchestrator session
-session_id: contextvars.ContextVar[str] = contextvars.ContextVar(
-    "session_id", default=""
-)
+session_id: contextvars.ContextVar[str] = contextvars.ContextVar("session_id", default="")
 
 # Vertical name for the current operation
-active_vertical: contextvars.ContextVar[str] = contextvars.ContextVar(
-    "active_vertical", default=""
-)
+active_vertical: contextvars.ContextVar[str] = contextvars.ContextVar("active_vertical", default="")
 
 # Vertical manifest version for the current operation
 active_vertical_manifest_version: contextvars.ContextVar[str] = contextvars.ContextVar(

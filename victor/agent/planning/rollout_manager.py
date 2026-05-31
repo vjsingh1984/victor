@@ -138,9 +138,7 @@ class RolloutManager:
             metrics_path: Path to store metrics for persistence
         """
         self.config = config or RolloutConfig()
-        self.metrics_path = (
-            metrics_path or Path.home() / ".victor" / "metrics" / "rollout.jsonl"
-        )
+        self.metrics_path = metrics_path or Path.home() / ".victor" / "metrics" / "rollout.jsonl"
 
         # Current stage
         self._current_stage = RolloutStage.CANARY
@@ -218,9 +216,7 @@ class RolloutManager:
             metrics.predictive_requests += 1
             if not success:
                 metrics.errors += 1
-                logger.warning(
-                    f"Predictive request failed (session={session_id}): {error_message}"
-                )
+                logger.warning(f"Predictive request failed (session={session_id}): {error_message}")
 
         # Update latency (exponential moving average)
         if latency_ms > 0:
@@ -228,9 +224,7 @@ class RolloutManager:
             if metrics.latency_ms == 0:
                 metrics.latency_ms = latency_ms
             else:
-                metrics.latency_ms = (
-                    alpha * latency_ms + (1 - alpha) * metrics.latency_ms
-                )
+                metrics.latency_ms = alpha * latency_ms + (1 - alpha) * metrics.latency_ms
 
         metrics.last_updated = datetime.now(timezone.utc)
 
@@ -254,9 +248,7 @@ class RolloutManager:
         # Check cooldown
         elapsed = time.time() - self._stage_start_time
         if elapsed < self.config.cooldown_seconds:
-            logger.debug(
-                f"Cooldown not met ({elapsed:.0f}s < {self.config.cooldown_seconds}s)"
-            )
+            logger.debug(f"Cooldown not met ({elapsed:.0f}s < {self.config.cooldown_seconds}s)")
             return False
 
         # Check minimum requests
@@ -271,9 +263,7 @@ class RolloutManager:
         # Check error rate
         overall_error_rate = self._get_overall_error_rate()
         if overall_error_rate > self.config.error_threshold:
-            logger.warning(
-                f"Cannot advance: error rate {overall_error_rate:.2%} exceeds threshold"
-            )
+            logger.warning(f"Cannot advance: error rate {overall_error_rate:.2%} exceeds threshold")
             return False
 
         return True
@@ -320,9 +310,7 @@ class RolloutManager:
         self._current_stage = RolloutStage.CANARY
         self._stage_start_time = time.time()
 
-        logger.warning(
-            f"Rolled back from {old_stage} to {RolloutStage.CANARY}: {reason}"
-        )
+        logger.warning(f"Rolled back from {old_stage} to {RolloutStage.CANARY}: {reason}")
 
         return RolloutStage.CANARY
 
@@ -363,9 +351,7 @@ class RolloutManager:
             "total_requests": total_requests,
             "predictive_requests": total_predictive,
             "errors": total_errors,
-            "error_rate": (
-                total_errors / total_predictive if total_predictive > 0 else 0.0
-            ),
+            "error_rate": (total_errors / total_predictive if total_predictive > 0 else 0.0),
             "actual_rollout_percentage": (
                 (total_predictive / total_requests * 100) if total_requests > 0 else 0.0
             ),

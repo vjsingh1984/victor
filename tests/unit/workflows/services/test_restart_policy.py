@@ -104,48 +104,34 @@ class TestRestartPolicyEnforcer:
         assert enforcer._restart_counts == {}
         assert enforcer._monitoring is False
 
-    def test_should_restart_no_policy(
-        self, registry, enforcer, service_config_no_restart
-    ):
+    def test_should_restart_no_policy(self, registry, enforcer, service_config_no_restart):
         """Should not restart with 'no' policy."""
         registry.add_service(service_config_no_restart)
         assert enforcer.should_restart("no_restart_svc", exit_code=1) is False
 
-    def test_should_restart_manual_stop(
-        self, registry, enforcer, service_config_always
-    ):
+    def test_should_restart_manual_stop(self, registry, enforcer, service_config_always):
         """Should not restart if manually stopped."""
         registry.add_service(service_config_always)
-        assert (
-            enforcer.should_restart("always_restart_svc", was_manual_stop=True) is False
-        )
+        assert enforcer.should_restart("always_restart_svc", was_manual_stop=True) is False
 
-    def test_should_restart_marked_manual(
-        self, registry, enforcer, service_config_always
-    ):
+    def test_should_restart_marked_manual(self, registry, enforcer, service_config_always):
         """Should not restart if marked as manually stopped."""
         registry.add_service(service_config_always)
         enforcer.mark_manual_stop("always_restart_svc")
         assert enforcer.should_restart("always_restart_svc", exit_code=1) is False
 
-    def test_should_restart_always_policy(
-        self, registry, enforcer, service_config_always
-    ):
+    def test_should_restart_always_policy(self, registry, enforcer, service_config_always):
         """Should restart with 'always' policy."""
         registry.add_service(service_config_always)
         assert enforcer.should_restart("always_restart_svc", exit_code=0) is True
         assert enforcer.should_restart("always_restart_svc", exit_code=1) is True
 
-    def test_should_restart_on_failure_success(
-        self, registry, enforcer, service_config_on_failure
-    ):
+    def test_should_restart_on_failure_success(self, registry, enforcer, service_config_on_failure):
         """Should not restart on-failure policy with exit code 0."""
         registry.add_service(service_config_on_failure)
         assert enforcer.should_restart("failure_restart_svc", exit_code=0) is False
 
-    def test_should_restart_on_failure_fail(
-        self, registry, enforcer, service_config_on_failure
-    ):
+    def test_should_restart_on_failure_fail(self, registry, enforcer, service_config_on_failure):
         """Should restart on-failure policy with non-zero exit code."""
         registry.add_service(service_config_on_failure)
         assert enforcer.should_restart("failure_restart_svc", exit_code=1) is True
@@ -158,9 +144,7 @@ class TestRestartPolicyEnforcer:
         registry.add_service(service_config_on_failure)
         assert enforcer.should_restart("failure_restart_svc", exit_code=None) is True
 
-    def test_should_restart_max_reached(
-        self, registry, enforcer, service_config_always
-    ):
+    def test_should_restart_max_reached(self, registry, enforcer, service_config_always):
         """Should not restart when max restarts reached."""
         registry.add_service(service_config_always)
         # Simulate reaching max restarts

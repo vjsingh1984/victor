@@ -99,9 +99,7 @@ class PromptRequirements:
             min_tools_per_file: Minimum tools needed per file (read + process)
         """
         # Find the largest file-related requirement
-        file_requirements = [
-            c for c in [self.file_count, self.finding_count] if c is not None
-        ]
+        file_requirements = [c for c in [self.file_count, self.finding_count] if c is not None]
 
         if file_requirements:
             max_files = max(file_requirements)
@@ -321,9 +319,7 @@ class PromptRequirementExtractor:
                     value = self._extract_value(matches, pattern_name=name)
                     if value is not None:
                         # Map file_list_count to file_count
-                        target_name = (
-                            "file_count" if name == "file_list_count" else name
-                        )
+                        target_name = "file_count" if name == "file_list_count" else name
                         self._set_requirement(requirements, target_name, value)
                         match_count += 1
                         break  # First match wins for each requirement type
@@ -332,9 +328,7 @@ class PromptRequirementExtractor:
 
         # Compute confidence based on match ratio
         if requirements.has_explicit_requirements():
-            requirements.confidence = min(
-                1.0, match_count / 3
-            )  # 3+ matches = full confidence
+            requirements.confidence = min(1.0, match_count / 3)  # 3+ matches = full confidence
         else:
             requirements.confidence = 0.0
 
@@ -373,11 +367,7 @@ class PromptRequirementExtractor:
         # Special handling for file list counting
         if pattern_name == "file_list_count" and isinstance(match, str):
             # Count lines starting with "-" in the matched content
-            lines = [
-                line.strip()
-                for line in match.split("\n")
-                if line.strip().startswith("-")
-            ]
+            lines = [line.strip() for line in match.split("\n") if line.strip().startswith("-")]
             return len(lines) if lines else None
 
         # Handle tuple matches (multiple groups)

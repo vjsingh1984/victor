@@ -25,9 +25,7 @@ class Orchestrator(Protocol):
     tool calls, LLM interactions, and result processing.
     """
 
-    async def run(
-        self, prompt: str, context: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+    async def run(self, prompt: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Run a single-turn agent interaction.
 
         Args:

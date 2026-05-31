@@ -287,9 +287,7 @@ async def test_code_search_localize_mode_uses_provider_capability(tmp_path) -> N
     assert result["count"] == 1
     assert result["results"][0]["search_mode"] == "issue_localization"
     assert result["metadata"]["provider_capability"] == "localize_issue"
-    assert result["results"][0]["metadata"]["localization"]["matched_hints"] == [
-        "BaseRepository"
-    ]
+    assert result["results"][0]["metadata"]["localization"]["matched_hints"] == ["BaseRepository"]
 
 
 @pytest.mark.asyncio
@@ -298,9 +296,7 @@ async def test_code_search_localize_mode_falls_back_to_semantic_when_unsupported
 ) -> None:
     """Localize mode should degrade to semantic search when provider support is absent."""
     mock_index = SimpleNamespace(
-        localize_issue=AsyncMock(
-            side_effect=NotImplementedError("localize_issue unsupported")
-        ),
+        localize_issue=AsyncMock(side_effect=NotImplementedError("localize_issue unsupported")),
         semantic_search=AsyncMock(
             return_value=[
                 {
@@ -1160,9 +1156,7 @@ async def test_code_search_literal_mode_uses_parent_directory_for_missing_child_
     missing_child = source_dir / "missing.py"
     literal_result = {
         "success": True,
-        "results": [
-            {"path": "src/main.py", "score": 1, "snippet": "src/main.py:1:def main()"}
-        ],
+        "results": [{"path": "src/main.py", "score": 1, "snippet": "src/main.py:1:def main()"}],
         "count": 1,
         "mode": "literal",
     }
@@ -1205,9 +1199,7 @@ async def test_code_search_text_mode_preserves_explicit_text_search_for_filename
     """Explicit text mode should not auto-switch to filename search for parser.py-like queries."""
     literal_result = {
         "success": True,
-        "results": [
-            {"path": "src/main.py", "score": 1, "snippet": "src/main.py:1:parser.py"}
-        ],
+        "results": [{"path": "src/main.py", "score": 1, "snippet": "src/main.py:1:parser.py"}],
         "count": 1,
         "mode": "literal",
     }
@@ -1250,9 +1242,7 @@ async def test_code_search_text_mode_passes_file_pattern_to_literal_search(
     """Explicit text mode should honor file_pattern filters on the literal path."""
     literal_result = {
         "success": True,
-        "results": [
-            {"path": "src/main.py", "score": 1, "snippet": "src/main.py:1:needle"}
-        ],
+        "results": [{"path": "src/main.py", "score": 1, "snippet": "src/main.py:1:needle"}],
         "count": 1,
         "mode": "literal",
     }
@@ -1722,9 +1712,7 @@ async def test_literal_search_filename_only_does_not_fall_back_to_content_on_mis
 
     proc = SimpleNamespace(communicate=AsyncMock(return_value=(b"", b"")))
 
-    with patch(
-        "asyncio.create_subprocess_exec", new=AsyncMock(return_value=proc)
-    ) as create_proc:
+    with patch("asyncio.create_subprocess_exec", new=AsyncMock(return_value=proc)) as create_proc:
         result = await _literal_search(
             "missing.py",
             str(tmp_path),
@@ -2518,9 +2506,7 @@ async def test_code_search_reports_non_timeout_index_build_fallback_reason(
 
 
 @pytest.mark.asyncio
-async def test_code_search_logs_missing_provider_fallback_as_info(
-    tmp_path, caplog
-) -> None:
+async def test_code_search_logs_missing_provider_fallback_as_info(tmp_path, caplog) -> None:
     """Missing semantic providers should degrade quietly instead of warning loudly."""
     exec_ctx = {"settings": _settings()}
     literal_result = {"success": True, "results": [], "count": 0, "mode": "literal"}
@@ -2621,9 +2607,7 @@ async def test_code_search_reuses_missing_provider_failure_across_repo_subdirect
     framework_dir.mkdir(parents=True)
     storage_dir.mkdir(parents=True)
     (framework_dir / "agent.py").write_text("class Agent: ...\n", encoding="utf-8")
-    (storage_dir / "sqlite_store.py").write_text(
-        "class SqliteStore: ...\n", encoding="utf-8"
-    )
+    (storage_dir / "sqlite_store.py").write_text("class SqliteStore: ...\n", encoding="utf-8")
 
     persist_dir = repo_root / ".victor" / "embeddings"
     persist_dir.mkdir(parents=True)
@@ -2656,16 +2640,12 @@ async def test_code_search_reuses_missing_provider_failure_across_repo_subdirect
         "get_instance",
         staticmethod(lambda: registry),
     )
-    monkeypatch.setattr(
-        bootstrap_module, "_discover_plugin_capabilities", lambda *_args: None
-    )
+    monkeypatch.setattr(bootstrap_module, "_discover_plugin_capabilities", lambda *_args: None)
     monkeypatch.setattr(
         "victor.tools.code_search_tool._load_codebase_index_factory_via_importlib",
         lambda: None,
     )
-    monkeypatch.setattr(
-        _get_or_build_index, "_failure_cache", failure_cache, raising=False
-    )
+    monkeypatch.setattr(_get_or_build_index, "_failure_cache", failure_cache, raising=False)
     clear_index_cache()
 
     with patch(
@@ -2699,8 +2679,7 @@ async def test_code_search_reuses_missing_provider_failure_across_repo_subdirect
         record.getMessage()
         for record in caplog.records
         if record.levelno == logging.INFO
-        and "Semantic index build skipped due to cached recent failure"
-        in record.getMessage()
+        and "Semantic index build skipped due to cached recent failure" in record.getMessage()
     ]
     assert len(provider_unavailable_messages) == 1
     assert len(cached_failure_messages) == 1
@@ -2746,9 +2725,7 @@ async def test_code_search_semantic_fallback_uses_normalized_parent_path(
     source_dir = tmp_path / "src"
     source_dir.mkdir()
     missing_child = source_dir / "missing.py"
-    mock_index = SimpleNamespace(
-        semantic_search=AsyncMock(side_effect=RuntimeError("boom"))
-    )
+    mock_index = SimpleNamespace(semantic_search=AsyncMock(side_effect=RuntimeError("boom")))
     literal_result = {"success": True, "results": [], "count": 0, "mode": "literal"}
 
     with (
@@ -2784,9 +2761,7 @@ async def test_code_search_literal_fallback_preserves_mode_context_after_semanti
 ) -> None:
     """Literal fallback should keep requested-mode context after mode->semantic downgrade."""
     mock_index = SimpleNamespace(
-        localize_issue=AsyncMock(
-            side_effect=NotImplementedError("localize_issue unsupported")
-        ),
+        localize_issue=AsyncMock(side_effect=NotImplementedError("localize_issue unsupported")),
         semantic_search=AsyncMock(side_effect=RuntimeError("semantic search failed")),
     )
     exec_ctx = {"settings": _settings()}
@@ -3007,9 +2982,7 @@ def test_get_index_build_failure_cache_ignores_mock_cache_manager_fallback(
 ) -> None:
     """Bare mocks should not fabricate a cache manager for failure-cache resolution."""
     sentinel_cache = {}
-    monkeypatch.setattr(
-        _get_or_build_index, "_failure_cache", sentinel_cache, raising=False
-    )
+    monkeypatch.setattr(_get_or_build_index, "_failure_cache", sentinel_cache, raising=False)
 
     result = _get_index_build_failure_cache(MagicMock())
 
@@ -3047,6 +3020,4 @@ def test_literal_fallback_result_adds_guidance_for_empty_semantic_fallback() -> 
         fallback="semantic_index_provider_unavailable",
     )
 
-    assert result["metadata"]["fallback_guidance"].startswith(
-        "Semantic search was unavailable"
-    )
+    assert result["metadata"]["fallback_guidance"].startswith("Semantic search was unavailable")

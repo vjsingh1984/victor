@@ -53,9 +53,7 @@ class ContextServiceAdapter:
         if inspect.isawaitable(result):
             result = await result
         if hasattr(result, "messages_removed"):
-            self._last_compaction_saved_tokens = int(
-                getattr(result, "tokens_freed", 0) or 0
-            )
+            self._last_compaction_saved_tokens = int(getattr(result, "tokens_freed", 0) or 0)
             return int(getattr(result, "messages_removed", 0) or 0)
         return int(result) if isinstance(result, int) else 0
 
@@ -108,9 +106,7 @@ class ContextServiceAdapter:
                 role = message.get("role")
                 content = message.get("content")
                 metadata = {
-                    key: value
-                    for key, value in message.items()
-                    if key not in {"role", "content"}
+                    key: value for key, value in message.items() if key not in {"role", "content"}
                 }
             else:
                 role = getattr(message, "role", None)
@@ -141,9 +137,7 @@ class ContextServiceAdapter:
     def clear_messages(self, retain_system: bool = True) -> None:
         """Clear conversation messages while optionally preserving the system prompt."""
         self._conversation_controller.reset()
-        if retain_system and hasattr(
-            self._conversation_controller, "ensure_system_message"
-        ):
+        if retain_system and hasattr(self._conversation_controller, "ensure_system_message"):
             self._conversation_controller.ensure_system_message()
 
     def manages_conversation_controller(self, controller: Any) -> bool:
@@ -186,14 +180,10 @@ class ContextServiceAdapter:
         message_count = len(self.get_messages())
         recommended_removal = 0
         if should_compact and message_count > 0:
-            target_tokens = max(
-                0.0, ((threshold_percent - 10.0) / 100.0) * self.get_max_tokens()
-            )
+            target_tokens = max(0.0, ((threshold_percent - 10.0) / 100.0) * self.get_max_tokens())
             excess_tokens = max(0.0, float(current_tokens) - target_tokens)
             avg_tokens = max(current_tokens / message_count, 1)
-            recommended_removal = (
-                int(excess_tokens / avg_tokens) + 1 if excess_tokens > 0 else 0
-            )
+            recommended_removal = int(excess_tokens / avg_tokens) + 1 if excess_tokens > 0 else 0
         return {
             "should_compact": should_compact,
             "current_tokens": current_tokens,

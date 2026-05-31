@@ -8,9 +8,7 @@ from victor_contracts.workflows import (
 
 
 def test_node_result_success_tracks_completed_status() -> None:
-    result = NodeResult(
-        node_id="demo", status=ExecutorNodeStatus.COMPLETED, output={"ok": True}
-    )
+    result = NodeResult(node_id="demo", status=ExecutorNodeStatus.COMPLETED, output={"ok": True})
 
     assert result.success is True
     assert result.to_dict()["status"] == "completed"

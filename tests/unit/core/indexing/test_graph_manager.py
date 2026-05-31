@@ -279,9 +279,7 @@ class TestGraphManager:
         assert stop_calls == [temp_codebase.resolve()]
 
     @pytest.mark.asyncio
-    async def test_background_refresh_cooldown_delays_recent_success(
-        self, temp_codebase
-    ):
+    async def test_background_refresh_cooldown_delays_recent_success(self, temp_codebase):
         """Recent successful refreshes should suppress immediate rescan churn."""
         manager = GraphManager.get_instance()
         root_str = str(temp_codebase.resolve())
@@ -439,9 +437,7 @@ class TestGraphManager:
 
         manager._background_refresh[root_str] = {
             "pending": False,
-            "on_refresh_error": lambda refreshed_root, exc: notified.append(
-                (refreshed_root, exc)
-            ),
+            "on_refresh_error": lambda refreshed_root, exc: notified.append((refreshed_root, exc)),
         }
 
         async def _boom(_root):

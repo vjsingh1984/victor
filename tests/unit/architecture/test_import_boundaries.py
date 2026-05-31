@@ -88,9 +88,7 @@ class TestVerticalImportBoundaries:
 
         # Get all Python files in vertical
         vertical_path = Path(module.__file__).parent
-        py_files = [
-            f for f in vertical_path.rglob("*.py") if "__pycache__" not in str(f)
-        ]
+        py_files = [f for f in vertical_path.rglob("*.py") if "__pycache__" not in str(f)]
 
         errors = []
         for py_file in py_files:
@@ -145,12 +143,7 @@ class TestVictorSDKNoDependencies:
             for i, line in enumerate(lines, 1):
                 # Skip empty lines, comments, and docstrings
                 stripped = line.strip()
-                if (
-                    not stripped
-                    or stripped.startswith("#")
-                    or '"""' in line
-                    or "'''" in line
-                ):
+                if not stripped or stripped.startswith("#") or '"""' in line or "'''" in line:
                     continue
 
                 # Check for actual import statements from victor
@@ -186,9 +179,7 @@ class TestVictorSDKNoDependencies:
         allowed_deps = ["typing-extensions"]
         for dep in dependencies:
             dep_name = dep.split(">=")[0].split("==")[0].strip()
-            assert (
-                dep_name in allowed_deps
-            ), f"victor-contracts has unexpected dependency: {dep}"
+            assert dep_name in allowed_deps, f"victor-contracts has unexpected dependency: {dep}"
 
 
 class TestCanonicalProtocolImports:
@@ -237,9 +228,8 @@ class TestCanonicalProtocolImports:
                 # Allow it in comments
                 lines = content.split("\n")
                 for i, line in enumerate(lines, 1):
-                    if (
-                        "from victor.teams.protocols import" in line
-                        and not line.strip().startswith("#")
+                    if "from victor.teams.protocols import" in line and not line.strip().startswith(
+                        "#"
                     ):
                         errors.append(
                             f"{py_file.relative_to(victor_path)}:{i} "
@@ -275,9 +265,9 @@ class TestPresentationBoundaries:
                     stripped = line.strip()
                     if not stripped or stripped.startswith("#"):
                         continue
-                    if stripped.startswith(
-                        "from victor.ui.emoji import"
-                    ) or stripped.startswith("import victor.ui.emoji"):
+                    if stripped.startswith("from victor.ui.emoji import") or stripped.startswith(
+                        "import victor.ui.emoji"
+                    ):
                         errors.append(
                             f"{rel_path}:{line_no} imports victor.ui.emoji directly; "
                             "use PresentationProtocol / EmojiPresentationAdapter boundary instead"
@@ -297,18 +287,15 @@ class TestPresentationBoundaries:
         errors = []
         for py_file in py_files:
             # Allow this boundary test module to inspect the compatibility shim.
-            if py_file.as_posix().endswith(
-                "tests/unit/architecture/test_import_boundaries.py"
-            ):
+            if py_file.as_posix().endswith("tests/unit/architecture/test_import_boundaries.py"):
                 continue
 
             content = py_file.read_text()
             if "from victor.teams.protocols import" in content:
                 lines = content.split("\n")
                 for i, line in enumerate(lines, 1):
-                    if (
-                        "from victor.teams.protocols import" in line
-                        and not line.strip().startswith("#")
+                    if "from victor.teams.protocols import" in line and not line.strip().startswith(
+                        "#"
                     ):
                         errors.append(
                             f"{py_file.relative_to(tests_path)}:{i} "
@@ -356,10 +343,7 @@ class TestCanonicalTypeImports:
                 stripped = line.strip()
                 if stripped.startswith("#"):
                     continue
-                if (
-                    "from victor.core.types import" in line
-                    or "import victor.core.types" in line
-                ):
+                if "from victor.core.types import" in line or "import victor.core.types" in line:
                     errors.append(
                         f"{py_file.relative_to(victor_path)}:{i} imports from "
                         "victor.core.types, should use victor.core.vertical_types "
@@ -379,9 +363,7 @@ class TestCanonicalTypeImports:
 
         errors = []
         for py_file in py_files:
-            if py_file.as_posix().endswith(
-                "tests/unit/architecture/test_import_boundaries.py"
-            ):
+            if py_file.as_posix().endswith("tests/unit/architecture/test_import_boundaries.py"):
                 continue
 
             content = py_file.read_text()
@@ -390,10 +372,7 @@ class TestCanonicalTypeImports:
                 stripped = line.strip()
                 if stripped.startswith("#"):
                     continue
-                if (
-                    "from victor.core.types import" in line
-                    or "import victor.core.types" in line
-                ):
+                if "from victor.core.types import" in line or "import victor.core.types" in line:
                     errors.append(
                         f"{py_file.relative_to(tests_path)}:{i} imports from "
                         "victor.core.types, should use victor.core.vertical_types "
@@ -445,11 +424,7 @@ if failed:
             cwd=Path(__file__).resolve().parents[3],
         )
         if result.returncode != 0:
-            details = (
-                result.stdout.strip()
-                or result.stderr.strip()
-                or "unknown import failure"
-            )
+            details = result.stdout.strip() or result.stderr.strip() or "unknown import failure"
             pytest.fail(f"Failed to import modules:\n{details}")
 
     def test_can_import_all_modules(self) -> None:

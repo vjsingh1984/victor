@@ -116,9 +116,7 @@ class TestConfigureLogging:
         _configure_logging("debug", stream=stream, file_logging=False)
         assert any(h.level == logging.DEBUG for h in logging.root.handlers)
 
-    def test_configure_logging_uses_global_victor_dir_for_default_log_file(
-        self, tmp_path
-    ):
+    def test_configure_logging_uses_global_victor_dir_for_default_log_file(self, tmp_path):
         """Default log file should resolve through centralized Victor paths."""
         from victor.ui.commands.utils import configure_logging as _configure_logging
 
@@ -128,9 +126,7 @@ class TestConfigureLogging:
         mock_file_handler.level = logging.NOTSET
 
         with (
-            patch(
-                "victor.ui.commands.utils.get_project_paths", return_value=fake_paths
-            ),
+            patch("victor.ui.commands.utils.get_project_paths", return_value=fake_paths),
             patch(
                 "logging.handlers.RotatingFileHandler", return_value=mock_file_handler
             ) as mock_handler,
@@ -303,9 +299,7 @@ class TestCliConfirmationCallback:
             arguments={"param": "value"},
         )
 
-        with patch(
-            "victor.ui.commands.utils.Confirm.ask", return_value=True
-        ) as mock_ask:
+        with patch("victor.ui.commands.utils.Confirm.ask", return_value=True) as mock_ask:
             result = await cli_confirmation_callback(request)
             assert result is True
             mock_ask.assert_called_once()
@@ -342,9 +336,7 @@ class TestCliConfirmationCallback:
             arguments={},
         )
 
-        with patch(
-            "victor.ui.commands.utils.Confirm.ask", side_effect=KeyboardInterrupt
-        ):
+        with patch("victor.ui.commands.utils.Confirm.ask", side_effect=KeyboardInterrupt):
             result = await cli_confirmation_callback(request)
             assert result is False
 
@@ -539,17 +531,13 @@ class TestCheckCodebaseIndex:
                 "victor.ui.commands.utils.CodebaseIndexFactoryProtocol",
                 new=MagicMock(),
             ),
-            patch(
-                "victor.ui.commands.utils.get_container", return_value=mock_container
-            ),
+            patch("victor.ui.commands.utils.get_container", return_value=mock_container),
         ):
             await check_codebase_index("/tmp", mock_console, silent=True)
             # No output expected when not stale and silent
 
     @pytest.mark.asyncio
-    async def test_check_codebase_index_passes_graph_writer_mode(
-        self, mock_console, monkeypatch
-    ):
+    async def test_check_codebase_index_passes_graph_writer_mode(self, mock_console, monkeypatch):
         """Graph writer mode should be explicitly forwarded to the indexer."""
         from types import SimpleNamespace
         from victor.ui.commands.utils import check_codebase_index
@@ -579,9 +567,7 @@ class TestCheckCodebaseIndex:
                 "victor.ui.commands.utils.CodebaseIndexFactoryProtocol",
                 new=MagicMock(),
             ),
-            patch(
-                "victor.ui.commands.utils.get_container", return_value=mock_container
-            ),
+            patch("victor.ui.commands.utils.get_container", return_value=mock_container),
         ):
             await check_codebase_index("/tmp", mock_console, silent=True)
             mock_factory.create.assert_called_once_with(
@@ -603,9 +589,7 @@ class TestPreloadSemanticIndex:
     """Tests for _preload_semantic_index async function."""
 
     @pytest.mark.asyncio
-    async def test_preload_semantic_index_import_error(
-        self, mock_console, mock_settings
-    ):
+    async def test_preload_semantic_index_import_error(self, mock_console, mock_settings):
         """Test handling of ImportError."""
         from victor.ui.commands.utils import preload_semantic_index
 
@@ -617,9 +601,7 @@ class TestPreloadSemanticIndex:
             assert result is False
 
     @pytest.mark.asyncio
-    async def test_preload_semantic_index_generic_error(
-        self, mock_console, mock_settings
-    ):
+    async def test_preload_semantic_index_generic_error(self, mock_console, mock_settings):
         """Test handling of generic errors."""
         from victor.ui.commands.utils import preload_semantic_index
 
@@ -952,9 +934,7 @@ class TestChatReplRendering:
             )
 
         rendered = [
-            str(call_args.args[0])
-            for call_args in mock_print.call_args_list
-            if call_args.args
+            str(call_args.args[0]) for call_args in mock_print.call_args_list if call_args.args
         ]
         assert not any("dup content" in item for item in rendered)
 
@@ -1012,18 +992,13 @@ class TestChatReplRendering:
                 )
 
         rendered = [
-            str(call_args.args[0])
-            for call_args in mock_print.call_args_list
-            if call_args.args
+            str(call_args.args[0]) for call_args in mock_print.call_args_list if call_args.args
         ]
         assert any("network error" in item.lower() for item in rendered)
         assert any("different provider" in item.lower() for item in rendered)
+        assert not any("cannot access local variable 'provider'" in item for item in rendered)
         assert not any(
-            "cannot access local variable 'provider'" in item for item in rendered
-        )
-        assert not any(
-            "SQLiteSessionPersistence is deprecated" in str(w.message)
-            for w in caught_warnings
+            "SQLiteSessionPersistence is deprecated" in str(w.message) for w in caught_warnings
         )
         assert not any(
             "get_sqlite_session_persistence() is deprecated" in str(w.message)

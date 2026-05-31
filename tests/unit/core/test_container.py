@@ -84,9 +84,7 @@ class TestServiceContainer:
     def test_register_and_get_singleton(self):
         """Test registering and retrieving a singleton service."""
         container = ServiceContainer()
-        container.register(
-            MockLogger, lambda c: MockLogger(), ServiceLifetime.SINGLETON
-        )
+        container.register(MockLogger, lambda c: MockLogger(), ServiceLifetime.SINGLETON)
 
         logger1 = container.get(MockLogger)
         logger2 = container.get(MockLogger)
@@ -97,9 +95,7 @@ class TestServiceContainer:
     def test_register_and_get_transient(self):
         """Test registering and retrieving a transient service."""
         container = ServiceContainer()
-        container.register(
-            MockLogger, lambda c: MockLogger(), ServiceLifetime.TRANSIENT
-        )
+        container.register(MockLogger, lambda c: MockLogger(), ServiceLifetime.TRANSIENT)
 
         logger1 = container.get(MockLogger)
         logger2 = container.get(MockLogger)
@@ -122,9 +118,7 @@ class TestServiceContainer:
     def test_dependency_injection(self):
         """Test injecting dependencies between services."""
         container = ServiceContainer()
-        container.register(
-            MockLogger, lambda c: MockLogger(), ServiceLifetime.SINGLETON
-        )
+        container.register(MockLogger, lambda c: MockLogger(), ServiceLifetime.SINGLETON)
         container.register(
             MockCache, lambda c: MockCache(c.get(MockLogger)), ServiceLifetime.SINGLETON
         )
@@ -231,9 +225,7 @@ class TestServiceContainer:
     def test_thread_safety_singleton(self):
         """Test that singleton resolution is thread-safe."""
         container = ServiceContainer()
-        container.register(
-            MockLogger, lambda c: MockLogger(), ServiceLifetime.SINGLETON
-        )
+        container.register(MockLogger, lambda c: MockLogger(), ServiceLifetime.SINGLETON)
 
         results = []
         errors = []
@@ -281,9 +273,7 @@ class TestServiceScope:
     def test_scoped_inherits_singletons(self):
         """Test that scoped containers inherit singleton instances."""
         container = ServiceContainer()
-        container.register(
-            MockLogger, lambda c: MockLogger(), ServiceLifetime.SINGLETON
-        )
+        container.register(MockLogger, lambda c: MockLogger(), ServiceLifetime.SINGLETON)
 
         singleton_logger = container.get(MockLogger)
 
@@ -294,9 +284,7 @@ class TestServiceScope:
     def test_scope_disposes_services(self):
         """Test that scope disposal cleans up scoped services."""
         container = ServiceContainer()
-        container.register(
-            DisposableService, lambda c: DisposableService(), ServiceLifetime.SCOPED
-        )
+        container.register(DisposableService, lambda c: DisposableService(), ServiceLifetime.SCOPED)
 
         with container.create_scope() as scope:
             scope.get(DisposableService)

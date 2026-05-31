@@ -31,14 +31,10 @@ class ExplodingContainer:
     """Container stub that fails if compatibility surfaces reach into DI."""
 
     def get(self, service_type: Any) -> Any:
-        raise AssertionError(
-            f"unexpected get({service_type!r}) for compatibility surface"
-        )
+        raise AssertionError(f"unexpected get({service_type!r}) for compatibility surface")
 
     def get_optional(self, service_type: Any) -> Any:
-        raise AssertionError(
-            f"unexpected get_optional({service_type!r}) for compatibility surface"
-        )
+        raise AssertionError(f"unexpected get_optional({service_type!r}) for compatibility surface")
 
 
 class TestCoordinatorFactoryCompatibility:
@@ -88,6 +84,4 @@ class TestCoordinatorFactoryCompatibility:
         }
 
         assert "victor.agent.coordinators.safety_coordinator" not in imported_modules
-        assert (
-            "victor.agent.coordinators.conversation_coordinator" not in imported_modules
-        )
+        assert "victor.agent.coordinators.conversation_coordinator" not in imported_modules

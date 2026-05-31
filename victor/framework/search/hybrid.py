@@ -158,17 +158,13 @@ class HybridSearchEngine:
             # Get semantic ranking/score
             semantic_rank, semantic_score = semantic_map.get(file_path, (-1, 0.0))
             semantic_rrf = (
-                self.semantic_weight / (self.rrf_k + semantic_rank)
-                if semantic_rank >= 0
-                else 0.0
+                self.semantic_weight / (self.rrf_k + semantic_rank) if semantic_rank >= 0 else 0.0
             )
 
             # Get keyword ranking/score
             keyword_rank, keyword_score = keyword_map.get(file_path, (-1, 0.0))
             keyword_rrf = (
-                self.keyword_weight / (self.rrf_k + keyword_rank)
-                if keyword_rank >= 0
-                else 0.0
+                self.keyword_weight / (self.rrf_k + keyword_rank) if keyword_rank >= 0 else 0.0
             )
 
             # Combined RRF score
@@ -207,9 +203,7 @@ class HybridSearchEngine:
 
         return hybrid_results
 
-    def _filter_ranked_results(
-        self, results: List[Dict[str, Any]]
-    ) -> List[Dict[str, Any]]:
+    def _filter_ranked_results(self, results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Drop empty or non-positive results before applying rank-only fusion."""
         filtered: List[Dict[str, Any]] = []
         for result in results:
@@ -297,17 +291,14 @@ class HybridSearchEngine:
 
         if result.keyword_rank >= 0:
             lines.append(
-                f"  Keyword: rank #{result.keyword_rank + 1}, "
-                f"score {result.keyword_score:.1f}"
+                f"  Keyword: rank #{result.keyword_rank + 1}, " f"score {result.keyword_score:.1f}"
             )
         else:
             lines.append("  Keyword: not in results")
 
         # Explain why it ranked
         if result.semantic_rank >= 0 and result.keyword_rank >= 0:
-            lines.append(
-                "  → Found by BOTH semantic and keyword search (high confidence)"
-            )
+            lines.append("  → Found by BOTH semantic and keyword search (high confidence)")
         elif result.semantic_rank >= 0:
             lines.append("  → Found only by semantic search (concept match)")
         else:

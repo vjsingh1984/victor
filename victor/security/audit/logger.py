@@ -74,9 +74,7 @@ class FileAuditLogger(AuditLoggerProtocol):
             with open(self._current_log_file, "a", encoding="utf-8") as f:
                 f.write(json.dumps(event.to_dict()) + "\n")
 
-            logger.debug(
-                f"Logged audit event: {event.event_type.value} - {event.action}"
-            )
+            logger.debug(f"Logged audit event: {event.event_type.value} - {event.action}")
         except Exception as e:
             logger.error(f"Failed to log audit event: {e}")
 
@@ -165,14 +163,10 @@ class FileAuditLogger(AuditLoggerProtocol):
         end_str = end_date.strftime("%Y%m%d")
 
         if format == "csv":
-            export_file = (
-                export_dir / f"audit_export_{start_str}_{end_str}_{timestamp}.csv"
-            )
+            export_file = export_dir / f"audit_export_{start_str}_{end_str}_{timestamp}.csv"
             await self._export_csv(events, export_file)
         else:
-            export_file = (
-                export_dir / f"audit_export_{start_str}_{end_str}_{timestamp}.json"
-            )
+            export_file = export_dir / f"audit_export_{start_str}_{end_str}_{timestamp}.json"
             await self._export_json(events, export_file)
 
         logger.info(f"Exported {len(events)} events to {export_file}")

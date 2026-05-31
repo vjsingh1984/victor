@@ -349,9 +349,7 @@ class ResourceManager:
                     "callbacks_registered": len(self._cleanup_callbacks),
                     "cleanup_done": self._cleanup_done,
                     "active_resources": sum(
-                        1
-                        for m in self._resources.values()
-                        if m.state == ResourceState.ACTIVE
+                        1 for m in self._resources.values() if m.state == ResourceState.ACTIVE
                     ),
                 }
 

@@ -238,14 +238,9 @@ class TestPermissionChecks:
             user_permissions={Permission.READ_FILES, Permission.WRITE_FILES},
         )
         assert context.has_all_permissions({Permission.READ_FILES}) is True
+        assert context.has_all_permissions({Permission.READ_FILES, Permission.WRITE_FILES}) is True
         assert (
-            context.has_all_permissions({Permission.READ_FILES, Permission.WRITE_FILES})
-            is True
-        )
-        assert (
-            context.has_all_permissions(
-                {Permission.READ_FILES, Permission.EXECUTE_COMMANDS}
-            )
+            context.has_all_permissions({Permission.READ_FILES, Permission.EXECUTE_COMMANDS})
             is False
         )
 
@@ -256,14 +251,9 @@ class TestPermissionChecks:
             workspace_root=Path("."),
             user_permissions={Permission.READ_FILES},
         )
+        assert context.has_any_permission({Permission.READ_FILES, Permission.WRITE_FILES}) is True
         assert (
-            context.has_any_permission({Permission.READ_FILES, Permission.WRITE_FILES})
-            is True
-        )
-        assert (
-            context.has_any_permission(
-                {Permission.EXECUTE_COMMANDS, Permission.NETWORK_ACCESS}
-            )
+            context.has_any_permission({Permission.EXECUTE_COMMANDS, Permission.NETWORK_ACCESS})
             is False
         )
 

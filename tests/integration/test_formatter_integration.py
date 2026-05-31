@@ -235,12 +235,8 @@ class TestFormatterIntegration:
                         "failures": [],
                     },
                 ),
-                executor.submit(
-                    format_in_thread, "code_search", {"results": [], "mode": "search"}
-                ),
-                executor.submit(
-                    format_in_thread, "git", {"output": "", "operation": "status"}
-                ),
+                executor.submit(format_in_thread, "code_search", {"results": [], "mode": "search"}),
+                executor.submit(format_in_thread, "git", {"output": "", "operation": "status"}),
             ]
 
             # All should complete without errors

@@ -288,9 +288,7 @@ def main():
     parser.add_argument(
         "--clean", action="store_true", help="Clean build artifacts before building"
     )
-    parser.add_argument(
-        "--debug", action="store_true", help="Include debug information"
-    )
+    parser.add_argument("--debug", action="store_true", help="Include debug information")
     parser.add_argument(
         "--output",
         default="victor-server",
@@ -322,9 +320,7 @@ def main():
         print()
 
     # Build
-    binary_path = build_binary(
-        onefile=args.onefile, debug=args.debug, output_name=args.output
-    )
+    binary_path = build_binary(onefile=args.onefile, debug=args.debug, output_name=args.output)
 
     if binary_path:
         create_launcher_script(binary_path)

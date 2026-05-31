@@ -25,9 +25,7 @@ class TestMockPluginContextProtocol:
 
         protocol_methods = {
             name
-            for name, _ in inspect.getmembers(
-                PluginContext, predicate=inspect.isfunction
-            )
+            for name, _ in inspect.getmembers(PluginContext, predicate=inspect.isfunction)
             if not name.startswith("_")
         }
         mock_methods = {

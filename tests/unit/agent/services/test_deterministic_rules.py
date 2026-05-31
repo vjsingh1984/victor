@@ -464,9 +464,7 @@ class TestEnsembleVoter:
         voter = EnsembleVoter()
 
         keyword_result = LookupResult(
-            decision=TaskCompletionDecision(
-                is_complete=True, confidence=0.90, phase="done"
-            ),
+            decision=TaskCompletionDecision(is_complete=True, confidence=0.90, phase="done"),
             confidence=0.90,
             reason="Keyword matched",
             matched_pattern="done",
@@ -488,18 +486,14 @@ class TestEnsembleVoter:
         voter = EnsembleVoter()
 
         keyword_result = LookupResult(
-            decision=TaskCompletionDecision(
-                is_complete=True, confidence=0.85, phase="done"
-            ),
+            decision=TaskCompletionDecision(is_complete=True, confidence=0.85, phase="done"),
             confidence=0.85,
             reason="Keyword matched",
             matched_pattern="complete",
         )
 
         semantic_result = LookupResult(
-            decision=TaskCompletionDecision(
-                is_complete=True, confidence=0.88, phase="done"
-            ),
+            decision=TaskCompletionDecision(is_complete=True, confidence=0.88, phase="done"),
             confidence=0.88,
             reason="Semantic match",
             matched_pattern="semantic",
@@ -583,18 +577,14 @@ class TestEnsembleVoter:
 
         # Create high-confidence results
         keyword_result = LookupResult(
-            decision=TaskCompletionDecision(
-                is_complete=True, confidence=0.95, phase="done"
-            ),
+            decision=TaskCompletionDecision(is_complete=True, confidence=0.95, phase="done"),
             confidence=0.95,
             reason="Keyword",
             matched_pattern="done",
         )
 
         semantic_result = LookupResult(
-            decision=TaskCompletionDecision(
-                is_complete=True, confidence=0.95, phase="done"
-            ),
+            decision=TaskCompletionDecision(is_complete=True, confidence=0.95, phase="done"),
             confidence=0.95,
             reason="Semantic",
             matched_pattern="done",
@@ -667,12 +657,8 @@ class TestIntegration:
         matches = 0
         for phrase in test_phrases:
             context = {"response": phrase}
-            lookup_result = LookupTables.lookup(
-                DecisionType.INTENT_CLASSIFICATION, context
-            )
-            pattern_result = PatternMatcher.match(
-                DecisionType.INTENT_CLASSIFICATION, context
-            )
+            lookup_result = LookupTables.lookup(DecisionType.INTENT_CLASSIFICATION, context)
+            pattern_result = PatternMatcher.match(DecisionType.INTENT_CLASSIFICATION, context)
 
             if lookup_result or pattern_result:
                 matches += 1
@@ -694,12 +680,8 @@ class TestIntegration:
         matches = 0
         for error_msg in error_messages:
             context = {"error_message": error_msg}
-            lookup_result = LookupTables.lookup(
-                DecisionType.ERROR_CLASSIFICATION, context
-            )
-            pattern_result = PatternMatcher.match(
-                DecisionType.ERROR_CLASSIFICATION, context
-            )
+            lookup_result = LookupTables.lookup(DecisionType.ERROR_CLASSIFICATION, context)
+            pattern_result = PatternMatcher.match(DecisionType.ERROR_CLASSIFICATION, context)
 
             if lookup_result or pattern_result:
                 matches += 1

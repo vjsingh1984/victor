@@ -28,9 +28,7 @@ class TestToolParameter:
 
     def test_tool_parameter_creation(self):
         """Test creating a tool parameter."""
-        param = ToolParameter(
-            name="test_param", type="string", description="A test parameter"
-        )
+        param = ToolParameter(name="test_param", type="string", description="A test parameter")
         assert param.name == "test_param"
         assert param.type == "string"
         assert param.description == "A test parameter"
@@ -76,17 +74,13 @@ class TestToolParameter:
 
     def test_tool_parameter_with_min_max(self):
         """Test tool parameter with min/max constraints."""
-        param = ToolParameter(
-            name="number_param", type="number", description="Number parameter"
-        )
+        param = ToolParameter(name="number_param", type="number", description="Number parameter")
         # ToolParameter may not have explicit min/max fields
         assert param.type == "number"
 
     def test_tool_parameter_with_pattern(self):
         """Test tool parameter with regex pattern."""
-        param = ToolParameter(
-            name="email_param", type="string", description="Email parameter"
-        )
+        param = ToolParameter(name="email_param", type="string", description="Email parameter")
         # ToolParameter may not have explicit pattern field
         assert param.type == "string"
 
@@ -258,9 +252,7 @@ class TestConcreteToolImplementation:
             parameters = {"properties": {}}
 
             async def execute(self, _exec_ctx, **kwargs):
-                return ToolResult(
-                    output="", success=False, error="Tool failed as expected"
-                )
+                return ToolResult(output="", success=False, error="Tool failed as expected")
 
         tool = FailingTool()
         result = await tool.execute({})
@@ -361,9 +353,9 @@ class TestToolRegistry:
         availability["ready"] = True
 
         assert [tool.name for tool in registry.list_tools()] == ["conditional_tool"]
-        assert [
-            schema["function"]["name"] for schema in registry.get_tool_schemas()
-        ] == ["conditional_tool"]
+        assert [schema["function"]["name"] for schema in registry.get_tool_schemas()] == [
+            "conditional_tool"
+        ]
 
     def test_tool_registry_unregister_tool(self):
         """Test unregistering a tool."""
@@ -415,9 +407,7 @@ class TestToolParameterSchema:
 
     def test_object_parameter_schema(self):
         """Test object parameter schema."""
-        param = ToolParameter(
-            name="config", type="object", description="Configuration object"
-        )
+        param = ToolParameter(name="config", type="object", description="Configuration object")
         assert param.type == "object"
 
 
@@ -532,15 +522,9 @@ class TestConvertParametersToSchema:
     def test_multiple_parameters_mixed_required(self):
         """Test conversion with multiple parameters, some required."""
         params = [
-            ToolParameter(
-                name="file", type="string", description="File", required=True
-            ),
-            ToolParameter(
-                name="mode", type="string", description="Mode", required=True
-            ),
-            ToolParameter(
-                name="encoding", type="string", description="Encoding", required=False
-            ),
+            ToolParameter(name="file", type="string", description="File", required=True),
+            ToolParameter(name="mode", type="string", description="Mode", required=True),
+            ToolParameter(name="encoding", type="string", description="Encoding", required=False),
         ]
         schema = BaseTool.convert_parameters_to_schema(params)
 
@@ -952,10 +936,7 @@ class TestToolDecorators:
         assert filters_schema["type"] == "object"
         assert "file_pattern" in filters_schema["properties"]
         assert filters_schema["properties"]["top_k"] == {"type": "integer"}
-        assert (
-            params["properties"]["filters"]["properties"]["file_pattern"]["type"]
-            == "string"
-        )
+        assert params["properties"]["filters"]["properties"]["file_pattern"]["type"] == "string"
 
     def test_code_search_filters_schema_is_object(self):
         """`code_search` filters should be typed as an object, not a string."""

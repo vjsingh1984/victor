@@ -127,9 +127,7 @@ class SemanticThresholdLearner(BaseLearner):
         embedding_model = outcome.metadata.get("embedding_model", "unknown")
         tool_name = outcome.metadata.get("tool_name", "code_search")
 
-        context_key = self._get_context_key(
-            embedding_model, outcome.task_type, tool_name
-        )
+        context_key = self._get_context_key(embedding_model, outcome.task_type, tool_name)
 
         cursor = self.db.cursor()
 
@@ -179,12 +177,7 @@ class SemanticThresholdLearner(BaseLearner):
         recommended = stats.get("recommended_threshold")
 
         # Dirty-check: skip write only when recommendation is stable
-        if (
-            rl_mode == "selective"
-            and row_map
-            and recommended is not None
-            and prev_recommended >= 0
-        ):
+        if rl_mode == "selective" and row_map and recommended is not None and prev_recommended >= 0:
             if abs(recommended - prev_recommended) < 0.01:
                 logger.debug(
                     "RL: semantic_threshold recommendation unchanged for %s, skipping",
@@ -203,9 +196,7 @@ class SemanticThresholdLearner(BaseLearner):
             ("results_sum", results_sum),
             ("threshold_sum", threshold_sum),
         ):
-            self._upsert_stat(
-                cursor, context_key, stat_key, stat_value, total_searches, ts
-            )
+            self._upsert_stat(cursor, context_key, stat_key, stat_value, total_searches, ts)
 
         if recommended is not None:
             self._upsert_stat(
@@ -342,9 +333,7 @@ class SemanticThresholdLearner(BaseLearner):
         if zero_rate > 0.3 or low_quality_rate > 0.3:
             confidence *= 0.7
 
-        recommended = (
-            recommended_threshold if recommended_threshold >= 0 else avg_threshold
-        )
+        recommended = recommended_threshold if recommended_threshold >= 0 else avg_threshold
 
         return RLRecommendation(
             value=recommended,

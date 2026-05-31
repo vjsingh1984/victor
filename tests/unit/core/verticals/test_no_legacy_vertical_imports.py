@@ -46,18 +46,12 @@ def test_runtime_code_has_no_direct_legacy_vertical_imports() -> None:
                 for alias in node.names:
                     for prefix in _FORBIDDEN_PREFIXES:
                         if alias.name == prefix or alias.name.startswith(f"{prefix}."):
-                            violations.append(
-                                f"{rel}:{node.lineno} import {alias.name}"
-                            )
+                            violations.append(f"{rel}:{node.lineno} import {alias.name}")
             elif isinstance(node, ast.ImportFrom):
                 if not node.module:
                     continue
                 for prefix in _FORBIDDEN_PREFIXES:
                     if node.module == prefix or node.module.startswith(f"{prefix}."):
-                        violations.append(
-                            f"{rel}:{node.lineno} from {node.module} import ..."
-                        )
+                        violations.append(f"{rel}:{node.lineno} from {node.module} import ...")
 
-    assert not violations, "Direct legacy vertical imports found:\n" + "\n".join(
-        violations
-    )
+    assert not violations, "Direct legacy vertical imports found:\n" + "\n".join(violations)

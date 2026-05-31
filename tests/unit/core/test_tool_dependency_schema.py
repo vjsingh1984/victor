@@ -239,16 +239,12 @@ class TestToolDependencyEntry:
 
     def test_entry_depends_on_list_is_cleaned(self):
         """ToolDependencyEntry should clean depends_on list."""
-        entry = ToolDependencyEntry(
-            tool="edit", depends_on=["  read  ", "", "analyze", "   "]
-        )
+        entry = ToolDependencyEntry(tool="edit", depends_on=["  read  ", "", "analyze", "   "])
         assert entry.depends_on == ["read", "analyze"]
 
     def test_entry_enables_list_is_cleaned(self):
         """ToolDependencyEntry should clean enables list."""
-        entry = ToolDependencyEntry(
-            tool="edit", enables=["  test  ", "", "commit", "   "]
-        )
+        entry = ToolDependencyEntry(tool="edit", enables=["  test  ", "", "commit", "   "])
         assert entry.enables == ["test", "commit"]
 
     def test_entry_weight_at_bounds(self):
@@ -295,9 +291,7 @@ class TestToolDependencySpec:
             clusters={"file_ops": ["read", "write", "edit"]},
             sequences={"exploration": ["ls", "read", "grep"]},
             dependencies=[
-                ToolDependencyEntry(
-                    tool="edit", depends_on=["read"], enables=["test"], weight=0.9
-                )
+                ToolDependencyEntry(tool="edit", depends_on=["read"], enables=["test"], weight=0.9)
             ],
             required_tools=["read", "edit"],
             optional_tools=["grep", "test"],
@@ -410,9 +404,7 @@ class TestToolDependencySpecCrossValidation:
             clusters={"file_ops": ["write", "delete"]},
             sequences={"explore": ["ls", "grep"]},
             dependencies=[
-                ToolDependencyEntry(
-                    tool="commit", depends_on=["test"], enables=["deploy"]
-                )
+                ToolDependencyEntry(tool="commit", depends_on=["test"], enables=["deploy"])
             ],
             required_tools=["required1"],
             optional_tools=["optional1"],
@@ -560,15 +552,11 @@ class TestToolDependencySpecGetAllToolNames:
         """get_all_tool_names should work with all configuration sources combined."""
         spec = ToolDependencySpec(
             vertical="coding",
-            transitions={
-                "trans_source": [ToolTransition(tool="trans_target", weight=0.5)]
-            },
+            transitions={"trans_source": [ToolTransition(tool="trans_target", weight=0.5)]},
             clusters={"cluster": ["cluster_tool"]},
             sequences={"sequence": ["sequence_tool"]},
             dependencies=[
-                ToolDependencyEntry(
-                    tool="dep_tool", depends_on=["dep_dep"], enables=["dep_enable"]
-                )
+                ToolDependencyEntry(tool="dep_tool", depends_on=["dep_dep"], enables=["dep_enable"])
             ],
             required_tools=["required_tool"],
             optional_tools=["optional_tool"],
@@ -603,9 +591,7 @@ class TestToolDependencySpecModelValidation:
             },
             "clusters": {"file_ops": ["read", "write"]},
             "sequences": {"explore": ["ls", "read"]},
-            "dependencies": [
-                {"tool": "edit", "depends_on": ["read"], "enables": ["test"]}
-            ],
+            "dependencies": [{"tool": "edit", "depends_on": ["read"], "enables": ["test"]}],
             "required_tools": ["read"],
             "optional_tools": ["grep"],
             "default_sequence": ["read", "edit"],

@@ -248,8 +248,7 @@ class SerializationConfig:
                 else self.min_savings_threshold
             ),
             include_format_hint=other.include_format_hint,
-            format_hint_template=other.format_hint_template
-            or self.format_hint_template,
+            format_hint_template=other.format_hint_template or self.format_hint_template,
             max_nesting_for_compact=(
                 other.max_nesting_for_compact
                 if other.max_nesting_for_compact != 1
@@ -325,15 +324,10 @@ FORMAT_DESCRIPTIONS: Dict[SerializationFormat, str] = {
         "TOON (Token-Oriented Object Notation): "
         "Arrays declared as name[count]{fields}: followed by comma-separated rows."
     ),
-    SerializationFormat.CSV: (
-        "CSV format: Header row followed by comma-separated data rows."
-    ),
-    SerializationFormat.MARKDOWN_TABLE: (
-        "Markdown table with | separators and header divider."
-    ),
+    SerializationFormat.CSV: ("CSV format: Header row followed by comma-separated data rows."),
+    SerializationFormat.MARKDOWN_TABLE: ("Markdown table with | separators and header divider."),
     SerializationFormat.RAW: "Raw text content.",
     SerializationFormat.REFERENCE_ENCODED: (
-        "Reference-encoded: Common values defined in refs={} block, "
-        "referenced by key in data."
+        "Reference-encoded: Common values defined in refs={} block, " "referenced by key in data."
     ),
 }

@@ -147,9 +147,7 @@ def _bind_configured_node(
 
     def _configured_node(state: Any) -> Any:
         state = _apply_agentic_state_defaults(state, max_iterations=max_iterations)
-        resolved_dependencies = {
-            name: dependencies.resolve(name) for name in dependency_names
-        }
+        resolved_dependencies = {name: dependencies.resolve(name) for name in dependency_names}
         resolved_dependencies.update(static_dependencies)
         return node_fn(state, **resolved_dependencies)
 

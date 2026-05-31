@@ -32,9 +32,7 @@ class TestCapabilityGapAnalysis:
         )
 
         traces = [
-            self._make_trace(
-                success=False, failures={"edit_mismatch": 8, "file_not_found": 2}
-            )
+            self._make_trace(success=False, failures={"edit_mismatch": 8, "file_not_found": 2})
         ]
         gaps = analyze_capability_gaps(traces)
         assert len(gaps) >= 1
@@ -71,11 +69,7 @@ class TestCapabilityGapAnalysis:
         )
 
         detail = self._make_detail(success=False, error="old_str not found in auth.py")
-        traces = [
-            self._make_trace(
-                success=False, failures={"edit_mismatch": 1}, details=[detail]
-            )
-        ]
+        traces = [self._make_trace(success=False, failures={"edit_mismatch": 1}, details=[detail])]
         gaps = analyze_capability_gaps(traces)
         assert len(gaps) >= 1
         assert any("old_str" in e for e in gaps[0].example_errors)

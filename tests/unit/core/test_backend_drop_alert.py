@@ -37,9 +37,7 @@ def _make_backend(
 class TestDropAlertFires:
     async def test_alert_fires_when_threshold_crossed(self):
         calls = []
-        backend = _make_backend(
-            maxsize=1, drop_alert_threshold=2, drop_alert_callback=calls.append
-        )
+        backend = _make_backend(maxsize=1, drop_alert_threshold=2, drop_alert_callback=calls.append)
         await backend.connect()
         # Fill the queue
         await backend.publish(_event("a"))
@@ -54,9 +52,7 @@ class TestDropAlertFires:
 
     async def test_no_alert_without_callback(self):
         """Should not raise even with many drops when no callback is set."""
-        backend = _make_backend(
-            maxsize=1, drop_alert_threshold=1, drop_alert_callback=None
-        )
+        backend = _make_backend(maxsize=1, drop_alert_threshold=1, drop_alert_callback=None)
         await backend.connect()
         await backend.publish(_event())
         for _ in range(5):
@@ -72,9 +68,7 @@ class TestDropAlertFires:
 class TestAlertDampening:
     async def test_alert_dampened_after_first_fire(self):
         calls = []
-        backend = _make_backend(
-            maxsize=1, drop_alert_threshold=2, drop_alert_callback=calls.append
-        )
+        backend = _make_backend(maxsize=1, drop_alert_threshold=2, drop_alert_callback=calls.append)
         await backend.connect()
         await backend.publish(_event("fill"))
         # Generate 10 drops — threshold=2 so alert fires at 2, 4, 6, 8, 10
@@ -141,9 +135,7 @@ class TestObservabilityBusAlertWiring:
 
     async def test_alert_payload_has_required_fields(self):
         calls = []
-        backend = _make_backend(
-            maxsize=1, drop_alert_threshold=1, drop_alert_callback=calls.append
-        )
+        backend = _make_backend(maxsize=1, drop_alert_threshold=1, drop_alert_callback=calls.append)
         await backend.connect()
         await backend.publish(_event("fill"))
         await backend.publish(_event("overflow"))

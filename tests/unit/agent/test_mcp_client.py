@@ -316,9 +316,7 @@ class TestMCPClientInitialize:
         client = MCPClient()
         client.process = MagicMock()
 
-        mock_response = {
-            "result": {"serverInfo": {"name": "Test Server", "version": "1.0"}}
-        }
+        mock_response = {"result": {"serverInfo": {"name": "Test Server", "version": "1.0"}}}
 
         with patch.object(client, "_send_request", new_callable=AsyncMock) as mock_send:
             mock_send.return_value = mock_response
@@ -356,9 +354,7 @@ class TestMCPClientConnect:
             mock_process = MagicMock()
             mock_popen.return_value = mock_process
 
-            with patch.object(
-                client, "initialize", new_callable=AsyncMock
-            ) as mock_init:
+            with patch.object(client, "initialize", new_callable=AsyncMock) as mock_init:
                 mock_init.return_value = False
 
                 await client.connect(["python", "server.py"])
@@ -376,9 +372,7 @@ class TestMCPClientConnect:
             mock_process = MagicMock()
             mock_popen.return_value = mock_process
 
-            with patch.object(
-                client, "initialize", new_callable=AsyncMock
-            ) as mock_init:
+            with patch.object(client, "initialize", new_callable=AsyncMock) as mock_init:
                 mock_init.return_value = True
 
                 result = await client.connect(["python", "server.py"])
@@ -461,9 +455,7 @@ class TestMCPClientDisconnect:
                 "victor.integrations.mcp.client.asyncio.get_running_loop",
                 side_effect=RuntimeError,
             ),
-            patch(
-                "victor.integrations.mcp.client.run_sync", return_value=None
-            ) as mock_run_sync,
+            patch("victor.integrations.mcp.client.run_sync", return_value=None) as mock_run_sync,
         ):
             client.disconnect()
 
@@ -485,9 +477,7 @@ class TestMCPClientDisconnect:
                 side_effect=RuntimeError,
             ),
             patch.object(client, "_cleanup_process_sync") as mock_cleanup_sync,
-            patch(
-                "victor.integrations.mcp.client.run_sync", return_value=None
-            ) as mock_run_sync,
+            patch("victor.integrations.mcp.client.run_sync", return_value=None) as mock_run_sync,
         ):
             client._cleanup_process()
 
@@ -569,12 +559,8 @@ class TestMCPClientHelpers:
         """Test get_resource_by_uri returns resource when found."""
         client = MCPClient()
         client.resources = [
-            MCPResource(
-                uri="file:///test1.txt", name="Test 1", description="Test file 1"
-            ),
-            MCPResource(
-                uri="file:///test2.txt", name="Test 2", description="Test file 2"
-            ),
+            MCPResource(uri="file:///test1.txt", name="Test 1", description="Test file 1"),
+            MCPResource(uri="file:///test2.txt", name="Test 2", description="Test file 2"),
         ]
 
         result = client.get_resource_by_uri("file:///test2.txt")
@@ -830,9 +816,7 @@ class TestMCPClientAsyncContextManager:
 
             client = MCPClient(command=["python", "server.py"], health_check_interval=0)
 
-            with patch.object(
-                client, "initialize", new_callable=AsyncMock
-            ) as mock_init:
+            with patch.object(client, "initialize", new_callable=AsyncMock) as mock_init:
                 mock_init.return_value = True
 
                 async with client:

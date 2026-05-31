@@ -24,15 +24,11 @@ def _find_import_violations(module_name: str) -> list[str]:
                 if isinstance(node, ast.Import):
                     for alias in node.names:
                         if alias.name == module_name:
-                            violations.append(
-                                f"{path}:{node.lineno} import {alias.name}"
-                            )
+                            violations.append(f"{path}:{node.lineno} import {alias.name}")
                 elif isinstance(node, ast.ImportFrom):
                     if node.module == module_name:
                         names = ", ".join(alias.name for alias in node.names)
-                        violations.append(
-                            f"{path}:{node.lineno} from {node.module} import {names}"
-                        )
+                        violations.append(f"{path}:{node.lineno} from {node.module} import {names}")
                     elif node.module == "victor.agent":
                         for alias in node.names:
                             if alias.name == module_name.rsplit(".", 1)[-1]:
@@ -58,9 +54,7 @@ def _find_provider_export_violations() -> list[str]:
 
                 if node.module == "victor.agent.provider":
                     banned = sorted(
-                        alias.name
-                        for alias in node.names
-                        if alias.name in BANNED_PROVIDER_EXPORTS
+                        alias.name for alias in node.names if alias.name in BANNED_PROVIDER_EXPORTS
                     )
                     if banned:
                         violations.append(
@@ -85,17 +79,14 @@ def test_removed_root_provider_shim_modules_are_not_importable() -> None:
 
 
 def test_removed_root_provider_shim_modules_stay_unreferenced():
-    provider_coordinator_violations = _find_import_violations(
-        "victor.agent.provider_coordinator"
-    )
-    provider_switch_violations = _find_import_violations(
-        "victor.agent.provider_switch_coordinator"
-    )
+    provider_coordinator_violations = _find_import_violations("victor.agent.provider_coordinator")
+    provider_switch_violations = _find_import_violations("victor.agent.provider_switch_coordinator")
     provider_export_violations = _find_provider_export_violations()
 
-    assert not provider_coordinator_violations, (
-        "removed root provider coordinator shim should stay unreferenced:\n"
-        + "\n".join(provider_coordinator_violations)
+    assert (
+        not provider_coordinator_violations
+    ), "removed root provider coordinator shim should stay unreferenced:\n" + "\n".join(
+        provider_coordinator_violations
     )
     assert (
         not provider_switch_violations

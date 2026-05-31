@@ -246,9 +246,7 @@ class CreditAssignmentDB:
                         agent_credits[agent][contributor] += amount
 
             for agent, credits in agent_credits.items():
-                received = sum(
-                    v for k, v in credits.items() if k != "direct" and k != "count"
-                )
+                received = sum(v for k, v in credits.items() if k != "direct" and k != "count")
                 conn.execute(
                     """
                     INSERT INTO agent_attribution (

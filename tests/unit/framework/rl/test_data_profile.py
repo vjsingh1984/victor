@@ -49,9 +49,7 @@ class TestDataAwareProfile:
     def test_profile_canonicalizes_legacy_tool_aliases(self):
         from victor.framework.rl.gepa_strategy_adapter import GEPAServiceStrategy
 
-        traces = [
-            self._make_trace(tools=["read_file", "list_directory", "execute_bash"])
-        ]
+        traces = [self._make_trace(tools=["read_file", "list_directory", "execute_bash"])]
         profile = GEPAServiceStrategy._build_data_profile(traces)
         assert "read(" in profile
         assert "ls(" in profile

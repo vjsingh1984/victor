@@ -18,9 +18,7 @@ def test_deleted_working_directory_can_exist_during_test(tmp_path) -> None:
     except FileNotFoundError:
         return
 
-    raise AssertionError(
-        "expected deleted cwd to raise FileNotFoundError inside the test"
-    )
+    raise AssertionError("expected deleted cwd to raise FileNotFoundError inside the test")
 
 
 def test_working_directory_is_restored_after_deleted_cwd() -> None:

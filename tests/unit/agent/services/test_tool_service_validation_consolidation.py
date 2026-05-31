@@ -83,9 +83,7 @@ class TestToolServiceValidationConsolidation:
         service.get_available_tools = Mock(return_value={"code_search", "file_read"})
 
         # Validate single invalid tool call
-        valid, invalid = service.validate_tool_calls(
-            {"name": "invalid_tool", "arguments": {}}
-        )
+        valid, invalid = service.validate_tool_calls({"name": "invalid_tool", "arguments": {}})
 
         # Verify results
         assert len(valid) == 0
@@ -166,9 +164,7 @@ class TestToolServiceValidationConsolidation:
         )
 
         # Mock get_available_tools
-        service.get_available_tools = Mock(
-            return_value={"code_search", "file_read", "grep"}
-        )
+        service.get_available_tools = Mock(return_value={"code_search", "file_read", "grep"})
 
         # Validate multiple tool calls
         valid, invalid = service.validate_tool_calls(
@@ -208,9 +204,7 @@ class TestToolServiceValidationConsolidation:
         )
 
         # Mock get_available_tools
-        service.get_available_tools = Mock(
-            return_value={"code_search", "file_read", "grep"}
-        )
+        service.get_available_tools = Mock(return_value={"code_search", "file_read", "grep"})
 
         # Validate list of valid tool calls
         valid, invalid = service.validate_tool_calls(
@@ -408,9 +402,7 @@ class TestToolServiceValidationConsolidation:
         assert error is None
 
         # Test invalid call
-        is_valid, error = service._validate_tool_call(
-            {"name": "invalid_tool", "arguments": {}}
-        )
+        is_valid, error = service._validate_tool_call({"name": "invalid_tool", "arguments": {}})
 
         # Verify result
         assert is_valid is False
@@ -474,9 +466,7 @@ class TestToolServiceValidationConsolidation:
         _, invalid3 = service.validate_tool_calls({"name": "missing_tool"})
         assert "not available" in invalid3[0]["_validation_error"]
 
-        _, invalid4 = service.validate_tool_calls(
-            {"name": "code_search", "arguments": []}
-        )
+        _, invalid4 = service.validate_tool_calls({"name": "code_search", "arguments": []})
         assert "must be a dictionary" in invalid4[0]["_validation_error"]
 
     def test_validate_tool_calls_reports_canonical_alias_and_mode_reason(self):
@@ -561,9 +551,7 @@ class TestToolServiceValidationIntegration:
         )
 
         # Mock get_available_tools to return a specific set
-        service.get_available_tools = Mock(
-            return_value={"code_search", "file_read", "grep"}
-        )
+        service.get_available_tools = Mock(return_value={"code_search", "file_read", "grep"})
 
         # Validate tool calls
         valid, invalid = service.validate_tool_calls(

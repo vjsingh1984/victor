@@ -107,9 +107,7 @@ class TestEditFiles:
 
         try:
             result = await edit(
-                ops=[
-                    {"type": "modify", "path": temp_path, "content": "updated content"}
-                ],
+                ops=[{"type": "modify", "path": temp_path, "content": "updated content"}],
                 preview=True,
                 commit=False,
             )
@@ -133,9 +131,7 @@ class TestEditFiles:
         try:
             import json
 
-            ops_json = json.dumps(
-                [{"type": "create", "path": temp_path, "content": "From JSON"}]
-            )
+            ops_json = json.dumps([{"type": "create", "path": temp_path, "content": "From JSON"}])
             result = await edit(ops=ops_json)
             assert result["success"] is True
         finally:
@@ -258,10 +254,7 @@ class TestReplaceOperation:
             )
             # Should fail because "foo" is ambiguous
             assert result["success"] is False
-            assert (
-                "multiple" in result["error"].lower()
-                or "ambiguous" in result["error"].lower()
-            )
+            assert "multiple" in result["error"].lower() or "ambiguous" in result["error"].lower()
         finally:
             Path(temp_path).unlink(missing_ok=True)
             Path(temp_dir).rmdir()

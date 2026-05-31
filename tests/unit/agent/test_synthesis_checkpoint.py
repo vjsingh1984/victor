@@ -175,9 +175,7 @@ class TestSimilarArgsCheckpoint:
         result = checkpoint.check(history, {})
 
         assert result.should_synthesize is True
-        assert (
-            "similar paths" in result.reason.lower() or "same" in result.reason.lower()
-        )
+        assert "similar paths" in result.reason.lower() or "same" in result.reason.lower()
 
     def test_repeated_queries_trigger(self, checkpoint):
         """Test repeated queries trigger synthesis."""
@@ -203,9 +201,7 @@ class TestTimeoutApproachingCheckpoint:
 
     @pytest.fixture
     def checkpoint(self):
-        return TimeoutApproachingCheckpoint(
-            warning_threshold=0.7, critical_threshold=0.9
-        )
+        return TimeoutApproachingCheckpoint(warning_threshold=0.7, critical_threshold=0.9)
 
     def test_plenty_of_time(self, checkpoint):
         """Test with plenty of time remaining."""
@@ -416,9 +412,7 @@ class TestFactoryFunctions:
         aggressive_count = next(
             c for c in aggressive._checkpoints if isinstance(c, ToolCountCheckpoint)
         )
-        default_count = next(
-            c for c in default._checkpoints if isinstance(c, ToolCountCheckpoint)
-        )
+        default_count = next(c for c in default._checkpoints if isinstance(c, ToolCountCheckpoint))
 
         assert aggressive_count.max_calls < default_count.max_calls
 
@@ -427,37 +421,27 @@ class TestFactoryFunctions:
         relaxed = create_relaxed_checkpoint()
         default = create_default_checkpoint()
 
-        relaxed_count = next(
-            c for c in relaxed._checkpoints if isinstance(c, ToolCountCheckpoint)
-        )
-        default_count = next(
-            c for c in default._checkpoints if isinstance(c, ToolCountCheckpoint)
-        )
+        relaxed_count = next(c for c in relaxed._checkpoints if isinstance(c, ToolCountCheckpoint))
+        default_count = next(c for c in default._checkpoints if isinstance(c, ToolCountCheckpoint))
 
         assert relaxed_count.max_calls > default_count.max_calls
 
     def test_get_checkpoint_for_complexity_simple(self):
         """Test simple complexity gets aggressive checkpoint."""
         checkpoint = get_checkpoint_for_complexity("simple")
-        tool_count = next(
-            c for c in checkpoint._checkpoints if isinstance(c, ToolCountCheckpoint)
-        )
+        tool_count = next(c for c in checkpoint._checkpoints if isinstance(c, ToolCountCheckpoint))
         assert tool_count.max_calls == 5  # Aggressive setting
 
     def test_get_checkpoint_for_complexity_complex(self):
         """Test complex complexity gets relaxed checkpoint."""
         checkpoint = get_checkpoint_for_complexity("complex")
-        tool_count = next(
-            c for c in checkpoint._checkpoints if isinstance(c, ToolCountCheckpoint)
-        )
+        tool_count = next(c for c in checkpoint._checkpoints if isinstance(c, ToolCountCheckpoint))
         assert tool_count.max_calls == 20  # Relaxed setting
 
     def test_get_checkpoint_for_complexity_medium(self):
         """Test medium complexity gets default checkpoint."""
         checkpoint = get_checkpoint_for_complexity("medium")
-        tool_count = next(
-            c for c in checkpoint._checkpoints if isinstance(c, ToolCountCheckpoint)
-        )
+        tool_count = next(c for c in checkpoint._checkpoints if isinstance(c, ToolCountCheckpoint))
         assert tool_count.max_calls == 12  # Default setting
 
 
@@ -543,9 +527,7 @@ class TestUnifiedTaskTrackerCheckpoint:
         from unittest.mock import MagicMock
 
         mock_tracker = MagicMock()
-        mock_tracker.check_loop_warning.return_value = (
-            "Approaching loop (2/3): read|file.py|0|100"
-        )
+        mock_tracker.check_loop_warning.return_value = "Approaching loop (2/3): read|file.py|0|100"
 
         checkpoint = UnifiedTaskTrackerCheckpoint(tracker=mock_tracker)
         history = [{"tool": "read"}, {"tool": "grep"}]
@@ -615,20 +597,12 @@ class TestPhase3CheckpointFactoryUpdates:
         has_unified = any(
             isinstance(c, UnifiedTaskTrackerCheckpoint) for c in checkpoint._checkpoints
         )
-        assert (
-            has_unified
-        ), "Default checkpoint should include UnifiedTaskTrackerCheckpoint"
+        assert has_unified, "Default checkpoint should include UnifiedTaskTrackerCheckpoint"
 
         # Should NOT include primitive checkpoints
-        has_duplicate = any(
-            isinstance(c, DuplicateToolCheckpoint) for c in checkpoint._checkpoints
-        )
-        has_similar = any(
-            isinstance(c, SimilarArgsCheckpoint) for c in checkpoint._checkpoints
-        )
-        has_no_progress = any(
-            isinstance(c, NoProgressCheckpoint) for c in checkpoint._checkpoints
-        )
+        has_duplicate = any(isinstance(c, DuplicateToolCheckpoint) for c in checkpoint._checkpoints)
+        has_similar = any(isinstance(c, SimilarArgsCheckpoint) for c in checkpoint._checkpoints)
+        has_no_progress = any(isinstance(c, NoProgressCheckpoint) for c in checkpoint._checkpoints)
 
         assert (
             not has_duplicate
@@ -641,15 +615,11 @@ class TestPhase3CheckpointFactoryUpdates:
         ), "Should not include NoProgressCheckpoint (replaced by UnifiedTaskTracker)"
 
         # Should still include unique-value checkpoints
-        has_tool_count = any(
-            isinstance(c, ToolCountCheckpoint) for c in checkpoint._checkpoints
-        )
+        has_tool_count = any(isinstance(c, ToolCountCheckpoint) for c in checkpoint._checkpoints)
         has_timeout = any(
             isinstance(c, TimeoutApproachingCheckpoint) for c in checkpoint._checkpoints
         )
-        has_error_rate = any(
-            isinstance(c, ErrorRateCheckpoint) for c in checkpoint._checkpoints
-        )
+        has_error_rate = any(isinstance(c, ErrorRateCheckpoint) for c in checkpoint._checkpoints)
 
         assert has_tool_count, "Should include ToolCountCheckpoint (unique value)"
         assert has_timeout, "Should include TimeoutApproachingCheckpoint (unique value)"
@@ -666,9 +636,7 @@ class TestPhase3CheckpointFactoryUpdates:
         assert has_unified
 
         # Should NOT include primitive checkpoints
-        has_duplicate = any(
-            isinstance(c, DuplicateToolCheckpoint) for c in checkpoint._checkpoints
-        )
+        has_duplicate = any(isinstance(c, DuplicateToolCheckpoint) for c in checkpoint._checkpoints)
         assert not has_duplicate
 
     def test_relaxed_checkpoint_uses_unified_tracker(self):
@@ -682,9 +650,7 @@ class TestPhase3CheckpointFactoryUpdates:
         assert has_unified
 
         # Should NOT include primitive checkpoints
-        has_duplicate = any(
-            isinstance(c, DuplicateToolCheckpoint) for c in checkpoint._checkpoints
-        )
+        has_duplicate = any(isinstance(c, DuplicateToolCheckpoint) for c in checkpoint._checkpoints)
         assert not has_duplicate
 
     def test_checkpoint_count_reduced(self):

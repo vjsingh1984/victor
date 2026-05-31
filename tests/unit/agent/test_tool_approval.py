@@ -60,9 +60,7 @@ class TestApprovalGate:
             ApprovalDecision,
         )
 
-        handler = AsyncMock(
-            return_value=ApprovalDecision(approved=True, reason="user approved")
-        )
+        handler = AsyncMock(return_value=ApprovalDecision(approved=True, reason="user approved"))
         gate = ToolApprovalGate(mode=ApprovalMode.DANGEROUS, approval_handler=handler)
         decision = await gate.request_approval("shell", {"command": "rm -rf"}, "high")
         handler.assert_called_once()
@@ -85,9 +83,7 @@ class TestApprovalGate:
             ApprovalDecision,
         )
 
-        handler = AsyncMock(
-            return_value=ApprovalDecision(approved=False, reason="too dangerous")
-        )
+        handler = AsyncMock(return_value=ApprovalDecision(approved=False, reason="too dangerous"))
         gate = ToolApprovalGate(mode=ApprovalMode.ALL, approval_handler=handler)
         decision = await gate.request_approval("shell", {"cmd": "rm -rf /"}, "critical")
         assert decision.approved is False

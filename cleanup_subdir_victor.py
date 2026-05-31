@@ -68,9 +68,7 @@ def find_victor_dirs(root_path: Path) -> tuple[Path, list[Path]]:
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Clean up subdirectory .victor directories"
-    )
+    parser = argparse.ArgumentParser(description="Clean up subdirectory .victor directories")
     parser.add_argument(
         "--dry-run",
         action="store_true",

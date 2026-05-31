@@ -68,9 +68,7 @@ class BufferedRenderer:
     ) -> None:
         """Record tool execution result."""
         tool_output = str(result) if result is not None else ""
-        full_output = (
-            str(original_result) if original_result is not None else tool_output
-        )
+        full_output = str(original_result) if original_result is not None else tool_output
         result_data = {
             "success": success,
             "elapsed": elapsed,

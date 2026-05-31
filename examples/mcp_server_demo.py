@@ -59,9 +59,7 @@ async def demo_server():
     # Create MCP server
     print("\n2️⃣ Creating MCP Server...")
     print("-" * 70)
-    server = MCPServer(
-        name="Victor MCP Server", version="1.0.0", tool_registry=tool_registry
-    )
+    server = MCPServer(name="Victor MCP Server", version="1.0.0", tool_registry=tool_registry)
 
     print(f"✓ Server created: {server.name} v{server.version}")
     print("  Capabilities:")
@@ -234,9 +232,7 @@ async def run_stdio_server():
     tool_registry.register(git)
 
     # Create and start server
-    server = MCPServer(
-        name="Victor MCP Server", version="1.0.0", tool_registry=tool_registry
-    )
+    server = MCPServer(name="Victor MCP Server", version="1.0.0", tool_registry=tool_registry)
 
     # Register resources
     server.register_resource(

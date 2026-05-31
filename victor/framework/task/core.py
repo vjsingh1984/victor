@@ -141,13 +141,11 @@ class TaskResult:
         """
         modified = []
         for call in self.tool_calls:
-            tool = canonicalize_core_tool_name(
-                call.get("tool", call.get("tool_name", ""))
-            )
+            tool = canonicalize_core_tool_name(call.get("tool", call.get("tool_name", "")))
             if tool in ("write", "edit", "file_edit") and call.get("success", True):
-                path = call.get("arguments", {}).get("path") or call.get(
-                    "arguments", {}
-                ).get("file_path")
+                path = call.get("arguments", {}).get("path") or call.get("arguments", {}).get(
+                    "file_path"
+                )
                 if path and path not in modified:
                     modified.append(path)
         return modified
@@ -161,13 +159,11 @@ class TaskResult:
         """
         read = []
         for call in self.tool_calls:
-            tool = canonicalize_core_tool_name(
-                call.get("tool", call.get("tool_name", ""))
-            )
+            tool = canonicalize_core_tool_name(call.get("tool", call.get("tool_name", "")))
             if tool in ("read", "ls") and call.get("success", True):
-                path = call.get("arguments", {}).get("path") or call.get(
-                    "arguments", {}
-                ).get("file_path")
+                path = call.get("arguments", {}).get("path") or call.get("arguments", {}).get(
+                    "file_path"
+                )
                 if path and path not in read:
                     read.append(path)
         return read

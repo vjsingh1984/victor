@@ -93,9 +93,7 @@ def _extract_yaml_description(file_path: Path) -> str:
         # Try to extract from 'description' field in YAML
         for line in lines:
             if "description:" in line.lower():
-                match = re.search(
-                    r'description:\s*["\']?([^"\']+)["\']?', line, re.IGNORECASE
-                )
+                match = re.search(r'description:\s*["\']?([^"\']+)["\']?', line, re.IGNORECASE)
                 if match:
                     return match.group(1).strip()
 
@@ -176,17 +174,11 @@ def _discover_examples(
     return examples
 
 
-def _find_example_by_name(
-    examples_dir: Path, name: str
-) -> Optional[Tuple[str, str, str, Path]]:
+def _find_example_by_name(examples_dir: Path, name: str) -> Optional[Tuple[str, str, str, Path]]:
     """Find a specific example by name (supports partial matching)."""
     examples = _discover_examples(examples_dir)
     name_lower = (
-        name.lower()
-        .replace("_", "")
-        .replace("-", "")
-        .replace(".py", "")
-        .replace(".yaml", "")
+        name.lower().replace("_", "").replace("-", "").replace(".py", "").replace(".yaml", "")
     )
 
     # First try exact match
@@ -277,8 +269,7 @@ def list_examples(
 
     # Create table
     table = Table(
-        title="Victor Examples"
-        + (f" (filtered: {filter_keyword})" if filter_keyword else ""),
+        title="Victor Examples" + (f" (filtered: {filter_keyword})" if filter_keyword else ""),
         show_header=True,
         header_style="bold cyan",
     )
@@ -310,9 +301,7 @@ def list_examples(
 
 @examples_app.command("show")
 def show_example(
-    name: str = typer.Argument(
-        ..., help="Name of the example to show (supports partial matching)"
-    ),
+    name: str = typer.Argument(..., help="Name of the example to show (supports partial matching)"),
     lines: Optional[int] = typer.Option(
         None,
         "--lines",
@@ -488,6 +477,4 @@ def list_categories() -> None:
         table.add_row(category, str(count), desc)
 
     console.print(table)
-    console.print(
-        "\n[dim]Use 'victor examples list --filter <category>' to filter by category[/]"
-    )
+    console.print("\n[dim]Use 'victor examples list --filter <category>' to filter by category[/]")

@@ -9,9 +9,7 @@ RECIPE_DIFFICULTY = "intermediate"
 RECIPE_TIME = "15 minutes"
 
 
-async def business_requirements_agent(
-    project_description: str, stakeholders: list[str]
-):
+async def business_requirements_agent(project_description: str, stakeholders: list[str]):
     """Gather and document business requirements."""
     from victor import Agent
 
@@ -184,9 +182,7 @@ Provide:
     return result.content
 
 
-async def meeting_notes_agent(
-    meeting_transcript: str, meeting_type: str = "team standup"
-):
+async def meeting_notes_agent(meeting_transcript: str, meeting_type: str = "team standup"):
     """Generate structured meeting notes."""
     from victor import Agent
 
@@ -347,9 +343,7 @@ Provide:
     return result.content
 
 
-async def business_intelligence_agent(
-    data_description: str, business_questions: list[str]
-):
+async def business_intelligence_agent(data_description: str, business_questions: list[str]):
     """Generate BI insights from data."""
     from victor import Agent
 

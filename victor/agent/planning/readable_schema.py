@@ -318,9 +318,7 @@ def _infer_exec_type(desc: str) -> Optional[str]:
 
         embed_score = 0.0
         if desc_vec is not None and exec_type in _ARCHETYPE_VECS:
-            embed_score = _EMBED_WEIGHT * _cosine_max(
-                desc_vec, _ARCHETYPE_VECS[exec_type]
-            )
+            embed_score = _EMBED_WEIGHT * _cosine_max(desc_vec, _ARCHETYPE_VECS[exec_type])
 
         score = regex_score + embed_score
         if score > best_score:
@@ -476,19 +474,11 @@ def _infer_branches(step_id: str, all_ids: List[str]) -> Optional[Dict[str, List
     base = num_match.group(1)
     for try_base in (base, str(int(base) + 1)):
         sa = next(
-            (
-                sid
-                for sid in all_ids
-                if re.fullmatch(rf"{re.escape(try_base)}a", sid, re.I)
-            ),
+            (sid for sid in all_ids if re.fullmatch(rf"{re.escape(try_base)}a", sid, re.I)),
             None,
         )
         sb = next(
-            (
-                sid
-                for sid in all_ids
-                if re.fullmatch(rf"{re.escape(try_base)}b", sid, re.I)
-            ),
+            (sid for sid in all_ids if re.fullmatch(rf"{re.escape(try_base)}b", sid, re.I)),
             None,
         )
         if sa and sb:
@@ -508,17 +498,13 @@ def _step_likely_produces(desc: str, key: str) -> bool:
     if not has_noun:
         return False
 
-    regex_score = (
-        _REGEX_WEIGHT if any(v in desc_lower for v in _PRODUCER_VERBS) else 0.0
-    )
+    regex_score = _REGEX_WEIGHT if any(v in desc_lower for v in _PRODUCER_VERBS) else 0.0
 
     embed_score = 0.0
     if _ARCHETYPE_VECS and "producer" in _ARCHETYPE_VECS:
         desc_vec = _embed_desc(desc)
         if desc_vec is not None:
-            embed_score = _EMBED_WEIGHT * _cosine_max(
-                desc_vec, _ARCHETYPE_VECS["producer"]
-            )
+            embed_score = _EMBED_WEIGHT * _cosine_max(desc_vec, _ARCHETYPE_VECS["producer"])
 
     return (regex_score + embed_score) >= 0.5
 
@@ -542,9 +528,7 @@ def _infer_produces_key_from_desc(step: Dict[str, Any]) -> Optional[str]:
     if re.search(r"^\s*route\b|\bpresent\b.{0,80}\bto\s+(?:the\s+)?user\b", desc):
         return None
 
-    if re.search(
-        r"\b(file\s+inventory|module\s+tree|src/|tests/|benches/|examples/)\b", desc
-    ):
+    if re.search(r"\b(file\s+inventory|module\s+tree|src/|tests/|benches/|examples/)\b", desc):
         return "target_file_inventory"
     if re.search(
         r"\b(review\s+targets?|workspace\s+members?|target\s+director|package\s+inventory|"
@@ -555,21 +539,15 @@ def _infer_produces_key_from_desc(step: Dict[str, Any]) -> Optional[str]:
         desc,
     ):
         return "review_targets"
-    if "checklist" in desc and re.search(
-        r"\b(create|build|generate|write|draft)\b", desc
-    ):
+    if "checklist" in desc and re.search(r"\b(create|build|generate|write|draft)\b", desc):
         return "review_checklist"
     if (
         step_type in {"doc", "documentation"}
         or "write" in tools
         or re.search(r"\b(synthesize|summarize|compile)\b", desc)
-    ) and re.search(
-        r"\b(final\s+report|prioritized\s+report|consolidated\s+report)\b", desc
-    ):
+    ) and re.search(r"\b(final\s+report|prioritized\s+report|consolidated\s+report)\b", desc):
         return "final_report"
-    if re.search(
-        r"\bcross[- ](?:crate|target|module|package|component)\b", desc
-    ) and re.search(
+    if re.search(r"\bcross[- ](?:crate|target|module|package|component)\b", desc) and re.search(
         r"\b(analysis|analyze|review|findings|issues|patterns)\b",
         desc,
     ):
@@ -579,16 +557,12 @@ def _infer_produces_key_from_desc(step: Dict[str, Any]) -> Optional[str]:
         desc,
     ):
         return "dependency_findings"
-    if re.search(
-        r"\bsingle[- ](?:crate|target|module|package|component)\b", desc
-    ) and re.search(
+    if re.search(r"\bsingle[- ](?:crate|target|module|package|component)\b", desc) and re.search(
         r"\b(analysis|analyze|review|audit|findings)\b",
         desc,
     ):
         return "findings_single_target"
-    if re.search(
-        r"\b(performance|hotspot|allocation-heavy|high-frequency|blocking)\b", desc
-    ):
+    if re.search(r"\b(performance|hotspot|allocation-heavy|high-frequency|blocking)\b", desc):
         if re.search(
             r"\b(analysis|analyze|identify|find|detect|check|rankings?|findings?)\b",
             desc,
@@ -673,9 +647,7 @@ def _validate_readable_plan_from_candidates(
             return ReadableTaskPlan.model_validate_json(candidate)
         except ValidationError as exc:
             last_error = exc
-            logger.debug(
-                "Plan JSON candidate rejected: %s; candidate=%.120s", exc, candidate
-            )
+            logger.debug("Plan JSON candidate rejected: %s; candidate=%.120s", exc, candidate)
     if last_error is not None:
         raise last_error
     raise ValueError(
@@ -731,9 +703,7 @@ class ReadableTaskPlan(BaseModel):
             "[{id, type, desc, tools, deps, exec, node, exit}, ...]"
         ),
     )
-    duration: Optional[str] = Field(
-        None, description="Estimated duration (e.g., '30min', '2hr')"
-    )
+    duration: Optional[str] = Field(None, description="Estimated duration (e.g., '30min', '2hr')")
     approval: bool = Field(False, description="Requires user approval")
 
     @field_validator("steps")
@@ -756,13 +726,9 @@ class ReadableTaskPlan(BaseModel):
                         f"Step {i}: must be list with at least [id, type, desc], got {step_data}"
                     )
                 if not isinstance(step_data[0], (int, str)):
-                    raise ValueError(
-                        f"Step {i}: id must be int or str, got {type(step_data[0])}"
-                    )
+                    raise ValueError(f"Step {i}: id must be int or str, got {type(step_data[0])}")
             else:
-                raise ValueError(
-                    f"Step {i}: must be list or dict, got {type(step_data)}"
-                )
+                raise ValueError(f"Step {i}: must be list or dict, got {type(step_data)}")
         return v
 
     @classmethod
@@ -785,8 +751,7 @@ class ReadableTaskPlan(BaseModel):
             dict(s) if isinstance(s, dict) else list(s) for s in steps
         ]
         all_ids = [
-            str(s.get("id", "") if isinstance(s, dict) else (s[0] if s else ""))
-            for s in result
+            str(s.get("id", "") if isinstance(s, dict) else (s[0] if s else "")) for s in result
         ]
 
         # --- Pass 1: infer exec types ---
@@ -851,9 +816,7 @@ class ReadableTaskPlan(BaseModel):
         # Back-populate 'produces' on the first upstream step whose description
         # suggests it inventories/lists the needed collection.
         current_produces: List[str] = [
-            str(s.get("produces", ""))
-            for s in result
-            if isinstance(s, dict) and s.get("produces")
+            str(s.get("produces", "")) for s in result if isinstance(s, dict) and s.get("produces")
         ]
         for key in needed_keys:
             if key in current_produces:
@@ -888,18 +851,14 @@ class ReadableTaskPlan(BaseModel):
                     # Prefer an exact match in known produces, fall back to raw
                     aligned = _best_matching_key(raw_key, current_produces) or raw_key
                     step["loop_over"] = aligned
-                    logger.debug(
-                        "Step %s: inferred loop_over=%s", step.get("id"), aligned
-                    )
+                    logger.debug("Step %s: inferred loop_over=%s", step.get("id"), aligned)
 
             elif exec_type == "conditional":
                 if not step.get("condition_on"):
                     key = _infer_condition_key(desc, current_produces)
                     if key:
                         step["condition_on"] = key
-                        logger.debug(
-                            "Step %s: inferred condition_on=%s", step.get("id"), key
-                        )
+                        logger.debug("Step %s: inferred condition_on=%s", step.get("id"), key)
                 if not step.get("condition"):
                     # Only default to "multiple" when the description implies a
                     # quantity comparison (multi vs single, more than one, etc.).
@@ -937,9 +896,7 @@ class ReadableTaskPlan(BaseModel):
         # --- Pass 5: infer data-flow inputs (which plan_state keys each step consumes) ---
         # Build a positional index so we can limit inference to UPSTREAM keys only.
         step_positions: Dict[str, int] = {
-            str(s.get("id", "")): idx
-            for idx, s in enumerate(result)
-            if isinstance(s, dict)
+            str(s.get("id", "")): idx for idx, s in enumerate(result) if isinstance(s, dict)
         }
         # produces_key -> position of the step that produces it
         produces_position: Dict[str, int] = {}
@@ -977,9 +934,7 @@ class ReadableTaskPlan(BaseModel):
                     "crates",
                 }
                 parts = [
-                    w
-                    for w in key.split("_")
-                    if len(w) >= 4 and w.rstrip("s") not in generic_parts
+                    w for w in key.split("_") if len(w) >= 4 and w.rstrip("s") not in generic_parts
                 ]
                 if words in desc_lower or any(p in desc_lower for p in parts):
                     inferred_inputs.append(key)
@@ -1024,9 +979,7 @@ class ReadableTaskPlan(BaseModel):
 
         # Map step_id → exec type so Rule B can check gate types quickly.
         step_exec_type: Dict[str, str] = {
-            str(s.get("id", "")): str(
-                s.get("exec", s.get("execution", s.get("type", "")))
-            ).lower()
+            str(s.get("id", "")): str(s.get("exec", s.get("execution", s.get("type", "")))).lower()
             for s in result
             if isinstance(s, dict)
         }
@@ -1040,16 +993,12 @@ class ReadableTaskPlan(BaseModel):
         # many valid plan shapes, but LLMs often omit matching deps.  Add those
         # deps generically for any upstream producer.
         deps_by_id: Dict[str, set[str]] = {
-            str(s.get("id", "")): {
-                str(d) for d in (s.get("deps") or s.get("depends_on") or [])
-            }
+            str(s.get("id", "")): {str(d) for d in (s.get("deps") or s.get("depends_on") or [])}
             for s in result
             if isinstance(s, dict)
         }
 
-        def _is_transitively_satisfied(
-            producer_id: str, current_deps: set[str]
-        ) -> bool:
+        def _is_transitively_satisfied(producer_id: str, current_deps: set[str]) -> bool:
             stack = list(current_deps)
             seen: set[str] = set()
             while stack:
@@ -1086,8 +1035,7 @@ class ReadableTaskPlan(BaseModel):
             missing = sorted(
                 dep
                 for dep in data_deps
-                if dep not in current_set
-                and not _is_transitively_satisfied(dep, current_set)
+                if dep not in current_set and not _is_transitively_satisfied(dep, current_set)
             )
             if missing:
                 new_deps = sorted(current_set | set(missing))
@@ -1129,9 +1077,7 @@ class ReadableTaskPlan(BaseModel):
             # needed input and step 2 was only an intermediate) while preventing dep
             # graph growth (e.g. deps=['4'] must not become ['1','2','4'] just because
             # steps 1 and 2 also produce some of the declared inputs).
-            data_deps: set = {
-                produces_map[key] for key in declared_inputs if key in produces_map
-            }
+            data_deps: set = {produces_map[key] for key in declared_inputs if key in produces_map}
             # Retain any dep that is either:
             #   (A) not a data producer at all — pure gate node
             #   (B) a control-gate exec type — even if it also produces a named output
@@ -1146,10 +1092,7 @@ class ReadableTaskPlan(BaseModel):
             # Guard: only trim when the result is no larger than the current dep set.
             # This prevents Pass 6 from adding producer step IDs that were never
             # explicit deps (which would widen the graph and defeat the purpose).
-            if (
-                len(minimal_deps) <= len(current_deps)
-                and set(minimal_deps) != current_dep_ids
-            ):
+            if len(minimal_deps) <= len(current_deps) and set(minimal_deps) != current_dep_ids:
                 removed = [d for d in current_deps if str(d) not in set(minimal_deps)]
                 logger.info(
                     "Step %s: trimmed deps %s → %s (removed redundant sequential deps %s; "
@@ -1241,9 +1184,7 @@ class ReadableTaskPlan(BaseModel):
         # variants.  Only replace when branch variants exist; leave unrecognized deps
         # untouched (the is_ready() fallback in base.py handles any remaining phantoms
         # at runtime without permanent BLOCKED state).
-        all_valid_ids: set = {
-            str(s.get("id", "")) for s in result if isinstance(s, dict)
-        }
+        all_valid_ids: set = {str(s.get("id", "")) for s in result if isinstance(s, dict)}
         for step in result:
             if not isinstance(step, dict):
                 continue
@@ -1287,9 +1228,7 @@ class ReadableTaskPlan(BaseModel):
         # finish.  This pass detects synthesis steps (produces a key ending in
         # "_report" or containing "final") and adds deps on every step that produces
         # a key ending in "_findings", "_results", "_audit", or "_review".
-        _SYNTHESIS_KEY_RE = re.compile(
-            r"_report$|^final_|^consolidated_|^summary_", re.IGNORECASE
-        )
+        _SYNTHESIS_KEY_RE = re.compile(r"_report$|^final_|^consolidated_|^summary_", re.IGNORECASE)
         _FINDINGS_KEY_RE = re.compile(
             r"(?:^findings_|_findings$|_results$|_audit$|_review$)",
             re.IGNORECASE,
@@ -1297,14 +1236,10 @@ class ReadableTaskPlan(BaseModel):
 
         # Collect step IDs that produce findings/analysis keys.
         findings_step_ids: set = {
-            step_id
-            for key, step_id in produces_map.items()
-            if _FINDINGS_KEY_RE.search(key)
+            step_id for key, step_id in produces_map.items() if _FINDINGS_KEY_RE.search(key)
         }
         findings_keys_by_step_id: Dict[str, str] = {
-            step_id: key
-            for key, step_id in produces_map.items()
-            if _FINDINGS_KEY_RE.search(key)
+            step_id: key for key, step_id in produces_map.items() if _FINDINGS_KEY_RE.search(key)
         }
 
         if findings_step_ids:
@@ -1451,9 +1386,7 @@ class ReadableTaskPlan(BaseModel):
         deps_raw = step_data.get("deps", step_data.get("depends_on", []))
         # Strip self-referential deps: a step depending on its own ID can never be satisfied.
         dependencies = (
-            [str(d) for d in deps_raw if str(d) != step_id]
-            if isinstance(deps_raw, list)
-            else []
+            [str(d) for d in deps_raw if str(d) != step_id] if isinstance(deps_raw, list) else []
         )
 
         execution = str(step_data.get("exec", step_data.get("execution", ""))).lower()
@@ -1462,9 +1395,7 @@ class ReadableTaskPlan(BaseModel):
         node = str(step_data.get("node", ""))
         exit_criteria = list(step_data.get("exit", step_data.get("exit_criteria", [])))
         requires_approval = (
-            step_type == StepType.DEPLOYMENT
-            or step_type == StepType.PLANNING
-            or self.approval
+            step_type == StepType.DEPLOYMENT or step_type == StepType.PLANNING or self.approval
         )
 
         loop_over = str(step_data.get("loop_over", ""))
@@ -1575,9 +1506,7 @@ class ReadableTaskPlan(BaseModel):
 
         # Check if deployment or high-risk step
         requires_approval = (
-            step_type == StepType.DEPLOYMENT
-            or step_type == StepType.PLANNING
-            or self.approval
+            step_type == StepType.DEPLOYMENT or step_type == StepType.PLANNING or self.approval
         )
 
         ctx: Dict[str, Any] = {}
@@ -1784,9 +1713,7 @@ class ReadableTaskPlan(BaseModel):
         step_data = self.steps[step_index]
         if isinstance(step_data, dict):
             step_type = str(step_data.get("type", ""))
-            step_description = str(
-                step_data.get("desc", step_data.get("description", ""))
-            )
+            step_description = str(step_data.get("desc", step_data.get("description", "")))
         else:
             step_type = step_data[1]  # [id, type, desc, tools, deps]
             step_description = step_data[2]
@@ -2215,9 +2142,7 @@ async def generate_task_plan(
         elif hasattr(provider, "_provider") and hasattr(provider._provider, "model"):
             model = provider._provider.model
         else:
-            raise ValueError(
-                "Model identifier must be provided or available from provider"
-            )
+            raise ValueError("Model identifier must be provided or available from provider")
 
     # Classify complexity if not provided
     task_complexity = complexity
@@ -2292,9 +2217,7 @@ async def generate_task_plan(
                     else:
                         logger.debug(f"Response dict[{key}] type: {type(value)}")
             elif hasattr(plan_response, "__dict__"):
-                logger.debug(
-                    f"Response object attributes: {list(plan_response.__dict__.keys())}"
-                )
+                logger.debug(f"Response object attributes: {list(plan_response.__dict__.keys())}")
 
             response_content = extract_llm_response_content(plan_response)
             logger.info(

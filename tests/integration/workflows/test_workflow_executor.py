@@ -234,9 +234,7 @@ def error_workflow():
 class TestWorkflowExecutorE2E:
     """End-to-end tests for WorkflowExecutor."""
 
-    async def test_execute_simple_linear_workflow(
-        self, mock_orchestrator, simple_workflow
-    ):
+    async def test_execute_simple_linear_workflow(self, mock_orchestrator, simple_workflow):
         """Test executing a simple linear workflow from start to finish."""
         # Given an executor with mock orchestrator
         executor = WorkflowExecutor(mock_orchestrator)
@@ -258,9 +256,7 @@ class TestWorkflowExecutorE2E:
         assert final_data.get("counter") == 111  # 0 + 1 + 10 + 100
         assert final_data.get("steps") == ["a", "b", "c"]
 
-    async def test_execute_with_initial_context(
-        self, mock_orchestrator, simple_workflow
-    ):
+    async def test_execute_with_initial_context(self, mock_orchestrator, simple_workflow):
         """Test that initial context is properly passed to workflow."""
         executor = WorkflowExecutor(mock_orchestrator)
 
@@ -306,9 +302,7 @@ class TestWorkflowExecutorE2E:
         assert result.success is True
         assert result.context.data.get("completed") is True
 
-    async def test_execute_tracks_node_results(
-        self, mock_orchestrator, simple_workflow
-    ):
+    async def test_execute_tracks_node_results(self, mock_orchestrator, simple_workflow):
         """Test that individual node results are tracked."""
         executor = WorkflowExecutor(mock_orchestrator)
 
@@ -342,9 +336,7 @@ class TestWorkflowExecutorE2E:
 class TestCheckpointFunctionality:
     """Tests for checkpoint save/resume functionality."""
 
-    async def test_checkpoint_saved_after_each_node(
-        self, mock_orchestrator, simple_workflow
-    ):
+    async def test_checkpoint_saved_after_each_node(self, mock_orchestrator, simple_workflow):
         """Test that checkpoints are saved after each node execution."""
         # Create a mock checkpointer
         mock_checkpointer = MagicMock()
@@ -420,9 +412,7 @@ class TestCheckpointFunctionality:
             return ctx
 
         workflow = (
-            WorkflowBuilder("state_checkpoint_workflow")
-            .add_transform("step_a", step_a)
-            .build()
+            WorkflowBuilder("state_checkpoint_workflow").add_transform("step_a", step_a).build()
         )
 
         mock_checkpointer = MagicMock()
@@ -446,9 +436,7 @@ class TestCheckpointFunctionality:
 class TestErrorHandlingAndRetry:
     """Tests for error handling and retry policies."""
 
-    async def test_error_stops_workflow_by_default(
-        self, mock_orchestrator, error_workflow
-    ):
+    async def test_error_stops_workflow_by_default(self, mock_orchestrator, error_workflow):
         """Test that errors stop workflow execution by default."""
         executor = WorkflowExecutor(mock_orchestrator)
 
@@ -499,9 +487,7 @@ class TestErrorHandlingAndRetry:
 
         # Error should be captured
         failed_results = [
-            r
-            for r in result.context.node_results.values()
-            if r.status == ExecutorNodeStatus.FAILED
+            r for r in result.context.node_results.values() if r.status == ExecutorNodeStatus.FAILED
         ]
         assert len(failed_results) > 0
 
@@ -510,9 +496,7 @@ class TestErrorHandlingAndRetry:
         assert failed_result.error is not None
         assert "Intentional failure" in failed_result.error
 
-    async def test_successful_workflow_no_error(
-        self, mock_orchestrator, error_workflow
-    ):
+    async def test_successful_workflow_no_error(self, mock_orchestrator, error_workflow):
         """Test that successful workflow has no errors."""
         executor = WorkflowExecutor(mock_orchestrator)
 
@@ -836,9 +820,7 @@ class TestWorkflowContextManagement:
             return ctx
 
         def read_both_keys(ctx: Dict[str, Any]) -> Dict[str, Any]:
-            ctx["saw_both"] = (
-                ctx.get("key_a") == "value_a" and ctx.get("key_b") == "value_b"
-            )
+            ctx["saw_both"] = ctx.get("key_a") == "value_a" and ctx.get("key_b") == "value_b"
             return ctx
 
         workflow = (
@@ -904,9 +886,7 @@ class TestWorkflowExecutionMetrics:
         for node_result in result.context.node_results.values():
             assert node_result.duration_seconds >= 0
 
-    async def test_workflow_result_serialization(
-        self, mock_orchestrator, simple_workflow
-    ):
+    async def test_workflow_result_serialization(self, mock_orchestrator, simple_workflow):
         """Test that workflow result can be serialized to dict."""
         executor = WorkflowExecutor(mock_orchestrator)
         result = await executor.execute(simple_workflow)

@@ -49,9 +49,7 @@ class TestPlanModeApprovalFlow:
         mock_orchestrator.max_tokens = 1000
         mock_orchestrator.provider = MagicMock()
         mock_orchestrator.provider.chat = AsyncMock(
-            return_value=MagicMock(
-                content="I cannot execute this plan without your approval."
-            )
+            return_value=MagicMock(content="I cannot execute this plan without your approval.")
         )
 
         mock_renderer = MagicMock()
@@ -100,9 +98,7 @@ class TestPlanModeApprovalFlow:
 
         # Create coordinator with auto_approve enabled
         config = PlanningConfig(auto_approve=True)
-        coordinator = PlanningCoordinator(
-            mock_orchestrator, config=config, renderer=mock_renderer
-        )
+        coordinator = PlanningCoordinator(mock_orchestrator, config=config, renderer=mock_renderer)
 
         plan = ReadableTaskPlan(
             name="Auto-Approve Plan",
@@ -155,10 +151,7 @@ class TestPlanModeApprovalFlow:
 
         # Should return a helpful response
         assert response is not None
-        assert (
-            "rejected" in response.content.lower()
-            or "understand" in response.content.lower()
-        )
+        assert "rejected" in response.content.lower() or "understand" in response.content.lower()
         assert len(response.content) > 0
 
 
@@ -334,9 +327,7 @@ class TestPlanModeRenderingIntegration:
         """
         mock_orchestrator = MagicMock()
 
-        coordinator = PlanningCoordinator(
-            mock_orchestrator, renderer=None
-        )  # No renderer injected
+        coordinator = PlanningCoordinator(mock_orchestrator, renderer=None)  # No renderer injected
 
         plan = ReadableTaskPlan(
             name="Fallback Test Plan",
@@ -469,9 +460,7 @@ class TestPlanModeEndToEnd:
         mock_orchestrator.max_tokens = 1000
         mock_orchestrator.provider = MagicMock()
         mock_orchestrator.provider.chat = AsyncMock(
-            return_value=MagicMock(
-                content="I understand. Let's try a different approach."
-            )
+            return_value=MagicMock(content="I understand. Let's try a different approach.")
         )
 
         coordinator = PlanningCoordinator(mock_orchestrator)

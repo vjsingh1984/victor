@@ -58,9 +58,7 @@ class ExtensionCacheManager:
         """Build composite cache key from namespace and key."""
         return f"{namespace}:{key}"
 
-    def get_or_create(
-        self, namespace: str, key: str, factory: Callable[[], Any]
-    ) -> Any:
+    def get_or_create(self, namespace: str, key: str, factory: Callable[[], Any]) -> Any:
         """Get cached value or create via factory. Thread-safe.
 
         If the key is not present in the cache, the factory callable is invoked

@@ -58,17 +58,13 @@ class TestStepHandlerContractValidation:
 
         assert registry.get_handler("test") is not None
         # No contract warnings for reasonable version
-        contract_warnings = [
-            r for r in caplog.records if "contract" in r.message.lower()
-        ]
+        contract_warnings = [r for r in caplog.records if "contract" in r.message.lower()]
         assert len(contract_warnings) == 0
 
     def test_invalid_version_contract_warns(self, caplog):
         """Handler declaring impossible version emits warning."""
         registry = StepHandlerRegistry(handlers=[])
-        handler = _MockHandler(
-            "bad_version", order=50, contracts=(("tools", 999, ">=999.0.0"),)
-        )
+        handler = _MockHandler("bad_version", order=50, contracts=(("tools", 999, ">=999.0.0"),))
 
         with caplog.at_level(logging.WARNING):
             registry.add_handler(handler)
@@ -76,9 +72,7 @@ class TestStepHandlerContractValidation:
         # Handler still registered (non-blocking)
         assert registry.get_handler("bad_version") is not None
         # But warning emitted
-        contract_warnings = [
-            r for r in caplog.records if "contract" in r.message.lower()
-        ]
+        contract_warnings = [r for r in caplog.records if "contract" in r.message.lower()]
         assert len(contract_warnings) >= 1
 
     def test_empty_contracts_always_pass(self, caplog):
@@ -90,9 +84,7 @@ class TestStepHandlerContractValidation:
             registry.add_handler(handler)
 
         assert registry.get_handler("no_contracts") is not None
-        contract_warnings = [
-            r for r in caplog.records if "contract" in r.message.lower()
-        ]
+        contract_warnings = [r for r in caplog.records if "contract" in r.message.lower()]
         assert len(contract_warnings) == 0
 
     def test_default_registry_validates(self):

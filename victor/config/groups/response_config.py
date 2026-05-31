@@ -46,11 +46,7 @@ class ResponseSettings(BaseModel):
             ValueError: If token reserve is not positive or too large
         """
         if v < 512:
-            raise ValueError(
-                "response_token_reserve must be >= 512 (too small for practical use)"
-            )
+            raise ValueError("response_token_reserve must be >= 512 (too small for practical use)")
         if v > 32768:
-            raise ValueError(
-                "response_token_reserve must be <= 32768 (unreasonably large)"
-            )
+            raise ValueError("response_token_reserve must be <= 32768 (unreasonably large)")
         return v

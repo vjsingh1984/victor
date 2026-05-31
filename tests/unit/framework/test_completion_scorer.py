@@ -111,9 +111,7 @@ class TestCompletionScorer:
         """Test score calculation with all signals present."""
         scorer = CompletionScorer()
 
-        requirement_result = MockValidationResult(
-            is_satisfied=True, satisfaction_score=0.95
-        )
+        requirement_result = MockValidationResult(is_satisfied=True, satisfaction_score=0.95)
         fulfillment_result = MockFulfillmentResult(is_fulfilled=True, score=0.90)
         keyword_result = CompletionSignal(
             has_completion_indicator=True,
@@ -285,9 +283,7 @@ class TestCompletionScorer:
         scorer = CompletionScorer()
 
         perception = MockPerception(complexity="low")
-        adjustment = scorer._calculate_complexity_adjustment(
-            perception, TaskType.SEARCH
-        )
+        adjustment = scorer._calculate_complexity_adjustment(perception, TaskType.SEARCH)
 
         assert adjustment >= 0.0
         assert adjustment <= 1.0
@@ -297,9 +293,7 @@ class TestCompletionScorer:
         scorer = CompletionScorer()
 
         perception = MockPerception(complexity="high")
-        adjustment = scorer._calculate_complexity_adjustment(
-            perception, TaskType.CODE_GENERATION
-        )
+        adjustment = scorer._calculate_complexity_adjustment(perception, TaskType.CODE_GENERATION)
 
         assert adjustment >= 0.0
         assert adjustment <= 1.0
@@ -309,12 +303,8 @@ class TestCompletionScorer:
         scorer = CompletionScorer()
 
         # Search should get higher adjustment than code generation
-        search_adjustment = scorer._calculate_complexity_adjustment(
-            None, TaskType.SEARCH
-        )
-        code_adjustment = scorer._calculate_complexity_adjustment(
-            None, TaskType.CODE_GENERATION
-        )
+        search_adjustment = scorer._calculate_complexity_adjustment(None, TaskType.SEARCH)
+        code_adjustment = scorer._calculate_complexity_adjustment(None, TaskType.CODE_GENERATION)
 
         assert search_adjustment >= 0.0
         assert code_adjustment >= 0.0
@@ -347,9 +337,7 @@ class TestCompletionScorer:
         """Test that completion score includes detailed breakdown."""
         scorer = CompletionScorer()
 
-        requirement_result = MockValidationResult(
-            is_satisfied=True, satisfaction_score=0.9
-        )
+        requirement_result = MockValidationResult(is_satisfied=True, satisfaction_score=0.9)
         fulfillment_result = MockFulfillmentResult(is_fulfilled=True, score=0.85)
         keyword_result = CompletionSignal(
             has_completion_indicator=True,

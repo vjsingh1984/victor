@@ -131,9 +131,7 @@ def test_capability_runtime_lazy_proxy_falls_back_without_host_runtime(
             raise ImportError(name)
         return real_import_module(name, package)
 
-    monkeypatch.setattr(
-        capability_runtime.importlib, "import_module", fake_import_module
-    )
+    monkeypatch.setattr(capability_runtime.importlib, "import_module", fake_import_module)
 
     proxy = capability_runtime.create_lazy_capability_proxy(factory)
 
@@ -155,9 +153,7 @@ def test_chain_provider_and_init_runtime_exports_host_helpers() -> None:
     assert RuntimeToolSet.__name__ == "ToolSet"
 
 
-def test_agent_spec_subagent_and_workflow_executor_runtime_exports_host_helpers() -> (
-    None
-):
+def test_agent_spec_subagent_and_workflow_executor_runtime_exports_host_helpers() -> None:
     assert AgentSpec.__name__ == "AgentSpec"
     assert AgentCapabilities.__name__ == "AgentCapabilities"
     assert AgentConstraints.__name__ == "AgentConstraints"

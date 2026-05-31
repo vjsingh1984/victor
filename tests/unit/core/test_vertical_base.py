@@ -109,9 +109,7 @@ class TestGetExtensionsLSPCompliance:
         extensions = FailingVertical.get_extensions(use_cache=False)
 
         # Must still return a valid object, not None (LSP compliance)
-        assert (
-            extensions is not None
-        ), "get_extensions() returned None on exception - LSP violation"
+        assert extensions is not None, "get_extensions() returned None on exception - LSP violation"
         assert isinstance(
             extensions, VerticalExtensions
         ), f"Expected VerticalExtensions, got {type(extensions)}"
@@ -132,9 +130,7 @@ class TestGetExtensionsLSPCompliance:
 
         # Verify default values for list fields
         assert isinstance(extensions.middleware, list), "middleware should be a list"
-        assert isinstance(
-            extensions.safety_extensions, list
-        ), "safety_extensions should be a list"
+        assert isinstance(extensions.safety_extensions, list), "safety_extensions should be a list"
         assert isinstance(
             extensions.prompt_contributors, list
         ), "prompt_contributors should be a list"
@@ -312,10 +308,7 @@ class TestGetExtensionsAsync:
         assert metrics["completed"] == metrics["submitted"]
         assert metrics["in_flight"] == 0
         assert metrics["max_in_flight"] >= 1
-        assert (
-            metrics["queue_limit"]
-            == VerticalExtensionLoader._extension_executor_queue_limit
-        )
+        assert metrics["queue_limit"] == VerticalExtensionLoader._extension_executor_queue_limit
 
     @pytest.mark.asyncio
     async def test_get_extensions_async_records_pressure_threshold_events(self):
@@ -495,9 +488,7 @@ class TestGetCachedExtension:
                 return ""
 
         # Both use same key but should be cached separately
-        result1 = ConcreteVertical._get_cached_extension(
-            "shared_key", lambda: "concrete"
-        )
+        result1 = ConcreteVertical._get_cached_extension("shared_key", lambda: "concrete")
         result2 = AnotherVertical._get_cached_extension("shared_key", lambda: "another")
 
         assert result1 == "concrete"
@@ -513,9 +504,7 @@ class TestGetCachedExtension:
         ConcreteVertical.clear_config_cache()
 
         # Should call factory again
-        result2 = ConcreteVertical._get_cached_extension(
-            "test_key", lambda: "new_value"
-        )
+        result2 = ConcreteVertical._get_cached_extension("test_key", lambda: "new_value")
         assert result2 == "new_value"
 
     def test_same_class_name_different_modules_do_not_share_extension_cache(self):
@@ -604,9 +593,7 @@ class TestDefaultStageDefinitions:
         # All next_stages should reference valid stage names
         for stage_name, stage in stages.items():
             for next_stage in stage.next_stages:
-                assert (
-                    next_stage in stages
-                ), f"{stage_name} references invalid stage: {next_stage}"
+                assert next_stage in stages, f"{stage_name} references invalid stage: {next_stage}"
 
         # COMPLETION should have no next stages (terminal state)
         assert len(stages["COMPLETION"].next_stages) == 0
@@ -825,9 +812,7 @@ class TestStrictExtensionLoading:
         assert error.original_error is original
         assert error.is_required is True
         assert error.category == ErrorCategory.CONFIG_INVALID
-        assert (
-            error.severity == ErrorSeverity.CRITICAL
-        )  # Critical because is_required=True
+        assert error.severity == ErrorSeverity.CRITICAL  # Critical because is_required=True
 
         # Check details dict
         assert error.details["extension_type"] == "safety"

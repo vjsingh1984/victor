@@ -35,9 +35,7 @@ def _make_model_learner() -> ModelSelectorLearner:
     return ModelSelectorLearner(name="model_selector", db_connection=_make_db())
 
 
-def _tool_outcome(
-    tool_name: str, success: bool = True, tools_used: list = None
-) -> RLOutcome:
+def _tool_outcome(tool_name: str, success: bool = True, tools_used: list = None) -> RLOutcome:
     return RLOutcome(
         provider="anthropic",
         model="claude-sonnet-4-6",
@@ -109,9 +107,7 @@ class TestToolSelectorPredictor:
     def test_get_next_tool_prediction_returns_none_on_predictor_error(self):
         learner = _make_tool_learner()
         mock_predictor = MagicMock()
-        mock_predictor.predict_tools.side_effect = RuntimeError(
-            "embedding service down"
-        )
+        mock_predictor.predict_tools.side_effect = RuntimeError("embedding service down")
         learner._predictor = mock_predictor
         result = learner.get_next_tool_prediction("task", recent_tools=[])
         assert result is None
@@ -121,9 +117,7 @@ class TestToolSelectorPredictor:
         import inspect
 
         src = inspect.getsource(ToolSelectorLearner.get_next_tool_prediction)
-        assert (
-            "predict_tools" in src
-        ), "Must delegate to existing ToolPredictor.predict_tools()"
+        assert "predict_tools" in src, "Must delegate to existing ToolPredictor.predict_tools()"
         assert "keyword" not in src.lower(), "Must not reimplement keyword matching"
         assert "semantic" not in src.lower(), "Must not reimplement semantic similarity"
 
@@ -187,9 +181,7 @@ class TestToolSelectorAnalyticsEnhancedRankings:
     def test_falls_back_to_base_rankings_when_analytics_unavailable(self):
         learner = _make_tool_learner()
         assert learner._analytics is None
-        result = learner.get_analytics_enhanced_rankings(
-            ["read", "write", "search"], "analysis"
-        )
+        result = learner.get_analytics_enhanced_rankings(["read", "write", "search"], "analysis")
         assert isinstance(result, list)
 
     def test_blends_analytics_success_rate(self):
@@ -206,9 +198,7 @@ class TestToolSelectorAnalyticsEnhancedRankings:
         }
         learner._analytics = mock_analytics
 
-        rankings = learner.get_analytics_enhanced_rankings(
-            ["read", "write"], "analysis"
-        )
+        rankings = learner.get_analytics_enhanced_rankings(["read", "write"], "analysis")
         tool_names = [r[0] for r in rankings]
         assert tool_names[0] == "read"
 
@@ -238,16 +228,12 @@ class TestToolSelectorAnalyticsEnhancedRankings:
 class TestModelSelectorConfidenceThresholds:
     def test_learn_confidence_threshold_stores_observation(self):
         learner = _make_model_learner()
-        learner.learn_confidence_threshold(
-            "task_type", 0.8, used_llm=False, success=True
-        )
+        learner.learn_confidence_threshold("task_type", 0.8, used_llm=False, success=True)
         assert len(learner._threshold_observations["task_type"]) == 1
 
     def test_get_optimal_threshold_none_when_insufficient_data(self):
         learner = _make_model_learner()
-        learner.learn_confidence_threshold(
-            "task_type", 0.8, used_llm=False, success=True
-        )
+        learner.learn_confidence_threshold("task_type", 0.8, used_llm=False, success=True)
         assert learner.get_optimal_threshold("task_type") is None  # need 10+ obs
 
     def test_get_optimal_threshold_returns_float_with_enough_data(self):

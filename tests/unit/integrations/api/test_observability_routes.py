@@ -198,9 +198,7 @@ class TestObservabilityIntegration:
         # Should respond (may have errors if no data, but endpoint exists)
         assert response.status_code in [200, 500]
 
-    def test_session_details_endpoint_filters_events_by_session(
-        self, client, monkeypatch
-    ):
+    def test_session_details_endpoint_filters_events_by_session(self, client, monkeypatch):
         """Test session details endpoint resolves session and applies session_id filter."""
 
         seen = {}
@@ -251,9 +249,7 @@ class TestObservabilityIntegration:
         assert seen["filters"].session_ids == ["session-1"]
         assert seen["limit"] == 1000
 
-    def test_trace_details_endpoint_filters_events_by_trace_id(
-        self, client, monkeypatch
-    ):
+    def test_trace_details_endpoint_filters_events_by_trace_id(self, client, monkeypatch):
         """Test trace details endpoint applies trace/session filter when loading events."""
 
         seen = {}

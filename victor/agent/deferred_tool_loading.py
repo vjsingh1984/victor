@@ -156,8 +156,7 @@ class DeferredLoadingManager:
         self._total_bytes_saved += len(content)
 
         logger.debug(
-            f"Stored deferred tool result: {result_id} "
-            f"({len(content)} chars from {tool_name})"
+            f"Stored deferred tool result: {result_id} " f"({len(content)} chars from {tool_name})"
         )
 
         return result_id

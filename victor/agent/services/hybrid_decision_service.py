@@ -109,9 +109,7 @@ class HybridDecisionService:
         self._config = config or HybridDecisionServiceConfig()
 
         # Initialize components
-        self._ensemble_voter = (
-            EnsembleVoter() if self._config.enable_ensemble_voting else None
-        )
+        self._ensemble_voter = EnsembleVoter() if self._config.enable_ensemble_voting else None
 
         # Confidence calibrator
         if self._config.enable_calibration:
@@ -731,9 +729,7 @@ class HybridDecisionService:
     def get_runtime_evaluation_feedback(self) -> RuntimeEvaluationFeedback:
         """Export runtime evaluation feedback from the adaptive calibrator when available."""
         if self._calibrator is not None:
-            return self._calibrator.get_runtime_evaluation_feedback(
-                DecisionType.TASK_COMPLETION
-            )
+            return self._calibrator.get_runtime_evaluation_feedback(DecisionType.TASK_COMPLETION)
         threshold = self._config.base_threshold
         return RuntimeEvaluationFeedback(
             completion_threshold=threshold,
@@ -795,9 +791,7 @@ class HybridMetrics:
 
     def get_hit_rate(self) -> float:
         """Calculate overall hit rate (cache + lookup + pattern + ensemble)."""
-        total_hits = (
-            self.cache_hits + self.lookup_hits + self.pattern_hits + self.ensemble_hits
-        )
+        total_hits = self.cache_hits + self.lookup_hits + self.pattern_hits + self.ensemble_hits
         total_requests = total_hits + self.llm_calls + self.heuristic_fallbacks
         return total_hits / total_requests if total_requests > 0 else 0.0
 

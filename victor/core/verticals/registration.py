@@ -75,9 +75,7 @@ def register_vertical(*args, **kwargs) -> Callable[[Type], Type]:
 
                 behavior_config = VerticalBehaviorConfigRegistry.from_manifest(manifest)
                 VerticalBehaviorConfigRegistry.register(manifest.name, behavior_config)
-                logger.debug(
-                    "Registered behavior configuration for '%s'", manifest.name
-                )
+                logger.debug("Registered behavior configuration for '%s'", manifest.name)
             except ImportError:
                 logger.debug(
                     "VerticalBehaviorConfigRegistry not available - "

@@ -32,9 +32,7 @@ _VERSION_KEY = "graph_enrichment.version"
 _LATEST_MTIME_KEY = "graph_enrichment.latest_mtime"
 
 _TOOL_DECORATOR_NODE_ID = "symbol:victor/tools/decorators.py:tool"
-_TOOL_METADATA_REGISTRY_NODE_ID = (
-    "symbol:victor/tools/metadata_registry.py:ToolMetadataRegistry"
-)
+_TOOL_METADATA_REGISTRY_NODE_ID = "symbol:victor/tools/metadata_registry.py:ToolMetadataRegistry"
 
 
 @dataclass(frozen=True)
@@ -61,9 +59,7 @@ def ensure_project_graph_enriched(
 
     root = Path(root_path)
     project_db = get_project_database(root)
-    if not project_db.table_exists("graph_node") or not project_db.table_exists(
-        "graph_edge"
-    ):
+    if not project_db.table_exists("graph_node") or not project_db.table_exists("graph_edge"):
         return GraphEnrichmentStats(skipped=True)
 
     node_count_row = project_db.query_one("SELECT COUNT(*) FROM graph_node")
@@ -78,9 +74,7 @@ def ensure_project_graph_enriched(
 
     with project_db.transaction() as conn:
         implements_edges = _infer_protocol_implementation_edges(conn)
-        decorates_edges, registers_edges = _infer_tool_registration_edges(
-            conn, repo_root
-        )
+        decorates_edges, registers_edges = _infer_tool_registration_edges(conn, repo_root)
         stats = GraphEnrichmentStats(
             implements_edges=implements_edges,
             decorates_edges=decorates_edges,
@@ -197,9 +191,7 @@ def _infer_tool_registration_edges(conn: object, repo_root: Path) -> Tuple[int, 
         """).fetchall()
     node_lookup: Dict[str, Dict[Tuple[str, int], str]] = {}
     for node_id, file_path, name, line in node_rows:
-        node_lookup.setdefault(str(file_path), {})[(str(name), int(line))] = str(
-            node_id
-        )
+        node_lookup.setdefault(str(file_path), {})[(str(name), int(line))] = str(node_id)
 
     decorates_inserted = 0
     registers_inserted = 0
@@ -260,10 +252,7 @@ def _find_tool_decorated_nodes(
     direct_tool_aliases: Set[str] = set()
     module_tool_aliases: Set[str] = set()
     for node in tree.body:
-        if (
-            isinstance(node, ast.ImportFrom)
-            and node.module == "victor.tools.decorators"
-        ):
+        if isinstance(node, ast.ImportFrom) and node.module == "victor.tools.decorators":
             for alias in node.names:
                 if alias.name == "tool":
                     direct_tool_aliases.add(alias.asname or alias.name)
@@ -276,9 +265,7 @@ def _find_tool_decorated_nodes(
     for node in ast.walk(tree):
         if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
             continue
-        if not _has_tool_decorator(
-            node.decorator_list, direct_tool_aliases, module_tool_aliases
-        ):
+        if not _has_tool_decorator(node.decorator_list, direct_tool_aliases, module_tool_aliases):
             continue
         node_id = nodes_by_name_line.get((node.name, int(node.lineno)))
         if node_id:
@@ -309,11 +296,7 @@ def _resolve_tool_decorator(
         dotted = _attribute_path(target)
         if dotted == ("victor", "tools", "decorators", "tool"):
             return True
-        if (
-            len(dotted) == 2
-            and dotted[0] in module_tool_aliases
-            and dotted[1] == "tool"
-        ):
+        if len(dotted) == 2 and dotted[0] in module_tool_aliases and dotted[1] == "tool":
             return True
     return False
 

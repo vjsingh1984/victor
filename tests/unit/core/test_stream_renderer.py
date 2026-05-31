@@ -49,9 +49,7 @@ class TestFormatterRenderer:
         renderer.start()
         mock_formatter.start_streaming.assert_called_once()
 
-    def test_pause_increments_depth_without_end_streaming(
-        self, renderer, mock_formatter
-    ):
+    def test_pause_increments_depth_without_end_streaming(self, renderer, mock_formatter):
         """pause() increments depth counter but does not call end_streaming (no-op removed)."""
         renderer.pause()
         assert renderer._pause_count == 1
@@ -73,15 +71,11 @@ class TestFormatterRenderer:
         assert "read" in mock_formatter.status.call_args[0][0]
         mock_formatter.start_streaming.assert_called_once()
 
-    def test_on_tool_start_formats_display_name_in_status(
-        self, renderer, mock_formatter
-    ):
+    def test_on_tool_start_formats_display_name_in_status(self, renderer, mock_formatter):
         """Tool start status uses lower-camel display formatting only for UI text."""
         renderer.on_tool_start("code_search", {"query": "foo"})
 
-        mock_formatter.tool_start.assert_called_once_with(
-            "code_search", {"query": "foo"}
-        )
+        mock_formatter.tool_start.assert_called_once_with("code_search", {"query": "foo"})
         mock_formatter.status.assert_called_once_with("🔧 Running codeSearch...")
 
     def test_on_tool_result_success(self, renderer, mock_formatter):
@@ -118,9 +112,7 @@ class TestFormatterRenderer:
             follow_up_suggestions=None,
         )
 
-    def test_on_tool_result_forwards_follow_up_suggestions(
-        self, renderer, mock_formatter
-    ):
+    def test_on_tool_result_forwards_follow_up_suggestions(self, renderer, mock_formatter):
         """Test on_tool_result() forwards follow-up suggestions to formatter."""
         follow_ups = [
             {
@@ -144,9 +136,7 @@ class TestFormatterRenderer:
             follow_up_suggestions=follow_ups,
         )
 
-    def test_on_tool_result_forwards_preview_and_full_output(
-        self, renderer, mock_formatter
-    ):
+    def test_on_tool_result_forwards_preview_and_full_output(self, renderer, mock_formatter):
         """Pruned previews forward both preview and full output to formatter."""
         renderer.on_tool_result(
             name="read",
@@ -230,9 +220,7 @@ class TestFormatterRenderer:
         call_args = mock_console.print.call_args
         assert call_args[1].get("end") == ""  # No newline
 
-    def test_on_thinking_start_shows_indicator(
-        self, renderer, mock_formatter, mock_console
-    ):
+    def test_on_thinking_start_shows_indicator(self, renderer, mock_formatter, mock_console):
         """Test on_thinking_start() shows thinking indicator."""
         renderer.on_thinking_start()
 
@@ -241,9 +229,7 @@ class TestFormatterRenderer:
         call_text = str(mock_console.print.call_args[0][0])
         assert "Thinking" in call_text
 
-    def test_on_thinking_end_resumes_streaming(
-        self, renderer, mock_formatter, mock_console
-    ):
+    def test_on_thinking_end_resumes_streaming(self, renderer, mock_formatter, mock_console):
         """Test on_thinking_end() resumes streaming after thinking_start."""
         renderer.on_thinking_start()
         mock_formatter.reset_mock()
@@ -254,9 +240,7 @@ class TestFormatterRenderer:
         mock_console.print.assert_called_once()
         mock_formatter.start_streaming.assert_called_once()
 
-    def test_thinking_content_not_in_buffer(
-        self, renderer, mock_formatter, mock_console
-    ):
+    def test_thinking_content_not_in_buffer(self, renderer, mock_formatter, mock_console):
         """Test thinking content is not accumulated in buffer."""
         renderer.on_content("Normal content")
         renderer.on_thinking_content("Thinking content")
@@ -326,9 +310,7 @@ class TestLiveDisplayRenderer:
         mock_live.stop.assert_called_once()
 
     @patch("victor.ui.rendering.live_renderer.Live")
-    def test_resume_creates_new_live_display(
-        self, mock_live_class, renderer, mock_console
-    ):
+    def test_resume_creates_new_live_display(self, mock_live_class, renderer, mock_console):
         """Test resume() creates a new Live display with current content when paused."""
         mock_live = MagicMock()
         mock_live_class.return_value = mock_live
@@ -344,9 +326,7 @@ class TestLiveDisplayRenderer:
         assert mock_live.start.call_count == 2
 
     @patch("victor.ui.rendering.live_renderer.Live")
-    def test_on_tool_start_prints_running_feedback(
-        self, mock_live_class, renderer, mock_console
-    ):
+    def test_on_tool_start_prints_running_feedback(self, mock_live_class, renderer, mock_console):
         """Test on_tool_start() stores state and prints immediate running feedback."""
         mock_live = MagicMock()
         mock_live_class.return_value = mock_live
@@ -357,18 +337,12 @@ class TestLiveDisplayRenderer:
         assert renderer._pending_tool is not None
         assert renderer._pending_tool["name"] == "read"
         assert renderer._pending_tool["arguments"] == {"path": "/test.py"}
-        printed_calls = [
-            str(call_args) for call_args in mock_console.print.call_args_list
-        ]
+        printed_calls = [str(call_args) for call_args in mock_console.print.call_args_list]
         assert any("Tool Execution" in call_str for call_str in printed_calls)
-        assert any(
-            "read" in call_str and "running" in call_str for call_str in printed_calls
-        )
+        assert any("read" in call_str and "running" in call_str for call_str in printed_calls)
 
     @patch("victor.ui.rendering.live_renderer.Live")
-    def test_on_tool_result_success_prints_checkmark(
-        self, mock_live_class, renderer, mock_console
-    ):
+    def test_on_tool_result_success_prints_checkmark(self, mock_live_class, renderer, mock_console):
         """Test on_tool_result() prints green checkmark for success."""
         mock_live = MagicMock()
         mock_live_class.return_value = mock_live
@@ -409,16 +383,12 @@ class TestLiveDisplayRenderer:
                 arguments={"query": "main"},
             )
 
-        printed_calls = [
-            str(call_args) for call_args in mock_console.print.call_args_list
-        ]
+        printed_calls = [str(call_args) for call_args in mock_console.print.call_args_list]
         assert any("codeSearch" in call_str for call_str in printed_calls)
         assert not any("[bold]code_search[/]" in call_str for call_str in printed_calls)
 
     @patch("victor.ui.rendering.live_renderer.Live")
-    def test_on_tool_result_failure_prints_x(
-        self, mock_live_class, renderer, mock_console
-    ):
+    def test_on_tool_result_failure_prints_x(self, mock_live_class, renderer, mock_console):
         """Test on_tool_result() prints red X for failure."""
         mock_live = MagicMock()
         mock_live_class.return_value = mock_live
@@ -459,13 +429,10 @@ class TestLiveDisplayRenderer:
             ],
         )
 
-        printed_calls = [
-            str(call_args) for call_args in mock_console.print.call_args_list
-        ]
+        printed_calls = [str(call_args) for call_args in mock_console.print.call_args_list]
         assert any("next:" in call_str for call_str in printed_calls)
         assert any(
-            'graph(mode="trace", node="main", depth=3)' in call_str
-            for call_str in printed_calls
+            'graph(mode="trace", node="main", depth=3)' in call_str for call_str in printed_calls
         )
 
     @patch("victor.ui.rendering.live_renderer.Live")
@@ -491,13 +458,10 @@ class TestLiveDisplayRenderer:
             ],
         )
 
-        printed_calls = [
-            str(call_args) for call_args in mock_console.print.call_args_list
-        ]
+        printed_calls = [str(call_args) for call_args in mock_console.print.call_args_list]
         assert any("next:" in call_str for call_str in printed_calls)
         assert any(
-            'graph(mode="overview", path=".", top_k=10)' in call_str
-            for call_str in printed_calls
+            'graph(mode="overview", path=".", top_k=10)' in call_str for call_str in printed_calls
         )
 
     @patch("victor.ui.rendering.live_renderer.Live")
@@ -515,9 +479,7 @@ class TestLiveDisplayRenderer:
         assert "Thinking" in call_str
 
     @patch("victor.ui.rendering.live_renderer.Live")
-    def test_on_content_updates_live_display(
-        self, mock_live_class, renderer, mock_console
-    ):
+    def test_on_content_updates_live_display(self, mock_live_class, renderer, mock_console):
         """Test on_content() updates the Live display."""
         mock_live = MagicMock()
         mock_live_class.return_value = mock_live
@@ -530,9 +492,7 @@ class TestLiveDisplayRenderer:
         assert renderer._content_buffer == "Hello World"
 
     @patch("victor.ui.rendering.live_renderer.Live")
-    def test_finalize_returns_content_and_cleans_up(
-        self, mock_live_class, renderer, mock_console
-    ):
+    def test_finalize_returns_content_and_cleans_up(self, mock_live_class, renderer, mock_console):
         """Test finalize() returns content and stops Live display."""
         mock_live = MagicMock()
         mock_live_class.return_value = mock_live
@@ -545,9 +505,7 @@ class TestLiveDisplayRenderer:
         mock_live.stop.assert_called()
 
     @patch("victor.ui.rendering.live_renderer.Live")
-    def test_cleanup_stops_live_if_running(
-        self, mock_live_class, renderer, mock_console
-    ):
+    def test_cleanup_stops_live_if_running(self, mock_live_class, renderer, mock_console):
         """Test cleanup() stops Live display if it exists."""
         mock_live = MagicMock()
         mock_live_class.return_value = mock_live
@@ -563,9 +521,7 @@ class TestLiveDisplayRenderer:
         renderer.cleanup()  # Should not raise
 
     @patch("victor.ui.rendering.live_renderer.Live")
-    def test_on_thinking_content_prints_immediately(
-        self, mock_live_class, renderer, mock_console
-    ):
+    def test_on_thinking_content_prints_immediately(self, mock_live_class, renderer, mock_console):
         """Test on_thinking_content() prints text immediately without buffering."""
         mock_live = MagicMock()
         mock_live_class.return_value = mock_live
@@ -579,9 +535,7 @@ class TestLiveDisplayRenderer:
         assert mock_console.print.call_count >= 2  # Each chunk prints immediately
 
     @patch("victor.ui.rendering.live_renderer.Live")
-    def test_on_thinking_start_shows_indicator(
-        self, mock_live_class, renderer, mock_console
-    ):
+    def test_on_thinking_start_shows_indicator(self, mock_live_class, renderer, mock_console):
         """Test on_thinking_start() shows thinking indicator."""
         mock_live = MagicMock()
         mock_live_class.return_value = mock_live
@@ -628,9 +582,7 @@ class TestLiveDisplayRenderer:
         assert renderer._in_thinking_mode is False
 
     @patch("victor.ui.rendering.live_renderer.Live")
-    def test_on_thinking_content_renders_immediately(
-        self, mock_live_class, renderer, mock_console
-    ):
+    def test_on_thinking_content_renders_immediately(self, mock_live_class, renderer, mock_console):
         """Test on_thinking_content() renders text immediately without buffering.
 
         Note: Delta normalization is handled upstream in stream_response(),
@@ -649,9 +601,7 @@ class TestLiveDisplayRenderer:
 
         # Should print each chunk immediately (no buffering at display layer)
         # Now includes: separator + badge + indicator + 3 chunks
-        assert (
-            mock_console.print.call_count == 6
-        )  # Separator + badge + indicator + 3 chunks
+        assert mock_console.print.call_count == 6  # Separator + badge + indicator + 3 chunks
 
     def test_calculate_adaptive_preview_lines_with_error_shows_all(self, renderer):
         """Adaptive preview with error shows all lines."""
@@ -676,14 +626,10 @@ class TestLiveDisplayRenderer:
         tool_settings.tool_output_preview_lines_max = 10
 
         output = "line1\nline2\nline3"
-        lines = renderer._calculate_adaptive_preview_lines(
-            output, None, 3, tool_settings
-        )
+        lines = renderer._calculate_adaptive_preview_lines(output, None, 3, tool_settings)
         assert lines == 3  # All lines shown for small output
 
-    def test_calculate_adaptive_preview_lines_medium_output_shows_moderate(
-        self, renderer
-    ):
+    def test_calculate_adaptive_preview_lines_medium_output_shows_moderate(self, renderer):
         """Adaptive preview with medium output (5-50 lines) shows 3-5 lines."""
         from unittest.mock import MagicMock
 
@@ -693,14 +639,10 @@ class TestLiveDisplayRenderer:
 
         # 20 lines → should show 5 lines (max for medium)
         output = "\n".join([f"line{i}" for i in range(20)])
-        lines = renderer._calculate_adaptive_preview_lines(
-            output, None, 3, tool_settings
-        )
+        lines = renderer._calculate_adaptive_preview_lines(output, None, 3, tool_settings)
         assert lines == 5  # Moderate preview for medium output
 
-    def test_calculate_adaptive_preview_lines_large_output_shows_minimal(
-        self, renderer
-    ):
+    def test_calculate_adaptive_preview_lines_large_output_shows_minimal(self, renderer):
         """Adaptive preview with large output (>50 lines) shows 1-2 lines."""
         from unittest.mock import MagicMock
 
@@ -710,9 +652,7 @@ class TestLiveDisplayRenderer:
 
         # 100 lines → should show 2 lines (max for large)
         output = "\n".join([f"line{i}" for i in range(100)])
-        lines = renderer._calculate_adaptive_preview_lines(
-            output, None, 3, tool_settings
-        )
+        lines = renderer._calculate_adaptive_preview_lines(output, None, 3, tool_settings)
         assert lines == 2  # Minimal preview for large output
 
     def test_calculate_adaptive_preview_lines_respects_min_max_bounds(self, renderer):
@@ -725,16 +665,12 @@ class TestLiveDisplayRenderer:
 
         # Large output that would normally show 2 lines
         output = "\n".join([f"line{i}" for i in range(100)])
-        lines = renderer._calculate_adaptive_preview_lines(
-            output, None, 3, tool_settings
-        )
+        lines = renderer._calculate_adaptive_preview_lines(output, None, 3, tool_settings)
         assert lines == 3  # Respects minimum bound
 
         # Small output that would show 5 lines
         output = "\n".join([f"line{i}" for i in range(20)])
-        lines = renderer._calculate_adaptive_preview_lines(
-            output, None, 3, tool_settings
-        )
+        lines = renderer._calculate_adaptive_preview_lines(output, None, 3, tool_settings)
         assert lines == 5  # Within bounds
 
     def test_categorize_tool_groups_filesystem_tools(self, renderer):
@@ -1020,9 +956,7 @@ class TestStreamResponse:
         )
 
     @pytest.mark.asyncio
-    async def test_processes_tool_result_event_with_follow_ups(
-        self, mock_agent, mock_renderer
-    ):
+    async def test_processes_tool_result_event_with_follow_ups(self, mock_agent, mock_renderer):
         """Test stream_response forwards tool follow-up suggestions."""
 
         async def mock_stream():
@@ -1109,9 +1043,7 @@ class TestStreamResponse:
         mock_renderer.on_status.assert_called_once_with("Starting...")
 
     @pytest.mark.asyncio
-    async def test_maps_generic_thinking_status_to_thinking_ui(
-        self, mock_agent, mock_renderer
-    ):
+    async def test_maps_generic_thinking_status_to_thinking_ui(self, mock_agent, mock_renderer):
         """Generic thinking statuses should use thinking UI instead of a status line."""
 
         async def mock_stream():
@@ -1128,9 +1060,7 @@ class TestStreamResponse:
         mock_renderer.on_content.assert_called_once_with("Answer")
 
     @pytest.mark.asyncio
-    async def test_suppressed_generic_thinking_status_is_hidden(
-        self, mock_agent, mock_renderer
-    ):
+    async def test_suppressed_generic_thinking_status_is_hidden(self, mock_agent, mock_renderer):
         """Suppress-thinking mode should hide generic thinking statuses entirely."""
 
         async def mock_stream():
@@ -1211,9 +1141,7 @@ class TestStreamResponse:
         mock_renderer.on_content.assert_any_call("World")
 
     @pytest.mark.asyncio
-    async def test_normalizes_cumulative_content_snapshots(
-        self, mock_agent, mock_renderer
-    ):
+    async def test_normalizes_cumulative_content_snapshots(self, mock_agent, mock_renderer):
         """Cumulative provider snapshots should be reduced to append-only deltas."""
 
         async def mock_stream():
@@ -1226,42 +1154,30 @@ class TestStreamResponse:
         await stream_response(mock_agent, "test message", mock_renderer)
 
         assert mock_renderer.on_content.call_count == 2
-        mock_renderer.on_content.assert_has_calls(
-            [call("I will analyze"), call(" the repository")]
-        )
+        mock_renderer.on_content.assert_has_calls([call("I will analyze"), call(" the repository")])
 
     @pytest.mark.asyncio
-    async def test_normalizes_cumulative_reasoning_snapshots(
-        self, mock_agent, mock_renderer
-    ):
+    async def test_normalizes_cumulative_reasoning_snapshots(self, mock_agent, mock_renderer):
         """Accumulated reasoning snapshots should not be printed repeatedly."""
 
         async def mock_stream():
             yield StreamChunk(content="", metadata={"reasoning_content": "Plan"})
-            yield StreamChunk(
-                content="", metadata={"reasoning_content": "Plan carefully"}
-            )
+            yield StreamChunk(content="", metadata={"reasoning_content": "Plan carefully"})
             yield StreamChunk(content="Done", metadata=None)
 
         mock_agent.stream_chat = MagicMock(return_value=mock_stream())
 
         await stream_response(mock_agent, "test message", mock_renderer)
 
-        mock_renderer.on_thinking_content.assert_has_calls(
-            [call("Plan"), call(" carefully")]
-        )
+        mock_renderer.on_thinking_content.assert_has_calls([call("Plan"), call(" carefully")])
         assert mock_renderer.on_thinking_content.call_count == 2
 
     @pytest.mark.asyncio
-    async def test_renders_reasoning_and_content_from_same_chunk(
-        self, mock_agent, mock_renderer
-    ):
+    async def test_renders_reasoning_and_content_from_same_chunk(self, mock_agent, mock_renderer):
         """Chunks containing both reasoning metadata and content should render both."""
 
         async def mock_stream():
-            yield StreamChunk(
-                content="Answer", metadata={"reasoning_content": "Thinking"}
-            )
+            yield StreamChunk(content="Answer", metadata={"reasoning_content": "Thinking"})
 
         mock_agent.stream_chat = MagicMock(return_value=mock_stream())
 
@@ -1276,9 +1192,7 @@ class TestStreamResponse:
         """Provider-added thinking banners should not be echoed in reasoning output."""
 
         async def mock_stream():
-            yield StreamChunk(
-                content="", metadata={"reasoning_content": "💭 Thinking...Plan"}
-            )
+            yield StreamChunk(content="", metadata={"reasoning_content": "💭 Thinking...Plan"})
             yield StreamChunk(content="Answer", metadata=None)
 
         mock_agent.stream_chat = MagicMock(return_value=mock_stream())
@@ -1322,9 +1236,7 @@ class TestStreamResponse:
         result = await stream_response(mock_agent, "test message", renderer)
 
         assert result == "Done"
-        assert (
-            renderer._tool_calls[0]["result"]["output"] == "line1\nline2\nline3\nline4"
-        )
+        assert renderer._tool_calls[0]["result"]["output"] == "line1\nline2\nline3\nline4"
 
     @pytest.mark.asyncio
     async def test_buffered_renderer_normalizes_exact_response_output(self, mock_agent):
@@ -1469,15 +1381,11 @@ class TestStreamResponse:
         """Test suppress_thinking parameter hides thinking content."""
 
         async def mock_stream():
-            yield StreamChunk(
-                content="<think>Hidden thinking</think>Visible", metadata=None
-            )
+            yield StreamChunk(content="<think>Hidden thinking</think>Visible", metadata=None)
 
         mock_agent.stream_chat = MagicMock(return_value=mock_stream())
 
-        await stream_response(
-            mock_agent, "test message", mock_renderer, suppress_thinking=True
-        )
+        await stream_response(mock_agent, "test message", mock_renderer, suppress_thinking=True)
 
         # Should still call lifecycle methods
         mock_renderer.start.assert_called()
@@ -1684,9 +1592,7 @@ class TestFormatterRendererPauseDepth:
         """resume() with no prior pause() logs a warning and is a no-op."""
         import logging
 
-        with caplog.at_level(
-            logging.WARNING, logger="victor.ui.rendering.formatter_renderer"
-        ):
+        with caplog.at_level(logging.WARNING, logger="victor.ui.rendering.formatter_renderer"):
             renderer.resume()
         mock_formatter.start_streaming.assert_not_called()
         assert "no matching pause" in caplog.text
@@ -1845,9 +1751,7 @@ class TestLiveDisplayRendererPauseDepth:
         """resume() with no prior pause() is a quiet no-op for operators."""
         import logging
 
-        with caplog.at_level(
-            logging.WARNING, logger="victor.ui.rendering.live_renderer"
-        ):
+        with caplog.at_level(logging.WARNING, logger="victor.ui.rendering.live_renderer"):
             renderer.resume()
         assert "no matching pause" not in caplog.text
 
@@ -1915,9 +1819,7 @@ class TestLiveDisplayRendererExpandLastOutput:
             renderer.expand_last_output()
         # Console.print should have been called with a Panel
         panel_calls = [
-            c
-            for c in mock_console.print.call_args_list
-            if c[0] and isinstance(c[0][0], Panel)
+            c for c in mock_console.print.call_args_list if c[0] and isinstance(c[0][0], Panel)
         ]
         assert len(panel_calls) == 1
 

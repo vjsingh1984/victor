@@ -851,9 +851,7 @@ class VerticalIntegrationPipeline:
         max_cache_entries: int = 256,
         cache_policy: Optional["VerticalIntegrationCachePolicy"] = None,
         parallel_enabled: bool = True,
-        context_factory: Optional[
-            Callable[..., "MutableVerticalContextProtocol"]
-        ] = None,
+        context_factory: Optional[Callable[..., "MutableVerticalContextProtocol"]] = None,
     ):
         """Initialize the pipeline.
 
@@ -894,9 +892,9 @@ class VerticalIntegrationPipeline:
         self._integration_plan_cache: Dict[str, Dict[str, Any]] = {}
         self._integration_plan_timestamps: Dict[str, float] = {}
         self._integration_plan_lock = threading.RLock()
-        self._applied_plan_by_orchestrator: (
-            "weakref.WeakKeyDictionary[Any, Dict[str, Any]]"
-        ) = weakref.WeakKeyDictionary()
+        self._applied_plan_by_orchestrator: "weakref.WeakKeyDictionary[Any, Dict[str, Any]]" = (
+            weakref.WeakKeyDictionary()
+        )
         # Persistent plan registry (survives GC, replaces WeakKeyDictionary for lookups)
         self._plan_registry = IntegrationPlanRegistry.get_instance()
         self._integration_plan_metrics: Dict[str, int] = {
@@ -913,9 +911,7 @@ class VerticalIntegrationPipeline:
             _warn_legacy_extension_registry_api(
                 "VerticalIntegrationPipeline(extension_registry=...)"
             )
-            logger.debug(
-                "Ignoring provided legacy extension_registry in active step-handler path."
-            )
+            logger.debug("Ignoring provided legacy extension_registry in active step-handler path.")
 
         # Initialize step handler registry
         if step_registry is not None:
@@ -1084,9 +1080,7 @@ class VerticalIntegrationPipeline:
                     cache_key = self._generate_cache_key(vertical_class)
                 if cache_key:
                     self._save_to_cache(cache_key, result)
-                    plan = self._build_integration_plan(
-                        cache_key, result, base_plan=cached_plan
-                    )
+                    plan = self._build_integration_plan(cache_key, result, base_plan=cached_plan)
                     self._save_plan_to_cache(cache_key, plan)
                     self._set_applied_plan_for_orchestrator(orchestrator, plan)
                     if result.context is not None:
@@ -1158,18 +1152,14 @@ class VerticalIntegrationPipeline:
             key_string = "|".join(key_parts)
             full_hash = hashlib.sha256(key_string.encode()).hexdigest()
 
-            logger.debug(
-                "Cache key tier=v1 (source file) for vertical=%s", vertical.name
-            )
+            logger.debug("Cache key tier=v1 (source file) for vertical=%s", vertical.name)
             return f"v1_{vertical.name}_{full_hash[:16]}"
 
         except Exception as e:
             logger.warning(f"Failed to generate cache key: {e}")
             return None
 
-    def _generate_class_based_key(
-        self, vertical: Type["VerticalBase"]
-    ) -> Optional[str]:
+    def _generate_class_based_key(self, vertical: Type["VerticalBase"]) -> Optional[str]:
         """Generate cache key from class properties when source file unavailable.
 
         This is a fallback for dynamically loaded classes or built-in classes.
@@ -1383,8 +1373,7 @@ class VerticalIntegrationPipeline:
         for handler_name, status in result.step_status.items():
             if (
                 status.get("status") == "skipped"
-                and status.get("details", {}).get("reason")
-                == _INTEGRATION_PLAN_SKIP_REASON
+                and status.get("details", {}).get("reason") == _INTEGRATION_PLAN_SKIP_REASON
                 and handler_name in base_fingerprints
             ):
                 fingerprints[handler_name] = base_fingerprints[handler_name]
@@ -1518,9 +1507,7 @@ class VerticalIntegrationPipeline:
                     return None
         return None
 
-    def _get_applied_plan_for_orchestrator(
-        self, orchestrator: Any
-    ) -> Optional[Dict[str, Any]]:
+    def _get_applied_plan_for_orchestrator(self, orchestrator: Any) -> Optional[Dict[str, Any]]:
         """Get previously applied plan metadata for this orchestrator."""
         # Check persistent registry first (survives GC)
         registry_plan = self._plan_registry.get_plan(orchestrator)
@@ -1552,9 +1539,7 @@ class VerticalIntegrationPipeline:
             return copy.deepcopy(plan)
         return None
 
-    def _set_applied_plan_for_orchestrator(
-        self, orchestrator: Any, plan: Dict[str, Any]
-    ) -> None:
+    def _set_applied_plan_for_orchestrator(self, orchestrator: Any, plan: Dict[str, Any]) -> None:
         """Store applied plan metadata for orchestrator delta/no-op checks."""
         # Write to persistent registry (primary)
         self._plan_registry.set_plan(orchestrator, plan)
@@ -1576,9 +1561,7 @@ class VerticalIntegrationPipeline:
 
         enabled_tools = self._resolve_enabled_tools_snapshot(orchestrator)
         if enabled_tools is not None:
-            snapshot["enabled_tools_hash"] = self._hash_plan_payload(
-                sorted(enabled_tools)
-            )
+            snapshot["enabled_tools_hash"] = self._hash_plan_payload(sorted(enabled_tools))
 
         return snapshot
 
@@ -1647,9 +1630,7 @@ class VerticalIntegrationPipeline:
             self._integration_plan_metrics["skipped_handlers"] += len(skip)
         return skip
 
-    def _record_skipped_handler(
-        self, result: IntegrationResult, handler_name: str
-    ) -> None:
+    def _record_skipped_handler(self, result: IntegrationResult, handler_name: str) -> None:
         """Record skipped handler status for integration-plan no-op delta."""
         result.record_step_status(
             handler_name,
@@ -1666,18 +1647,14 @@ class VerticalIntegrationPipeline:
     ) -> Dict[str, Any]:
         """Build observability payload for vertical.applied events."""
         cache_stats = self.get_cache_stats() if self._enable_cache else {}
-        integration_plan_stats = (
-            self.get_integration_plan_stats() if self._enable_cache else {}
-        )
+        integration_plan_stats = self.get_integration_plan_stats() if self._enable_cache else {}
         extension_loader_metrics: Dict[str, Any] = {}
         observability_delivery_stats: Dict[str, Any] = {}
         framework_registry_metrics: Dict[str, Any] = {}
         try:
             from victor.core.verticals.extension_loader import VerticalExtensionLoader
 
-            extension_loader_metrics = (
-                VerticalExtensionLoader.get_extension_loader_metrics()
-            )
+            extension_loader_metrics = VerticalExtensionLoader.get_extension_loader_metrics()
         except Exception:
             extension_loader_metrics = {}
         try:
@@ -1690,9 +1667,7 @@ class VerticalIntegrationPipeline:
         except Exception:
             observability_delivery_stats = {}
         try:
-            registry_service = resolve_framework_integration_registry_service(
-                orchestrator
-            )
+            registry_service = resolve_framework_integration_registry_service(orchestrator)
             snapshot_metrics = getattr(registry_service, "snapshot_metrics", None)
             if callable(snapshot_metrics):
                 framework_registry_metrics = snapshot_metrics() or {}
@@ -1705,8 +1680,7 @@ class VerticalIntegrationPipeline:
                 get_vertical_runtime_metadata(vertical_cls)
                 if (
                     result.vertical_name
-                    and (vertical_cls := VerticalRegistry.get(result.vertical_name))
-                    is not None
+                    and (vertical_cls := VerticalRegistry.get(result.vertical_name)) is not None
                 )
                 else {
                     "vertical_manifest_version": "",
@@ -1919,9 +1893,7 @@ class VerticalIntegrationPipeline:
                         return
 
         # Emit vertical_applied event for observability (async parity with sync apply)
-        await self._emit_vertical_applied_event_async(
-            orchestrator, result, cache_hit=cache_hit
-        )
+        await self._emit_vertical_applied_event_async(orchestrator, result, cache_hit=cache_hit)
 
         # Cache result (Phase 1)
         if self._enable_cache and result.success:
@@ -1929,9 +1901,7 @@ class VerticalIntegrationPipeline:
                 cache_key = self._generate_cache_key(vertical_cls)
             if cache_key:
                 self._save_to_cache(cache_key, result)
-                plan = self._build_integration_plan(
-                    cache_key, result, base_plan=cached_plan
-                )
+                plan = self._build_integration_plan(cache_key, result, base_plan=cached_plan)
                 self._save_plan_to_cache(cache_key, plan)
                 self._set_applied_plan_for_orchestrator(orchestrator, plan)
                 if result.context is not None:
@@ -1974,9 +1944,7 @@ class VerticalIntegrationPipeline:
         for handler in ordered_handlers:
             parallel_safe = self._is_parallel_eligible(handler)
             declared_dependencies = tuple(getattr(handler, "depends_on", ()) or ())
-            active_dependencies = [
-                d for d in declared_dependencies if d in known_handler_names
-            ]
+            active_dependencies = [d for d in declared_dependencies if d in known_handler_names]
 
             if parallel_safe and not active_dependencies:
                 independent.append(handler)
@@ -2037,11 +2005,7 @@ class VerticalIntegrationPipeline:
             handler_name = str(getattr(handler, "name", f"handler_{index}"))
             declared_dependencies = tuple(getattr(handler, "depends_on", ()) or ())
             missing_dependencies = sorted(
-                {
-                    str(dep)
-                    for dep in declared_dependencies
-                    if str(dep) not in known_names
-                }
+                {str(dep) for dep in declared_dependencies if str(dep) not in known_names}
             )
             if missing_dependencies:
                 missing_names = ", ".join(missing_dependencies)
@@ -2051,9 +2015,7 @@ class VerticalIntegrationPipeline:
 
         return violations
 
-    def _validate_step_handler_dependency_contract(
-        self, result: IntegrationResult
-    ) -> bool:
+    def _validate_step_handler_dependency_contract(self, result: IntegrationResult) -> bool:
         """Validate active step-handler dependency metadata.
 
         Returns:
@@ -2131,9 +2093,7 @@ class VerticalIntegrationPipeline:
         for name in ordered_names:
             handler = name_to_handler[name]
             declared_dependencies = tuple(getattr(handler, "depends_on", ()) or ())
-            active_dependencies = [
-                dep for dep in declared_dependencies if dep in name_to_handler
-            ]
+            active_dependencies = [dep for dep in declared_dependencies if dep in name_to_handler]
 
             for dependency in active_dependencies:
                 indegree[name] += 1
@@ -2155,9 +2115,7 @@ class VerticalIntegrationPipeline:
                     indegree[dependent] -= 1
 
             ready = [
-                name
-                for name in ordered_names
-                if name not in completed and indegree[name] == 0
+                name for name in ordered_names if name not in completed and indegree[name] == 0
             ]
 
         if len(completed) != len(ordered_names):
@@ -2228,18 +2186,11 @@ class VerticalIntegrationPipeline:
                 logger.debug(
                     "Executing level %s sequential handlers: %s",
                     level_index,
-                    [
-                        getattr(h, "name", h.__class__.__name__)
-                        for h in sequential_handlers
-                    ],
+                    [getattr(h, "name", h.__class__.__name__) for h in sequential_handlers],
                 )
                 for handler in sequential_handlers:
-                    await self._run_handler_async(
-                        handler, orchestrator, vertical, context, result
-                    )
-                    handler_name = str(
-                        getattr(handler, "name", handler.__class__.__name__)
-                    )
+                    await self._run_handler_async(handler, orchestrator, vertical, context, result)
+                    handler_name = str(getattr(handler, "name", handler.__class__.__name__))
                     if self._should_stop_after_handler(handler_name, result):
                         return
 
@@ -2247,10 +2198,7 @@ class VerticalIntegrationPipeline:
                 logger.debug(
                     "Executing level %s parallel handlers: %s",
                     level_index,
-                    [
-                        getattr(h, "name", h.__class__.__name__)
-                        for h in parallel_handlers
-                    ],
+                    [getattr(h, "name", h.__class__.__name__) for h in parallel_handlers],
                 )
                 tasks = [
                     self._run_handler_async(h, orchestrator, vertical, context, result)
@@ -2395,9 +2343,7 @@ class VerticalIntegrationPipeline:
                     return
 
     @staticmethod
-    def _should_stop_after_handler(
-        handler_name: str, result: IntegrationResult
-    ) -> bool:
+    def _should_stop_after_handler(handler_name: str, result: IntegrationResult) -> bool:
         """Return True when a handler failure must abort remaining integration."""
 
         return handler_name == "compatibility" and not result.success
@@ -2477,8 +2423,7 @@ class VerticalIntegrationPipeline:
                 context.apply_capability_configs(
                     {
                         "sdk_capability_resolutions": [
-                            resolution.to_dict()
-                            for resolution in capability_resolutions
+                            resolution.to_dict() for resolution in capability_resolutions
                         ],
                     }
                 )

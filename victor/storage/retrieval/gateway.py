@@ -86,9 +86,7 @@ class RetrievalGateway:
         """Route the request to the appropriate backend and return normalised results."""
         mode = request.mode
         if mode == RetrievalMode.HYBRID and self._unified_store is None:
-            logger.debug(
-                "RetrievalGateway: unified_store unavailable, falling back to VECTOR"
-            )
+            logger.debug("RetrievalGateway: unified_store unavailable, falling back to VECTOR")
             mode = RetrievalMode.VECTOR
 
         try:

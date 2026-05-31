@@ -40,7 +40,5 @@ def test_assert_import_boundaries_flags_dynamic_forbidden_imports(
     violations = assert_import_boundaries(str(package_dir))
 
     assert len(violations) == 2
-    assert any(
-        "dynamic import victor.agent.orchestrator" in item for item in violations
-    )
+    assert any("dynamic import victor.agent.orchestrator" in item for item in violations)
     assert any("dynamic import victor.core.container" in item for item in violations)

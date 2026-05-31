@@ -85,9 +85,7 @@ class TestProviderErrorHandling:
 
     def test_provider_timeout_error(self, caplog):
         """Verify ProviderTimeoutError includes timeout value."""
-        error = ProviderTimeoutError(
-            "Request timeout", provider="test_provider", timeout=30
-        )
+        error = ProviderTimeoutError("Request timeout", provider="test_provider", timeout=30)
 
         assert "Request timeout" in str(error)
         assert error.timeout == 30
@@ -280,9 +278,7 @@ class TestErrorSerialization:
 
     def test_error_to_dict(self):
         """Verify VictorError serializes to dict correctly."""
-        error = ProviderError(
-            "Test error", provider="test_provider", model="test_model"
-        )
+        error = ProviderError("Test error", provider="test_provider", model="test_model")
 
         error_dict = error.to_dict()
 
@@ -360,9 +356,7 @@ class TestLoggingPatterns:
 
         error = ToolExecutionError("Execution failed", tool_name="test_tool")
         handler = ErrorHandler()
-        error_info = handler.handle(
-            error, context={"operation": "test_operation", "attempt": 1}
-        )
+        error_info = handler.handle(error, context={"operation": "test_operation", "attempt": 1})
 
         assert error_info.details["operation"] == "test_operation"
         assert error_info.details["attempt"] == 1

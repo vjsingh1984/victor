@@ -74,9 +74,7 @@ logger = logging.getLogger(__name__)
 
 _MODEL_FACING_TOOL_ALIAS_PATTERN = re.compile(
     r"\b("
-    + "|".join(
-        sorted((re.escape(name) for name in CORE_TOOL_ALIASES), key=len, reverse=True)
-    )
+    + "|".join(sorted((re.escape(name) for name in CORE_TOOL_ALIASES), key=len, reverse=True))
     + r")\b"
 )
 
@@ -113,13 +111,9 @@ def detect_provider_tier(provider: Any) -> ProviderTier:
     if provider is None:
         return ProviderTier.NO_CACHE
 
-    api_cache = (
-        hasattr(provider, "supports_prompt_caching")
-        and provider.supports_prompt_caching()
-    )
+    api_cache = hasattr(provider, "supports_prompt_caching") and provider.supports_prompt_caching()
     kv_cache = (
-        hasattr(provider, "supports_kv_prefix_caching")
-        and provider.supports_kv_prefix_caching()
+        hasattr(provider, "supports_kv_prefix_caching") and provider.supports_kv_prefix_caching()
     )
 
     if api_cache:
@@ -160,10 +154,7 @@ class ContentRouter:
 
         if self._tier == ProviderTier.KV_ONLY:
             if self._edge_sections is not None:
-                if (
-                    not _matches_edge_sections(item, self._edge_sections)
-                    and not item.required
-                ):
+                if not _matches_edge_sections(item, self._edge_sections) and not item.required:
                     return Placement.OMITTED
             return Placement.SYSTEM_PROMPT
 
@@ -181,9 +172,7 @@ class ContentRouter:
 def _matches_edge_sections(item: "ContentItem", selected_sections: Set[str]) -> bool:
     """Return whether a content item is enabled by the selected edge sections."""
     normalized_selected = {
-        str(value or "").strip()
-        for value in selected_sections
-        if str(value or "").strip()
+        str(value or "").strip() for value in selected_sections if str(value or "").strip()
     }
     if not normalized_selected:
         return False
@@ -314,15 +303,9 @@ def coerce_prompt_overlays(value: Any) -> List[PromptOverlay]:
             content = str(raw.get("content") or raw.get("text") or "").strip()
             if not content:
                 continue
-            name = (
-                str(raw.get("name") or f"overlay_{index}").strip() or f"overlay_{index}"
-            )
-            placement = (
-                str(raw.get("placement") or "turn_prefix").strip() or "turn_prefix"
-            )
-            overlays.append(
-                PromptOverlay(name=name, content=content, placement=placement)
-            )
+            name = str(raw.get("name") or f"overlay_{index}").strip() or f"overlay_{index}"
+            placement = str(raw.get("placement") or "turn_prefix").strip() or "turn_prefix"
+            overlays.append(PromptOverlay(name=name, content=content, placement=placement))
     return overlays
 
 
@@ -421,10 +404,8 @@ class UnifiedPromptPipeline:
                     get_feature_flag_manager,
                 )
 
-                enable_prompt_completeness_guard = (
-                    get_feature_flag_manager().is_enabled(
-                        FeatureFlag.USE_PROMPT_COMPLETENESS_GUARD
-                    )
+                enable_prompt_completeness_guard = get_feature_flag_manager().is_enabled(
+                    FeatureFlag.USE_PROMPT_COMPLETENESS_GUARD
                 )
             except Exception:
                 enable_prompt_completeness_guard = False
@@ -432,9 +413,7 @@ class UnifiedPromptPipeline:
 
         self._router = ContentRouter(self._tier, edge_sections)
         self._frozen_prompt: Optional[str] = None
-        self._last_prompt_completeness_assessment: Optional[
-            PromptCompletenessAssessment
-        ] = None
+        self._last_prompt_completeness_assessment: Optional[PromptCompletenessAssessment] = None
 
         # Extract provider/model names for RL events
         self._provider_name = getattr(builder, "provider_name", "") or ""
@@ -459,9 +438,7 @@ class UnifiedPromptPipeline:
                     CreditTrackingService,
                 )
 
-                self._credit_tracking_service = resolve_optional_service(
-                    CreditTrackingService
-                )
+                self._credit_tracking_service = resolve_optional_service(CreditTrackingService)
             except Exception:
                 pass
 
@@ -603,9 +580,7 @@ class UnifiedPromptPipeline:
             next_priority += 10
 
         if self.enable_prompt_completeness_guard:
-            guidance = self._build_prompt_completeness_guidance(
-                user_message, turn_context
-            )
+            guidance = self._build_prompt_completeness_guidance(user_message, turn_context)
             add_block("prompt_completeness", guidance)
 
         add_block("task_guidance", turn_context.task_guidance_text)
@@ -617,11 +592,9 @@ class UnifiedPromptPipeline:
         # 1. GEPA/MiPRO/CoT/failure optimizations via canonical runtime intelligence
         optimization_bundle = None
         if self._runtime_intelligence:
-            optimization_bundle = (
-                self._runtime_intelligence.get_prompt_optimization_bundle(
-                    user_message,
-                    turn_context,
-                )
+            optimization_bundle = self._runtime_intelligence.get_prompt_optimization_bundle(
+                user_message,
+                turn_context,
             )
         elif self._optimizer:
             evolved = self._optimizer.get_evolved_sections(
@@ -652,9 +625,7 @@ class UnifiedPromptPipeline:
             )
 
         if optimization_bundle:
-            turn_context.prompt_optimization_metadata = (
-                optimization_bundle.to_session_metadata()
-            )
+            turn_context.prompt_optimization_metadata = optimization_bundle.to_session_metadata()
         else:
             turn_context.prompt_optimization_metadata = {
                 "entries": [],
@@ -678,16 +649,12 @@ class UnifiedPromptPipeline:
             if optimization_bundle.few_shots:
                 add_block(
                     "few_shots",
-                    self._canonicalize_system_guidance_text(
-                        optimization_bundle.few_shots
-                    ),
+                    self._canonicalize_system_guidance_text(optimization_bundle.few_shots),
                 )
             if optimization_bundle.failure_hint:
                 add_block(
                     "failure_hint",
-                    self._canonicalize_system_guidance_text(
-                        optimization_bundle.failure_hint
-                    ),
+                    self._canonicalize_system_guidance_text(optimization_bundle.failure_hint),
                 )
             for index, guidance in enumerate(optimization_bundle.experiment_guidance):
                 add_block(
@@ -706,16 +673,12 @@ class UnifiedPromptPipeline:
         if self._tier != ProviderTier.NO_CACHE:
             credit = self._get_credit_guidance()
             if credit:
-                add_block(
-                    "credit_guidance", self._canonicalize_system_guidance_text(credit)
-                )
+                add_block("credit_guidance", self._canonicalize_system_guidance_text(credit))
 
         # 7. Online tool reputation (mid-turn feedback from current session)
         reputation = self._get_tool_reputation_guidance()
         if reputation:
-            add_block(
-                "tool_reputation", self._canonicalize_system_guidance_text(reputation)
-            )
+            add_block("tool_reputation", self._canonicalize_system_guidance_text(reputation))
 
         if not document.iter_renderable_blocks():
             return ""
@@ -746,9 +709,7 @@ class UnifiedPromptPipeline:
             try:
                 return self._runtime_intelligence.classify_task_keywords(user_message)
             except Exception as e:
-                logger.debug(
-                    "Runtime intelligence keyword classification failed: %s", e
-                )
+                logger.debug("Runtime intelligence keyword classification failed: %s", e)
         if self._task_analyzer:
             try:
                 return self._task_analyzer.classify_keywords(user_message)
@@ -773,9 +734,7 @@ class UnifiedPromptPipeline:
                 )
         if self._task_analyzer:
             try:
-                return self._task_analyzer.classify_with_context(
-                    user_message, history or []
-                )
+                return self._task_analyzer.classify_with_context(user_message, history or [])
             except Exception as e:
                 logger.debug("Task classification with context failed: %s", e)
         return {"task_type": "default", "confidence": 0.0}
@@ -907,17 +866,10 @@ class UnifiedPromptPipeline:
             contains_keyword_marker(message_lower, report_markers)
         )
         target_present = bool(required_files or scope_hints)
-        deliverable_present = bool(required_outputs) or (
-            action_task and not report_task
-        )
-        ambiguous_reference = (
-            has_ambiguous_target_reference(message_lower) and not target_present
-        )
+        deliverable_present = bool(required_outputs) or (action_task and not report_task)
+        ambiguous_reference = has_ambiguous_target_reference(message_lower) and not target_present
         search_first = bool(
-            action_task
-            and scope_hints
-            and not required_files
-            and not ambiguous_reference
+            action_task and scope_hints and not required_files and not ambiguous_reference
         )
 
         missing: List[str] = []
@@ -947,9 +899,7 @@ class UnifiedPromptPipeline:
             or "expected deliverable" in missing
         )
 
-        if not (
-            required_files or required_outputs or constraints or needs_clarification
-        ):
+        if not (required_files or required_outputs or constraints or needs_clarification):
             return None
 
         return PromptCompletenessAssessment(
@@ -969,9 +919,7 @@ class UnifiedPromptPipeline:
             self._task_analyzer, "extract_required_files_from_prompt"
         ):
             try:
-                paths = self._task_analyzer.extract_required_files_from_prompt(
-                    user_message
-                )
+                paths = self._task_analyzer.extract_required_files_from_prompt(user_message)
                 return self._unique_nonempty(paths)
             except Exception as e:
                 logger.debug("Task analyzer file extraction failed: %s", e)
@@ -989,9 +937,7 @@ class UnifiedPromptPipeline:
             self._task_analyzer, "extract_required_outputs_from_prompt"
         ):
             try:
-                outputs = self._task_analyzer.extract_required_outputs_from_prompt(
-                    user_message
-                )
+                outputs = self._task_analyzer.extract_required_outputs_from_prompt(user_message)
                 return self._unique_nonempty(outputs)
             except Exception as e:
                 logger.debug("Task analyzer output extraction failed: %s", e)
@@ -1070,8 +1016,7 @@ class UnifiedPromptPipeline:
                     "prompt_length": len(prompt),
                     "has_examples": "example" in prompt_lower or "e.g." in prompt_lower,
                     "has_thinking_prompt": "step by step" in prompt_lower,
-                    "has_constraints": "must" in prompt_lower
-                    or "always" in prompt_lower,
+                    "has_constraints": "must" in prompt_lower or "always" in prompt_lower,
                     "session_id": self._session_id,
                 },
             )

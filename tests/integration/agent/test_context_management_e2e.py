@@ -72,9 +72,7 @@ class TestContextManagementPipeline:
         )
 
         # Turn 2: Assistant responds with recommendation
-        assistant_response = (
-            "I recommend refactoring the config module into smaller files."
-        )
+        assistant_response = "I recommend refactoring the config module into smaller files."
         messages.append(_msg("assistant", assistant_response))
         ledger.update_from_assistant_response(assistant_response, turn_index=3)
 
@@ -89,9 +87,7 @@ class TestContextManagementPipeline:
 
         # Deduplication should stub the older read
         if deduplicator.should_deduplicate("read", {"path": "/src/config.py"}):
-            count = deduplicator.deduplicate_in_place(
-                messages, "read", {"path": "/src/config.py"}
-            )
+            count = deduplicator.deduplicate_in_place(messages, "read", {"path": "/src/config.py"})
             assert count == 1  # First read stubbed
             assert "Previously read" in messages[2].content
 
@@ -208,10 +204,7 @@ class TestContextManagementPipeline:
         resolver = ReferentialIntentResolver(session_ledger=ledger)
 
         # These should NOT be referential
-        assert (
-            resolver.enrich("How do I configure logging?")
-            == "How do I configure logging?"
-        )
+        assert resolver.enrich("How do I configure logging?") == "How do I configure logging?"
         assert resolver.enrich("What does the do_something function do?") == (
             "What does the do_something function do?"
         )

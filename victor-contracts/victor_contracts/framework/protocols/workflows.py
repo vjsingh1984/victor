@@ -40,9 +40,7 @@ class WorkflowCompiler(Protocol):
         """
         ...
 
-    def get_stage_definitions(
-        self, workflow_spec: Dict[str, Any]
-    ) -> Dict[str, StageDefinition]:
+    def get_stage_definitions(self, workflow_spec: Dict[str, Any]) -> Dict[str, StageDefinition]:
         """Extract stage definitions from workflow spec.
 
         Args:

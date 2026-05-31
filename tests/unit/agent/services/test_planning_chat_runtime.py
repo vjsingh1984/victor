@@ -14,9 +14,7 @@ async def test_planning_chat_runtime_caches_planning_service_on_runtime_host():
     runtime_host._get_conversation_message_count.side_effect = [0, 1]
     response = CompletionResponse(content="planned", role="assistant")
 
-    with patch(
-        "victor.agent.services.planning_runtime.PlanningRuntimeService"
-    ) as planning_cls:
+    with patch("victor.agent.services.planning_runtime.PlanningRuntimeService") as planning_cls:
         planning_instance = MagicMock()
         planning_instance.chat_with_planning = AsyncMock(return_value=response)
         planning_cls.return_value = planning_instance
@@ -59,9 +57,7 @@ async def test_planning_chat_runtime_skips_duplicate_recording_when_planner_alre
     runtime_host = MagicMock()
     runtime_host._service_planning_coordinator = MagicMock()
     response = CompletionResponse(content="already recorded", role="assistant")
-    runtime_host._service_planning_coordinator.chat_with_planning = AsyncMock(
-        return_value=response
-    )
+    runtime_host._service_planning_coordinator.chat_with_planning = AsyncMock(return_value=response)
     runtime_host.task_analyzer.analyze.return_value = "task-analysis"
     runtime_host._get_conversation_message_count.side_effect = [0, 2]
     runtime_host._system_added = False

@@ -318,9 +318,7 @@ async def _do_query(
 
     # Check for dangerous patterns
     allow_writes = (
-        _DEFAULT_ALLOW_MODIFICATIONS
-        if allow_modifications is None
-        else allow_modifications
+        _DEFAULT_ALLOW_MODIFICATIONS if allow_modifications is None else allow_modifications
     )
     if not allow_writes:
         sql_upper = sql.upper()
@@ -450,8 +448,7 @@ async def _do_describe(
                 """)
             rows = cursor.fetchall()
             columns = [
-                {"name": row[0], "type": row[1], "nullable": row[2] == "YES"}
-                for row in rows
+                {"name": row[0], "type": row[1], "nullable": row[2] == "YES"} for row in rows
             ]
 
         elif connection_id.startswith("mysql"):
@@ -504,9 +501,7 @@ async def _do_schema(
         for table in tables_result["tables"]:
             describe_result = await _do_describe(connection_id, table, pool)
             if describe_result["success"]:
-                schema_info["tables"].append(
-                    {"name": table, "columns": describe_result["columns"]}
-                )
+                schema_info["tables"].append({"name": table, "columns": describe_result["columns"]})
 
         return {"success": True, "tables": schema_info["tables"]}
 

@@ -38,9 +38,7 @@ from victor.tools.decorators import tool
 from victor.storage.cache.generic_result_cache import GenericResultCache, ResultType
 
 # Constants
-_USER_AGENT = (
-    "Mozilla/5.0 (compatible; Victor/1.0; +https://github.com/vijaykumar/victor)"
-)
+_USER_AGENT = "Mozilla/5.0 (compatible; Victor/1.0; +https://github.com/vijaykumar/victor)"
 _DEFAULT_MAX_CONTENT_LENGTH = 5000
 
 _GENERIC_WEB_CACHE: Optional[GenericResultCache] = None
@@ -122,9 +120,7 @@ class RateLimiter:
             # Clean old requests outside the 1-minute window
             if host in self._request_times:
                 cutoff = now - 60.0
-                self._request_times[host] = [
-                    ts for ts in self._request_times[host] if ts > cutoff
-                ]
+                self._request_times[host] = [ts for ts in self._request_times[host] if ts > cutoff]
 
             # Check if we can make a request now
             if self._request_times.get(host, []):
@@ -250,17 +246,10 @@ def _get_web_config(context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
             "model": config.model,
             "fetch_top": config.web_fetch_top,
             "fetch_pool": config.web_fetch_pool,
-            "max_content_length": config.max_content_length
-            or _DEFAULT_MAX_CONTENT_LENGTH,
-            "generic_result_cache_enabled": getattr(
-                config, "generic_result_cache_enabled", False
-            ),
-            "generic_result_cache_ttl": getattr(
-                config, "generic_result_cache_ttl", 300
-            ),
-            "http_connection_pool_enabled": getattr(
-                config, "http_connection_pool_enabled", False
-            ),
+            "max_content_length": config.max_content_length or _DEFAULT_MAX_CONTENT_LENGTH,
+            "generic_result_cache_enabled": getattr(config, "generic_result_cache_enabled", False),
+            "generic_result_cache_ttl": getattr(config, "generic_result_cache_ttl", 300),
+            "http_connection_pool_enabled": getattr(config, "http_connection_pool_enabled", False),
             "http_connection_pool_max_connections": getattr(
                 config,
                 "http_connection_pool_max_connections",
@@ -288,9 +277,7 @@ def _get_web_config(context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
                 10,
             ),
             "rate_limiter_max_retries": getattr(config, "rate_limiter_max_retries", 5),
-            "rate_limiter_initial_delay": getattr(
-                config, "rate_limiter_initial_delay", 1.0
-            ),
+            "rate_limiter_initial_delay": getattr(config, "rate_limiter_initial_delay", 1.0),
             "rate_limiter_max_delay": getattr(config, "rate_limiter_max_delay", 60.0),
             "rate_limiter_backoff_multiplier": getattr(
                 config,
@@ -325,9 +312,7 @@ def _get_generic_web_cache(default_ttl: int) -> GenericResultCache:
     global _GENERIC_WEB_CACHE
     with _GENERIC_WEB_CACHE_LOCK:
         if _GENERIC_WEB_CACHE is None:
-            _GENERIC_WEB_CACHE = GenericResultCache(
-                default_ttl=max(1, int(default_ttl))
-            )
+            _GENERIC_WEB_CACHE = GenericResultCache(default_ttl=max(1, int(default_ttl)))
         return _GENERIC_WEB_CACHE
 
 
@@ -377,9 +362,7 @@ async def _request_text(
             max_retries=int(config.get("rate_limiter_max_retries", 5)),
             initial_delay=float(config.get("rate_limiter_initial_delay", 1.0)),
             max_delay=float(config.get("rate_limiter_max_delay", 60.0)),
-            backoff_multiplier=float(
-                config.get("rate_limiter_backoff_multiplier", 2.0)
-            ),
+            backoff_multiplier=float(config.get("rate_limiter_backoff_multiplier", 2.0)),
         )
 
     # Retry loop for rate limit errors
@@ -404,9 +387,7 @@ async def _request_text(
                         pool = await get_http_pool(
                             ConnectionPoolConfig(
                                 max_connections=int(
-                                    config.get(
-                                        "http_connection_pool_max_connections", 100
-                                    )
+                                    config.get("http_connection_pool_max_connections", 100)
                                 ),
                                 max_connections_per_host=int(
                                     config.get(
@@ -415,9 +396,7 @@ async def _request_text(
                                     )
                                 ),
                                 connection_timeout=int(
-                                    config.get(
-                                        "http_connection_pool_connection_timeout", 30
-                                    )
+                                    config.get("http_connection_pool_connection_timeout", 30)
                                 ),
                                 total_timeout=int(
                                     config.get("http_connection_pool_total_timeout", 60)
@@ -451,9 +430,7 @@ async def _request_text(
                         finally:
                             response.release()
                 except Exception as e:
-                    logger.debug(
-                        "HTTP pool request failed, falling back to httpx: %s", e
-                    )
+                    logger.debug("HTTP pool request failed, falling back to httpx: %s", e)
 
             # Fallback to httpx
             async with httpx.AsyncClient(timeout=timeout_seconds) as client:
@@ -468,11 +445,7 @@ async def _request_text(
                 payload = response.text
 
                 # Check for rate limit error (429)
-                if (
-                    status == 429
-                    and rate_limiter
-                    and rate_limiter.should_retry(url, attempt)
-                ):
+                if status == 429 and rate_limiter and rate_limiter.should_retry(url, attempt):
                     delay = rate_limiter.on_rate_limit_error(url, attempt)
                     await asyncio.sleep(delay)
                     attempt += 1
@@ -487,11 +460,7 @@ async def _request_text(
 
         except httpx.HTTPError as e:
             # Check if it's a rate limit error (some servers return 429 as HTTPError)
-            if (
-                "429" in str(e)
-                and rate_limiter
-                and rate_limiter.should_retry(url, attempt)
-            ):
+            if "429" in str(e) and rate_limiter and rate_limiter.should_retry(url, attempt):
                 delay = rate_limiter.on_rate_limit_error(url, attempt)
                 await asyncio.sleep(delay)
                 attempt += 1
@@ -749,9 +718,7 @@ async def web_search(
                 "result_count": 0,
             }
             if cache is not None:
-                cache.set(
-                    ResultType.SEARCH, query, dict(result_payload), params=cache_params
-                )
+                cache.set(ResultType.SEARCH, query, dict(result_payload), params=cache_params)
             return result_payload
 
         # Format results
@@ -762,9 +729,7 @@ async def web_search(
             "result_count": len(results),
         }
         if cache is not None:
-            cache.set(
-                ResultType.SEARCH, query, dict(result_payload), params=cache_params
-            )
+            cache.set(ResultType.SEARCH, query, dict(result_payload), params=cache_params)
         return result_payload
 
     except httpx.TimeoutException:
@@ -790,9 +755,7 @@ async def web_search(
     keywords=["fetch", "url", "webpage", "download", "http", "content", "web fetch"],
     aliases=["fetch"],  # Backward compatibility alias
 )
-async def web_fetch(
-    url: str, _exec_ctx: Optional[Dict[str, Any]] = None
-) -> Dict[str, Any]:
+async def web_fetch(url: str, _exec_ctx: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Fetch and extract main text content from a URL.
 
     Args:
@@ -804,9 +767,7 @@ async def web_fetch(
     config = _get_web_config(_exec_ctx)
     cache: Optional[GenericResultCache] = None
     cache_params = {
-        "max_content_length": int(
-            config.get("max_content_length", _DEFAULT_MAX_CONTENT_LENGTH)
-        )
+        "max_content_length": int(config.get("max_content_length", _DEFAULT_MAX_CONTENT_LENGTH))
     }
     if config.get("generic_result_cache_enabled"):
         cache = _get_generic_web_cache(int(config.get("generic_result_cache_ttl", 300)))
@@ -834,9 +795,7 @@ async def web_fetch(
         # Extract text content
         content = _extract_content(
             payload,
-            max_length=int(
-                config.get("max_content_length", _DEFAULT_MAX_CONTENT_LENGTH)
-            ),
+            max_length=int(config.get("max_content_length", _DEFAULT_MAX_CONTENT_LENGTH)),
         )
 
         if not content:
@@ -918,9 +877,7 @@ async def _summarize_search(
             else max(fetch_top + 2, max_results)
         )
     )
-    max_content_length = (
-        max_content_length if max_content_length is not None else default_max_len
-    )
+    max_content_length = max_content_length if max_content_length is not None else default_max_len
 
     fetch_top = max(0, min(fetch_top, 10))
     fetch_pool = max(fetch_top, min(fetch_pool, 12))
@@ -948,13 +905,9 @@ async def _summarize_search(
 
         # Parse results
         results = _parse_ddg_results(payload, fetch_pool)
-        logger.info(
-            f"[web_summarize] search query='{query}', parsed_results={len(results)}"
-        )
+        logger.info(f"[web_summarize] search query='{query}', parsed_results={len(results)}")
         if results:
-            logger.info(
-                f"[web_summarize] top URLs: {[r.get('url','') for r in results[:5]]}"
-            )
+            logger.info(f"[web_summarize] top URLs: {[r.get('url','') for r in results[:5]]}")
 
         if not results:
             return {
@@ -988,7 +941,9 @@ async def _summarize_search(
         if fetched_contents:
             fetch_section = "\n\nFetched content excerpts:\n"
             for i, item in enumerate(fetched_contents, 1):
-                fetch_section += f"\n{i}. URL: {item['url']}\nContent (excerpt):\n{item['content']}\n"
+                fetch_section += (
+                    f"\n{i}. URL: {item['url']}\nContent (excerpt):\n{item['content']}\n"
+                )
 
         prompt = f"""Analyze these web search results and provide a comprehensive summary.
 

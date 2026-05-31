@@ -233,9 +233,7 @@ class TestSearchFunctionality:
         # Create sessions
         for i in range(5):
             store.save_session(
-                conversation={
-                    "messages": [{"role": "user", "content": f"Message {i}"}]
-                },
+                conversation={"messages": [{"role": "user", "content": f"Message {i}"}]},
                 model="claude-3-5-sonnet-20241022",
                 provider="anthropic",
                 title=f"Session about binary search {i}",
@@ -274,9 +272,7 @@ class TestSearchFunctionality:
 
         store.save_session(
             conversation={
-                "messages": [
-                    {"role": "user", "content": "Create a graph visualization"}
-                ]
+                "messages": [{"role": "user", "content": "Create a graph visualization"}]
             },
             model="claude-3-5-sonnet-20241022",
             provider="anthropic",
@@ -320,9 +316,7 @@ class TestSearchFunctionality:
         # Create many sessions
         for i in range(20):
             store.save_session(
-                conversation={
-                    "messages": [{"role": "user", "content": f"Message {i}"}]
-                },
+                conversation={"messages": [{"role": "user", "content": f"Message {i}"}]},
                 model="claude-3-5-sonnet-20241022",
                 provider="anthropic",
                 title=f"Session {i}",
@@ -407,10 +401,7 @@ class TestSessionContextLinkerIntegration:
         context = linker.build_resume_context(session.session_id)
 
         # Verify preview info in summary
-        assert (
-            "preview" in context.resume_summary.lower()
-            or "main.py" in context.resume_summary
-        )
+        assert "preview" in context.resume_summary.lower() or "main.py" in context.resume_summary
 
 
 class TestMultipleSessions:
@@ -421,9 +412,7 @@ class TestMultipleSessions:
         # Create multiple sessions
         for i in range(3):
             store.save_session(
-                conversation={
-                    "messages": [{"role": "user", "content": f"Message {i}"}]
-                },
+                conversation={"messages": [{"role": "user", "content": f"Message {i}"}]},
                 model="claude-3-5-sonnet-20241022",
                 provider="anthropic",
                 title=f"Session {i}",
@@ -504,9 +493,7 @@ class TestPerformanceAndScalability:
 
         for i in range(100):
             store.save_session(
-                conversation={
-                    "messages": [{"role": "user", "content": f"Message {i}"}]
-                },
+                conversation={"messages": [{"role": "user", "content": f"Message {i}"}]},
                 model="claude-3-5-sonnet-20241022",
                 provider="anthropic",
                 title=f"Session {i}",

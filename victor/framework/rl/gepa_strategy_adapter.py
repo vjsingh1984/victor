@@ -105,9 +105,7 @@ class GEPAServiceStrategy:
             for d in getattr(t, "tool_call_details", []):
                 name = getattr(d, "tool_name", "")
                 if name:
-                    canonical_tool_name = get_canonical_name(
-                        canonicalize_core_tool_name(name)
-                    )
+                    canonical_tool_name = get_canonical_name(canonicalize_core_tool_name(name))
                     all_tools[canonical_tool_name] += 1
         top_tools = all_tools.most_common(5)
         lines = [
@@ -130,9 +128,7 @@ class GEPAServiceStrategy:
         lines = ["=== CAPABILITY GAP ANALYSIS (TRACE-inspired) ==="]
         for i, gap in enumerate(gaps, 1):
             pct = int(gap.failure_rate * 100)
-            lines.append(
-                f"  #{i} {gap.capability}: {gap.failure_count} failures ({pct}% of total)"
-            )
+            lines.append(f"  #{i} {gap.capability}: {gap.failure_count} failures ({pct}% of total)")
             for err in gap.example_errors[:2]:
                 lines.append(f"      Example: {err}")
         lines.append("Focus reflection on the PRIMARY gap above.\n")
@@ -157,9 +153,7 @@ class GEPAServiceStrategy:
     ) -> str:
         """Call GEPA merge via the current tier service."""
         service = self._tier_manager.get_service()
-        return service.merge(
-            candidate_a, candidate_b, section_name, max_chars=max_chars
-        )
+        return service.merge(candidate_a, candidate_b, section_name, max_chars=max_chars)
 
     @staticmethod
     def _format_single_trace(trace) -> List[str]:

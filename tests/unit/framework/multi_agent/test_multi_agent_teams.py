@@ -500,9 +500,7 @@ class TestTeamSpec:
         assert len(researchers) == 1
         assert researchers[0].name == "Researcher"
 
-    def test_get_members_by_role_returns_empty_for_unknown(
-        self, sample_template, sample_members
-    ):
+    def test_get_members_by_role_returns_empty_for_unknown(self, sample_template, sample_members):
         """get_members_by_role should return empty list for unknown role."""
         spec = TeamSpec(
             template=sample_template,

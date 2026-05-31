@@ -61,9 +61,7 @@ class OrchestratorPool:
             AgentOrchestrator instance
         """
         # STUB: Proper orchestrator pooling — future feature for workflow parallelism
-        logger.debug(
-            f"OrchestratorPool.get_orchestrator({profile}) - stub implementation"
-        )
+        logger.debug(f"OrchestratorPool.get_orchestrator({profile}) - stub implementation")
         return None
 
     def get_default_orchestrator(self) -> Any:

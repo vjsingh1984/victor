@@ -13,9 +13,7 @@ async def data_exploration_agent(data_description: str):
     """Explore and summarize dataset."""
     from victor import Agent
 
-    agent = Agent.create(
-        vertical="dataanalysis", tools=["read", "python"], temperature=0.3
-    )
+    agent = Agent.create(vertical="dataanalysis", tools=["read", "python"], temperature=0.3)
 
     result = await agent.run(f"""Perform data exploration on:
 
@@ -79,9 +77,7 @@ Provide:
     return result.content
 
 
-async def statistical_analysis_agent(
-    data_description: str, research_questions: list[str]
-):
+async def statistical_analysis_agent(data_description: str, research_questions: list[str]):
     """Design statistical analysis approach."""
     from victor import Agent
 

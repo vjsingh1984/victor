@@ -192,9 +192,7 @@ class TestParseOpenAIStreamChunk:
         chunk = {
             "choices": [
                 {
-                    "delta": {
-                        "tool_calls": [{"index": 0, "function": {"name": "test"}}]
-                    },
+                    "delta": {"tool_calls": [{"index": 0, "function": {"name": "test"}}]},
                     "finish_reason": None,
                 }
             ]
@@ -329,9 +327,7 @@ class TestBuildOpenAIMessages:
         ]
         # Create assistant message with tool_calls
         assistant_msg = Message(role="assistant", content="")
-        assistant_msg.tool_calls = [
-            {"id": "call_123", "name": "test_tool", "arguments": {}}
-        ]
+        assistant_msg.tool_calls = [{"id": "call_123", "name": "test_tool", "arguments": {}}]
         messages.append(assistant_msg)
 
         # Create tool message with empty content

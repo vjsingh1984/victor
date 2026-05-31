@@ -259,9 +259,7 @@ class GitCheckpointManager:
                 logger.warning("Failed to restore staging info, applying changes only")
                 self._run_git_command(["stash", "apply", stash_ref])
 
-            logger.info(
-                f"Created checkpoint {checkpoint_id}: {description or '(no description)'}"
-            )
+            logger.info(f"Created checkpoint {checkpoint_id}: {description or '(no description)'}")
 
             return GitCheckpoint(
                 id=checkpoint_id,
@@ -335,9 +333,7 @@ class GitCheckpointManager:
         except CheckpointNotFoundError:
             raise
         except subprocess.CalledProcessError as e:
-            raise CheckpointError(
-                f"Failed to rollback to checkpoint: {e.stderr}"
-            ) from e
+            raise CheckpointError(f"Failed to rollback to checkpoint: {e.stderr}") from e
 
     def list_checkpoints(self) -> List[GitCheckpoint]:
         """List all available checkpoints.
@@ -360,9 +356,7 @@ class GitCheckpointManager:
 
                 # Parse stash list output
                 # Format: stash@{N}: On branch: message
-                match = re.match(
-                    r"(stash@\{\d+\}):\s+(?:On [^:]+|WIP on [^:]+):\s*(.+)", line
-                )
+                match = re.match(r"(stash@\{\d+\}):\s+(?:On [^:]+|WIP on [^:]+):\s*(.+)", line)
                 if not match:
                     continue
 

@@ -94,9 +94,7 @@ def _internal_prompt_metadata(kind: str) -> dict[str, Any]:
     """Build metadata for internal user-role continuation prompts."""
     from victor.agent.conversation.types import MessageSource
 
-    return build_internal_history_metadata(
-        kind, source=MessageSource.AGENT_CONTINUATION
-    )
+    return build_internal_history_metadata(kind, source=MessageSource.AGENT_CONTINUATION)
 
 
 # =============================================================================
@@ -174,9 +172,7 @@ class ContinuationHandler:
         unified_tracker: Optional[Any] = None,
         finalize_metrics: Optional[Callable[[Dict], Any]] = None,
         record_outcome: Optional[Callable[..., None]] = None,
-        execute_extracted_tool: Optional[
-            Callable[..., AsyncIterator[StreamChunk]]
-        ] = None,
+        execute_extracted_tool: Optional[Callable[..., AsyncIterator[StreamChunk]]] = None,
     ):
         """Initialize the continuation handler.
 
@@ -239,9 +235,7 @@ class ContinuationHandler:
             if forced_stop and hasattr(forced_stop, "forced_stop"):
                 stop_reason = getattr(forced_stop, "forced_stop", None)
                 if stop_reason:
-                    logger.info(
-                        f"Early exit: forced_stop signal detected (reason={stop_reason})"
-                    )
+                    logger.info(f"Early exit: forced_stop signal detected (reason={stop_reason})")
                     return ContinuationResult(
                         chunks=[],
                         should_return=True,
@@ -249,9 +243,7 @@ class ContinuationHandler:
                     )
 
         if not isinstance(action_result, ContinuationDirective):
-            legacy_payload = (
-                dict(action_result) if isinstance(action_result, dict) else {}
-            )
+            legacy_payload = dict(action_result) if isinstance(action_result, dict) else {}
             action_result = ContinuationDirective.from_legacy(
                 action=legacy_payload.get("action", ContinuationActionType.FINISH),
                 reason=legacy_payload.get("reason", "legacy_action_result"),
@@ -282,13 +274,8 @@ class ContinuationHandler:
             ContinuationActionType.FORCE_TOOL_EXECUTION,
             ContinuationActionType.REQUEST_SUMMARY,
         }
-        if (
-            getattr(stream_ctx, "skip_continuation", False)
-            and action not in recovery_actions
-        ):
-            logger.info(
-                "Continuation skipped: skip_continuation flag set (completion was forced)"
-            )
+        if getattr(stream_ctx, "skip_continuation", False) and action not in recovery_actions:
+            logger.info("Continuation skipped: skip_continuation flag set (completion was forced)")
             return ContinuationResult(
                 chunks=[],
                 should_return=True,
@@ -313,9 +300,7 @@ class ContinuationHandler:
         handler = handlers.get(action, self._handle_finish)
         return await handler(action_result, stream_ctx, full_content)
 
-    def _apply_state_updates(
-        self, action_result: ContinuationDirective
-    ) -> Dict[str, Any]:
+    def _apply_state_updates(self, action_result: ContinuationDirective) -> Dict[str, Any]:
         """Apply state updates from action result.
 
         Args:
@@ -329,9 +314,7 @@ class ContinuationHandler:
 
         if "cumulative_prompt_interventions" in updates:
             # Note: This is tracked internally but also returned for orchestrator sync
-            applied["cumulative_prompt_interventions"] = updates[
-                "cumulative_prompt_interventions"
-            ]
+            applied["cumulative_prompt_interventions"] = updates["cumulative_prompt_interventions"]
 
         if action_result.state_patch.final_summary_requested:
             applied["final_summary_requested"] = True
@@ -429,9 +412,7 @@ class ContinuationHandler:
         updates = action_result.get("updates", {})
         if "synthesis_nudge_count" in updates and self._unified_tracker:
             if hasattr(self._unified_tracker, "synthesis_nudge_count"):
-                self._unified_tracker.synthesis_nudge_count = updates[
-                    "synthesis_nudge_count"
-                ]
+                self._unified_tracker.synthesis_nudge_count = updates["synthesis_nudge_count"]
 
         return result
 
@@ -512,13 +493,9 @@ class ContinuationHandler:
                     self._message_adder.add_message(
                         "assistant",
                         sanitized,
-                        metadata={
-                            MESSAGE_SOURCE_METADATA_KEY: MessageSource.AGENT_RESPONSE.value
-                        },
+                        metadata={MESSAGE_SOURCE_METADATA_KEY: MessageSource.AGENT_RESPONSE.value},
                     )
-                    result.add_chunk(
-                        self._chunk_generator.generate_content_chunk(sanitized)
-                    )
+                    result.add_chunk(self._chunk_generator.generate_content_chunk(sanitized))
 
             # Finalize metrics
             if self._finalize_metrics:
@@ -534,9 +511,7 @@ class ContinuationHandler:
                 metrics_line = self._chunk_generator.format_completion_metrics(
                     stream_ctx, elapsed_time, cost_str
                 )
-                result.add_chunk(
-                    self._chunk_generator.generate_metrics_chunk(metrics_line)
-                )
+                result.add_chunk(self._chunk_generator.generate_metrics_chunk(metrics_line))
 
             result.add_chunk(self._chunk_generator.generate_final_marker_chunk())
 
@@ -726,7 +701,5 @@ def create_continuation_handler(
         unified_tracker=orchestrator.unified_tracker,
         finalize_metrics=orchestrator._finalize_stream_metrics,
         record_outcome=orchestrator._record_runtime_intelligence_outcome,
-        execute_extracted_tool=getattr(
-            orchestrator, "_execute_extracted_tool_call", None
-        ),
+        execute_extracted_tool=getattr(orchestrator, "_execute_extracted_tool_call", None),
     )

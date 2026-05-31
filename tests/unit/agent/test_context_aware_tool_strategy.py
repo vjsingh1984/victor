@@ -271,9 +271,7 @@ class TestEconomyFirstPrinciples:
 
         # With cache: pay 10% after first turn
         with_cache_tokens = 5000
-        total_with_cache = (with_cache_tokens * 1) + (
-            with_cache_tokens * 0.1 * (turns - 1)
-        )  # 9500
+        total_with_cache = (with_cache_tokens * 1) + (with_cache_tokens * 0.1 * (turns - 1))  # 9500
 
         # Cache should provide significant savings
         savings = total_without_cache - total_with_cache
@@ -339,9 +337,7 @@ class TestValidationCriteria:
         typical_full_tokens = 6 * 125  # 750
         typical_compact_tokens = 10 * 70  # 700
         typical_stub_tokens = 20 * 32  # 640
-        typical_total = (
-            typical_full_tokens + typical_compact_tokens + typical_stub_tokens
-        )  # 2090
+        typical_total = typical_full_tokens + typical_compact_tokens + typical_stub_tokens  # 2090
 
         # Should fit in large context
         large_context = 200000

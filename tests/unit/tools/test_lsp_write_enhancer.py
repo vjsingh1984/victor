@@ -110,9 +110,7 @@ class TestWriteResult:
 
         # Add error diagnostic
         result.diagnostics.append(
-            Diagnostic(
-                line=1, column=0, severity=DiagnosticSeverity.ERROR, message="Error"
-            )
+            Diagnostic(line=1, column=0, severity=DiagnosticSeverity.ERROR, message="Error")
         )
         assert result.has_errors is True
 
@@ -125,9 +123,7 @@ class TestWriteResult:
 
         # Add warning diagnostic
         result.diagnostics.append(
-            Diagnostic(
-                line=1, column=0, severity=DiagnosticSeverity.WARNING, message="Warning"
-            )
+            Diagnostic(line=1, column=0, severity=DiagnosticSeverity.WARNING, message="Warning")
         )
         assert result.has_warnings is True
 
@@ -281,9 +277,7 @@ class TestLSPWriteEnhancer:
             enhancer = LSPWriteEnhancer(workspace_root=tmpdir)
 
             # Mock methods to avoid actual LSP calls
-            enhancer.format_with_formatter = AsyncMock(
-                return_value=("formatted content", "black")
-            )
+            enhancer.format_with_formatter = AsyncMock(return_value=("formatted content", "black"))
             enhancer.validate_with_lsp = AsyncMock(return_value=[])
 
             result = await enhancer.write_with_lsp(
@@ -312,9 +306,7 @@ class TestLSPWriteEnhancer:
             enhancer = LSPWriteEnhancer(workspace_root=tmpdir)
 
             # Mock validation to return errors
-            enhancer.format_with_formatter = AsyncMock(
-                return_value=("formatted content", "black")
-            )
+            enhancer.format_with_formatter = AsyncMock(return_value=("formatted content", "black"))
             enhancer.validate_with_lsp = AsyncMock(
                 return_value=[
                     Diagnostic(
@@ -348,9 +340,7 @@ class TestLSPWriteEnhancer:
             enhancer = LSPWriteEnhancer(workspace_root=tmpdir)
 
             # Mock methods
-            enhancer.format_with_formatter = AsyncMock(
-                return_value=("formatted content", "black")
-            )
+            enhancer.format_with_formatter = AsyncMock(return_value=("formatted content", "black"))
             enhancer.validate_with_lsp = AsyncMock(return_value=[])
 
             # Use full path in tmpdir

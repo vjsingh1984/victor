@@ -60,9 +60,7 @@ class VerticalTraceWidget(RichLog):
 
         self._trace_count += 1
         data = event.data or {}
-        timestamp = datetime.fromtimestamp(event.timestamp, tz=None).strftime(
-            "%H:%M:%S.%f"
-        )[:-3]
+        timestamp = datetime.fromtimestamp(event.timestamp, tz=None).strftime("%H:%M:%S.%f")[:-3]
 
         # Extract key information
         vertical_name = data.get("vertical", "unknown")
@@ -83,9 +81,7 @@ class VerticalTraceWidget(RichLog):
         color = action_colors.get(action_key, "white")
 
         # Main trace line
-        self.write(
-            f"[dim]{timestamp}[/] [magenta]{vertical_name}[/] [{color}]{action}[/]"
-        )
+        self.write(f"[dim]{timestamp}[/] [magenta]{vertical_name}[/] [{color}]{action}[/]")
 
         # Show configuration details
         if "config" in data:
@@ -99,9 +95,7 @@ class VerticalTraceWidget(RichLog):
             if tools:
                 self.write(f"           [dim]tools: {', '.join(tools[:5])}")
                 if len(tools) > 5:
-                    self.write(
-                        f"           [dim]       ... and {len(tools) - 5} more[/]"
-                    )
+                    self.write(f"           [dim]       ... and {len(tools) - 5} more[/]")
 
         # Show workflow information
         if "workflow" in data:
@@ -224,9 +218,7 @@ class IntegrationResultWidget(Container):
                         continue
 
             # Update display
-            status.update(
-                f"[green]Loaded {len(self._results)} results from {path.name}[/]"
-            )
+            status.update(f"[green]Loaded {len(self._results)} results from {path.name}[/]")
 
             table.clear()
             # Show last 100 results in descending order (newest first)

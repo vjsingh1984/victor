@@ -53,9 +53,7 @@ def _check_staleness(source_files: List[Dict[str, Any]]) -> List[str]:
         project_db = get_project_database()
         for entry in source_files:
             path, recorded = entry["path"], float(entry["mtime"])
-            rows = project_db.query(
-                "SELECT mtime FROM graph_file_mtime WHERE file = ?", (path,)
-            )
+            rows = project_db.query("SELECT mtime FROM graph_file_mtime WHERE file = ?", (path,))
             if rows:
                 current = float(dict(rows[0])["mtime"])
             else:

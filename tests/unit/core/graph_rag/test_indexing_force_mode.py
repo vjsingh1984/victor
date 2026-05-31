@@ -129,9 +129,7 @@ class TestForceModeRebuild:
 
         # Verify delete_by_repo was called
         delete_calls = [c for c in store.calls if c[0] == "delete_by_repo"]
-        assert (
-            len(delete_calls) == 1
-        ), f"Expected 1 delete_by_repo call, got {len(delete_calls)}"
+        assert len(delete_calls) == 1, f"Expected 1 delete_by_repo call, got {len(delete_calls)}"
         assert delete_calls[0][2]["clear_embeddings"] is True
 
     async def test_force_mode_clears_all_existing_data(self) -> None:

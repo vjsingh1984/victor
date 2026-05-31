@@ -76,9 +76,7 @@ class TestIWorkflowLoaderProtocol:
         # Check if it's a Protocol by checking MRO (Python 3.10+ compatible)
         assert any(c.__name__ == "Protocol" for c in IWorkflowLoader.__mro__)
         # The protocol should require a load method - check direct attribute
-        assert hasattr(IWorkflowLoader, "load") or callable(
-            getattr(IWorkflowLoader, "load", None)
-        )
+        assert hasattr(IWorkflowLoader, "load") or callable(getattr(IWorkflowLoader, "load", None))
 
     def test_concrete_loader_implementation(self):
         """Test that a concrete implementation can satisfy the protocol."""

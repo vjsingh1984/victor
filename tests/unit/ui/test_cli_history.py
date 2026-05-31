@@ -313,10 +313,7 @@ class TestCliPromptSession:
 
         session, _renderer_holder = _create_cli_prompt_session()
 
-        assert (
-            Path(session.history.filename)
-            == isolated_project_victor_dir / "chat_history"
-        )
+        assert Path(session.history.filename) == isolated_project_victor_dir / "chat_history"
 
     def test_fallback_to_in_memory_on_error(self):
         from victor.ui.commands.chat import _create_cli_prompt_session
@@ -372,9 +369,7 @@ class TestCliPromptSession:
         fake_settings = SimpleNamespace(ui=SimpleNamespace(cli_history_max_entries=20))
 
         with patch("victor.config.settings.get_project_paths", return_value=fake_paths):
-            session, _renderer_holder = _create_cli_prompt_session(
-                settings=fake_settings
-            )
+            session, _renderer_holder = _create_cli_prompt_session(settings=fake_settings)
 
         history_strings = list(session.history.load_history_strings())
         assert history_strings == ["follow-up prompt", "real prompt"]
@@ -408,6 +403,4 @@ class TestPlanningWiring:
         mock_coordinator.chat.return_value = MagicMock(content="response")
 
         result = await mock_coordinator.chat("test message", use_planning=False)
-        mock_coordinator.chat.assert_called_once_with(
-            "test message", use_planning=False
-        )
+        mock_coordinator.chat.assert_called_once_with("test message", use_planning=False)

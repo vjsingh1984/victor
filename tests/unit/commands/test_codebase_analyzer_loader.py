@@ -28,12 +28,8 @@ def test_analyzer_loader_prefers_extension_capability_entry_point() -> None:
     entry_module = types.SimpleNamespace(generate_smart_victor_md=lambda: "entry")
     provider = types.SimpleNamespace(__module__="victor_coding.codebase_analyzer")
 
-    with patch.object(
-        coding_support, "_try_capability_entry_point", return_value=provider
-    ):
-        with patch(
-            "importlib.import_module", return_value=entry_module
-        ) as import_module:
+    with patch.object(coding_support, "_try_capability_entry_point", return_value=provider):
+        with patch("importlib.import_module", return_value=entry_module) as import_module:
             result = coding_support.load_codebase_analyzer_module()
 
     assert result is entry_module
@@ -71,9 +67,7 @@ def test_analyzer_attr_loader_raises_clear_error_for_missing_symbol(
     module = types.SimpleNamespace(generate_smart_victor_md=lambda: "content")
     monkeypatch.setattr(coding_support, "load_codebase_analyzer_module", lambda: module)
 
-    with pytest.raises(
-        ImportError, match="required symbol 'generate_enhanced_init_md'"
-    ):
+    with pytest.raises(ImportError, match="required symbol 'generate_enhanced_init_md'"):
         coding_support.load_codebase_analyzer_attr("generate_enhanced_init_md")
 
 

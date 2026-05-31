@@ -27,9 +27,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, Iterable, List, Optional
 
 _QUOTED_HINT_RE = re.compile(r"[`'\"]([^`'\"]{2,80})[`'\"]")
-_DOTTED_SYMBOL_RE = re.compile(
-    r"\b[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)+\b"
-)
+_DOTTED_SYMBOL_RE = re.compile(r"\b[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)+\b")
 _CAMEL_HINT_RE = re.compile(r"\b[A-Z][A-Za-z0-9_]{2,}\b")
 _SNAKE_HINT_RE = re.compile(r"\b[a-z]+_[a-z0-9_]{2,}\b")
 _FILE_HINT_RE = re.compile(r"\b[\w./-]+\.(?:py|js|ts|tsx|jsx|java|go|rs|cpp|c|h)\b")
@@ -46,8 +44,7 @@ def extract_issue_hints(issue_description: str, *, limit: int = 12) -> List[str]
         if len(normalized) < 3 or key in seen:
             return
         if any(
-            key in existing.lower() and len(existing) > len(normalized)
-            for existing in candidates
+            key in existing.lower() and len(existing) > len(normalized) for existing in candidates
         ):
             return
         seen.add(key)
@@ -89,9 +86,7 @@ def _match_hints(
     return [hint for hint in hints if hint.lower() in combined]
 
 
-def _dedupe_graph_rows(
-    rows: Iterable[Dict[str, Any]], *, limit: int
-) -> List[Dict[str, Any]]:
+def _dedupe_graph_rows(rows: Iterable[Dict[str, Any]], *, limit: int) -> List[Dict[str, Any]]:
     seen: set[tuple[str, str, str]] = set()
     deduped: List[Dict[str, Any]] = []
     for row in rows:
@@ -137,9 +132,7 @@ class IssueLocalizationAccumulator:
         self._candidates: Dict[str, _LocalizationCandidate] = {}
 
     def add_seed(self, row: Dict[str, Any]) -> None:
-        file_path = str(
-            row.get("file_path") or row.get("metadata", {}).get("file_path") or ""
-        )
+        file_path = str(row.get("file_path") or row.get("metadata", {}).get("file_path") or "")
         if not file_path:
             return
 
@@ -150,14 +143,10 @@ class IssueLocalizationAccumulator:
         metadata = dict(row.get("metadata", {}) or {})
         content = str(row.get("content", "") or "")
         symbol_name = (
-            row.get("symbol_name")
-            or metadata.get("qualified_name")
-            or metadata.get("name")
+            row.get("symbol_name") or metadata.get("qualified_name") or metadata.get("name")
         )
         line_number = (
-            row.get("line_number")
-            or metadata.get("start_line")
-            or metadata.get("line_number")
+            row.get("line_number") or metadata.get("start_line") or metadata.get("line_number")
         )
 
         if score >= candidate.seed_score:
@@ -167,9 +156,7 @@ class IssueLocalizationAccumulator:
             candidate.metadata.update(metadata)
 
         candidate.seed_score = max(candidate.seed_score, score)
-        candidate.sources.update(
-            str(source) for source in row.get("sources", []) if source
-        )
+        candidate.sources.update(str(source) for source in row.get("sources", []) if source)
         if not candidate.sources:
             candidate.sources.add("semantic")
         candidate.support_count += 1
@@ -239,7 +226,9 @@ class IssueLocalizationAccumulator:
             candidate.metadata.setdefault("related_symbol", neighbor.get("name"))
             if not candidate.content:
                 relation_summary = seed_symbol or seed_file_path
-                candidate.content = f"{neighbor.get('name') or neighbor_file} ({relation} of {relation_summary})"
+                candidate.content = (
+                    f"{neighbor.get('name') or neighbor_file} ({relation} of {relation_summary})"
+                )
             candidate.matched_hints.update(
                 _match_hints(
                     self.hints,
@@ -259,10 +248,7 @@ class IssueLocalizationAccumulator:
             hint_boost = min(0.05 * len(candidate.matched_hints), 0.15)
             support_boost = min(0.03 * max(candidate.support_count - 1, 0), 0.12)
             score = round(
-                candidate.seed_score
-                + candidate.graph_score
-                + hint_boost
-                + support_boost,
+                candidate.seed_score + candidate.graph_score + hint_boost + support_boost,
                 4,
             )
 
@@ -273,9 +259,7 @@ class IssueLocalizationAccumulator:
                 "matched_hints": sorted(candidate.matched_hints),
                 "support_count": candidate.support_count,
                 "reasons": list(candidate.reasons),
-                "candidate_type": (
-                    "seed" if candidate.seed_score > 0 else "graph_related"
-                ),
+                "candidate_type": ("seed" if candidate.seed_score > 0 else "graph_related"),
             }
 
             results.append(
@@ -296,11 +280,7 @@ class IssueLocalizationAccumulator:
             key=lambda row: (
                 row.get("score", 0.0),
                 row.get("metadata", {}).get("localization", {}).get("seed_score", 0.0),
-                len(
-                    row.get("metadata", {})
-                    .get("localization", {})
-                    .get("matched_hints", [])
-                ),
+                len(row.get("metadata", {}).get("localization", {}).get("matched_hints", [])),
                 row.get("file_path", ""),
             ),
             reverse=True,

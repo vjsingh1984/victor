@@ -86,9 +86,7 @@ class DeduplicationStats:
             "bytes_saved": self.bytes_saved,
             "unique_count": len(self.unique_hashes),
             "dedup_ratio": (
-                self.duplicates_removed / self.total_blocks
-                if self.total_blocks > 0
-                else 0.0
+                self.duplicates_removed / self.total_blocks if self.total_blocks > 0 else 0.0
             ),
         }
 
@@ -196,9 +194,7 @@ class OutputDeduplicator:
         # First, preserve code blocks as single units
         code_block_pattern = r"```[\s\S]*?```"
         code_blocks = re.findall(code_block_pattern, content)
-        content_with_placeholders = re.sub(
-            code_block_pattern, "<<<CODE_BLOCK>>>", content
-        )
+        content_with_placeholders = re.sub(code_block_pattern, "<<<CODE_BLOCK>>>", content)
 
         # Split on paragraph breaks (2+ newlines)
         raw_blocks = re.split(r"\n{2,}", content_with_placeholders)
@@ -246,16 +242,13 @@ class OutputDeduplicator:
 
         for block_hash, block, is_duplicate in results:
             self._stats.total_blocks += 1
-            duplicate_across_calls = (
-                bool(block_hash) and block_hash in self._seen_hashes
-            )
+            duplicate_across_calls = bool(block_hash) and block_hash in self._seen_hashes
 
             if is_duplicate or duplicate_across_calls:
                 self._stats.duplicates_removed += 1
                 self._stats.bytes_saved += len(block)
                 logger.debug(
-                    f"Removed duplicate block (hash={block_hash[:8]}): "
-                    f"{block[:50]}..."
+                    f"Removed duplicate block (hash={block_hash[:8]}): " f"{block[:50]}..."
                 )
             else:
                 if block_hash:
@@ -297,8 +290,7 @@ class OutputDeduplicator:
                 self._stats.duplicates_removed += 1
                 self._stats.bytes_saved += len(block)
                 logger.debug(
-                    f"Removed duplicate block (hash={block_hash[:8]}): "
-                    f"{block[:50]}..."
+                    f"Removed duplicate block (hash={block_hash[:8]}): " f"{block[:50]}..."
                 )
 
         # Reconstruct with preserved formatting

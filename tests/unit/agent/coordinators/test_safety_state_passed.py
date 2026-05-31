@@ -81,9 +81,7 @@ class TestSafetyCheck:
     async def test_blocked_operation_stops(self):
         coord = SafetyStatePassedCoordinator(rules=[FORCE_PUSH_RULE])
         snapshot = _make_snapshot()
-        result = await coord.check(
-            snapshot, "git", ["push", "--force", "origin", "main"]
-        )
+        result = await coord.check(snapshot, "git", ["push", "--force", "origin", "main"])
         assert result.should_continue is False
         assert "BLOCKED" in result.reasoning
 
@@ -91,9 +89,7 @@ class TestSafetyCheck:
     async def test_warning_allows_continuation(self):
         coord = SafetyStatePassedCoordinator(rules=[CURL_WARN_RULE])
         snapshot = _make_snapshot()
-        result = await coord.check(
-            snapshot, "shell", ["curl", "--insecure", "https://example.com"]
-        )
+        result = await coord.check(snapshot, "shell", ["curl", "--insecure", "https://example.com"])
         assert result.should_continue is True
         assert "WARNING" in result.reasoning
 
@@ -126,9 +122,7 @@ class TestSafetyCheck:
     async def test_warning_stores_warnings_in_transitions(self):
         coord = SafetyStatePassedCoordinator(rules=[CURL_WARN_RULE])
         snapshot = _make_snapshot()
-        result = await coord.check(
-            snapshot, "shell", ["curl", "--insecure", "https://example.com"]
-        )
+        result = await coord.check(snapshot, "shell", ["curl", "--insecure", "https://example.com"])
         warning_transitions = [
             t
             for t in result.transitions.transitions

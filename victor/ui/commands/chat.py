@@ -505,9 +505,7 @@ def _ensure_graph_watch_handle_for_chat(*, enabled: bool) -> ChatGraphWatchHandl
 
     manifest = _read_graph_watch_manifest(paths.project_root)
     return ChatGraphWatchHandle(
-        messages=summarize_graph_watch_startup(
-            paths.project_root, state, manifest=manifest
-        ),
+        messages=summarize_graph_watch_startup(paths.project_root, state, manifest=manifest),
         project_root=paths.project_root,
         started_by_chat=bool(state.started),
     )
@@ -559,9 +557,7 @@ def _summarize_compaction_overrides(
     if adaptive_threshold is True:
         min_thresh = compaction_min_threshold or 0.35
         max_thresh = compaction_max_threshold or 0.70
-        messages.append(
-            f"Adaptive threshold enabled ({min_thresh:.0%}-{max_thresh:.0%})"
-        )
+        messages.append(f"Adaptive threshold enabled ({min_thresh:.0%}-{max_thresh:.0%})")
     elif adaptive_threshold is False:
         messages.append("Adaptive threshold disabled")
     return messages
@@ -599,13 +595,9 @@ def _build_cli_panel(
     meta.append("Provider ", style="dim")
     # Handle None profile_config (default settings)
     provider_name = (
-        profile_config.provider
-        if profile_config
-        else settings.provider.default_provider
+        profile_config.provider if profile_config else settings.provider.default_provider
     )
-    model_name = (
-        profile_config.model if profile_config else settings.provider.default_model
-    )
+    model_name = profile_config.model if profile_config else settings.provider.default_model
     meta.append(str(provider_name), style="bold cyan")
     meta.append("  •  ", style="dim")
     meta.append("Model ", style="dim")
@@ -672,12 +664,8 @@ def _configure_agent_compaction(
     if compaction_threshold is not None:
         if not (0.1 <= compaction_threshold <= 0.95):
             if show_status:
-                con.print(
-                    f"\n[red]✗[/] Invalid compaction threshold: {compaction_threshold}"
-                )
-                con.print(
-                    "[yellow]Threshold must be between 0.1 (10%) and 0.95 (95%)[/]"
-                )
+                con.print(f"\n[red]✗[/] Invalid compaction threshold: {compaction_threshold}")
+                con.print("[yellow]Threshold must be between 0.1 (10%) and 0.95 (95%)[/]")
             raise typer.Exit(code=1)
         compactor.config.proactive_threshold = compaction_threshold
         if show_status:
@@ -703,9 +691,7 @@ def _configure_agent_compaction(
             )
             compactor.set_adaptive_threshold(adaptive)
             if show_status:
-                con.print(
-                    f"[dim]Adaptive threshold enabled ({min_thresh:.0%}-{max_thresh:.0%})[/]"
-                )
+                con.print(f"[dim]Adaptive threshold enabled ({min_thresh:.0%}-{max_thresh:.0%})[/]")
         else:
             compactor.disable_adaptive_threshold()
             if show_status:
@@ -1319,9 +1305,7 @@ victor chat --sessionid abc123            # Resume session
 
             console.print(table)
             console.print(f"\n[dim]Total: {len(sessions)} session(s)[/]")
-            console.print(
-                "[dim]Use 'victor chat --sessionid <id>' to resume a session[/]"
-            )
+            console.print("[dim]Use 'victor chat --sessionid <id>' to resume a session[/]")
             raise typer.Exit(0)
 
         from victor.agent.debug_logger import configure_logging_levels
@@ -1395,9 +1379,7 @@ victor chat --sessionid abc123            # Resume session
         # Periodic cleanup: check if history file needs rotation (once per 7 days)
         try:
             history_file = get_project_paths().project_victor_dir / "chat_history"
-            max_entries = (
-                settings.ui.cli_history_max_entries
-            )  # Use configured max entries
+            max_entries = settings.ui.cli_history_max_entries  # Use configured max entries
             _maybe_rotate_history_file(history_file, max_entries=max_entries)
         except Exception:
             pass  # Periodic cleanup is best-effort
@@ -1508,14 +1490,10 @@ def _configure_smart_routing(
     feature_manager = get_feature_flag_manager()
     if feature_manager.is_enabled(FeatureFlag.USE_SMART_ROUTING):
         if show_status:
-            console.print(
-                f"[green]✓[/] Smart routing enabled (profile={routing_profile})"
-            )
+            console.print(f"[green]✓[/] Smart routing enabled (profile={routing_profile})")
     else:
         if show_status:
-            console.print(
-                "[yellow]Smart routing is currently disabled via feature flag.[/]"
-            )
+            console.print("[yellow]Smart routing is currently disabled via feature flag.[/]")
             console.print(
                 "Enable with: [cyan]export VICTOR_USE_SMART_ROUTING=true[/] or "
                 "[cyan]--enable-smart-routing[/] flag in beta period"
@@ -1639,9 +1617,7 @@ async def run_oneshot(
     # Configure tool output preview (safe-default pruning)
     from victor.config.tool_settings import ToolSettings
 
-    tool_settings = (
-        settings.tool_settings if hasattr(settings, "tool_settings") else ToolSettings()
-    )
+    tool_settings = settings.tool_settings if hasattr(settings, "tool_settings") else ToolSettings()
     if show_cli_chrome:
         _print_tool_output_mode_banner(console, tool_settings)
 
@@ -1652,9 +1628,7 @@ async def run_oneshot(
 
         classifier = ComplexityClassifier(use_semantic=False)
         classification = classifier.classify(message)
-        _task_type = (
-            classification.complexity.value
-        )  # Currently unused, logged for debugging
+        _task_type = classification.complexity.value  # Currently unused, logged for debugging
     except Exception:
         pass
 
@@ -1708,9 +1682,7 @@ async def run_oneshot(
                             "[yellow]Run 'victor config validate' for detailed diagnostics[/]"
                         )
                     else:
-                        formatter.error(
-                            "Configuration validation failed", formatted_validation
-                        )
+                        formatter.error("Configuration validation failed", formatted_validation)
                     raise typer.Exit(1)
                 elif validation_result.has_warnings():
                     # Configuration has warnings but is valid - show summary
@@ -1757,13 +1729,9 @@ async def run_oneshot(
                     if prompt_for_model_warning:
                         from rich.prompt import Confirm
 
-                        if not Confirm.ask(
-                            "Continue anyway?", default=False, show_default=True
-                        ):
+                        if not Confirm.ask("Continue anyway?", default=False, show_default=True):
                             console.print("\n[yellow]Setup cancelled.[/]")
-                            console.print(
-                                "Fix the issue above and run 'victor chat' again.\n"
-                            )
+                            console.print("Fix the issue above and run 'victor chat' again.\n")
                             raise typer.Exit(code=1)
                     else:
                         console.print("[dim]Continuing in non-interactive mode.[/]")
@@ -1775,20 +1743,14 @@ async def run_oneshot(
             except ConfigurationError as e:
                 console.print(f"\n[red]✗[/] Configuration error: {e}")
                 console.print("\n[yellow]Suggestions:[/]")
-                console.print(
-                    "  • Run 'victor doctor' to diagnose configuration issues"
-                )
-                console.print(
-                    "  • Check your profile configuration: victor profiles list"
-                )
+                console.print("  • Run 'victor doctor' to diagnose configuration issues")
+                console.print("  • Check your profile configuration: victor profiles list")
                 console.print("  • Validate config: victor config validate\n")
                 raise typer.Exit(code=1)
             except (ProviderConnectionError, ProviderNotFoundError) as e:
                 console.print(f"\n[red]✗[/] Provider error: {e}")
                 console.print("\n[yellow]Suggestions:[/]")
-                console.print(
-                    "  • Check if provider is available: victor doctor --providers"
-                )
+                console.print("  • Check if provider is available: victor doctor --providers")
                 console.print("  • Verify provider configuration in profiles.yaml")
                 console.print("  • Try a different profile: victor profiles list\n")
                 raise typer.Exit(code=1)
@@ -1803,15 +1765,9 @@ async def run_oneshot(
                 # Unexpected error - show full traceback in debug mode
                 console.print(f"\n[red]✗[/] Failed to initialize agent factory: {e}")
                 console.print("\n[yellow]Suggestions:[/]")
-                console.print(
-                    "  • Run 'victor doctor' to diagnose configuration issues"
-                )
-                console.print(
-                    "  • Check your profile configuration: victor profiles list"
-                )
-                console.print(
-                    "  • Try default profile: victor chat --profile default\n"
-                )
+                console.print("  • Run 'victor doctor' to diagnose configuration issues")
+                console.print("  • Check your profile configuration: victor profiles list")
+                console.print("  • Try default profile: victor chat --profile default\n")
                 if os.getenv("VICTOR_DEBUG"):
                     import traceback
 
@@ -1826,32 +1782,24 @@ async def run_oneshot(
                     planning_model=planning_model,
                 )
             except ConfigurationError as e:
-                console.print(
-                    f"\n[red]✗[/] Configuration error during agent creation: {e}"
-                )
+                console.print(f"\n[red]✗[/] Configuration error during agent creation: {e}")
                 console.print("\n[yellow]Suggestions:[/]")
                 console.print("  • Check vertical configuration: victor vertical list")
                 console.print("  • Validate config: victor config validate")
-                console.print(
-                    "  • Try default vertical: victor chat --vertical default\n"
-                )
+                console.print("  • Try default vertical: victor chat --vertical default\n")
                 raise typer.Exit(code=1)
             except ProviderError as e:
                 console.print(f"\n[red]✗[/] Provider error during agent creation: {e}")
                 console.print("\n[yellow]Suggestions:[/]")
                 console.print("  • Check provider status: victor doctor --providers")
                 console.print("  • Verify provider is running (for local models)")
-                console.print(
-                    "  • Try a different provider: victor chat --provider ollama\n"
-                )
+                console.print("  • Try a different provider: victor chat --provider ollama\n")
                 raise typer.Exit(code=1)
             except Exception as e:
                 # Unexpected error - show full traceback in debug mode
                 console.print(f"\n[red]✗[/] Failed to create agent: {e}")
                 console.print("\n[yellow]Suggestions:[/]")
-                console.print(
-                    "  • Check if provider is configured: victor doctor --providers"
-                )
+                console.print("  • Check if provider is configured: victor doctor --providers")
                 console.print("  • Verify API keys or local model availability")
                 console.print("  • Try a different profile: victor profiles list\n")
                 if os.getenv("VICTOR_DEBUG"):
@@ -1870,9 +1818,7 @@ async def run_oneshot(
                     session_runner.apply_agent_mode(mode)
                 except Exception as e:
                     if show_cli_chrome:
-                        console.print(
-                            f"\n[yellow]Warning:[/] Failed to set mode '{mode}': {e}"
-                        )
+                        console.print(f"\n[yellow]Warning:[/] Failed to set mode '{mode}': {e}")
                         console.print("  Continuing with default mode.\n")
 
             # Step 5: Preload semantic index if requested
@@ -1895,9 +1841,7 @@ async def run_oneshot(
                 await session_runner.start_embedding_preload(client)
             except Exception as e:
                 if show_cli_chrome:
-                    console.print(
-                        f"\n[yellow]Warning:[/] Failed to start embedding preload: {e}"
-                    )
+                    console.print(f"\n[yellow]Warning:[/] Failed to start embedding preload: {e}")
                     console.print(
                         "  Continuing without embeddings (some features may be slower).\n"
                     )
@@ -2107,17 +2051,13 @@ async def run_interactive(
     # Configure tool output preview (safe-default pruning)
     from victor.config.tool_settings import ToolSettings
 
-    tool_settings = (
-        settings.tool_settings if hasattr(settings, "tool_settings") else ToolSettings()
-    )
+    tool_settings = settings.tool_settings if hasattr(settings, "tool_settings") else ToolSettings()
     tool_banner_shown = False
     if show_startup_cli_chrome:
         _print_tool_output_mode_banner(console, tool_settings)
         tool_banner_shown = True
     try:
-        profiles, profile_config = _require_existing_non_default_profile(
-            settings, profile
-        )
+        profiles, profile_config = _require_existing_non_default_profile(settings, profile)
     except ValueError as exc:
         console.print(f"[bold red]Error:[/] {exc}")
         raise typer.Exit(1) from exc
@@ -2155,9 +2095,7 @@ async def run_interactive(
                 session_data = persistence.load_session(resume_session_id)
 
                 if not session_data:
-                    console.print(
-                        f"[bold red]Error:[/ ] Session not found: {resume_session_id}"
-                    )
+                    console.print(f"[bold red]Error:[/ ] Session not found: {resume_session_id}")
                     raise typer.Exit(1)
 
                 # Restore conversation
@@ -2572,9 +2510,7 @@ def _build_cli_runtime_segment(
     messages = _collect_cli_messages(agent)
     conversation = getattr(agent, "conversation", None)
     message_count = None
-    if conversation is not None and callable(
-        getattr(conversation, "message_count", None)
-    ):
+    if conversation is not None and callable(getattr(conversation, "message_count", None)):
         try:
             message_count = _coerce_cli_int(conversation.message_count())
         except Exception:
@@ -2817,9 +2753,7 @@ CLI_COMMAND_ARGUMENT_COMPLETIONS = {
 def _collect_cli_command_metadata() -> dict[str, str]:
     """Return slash command completion metadata from the registry plus CLI-only commands."""
     commands = dict(CLI_COMMAND_COMPLETIONS)
-    commands.update(
-        {alias: description for alias, _target, description in CLI_COMMAND_ALIASES}
-    )
+    commands.update({alias: description for alias, _target, description in CLI_COMMAND_ALIASES})
 
     try:
         from victor.ui.slash import get_command_registry
@@ -2844,9 +2778,7 @@ def _build_cli_command_completer():
     from prompt_toolkit.completion import Completer, Completion
 
     commands = _collect_cli_command_metadata()
-    alias_targets = {
-        alias: target for alias, target, _description in CLI_COMMAND_ALIASES
-    }
+    alias_targets = {alias: target for alias, target, _description in CLI_COMMAND_ALIASES}
 
     class VictorCliCommandCompleter(Completer):
         """Complete slash and command-mode inputs without scanning arbitrary prompt text."""
@@ -2956,18 +2888,14 @@ def cleanup_history_command(
     try:
         new_entries = count_prompt_toolkit_history_entries(history_file)
     except Exception as e:
-        console.print(
-            f"[bold red]Error:[/] Failed to read history file after pruning: {e}"
-        )
+        console.print(f"[bold red]Error:[/] Failed to read history file after pruning: {e}")
         raise typer.Exit(1)
 
     removed = original_entries - new_entries
     size_kb = history_file.stat().st_size / 1024
 
     console.print("[green]✓[/] Cleaned up history file:")
-    console.print(
-        f"  Entries: {original_entries:,} → {new_entries:,} (removed {removed:,})"
-    )
+    console.print(f"  Entries: {original_entries:,} → {new_entries:,} (removed {removed:,})")
     console.print(f"  File size: {size_kb:.1f} KB")
     console.print()
     console.print("[dim]Typing should feel snappier now![/]")
@@ -3029,9 +2957,7 @@ def _create_cli_prompt_session(
         if not history_file.exists() or history_file.stat().st_size == 0:
             try:
                 db_path = get_project_paths().project_db
-                for msg in load_input_history_from_db(
-                    db_path, limit=min(max_entries, 100)
-                ):
+                for msg in load_input_history_from_db(db_path, limit=min(max_entries, 100)):
                     history.store_string(msg)
 
                 # Prune again after seeding to ensure we stay at max_entries
@@ -3138,9 +3064,7 @@ async def _run_cli_repl(
     startup_messages: Optional[list[str]] = None,
 ) -> None:
     """Run the CLI-based REPL (fallback for unsupported terminals)."""
-    console.print(
-        _build_cli_panel(profile_config, vertical_name, rl_suggestion, settings)
-    )
+    console.print(_build_cli_panel(profile_config, vertical_name, rl_suggestion, settings))
     if startup_messages:
         _print_interactive_startup_messages(console, startup_messages)
 
@@ -3199,9 +3123,7 @@ async def _run_cli_repl(
                 session_id=session.session_id,
                 role=role,
                 content=str(message.get("content", "")),
-                tool_name=(
-                    str(message["name"]) if message.get("name") is not None else None
-                ),
+                tool_name=(str(message["name"]) if message.get("name") is not None else None),
                 tool_call_id=(
                     str(message["tool_call_id"])
                     if message.get("tool_call_id") is not None
@@ -3216,9 +3138,7 @@ async def _run_cli_repl(
                 continue
             preview_metadata = dict(preview.get("metadata", {}) or {})
             preview_metadata["interactive_preview"] = True
-            preview_metadata["after_message_index"] = preview.get(
-                "after_message_index", 0
-            )
+            preview_metadata["after_message_index"] = preview.get("after_message_index", 0)
             preview_role_name = str(preview.get("role", "system"))
             preview_role = role_by_value.get(preview_role_name, MessageRole.SYSTEM)
             store.add_message(
@@ -3250,9 +3170,7 @@ async def _run_cli_repl(
 
             if user_input.strip().lower() in ("/expand", "/e"):
                 current_renderer = renderer_holder["ref"]
-                if current_renderer is not None and hasattr(
-                    current_renderer, "expand_last_output"
-                ):
+                if current_renderer is not None and hasattr(current_renderer, "expand_last_output"):
                     current_renderer.expand_last_output()
                 else:
                     console.print("[dim]No tool output to expand[/]")
@@ -3313,9 +3231,7 @@ async def _run_cli_repl(
                     f"[dim]{_cli_work_status_message(enable_planning)}[/]",
                     spinner="dots",
                 ):
-                    response = await agent.chat(
-                        user_input, use_planning=enable_planning
-                    )
+                    response = await agent.chat(user_input, use_planning=enable_planning)
                 console.print(Markdown(response.content))
 
         except KeyboardInterrupt:
@@ -3338,9 +3254,7 @@ async def _run_cli_repl(
 
             current_model = getattr(profile_config, "model", None)
             if not isinstance(current_model, str) or not current_model.strip():
-                current_model = getattr(
-                    getattr(settings, "provider", None), "default_model", None
-                )
+                current_model = getattr(getattr(settings, "provider", None), "default_model", None)
             current_model = str(current_model or "unknown")
 
             # Show traceback in debug mode only
@@ -3457,9 +3371,7 @@ async def run_workflow_mode(
         raise typer.Exit(1)
 
     if workflow_file.suffix not in {".yaml", ".yml"}:
-        console.print(
-            f"[bold red]Error:[/] File must be .yaml or .yml: {workflow_path}"
-        )
+        console.print(f"[bold red]Error:[/] File must be .yaml or .yml: {workflow_path}")
         raise typer.Exit(1)
 
     console.print(f"\n[bold blue]Workflow:[/] {workflow_file.name}")
@@ -3551,9 +3463,7 @@ async def run_workflow_mode(
             # SVG/PNG require output path
             if fmt in {VizFormat.SVG, VizFormat.PNG} and not render_output:
                 # Generate default output path
-                render_output = str(
-                    workflow_file.with_suffix(f".{render_format.lower()}")
-                )
+                render_output = str(workflow_file.with_suffix(f".{render_format.lower()}"))
                 console.print(f"[dim]Output: {render_output}[/]")
 
             console.print(f"\n[bold]Rendering as {render_format.upper()}...[/]")
@@ -3586,13 +3496,10 @@ async def run_workflow_mode(
         if delegate_follow_up_contract:
             contract_path = Path(delegate_follow_up_contract)
             try:
-                follow_up_contract = load_delegate_follow_up_contract_file(
-                    contract_path
-                )
+                follow_up_contract = load_delegate_follow_up_contract_file(contract_path)
             except FileNotFoundError:
                 console.print(
-                    "[bold red]Error:[/] Delegate follow-up contract not found: "
-                    f"{contract_path}"
+                    "[bold red]Error:[/] Delegate follow-up contract not found: " f"{contract_path}"
                 )
                 raise typer.Exit(1)
             except DelegateFollowUpContractError as e:
@@ -3619,9 +3526,7 @@ async def run_workflow_mode(
         orchestrator = None
         from victor.workflows.definition import AgentNode
 
-        has_agent_nodes = any(
-            isinstance(node, AgentNode) for node in workflow.nodes.values()
-        )
+        has_agent_nodes = any(isinstance(node, AgentNode) for node in workflow.nodes.values())
 
         if has_agent_nodes:
             # ✅ PROPER: Use FrameworkSessionRunner/VictorClient instead of FrameworkShim
@@ -3648,18 +3553,14 @@ async def run_workflow_mode(
         if result.success:
             console.print("[bold green]✓[/] Workflow completed successfully")
             console.print(f"  [dim]Duration: {result.duration_seconds:.2f}s[/]")
-            console.print(
-                f"  [dim]Nodes executed: {', '.join(result.nodes_executed)}[/]"
-            )
+            console.print(f"  [dim]Nodes executed: {', '.join(result.nodes_executed)}[/]")
             console.print(f"  [dim]Iterations: {result.iterations}[/]")
 
             if result.state:
                 console.print("\n[bold]Final State:[/]")
                 # Convert Pydantic model to dict if needed
                 state_dict = (
-                    result.state.to_dict()
-                    if hasattr(result.state, "to_dict")
-                    else result.state
+                    result.state.to_dict() if hasattr(result.state, "to_dict") else result.state
                 )
                 # Filter internal keys
                 display_state = {

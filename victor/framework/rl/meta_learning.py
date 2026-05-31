@@ -51,9 +51,7 @@ class MetaLearningCoordinator(RLCoordinator):
 
         self._analytics = UsageAnalytics.get_instance()
 
-    def aggregate_session_metrics(
-        self, repo_id: Optional[str] = None
-    ) -> Dict[str, Any]:
+    def aggregate_session_metrics(self, repo_id: Optional[str] = None) -> Dict[str, Any]:
         """Aggregate in-memory session metrics and persist them to the RL database.
 
         Uses the existing UsageAnalytics.get_session_summary() for computation
@@ -164,9 +162,7 @@ class MetaLearningCoordinator(RLCoordinator):
                 delta_pct = (avg_second - avg_first) / avg_first * 100
 
             trends["metrics"][key] = {
-                "direction": (
-                    "up" if delta_pct > 2 else ("down" if delta_pct < -2 else "stable")
-                ),
+                "direction": ("up" if delta_pct > 2 else ("down" if delta_pct < -2 else "stable")),
                 "delta_pct": round(delta_pct, 1),
                 "latest": values[-1],
                 "earliest": values[0],
@@ -228,12 +224,8 @@ def get_meta_learning_coordinator() -> "RLCoordinator":
     """
     from victor.core.feature_flags import FeatureFlag, get_feature_flag_manager
 
-    if not get_feature_flag_manager().is_enabled(
-        FeatureFlag.USE_LEARNING_FROM_EXECUTION
-    ):
-        logger.debug(
-            "MetaLearning: USE_LEARNING_FROM_EXECUTION disabled, using base coordinator"
-        )
+    if not get_feature_flag_manager().is_enabled(FeatureFlag.USE_LEARNING_FROM_EXECUTION):
+        logger.debug("MetaLearning: USE_LEARNING_FROM_EXECUTION disabled, using base coordinator")
         return get_rl_coordinator()
 
     global _meta_coordinator

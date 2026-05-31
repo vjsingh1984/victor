@@ -36,9 +36,7 @@ class TestResourceCalculator:
 
     def test_complex_task_full_budget(self):
         """Complex tasks → full exploration budget."""
-        budget = calculate_exploration_budget(
-            complexity="complex", provider="anthropic"
-        )
+        budget = calculate_exploration_budget(complexity="complex", provider="anthropic")
         assert budget.exploration_timeout >= 90
         assert budget.tool_budget_per_agent >= 5
 

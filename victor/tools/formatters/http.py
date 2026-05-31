@@ -55,9 +55,7 @@ class HTTPFormatter(ToolFormatter):
 
         # Status line
         if status_code:
-            lines.append(
-                f"[{color} bold]{status_code} {status}[/] [dim]• {duration_ms}ms[/]"
-            )
+            lines.append(f"[{color} bold]{status_code} {status}[/] [dim]• {duration_ms}ms[/]")
             lines.append("")  # Blank line
 
         # Headers
@@ -68,9 +66,7 @@ class HTTPFormatter(ToolFormatter):
                 lines.append(f"  [cyan]{key}:[/] [dim]{value}[/]")
 
             if len(headers) > max_headers:
-                lines.append(
-                    f"  [dim]... and {len(headers) - max_headers} more headers[/]"
-                )
+                lines.append(f"  [dim]... and {len(headers) - max_headers} more headers[/]")
 
             lines.append("")  # Blank line
 

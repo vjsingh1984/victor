@@ -75,9 +75,7 @@ async def test_query_translation_path():
 @pytest.mark.asyncio
 async def test_query_translation_impact_analysis():
     """Test translating natural language to impact query."""
-    result = await translate_query(
-        "What depends on authenticate_user?", graph_store=None
-    )
+    result = await translate_query("What depends on authenticate_user?", graph_store=None)
 
     assert result is not None
     assert result.matched_template is not None
@@ -186,9 +184,7 @@ def send_response(resp):
         await pipeline.index_repository()
 
         # Test query translation with graph store
-        result = await translate_query(
-            "What calls validate_request?", graph_store=graph_store
-        )
+        result = await translate_query("What calls validate_request?", graph_store=graph_store)
 
         assert result is not None
         assert result.matched_template is not None

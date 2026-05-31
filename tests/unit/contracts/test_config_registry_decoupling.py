@@ -72,8 +72,6 @@ class TestConfigRegistryDecoupling:
 
     def test_get_evaluation_criteria_falls_back_to_default(self):
         """An unknown vertical should return default criteria."""
-        criteria = VerticalConfigRegistry.get_evaluation_criteria(
-            "nonexistent_vertical_xyz"
-        )
+        criteria = VerticalConfigRegistry.get_evaluation_criteria("nonexistent_vertical_xyz")
         default_criteria = VerticalConfigRegistry.get_evaluation_criteria("default")
         assert criteria == default_criteria

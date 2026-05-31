@@ -108,17 +108,13 @@ class AuditManager:
                     framework_overrides[ComplianceFramework(k)] = v
 
                 retention = RetentionPolicy(
-                    default_retention_days=retention_data.get(
-                        "default_retention_days", 365
-                    ),
+                    default_retention_days=retention_data.get("default_retention_days", 365),
                     framework_overrides=framework_overrides,
                     sensitive_data_retention_days=retention_data.get(
                         "sensitive_data_retention_days", 90
                     ),
                     auto_purge=retention_data.get("auto_purge", True),
-                    archive_before_purge=retention_data.get(
-                        "archive_before_purge", True
-                    ),
+                    archive_before_purge=retention_data.get("archive_before_purge", True),
                 )
 
                 return AuditConfig(
@@ -128,9 +124,7 @@ class AuditManager:
                     log_model_interactions=data.get("log_model_interactions", True),
                     detect_secrets=data.get("detect_secrets", True),
                     detect_pii=data.get("detect_pii", True),
-                    frameworks=[
-                        ComplianceFramework(f) for f in data.get("frameworks", [])
-                    ],
+                    frameworks=[ComplianceFramework(f) for f in data.get("frameworks", [])],
                     retention=retention,
                     export_format=data.get("export_format", "json"),
                 )
@@ -320,9 +314,7 @@ class AuditManager:
             duration_ms: Execution duration in milliseconds
         """
         event_type = (
-            AuditEventType.TOOL_EXECUTION
-            if outcome == "success"
-            else AuditEventType.TOOL_FAILURE
+            AuditEventType.TOOL_EXECUTION if outcome == "success" else AuditEventType.TOOL_FAILURE
         )
 
         metadata = {}
@@ -499,9 +491,7 @@ class AuditManager:
             "events_by_type": report.events_by_type,
             "events_by_severity": report.events_by_severity,
             "violations": len(report.violations),
-            "compliance_status": (
-                "compliant" if not report.violations else "non_compliant"
-            ),
+            "compliance_status": ("compliant" if not report.violations else "non_compliant"),
         }
 
     async def apply_retention_policy(self) -> dict[str, Any]:

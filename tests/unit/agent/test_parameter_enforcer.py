@@ -499,9 +499,7 @@ class TestDeepSeekScenarios:
         assert enforced2["file_path"] == "/src/main.py"
         assert enforced2["symbol_name"] == "ClassB"
 
-    def test_multiple_previous_reads_uses_most_recent(
-        self, symbol_enforcer_with_inference
-    ):
+    def test_multiple_previous_reads_uses_most_recent(self, symbol_enforcer_with_inference):
         """Test that most recent read path is used for inference."""
         context = {
             "previous_tool_args": {

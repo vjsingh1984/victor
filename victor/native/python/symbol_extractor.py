@@ -310,9 +310,7 @@ class PythonSymbolExtractor(InstrumentedAccelerator):
                     visibility = "protected"
 
                 # Get decorators
-                decorators = tuple(
-                    self._get_decorator_name(d) for d in node.decorator_list
-                )
+                decorators = tuple(self._get_decorator_name(d) for d in node.decorator_list)
 
                 # Get docstring
                 docstring = ast.get_docstring(node) or ""
@@ -349,9 +347,7 @@ class PythonSymbolExtractor(InstrumentedAccelerator):
                 visibility = "private" if node.name.startswith("_") else "public"
 
                 # Get decorators
-                decorators = tuple(
-                    self._get_decorator_name(d) for d in node.decorator_list
-                )
+                decorators = tuple(self._get_decorator_name(d) for d in node.decorator_list)
 
                 # Get docstring
                 docstring = ast.get_docstring(node) or ""
@@ -416,9 +412,7 @@ class PythonSymbolExtractor(InstrumentedAccelerator):
             return self._get_name(node.value)
         return "unknown"
 
-    def _build_function_signature(
-        self, node: ast.FunctionDef | ast.AsyncFunctionDef
-    ) -> str:
+    def _build_function_signature(self, node: ast.FunctionDef | ast.AsyncFunctionDef) -> str:
         """Build a function signature string."""
         prefix = "async def" if isinstance(node, ast.AsyncFunctionDef) else "def"
         args = []

@@ -255,10 +255,7 @@ class StageTransitionCoordinator:
         if result.confidence < 0.95:
             return False
 
-        if (
-            getattr(self._state_machine, "_action_intent", None)
-            == ActionIntent.WRITE_ALLOWED
-        ):
+        if getattr(self._state_machine, "_action_intent", None) == ActionIntent.WRITE_ALLOWED:
             return False
 
         files_read = len(self._state_machine.state.observed_files)
@@ -313,11 +310,7 @@ class StageTransitionCoordinator:
         return {
             "transition_count": self._transition_count,
             "last_transition_time": self._last_transition_time,
-            "current_turn_id": (
-                self._current_turn.turn_id if self._current_turn else None
-            ),
-            "current_turn_tools": (
-                self._current_turn.tool_count if self._current_turn else 0
-            ),
+            "current_turn_id": (self._current_turn.turn_id if self._current_turn else None),
+            "current_turn_tools": (self._current_turn.tool_count if self._current_turn else 0),
             "strategy": type(self._strategy).__name__,
         }

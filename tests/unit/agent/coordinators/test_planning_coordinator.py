@@ -256,9 +256,7 @@ class TestPlanningCoordinator:
             steps_failed=1,
             final_output="workspace evidence",
             step_results={
-                "1": StepResult(
-                    success=True, output="Cargo.toml declares workspace members"
-                ),
+                "1": StepResult(success=True, output="Cargo.toml declares workspace members"),
                 "2": StepResult(
                     success=False,
                     output="",

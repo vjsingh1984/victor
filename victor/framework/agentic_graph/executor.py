@@ -288,9 +288,7 @@ class AgenticLoopGraphExecutor:
                 plan_execution_state = _extract_plan_execution_state(state)
                 if plan_execution_state:
                     event["plan_execution_state"] = plan_execution_state
-                checkpoint_metadata = _extract_execution_checkpoint_trace_metadata(
-                    state
-                )
+                checkpoint_metadata = _extract_execution_checkpoint_trace_metadata(state)
                 if checkpoint_metadata:
                     event["execution_checkpoint"] = checkpoint_metadata
                 yield event

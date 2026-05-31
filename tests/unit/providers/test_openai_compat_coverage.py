@@ -282,9 +282,7 @@ class TestHttpxOpenAICompatProviderRetries:
         )
 
         provider.client.post = AsyncMock(side_effect=[first_response, second_response])
-        provider._parse_response = MagicMock(
-            return_value=MagicMock(usage={"total_tokens": 7})
-        )
+        provider._parse_response = MagicMock(return_value=MagicMock(usage={"total_tokens": 7}))
 
         result = await provider.chat(
             messages=[Message(role="user", content="hello")],
@@ -434,11 +432,7 @@ class TestAccumulateToolCallDelta:
         """Tool call ID and name are preserved when already set."""
         accumulated = [{"id": "call_1", "name": "old_name", "arguments": ""}]
 
-        delta = {
-            "tool_calls": [
-                {"index": 0, "id": "call_1", "function": {"name": "new_name"}}
-            ]
-        }
+        delta = {"tool_calls": [{"index": 0, "id": "call_1", "function": {"name": "new_name"}}]}
 
         accumulate_tool_call_delta(delta, accumulated)
 
@@ -582,9 +576,7 @@ class TestFixOrphanedToolMessages:
         # The tool response for call_A should also be removed (now orphaned)
         assert len(result) == 2  # user + assistant only
         assert result[1]["role"] == "assistant"
-        assert (
-            "tool_calls" not in result[1]
-        )  # stripped because not all responses present
+        assert "tool_calls" not in result[1]  # stripped because not all responses present
         # No tool messages should remain
         assert not any(m.get("role") == "tool" for m in result)
 
@@ -623,9 +615,7 @@ class TestMarkdownRendering:
 
     def test_render_image_placeholder(self):
         """Image placeholder is rendered correctly."""
-        result = _render_image_placeholder(
-            "Test image", "https://example.com/image.png"
-        )
+        result = _render_image_placeholder("Test image", "https://example.com/image.png")
 
         # Should return a Panel
         from rich.panel import Panel
@@ -762,9 +752,7 @@ class TestToolConversion:
                 description="A test tool",
                 parameters={
                     "type": "object",
-                    "properties": {
-                        "arg1": {"type": "string", "description": "First arg"}
-                    },
+                    "properties": {"arg1": {"type": "string", "description": "First arg"}},
                 },
             )
         ]

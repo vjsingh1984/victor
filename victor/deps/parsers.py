@@ -110,9 +110,7 @@ class RequirementsTxtParser(BaseDependencyParser):
             return [], []
 
         # Determine dependency type from filename
-        dep_type = (
-            DependencyType.DEV if "dev" in path.name.lower() else DependencyType.RUNTIME
-        )
+        dep_type = DependencyType.DEV if "dev" in path.name.lower() else DependencyType.RUNTIME
 
         for line in content.split("\n"):
             line = line.strip()
@@ -193,11 +191,7 @@ class PyprojectParser(BaseDependencyParser):
 
             # Optional dependencies
             for group, deps in project.get("optional-dependencies", {}).items():
-                dep_type = (
-                    DependencyType.DEV
-                    if "dev" in group.lower()
-                    else DependencyType.OPTIONAL
-                )
+                dep_type = DependencyType.DEV if "dev" in group.lower() else DependencyType.OPTIONAL
                 for dep_str in deps:
                     dep = self._parse_pep508(dep_str, str(path))
                     if dep:
@@ -227,11 +221,7 @@ class PyprojectParser(BaseDependencyParser):
 
             # Dev dependencies (new format with groups)
             for group, group_data in poetry.get("group", {}).items():
-                dep_type = (
-                    DependencyType.DEV
-                    if "dev" in group.lower()
-                    else DependencyType.OPTIONAL
-                )
+                dep_type = DependencyType.DEV if "dev" in group.lower() else DependencyType.OPTIONAL
                 for name, spec in group_data.get("dependencies", {}).items():
                     dep = self._parse_poetry_dep(name, spec, str(path), dep_type)
                     if dep:

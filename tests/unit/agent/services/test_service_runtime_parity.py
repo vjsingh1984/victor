@@ -27,14 +27,10 @@ def _make_tool_service() -> ToolService:
 async def test_tool_service_execute_tool_with_retry_uses_bound_retry_executor():
     service = _make_tool_service()
     retry_executor = MagicMock()
-    retry_executor.execute_tool_with_retry = AsyncMock(
-        return_value=("result", True, None)
-    )
+    retry_executor.execute_tool_with_retry = AsyncMock(return_value=("result", True, None))
     service.bind_runtime_components(retry_executor=retry_executor)
 
-    result = await service.execute_tool_with_retry(
-        "read", {"path": "a.py"}, {"task_type": "read"}
-    )
+    result = await service.execute_tool_with_retry("read", {"path": "a.py"}, {"task_type": "read"})
 
     retry_executor.execute_tool_with_retry.assert_awaited_once()
     assert result == ("result", True, None)
@@ -50,9 +46,7 @@ async def test_tool_service_execute_tool_with_retry_uses_service_owned_retry_run
 
     service.bind_runtime_components(tool_pipeline=pipeline)
 
-    result = await service.execute_tool_with_retry(
-        "read", {"path": "a.py"}, {"task_type": "read"}
-    )
+    result = await service.execute_tool_with_retry("read", {"path": "a.py"}, {"task_type": "read"})
 
     pipeline._execute_single_tool.assert_awaited_once_with(
         "read",
@@ -69,9 +63,7 @@ def test_tool_service_parse_and_validate_tool_calls_matches_runtime_contract():
     service.bind_runtime_components(tool_call_parser=parser)
     service.set_enabled_tools({"read"})
 
-    tool_call = SimpleNamespace(
-        to_dict=lambda: {"name": "read", "arguments": '{"path": "a.py"}'}
-    )
+    tool_call = SimpleNamespace(to_dict=lambda: {"name": "read", "arguments": '{"path": "a.py"}'})
     parse_result = SimpleNamespace(
         tool_calls=[tool_call],
         warnings=[],
@@ -80,9 +72,7 @@ def test_tool_service_parse_and_validate_tool_calls_matches_runtime_contract():
     tool_adapter = MagicMock()
     tool_adapter.parse_tool_calls.return_value = parse_result
 
-    tool_calls, remaining = service.parse_and_validate_tool_calls(
-        None, "content", tool_adapter
-    )
+    tool_calls, remaining = service.parse_and_validate_tool_calls(None, "content", tool_adapter)
 
     assert tool_calls == [{"name": "read", "arguments": {"path": "a.py"}}]
     assert remaining == "trimmed content"
@@ -95,9 +85,7 @@ def test_tool_service_records_fallback_parse_diagnostics(caplog):
     service.bind_runtime_components(tool_call_parser=parser)
     service.set_enabled_tools({"read"})
 
-    tool_call = SimpleNamespace(
-        to_dict=lambda: {"name": "read", "arguments": {"path": "a.py"}}
-    )
+    tool_call = SimpleNamespace(to_dict=lambda: {"name": "read", "arguments": {"path": "a.py"}})
     parse_result = SimpleNamespace(
         tool_calls=[tool_call],
         warnings=["native parse empty"],
@@ -138,9 +126,7 @@ def test_tool_service_records_native_passthrough_parse_diagnostics(caplog):
     tool_adapter = MagicMock()
     tool_adapter.provider_name = "zai"
     tool_adapter.model = "glm-5.1"
-    raw_tool_calls = [
-        {"name": "write", "arguments": {"path": "notes.txt", "content": "hello"}}
-    ]
+    raw_tool_calls = [{"name": "write", "arguments": {"path": "notes.txt", "content": "hello"}}]
 
     with caplog.at_level(logging.INFO):
         tool_calls, remaining = service.parse_and_validate_tool_calls(
@@ -173,9 +159,7 @@ def test_tool_service_validate_tool_call_matches_legacy_contract():
     )
     sanitizer = SimpleNamespace(is_valid_tool_name=lambda name: name == "read")
 
-    validation = service.validate_tool_call(
-        {"name": "read", "arguments": {}}, sanitizer
-    )
+    validation = service.validate_tool_call({"name": "read", "arguments": {}}, sanitizer)
 
     assert validation.valid is True
     assert validation.canonical_name == "read"
@@ -257,9 +241,7 @@ def test_service_rl_runtime_prompt_rollout_helper_uses_global_coordinator():
     coordinator = MagicMock()
     coordinator.create_prompt_rollout_experiment.return_value = "prompt_exp_service"
 
-    with patch(
-        "victor.agent.services.rl_runtime.get_rl_coordinator", return_value=coordinator
-    ):
+    with patch("victor.agent.services.rl_runtime.get_rl_coordinator", return_value=coordinator):
         experiment_id = create_prompt_rollout_experiment(
             section_name="GROUNDING_RULES",
             provider="anthropic",
@@ -315,13 +297,9 @@ def test_service_rl_runtime_rollout_analysis_helper_uses_global_coordinator():
     from victor.agent.services.rl_runtime import analyze_prompt_rollout_experiment
 
     coordinator = MagicMock()
-    coordinator.analyze_prompt_rollout_experiment.return_value = {
-        "auto_action": "rollout"
-    }
+    coordinator.analyze_prompt_rollout_experiment.return_value = {"auto_action": "rollout"}
 
-    with patch(
-        "victor.agent.services.rl_runtime.get_rl_coordinator", return_value=coordinator
-    ):
+    with patch("victor.agent.services.rl_runtime.get_rl_coordinator", return_value=coordinator):
         report = analyze_prompt_rollout_experiment(
             section_name="GROUNDING_RULES",
             provider="anthropic",
@@ -342,13 +320,11 @@ def test_service_rl_runtime_suite_processing_helper_uses_global_coordinator():
     )
 
     coordinator = MagicMock()
-    coordinator.process_prompt_candidate_evaluation_suite.return_value = (
-        SimpleNamespace(to_dict=lambda: {"prompt_rollout": {"created": True}})
+    coordinator.process_prompt_candidate_evaluation_suite.return_value = SimpleNamespace(
+        to_dict=lambda: {"prompt_rollout": {"created": True}}
     )
 
-    with patch(
-        "victor.agent.services.rl_runtime.get_rl_coordinator", return_value=coordinator
-    ):
+    with patch("victor.agent.services.rl_runtime.get_rl_coordinator", return_value=coordinator):
         workflow = process_prompt_candidate_evaluation_suite(
             {"runs": []},
             create_rollout=True,
@@ -408,9 +384,7 @@ async def test_service_rl_runtime_suite_processing_async_helper_uses_global_coor
 
     coordinator = MagicMock()
     coordinator.process_prompt_candidate_evaluation_suite_async = AsyncMock(
-        return_value=SimpleNamespace(
-            to_dict=lambda: {"prompt_rollout_analysis": {"ok": True}}
-        )
+        return_value=SimpleNamespace(to_dict=lambda: {"prompt_rollout_analysis": {"ok": True}})
     )
 
     with patch(
@@ -578,9 +552,7 @@ async def test_session_service_save_and_restore_checkpoint_round_trip():
 async def test_provider_service_switch_provider_uses_bound_provider_manager():
     manager = MagicMock()
     manager.switch_provider = AsyncMock(return_value=True)
-    manager.provider = SimpleNamespace(
-        name="openai", model="gpt-4.1", max_tokens=200000
-    )
+    manager.provider = SimpleNamespace(name="openai", model="gpt-4.1", max_tokens=200000)
     manager.provider_name = "openai"
     manager.model = "gpt-4.1"
     manager.switch_count = 2
@@ -642,14 +614,9 @@ async def test_recovery_service_streaming_methods_fallback_to_bound_recovery_coo
         new_temperature=None,
         failure_type=None,
     )
-    assert (
-        service.apply_recovery_action(retry_action, ctx, message_adder=message_adder)
-        is None
-    )
+    assert service.apply_recovery_action(retry_action, ctx, message_adder=message_adder) is None
     message_adder.assert_called_once_with("user", "retry now")
-    assert service.truncate_tool_calls(
-        ctx, [{"name": "read"}, {"name": "grep"}], 1
-    ) == (
+    assert service.truncate_tool_calls(ctx, [{"name": "read"}, {"name": "grep"}], 1) == (
         [{"name": "read"}],
         True,
     )

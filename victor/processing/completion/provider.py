@@ -177,23 +177,17 @@ class BaseCompletionProvider(ABC):
         capabilities = self.get_capabilities()
         if not capabilities.supported_languages:
             return True  # Empty means all languages
-        return language.lower() in [
-            lang.lower() for lang in capabilities.supported_languages
-        ]
+        return language.lower() in [lang.lower() for lang in capabilities.supported_languages]
 
     def __repr__(self) -> str:
-        return (
-            f"{self.__class__.__name__}(name={self.name!r}, priority={self.priority})"
-        )
+        return f"{self.__class__.__name__}(name={self.name!r}, priority={self.priority})"
 
 
 class StreamingCompletionProvider(BaseCompletionProvider):
     """Base class for providers that support streaming completions."""
 
     @abstractmethod
-    async def stream_inline_completion(
-        self, params: InlineCompletionParams
-    ) -> AsyncIterator[str]:
+    async def stream_inline_completion(self, params: InlineCompletionParams) -> AsyncIterator[str]:
         """Stream inline completion tokens.
 
         Args:
@@ -232,7 +226,9 @@ class CachingCompletionProvider(BaseCompletionProvider):
 
     def _cache_key(self, params: CompletionParams) -> str:
         """Generate cache key for completion params."""
-        return f"{params.file_path}:{params.position.line}:{params.position.character}:{params.prefix}"
+        return (
+            f"{params.file_path}:{params.position.line}:{params.position.character}:{params.prefix}"
+        )
 
     def _get_cached(self, params: CompletionParams) -> Optional[CompletionList]:
         """Get cached completions if available and not expired."""
@@ -333,9 +329,7 @@ class CompositeCompletionProvider(BaseCompletionProvider):
                 continue
 
         # Sort by confidence, then by sort_text
-        all_items.sort(
-            key=lambda item: (-item.confidence, item.sort_text or item.label)
-        )
+        all_items.sort(key=lambda item: (-item.confidence, item.sort_text or item.label))
 
         # Limit results
         if len(all_items) > params.max_results:
@@ -363,9 +357,7 @@ class CompositeCompletionProvider(BaseCompletionProvider):
                 if result.items:
                     return result
             except Exception as e:
-                logger.warning(
-                    f"Provider {provider.name} failed inline completion: {e}"
-                )
+                logger.warning(f"Provider {provider.name} failed inline completion: {e}")
                 continue
 
         return InlineCompletionList(items=[])

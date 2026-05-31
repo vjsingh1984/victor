@@ -36,9 +36,7 @@ def _parse_duration(duration_str: str) -> int:
     """Parse duration string like '30d', '6m', '1y' to days."""
     match = re.match(r"^(\d+)([dDmMyY])$", duration_str.strip())
     if not match:
-        raise typer.BadParameter(
-            f"Invalid duration '{duration_str}'. Use format: 30d, 6m, 1y"
-        )
+        raise typer.BadParameter(f"Invalid duration '{duration_str}'. Use format: 30d, 6m, 1y")
     value = int(match.group(1))
     unit = match.group(2).lower()
     if unit == "d":
@@ -121,15 +119,9 @@ def db_prune(
     older_than: Optional[str] = typer.Option(
         None, "--older-than", help="Delete rows older than (e.g., '30d', '6m', '1y')"
     ),
-    table: Optional[str] = typer.Option(
-        None, "--table", help="Specific table to prune"
-    ),
-    group: Optional[str] = typer.Option(
-        None, "--group", help="Table group: rl, agent, all"
-    ),
-    keep_last: Optional[int] = typer.Option(
-        None, "--keep-last", help="Keep only last N rows"
-    ),
+    table: Optional[str] = typer.Option(None, "--table", help="Specific table to prune"),
+    group: Optional[str] = typer.Option(None, "--group", help="Table group: rl, agent, all"),
+    keep_last: Optional[int] = typer.Option(None, "--keep-last", help="Keep only last N rows"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Show what would be deleted"),
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
 ) -> None:
@@ -167,9 +159,7 @@ def db_prune(
                 from datetime import datetime, timedelta, timezone
 
                 date_col = db._get_date_column(tbl)
-                cutoff = (
-                    datetime.now(timezone.utc) - timedelta(days=older_than_days)
-                ).isoformat()
+                cutoff = (datetime.now(timezone.utc) - timedelta(days=older_than_days)).isoformat()
                 count = conn.execute(
                     f"SELECT count(*) FROM [{tbl}] WHERE [{date_col}] < ?", (cutoff,)
                 ).fetchone()[0]
@@ -233,12 +223,8 @@ def db_vacuum() -> None:
 
 @db_app.command("archive")
 def db_archive(
-    before: str = typer.Option(
-        ..., "--before", help="Archive rows before date (YYYY-MM-DD)"
-    ),
-    output: Optional[Path] = typer.Option(
-        None, "--output", help="Output directory for archives"
-    ),
+    before: str = typer.Option(..., "--before", help="Archive rows before date (YYYY-MM-DD)"),
+    output: Optional[Path] = typer.Option(None, "--output", help="Output directory for archives"),
     group: str = typer.Option("all", "--group", help="Table group: rl, agent, all"),
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
 ) -> None:

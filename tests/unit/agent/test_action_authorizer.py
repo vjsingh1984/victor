@@ -288,9 +288,7 @@ class TestIntentDetector:
         detector = IntentDetector()
 
         # Test consolidation prompt (the original bug trigger)
-        result = detector.detect(
-            "consolidate documentation and replace adoc files with md"
-        )
+        result = detector.detect("consolidate documentation and replace adoc files with md")
         assert result.intent == ActionIntent.WRITE_ALLOWED
         assert len(result.prompt_guard) > 0  # Not empty
         assert (
@@ -611,18 +609,14 @@ class TestScorePatterns:
     def test_score_patterns_no_match(self):
         """Test scoring when no patterns match."""
         detector = IntentDetector()
-        score, matched = detector._score_patterns(
-            "hello world", detector._write_patterns
-        )
+        score, matched = detector._score_patterns("hello world", detector._write_patterns)
         assert score == 0.0
         assert matched == []
 
     def test_score_patterns_single_match(self):
         """Test scoring with a single matching pattern."""
         detector = IntentDetector()
-        score, matched = detector._score_patterns(
-            "show me the code", detector._display_patterns
-        )
+        score, matched = detector._score_patterns("show me the code", detector._display_patterns)
         assert score > 0
         assert "show_me" in matched
 

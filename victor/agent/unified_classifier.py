@@ -155,8 +155,7 @@ class ClassificationResult:
             coarse_type = "default"
 
         return {
-            "is_action_task": self.is_action_task
-            or self.task_type == ClassifierTaskType.ACTION,
+            "is_action_task": self.is_action_task or self.task_type == ClassifierTaskType.ACTION,
             "is_analysis_task": self.is_analysis_task
             or self.task_type == ClassifierTaskType.ANALYSIS,
             "needs_execution": self.needs_execution,
@@ -715,9 +714,7 @@ class UnifiedTaskClassifier:
             m.category = "generation"
 
         analysis_matches = _find_keywords_with_positions(message, ANALYSIS_KEYWORDS)
-        analysis_matches.extend(
-            _find_keywords_with_positions(message, ANALYSIS_QUESTION_PATTERNS)
-        )
+        analysis_matches.extend(_find_keywords_with_positions(message, ANALYSIS_QUESTION_PATTERNS))
         for m in analysis_matches:
             m.category = "analysis"
 
@@ -743,11 +740,7 @@ class UnifiedTaskClassifier:
 
         # Collect all matches for debugging
         all_matches = (
-            action_matches
-            + gen_matches
-            + analysis_matches
-            + search_matches
-            + edit_matches
+            action_matches + gen_matches + analysis_matches + search_matches + edit_matches
         )
         negated = [m for m in all_matches if m.negated]
         non_negated = [m for m in all_matches if not m.negated]
@@ -787,9 +780,7 @@ class UnifiedTaskClassifier:
         # (e.g., "analyze the codebase and apply the fix" → ACTION)
         # (e.g., "analyze the logs" → ANALYSIS)
         action_positions = [
-            m.position
-            for m in action_matches + gen_matches + edit_matches
-            if not m.negated
+            m.position for m in action_matches + gen_matches + edit_matches if not m.negated
         ]
         analysis_positions = [m.position for m in analysis_matches if not m.negated]
 
@@ -801,9 +792,7 @@ class UnifiedTaskClassifier:
             if max_action_pos > max_analysis_pos:
                 # Action/edit/generation takes precedence - it's the end goal
                 combined_action_score = action_score + gen_score + edit_score
-                if (
-                    combined_action_score >= analysis_score * 0.5
-                ):  # Action strong enough
+                if combined_action_score >= analysis_score * 0.5:  # Action strong enough
                     if gen_score >= action_score and gen_score >= edit_score:
                         best_type = ClassifierTaskType.GENERATION
                     elif edit_score >= action_score:
@@ -841,8 +830,7 @@ class UnifiedTaskClassifier:
             task_type=best_type,
             confidence=confidence,
             is_action_task=has_action or has_gen,  # Generation is a form of action
-            is_analysis_task=has_analysis
-            or has_search,  # Search is exploratory like analysis
+            is_analysis_task=has_analysis or has_search,  # Search is exploratory like analysis
             is_generation_task=has_gen,
             needs_execution=has_execution,
             source="keyword",
@@ -906,8 +894,7 @@ class UnifiedTaskClassifier:
                                     ClassifierTaskType.ANALYSIS,
                                     ClassifierTaskType.SEARCH,
                                 ),
-                                is_generation_task=triage_type
-                                == ClassifierTaskType.GENERATION,
+                                is_generation_task=triage_type == ClassifierTaskType.GENERATION,
                                 needs_execution=has_execution,
                                 source="triage",
                                 keyword_confidence=confidence,
@@ -915,9 +902,7 @@ class UnifiedTaskClassifier:
                                 negated_keywords=negated,
                                 recommended_tool_budget=budget_map.get(triage_type, 20),
                                 temperature_adjustment=(
-                                    0.2
-                                    if triage_type == ClassifierTaskType.ANALYSIS
-                                    else 0.0
+                                    0.2 if triage_type == ClassifierTaskType.ANALYSIS else 0.0
                                 ),
                             )
                             logger.debug(
@@ -978,8 +963,7 @@ class UnifiedTaskClassifier:
                             ),
                             is_analysis_task=llm_type
                             in (ClassifierTaskType.ANALYSIS, ClassifierTaskType.SEARCH),
-                            is_generation_task=llm_type
-                            == ClassifierTaskType.GENERATION,
+                            is_generation_task=llm_type == ClassifierTaskType.GENERATION,
                             needs_execution=has_execution,
                             source="llm",
                             keyword_confidence=confidence,
@@ -1054,9 +1038,7 @@ class UnifiedTaskClassifier:
         if dominant_type and result.confidence < 0.7:
             # Low confidence + clear context = boost toward context type
             if dominant_count >= 2:  # At least 2 recent messages of same type
-                context_signals.append(
-                    f"history_dominant:{dominant_type.value}:{dominant_count}"
-                )
+                context_signals.append(f"history_dominant:{dominant_type.value}:{dominant_count}")
 
                 # If current result matches context, boost confidence
                 if result.task_type == dominant_type:
@@ -1065,14 +1047,9 @@ class UnifiedTaskClassifier:
                     result.context_boost = boost
                     result.source = "context"
                 # If current is DEFAULT but context is clear, consider switching
-                elif (
-                    result.task_type == ClassifierTaskType.DEFAULT
-                    and dominant_count >= 3
-                ):
+                elif result.task_type == ClassifierTaskType.DEFAULT and dominant_count >= 3:
                     result.task_type = dominant_type
-                    result.confidence = 0.5 + (
-                        self._context_boost * dominant_count / max_history
-                    )
+                    result.confidence = 0.5 + (self._context_boost * dominant_count / max_history)
                     result.context_boost = result.confidence - 0.5
                     result.source = "context"
                     context_signals.append("type_switched_from_default")
@@ -1173,9 +1150,7 @@ class UnifiedTaskClassifier:
             "analyze": ClassifierTaskType.ANALYSIS,
             "design": ClassifierTaskType.ANALYSIS,  # Design is analysis-like
         }
-        return type_map.get(
-            str(semantic_type.value).lower(), ClassifierTaskType.DEFAULT
-        )
+        return type_map.get(str(semantic_type.value).lower(), ClassifierTaskType.DEFAULT)
 
 
 # =============================================================================
@@ -1209,9 +1184,7 @@ def classify_task(message: str) -> ClassificationResult:
     return get_unified_classifier().classify(message)
 
 
-def classify_task_with_context(
-    message: str, history: List[Dict[str, Any]]
-) -> ClassificationResult:
+def classify_task_with_context(message: str, history: List[Dict[str, Any]]) -> ClassificationResult:
     """Convenience function for context-aware classification.
 
     Args:

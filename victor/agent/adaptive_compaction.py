@@ -136,9 +136,7 @@ class AdaptiveCompactionThreshold:
         self.update_frequency = update_frequency
 
         # Plugin-contributed domain keywords (merged into built-ins at detection time)
-        self._extra_domain_keywords: Dict[str, List[str]] = dict(
-            extra_domain_keywords or {}
-        )
+        self._extra_domain_keywords: Dict[str, List[str]] = dict(extra_domain_keywords or {})
 
         # State tracking
         self._turn_count = 0
@@ -202,9 +200,7 @@ class AdaptiveCompactionThreshold:
         )
 
         # Track history
-        self._threshold_history.append(
-            (datetime.now(), threshold, analysis.pattern.value)
-        )
+        self._threshold_history.append((datetime.now(), threshold, analysis.pattern.value))
 
         return threshold
 
@@ -231,9 +227,7 @@ class AdaptiveCompactionThreshold:
 
         # Extract recent messages for analysis
         recent_messages = messages[-self.analysis_window :]
-        user_messages = [
-            m for m in recent_messages if getattr(m, "role", None) == "user"
-        ]
+        user_messages = [m for m in recent_messages if getattr(m, "role", None) == "user"]
 
         if len(user_messages) < 2:
             return PatternAnalysis(
@@ -263,9 +257,7 @@ class AdaptiveCompactionThreshold:
         # Calculate recommended threshold
         threshold_range = self.PATTERN_THRESHOLDS[pattern]
         # Adjust within range based on confidence
-        threshold = (
-            threshold_range[0] + (threshold_range[1] - threshold_range[0]) * confidence
-        )
+        threshold = threshold_range[0] + (threshold_range[1] - threshold_range[0]) * confidence
 
         # Generate reasoning
         reasoning = self._generate_reasoning(
@@ -281,9 +273,7 @@ class AdaptiveCompactionThreshold:
             confidence=confidence,
             topic_coherence=topic_coherence,
             context_dependency=context_dependency,
-            topic_switches_per_turn=(
-                topic_switches / len(user_messages) if user_messages else 0
-            ),
+            topic_switches_per_turn=(topic_switches / len(user_messages) if user_messages else 0),
             recommended_threshold=threshold,
             reasoning=reasoning,
             metadata={
@@ -426,9 +416,7 @@ class AdaptiveCompactionThreshold:
             return 0.5
 
         # Focus on assistant responses (they show if they understood context)
-        assistant_messages = [
-            m for m in messages if getattr(m, "role", None) == "assistant"
-        ]
+        assistant_messages = [m for m in messages if getattr(m, "role", None) == "assistant"]
 
         reference_markers = [
             "mentioned",

@@ -171,8 +171,7 @@ class WorkflowVersion:
             True if compatible
         """
         return self.major == other.major and (
-            self.minor > other.minor
-            or (self.minor == other.minor and self.patch >= other.patch)
+            self.minor > other.minor or (self.minor == other.minor and self.patch >= other.patch)
         )
 
     def bump_major(self) -> "WorkflowVersion":
@@ -610,9 +609,7 @@ class WorkflowVersionRegistry:
         path = self.get_migration_path(name, from_v, to_v)
 
         if not path:
-            logger.warning(
-                f"No migration path found: {name} {from_version} -> {to_version}"
-            )
+            logger.warning(f"No migration path found: {name} {from_version} -> {to_version}")
             return state, []
 
         result = dict(state)

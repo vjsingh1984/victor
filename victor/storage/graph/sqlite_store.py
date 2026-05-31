@@ -193,9 +193,7 @@ class SqliteGraphStore(GraphStoreProtocol):
         variants = [raw_path, canonical_path]
         raw_candidate = Path(raw_path).expanduser()
         if not raw_candidate.is_absolute():
-            variants.append(
-                str((self._project_root / raw_candidate).resolve(strict=False))
-            )
+            variants.append(str((self._project_root / raw_candidate).resolve(strict=False)))
         return list(dict.fromkeys(variants))
 
     def _ensure_schema(self) -> None:
@@ -266,8 +264,7 @@ class SqliteGraphStore(GraphStoreProtocol):
         cursor = conn.execute(f"PRAGMA table_info({_NODE_TABLE})")
         node_columns = {row[1] for row in cursor.fetchall()}
         edge_columns = {
-            row[1]
-            for row in conn.execute(f"PRAGMA table_info({_EDGE_TABLE})").fetchall()
+            row[1] for row in conn.execute(f"PRAGMA table_info({_EDGE_TABLE})").fetchall()
         }
 
         # v4 columns (legacy)
@@ -290,9 +287,7 @@ class SqliteGraphStore(GraphStoreProtocol):
         for col_name, col_type in new_columns:
             if col_name not in node_columns:
                 try:
-                    conn.execute(
-                        f"ALTER TABLE {_NODE_TABLE} ADD COLUMN {col_name} {col_type}"
-                    )
+                    conn.execute(f"ALTER TABLE {_NODE_TABLE} ADD COLUMN {col_name} {col_type}")
                 except sqlite3.OperationalError:
                     pass  # Column already exists
 
@@ -322,9 +317,7 @@ class SqliteGraphStore(GraphStoreProtocol):
                 """)
 
         # Keep file lookup fast when populated
-        conn.execute(
-            f"CREATE INDEX IF NOT EXISTS idx_{_EDGE_TABLE}_file ON {_EDGE_TABLE}(file)"
-        )
+        conn.execute(f"CREATE INDEX IF NOT EXISTS idx_{_EDGE_TABLE}_file ON {_EDGE_TABLE}(file)")
 
     def _has_table_column(
         self,
@@ -343,9 +336,7 @@ class SqliteGraphStore(GraphStoreProtocol):
 
         metadata = getattr(edge, "metadata", None)
         if isinstance(metadata, dict):
-            file_hint = (
-                str(metadata.get("file") or metadata.get("file_path") or "") or None
-            )
+            file_hint = str(metadata.get("file") or metadata.get("file_path") or "") or None
             return self._canonical_file_path(file_hint) if file_hint else None
 
         return None
@@ -458,9 +449,7 @@ class SqliteGraphStore(GraphStoreProtocol):
             rows,
         )
 
-    def _update_file_mtime_conn(
-        self, conn: sqlite3.Connection, file: str, mtime: float
-    ) -> None:
+    def _update_file_mtime_conn(self, conn: sqlite3.Connection, file: str, mtime: float) -> None:
         """Record file modification time using the provided connection."""
         import time
 
@@ -501,12 +490,8 @@ class SqliteGraphStore(GraphStoreProtocol):
         if node_ids:
             placeholders = ",".join("?" for _ in node_ids)
             # Delete all edges connected to these nodes
-            conn.execute(
-                f"DELETE FROM {_EDGE_TABLE} WHERE src IN ({placeholders})", node_ids
-            )
-            conn.execute(
-                f"DELETE FROM {_EDGE_TABLE} WHERE dst IN ({placeholders})", node_ids
-            )
+            conn.execute(f"DELETE FROM {_EDGE_TABLE} WHERE src IN ({placeholders})", node_ids)
+            conn.execute(f"DELETE FROM {_EDGE_TABLE} WHERE dst IN ({placeholders})", node_ids)
             # Delete the nodes themselves
             conn.execute(
                 f"DELETE FROM {_NODE_TABLE} WHERE node_id IN ({placeholders})",
@@ -707,9 +692,7 @@ class SqliteGraphStore(GraphStoreProtocol):
                 visited_nodes.update(next_frontier)
                 frontier = next_frontier
 
-        return sorted(
-            seen_edges.values(), key=lambda edge: (edge.src, edge.dst, edge.type)
-        )
+        return sorted(seen_edges.values(), key=lambda edge: (edge.src, edge.dst, edge.type))
 
     def _select_frontier_edges(
         self,
@@ -1034,9 +1017,7 @@ class SqliteGraphStore(GraphStoreProtocol):
         """Get all edges in the graph (bulk retrieval for loading into memory)."""
         async with self._lock:
             conn = self._connect()
-            cur = conn.execute(
-                f"SELECT src, dst, type, weight, metadata FROM {_EDGE_TABLE}"
-            )
+            cur = conn.execute(f"SELECT src, dst, type, weight, metadata FROM {_EDGE_TABLE}")
             return [
                 GraphEdge(
                     src=row[0],
@@ -1073,7 +1054,9 @@ class SqliteGraphStore(GraphStoreProtocol):
             clauses.append("file = ?")
             params.append(file)
         where = " AND ".join(clauses) if clauses else "1=1"
-        query = f"SELECT {self._NODE_COLS} FROM {_NODE_TABLE} WHERE {where} ORDER BY file, line, name"
+        query = (
+            f"SELECT {self._NODE_COLS} FROM {_NODE_TABLE} WHERE {where} ORDER BY file, line, name"
+        )
 
         async with self._lock:
             conn = self._connect()

@@ -397,15 +397,12 @@ class RuleBasedExtractor:
 
         # Research roles
         if any(
-            kw in desc_lower
-            for kw in ["research", "investigate", "analyze", "explore", "study"]
+            kw in desc_lower for kw in ["research", "investigate", "analyze", "explore", "study"]
         ):
             return "researcher"
 
         # Execution roles
-        if any(
-            kw in desc_lower for kw in ["fix", "implement", "build", "create", "deploy"]
-        ):
+        if any(kw in desc_lower for kw in ["fix", "implement", "build", "create", "deploy"]):
             return "executor"
 
         # Planning roles
@@ -423,9 +420,7 @@ class RuleBasedExtractor:
         # Default
         return "executor"
 
-    def _extract_tools(
-        self, text: str, tasks: List[TaskRequirement]
-    ) -> Dict[str, List[str]]:
+    def _extract_tools(self, text: str, tasks: List[TaskRequirement]) -> Dict[str, List[str]]:
         """Extract tool names from text.
 
         Args:

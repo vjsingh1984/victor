@@ -362,9 +362,7 @@ async def git(
 
         author_info = ""
         if author_name or author_email:
-            author_info = (
-                f" (as {author_name or 'default'} <{author_email or 'default'}>)"
-            )
+            author_info = f" (as {author_name or 'default'} <{author_email or 'default'}>)"
 
         return {
             "success": True,
@@ -413,9 +411,7 @@ async def git(
 
         # Get current branch if none specified
         if not push_branch and not push_all:
-            success, current, stderr = await _run_git_async(
-                "rev-parse", "--abbrev-ref", "HEAD"
-            )
+            success, current, stderr = await _run_git_async("rev-parse", "--abbrev-ref", "HEAD")
             if not success:
                 return {
                     "success": False,
@@ -437,9 +433,7 @@ async def git(
             args.append(remote)
         else:
             # Push specific branch; set upstream if not already set
-            args.extend(
-                ["--set-upstream" if not dry_run else "-u", remote, push_branch]
-            )
+            args.extend(["--set-upstream" if not dry_run else "-u", remote, push_branch])
 
         success, stdout, stderr = await _run_git_async(*args)
 
@@ -452,8 +446,7 @@ async def git(
 
         return {
             "success": True,
-            "output": stdout.strip()
-            or f"Successfully pushed to {remote}/{push_branch}",
+            "output": stdout.strip() or f"Successfully pushed to {remote}/{push_branch}",
             "error": "",
         }
 
@@ -536,9 +529,7 @@ Generate ONLY the commit message, nothing else."""
             return {"success": False, "output": "", "error": stderr}
 
         # Find conflicted files (marked with UU)
-        conflicted = [
-            line.split()[-1] for line in status.split("\n") if line.startswith("UU")
-        ]
+        conflicted = [line.split()[-1] for line in status.split("\n") if line.startswith("UU")]
 
         if not conflicted:
             return {
@@ -606,13 +597,10 @@ Generate ONLY the commit message, nothing else."""
                             pos = end_line
                         if conflicts_in_file:
                             conflict_details.append(
-                                f"File: {file}\n"
-                                + "\n---\n".join(conflicts_in_file[:2])
+                                f"File: {file}\n" + "\n---\n".join(conflicts_in_file[:2])
                             )
                     except Exception as e:
-                        logger.debug(
-                            "Failed to read merge conflict details for %s: %s", file, e
-                        )
+                        logger.debug("Failed to read merge conflict details for %s: %s", file, e)
 
                 if conflict_details:
                     prompt = f"""Analyze these git merge conflicts and suggest how to resolve them.
@@ -717,9 +705,7 @@ async def pr(
 
         if success and diff:
             # Get commit log
-            _, log, _ = await _run_git_async(
-                "log", f"{base_branch}..HEAD", "--pretty=format:- %s"
-            )
+            _, log, _ = await _run_git_async("log", f"{base_branch}..HEAD", "--pretty=format:- %s")
 
             # Generate PR content
             prompt = f"""Generate a pull request title and description for these changes.

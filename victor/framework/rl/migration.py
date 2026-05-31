@@ -154,15 +154,9 @@ class RLTableMigrator:
         if _table_exists(conn, Tables.RL_MODE_HISTORY):
             cols = {
                 r[1]
-                for r in conn.execute(
-                    f"PRAGMA table_info({Tables.RL_MODE_HISTORY})"
-                ).fetchall()
+                for r in conn.execute(f"PRAGMA table_info({Tables.RL_MODE_HISTORY})").fetchall()
             }
-            extra = (
-                "profile_name, trigger"
-                if "profile_name" in cols and "trigger" in cols
-                else ""
-            )
+            extra = "profile_name, trigger" if "profile_name" in cols and "trigger" in cols else ""
             rows = conn.execute(
                 "SELECT from_mode, to_mode, action_key, reward, success, quality_score"
                 + (", profile_name, trigger" if extra else "")
@@ -260,10 +254,7 @@ class RLTableMigrator:
                 [(r[0], r[1], r[2]) for r in rows],
             )
             # success_count -> rl_task_stat
-            stats = [
-                ("tool_selector", r[0], "success_count", float(r[3] or 0), r[2])
-                for r in rows
-            ]
+            stats = [("tool_selector", r[0], "success_count", float(r[3] or 0), r[2]) for r in rows]
             conn.executemany(
                 f"INSERT OR IGNORE INTO {Tables.RL_TASK_STAT} "
                 f"(learner_id, task_type, stat_key, stat_value, sample_count, updated_at) "

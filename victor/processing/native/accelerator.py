@@ -184,9 +184,7 @@ _ALLOWED_THIRD_PARTY_MODULES = frozenset(
     }
 )
 _FAST_STDLIB_MODULES = frozenset(
-    set(sys.stdlib_module_names)
-    | set(_PYTHON_STDLIB_MODULES)
-    | set(_ALLOWED_THIRD_PARTY_MODULES)
+    set(sys.stdlib_module_names) | set(_PYTHON_STDLIB_MODULES) | set(_ALLOWED_THIRD_PARTY_MODULES)
 )
 
 

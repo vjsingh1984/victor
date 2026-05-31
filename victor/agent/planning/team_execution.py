@@ -61,9 +61,7 @@ class PlanningTeamExecutionAdapter:
         exploratory_steps = 0
         for step_data in plan.steps:
             if isinstance(step_data, dict):
-                exec_type = str(
-                    step_data.get("exec", step_data.get("execution", ""))
-                ).lower()
+                exec_type = str(step_data.get("exec", step_data.get("execution", ""))).lower()
                 step_type = str(step_data.get("type", "")).lower()
             elif len(step_data) >= 2:
                 exec_type = str(step_data[5]).lower() if len(step_data) > 5 else ""
@@ -125,9 +123,7 @@ class PlanningTeamExecutionAdapter:
         # 3. Loop node — iterate over a plan-state collection.  Inferred loop
         # steps occasionally miss the collection key; those must still get real
         # worker execution instead of becoming a zero-item no-op.
-        if execution == "loop" and (
-            step.context.get("items") or step.context.get("loop_over")
-        ):
+        if execution == "loop" and (step.context.get("items") or step.context.get("loop_over")):
             return await self._execute_loop_node(
                 step, execution_plan, team_id, context, resolved_plan_state
             )
@@ -151,9 +147,7 @@ class PlanningTeamExecutionAdapter:
         if self._should_execute_step_directly(execution_plan, step):
             members = self._build_members(execution_plan, team_id, current_step=step)
             worker = next(
-                member
-                for member_id, member in members.items()
-                if member_id != "plan_manager"
+                member for member_id, member in members.items() if member_id != "plan_manager"
             )
             payload = await worker.execute_task(task, context)
             return self._member_payload_to_step_result(payload, worker.id)
@@ -243,9 +237,7 @@ class PlanningTeamExecutionAdapter:
 
         parallel = bool(step.context.get("parallel", False))
         subagents = self._subagents()
-        parent_session_id = context.get("parent_session_id") or context.get(
-            "root_session_id"
-        )
+        parent_session_id = context.get("parent_session_id") or context.get("root_session_id")
 
         async def _run_item(index: int, item: str) -> tuple[str, StepResult]:
             item_task = f"{step.description} — [{item}]"
@@ -288,9 +280,7 @@ class PlanningTeamExecutionAdapter:
         if parallel:
             import asyncio as _asyncio
 
-            pairs = await _asyncio.gather(
-                *[_run_item(i, item) for i, item in enumerate(items)]
-            )
+            pairs = await _asyncio.gather(*[_run_item(i, item) for i, item in enumerate(items)])
         else:
             pairs = []
             early_stopped = False
@@ -355,9 +345,7 @@ class PlanningTeamExecutionAdapter:
             # loop_over, then try to fall back to any non-empty list value.
             if raw is None:
                 lo_words = {
-                    w.rstrip("s")
-                    for w in loop_over.replace("_", " ").split()
-                    if len(w) > 3
+                    w.rstrip("s") for w in loop_over.replace("_", " ").split() if len(w) > 3
                 }
                 best_val = None
                 best_score = 0
@@ -409,9 +397,7 @@ class PlanningTeamExecutionAdapter:
         branches: Dict[str, Any] = step.context.get("branches", {})
         value = plan_state.get(condition_on) if condition_on else None
         value_source = (
-            f"plan_state['{condition_on}']"
-            if condition_on and value is not None
-            else "none"
+            f"plan_state['{condition_on}']" if condition_on and value is not None else "none"
         )
         # Fallback A: key name mismatch — find a plan_state key whose words
         # overlap with condition_on (handles LLM naming variation).
@@ -423,9 +409,7 @@ class PlanningTeamExecutionAdapter:
                 [k for k in plan_state if not k.startswith("step_")],
             )
             cond_words = {
-                w.rstrip("s")
-                for w in condition_on.replace("_", " ").split()
-                if len(w) > 3
+                w.rstrip("s") for w in condition_on.replace("_", " ").split() if len(w) > 3
             }
             for k, v in plan_state.items():
                 if not k.startswith("step_") and isinstance(v, list) and v:
@@ -469,9 +453,7 @@ class PlanningTeamExecutionAdapter:
         if produces:
             plan_state[produces] = result
 
-        label = (
-            f"'{condition}' on '{condition_on}'" if condition_on else f"'{condition}'"
-        )
+        label = f"'{condition}' on '{condition_on}'" if condition_on else f"'{condition}'"
         _log.info(
             "Conditional step %s: %s = %s (value_source=%s, value=%r) → active=%s, skip=%s",
             step.id,
@@ -530,9 +512,7 @@ class PlanningTeamExecutionAdapter:
             "targets",
             "source files",
         )
-        if len(cleaned) == 1 and any(
-            marker in cleaned[0].lower() for marker in prose_markers
-        ):
+        if len(cleaned) == 1 and any(marker in cleaned[0].lower() for marker in prose_markers):
             return True
         return len(plausible) < len(cleaned)
 
@@ -579,9 +559,7 @@ class PlanningTeamExecutionAdapter:
                 success=approved,
                 output=feedback
                 or (
-                    f"Approved: {step.description}"
-                    if approved
-                    else f"Rejected: {step.description}"
+                    f"Approved: {step.description}" if approved else f"Rejected: {step.description}"
                 ),
                 error=None if approved else f"User rejected: {feedback}",
                 tool_calls_used=0,
@@ -619,9 +597,7 @@ class PlanningTeamExecutionAdapter:
         if "write" in (step.allowed_tools or []):
             return True
         return bool(
-            PlanningTeamExecutionAdapter._SYNTHESIS_KEYWORDS_RE.search(
-                step.description or ""
-            )
+            PlanningTeamExecutionAdapter._SYNTHESIS_KEYWORDS_RE.search(step.description or "")
         )
 
     @staticmethod
@@ -708,24 +684,17 @@ class PlanningTeamExecutionAdapter:
                     if isinstance(value, list) and value:
                         items_str = ", ".join(str(v) for v in value[:20])
                         context_lines.append(f"- {key}: {items_str}")
-                    elif (
-                        isinstance(value, (str, bool, int, float))
-                        and str(value).strip()
-                    ):
+                    elif isinstance(value, (str, bool, int, float)) and str(value).strip():
                         short = str(value).strip()
                         short = short[:600] if is_step_key else short[:200]
                         context_lines.append(f"- {key}: {short}")
 
             if context_lines:
-                task = (
-                    task + "\n\nContext from prior steps:\n" + "\n".join(context_lines)
-                )
+                task = task + "\n\nContext from prior steps:\n" + "\n".join(context_lines)
 
         produces_key = step.context.get("produces", "")
         if produces_key:
-            contract = PlanningTeamExecutionAdapter._produces_output_contract(
-                produces_key
-            )
+            contract = PlanningTeamExecutionAdapter._produces_output_contract(produces_key)
             task = f"{task}\n\n{contract}"
 
         # Compute steps (execution="compute") that produce named output are dispatched
@@ -742,9 +711,7 @@ class PlanningTeamExecutionAdapter:
                 f"Do not attempt to call any tools."
             )
 
-        evidence_guidance = PlanningTeamExecutionAdapter._evidence_guidance_for_step(
-            step
-        )
+        evidence_guidance = PlanningTeamExecutionAdapter._evidence_guidance_for_step(step)
         if evidence_guidance:
             task = f"{task}\n\n{evidence_guidance}"
 
@@ -800,9 +767,7 @@ class PlanningTeamExecutionAdapter:
         )
 
     @staticmethod
-    def _should_execute_step_directly(
-        execution_plan: ExecutionPlan, step: PlanStep
-    ) -> bool:
+    def _should_execute_step_directly(execution_plan: ExecutionPlan, step: PlanStep) -> bool:
         """Avoid a manager/worker hierarchy when a step has exactly one owner."""
         return step in execution_plan.steps
 
@@ -857,9 +822,7 @@ class PlanningTeamExecutionAdapter:
         )
         members[manager.id] = self._adapt_member(manager, team_id, execution_plan.id)
 
-        step_members = (
-            [current_step] if current_step is not None else execution_plan.steps
-        )
+        step_members = [current_step] if current_step is not None else execution_plan.steps
         for step in step_members:
             role = self._role_for_step(step)
             member_id = f"step_{self._slug(step.id)}_{role.value}"
@@ -917,8 +880,7 @@ class PlanningTeamExecutionAdapter:
             import logging as _logging
 
             _logging.getLogger(__name__).info(
-                "Planning step %s: dropped unavailable tool hint(s): %s "
-                "(available=%s)",
+                "Planning step %s: dropped unavailable tool hint(s): %s " "(available=%s)",
                 getattr(step, "id", "?"),
                 dropped,
                 sorted(available)[:12],
@@ -950,11 +912,7 @@ class PlanningTeamExecutionAdapter:
                 if hasattr(registry, "list_tools"):
                     names: set[str] = set()
                     for item in registry.list_tools():
-                        name = (
-                            item
-                            if isinstance(item, str)
-                            else getattr(item, "name", None)
-                        )
+                        name = item if isinstance(item, str) else getattr(item, "name", None)
                         if name:
                             names.add(canonicalize_core_tool_name(str(name)))
                     if names:
@@ -962,9 +920,7 @@ class PlanningTeamExecutionAdapter:
                 if hasattr(registry, "get_tool_names"):
                     names = registry.get_tool_names()
                     if names:
-                        return {
-                            canonicalize_core_tool_name(str(name)) for name in names
-                        }
+                        return {canonicalize_core_tool_name(str(name)) for name in names}
             except Exception:
                 continue
 
@@ -980,12 +936,8 @@ class PlanningTeamExecutionAdapter:
     ) -> TeamMemberAdapter:
         async def _execute(task: str, context: Dict[str, Any]) -> Dict[str, Any]:
             subagents = self._subagents()
-            parent_session_id = context.get("parent_session_id") or context.get(
-                "root_session_id"
-            )
-            child_session_id = self._child_session_id(
-                parent_session_id, team_id, member.id
-            )
+            parent_session_id = context.get("parent_session_id") or context.get("root_session_id")
+            child_session_id = self._child_session_id(parent_session_id, team_id, member.id)
             agent_id = f"{team_id}_{member.id}"
             result = await subagents.spawn(
                 role=member.role,
@@ -1075,9 +1027,7 @@ class PlanningTeamExecutionAdapter:
     # language-agnostic.
 
     @staticmethod
-    def _builtin_checklist_artifact(
-        step: "PlanStep", plan_state: Dict[str, Any]
-    ) -> "StepResult":
+    def _builtin_checklist_artifact(step: "PlanStep", plan_state: Dict[str, Any]) -> "StepResult":
         """Generate a deterministic, language-agnostic review checklist artifact.
 
         Categories are extracted from the step description (the planner must
@@ -1092,9 +1042,7 @@ class PlanningTeamExecutionAdapter:
 
         description = (step.description or "").strip()
         topic = description or "Review checklist"
-        categories = PlanningTeamExecutionAdapter._extract_checklist_categories(
-            description
-        )
+        categories = PlanningTeamExecutionAdapter._extract_checklist_categories(description)
         category_source = "extracted_from_description"
         if not categories:
             categories = [
@@ -1208,11 +1156,7 @@ class PlanningTeamExecutionAdapter:
                 chosen_key = key
                 break
 
-        targets_raw = (
-            plan_state.get("review_targets")
-            or plan_state.get("workspace_members")
-            or []
-        )
+        targets_raw = plan_state.get("review_targets") or plan_state.get("workspace_members") or []
         targets: list[str]
         if isinstance(targets_raw, list):
             targets = [str(t).strip() for t in targets_raw if str(t).strip()]
@@ -1230,9 +1174,7 @@ class PlanningTeamExecutionAdapter:
             lines.append(f"Reviewed {len(targets)} target(s).")
             lines.append("")
         if items:
-            lines.append(
-                f"## Per-target findings ({len(items)} item(s) from `{chosen_key}`)"
-            )
+            lines.append(f"## Per-target findings ({len(items)} item(s) from `{chosen_key}`)")
             lines.append("")
             for item in items[:200]:
                 if item.startswith(("-", "*", "#")):
@@ -1310,16 +1252,13 @@ class PlanningTeamExecutionAdapter:
         execution = (step.execution or step.context.get("execution", "")).lower()
         produces_key = step.context.get("produces", "")
         desc = (step.description or "").lower()
-        is_checklist_artifact = cls._is_checklist_artifact_step(
-            step, produces_key, desc
-        )
+        is_checklist_artifact = cls._is_checklist_artifact_step(step, produces_key, desc)
         if execution in {"approval", "checkpoint", "conditional"}:
             return None
         if execution == "compute":
             explicit_node = step.context.get("node", "")
             if explicit_node and (
-                explicit_node in cls._COMPUTE_NODES
-                or explicit_node in cls._BUILTIN_NODES
+                explicit_node in cls._COMPUTE_NODES or explicit_node in cls._BUILTIN_NODES
             ):
                 return explicit_node
             if "_checklist_artifact" in cls._COMPUTE_NODES and is_checklist_artifact:
@@ -1342,9 +1281,7 @@ class PlanningTeamExecutionAdapter:
         return None
 
     @staticmethod
-    def _is_checklist_artifact_step(
-        step: PlanStep, produces_key: str, desc: str
-    ) -> bool:
+    def _is_checklist_artifact_step(step: PlanStep, produces_key: str, desc: str) -> bool:
         """Return True only for steps that create a checklist artifact.
 
         Analysis steps often say "evaluate against the checklist"; those must use
@@ -1359,9 +1296,7 @@ class PlanningTeamExecutionAdapter:
             return True
         return bool(
             re.search(r"\b(create|build|generate|write|draft|present)\b", desc)
-            and not re.search(
-                r"\b(against|using|with|apply|evaluate)\b.{0,40}\bchecklist\b", desc
-            )
+            and not re.search(r"\b(against|using|with|apply|evaluate)\b.{0,40}\bchecklist\b", desc)
         )
 
     @classmethod
@@ -1485,9 +1420,7 @@ class PlanningTeamExecutionAdapter:
         metadata.setdefault("member_id", member_id)
         tool_evidence = metadata.get("tool_evidence") or {}
         if isinstance(tool_evidence, dict) and tool_evidence.get("tool_names"):
-            metadata.setdefault(
-                "tool_names_used", list(tool_evidence.get("tool_names") or [])
-            )
+            metadata.setdefault("tool_names_used", list(tool_evidence.get("tool_names") or []))
         artifacts = metadata.get("artifacts") or metadata.get("changed_files") or []
         if not isinstance(artifacts, list):
             artifacts = [str(artifacts)]
@@ -1508,22 +1441,18 @@ class PlanningTeamExecutionAdapter:
             return None
         items = dict(member_results).items()
         worker_results = [
-            member_result
-            for member_id, member_result in items
-            if member_id != "plan_manager"
+            member_result for member_id, member_result in items if member_id != "plan_manager"
         ]
         if not worker_results:
             return None
         if not all(
-            PlanningTeamExecutionAdapter._member_success(member)
-            for member in worker_results
+            PlanningTeamExecutionAdapter._member_success(member) for member in worker_results
         ):
             return None
         return "\n\n".join(
             output
             for output in (
-                PlanningTeamExecutionAdapter._member_output(member)
-                for member in worker_results
+                PlanningTeamExecutionAdapter._member_output(member) for member in worker_results
             )
             if output
         )
@@ -1576,9 +1505,7 @@ class PlanningTeamExecutionAdapter:
         return f"team_{cls._slug(plan_id)}_{cls._slug(step_id)}"
 
     @staticmethod
-    def _child_session_id(
-        parent_session_id: Optional[str], team_id: str, member_id: str
-    ) -> str:
+    def _child_session_id(parent_session_id: Optional[str], team_id: str, member_id: str) -> str:
         parent = parent_session_id or "session"
         return f"{parent}:{team_id}:{member_id}"
 

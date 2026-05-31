@@ -109,9 +109,7 @@ class AdaptationValidationResult:
     suggestions: List[str] = field(default_factory=list)
     metadata: Dict[str, Any] = field(default_factory=dict)
 
-    def merge(
-        self, other: "AdaptationValidationResult"
-    ) -> "AdaptationValidationResult":
+    def merge(self, other: "AdaptationValidationResult") -> "AdaptationValidationResult":
         """Merge two validation results."""
         return AdaptationValidationResult(
             is_valid=self.is_valid and other.is_valid,

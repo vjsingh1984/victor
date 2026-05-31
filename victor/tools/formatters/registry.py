@@ -35,9 +35,7 @@ class _FormatCache:
         self._hits = 0
         self._misses = 0
 
-    def get(
-        self, tool_name: str, data: Dict[str, Any], **kwargs
-    ) -> Optional[FormattedOutput]:
+    def get(self, tool_name: str, data: Dict[str, Any], **kwargs) -> Optional[FormattedOutput]:
         """Get formatted output from cache.
 
         Args:
@@ -122,9 +120,7 @@ class _FormatCache:
             "hit_rate": hit_rate,
         }
 
-    def _generate_key(
-        self, tool_name: str, data: Dict[str, Any], kwargs: Dict[str, Any]
-    ) -> str:
+    def _generate_key(self, tool_name: str, data: Dict[str, Any], kwargs: Dict[str, Any]) -> str:
         """Generate content-based cache key.
 
         Args:
@@ -148,9 +144,7 @@ class _FormatCache:
 
         # Add relevant kwargs to key (exclude cache-specific options)
         cacheable_kwargs = {
-            k: v
-            for k, v in kwargs.items()
-            if k not in ("ttl", "max_size", "max_time_ms")
+            k: v for k, v in kwargs.items() if k not in ("ttl", "max_size", "max_time_ms")
         }
         if cacheable_kwargs:
             sorted_kwargs = json.dumps(cacheable_kwargs, sort_keys=True)
@@ -271,9 +265,7 @@ def get_formatter_registry() -> FormatterRegistry:
 
 
 # Module-level convenience function for formatting
-def format_tool_output(
-    tool_name: str, data: Dict[str, Any], **kwargs
-) -> FormattedOutput:
+def format_tool_output(tool_name: str, data: Dict[str, Any], **kwargs) -> FormattedOutput:
     """Format tool output using registered formatter with production guards.
 
     This is the main entry point for tools to format their output.
@@ -432,9 +424,7 @@ def format_tool_output(
                 cache_ttl = settings.rich_formatting_cache_ttl
                 _format_cache.put(tool_name, data, formatted, ttl=cache_ttl, **kwargs)
             except Exception as cache_error:
-                logger.debug(
-                    f"Failed to cache formatted output for {tool_name}: {cache_error}"
-                )
+                logger.debug(f"Failed to cache formatted output for {tool_name}: {cache_error}")
 
         return formatted
 

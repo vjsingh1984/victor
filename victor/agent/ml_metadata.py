@@ -232,9 +232,7 @@ def parse_model_metadata(
     is_moe = any(re.search(pattern, model_lower) for pattern in _MOE_PATTERNS)
 
     # 6. Detect reasoning models
-    is_reasoning = any(
-        re.search(pattern, model_lower) for pattern in _REASONING_PATTERNS
-    )
+    is_reasoning = any(re.search(pattern, model_lower) for pattern in _REASONING_PATTERNS)
 
     return ModelMetadata(
         model_family=model_family,

@@ -169,8 +169,7 @@ class RuleBasedCompactionSummarizer:
         self._file_extensions = self._FILE_EXTENSIONS
         self._pending_keywords = [kw.lower() for kw in self._PENDING_KEYWORDS]
         self._current_work_patterns = [
-            re.compile(pattern, re.IGNORECASE)
-            for pattern in self._CURRENT_WORK_PATTERNS
+            re.compile(pattern, re.IGNORECASE) for pattern in self._CURRENT_WORK_PATTERNS
         ]
 
     def summarize(
@@ -213,9 +212,7 @@ class RuleBasedCompactionSummarizer:
 
         # Extract structured information
         tools = self._extract_tool_names(messages)
-        recent_requests = self._extract_recent_user_requests(
-            messages, limit=min(3, user_count)
-        )
+        recent_requests = self._extract_recent_user_requests(messages, limit=min(3, user_count))
         pending = self._infer_pending_work(messages)
         files = self._extract_file_paths(messages)
         current_work = self._infer_current_work(messages)

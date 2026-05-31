@@ -101,9 +101,7 @@ class OrchestrationFacade:
         tool_call_tracer: Optional[Any] = None,
         runtime_state_host: Optional[Any] = None,
         runtime_intelligence_integration: Optional[Any] = None,
-        get_runtime_intelligence_integration: Optional[
-            Callable[[], Optional[Any]]
-        ] = None,
+        get_runtime_intelligence_integration: Optional[Callable[[], Optional[Any]]] = None,
         subagent_orchestrator: Optional[Any] = None,
         get_subagent_orchestrator: Optional[Callable[[], Optional[Any]]] = None,
     ) -> None:
@@ -135,9 +133,7 @@ class OrchestrationFacade:
         self._tool_call_tracer = tool_call_tracer
         self._runtime_state_host = runtime_state_host
         self._runtime_intelligence_integration = runtime_intelligence_integration
-        self._get_runtime_intelligence_integration = (
-            get_runtime_intelligence_integration
-        )
+        self._get_runtime_intelligence_integration = get_runtime_intelligence_integration
         self._subagent_orchestrator = subagent_orchestrator
         self._get_subagent_orchestrator = get_subagent_orchestrator
 
@@ -176,15 +172,10 @@ class OrchestrationFacade:
                 if self._get_chat_stream_adapter is None:
                     self._chat_stream_adapter = None
                     return None
-        if (
-            self._chat_stream_adapter is None
-            and self._get_chat_stream_adapter is not None
-        ):
+        if self._chat_stream_adapter is None and self._get_chat_stream_adapter is not None:
             self._chat_stream_adapter = self._get_chat_stream_adapter()
             if self._runtime_state_host is not None:
-                self._runtime_state_host._chat_stream_adapter = (
-                    self._chat_stream_adapter
-                )
+                self._runtime_state_host._chat_stream_adapter = self._chat_stream_adapter
         return self._chat_stream_adapter
 
     @property
@@ -358,9 +349,7 @@ class OrchestrationFacade:
             self._runtime_intelligence_integration is None
             and self._get_runtime_intelligence_integration is not None
         ):
-            self._runtime_intelligence_integration = (
-                self._get_runtime_intelligence_integration()
-            )
+            self._runtime_intelligence_integration = self._get_runtime_intelligence_integration()
             if self._runtime_state_host is not None:
                 self._runtime_state_host._runtime_intelligence_integration = (
                     self._runtime_intelligence_integration
@@ -387,15 +376,10 @@ class OrchestrationFacade:
                 if self._get_subagent_orchestrator is None:
                     self._subagent_orchestrator = None
                     return None
-        if (
-            self._subagent_orchestrator is None
-            and self._get_subagent_orchestrator is not None
-        ):
+        if self._subagent_orchestrator is None and self._get_subagent_orchestrator is not None:
             self._subagent_orchestrator = self._get_subagent_orchestrator()
             if self._runtime_state_host is not None:
-                self._runtime_state_host._subagent_orchestrator = (
-                    self._subagent_orchestrator
-                )
+                self._runtime_state_host._subagent_orchestrator = self._subagent_orchestrator
         return self._subagent_orchestrator
 
     @subagent_orchestrator.setter

@@ -73,9 +73,7 @@ import sys
 from typing import Dict, List, Optional
 
 # Set up logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 
@@ -86,9 +84,7 @@ def check_docker_available() -> bool:
     try:
         import subprocess
 
-        result = subprocess.run(
-            ["docker", "info"], capture_output=True, text=True, timeout=10
-        )
+        result = subprocess.run(["docker", "info"], capture_output=True, text=True, timeout=10)
         return result.returncode == 0
     except Exception:
         return False
@@ -197,9 +193,7 @@ async def demo_aws_mcp_direct():
 
         # Show server info
         if client.server_info:
-            print(
-                f"\n   Server: {client.server_info.name} v{client.server_info.version}"
-            )
+            print(f"\n   Server: {client.server_info.name} v{client.server_info.version}")
 
         # List available tools
         print("\n2. Discovering available tools...")
@@ -230,17 +224,13 @@ async def demo_aws_mcp_direct():
         print("-" * 70)
 
         # Find a search tool
-        search_tools = [
-            t for t in tools if "search" in t.name.lower() or "query" in t.name.lower()
-        ]
+        search_tools = [t for t in tools if "search" in t.name.lower() or "query" in t.name.lower()]
         if search_tools:
             search_tool = search_tools[0]
             print(f"   Using tool: {search_tool.name}")
 
             # Call the search tool
-            result = await client.call_tool(
-                search_tool.name, query="Lambda function timeout"
-            )
+            result = await client.call_tool(search_tool.name, query="Lambda function timeout")
 
             if result.success:
                 print("   Search completed successfully!")

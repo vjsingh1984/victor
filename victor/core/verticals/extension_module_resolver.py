@@ -229,9 +229,7 @@ class ExtensionModuleResolver:
             raise last_error
         return None
 
-    def auto_generate_class_name(
-        self, vertical_class_name: str, extension_key: str
-    ) -> str:
+    def auto_generate_class_name(self, vertical_class_name: str, extension_key: str) -> str:
         """Auto-generate a class name from vertical class name and extension key.
 
         Strips the ``"Assistant"`` suffix from the vertical class name and

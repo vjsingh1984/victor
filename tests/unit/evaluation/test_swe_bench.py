@@ -141,9 +141,7 @@ class TestSWEBenchRunnerLoadTasks:
         """Load tasks returns cached tasks when available."""
         runner = SWEBenchRunner()
         runner._tasks_cache = []
-        config = EvaluationConfig(
-            benchmark=BenchmarkType.SWE_BENCH, model="test", max_tasks=10
-        )
+        config = EvaluationConfig(benchmark=BenchmarkType.SWE_BENCH, model="test", max_tasks=10)
 
         tasks = await runner.load_tasks(config)
         assert tasks == []
@@ -166,9 +164,7 @@ class TestSWEBenchRunnerLoadTasks:
 
         runner = SWEBenchRunner()
         runner._tasks_cache = [mock_task1, mock_task2]
-        config = EvaluationConfig(
-            benchmark=BenchmarkType.SWE_BENCH, model="test", max_tasks=1
-        )
+        config = EvaluationConfig(benchmark=BenchmarkType.SWE_BENCH, model="test", max_tasks=1)
 
         tasks = await runner.load_tasks(config)
         assert len(tasks) == 1
@@ -298,9 +294,7 @@ class TestRunTaskErrorHandling:
         task.repo = None
 
         agent_output = "diff --git a/file.py b/file.py\n--- a/file.py\n+++ b/file.py\n@@ -1,1 +1,1 @@\n-old\n+new"
-        config = EvaluationConfig(
-            benchmark=BenchmarkType.SWE_BENCH, model="test", use_docker=False
-        )
+        config = EvaluationConfig(benchmark=BenchmarkType.SWE_BENCH, model="test", use_docker=False)
 
         # Mock TaskEnvironment to raise exception on setup
         with patch("victor.evaluation.benchmarks.swe_bench.TaskEnvironment") as MockEnv:
@@ -315,9 +309,7 @@ class TestRunTaskErrorHandling:
             assert "Setup failed" in result.error_message
 
     @pytest.mark.asyncio
-    async def test_cached_repo_success_logs_test_output_at_debug_only(
-        self, tmp_path, caplog
-    ):
+    async def test_cached_repo_success_logs_test_output_at_debug_only(self, tmp_path, caplog):
         """Passing test output should not pollute INFO logs."""
         runner = SWEBenchRunner()
         task = MagicMock()
@@ -326,9 +318,7 @@ class TestRunTaskErrorHandling:
         task.test_code = None
         task.repo = None
 
-        result = TaskResult(
-            task_id="test-1", status=TaskStatus.RUNNING, generated_code="diff"
-        )
+        result = TaskResult(task_id="test-1", status=TaskStatus.RUNNING, generated_code="diff")
         config = EvaluationConfig(benchmark=BenchmarkType.SWE_BENCH, model="test")
         cached_repo = tmp_path / "repo"
         cached_repo.mkdir()
@@ -380,13 +370,11 @@ class TestRunTaskErrorHandling:
 
         assert updated.status == TaskStatus.PASSED
         assert any(
-            record.levelno == logging.DEBUG
-            and "Test stdout (last 500)" in record.message
+            record.levelno == logging.DEBUG and "Test stdout (last 500)" in record.message
             for record in caplog.records
         )
         assert not any(
-            record.levelno == logging.INFO
-            and "Test stdout (last 500)" in record.message
+            record.levelno == logging.INFO and "Test stdout (last 500)" in record.message
             for record in caplog.records
         )
 

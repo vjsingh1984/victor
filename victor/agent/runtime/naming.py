@@ -107,9 +107,7 @@ def _display_token(token: str) -> str:
 
 
 def _title_words(value: str) -> str:
-    return " ".join(
-        _display_token(part) for part in re.split(r"[_\s-]+", value) if part
-    )
+    return " ".join(_display_token(part) for part in re.split(r"[_\s-]+", value) if part)
 
 
 def _slug(value: str) -> str:

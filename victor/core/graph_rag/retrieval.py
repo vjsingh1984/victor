@@ -84,8 +84,7 @@ class RetrievalResult:
             "query": self.query,
             "seed_count": len(self.seed_nodes),
             "top_nodes": [
-                {"node_id": n.node_id, "name": n.name, "file": n.file}
-                for n in self.nodes[:5]
+                {"node_id": n.node_id, "name": n.name, "file": n.file} for n in self.nodes[:5]
             ],
             "execution_time_ms": self.execution_time_ms,
         }
@@ -365,9 +364,7 @@ class MultiHopRetriever:
 
                     # Use lazy loading if enabled and available (PH4-006)
                     if use_lazy_loading and hasattr(self.graph_store, "iter_neighbors"):
-                        neighbors = await self._get_neighbors_lazy(
-                            node_id, edge_types, config
-                        )
+                        neighbors = await self._get_neighbors_lazy(node_id, edge_types, config)
                     else:
                         neighbors = await self.graph_store.get_neighbors(
                             node_id,
@@ -742,10 +739,7 @@ class MultiHopRetriever:
 
         # Stage 3: Rank and prune
         ranked_nodes = self._rank_nodes(
-            [
-                NodeWithScore(n, result.scores.get(n.node_id, 0.5), 0, [])
-                for n in result.nodes
-            ],
+            [NodeWithScore(n, result.scores.get(n.node_id, 0.5), 0, []) for n in result.nodes],
             seed_ids,
             query,
             cfg,

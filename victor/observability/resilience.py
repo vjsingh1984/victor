@@ -388,18 +388,14 @@ class ObservableCircuitBreaker(CanonicalCircuitBreaker):
             timeout_seconds: Alias for recovery_timeout (for compatibility).
         """
         # Support both parameter names for compatibility
-        actual_timeout = (
-            timeout_seconds if timeout_seconds is not None else recovery_timeout
-        )
+        actual_timeout = timeout_seconds if timeout_seconds is not None else recovery_timeout
 
         # Wrap callback to match parent's 3-param signature (old, new, name)
         # Parent expects (old_state, new_state, name), we provide (old_state, new_state)
         wrapped_callback: Optional[Callable] = None
         if on_state_change is not None:
 
-            def wrapped_callback(
-                old: CircuitState, new: CircuitState, cb_name: str
-            ) -> None:
+            def wrapped_callback(old: CircuitState, new: CircuitState, cb_name: str) -> None:
                 on_state_change(old, new)  # type: ignore
 
         # Initialize parent canonical circuit breaker
@@ -532,10 +528,7 @@ class Bulkhead:
             BulkheadFullError: If queue is full or timeout exceeded.
         """
         async with self._lock:
-            if (
-                self._max_waiting is not None
-                and self._waiting_count >= self._max_waiting
-            ):
+            if self._max_waiting is not None and self._waiting_count >= self._max_waiting:
                 raise BulkheadFullError(
                     f"Bulkhead '{self._name}' queue full: {self._waiting_count}/{self._max_waiting}"
                 )
@@ -543,9 +536,7 @@ class Bulkhead:
 
         try:
             if timeout is not None:
-                acquired = await asyncio.wait_for(
-                    self._semaphore.acquire(), timeout=timeout
-                )
+                acquired = await asyncio.wait_for(self._semaphore.acquire(), timeout=timeout)
                 if not acquired:
                     raise BulkheadFullError(f"Bulkhead '{self._name}' timeout")
             else:
@@ -812,9 +803,7 @@ class ResiliencePolicy:
 
         return await execute_with_bulkhead()
 
-    async def _execute_inner(
-        self, func: Callable[..., Any], *args: Any, **kwargs: Any
-    ) -> Any:
+    async def _execute_inner(self, func: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
         """Execute with circuit breaker, retry, and timeout."""
 
         async def execute_once() -> Any:
@@ -825,9 +814,7 @@ class ResiliencePolicy:
             try:
                 # Apply timeout
                 if self._timeout:
-                    result = await asyncio.wait_for(
-                        func(*args, **kwargs), timeout=self._timeout
-                    )
+                    result = await asyncio.wait_for(func(*args, **kwargs), timeout=self._timeout)
                 else:
                     result = await func(*args, **kwargs)
 
@@ -856,9 +843,7 @@ class ResiliencePolicy:
                     if attempt == self._retry_config.max_retries:
                         raise
 
-                    delay = strategy.calculate_delay(
-                        attempt, self._retry_config.base_delay
-                    )
+                    delay = strategy.calculate_delay(attempt, self._retry_config.base_delay)
 
                     if self._retry_config.on_retry:
                         self._retry_config.on_retry(attempt + 1, e, delay)

@@ -205,9 +205,7 @@ class TestTransitionsSummary:
         machine._transition_to(ConversationStage.READING, confidence=0.8)
 
         mock_time.return_value = 1020.0
-        machine._transition_to(
-            ConversationStage.PLANNING, confidence=0.9
-        )  # Back to planning
+        machine._transition_to(ConversationStage.PLANNING, confidence=0.9)  # Back to planning
 
         summary = machine.get_transitions_summary()
 

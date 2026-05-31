@@ -93,9 +93,7 @@ class TaskRuntimeProtocol(Protocol):
         """Prepare task-specific guidance and budget adjustments."""
         ...
 
-    def apply_intent_guard(
-        self, user_message: str, conversation_controller: Any
-    ) -> None:
+    def apply_intent_guard(self, user_message: str, conversation_controller: Any) -> None:
         """Detect intent and inject prompt guards for read-only tasks."""
         ...
 
@@ -231,9 +229,7 @@ class StreamingRecoveryRuntimeProtocol(Protocol):
         """Check if session is making progress."""
         ...
 
-    def check_blocked_threshold(
-        self, ctx: Any, all_blocked: bool
-    ) -> Optional[Tuple[Any, bool]]:
+    def check_blocked_threshold(self, ctx: Any, all_blocked: bool) -> Optional[Tuple[Any, bool]]:
         """Check if too many tools have been blocked."""
         ...
 
@@ -353,9 +349,7 @@ class ChunkRuntimeProtocol(Protocol):
         """Generate chunk for metrics display."""
         ...
 
-    def generate_content_chunk(
-        self, content: str, is_final: bool = False, suffix: str = ""
-    ) -> Any:
+    def generate_content_chunk(self, content: str, is_final: bool = False, suffix: str = "") -> Any:
         """Generate chunk for content display."""
         ...
 

@@ -223,8 +223,7 @@ class ParallelizationStrategy(BaseOptimizationStrategy):
                         f"Execute {len(group.node_ids)} nodes in parallel "
                         f"(potential speedup: {group.estimated_speedup:.2f}x)"
                     ),
-                    expected_improvement=(group.estimated_speedup - 1)
-                    / group.estimated_speedup,
+                    expected_improvement=(group.estimated_speedup - 1) / group.estimated_speedup,
                     risk_level=BottleneckSeverity.MEDIUM,
                     estimated_duration_reduction=(
                         group.sequential_duration - group.parallel_duration
@@ -273,9 +272,7 @@ class ParallelizationStrategy(BaseOptimizationStrategy):
 
             if len(independent_nodes) > 1:
                 # Calculate estimated speedup
-                durations = [
-                    profile.node_stats[n].p95_duration for n in independent_nodes
-                ]
+                durations = [profile.node_stats[n].p95_duration for n in independent_nodes]
                 sequential_time = sum(durations)
                 parallel_time = max(durations)
                 speedup = sequential_time / parallel_time if parallel_time > 0 else 1.0

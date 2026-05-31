@@ -149,9 +149,7 @@ class SkillMatcher:
         if not self._initialized or not self._skills:
             return None
 
-        results = self._collection.search_sync(
-            user_message, top_k=3, threshold=self._low_threshold
-        )
+        results = self._collection.search_sync(user_message, top_k=3, threshold=self._low_threshold)
         if not results:
             return None
 

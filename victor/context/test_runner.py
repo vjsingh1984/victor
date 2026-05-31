@@ -229,9 +229,7 @@ def _detect_non_python_runner(
         return TestRunnerConfig(command=cmd, runner_type="go")
 
     # Java / Gradle
-    if (project_root / "build.gradle").exists() or (
-        project_root / "build.gradle.kts"
-    ).exists():
+    if (project_root / "build.gradle").exists() or (project_root / "build.gradle.kts").exists():
         cmd = ["./gradlew", "test"]
         logger.info("Detected Gradle project")
         return TestRunnerConfig(command=cmd, runner_type="gradle")

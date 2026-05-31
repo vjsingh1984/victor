@@ -140,9 +140,7 @@ class TestExtractJSONFromLLMResponse:
 
     def test_json_with_text_suffix(self):
         """Test extracting JSON when response has text suffix."""
-        response = (
-            '{"name": "test", "complexity": "simple"}\n\nLet me know if you need help.'
-        )
+        response = '{"name": "test", "complexity": "simple"}\n\nLet me know if you need help.'
         json_str = extract_json_from_llm_response(response)
         assert json_str == '{"name": "test", "complexity": "simple"}'
 

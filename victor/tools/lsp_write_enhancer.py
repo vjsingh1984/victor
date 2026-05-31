@@ -120,21 +120,13 @@ class WriteResult:
             "summary": {
                 "total_diagnostics": len(self.diagnostics),
                 "errors": sum(
-                    1
-                    for d in self.diagnostics
-                    if d.severity == DiagnosticSeverity.ERROR
+                    1 for d in self.diagnostics if d.severity == DiagnosticSeverity.ERROR
                 ),
                 "warnings": sum(
-                    1
-                    for d in self.diagnostics
-                    if d.severity == DiagnosticSeverity.WARNING
+                    1 for d in self.diagnostics if d.severity == DiagnosticSeverity.WARNING
                 ),
-                "info": sum(
-                    1 for d in self.diagnostics if d.severity == DiagnosticSeverity.INFO
-                ),
-                "hints": sum(
-                    1 for d in self.diagnostics if d.severity == DiagnosticSeverity.HINT
-                ),
+                "info": sum(1 for d in self.diagnostics if d.severity == DiagnosticSeverity.INFO),
+                "hints": sum(1 for d in self.diagnostics if d.severity == DiagnosticSeverity.HINT),
             },
         }
 
@@ -157,9 +149,7 @@ class LSPWriteEnhancer:
         """
         self._workspace_root = workspace_root or str(Path.cwd())
         self._lsp_pool: Optional["LSPPoolProtocol"] = lsp_pool
-        self._language_registry: Optional["LanguageRegistryProtocol"] = (
-            language_registry
-        )
+        self._language_registry: Optional["LanguageRegistryProtocol"] = language_registry
         # Use in-process black library by default (faster, no subprocess overhead)
         self._use_thread_formatter = True
 
@@ -199,9 +189,7 @@ class LSPWriteEnhancer:
             self._language_registry = get_registry()
         return self._language_registry
 
-    def _load_optional_symbol(
-        self, module_path: str, symbol_name: str
-    ) -> Optional[Any]:
+    def _load_optional_symbol(self, module_path: str, symbol_name: str) -> Optional[Any]:
         """Load symbol from the first importable compatibility module path."""
         for candidate in module_import_candidates(module_path):
             try:
@@ -248,9 +236,7 @@ class LSPWriteEnhancer:
             for d in diagnostics
         ]
 
-    async def format_with_formatter(
-        self, path: str, content: str
-    ) -> tuple[str, Optional[str]]:
+    async def format_with_formatter(self, path: str, content: str) -> tuple[str, Optional[str]]:
         """Format code using language-specific formatter.
 
         Args:
@@ -276,11 +262,7 @@ class LSPWriteEnhancer:
 
         # Get formatter
         project_root = Path(self._workspace_root)
-        formatter = (
-            plugin.get_formatter(project_root)
-            if hasattr(plugin, "get_formatter")
-            else None
-        )
+        formatter = plugin.get_formatter(project_root) if hasattr(plugin, "get_formatter") else None
 
         if not formatter:
             return content, None
@@ -302,9 +284,7 @@ class LSPWriteEnhancer:
         # Fallback: subprocess-based formatting
         import tempfile
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=file_path.suffix, delete=False
-        ) as tmp:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=file_path.suffix, delete=False) as tmp:
             tmp_path = tmp.name
             tmp.write(content)
 
@@ -350,9 +330,7 @@ class LSPWriteEnhancer:
             except Exception:
                 pass
 
-    def _format_with_black_library(
-        self, content: str, file_path: Path
-    ) -> Optional[str]:
+    def _format_with_black_library(self, content: str, file_path: Path) -> Optional[str]:
         """Format Python code using black as a library (no subprocess).
 
         Much faster than subprocess — avoids process spawn overhead.
@@ -363,9 +341,7 @@ class LSPWriteEnhancer:
         try:
             import black
 
-            mode = black.Mode(
-                line_length=100, target_versions={black.TargetVersion.PY310}
-            )
+            mode = black.Mode(line_length=100, target_versions={black.TargetVersion.PY310})
             return black.format_str(content, mode=mode)
         except ImportError:
             return None
@@ -399,9 +375,7 @@ class LSPWriteEnhancer:
 
         # Format if requested
         if format_code:
-            formatted_content, formatter_name = await self.format_with_formatter(
-                path, content
-            )
+            formatted_content, formatter_name = await self.format_with_formatter(path, content)
             result.formatted = formatter_name is not None
             result.formatter_used = formatter_name
             content_to_write = formatted_content

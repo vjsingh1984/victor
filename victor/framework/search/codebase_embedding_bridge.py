@@ -172,9 +172,7 @@ def build_codebase_index_manifest(
 
     extra_config = _normalized_extra_config(embedding_config)
     vector_store = str(embedding_config.get("vector_store", "lancedb"))
-    upstream_vector_store = str(
-        extra_config.get("upstream_vector_store") or vector_store
-    )
+    upstream_vector_store = str(extra_config.get("upstream_vector_store") or vector_store)
     bridge_enabled = vector_store == STRUCTURAL_CODEBASE_VECTOR_STORE or bool(
         extra_config.get("structural_indexing_enabled", False)
     )
@@ -194,9 +192,7 @@ def build_codebase_index_manifest(
         "batch_size": int(extra_config.get("batch_size", 32)),
         "chunking_strategy": _normalized_chunking_strategy(extra_config),
         "chunk_size": int(extra_config.get("chunk_size", DEFAULT_CODEBASE_CHUNK_SIZE)),
-        "chunk_overlap": int(
-            extra_config.get("chunk_overlap", DEFAULT_CODEBASE_CHUNK_OVERLAP)
-        ),
+        "chunk_overlap": int(extra_config.get("chunk_overlap", DEFAULT_CODEBASE_CHUNK_OVERLAP)),
         "language_overrides": _normalized_language_overrides(extra_config),
     }
 
@@ -211,26 +207,20 @@ def read_codebase_index_manifest(persist_directory: Path) -> Optional[dict[str, 
     try:
         payload = json.loads(manifest_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
-        logger.warning(
-            "Failed to read code_search manifest from %s: %s", manifest_path, exc
-        )
+        logger.warning("Failed to read code_search manifest from %s: %s", manifest_path, exc)
         return None
     if isinstance(payload, dict):
         return payload
     return None
 
 
-def write_codebase_index_manifest(
-    persist_directory: Path, manifest: Mapping[str, Any]
-) -> None:
+def write_codebase_index_manifest(persist_directory: Path, manifest: Mapping[str, Any]) -> None:
     """Persist the code_search manifest atomically."""
 
     persist_directory.mkdir(parents=True, exist_ok=True)
     manifest_path = persist_directory / CODEBASE_INDEX_MANIFEST_NAME
     temp_path = manifest_path.with_suffix(".tmp")
-    temp_path.write_text(
-        json.dumps(dict(manifest), sort_keys=True, indent=2), encoding="utf-8"
-    )
+    temp_path.write_text(json.dumps(dict(manifest), sort_keys=True, indent=2), encoding="utf-8")
     temp_path.replace(manifest_path)
 
 
@@ -275,9 +265,7 @@ def has_compatible_codebase_index_manifest(
     return False
 
 
-def _get_mismatched_keys(
-    persisted: Dict[str, Any], expected: Dict[str, Any]
-) -> Set[str]:
+def _get_mismatched_keys(persisted: Dict[str, Any], expected: Dict[str, Any]) -> Set[str]:
     """Identify which keys have different values between two manifests.
 
     Returns a set of key names that differ, useful for debugging manifest
@@ -433,9 +421,7 @@ def get_structural_codebase_embedding_provider_class() -> Optional[type[Any]]:
                 persist_directory=getattr(config, "persist_directory", None),
             )
             self._chunking_strategy = _normalized_chunking_strategy(self._extra_config)
-            self._language_overrides = _normalized_language_overrides(
-                self._extra_config
-            )
+            self._language_overrides = _normalized_language_overrides(self._extra_config)
             self._chunk_size = int(
                 self._extra_config.get("chunk_size", DEFAULT_CODEBASE_CHUNK_SIZE)
             )
@@ -528,12 +514,8 @@ def get_structural_codebase_embedding_provider_class() -> Optional[type[Any]]:
                 )
             for result in results:
                 if isinstance(getattr(result, "metadata", None), dict):
-                    result.metadata.setdefault(
-                        "chunking_strategy", self._chunking_strategy
-                    )
-                    result.metadata.setdefault(
-                        "vector_store", self._upstream_vector_store
-                    )
+                    result.metadata.setdefault("chunking_strategy", self._chunking_strategy)
+                    result.metadata.setdefault("vector_store", self._upstream_vector_store)
             return results
 
         async def delete_document(self, doc_id: str) -> None:
@@ -654,9 +636,7 @@ def get_structural_codebase_embedding_provider_class() -> Optional[type[Any]]:
             try:
                 content = full_path.read_text(encoding="utf-8", errors="ignore")
             except OSError:
-                logger.debug(
-                    "Falling back to symbol documents for missing file: %s", full_path
-                )
+                logger.debug("Falling back to symbol documents for missing file: %s", full_path)
                 return []
 
             if not content.strip():
@@ -677,18 +657,14 @@ def get_structural_codebase_embedding_provider_class() -> Optional[type[Any]]:
             chunks = self._chunker.chunk(
                 file_path=file_path,
                 content=content,
-                context=CodeChunkingContext(
-                    symbols=symbols, parse_context=parse_context
-                ),
+                context=CodeChunkingContext(symbols=symbols, parse_context=parse_context),
             )
 
             chunk_documents: list[dict[str, Any]] = []
             for index, chunk in enumerate(chunks):
                 symbol_name = chunk.symbol_name
                 unified_id = (
-                    f"symbol:{file_path}:{symbol_name}"
-                    if symbol_name
-                    else f"file:{file_path}"
+                    f"symbol:{file_path}:{symbol_name}" if symbol_name else f"file:{file_path}"
                 )
                 chunk_id = _make_chunk_id(
                     file_path=file_path,
@@ -795,9 +771,7 @@ def _resolve_language(
 
         registry = CapabilityRegistry.get_instance()
         language_registry = registry.get(LanguageRegistryProtocol)
-        if language_registry is not None and hasattr(
-            language_registry, "detect_language"
-        ):
+        if language_registry is not None and hasattr(language_registry, "detect_language"):
             detected = language_registry.detect_language(full_path)
             if isinstance(detected, str) and detected:
                 return detected
@@ -845,9 +819,7 @@ def _build_tree_sitter_parse_context(
         parser = get_parser(language)
         tree = parser.parse(content.encode("utf-8"))
     except Exception as exc:
-        logger.debug(
-            "Tree-sitter parse unavailable for %s (%s): %s", file_path, language, exc
-        )
+        logger.debug("Tree-sitter parse unavailable for %s (%s): %s", file_path, language, exc)
         return None
 
     try:

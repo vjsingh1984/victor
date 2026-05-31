@@ -148,9 +148,7 @@ class MemoryResult:
         """Generate ID if not provided."""
         if not self.id:
             content_str = str(self.content)[:100]
-            self.id = hashlib.md5(
-                f"{self.source.name}:{content_str}".encode()
-            ).hexdigest()[:16]
+            self.id = hashlib.md5(f"{self.source.name}:{content_str}".encode()).hexdigest()[:16]
 
     def __repr__(self) -> str:
         return (
@@ -381,9 +379,7 @@ class RelevanceRankingStrategy:
 
         # Filter by min relevance
         if query.min_relevance > 0:
-            sorted_results = [
-                r for r in sorted_results if r.relevance >= query.min_relevance
-            ]
+            sorted_results = [r for r in sorted_results if r.relevance >= query.min_relevance]
 
         return sorted_results[:limit]
 
@@ -465,9 +461,7 @@ class HybridRankingStrategy:
         scored_results = []
         for r in unique_results:
             recency = self._recency_score(r.timestamp)
-            combined = (
-                self.relevance_weight * r.relevance + self.recency_weight * recency
-            )
+            combined = self.relevance_weight * r.relevance + self.recency_weight * recency
             scored_results.append((combined, r))
 
         # Sort by combined score
@@ -690,8 +684,7 @@ class UnifiedMemoryCoordinator:
 
         # Parallel search
         search_tasks = [
-            self._search_provider(provider, memory_query)
-            for provider in target_providers
+            self._search_provider(provider, memory_query) for provider in target_providers
         ]
 
         results_lists = await asyncio.gather(*search_tasks, return_exceptions=True)
@@ -701,9 +694,7 @@ class UnifiedMemoryCoordinator:
         for i, results in enumerate(results_lists):
             if isinstance(results, Exception):
                 self._error_count += 1
-                logger.warning(
-                    f"Provider {target_providers[i].memory_type.name} failed: {results}"
-                )
+                logger.warning(f"Provider {target_providers[i].memory_type.name} failed: {results}")
             else:
                 all_results.extend(results)
 
@@ -818,12 +809,7 @@ class UnifiedMemoryCoordinator:
         metadata: Optional[Dict[str, Any]] = None,
     ) -> bool:
         """Record a successful query outcome for future transfer hints."""
-        if (
-            not self._enable_memory_evolution
-            or not success
-            or not query.strip()
-            or not results
-        ):
+        if not self._enable_memory_evolution or not success or not query.strip() or not results:
             return False
 
         trace = MemoryEvolutionTrace(
@@ -836,9 +822,7 @@ class UnifiedMemoryCoordinator:
         )
         self._evolution_traces.append(trace)
         if len(self._evolution_traces) > self._max_evolution_traces:
-            self._evolution_traces = self._evolution_traces[
-                -self._max_evolution_traces :
-            ]
+            self._evolution_traces = self._evolution_traces[-self._max_evolution_traces :]
         return True
 
     def suggest_transfer(
@@ -875,9 +859,7 @@ class UnifiedMemoryCoordinator:
                 continue
 
             similarity = len(overlap) / max(1, len(query_tokens | trace_tokens))
-            cross_session = bool(
-                session_id and trace.session_id and session_id != trace.session_id
-            )
+            cross_session = bool(session_id and trace.session_id and session_id != trace.session_id)
             transfer_scope = self._resolve_transfer_scope(
                 trace,
                 session_id=session_id,
@@ -893,12 +875,8 @@ class UnifiedMemoryCoordinator:
 
             score = similarity + (0.05 if cross_session else 0.0)
             hint_metadata = dict(trace.metadata)
-            source_project_path = self._normalize_scope_value(
-                trace.metadata.get("project_path")
-            )
-            source_vertical_name = self._normalize_scope_value(
-                trace.metadata.get("vertical_name")
-            )
+            source_project_path = self._normalize_scope_value(trace.metadata.get("project_path"))
+            source_vertical_name = self._normalize_scope_value(trace.metadata.get("vertical_name"))
             normalized_transfer_group = self._normalize_scope_value(
                 trace.metadata.get("transfer_group")
             )
@@ -945,9 +923,7 @@ class UnifiedMemoryCoordinator:
             transfer_group=transfer_group,
             allow_cross_project=allow_cross_project,
         )
-        return self._derive_proactive_hints_from_transfer_hints(
-            transfer_hints, limit=limit
-        )
+        return self._derive_proactive_hints_from_transfer_hints(transfer_hints, limit=limit)
 
     def _derive_proactive_hints_from_transfer_hints(
         self,
@@ -1017,9 +993,7 @@ class UnifiedMemoryCoordinator:
             metadata = dict(result.metadata)
             metadata["memory_transfer_boost"] = round(boost, 4)
             metadata["memory_transfer_queries"] = query_map.get(result.id, [])
-            transfer_scope = scope_map.get(result.id) or source_scope_map.get(
-                result.source.name
-            )
+            transfer_scope = scope_map.get(result.id) or source_scope_map.get(result.source.name)
             if transfer_scope:
                 metadata["memory_transfer_scope"] = transfer_scope
             boosted_results.append(
@@ -1064,9 +1038,7 @@ class UnifiedMemoryCoordinator:
         if not fragments:
             return ""
 
-        return f"Matched prior query '{transfer_hint.matched_query}'. " + " ".join(
-            fragments
-        )
+        return f"Matched prior query '{transfer_hint.matched_query}'. " + " ".join(fragments)
 
     @staticmethod
     def _normalize_hint_list(value: Any) -> List[str]:
@@ -1110,15 +1082,9 @@ class UnifiedMemoryCoordinator:
         """Extract transfer-policy context from federated-search filters."""
         filter_dict = dict(filters or {})
         return {
-            "project_path": self._normalize_scope_value(
-                filter_dict.get("project_path")
-            ),
-            "vertical_name": self._normalize_scope_value(
-                filter_dict.get("vertical_name")
-            ),
-            "transfer_group": self._normalize_scope_value(
-                filter_dict.get("transfer_group")
-            ),
+            "project_path": self._normalize_scope_value(filter_dict.get("project_path")),
+            "vertical_name": self._normalize_scope_value(filter_dict.get("vertical_name")),
+            "transfer_group": self._normalize_scope_value(filter_dict.get("transfer_group")),
             "allow_cross_project": bool(filter_dict.get("allow_cross_project")),
         }
 
@@ -1133,21 +1099,13 @@ class UnifiedMemoryCoordinator:
         allow_cross_project: bool,
     ) -> Optional[str]:
         """Decide whether a trace may transfer into the current request scope."""
-        trace_project_path = self._normalize_scope_value(
-            trace.metadata.get("project_path")
-        )
-        trace_vertical_name = self._normalize_scope_value(
-            trace.metadata.get("vertical_name")
-        )
-        trace_transfer_group = self._normalize_scope_value(
-            trace.metadata.get("transfer_group")
-        )
+        trace_project_path = self._normalize_scope_value(trace.metadata.get("project_path"))
+        trace_vertical_name = self._normalize_scope_value(trace.metadata.get("vertical_name"))
+        trace_transfer_group = self._normalize_scope_value(trace.metadata.get("transfer_group"))
         current_project_path = self._normalize_scope_value(project_path)
         current_vertical_name = self._normalize_scope_value(vertical_name)
         current_transfer_group = self._normalize_scope_value(transfer_group)
-        cross_session = bool(
-            session_id and trace.session_id and session_id != trace.session_id
-        )
+        cross_session = bool(session_id and trace.session_id and session_id != trace.session_id)
 
         if (
             current_project_path

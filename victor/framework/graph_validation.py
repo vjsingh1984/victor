@@ -46,9 +46,7 @@ class StateValidator:
         try:
             from pydantic import BaseModel
 
-            return isinstance(self._schema, type) and issubclass(
-                self._schema, BaseModel
-            )
+            return isinstance(self._schema, type) and issubclass(self._schema, BaseModel)
         except (ImportError, TypeError):
             return False
 
@@ -60,9 +58,7 @@ class StateValidator:
 
             if hasattr(self._schema, "__required_keys__"):
                 return True
-            return isinstance(self._schema, type) and issubclass(
-                self._schema, TypedDict
-            )
+            return isinstance(self._schema, type) and issubclass(self._schema, TypedDict)
         except (ImportError, TypeError):
             return False
 
@@ -149,8 +145,7 @@ class StateValidator:
                 if get_args(expected_type):
                     key_type, value_type = get_args(expected_type)
                     return all(
-                        self._check_type(key, key_type)
-                        and self._check_type(item, value_type)
+                        self._check_type(key, key_type) and self._check_type(item, value_type)
                         for key, item in value.items()
                     )
                 return True

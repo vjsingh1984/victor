@@ -768,9 +768,7 @@ class DatabaseManager(_DatabaseManagerBase):
         Returns:
             List of table names
         """
-        rows = self.query(
-            "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
-        )
+        rows = self.query("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
         return [row[0] for row in rows]
 
     def _run_schema_version_migrations(self, conn: sqlite3.Connection) -> None:
@@ -816,9 +814,7 @@ class DatabaseManager(_DatabaseManagerBase):
                     (str(CURRENT_SCHEMA_VERSION),),
                 )
                 conn.commit()
-                logger.info(
-                    f"Database initialized at schema version {CURRENT_SCHEMA_VERSION}"
-                )
+                logger.info(f"Database initialized at schema version {CURRENT_SCHEMA_VERSION}")
                 return
 
         # Run migrations if needed
@@ -927,9 +923,7 @@ class DatabaseManager(_DatabaseManagerBase):
                     source_count = conn.execute(
                         f"SELECT COUNT(*) FROM legacy_{source_name}.{table}"
                     ).fetchone()[0]
-                    target_count = conn.execute(
-                        f"SELECT COUNT(*) FROM {table}"
-                    ).fetchone()[0]
+                    target_count = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
 
                     if source_count > 0 and target_count == 0:
                         # Copy data from source to existing target
@@ -1101,12 +1095,8 @@ class DatabaseManager(_DatabaseManagerBase):
             from datetime import datetime, timedelta, timezone
 
             date_col = self._get_date_column(table)
-            cutoff = (
-                datetime.now(timezone.utc) - timedelta(days=older_than_days)
-            ).isoformat()
-            cursor = conn.execute(
-                f"DELETE FROM [{table}] WHERE [{date_col}] < ?", (cutoff,)
-            )
+            cutoff = (datetime.now(timezone.utc) - timedelta(days=older_than_days)).isoformat()
+            cursor = conn.execute(f"DELETE FROM [{table}] WHERE [{date_col}] < ?", (cutoff,))
             conn.commit()
             deleted = cursor.rowcount
             logger.info(
@@ -1125,9 +1115,7 @@ class DatabaseManager(_DatabaseManagerBase):
             )
             conn.commit()
             deleted = cursor.rowcount
-            logger.info(
-                "Pruned %d rows from %s (kept last %d)", deleted, table, keep_last
-            )
+            logger.info("Pruned %d rows from %s (kept last %d)", deleted, table, keep_last)
             return deleted
 
         return 0
@@ -1152,9 +1140,7 @@ class DatabaseManager(_DatabaseManagerBase):
 
         conn = self.get_connection()
         date_col = self._get_date_column(table)
-        cursor = conn.execute(
-            f"SELECT * FROM [{table}] WHERE [{date_col}] < ?", (before_date,)
-        )
+        cursor = conn.execute(f"SELECT * FROM [{table}] WHERE [{date_col}] < ?", (before_date,))
         columns = [desc[0] for desc in cursor.description]
         rows = cursor.fetchall()
 
@@ -1184,9 +1170,7 @@ class DatabaseManager(_DatabaseManagerBase):
         conn = self.get_connection()
         tables = [
             r[0]
-            for r in conn.execute(
-                "SELECT name FROM sqlite_master WHERE type='table'"
-            ).fetchall()
+            for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
         ]
 
         stats = []
@@ -1239,9 +1223,7 @@ class DatabaseManager(_DatabaseManagerBase):
     def _ensure_async_state(self) -> None:
         """Initialize async-related state if not already done."""
         if not hasattr(self, "_write_queue"):
-            self._write_queue: queue.Queue[Tuple[str, Optional[Tuple[Any, ...]]]] = (
-                queue.Queue()
-            )
+            self._write_queue: queue.Queue[Tuple[str, Optional[Tuple[Any, ...]]]] = queue.Queue()
             self._write_lock = threading.Lock()
             self._batch_size = 100
             self._flush_interval = 5.0
@@ -1496,9 +1478,7 @@ class ProjectDatabaseManager(_DatabaseManagerBase):
         Args:
             project_path: Path to project root. If None, uses current directory.
         """
-        project_root, project_dir, db_path = _normalize_project_database_paths(
-            project_path
-        )
+        project_root, project_dir, db_path = _normalize_project_database_paths(project_path)
 
         # Initialize base class (sets up self._local)
         super().__init__()
@@ -1561,9 +1541,7 @@ class ProjectDatabaseManager(_DatabaseManagerBase):
         """Apply versioned column migrations to existing project tables."""
         from victor.core.schema import CURRENT_SCHEMA_VERSION, get_migration_sql
 
-        cursor = conn.execute(
-            "SELECT value FROM _project_metadata WHERE key = 'schema_version'"
-        )
+        cursor = conn.execute("SELECT value FROM _project_metadata WHERE key = 'schema_version'")
         row = cursor.fetchone()
 
         if row:
@@ -1606,18 +1584,14 @@ class ProjectDatabaseManager(_DatabaseManagerBase):
                 try:
                     conn.execute(sql)
                 except Exception as e:
-                    logger.debug(
-                        f"Project DB migration SQL skipped (may be inapplicable): {e}"
-                    )
+                    logger.debug(f"Project DB migration SQL skipped (may be inapplicable): {e}")
             conn.execute(
                 "INSERT OR REPLACE INTO _project_metadata (key, value, updated_at) "
                 "VALUES ('schema_version', ?, datetime('now'))",
                 (str(CURRENT_SCHEMA_VERSION),),
             )
             conn.commit()
-            logger.info(
-                f"Project DB migrated to schema version {CURRENT_SCHEMA_VERSION}"
-            )
+            logger.info(f"Project DB migrated to schema version {CURRENT_SCHEMA_VERSION}")
 
     def get_connection(self) -> sqlite3.Connection:
         """Get database connection."""
@@ -1675,9 +1649,7 @@ class ProjectDatabaseManager(_DatabaseManagerBase):
 
     def get_tables(self) -> List[str]:
         """Get list of all tables."""
-        rows = self.query(
-            "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
-        )
+        rows = self.query("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
         return [row[0] for row in rows]
 
     def _run_migrations(self, conn: sqlite3.Connection) -> None:
@@ -1687,9 +1659,7 @@ class ProjectDatabaseManager(_DatabaseManagerBase):
                 return
 
             # Check if already migrated
-            cursor = conn.execute(
-                "SELECT value FROM _project_metadata WHERE key = 'migrated_at'"
-            )
+            cursor = conn.execute("SELECT value FROM _project_metadata WHERE key = 'migrated_at'")
             row = cursor.fetchone()
             if row:
                 logger.debug(f"Project database already migrated at {row[0]}")
@@ -1722,9 +1692,7 @@ class ProjectDatabaseManager(_DatabaseManagerBase):
 
             self._migrated = True
             if migrated_count > 0:
-                logger.info(
-                    f"Project database migration complete: {migrated_count} tables"
-                )
+                logger.info(f"Project database migration complete: {migrated_count} tables")
 
     def _migrate_project_tables(
         self,
@@ -1832,9 +1800,7 @@ def get_project_database(project_path: Optional[Path] = None) -> ProjectDatabase
         ProjectDatabaseManager instance for the project
     """
     global _project_databases
-    _project_root, _project_dir, db_path = _normalize_project_database_paths(
-        project_path
-    )
+    _project_root, _project_dir, db_path = _normalize_project_database_paths(project_path)
     project_key = str(db_path)
     if project_key not in _project_databases:
         _project_databases[project_key] = ProjectDatabaseManager(project_path)
@@ -1853,9 +1819,7 @@ def reset_database() -> None:
 def reset_project_database(project_path: Optional[Path] = None) -> None:
     """Reset project database instance (for testing)."""
     global _project_databases
-    _project_root, _project_dir, db_path = _normalize_project_database_paths(
-        project_path
-    )
+    _project_root, _project_dir, db_path = _normalize_project_database_paths(project_path)
     project_key = str(db_path)
     if project_key in _project_databases:
         _project_databases[project_key].close()

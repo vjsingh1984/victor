@@ -189,9 +189,7 @@ class TestFormatWebResults:
     def test_truncates_long_snippets(self):
         """Test long snippets are truncated."""
         long_snippet = "x" * 500
-        results = [
-            {"title": "Test", "snippet": long_snippet, "url": "https://test.com"}
-        ]
+        results = [{"title": "Test", "snippet": long_snippet, "url": "https://test.com"}]
         result = format_web_results(results, max_snippet_length=100)
         assert "..." in result
         assert len(result) < 600
@@ -214,11 +212,7 @@ class TestFormatWebResults:
         result = format_web_results(results, include_urls=True)
         assert "Test" in result
         # Should not have Source: line for empty URL
-        assert (
-            "Source: " not in result
-            or "Source: \n" in result
-            or result.count("Source:") == 0
-        )
+        assert "Source: " not in result or "Source: \n" in result or result.count("Source:") == 0
 
     def test_handles_empty_result_dict(self):
         """Test handles empty result dict."""
@@ -547,9 +541,7 @@ class TestIntegration:
     def test_citation_roundtrip(self):
         """Test that format_for_citation produces usable data."""
         formatter = WebSearchFormatter()
-        results = [
-            {"title": "Test", "snippet": "Test content", "url": "https://test.com"}
-        ]
+        results = [{"title": "Test", "snippet": "Test content", "url": "https://test.com"}]
 
         citations = formatter.format_for_citation(results)
 

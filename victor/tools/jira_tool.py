@@ -129,9 +129,7 @@ async def jira(
                     "key": issue.key,
                     "summary": issue.fields.summary,
                     "status": issue.fields.status.name,
-                    "assignee": getattr(
-                        issue.fields.assignee, "displayName", "Unassigned"
-                    ),
+                    "assignee": getattr(issue.fields.assignee, "displayName", "Unassigned"),
                     "priority": getattr(issue.fields.priority, "name", "None"),
                 }
                 for issue in issues
@@ -144,9 +142,7 @@ async def jira(
                     "success": False,
                     "error": "Missing required parameters: project and summary",
                 }
-            logger.info(
-                f"[jira] Creating issue in project '{project}' with summary '{summary}'"
-            )
+            logger.info(f"[jira] Creating issue in project '{project}' with summary '{summary}'")
             issue_dict: Dict[str, Any] = {
                 "project": {"key": project},
                 "summary": summary,
@@ -160,9 +156,7 @@ async def jira(
                 "key": new_issue.key,
                 "summary": new_issue.fields.summary,
                 "url": (
-                    f"{context.get('jira_server', '')}/browse/{new_issue.key}"
-                    if context
-                    else ""
+                    f"{context.get('jira_server', '')}/browse/{new_issue.key}" if context else ""
                 ),
             }
 
@@ -182,9 +176,7 @@ async def jira(
                         "body": comment.body,
                         "created": str(comment.created),
                     }
-                    for comment in issue.fields.comment.comments[
-                        :5
-                    ]  # Limit to 5 most recent
+                    for comment in issue.fields.comment.comments[:5]  # Limit to 5 most recent
                 ]
             return {
                 "success": True,
@@ -196,11 +188,7 @@ async def jira(
                 "reporter": getattr(issue.fields.reporter, "displayName", "Unknown"),
                 "priority": getattr(issue.fields.priority, "name", "None"),
                 "comments": comments,
-                "url": (
-                    f"{context.get('jira_server', '')}/browse/{issue.key}"
-                    if context
-                    else ""
-                ),
+                "url": (f"{context.get('jira_server', '')}/browse/{issue.key}" if context else ""),
             }
 
         elif operation == "add_comment":

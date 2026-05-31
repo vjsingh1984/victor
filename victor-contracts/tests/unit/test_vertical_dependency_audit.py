@@ -76,8 +76,7 @@ class TestAuditVerticalDependencies:
         report = audit_vertical_dependencies(src, manifest)
         assert report.ok
         assert not any(
-            issue.code == "undeclared_dependency:victor_contracts"
-            for issue in report.issues
+            issue.code == "undeclared_dependency:victor_contracts" for issue in report.issues
         )
 
     def test_source_not_found(self):

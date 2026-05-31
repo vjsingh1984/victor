@@ -423,9 +423,7 @@ def is_path_excluded(path: Path, root_path: Path, patterns: List[str]) -> bool:
         path_parts = path_str.split("/")
         for i in range(len(path_parts)):
             subpath = "/".join(path_parts[i:])
-            if fnmatch.fnmatch(subpath, clean_pattern) or fnmatch.fnmatch(
-                subpath, pattern
-            ):
+            if fnmatch.fnmatch(subpath, clean_pattern) or fnmatch.fnmatch(subpath, pattern):
                 return True
 
         # Also check if path starts with pattern (for directory patterns)

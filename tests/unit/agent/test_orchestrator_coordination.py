@@ -9,13 +9,9 @@ from unittest.mock import MagicMock, patch
 from victor.agent.orchestrator import AgentOrchestrator
 
 
-def test_get_coordination_suggestion_auto_provisions_coordination_runtime_from_factory() -> (
-    None
-):
+def test_get_coordination_suggestion_auto_provisions_coordination_runtime_from_factory() -> None:
     expected = SimpleNamespace(kind="coordination")
-    coordination_runtime = SimpleNamespace(
-        suggest_for_task=MagicMock(return_value=expected)
-    )
+    coordination_runtime = SimpleNamespace(suggest_for_task=MagicMock(return_value=expected))
     factory = SimpleNamespace(
         create_coordination_advisor_runtime=MagicMock(return_value=coordination_runtime)
     )
@@ -42,9 +38,7 @@ def test_get_coordination_suggestion_auto_provisions_coordination_runtime_from_f
 
 
 def test_get_coordination_suggestion_prefers_coordination_runtime_surface() -> None:
-    coordination_runtime = SimpleNamespace(
-        suggest_for_task=MagicMock(return_value="suggestion")
-    )
+    coordination_runtime = SimpleNamespace(suggest_for_task=MagicMock(return_value="suggestion"))
     fake_orchestrator = SimpleNamespace(
         _coordination_advisor_runtime=coordination_runtime,
         mode_controller=SimpleNamespace(current_mode=SimpleNamespace(value="plan")),
@@ -66,9 +60,7 @@ def test_get_coordination_suggestion_prefers_coordination_runtime_surface() -> N
 
 
 def test_get_coordination_suggestion_honors_explicit_mode_override() -> None:
-    coordination_runtime = SimpleNamespace(
-        suggest_for_task=MagicMock(return_value="suggestion")
-    )
+    coordination_runtime = SimpleNamespace(suggest_for_task=MagicMock(return_value="suggestion"))
     fake_orchestrator = SimpleNamespace(
         _coordination_advisor_runtime=coordination_runtime,
         mode_controller=SimpleNamespace(current_mode=SimpleNamespace(value="plan")),
@@ -127,14 +119,10 @@ def test_get_team_suggestions_warns_and_delegates_to_coordination_suggestion() -
         DeprecationWarning,
         match="AgentOrchestrator.get_team_suggestions\\(\\.\\.\\.\\) is deprecated",
     ):
-        result = AgentOrchestrator.get_team_suggestions(
-            fake_orchestrator, "feature", "high"
-        )
+        result = AgentOrchestrator.get_team_suggestions(fake_orchestrator, "feature", "high")
 
     assert result == "suggestion"
-    fake_orchestrator.get_coordination_suggestion.assert_called_once_with(
-        "feature", "high"
-    )
+    fake_orchestrator.get_coordination_suggestion.assert_called_once_with("feature", "high")
 
 
 def test_get_runtime_coordination_suggestion_prefers_public_runtime_api() -> None:

@@ -34,9 +34,7 @@ class TestFailureHints:
 
         for error in test_errors:
             cat = PromptOptimizerLearner._categorize_failure(error)
-            assert (
-                cat in FAILURE_HINTS
-            ), f"Category '{cat}' from error '{error}' has no hint"
+            assert cat in FAILURE_HINTS, f"Category '{cat}' from error '{error}' has no hint"
 
     def test_hints_are_actionable(self):
         """All hints are non-empty and at least 20 chars (actionable, not vague)."""
@@ -44,9 +42,7 @@ class TestFailureHints:
 
         for cat, hint in FAILURE_HINTS.items():
             assert isinstance(hint, str), f"Hint for '{cat}' is not a string"
-            assert (
-                len(hint) >= 20
-            ), f"Hint for '{cat}' too short ({len(hint)} chars): '{hint}'"
+            assert len(hint) >= 20, f"Hint for '{cat}' too short ({len(hint)} chars): '{hint}'"
 
     def test_get_failure_hint_known(self):
         """get_failure_hint() returns the correct hint for known categories."""
@@ -81,8 +77,7 @@ class TestExpandedCategories:
         from victor.framework.rl.learners.prompt_optimizer import PromptOptimizerLearner
 
         assert (
-            PromptOptimizerLearner._categorize_failure("Syntax error after edit")
-            == "edit_syntax"
+            PromptOptimizerLearner._categorize_failure("Syntax error after edit") == "edit_syntax"
         )
 
     def test_search_no_results(self):
@@ -101,9 +96,7 @@ class TestExpandedCategories:
         from victor.framework.rl.learners.prompt_optimizer import PromptOptimizerLearner
 
         assert (
-            PromptOptimizerLearner._categorize_failure(
-                "Test failed: assertion error in test_auth"
-            )
+            PromptOptimizerLearner._categorize_failure("Test failed: assertion error in test_auth")
             == "test_failure"
         )
 
@@ -111,19 +104,14 @@ class TestExpandedCategories:
         from victor.framework.rl.learners.prompt_optimizer import PromptOptimizerLearner
 
         assert (
-            PromptOptimizerLearner._categorize_failure(
-                "Command failed with error code 1"
-            )
+            PromptOptimizerLearner._categorize_failure("Command failed with error code 1")
             == "shell_error"
         )
 
     def test_tool_error(self):
         from victor.framework.rl.learners.prompt_optimizer import PromptOptimizerLearner
 
-        assert (
-            PromptOptimizerLearner._categorize_failure("error in tool execution")
-            == "tool_error"
-        )
+        assert PromptOptimizerLearner._categorize_failure("error in tool execution") == "tool_error"
 
     def test_original_categories_preserved(self):
         """Original 7 categories still work correctly."""

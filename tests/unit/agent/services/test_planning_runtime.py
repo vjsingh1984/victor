@@ -84,9 +84,7 @@ async def test_planning_compaction_prefers_context_service_before_legacy_compact
         _context_service=context_service,
         settings=SimpleNamespace(context_compaction_strategy="semantic"),
         tool_calls_used=0,
-        conversation=SimpleNamespace(
-            get_latest_user_message=MagicMock(return_value="review plan")
-        ),
+        conversation=SimpleNamespace(get_latest_user_message=MagicMock(return_value="review plan")),
         has_capability=MagicMock(return_value=True),
         get_capability_value=MagicMock(return_value=legacy_compactor),
     )
@@ -234,9 +232,7 @@ async def test_team_plan_continues_read_only_step_when_prior_read_lacks_evidence
     assert result.steps_completed == 1
     assert result.steps_failed == 1
     assert adapter.execute_step.await_count == 2
-    assert [
-        call.kwargs["step"].id for call in adapter.execute_step.await_args_list
-    ] == [
+    assert [call.kwargs["step"].id for call in adapter.execute_step.await_args_list] == [
         "1",
         "2",
     ]
@@ -307,9 +303,7 @@ async def test_team_plan_accepts_concrete_file_target_from_step_description():
     adapter = MagicMock()
     adapter.execute_step = AsyncMock(
         side_effect=[
-            StepResult(
-                success=True, output="Workspace manifest inspected.", tool_calls_used=1
-            ),
+            StepResult(success=True, output="Workspace manifest inspected.", tool_calls_used=1),
             StepResult(
                 success=True,
                 output="Reviewed rust/crates/core/src/lib.rs:12 for Arc usage.",
@@ -633,10 +627,7 @@ def test_summary_prompt_surfaces_provider_retry_diagnostics():
     assert "retry_count=3" in prompt
     assert "retry_count=1" in prompt
     assert "Server disconnected without sending a response" in prompt
-    assert (
-        "Mention provider retry diagnostics separately from repository findings"
-        in prompt
-    )
+    assert "Mention provider retry diagnostics separately from repository findings" in prompt
 
 
 def test_shell_plan_requires_execution_approval():
@@ -687,9 +678,7 @@ async def test_read_only_plan_decision_uses_not_required_approval_state():
 
 @pytest.mark.asyncio
 async def test_effectful_plan_decision_uses_approved_approval_state():
-    service = PlanningRuntimeService(
-        SimpleNamespace(), config=PlanningConfig(auto_approve=False)
-    )
+    service = PlanningRuntimeService(SimpleNamespace(), config=PlanningConfig(auto_approve=False))
     plan = ReadableTaskPlan(
         name="Effectful Plan",
         complexity=TaskComplexity.MODERATE,
@@ -711,9 +700,7 @@ async def test_effectful_plan_decision_uses_approved_approval_state():
 
 @pytest.mark.asyncio
 async def test_effectful_plan_decision_uses_rejected_approval_state():
-    service = PlanningRuntimeService(
-        SimpleNamespace(), config=PlanningConfig(auto_approve=False)
-    )
+    service = PlanningRuntimeService(SimpleNamespace(), config=PlanningConfig(auto_approve=False))
     plan = ReadableTaskPlan(
         name="Rejected Plan",
         complexity=TaskComplexity.MODERATE,
@@ -751,9 +738,7 @@ async def test_plan_approval_prompt_explains_enter_and_reject_options():
         approved = await service._request_plan_approval(plan, console)
 
     assert approved is True
-    rendered = "\n".join(
-        str(call.args[0]) for call in console.print.call_args_list if call.args
-    )
+    rendered = "\n".join(str(call.args[0]) for call in console.print.call_args_list if call.args)
     assert "Press Enter to execute" in rendered
     assert "type y then Enter" in rendered
     assert "Type n then Enter to reject" in rendered
@@ -831,9 +816,7 @@ class TestExtractListFromOutput:
         crates/tools...' instead of a plain list. The secondary embedded-token scan
         should rescue the actual crate paths.
         """
-        out = (
-            "Now let me examine crates/state and crates/tools to review the workspace."
-        )
+        out = "Now let me examine crates/state and crates/tools to review the workspace."
         items = self.svc._extract_list_from_output(out)
         assert "crates/state" in items
         assert "crates/tools" in items
@@ -915,9 +898,7 @@ class TestExtractListFromOutput:
             "rust/crates/edge-runtime/src/lib"
         )
 
-        with caplog.at_level(
-            logging.WARNING, logger="victor.agent.services.planning_runtime"
-        ):
+        with caplog.at_level(logging.WARNING, logger="victor.agent.services.planning_runtime"):
             items = self.svc._extract_list_from_output(out)
 
         assert items
@@ -962,9 +943,7 @@ class TestExtractListFromOutput:
         items = self.svc._extract_list_from_output(out)
         assert "core" in items
         assert "util" in items
-        assert not any(
-            "halted" in i.lower() for i in items
-        ), f"halted phrase in items: {items}"
+        assert not any("halted" in i.lower() for i in items), f"halted phrase in items: {items}"
 
     def test_let_me_examine_filtered(self) -> None:
         """'Let me examine...' continuation lines must not appear as list items."""
@@ -1104,12 +1083,7 @@ def test_produces_consumed_downstream_requires_nonempty_output():
     )
     plan = ExecutionPlan(id="p", goal="g", steps=[producer, consumer])
 
-    assert (
-        PlanningRuntimeService._produces_consumed_downstream(
-            plan, "2", "review_targets"
-        )
-        is True
-    )
+    assert PlanningRuntimeService._produces_consumed_downstream(plan, "2", "review_targets") is True
 
 
 # ---------------------------------------------------------------------------
@@ -1264,13 +1238,9 @@ class TestAssessStepEvidence:
 
     def test_explicit_content_tool_in_metadata_passes(self) -> None:
         step = self._make_step()
-        result = self._make_result(
-            "Some output without obvious code patterns", tool_calls=1
-        )
+        result = self._make_result("Some output without obvious code patterns", tool_calls=1)
         metadata = {"tool_names_used": ["read", "grep"]}
-        passed, reason, evidence = self.svc._assess_step_evidence(
-            step, result, metadata
-        )
+        passed, reason, evidence = self.svc._assess_step_evidence(step, result, metadata)
         assert evidence["has_content_tool"] is True
 
     def test_zero_tool_calls_always_fails(self) -> None:
@@ -1313,9 +1283,7 @@ class TestAssessStepEvidence:
         """Non-write steps still need 240+ chars or concrete file/scope evidence."""
         step = self._make_step("Review Arc usage in codebase")
         # 95 chars, no file refs, no code patterns
-        result = self._make_result(
-            "Analysis complete. Found some patterns.", tool_calls=10
-        )
+        result = self._make_result("Analysis complete. Found some patterns.", tool_calls=10)
         passed, reason, evidence = self.svc._assess_step_evidence(step, result, {})
         assert not passed
         assert evidence["is_write_step"] is False
@@ -1329,9 +1297,7 @@ class TestAssessStepEvidence:
         Production failure: step 8 (cross-crate analysis), tools=8, chars=62,
         output="Now let me read the source files to find cross-crate patterns:"
         """
-        step = self._make_step(
-            "Cross-crate analysis: shared Arc patterns, redundant clones"
-        )
+        step = self._make_step("Cross-crate analysis: shared Arc patterns, redundant clones")
         result = self._make_result(
             "Now let me read the source files to find cross-crate patterns:",
             tool_calls=8,
@@ -1462,9 +1428,7 @@ class TestAssessStepEvidence:
         """The existing intent-phrase rejection must fire for 1-2 tool calls
         — this prevents hollow steps from slipping through."""
         step = self._make_step("Analyze Arc usage")
-        result = self._make_result(
-            "Let me use grep to search for Arc patterns.", tool_calls=2
-        )
+        result = self._make_result("Let me use grep to search for Arc patterns.", tool_calls=2)
         passed, reason, evidence = self.svc._assess_step_evidence(step, result, {})
         assert not passed
         assert "intent" in reason
@@ -1481,9 +1445,7 @@ class TestAssessStepEvidence:
         Fix: add a general pass for ≥5 tool calls with ≥100-char output. This makes the
         evidence contract pass directly, removing the need for a rescue that stores bad data.
         """
-        step = self._make_step(
-            "Cross-crate analysis: shared Arc patterns, redundant clones"
-        )
+        step = self._make_step("Cross-crate analysis: shared Arc patterns, redundant clones")
         result = self._make_result(
             "Cross-crate analysis complete. Edge-runtime depends on protocol and state. "
             "Python-bindings wraps all crates. No redundant Arc clones found at interfaces. "
@@ -1499,9 +1461,7 @@ class TestAssessStepEvidence:
         A 39-char output with 10 tool calls should still fail the evidence contract.
         """
         step = self._make_step("Review Arc usage in codebase")
-        result = self._make_result(
-            "Analysis complete. Found some patterns.", tool_calls=10
-        )
+        result = self._make_result("Analysis complete. Found some patterns.", tool_calls=10)
         passed, reason, evidence = self.svc._assess_step_evidence(step, result, {})
         assert not passed
         assert evidence["is_write_step"] is False
@@ -1509,9 +1469,7 @@ class TestAssessStepEvidence:
     def test_multi_tool_pass_requires_5_tool_calls_minimum(self) -> None:
         """The general multi-tool pass must NOT fire for fewer than 5 tool calls,
         even if the output is long enough."""
-        step = self._make_step(
-            "Cross-crate analysis: shared Arc patterns, redundant clones"
-        )
+        step = self._make_step("Cross-crate analysis: shared Arc patterns, redundant clones")
         result = self._make_result(
             "Cross-crate analysis complete. Edge-runtime depends on protocol and state. "
             "Python-bindings wraps all crates. No redundant Arc clones found at interfaces. "
@@ -1804,9 +1762,7 @@ async def test_synthesis_step_runs_after_failed_upstream_with_partial_state():
         if step.id == "3":
             assert step.context["partial_failed_dependencies"] == ["2"]
             return StepResult(success=True, output="partial report", tool_calls_used=1)
-        return StepResult(
-            success=True, output="src/lib.rs:1 inspected", tool_calls_used=1
-        )
+        return StepResult(success=True, output="src/lib.rs:1 inspected", tool_calls_used=1)
 
     plan = ReadableTaskPlan(
         name="Partial synthesis after failure",
@@ -1835,9 +1791,7 @@ async def test_synthesis_step_runs_after_failed_upstream_with_partial_state():
     mock_adapter.execute_step = AsyncMock(side_effect=_fake_execute)
 
     with (
-        patch.object(
-            svc, "_apply_step_evidence_contract", side_effect=lambda s, r, *a, **kw: r
-        ),
+        patch.object(svc, "_apply_step_evidence_contract", side_effect=lambda s, r, *a, **kw: r),
         patch.object(svc, "_effective_team_plan_concurrency", return_value=1),
     ):
         result = await svc._execute_plan_via_team_adapter(plan, mock_adapter)
@@ -2029,12 +1983,8 @@ async def test_clarification_fp_rescue_upgrades_failed_step_to_completed():
     assert (
         call_counts["step3"] == 1
     ), "Step 3 must run — step 2 should have been rescued, not treated as failed"
-    assert (
-        result.steps_completed == 3
-    ), f"All 3 steps should complete; got {result.steps_completed}"
-    assert (
-        result.steps_failed == 0
-    ), f"No failures expected after rescue; got {result.steps_failed}"
+    assert result.steps_completed == 3, f"All 3 steps should complete; got {result.steps_completed}"
+    assert result.steps_failed == 0, f"No failures expected after rescue; got {result.steps_failed}"
 
 
 @pytest.mark.asyncio
@@ -2124,9 +2074,7 @@ async def test_synthesis_step_multi_tool_passes_evidence_contract_directly():
             )
         if step.id == "3":
             call_counts["step3"] += 1
-            return StepResult(
-                success=True, output="report.md written", tool_calls_used=1
-            )
+            return StepResult(success=True, output="report.md written", tool_calls_used=1)
         return StepResult(success=True, output="ok", tool_calls_used=0)
 
     mock_adapter = MagicMock(spec=PlanningTeamExecutionAdapter)
@@ -2138,9 +2086,7 @@ async def test_synthesis_step_multi_tool_passes_evidence_contract_directly():
     assert (
         call_counts["step3"] == 1
     ), "Step 3 must run — step 2 passed the evidence contract directly"
-    assert (
-        result.steps_completed == 3
-    ), f"All 3 steps should complete; got {result.steps_completed}"
+    assert result.steps_completed == 3, f"All 3 steps should complete; got {result.steps_completed}"
     assert result.steps_failed == 0, f"No failures expected; got {result.steps_failed}"
 
 
@@ -2256,9 +2202,7 @@ def test_evidence_contract_exempts_synthesis_step_when_inputs_in_plan_state():
     )
 
     # Without plan_state the contract fires normally (not exempt)
-    result_no_state = svc._apply_step_evidence_contract(
-        step, step_result, plan_state=None
-    )
+    result_no_state = svc._apply_step_evidence_contract(step, step_result, plan_state=None)
     # With only 6 tools and 57 chars, evidence contract should fail (no file refs, low chars)
     # This verifies the contract IS active when plan_state is absent.
     assert result_no_state.success is False, (
@@ -2489,9 +2433,7 @@ def test_required_checklist_produces_accepts_substantive_zero_tool_artifact():
         success=True,
         output=output,
         tool_calls_used=0,
-        metadata={
-            "evidence_validation": {"passed": True, "reason": "knowledge artifact"}
-        },
+        metadata={"evidence_validation": {"passed": True, "reason": "knowledge artifact"}},
     )
 
     coerced = PlanningRuntimeService._coerce_required_produces_items(
@@ -2715,9 +2657,7 @@ async def test_failed_step_does_not_store_produces_key_in_plan_state():
     # Bypass evidence contract and force sequential execution (1 at a time) so step 2
     # runs after step 1 and receives the live (post-step-1) plan_state.
     with (
-        patch.object(
-            svc, "_apply_step_evidence_contract", side_effect=lambda s, r, *a, **kw: r
-        ),
+        patch.object(svc, "_apply_step_evidence_contract", side_effect=lambda s, r, *a, **kw: r),
         patch.object(svc, "_effective_team_plan_concurrency", return_value=1),
     ):
         await svc._execute_plan_via_team_adapter(plan, mock_adapter)
@@ -2746,16 +2686,13 @@ def test_exempt_step_has_evidence_validation_metadata():
         description="Route: multi-crate vs single crate",
         context={"execution": "conditional"},
     )
-    step_result = StepResult(
-        success=True, output="multi-crate", tool_calls_used=0, metadata={}
-    )
+    step_result = StepResult(success=True, output="multi-crate", tool_calls_used=0, metadata={})
 
     result = svc._apply_step_evidence_contract(step, step_result)
 
     ev = (result.metadata or {}).get("evidence_validation")
     assert ev is not None, (
-        "Exempt step must have evidence_validation in metadata; "
-        f"metadata={result.metadata}"
+        "Exempt step must have evidence_validation in metadata; " f"metadata={result.metadata}"
     )
     assert (
         ev.get("exempt") is True
@@ -2829,12 +2766,9 @@ def test_final_report_output_is_persisted_as_plan_artifact(tmp_path, monkeypatch
         description="Synthesize all findings into a prioritized report",
         context={"produces": "final_report"},
     )
-    execution_plan = ExecutionPlan(
-        id="Rust Arc Review 123", goal="Review Rust", steps=[step]
-    )
+    execution_plan = ExecutionPlan(id="Rust Arc Review 123", goal="Review Rust", steps=[step])
     output = "# Rust Best Practices Report\n\n" + "\n".join(
-        f"- finding {index}: `rust/crates/state/src/lib.rs:{index}`"
-        for index in range(80)
+        f"- finding {index}: `rust/crates/state/src/lib.rs:{index}`" for index in range(80)
     )
     step_result = StepResult(
         success=True,
@@ -2941,9 +2875,7 @@ def test_final_response_does_not_duplicate_existing_artifact_paths():
     PlanningRuntimeService._append_artifact_paths_to_response(response, result)
 
     assert "Full artifacts:" not in response.content
-    assert (
-        response.content.count(".victor/plans/artifacts/p1/step_9_final_report.md") == 1
-    )
+    assert response.content.count(".victor/plans/artifacts/p1/step_9_final_report.md") == 1
 
 
 def test_evidence_summary_counts_exempt_separately_from_missing():
@@ -2973,9 +2905,7 @@ def test_evidence_summary_counts_exempt_separately_from_missing():
 
     execution_plan = plan.to_execution_plan()
     step = execution_plan.steps[0]
-    step_result = StepResult(
-        success=True, output="multi-crate", tool_calls_used=0, metadata={}
-    )
+    step_result = StepResult(success=True, output="multi-crate", tool_calls_used=0, metadata={})
     result = svc._apply_step_evidence_contract(step, step_result)
 
     plan_result = PlanResult(
@@ -2987,9 +2917,7 @@ def test_evidence_summary_counts_exempt_separately_from_missing():
 
     summary = svc._format_evidence_validation_summary_for_summary(plan, plan_result)
     assert summary, "Summary should not be empty"
-    assert (
-        "missing=0" in summary
-    ), f"Exempt steps must not count as missing; summary: {summary}"
+    assert "missing=0" in summary, f"Exempt steps must not count as missing; summary: {summary}"
     assert (
         "exempt=1" in summary
     ), f"Exempt steps must appear as exempt=1 in summary; summary: {summary}"

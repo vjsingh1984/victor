@@ -214,9 +214,7 @@ class WorkflowExecutionLearner(BaseLearner):
                 (self.name, task_type),
             )
 
-        return {
-            dict(row)["state_key"]: dict(row)["q_value"] for row in cursor.fetchall()
-        }
+        return {dict(row)["state_key"]: dict(row)["q_value"] for row in cursor.fetchall()}
 
     def record_workflow_outcome(
         self,

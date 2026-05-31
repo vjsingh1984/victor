@@ -465,9 +465,7 @@ class TestSafetyCoordinator:
         """Test force push to non-main branch requires confirmation."""
         coordinator = SafetyCoordinator(enable_default_rules=True)
 
-        result = coordinator.check_safety(
-            "git", ["push", "--force", "origin", "feature"]
-        )
+        result = coordinator.check_safety("git", ["push", "--force", "origin", "feature"])
 
         # Should require confirmation (not block)
         assert result.is_safe is False
@@ -477,9 +475,7 @@ class TestSafetyCoordinator:
         """Test default system-path rule matches canonical write tool names."""
         coordinator = SafetyCoordinator(enable_default_rules=True)
 
-        result = coordinator.check_safety(
-            "write", ["/etc/hosts", "127.0.0.1 localhost"]
-        )
+        result = coordinator.check_safety("write", ["/etc/hosts", "127.0.0.1 localhost"])
 
         assert result.is_safe is False
         assert result.action == SafetyAction.BLOCK
@@ -489,9 +485,7 @@ class TestSafetyCoordinator:
         """Test default system-path rule matches canonical edit tool names."""
         coordinator = SafetyCoordinator(enable_default_rules=True)
 
-        result = coordinator.check_safety(
-            "edit", ["/usr/bin/python", "replace shebang"]
-        )
+        result = coordinator.check_safety("edit", ["/usr/bin/python", "replace shebang"])
 
         assert result.is_safe is False
         assert result.action == SafetyAction.BLOCK

@@ -233,9 +233,7 @@ class Message(BaseModel):
 
     role: str = Field(..., description="Message role: system, user, or assistant")
     content: str = Field(..., description="Message content")
-    name: Optional[str] = Field(
-        default=None, description="Optional name for the message sender"
-    )
+    name: Optional[str] = Field(default=None, description="Optional name for the message sender")
     tool_calls: Optional[List[Dict[str, Any]]] = Field(
         default=None, description="Tool calls requested by the assistant"
     )
@@ -268,9 +266,7 @@ class ToolDefinition(BaseModel):
 
     name: str = Field(..., description="Tool name")
     description: str = Field(..., description="What the tool does")
-    parameters: Dict[str, Any] = Field(
-        ..., description="JSON Schema for tool parameters"
-    )
+    parameters: Dict[str, Any] = Field(..., description="JSON Schema for tool parameters")
     schema_level: Optional[str] = Field(default=None, exclude=True)
 
 
@@ -279,15 +275,11 @@ class CompletionResponse(BaseModel):
 
     content: str = Field(..., description="Generated content")
     role: str = Field(default="assistant", description="Response role")
-    tool_calls: Optional[List[Dict[str, Any]]] = Field(
-        None, description="Tool calls requested"
-    )
+    tool_calls: Optional[List[Dict[str, Any]]] = Field(None, description="Tool calls requested")
     stop_reason: Optional[str] = Field(None, description="Why generation stopped")
     usage: Optional[Dict[str, int]] = Field(None, description="Token usage stats")
     model: Optional[str] = Field(None, description="Model used")
-    raw_response: Optional[Dict[str, Any]] = Field(
-        None, description="Raw provider response"
-    )
+    raw_response: Optional[Dict[str, Any]] = Field(None, description="Raw provider response")
     metadata: Optional[Dict[str, Any]] = Field(
         None, description="Additional metadata (e.g., reasoning_content)"
     )
@@ -560,8 +552,7 @@ class BaseProvider(ABC):
                 return True
 
             if any(
-                parent.__name__ in connection_exception_names
-                for parent in type(candidate).__mro__
+                parent.__name__ in connection_exception_names for parent in type(candidate).__mro__
             ):
                 return True
 
@@ -589,8 +580,7 @@ class BaseProvider(ABC):
                 return True
 
             if any(
-                parent.__name__ in timeout_exception_names
-                for parent in type(candidate).__mro__
+                parent.__name__ in timeout_exception_names for parent in type(candidate).__mro__
             ):
                 return True
 
@@ -616,9 +606,7 @@ class BaseProvider(ABC):
         status_code = getattr(response, "status_code", None)
         response_text = getattr(response, "text", None)
         raw_message = (
-            response_text
-            if isinstance(response_text, str) and response_text
-            else str(error)
+            response_text if isinstance(response_text, str) and response_text else str(error)
         )
         message = raw_message.strip() or type(error).__name__
         lowered = message.lower()
@@ -664,9 +652,7 @@ class BaseProvider(ABC):
             if isinstance(response_text, str) and response_text:
                 text_parts.append(response_text)
 
-            if any(
-                token in " ".join(text_parts).lower() for token in hard_limit_tokens
-            ):
+            if any(token in " ".join(text_parts).lower() for token in hard_limit_tokens):
                 return True
 
         return False
@@ -736,9 +722,7 @@ class BaseProvider(ABC):
         if self._rate_limit_suppressed_until_monotonic is None:
             return
 
-        remaining_seconds = (
-            self._rate_limit_suppressed_until_monotonic - time.monotonic()
-        )
+        remaining_seconds = self._rate_limit_suppressed_until_monotonic - time.monotonic()
         if remaining_seconds <= 0:
             self._rate_limit_suppressed_until_monotonic = None
             self._rate_limit_suppression_error = None
@@ -828,11 +812,7 @@ class BaseProvider(ABC):
             return ProviderTimeoutError(
                 message=f"Request timed out: {error_detail}",
                 provider=self.name,
-                timeout=(
-                    timeout_seconds
-                    if isinstance(timeout_seconds, (int, float))
-                    else None
-                ),
+                timeout=(timeout_seconds if isinstance(timeout_seconds, (int, float)) else None),
                 raw_error=error,
             )
 

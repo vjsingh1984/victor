@@ -56,9 +56,7 @@ def __getattr__(name: str) -> Any:
     """Resolve RL helpers lazily from the Victor host runtime."""
     module_name = _LAZY_IMPORTS.get(name)
     if module_name is None:
-        raise AttributeError(
-            f"module 'victor_contracts.rl_runtime' has no attribute {name!r}"
-        )
+        raise AttributeError(f"module 'victor_contracts.rl_runtime' has no attribute {name!r}")
 
     module = importlib.import_module(module_name)
     return getattr(module, name)

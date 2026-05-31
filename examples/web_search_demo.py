@@ -40,9 +40,7 @@ async def main():
     print("-" * 70)
     print("Query: Python async programming best practices")
 
-    result = await web_search(
-        query="Python async programming best practices", max_results=3
-    )
+    result = await web_search(query="Python async programming best practices", max_results=3)
 
     if result.get("success"):
         print(result.get("results"))
@@ -54,9 +52,7 @@ async def main():
     print("-" * 70)
     print("Query: Victor AI coding assistant features")
 
-    result = await web_search(
-        query="AI coding assistant features comparison", max_results=3
-    )
+    result = await web_search(query="AI coding assistant features comparison", max_results=3)
 
     if result.get("success"):
         print(result.get("results"))
@@ -83,9 +79,7 @@ async def main():
     print("-" * 70)
     print("Query: machine learning tutorials")
 
-    result = await web_search(
-        query="machine learning tutorials for beginners", max_results=5
-    )
+    result = await web_search(query="machine learning tutorials for beginners", max_results=5)
 
     if result.get("success"):
         print(result.get("results"))

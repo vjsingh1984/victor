@@ -156,9 +156,7 @@ class TestBundleRegistry:
     def test_list_bundles(self):
         """Test listing all bundles."""
         bundles = list_bundles()
-        assert (
-            len(bundles) == 5
-        )  # foundation, engineering, data, professional, enterprise
+        assert len(bundles) == 5  # foundation, engineering, data, professional, enterprise
 
         bundle_names = {b.name for b in bundles}
         assert bundle_names == {
@@ -328,9 +326,7 @@ class TestUnifiedVerticalRegistry:
         assert names == {"vertical1", "vertical2"}
 
     @pytest.mark.asyncio
-    async def test_register_vertical_applies_shared_compatibility_gate(
-        self, registry, monkeypatch
-    ):
+    async def test_register_vertical_applies_shared_compatibility_gate(self, registry, monkeypatch):
         """Installed verticals should be marked incompatible when the shared gate fails."""
 
         await registry.initialize()
@@ -353,9 +349,7 @@ class TestUnifiedVerticalRegistry:
         assert info.metadata["compatibility"]["compatible"] is False
 
     @pytest.mark.asyncio
-    async def test_load_entry_point_registers_plugin_vertical(
-        self, registry, monkeypatch
-    ):
+    async def test_load_entry_point_registers_plugin_vertical(self, registry, monkeypatch):
         """Plugin entry points should register verticals through the unified registry context."""
 
         await registry.initialize()
@@ -404,9 +398,7 @@ class TestUnifiedVerticalRegistry:
         assert info.metadata["plugin_name"] == "test-plugin"
 
     @pytest.mark.asyncio
-    async def test_load_from_entry_point_group_uses_shared_registry(
-        self, registry, monkeypatch
-    ):
+    async def test_load_from_entry_point_group_uses_shared_registry(self, registry, monkeypatch):
         """Unified registry discovery should reuse the shared entry-point registry."""
 
         class _EntryPoint:

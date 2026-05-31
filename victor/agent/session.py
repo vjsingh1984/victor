@@ -95,9 +95,7 @@ class Session:
 
     metadata: SessionMetadata
     conversation: Dict[str, Any]  # Serialized MessageHistory state
-    conversation_state: Optional[Dict[str, Any]] = (
-        None  # ConversationStateMachine state
-    )
+    conversation_state: Optional[Dict[str, Any]] = None  # ConversationStateMachine state
     tool_selection_stats: Optional[Dict[str, Any]] = None  # Tool usage statistics
 
     def to_dict(self) -> Dict[str, Any]:
@@ -412,9 +410,6 @@ def get_session_manager() -> SessionPersistence:
     from victor.config.settings import get_project_paths
 
     current_session_dir = get_project_paths().sessions_dir
-    if (
-        _default_persistence is None
-        or _default_persistence.session_dir != current_session_dir
-    ):
+    if _default_persistence is None or _default_persistence.session_dir != current_session_dir:
         _default_persistence = SessionPersistence()
     return _default_persistence

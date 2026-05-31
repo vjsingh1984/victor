@@ -360,9 +360,7 @@ class TestApplyToolGraphs:
 class TestApplyWorkflowsWithTriggers:
     """Tests for workflow trigger registration in apply_workflows."""
 
-    def test_apply_workflows_registers_triggers(
-        self, mock_orchestrator, mock_context, mock_result
-    ):
+    def test_apply_workflows_registers_triggers(self, mock_orchestrator, mock_context, mock_result):
         """Test apply_workflows registers triggers with WorkflowTriggerRegistry."""
         from victor.framework.step_handlers import FrameworkStepHandler
 
@@ -517,13 +515,9 @@ class TestServiceProviderRegistrationPorts:
             "victor.core.verticals.vertical_loader.activate_vertical_services",
             return_value=activation,
         ) as mock_activate:
-            handler._do_apply(
-                orchestrator, MockVerticalWithServiceProvider, context, result
-            )
+            handler._do_apply(orchestrator, MockVerticalWithServiceProvider, context, result)
 
-        mock_activate.assert_called_once_with(
-            container, settings, "test_service_vertical"
-        )
+        mock_activate.assert_called_once_with(container, settings, "test_service_vertical")
 
     def test_extensions_step_handler_warns_without_public_container_port(self):
         """Service provider registration should fail fast without container access port."""
@@ -626,17 +620,11 @@ class TestCapabilityConfigPersistence:
         result = MagicMock()
         result.add_info = MagicMock()
 
-        handler._do_apply(
-            orchestrator, MockVerticalWithCapabilityConfigs, context, result
-        )
+        handler._do_apply(orchestrator, MockVerticalWithCapabilityConfigs, context, result)
 
-        service = orchestrator.get_service_container().get_optional(
-            CapabilityConfigService
-        )
+        service = orchestrator.get_service_container().get_optional(CapabilityConfigService)
         assert service is not None
-        assert service.get_config("source_verification_config") == {
-            "min_credibility": 0.8
-        }
+        assert service.get_config("source_verification_config") == {"min_credibility": 0.8}
         assert service.get_config("citation_config") == {"default_style": "apa"}
 
     def test_end_to_end_defaults_flow_service_to_runtime_getter(self):
@@ -675,9 +663,7 @@ class TestCapabilityConfigPersistence:
         result = MagicMock()
         result.add_info = MagicMock()
 
-        handler._do_apply(
-            orchestrator, MockVerticalWithCapabilityConfigs, context, result
-        )
+        handler._do_apply(orchestrator, MockVerticalWithCapabilityConfigs, context, result)
 
         source_verification = get_source_verification(orchestrator)
         assert source_verification == {"min_credibility": 0.8}

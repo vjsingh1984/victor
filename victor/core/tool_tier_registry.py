@@ -486,9 +486,7 @@ class ToolTierRegistry:
 
             # Check for empty mandatory tools
             if not entry.config.mandatory:
-                errors.append(
-                    "Empty mandatory tool set (should include at least 'read')"
-                )
+                errors.append("Empty mandatory tool set (should include at least 'read')")
 
             return errors
 

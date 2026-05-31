@@ -129,9 +129,7 @@ class TestLangChainToolProjectorMock:
 
     def test_project_collision_prefix_source(self):
         tools = [FakeLCTool(name="search"), FakeLCTool(name="search")]
-        adapted = LangChainToolProjector.project(
-            tools, conflict_strategy="prefix_source"
-        )
+        adapted = LangChainToolProjector.project(tools, conflict_strategy="prefix_source")
         assert len(adapted) == 2
         names = {t.name for t in adapted}
         assert len(names) == 2  # No collision

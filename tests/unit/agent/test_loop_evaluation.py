@@ -131,9 +131,7 @@ class TestLegacyEvaluator:
         mock_directive.extracted_call = None
         mock_directive.mentioned_tools = None
 
-        with patch(
-            "victor.agent.continuation_strategy.ContinuationStrategy"
-        ) as MockStrategy:
+        with patch("victor.agent.continuation_strategy.ContinuationStrategy") as MockStrategy:
             instance = MockStrategy.return_value
             instance.determine_continuation_action.return_value = mock_directive
 
@@ -162,9 +160,7 @@ class TestLegacyEvaluator:
         mock_directive.extracted_call = None
         mock_directive.mentioned_tools = None
 
-        with patch(
-            "victor.agent.continuation_strategy.ContinuationStrategy"
-        ) as MockStrategy:
+        with patch("victor.agent.continuation_strategy.ContinuationStrategy") as MockStrategy:
             instance = MockStrategy.return_value
             instance.determine_continuation_action.return_value = mock_directive
             evaluator.evaluate(ctx)
@@ -241,14 +237,10 @@ class TestAgenticLoopEvaluator:
     def test_plateau_triggers_summary(self):
         """Stalled quality score (plateau) requests a summary."""
         evaluator = AgenticLoopEvaluator()
-        ctx = _base_ctx(
-            quality_score=0.5, is_analysis_task=True, continuation_prompts=1
-        )
+        ctx = _base_ctx(quality_score=0.5, is_analysis_task=True, continuation_prompts=1)
         # Seed the history with a plateau
         evaluator._score_history = [0.5, 0.5, 0.5]
-        ctx2 = _base_ctx(
-            quality_score=0.5, is_analysis_task=True, continuation_prompts=1
-        )
+        ctx2 = _base_ctx(quality_score=0.5, is_analysis_task=True, continuation_prompts=1)
         decision = evaluator.evaluate(ctx2)
         assert decision.action is ContinuationActionType.REQUEST_SUMMARY
 
@@ -323,9 +315,7 @@ class TestHybridLoopEvaluator:
                 action=ContinuationActionType.FINISH, reason="delegate", confidence=0.0
             ),
         ):
-            with patch.object(
-                hybrid._get_legacy(), "evaluate", return_value=legacy_decision
-            ):
+            with patch.object(hybrid._get_legacy(), "evaluate", return_value=legacy_decision):
                 decision = hybrid.evaluate(_base_ctx(mentioned_tools=["read"]))
 
         assert decision.source == "legacy"
@@ -351,9 +341,7 @@ class TestHybridLoopEvaluator:
         dummy_decision = LoopDecision(
             action=ContinuationActionType.FINISH, reason="x", source="legacy"
         )
-        with patch(
-            "victor.core.feature_flags.is_feature_enabled", return_value=False
-        ) as mock_flag:
+        with patch("victor.core.feature_flags.is_feature_enabled", return_value=False) as mock_flag:
             with patch.object(hybrid, "_get_legacy") as mock_get_legacy:
                 mock_get_legacy.return_value.evaluate.return_value = dummy_decision
                 hybrid.evaluate(_base_ctx())

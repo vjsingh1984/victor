@@ -205,16 +205,12 @@ class TestProjectManifest:
             (root / "docs").mkdir()
 
             # Create Python files
-            (root / "main.py").write_text(
-                '"""Main entry point."""\nimport os\ndef main(): pass'
-            )
+            (root / "main.py").write_text('"""Main entry point."""\nimport os\ndef main(): pass')
             (root / "src" / "__init__.py").write_text("")
             (root / "src" / "app.py").write_text(
                 '"""App module."""\nfrom .utils import helper\nclass App: pass'
             )
-            (root / "src" / "utils.py").write_text(
-                '"""Utility functions."""\ndef helper(): pass'
-            )
+            (root / "src" / "utils.py").write_text('"""Utility functions."""\ndef helper(): pass')
             (root / "tests" / "test_main.py").write_text("def test_main(): pass")
 
             # Create config files
@@ -272,9 +268,7 @@ class TestProjectManifest:
     @pytest.mark.asyncio
     async def test_build_manifest(self, temp_project):
         """Test building manifest from project."""
-        manifest = await ProjectManifest.build(
-            str(temp_project), include_analysis=False
-        )
+        manifest = await ProjectManifest.build(str(temp_project), include_analysis=False)
         assert len(manifest.files) > 0
         assert "main.py" in manifest.files
 
@@ -298,9 +292,7 @@ class TestProjectManifest:
     @pytest.mark.asyncio
     async def test_file_categorization(self, temp_project):
         """Test file categorization."""
-        manifest = await ProjectManifest.build(
-            str(temp_project), include_analysis=False
-        )
+        manifest = await ProjectManifest.build(str(temp_project), include_analysis=False)
 
         # main.py should be entry point
         main_file = manifest.files.get("main.py")
@@ -325,9 +317,7 @@ class TestProjectManifest:
     @pytest.mark.asyncio
     async def test_language_detection(self, temp_project):
         """Test language detection."""
-        manifest = await ProjectManifest.build(
-            str(temp_project), include_analysis=False
-        )
+        manifest = await ProjectManifest.build(str(temp_project), include_analysis=False)
 
         py_file = manifest.files.get("main.py")
         assert py_file is not None
@@ -340,9 +330,7 @@ class TestProjectManifest:
     @pytest.mark.asyncio
     async def test_importance_calculation(self, temp_project):
         """Test importance score calculation."""
-        manifest = await ProjectManifest.build(
-            str(temp_project), include_analysis=False
-        )
+        manifest = await ProjectManifest.build(str(temp_project), include_analysis=False)
 
         # Entry points should have high importance
         main_file = manifest.files.get("main.py")
@@ -398,9 +386,7 @@ class TestProjectManifest:
     @pytest.mark.asyncio
     async def test_js_file_analysis(self, temp_npm_project):
         """Test JavaScript file analysis."""
-        manifest = await ProjectManifest.build(
-            str(temp_npm_project), include_analysis=True
-        )
+        manifest = await ProjectManifest.build(str(temp_npm_project), include_analysis=True)
 
         js_file = manifest.files.get("src/index.js")
         assert js_file is not None
@@ -413,26 +399,11 @@ class TestProjectManifest:
         manifest = ProjectManifest(str(temp_project))
 
         # Test path-based categorization (implementation requires /dir/ pattern for matching)
-        assert (
-            manifest._categorize_file("src/api/routes.py", "routes.py")
-            == FileCategory.API
-        )
-        assert (
-            manifest._categorize_file("src/models/user.py", "user.py")
-            == FileCategory.MODEL
-        )
-        assert (
-            manifest._categorize_file("src/services/auth.py", "auth.py")
-            == FileCategory.SERVICE
-        )
-        assert (
-            manifest._categorize_file("src/utils/helper.py", "helper.py")
-            == FileCategory.UTILITY
-        )
-        assert (
-            manifest._categorize_file("src/static/image.png", "image.png")
-            == FileCategory.ASSET
-        )
+        assert manifest._categorize_file("src/api/routes.py", "routes.py") == FileCategory.API
+        assert manifest._categorize_file("src/models/user.py", "user.py") == FileCategory.MODEL
+        assert manifest._categorize_file("src/services/auth.py", "auth.py") == FileCategory.SERVICE
+        assert manifest._categorize_file("src/utils/helper.py", "helper.py") == FileCategory.UTILITY
+        assert manifest._categorize_file("src/static/image.png", "image.png") == FileCategory.ASSET
 
     def test_calculate_importance_entry_point(self, temp_project):
         """Test importance calculation for entry points."""
@@ -453,9 +424,7 @@ class TestProjectManifest:
         manifest = ProjectManifest(str(temp_project))
         shallow = FileInfo(path="service.py", category=FileCategory.SERVICE)
         deep = FileInfo(path="a/b/c/service.py", category=FileCategory.SERVICE)
-        assert manifest._calculate_importance(shallow) > manifest._calculate_importance(
-            deep
-        )
+        assert manifest._calculate_importance(shallow) > manifest._calculate_importance(deep)
 
     def test_extract_description_python_docstring(self, temp_project):
         """Test extracting description from Python docstring."""

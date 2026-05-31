@@ -62,9 +62,7 @@ class TestIsQuestionOnlyWithConfidence:
     def test_ambiguous_lower_confidence(self):
         from victor.agent.services.turn_execution_runtime import TurnExecutor
 
-        is_qa, conf = TurnExecutor._is_question_only_scored(
-            "Show me how to fix the auth module"
-        )
+        is_qa, conf = TurnExecutor._is_question_only_scored("Show me how to fix the auth module")
         # "Show me" prefix triggers QA but "fix" is an action word — ambiguous
         assert conf < 0.8
 

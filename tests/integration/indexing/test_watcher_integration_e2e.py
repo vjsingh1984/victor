@@ -164,19 +164,13 @@ class TestFileWatcherInitializer:
                 (root2 / "test.py").write_text("print('2')")
 
                 await initialize_file_watchers([root1, root2])
-                assert (
-                    FileWatcherRegistry.get_instance().get_stats()["total_watchers"]
-                    == 2
-                )
+                assert FileWatcherRegistry.get_instance().get_stats()["total_watchers"] == 2
 
                 # Stop all
                 await stop_file_watchers(None)
 
                 # Verify all stopped
-                assert (
-                    FileWatcherRegistry.get_instance().get_stats()["total_watchers"]
-                    == 0
-                )
+                assert FileWatcherRegistry.get_instance().get_stats()["total_watchers"] == 0
 
     @pytest.mark.asyncio
     async def test_get_project_paths_from_context(self, temp_project):
@@ -269,9 +263,7 @@ class TestFileWatcherInitializer:
                 assert stats["total_watchers"] == 2
 
     @pytest.mark.asyncio
-    async def test_graph_manager_background_refresh_updates_project_graph(
-        self, temp_project
-    ):
+    async def test_graph_manager_background_refresh_updates_project_graph(self, temp_project):
         """GraphManager should incrementally refresh the stored graph after file changes."""
         graph_store, manager = await self._build_initial_graph(temp_project)
 
@@ -295,9 +287,7 @@ class TestFileWatcherInitializer:
         assert str(temp_project.resolve()) not in manager._refresh_tasks
 
     @pytest.mark.asyncio
-    async def test_graph_manager_background_refresh_invokes_refresh_callback(
-        self, temp_project
-    ):
+    async def test_graph_manager_background_refresh_invokes_refresh_callback(self, temp_project):
         """Background refresh should report incremental stats through the completion callback."""
         graph_store = create_graph_store("sqlite", project_path=temp_project)
         await graph_store.initialize()
@@ -388,9 +378,7 @@ class TestFileWatcherInitializer:
         assert "Too many open files" in failure["last_error"]
 
     @pytest.mark.asyncio
-    async def test_graph_manager_background_refresh_indexes_new_file(
-        self, temp_project
-    ):
+    async def test_graph_manager_background_refresh_indexes_new_file(self, temp_project):
         """Background refresh should index newly created files."""
         graph_store, manager = await self._build_initial_graph(temp_project)
 
@@ -413,16 +401,14 @@ class TestFileWatcherInitializer:
         assert {node.name for node in new_nodes} == {"created_later"}
 
     @pytest.mark.asyncio
-    async def test_graph_manager_background_refresh_deletes_removed_file(
-        self, temp_project
-    ):
+    async def test_graph_manager_background_refresh_deletes_removed_file(self, temp_project):
         """Background refresh should remove graph state for deleted files."""
         graph_store, manager = await self._build_initial_graph(temp_project)
 
         deleted_file = temp_project / "src" / "module.py"
-        assert {
-            node.name for node in await graph_store.get_nodes_by_file(str(deleted_file))
-        } == {"foo"}
+        assert {node.name for node in await graph_store.get_nodes_by_file(str(deleted_file))} == {
+            "foo"
+        }
 
         time.sleep(0.5)
         deleted_file.unlink()
@@ -441,9 +427,7 @@ class TestFileWatcherInitializer:
         assert await graph_store.get_nodes_by_file(str(deleted_file)) == []
 
     @pytest.mark.asyncio
-    async def test_graph_manager_background_refresh_handles_renamed_file(
-        self, temp_project
-    ):
+    async def test_graph_manager_background_refresh_handles_renamed_file(self, temp_project):
         """Background refresh should remove old graph state and index the renamed file."""
         graph_store, manager = await self._build_initial_graph(temp_project)
 
@@ -465,9 +449,9 @@ class TestFileWatcherInitializer:
         await manager.wait_for_refresh(temp_project)
 
         assert await graph_store.get_nodes_by_file(str(old_file)) == []
-        assert {
-            node.name for node in await graph_store.get_nodes_by_file(str(renamed_file))
-        } == {"foo"}
+        assert {node.name for node in await graph_store.get_nodes_by_file(str(renamed_file))} == {
+            "foo"
+        }
 
 
 class TestCrossSessionBehavior:

@@ -276,9 +276,7 @@ async def test_graph_aware_prompt_builder():
         query="How does authentication work?",
         retrieval_result=retrieval_result,
     )
-    assert (
-        "authenticate" in prompt_hierarchical.lower()
-    )  # Function name is "authenticate"
+    assert "authenticate" in prompt_hierarchical.lower()  # Function name is "authenticate"
 
     config = PromptConfig(format_style="flat")
     builder = GraphAwarePromptBuilder(config)

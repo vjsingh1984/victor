@@ -199,10 +199,7 @@ async def plan_node(
             if isinstance(resolved_planning_hints, dict):
                 planning_routing_hints = dict(resolved_planning_hints)
 
-    if (
-        planning_routing_hints.get("planning_force_llm")
-        and planning_coordinator is not None
-    ):
+    if planning_routing_hints.get("planning_force_llm") and planning_coordinator is not None:
         effective_use_llm_planning = True
     elif planning_routing_hints.get("planning_prefer_fast_path"):
         effective_use_llm_planning = False
@@ -241,18 +238,14 @@ async def plan_node(
                         planning_routing_hints.get("planning_force_llm")
                     ),
                     "force_reason": planning_routing_hints.get("planning_force_reason"),
-                    "preference_reason": planning_routing_hints.get(
-                        "planning_prefer_reason"
-                    ),
+                    "preference_reason": planning_routing_hints.get("planning_prefer_reason"),
                     "preferred_by_runtime_feedback": bool(
                         planning_routing_hints.get("planning_prefer_fast_path")
                     ),
                     "constraint_tags": list(
                         planning_routing_hints.get("planning_constraint_tags") or []
                     ),
-                    "experiment_support": planning_routing_hints.get(
-                        "planning_experiment_support"
-                    ),
+                    "experiment_support": planning_routing_hints.get("planning_experiment_support"),
                     "has_plan_execution_state": bool(plan_execution_state),
                 }
             )
@@ -283,20 +276,14 @@ async def plan_node(
             "used_llm_planning": False,
             "task_type": state.task_type or "general",
             "skip_reason": None,
-            "forced_by_runtime_feedback": bool(
-                planning_routing_hints.get("planning_force_llm")
-            ),
+            "forced_by_runtime_feedback": bool(planning_routing_hints.get("planning_force_llm")),
             "force_reason": planning_routing_hints.get("planning_force_reason"),
             "preference_reason": planning_routing_hints.get("planning_prefer_reason"),
             "preferred_by_runtime_feedback": bool(
                 planning_routing_hints.get("planning_prefer_fast_path")
             ),
-            "constraint_tags": list(
-                planning_routing_hints.get("planning_constraint_tags") or []
-            ),
-            "experiment_support": planning_routing_hints.get(
-                "planning_experiment_support"
-            ),
+            "constraint_tags": list(planning_routing_hints.get("planning_constraint_tags") or []),
+            "experiment_support": planning_routing_hints.get("planning_experiment_support"),
         }
     )
 
@@ -567,8 +554,7 @@ def _default_evaluation(state: AgenticLoopStateModel) -> Dict[str, Any]:
     # Check for completion signals
     response = action_result.get("response", "")
     if response and any(
-        marker in response.lower()
-        for marker in ["done", "complete", "finished", "successfully"]
+        marker in response.lower() for marker in ["done", "complete", "finished", "successfully"]
     ):
         return {
             "decision": "complete",

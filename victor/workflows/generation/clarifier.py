@@ -255,9 +255,7 @@ class AmbiguityDetector:
 
         return ambiguities
 
-    def _check_functional_gaps(
-        self, requirements: WorkflowRequirements
-    ) -> List[Ambiguity]:
+    def _check_functional_gaps(self, requirements: WorkflowRequirements) -> List[Ambiguity]:
         """Check for missing functional requirements."""
         gaps = []
 
@@ -307,9 +305,7 @@ class AmbiguityDetector:
 
         return gaps
 
-    def _check_structural_conflicts(
-        self, requirements: WorkflowRequirements
-    ) -> List[Ambiguity]:
+    def _check_structural_conflicts(self, requirements: WorkflowRequirements) -> List[Ambiguity]:
         """Check for structural inconsistencies."""
         conflicts = []
 
@@ -425,9 +421,7 @@ class AmbiguityDetector:
 
         return infeasible
 
-    def _build_dependency_graph(
-        self, requirements: WorkflowRequirements
-    ) -> Dict[str, List[str]]:
+    def _build_dependency_graph(self, requirements: WorkflowRequirements) -> Dict[str, List[str]]:
         """Build dependency graph from requirements."""
         graph = {}
         for task_id, deps in requirements.structural.dependencies.items():
@@ -532,9 +526,7 @@ class AmbiguityResolver:
         if not ambiguities:
             return requirements
 
-        logger.info(
-            f"Resolving {len(ambiguities)} ambiguities using {strategy} strategy"
-        )
+        logger.info(f"Resolving {len(ambiguities)} ambiguities using {strategy} strategy")
 
         if strategy == "interactive":
             return await self._resolve_interactively(requirements, ambiguities)
@@ -564,9 +556,7 @@ class AmbiguityResolver:
         """
         # For now, just use assumptions
         # In production, this would use Rich.prompt.Prompt
-        logger.warning(
-            "Interactive resolution not fully implemented, using assumptions"
-        )
+        logger.warning("Interactive resolution not fully implemented, using assumptions")
         return await self._resolve_with_assumptions(requirements, ambiguities)
 
     async def _resolve_with_assumptions(
@@ -700,9 +690,7 @@ class AmbiguityResolver:
 
         if "max_tool_calls" in parts:
             # Increase budget
-            requirements.quality.max_tool_calls = (
-                requirements.quality.max_tool_calls or 100
-            ) + 50
+            requirements.quality.max_tool_calls = (requirements.quality.max_tool_calls or 100) + 50
 
         return requirements
 

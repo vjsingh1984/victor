@@ -59,9 +59,7 @@ class SelfBenchmarkConfig:
         timeout_per_task: Timeout per task in seconds
     """
 
-    benchmark_types: list[BenchmarkType] = field(
-        default_factory=lambda: [BenchmarkType.SWE_BENCH]
-    )
+    benchmark_types: list[BenchmarkType] = field(default_factory=lambda: [BenchmarkType.SWE_BENCH])
     model: str = "claude-3-sonnet"
     provider: str = "anthropic"
     max_tasks: int = 10
@@ -191,8 +189,6 @@ class SelfBenchmarkRunner:
     def _save_report(self, report: ComparisonReport) -> None:
         """Save comparison report to output directory."""
         self.config.output_dir.mkdir(parents=True, exist_ok=True)
-        save_comparison_report_bundle(
-            report, self.config.output_dir, primary_format="markdown"
-        )
+        save_comparison_report_bundle(report, self.config.output_dir, primary_format="markdown")
 
         logger.info(f"Benchmark report saved to {self.config.output_dir}")

@@ -644,9 +644,7 @@ class TestGoogleAdapterFallbackCanonicalization:
         )
         adapter._valid_tool_names = {"read"}
 
-        result = adapter.parse_tool_calls(
-            '<tool_code>print(read_file("foo.py"))</tool_code>', None
-        )
+        result = adapter.parse_tool_calls('<tool_code>print(read_file("foo.py"))</tool_code>', None)
 
         assert len(result.tool_calls) == 1
         assert result.tool_calls[0].name == "read"

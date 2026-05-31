@@ -214,9 +214,9 @@ class TestTopologySelector:
         assert decision.grounding_requirements.metadata["selection_policy"] == (
             "learned_close_override"
         )
-        assert decision.grounding_requirements.metadata[
-            "learned_override_effective_score_gap"
-        ] == (0.1)
+        assert decision.grounding_requirements.metadata["learned_override_effective_score_gap"] == (
+            0.1
+        )
         assert "overrode the close heuristic preference" in decision.rationale
 
     def test_feedback_hints_prefer_provider_and_formation_when_supported(self):
@@ -465,13 +465,10 @@ class TestTopologySelector:
         assert tuned.action == TopologyAction.ESCALATE_MODEL
         assert tuned.fallback_action == TopologyAction.SINGLE_AGENT
         assert tuned.telemetry_tags["selection_policy"] == "learned_close_override"
-        assert (
-            tuned.telemetry_tags["learned_override_threshold_profile"]
-            == "adaptive_positive"
+        assert tuned.telemetry_tags["learned_override_threshold_profile"] == "adaptive_positive"
+        assert tuned.grounding_requirements.metadata["learned_override_effective_score_gap"] == (
+            0.175
         )
-        assert tuned.grounding_requirements.metadata[
-            "learned_override_effective_score_gap"
-        ] == (0.175)
 
     def test_negative_override_reward_delta_tightens_learned_close_override(self):
         """Mildly negative reward history should tighten, not only hard-disable, overrides."""
@@ -507,13 +504,10 @@ class TestTopologySelector:
         assert decision.action == TopologyAction.SINGLE_AGENT
         assert decision.fallback_action == TopologyAction.ESCALATE_MODEL
         assert decision.telemetry_tags["selection_policy"] == "heuristic"
-        assert (
-            decision.telemetry_tags["learned_override_threshold_profile"]
-            == "adaptive_negative"
+        assert decision.telemetry_tags["learned_override_threshold_profile"] == "adaptive_negative"
+        assert decision.grounding_requirements.metadata["learned_override_effective_score_gap"] == (
+            0.064
         )
-        assert decision.grounding_requirements.metadata[
-            "learned_override_effective_score_gap"
-        ] == (0.064)
 
     def test_strongly_negative_reward_delta_hard_disables_learned_close_override(self):
         """Severely negative reward history should still hard-disable learned overrides."""
@@ -551,10 +545,7 @@ class TestTopologySelector:
         assert decision.telemetry_tags["learned_override_threshold_profile"] == (
             "adaptive_disabled_negative"
         )
-        assert (
-            decision.grounding_requirements.metadata["learned_override_disabled"]
-            is True
-        )
+        assert decision.grounding_requirements.metadata["learned_override_disabled"] is True
 
     def test_positive_optimization_reward_delta_takes_precedence_for_tuning(self):
         """PR2 optimization reward should tune overrides ahead of topology-only reward history."""
@@ -590,10 +581,7 @@ class TestTopologySelector:
 
         assert decision.action == TopologyAction.ESCALATE_MODEL
         assert decision.telemetry_tags["selection_policy"] == "learned_close_override"
-        assert (
-            decision.telemetry_tags["learned_override_threshold_profile"]
-            == "adaptive_positive"
-        )
+        assert decision.telemetry_tags["learned_override_threshold_profile"] == "adaptive_positive"
         assert (
             decision.grounding_requirements.metadata[
                 "learned_override_policy_optimization_reward_delta"
@@ -638,10 +626,7 @@ class TestTopologySelector:
         assert decision.telemetry_tags["learned_override_threshold_profile"] == (
             "adaptive_disabled_feasibility"
         )
-        assert (
-            decision.grounding_requirements.metadata["learned_override_disabled"]
-            is True
-        )
+        assert decision.grounding_requirements.metadata["learned_override_disabled"] is True
 
     def test_negative_experiment_memory_bias_disables_learned_close_override(self):
         """Experiment-memory evidence should suppress learned overrides before live policy data exists."""
@@ -680,10 +665,7 @@ class TestTopologySelector:
         assert decision.telemetry_tags["learned_override_threshold_profile"] == (
             "experiment_memory_disabled_negative"
         )
-        assert (
-            decision.grounding_requirements.metadata["learned_override_disabled"]
-            is True
-        )
+        assert decision.grounding_requirements.metadata["learned_override_disabled"] is True
         assert decision.grounding_requirements.metadata[
             "experiment_memory_selection_policy_bias"
         ] == (-0.8)

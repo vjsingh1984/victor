@@ -230,9 +230,7 @@ class TestActNode:
         """Action failures should be recorded in graph-side degradation metadata."""
         state = create_initial_state(query="Write code")
         mock_executor = AsyncMock()
-        mock_executor.execute_turn = AsyncMock(
-            side_effect=RuntimeError("provider failed")
-        )
+        mock_executor.execute_turn = AsyncMock(side_effect=RuntimeError("provider failed"))
 
         result = await act_node(state, turn_executor=mock_executor)
 

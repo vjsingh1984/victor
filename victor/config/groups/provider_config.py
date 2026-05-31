@@ -77,9 +77,7 @@ class ProviderConfig(BaseSettings):
         for name in secret_fields:
             val = getattr(self, name, None)
             if val is not None:
-                result[name] = (
-                    val.get_secret_value() if isinstance(val, SecretStr) else val
-                )
+                result[name] = val.get_secret_value() if isinstance(val, SecretStr) else val
         return result
 
 
@@ -129,9 +127,7 @@ class ProviderSettings(BaseModel):
     ollama_base_url: str = "http://localhost:11434"
     # LMStudio tiered endpoints (try in order) - defaults to localhost only
     # Set LMSTUDIO_BASE_URLS env var to add LAN servers
-    lmstudio_base_urls: List[str] = Field(
-        default_factory=lambda: ["http://127.0.0.1:1234"]
-    )
+    lmstudio_base_urls: List[str] = Field(default_factory=lambda: ["http://127.0.0.1:1234"])
     vllm_base_url: str = "http://localhost:8000"
 
     # LMStudio resource guard
@@ -207,8 +203,7 @@ class ProviderSettings(BaseModel):
 
         if v not in known_providers:
             raise ValueError(
-                f"Unknown provider '{v}'. "
-                f"Known providers: {', '.join(sorted(known_providers))}"
+                f"Unknown provider '{v}'. " f"Known providers: {', '.join(sorted(known_providers))}"
             )
 
         return v

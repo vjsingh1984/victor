@@ -258,9 +258,7 @@ Focus on depth over breadth when exploring.
 
         # Check for same tool called 3+ times
         if len(tool_history) >= 3:
-            recent_tools = [
-                _canonical_tool_name(h.get("tool", "")) for h in tool_history[-5:]
-            ]
+            recent_tools = [_canonical_tool_name(h.get("tool", "")) for h in tool_history[-5:]]
             tool_counts = {}
             for tool in recent_tools:
                 tool_counts[tool] = tool_counts.get(tool, 0) + 1
@@ -269,9 +267,7 @@ Focus on depth over breadth when exploring.
 
         # Check for excessive ls/listing calls
         ls_count = sum(
-            1
-            for h in tool_history
-            if _canonical_tool_name(h.get("tool", "")) == ToolNames.LS
+            1 for h in tool_history if _canonical_tool_name(h.get("tool", "")) == ToolNames.LS
         )
         if ls_count >= 4:
             return True
@@ -558,9 +554,7 @@ def get_tool_guidance_strategy(provider_name: str) -> ToolGuidanceStrategy:
     strategy = strategy_class()
     _strategy_cache[provider_key] = strategy
 
-    logger.debug(
-        f"Created tool guidance strategy for {provider_name}: {strategy_class.__name__}"
-    )
+    logger.debug(f"Created tool guidance strategy for {provider_name}: {strategy_class.__name__}")
 
     return strategy
 

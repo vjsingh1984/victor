@@ -334,16 +334,12 @@ class OutputFormatter:
                 )
                 if preview.header or preview.lines:
                     if preview.header:
-                        self._console.print(
-                            f"[dim]│ {_markup_escape(preview.header)}[/]"
-                        )
+                        self._console.print(f"[dim]│ {_markup_escape(preview.header)}[/]")
                     if preview.lines:
                         if preview.syntax_hint == "diff":
                             render_tool_preview(
                                 self._console,
-                                "\n".join(
-                                    _colorize_diff_line(line) for line in preview.lines
-                                ),
+                                "\n".join(_colorize_diff_line(line) for line in preview.lines),
                                 total_lines=preview.total_line_count,
                                 preview_lines=preview_lines,
                                 hotkey=hotkey,
@@ -351,9 +347,7 @@ class OutputFormatter:
                         else:
                             render_tool_preview(
                                 self._console,
-                                "\n".join(
-                                    _markup_escape(line) for line in preview.lines
-                                ),
+                                "\n".join(_markup_escape(line) for line in preview.lines),
                                 total_lines=preview.total_line_count,
                                 preview_lines=preview_lines,
                                 hotkey=hotkey,
@@ -473,9 +467,7 @@ class OutputFormatter:
                 }
                 ext = ext_map.get(tool_name, ext)
 
-                syntax = Syntax(
-                    content, ext, theme="monokai", line_numbers=True, word_wrap=True
-                )
+                syntax = Syntax(content, ext, theme="monokai", line_numbers=True, word_wrap=True)
                 self._console.print(
                     Panel(
                         syntax,
@@ -727,12 +719,8 @@ class OutputFormatter:
         """
         # Try tool call format first (model hallucinated tool calls)
         # Format: <parameter=content> ... </tool_call> or <parameter=content>...</parameter>
-        tool_content_pattern = (
-            r"<parameter=content>\s*(.*?)\s*(?:</tool_call>|</parameter>|\Z)"
-        )
-        tool_matches = re.findall(
-            tool_content_pattern, content, re.DOTALL | re.IGNORECASE
-        )
+        tool_content_pattern = r"<parameter=content>\s*(.*?)\s*(?:</tool_call>|</parameter>|\Z)"
+        tool_matches = re.findall(tool_content_pattern, content, re.DOTALL | re.IGNORECASE)
         if tool_matches:
             # Extract the code from tool call content
             extracted = tool_matches[0].strip()

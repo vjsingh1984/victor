@@ -191,9 +191,7 @@ Actions:
 
             elif action == "report":
                 days = days or 30
-                framework = (
-                    ComplianceFramework(framework_str) if framework_str else None
-                )
+                framework = ComplianceFramework(framework_str) if framework_str else None
                 report = await manager.generate_report(days=days, framework=framework)
                 return ToolResult(
                     success=True,
@@ -290,9 +288,7 @@ Actions:
             if summary["compliance_status"] == "compliant"
             else _get_icon("warning")
         )
-        lines.append(
-            f"**Compliance Status:** {status_icon} {summary['compliance_status']}"
-        )
+        lines.append(f"**Compliance Status:** {status_icon} {summary['compliance_status']}")
         if summary["violations"] > 0:
             lines.append(f"**Violations:** {summary['violations']}")
         lines.append("")
@@ -376,9 +372,7 @@ Actions:
                 "info": _get_icon("level_info"),
                 "debug": _get_icon("level_unknown"),
             }
-            severity_icon = severity_icons.get(
-                event.severity.value, _get_icon("level_unknown")
-            )
+            severity_icon = severity_icons.get(event.severity.value, _get_icon("level_unknown"))
 
             lines.append(f"{severity_icon} **{event.event_type.value}** - {timestamp}")
             lines.append(f"   {event.action}")
@@ -400,9 +394,7 @@ Actions:
         icon = _get_icon("success") if compliant else _get_icon("error")
 
         lines.append(f"**Framework:** {framework}")
-        lines.append(
-            f"**Status:** {icon} {'Compliant' if compliant else 'Non-Compliant'}"
-        )
+        lines.append(f"**Status:** {icon} {'Compliant' if compliant else 'Non-Compliant'}")
         lines.append(f"**Events Analyzed:** {status['total_events']}")
         lines.append(f"**Period:** Last {status['report_period_days']} days")
         lines.append("")
@@ -410,8 +402,6 @@ Actions:
         if status["violations"] > 0:
             lines.append(f"**Violations ({status['violations']}):**")
             for v in status["violation_details"]:
-                lines.append(
-                    f"- {_get_icon('warning')} {v['violation_type']}: {v['message']}"
-                )
+                lines.append(f"- {_get_icon('warning')} {v['violation_type']}: {v['message']}")
 
         return "\n".join(lines)

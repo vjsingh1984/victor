@@ -232,12 +232,8 @@ class TestPromptBuilder:
         resolved = SimpleNamespace(text="EVOLVED PAGINATION", source="evolved")
 
         with (
-            patch(
-                "victor.agent.optimization_injector.OptimizationInjector"
-            ) as injector_cls,
-            patch(
-                "victor.agent.evolved_content_resolver.EvolvedContentResolver"
-            ) as resolver_cls,
+            patch("victor.agent.optimization_injector.OptimizationInjector") as injector_cls,
+            patch("victor.agent.evolved_content_resolver.EvolvedContentResolver") as resolver_cls,
         ):
             injector_instance = injector_cls.return_value
             resolver_cls.return_value.resolve_section.return_value = resolved
@@ -256,9 +252,7 @@ class TestPromptBuilder:
             provider="anthropic",
             model="claude-sonnet",
             task_type="analysis",
-            fallback_text=builder._get_section_fallback(
-                "LARGE_FILE_PAGINATION_GUIDANCE"
-            ),
+            fallback_text=builder._get_section_fallback("LARGE_FILE_PAGINATION_GUIDANCE"),
         )
         section = builder.get_section("large_file_pagination_guidance")
         assert section is not None
@@ -571,9 +565,7 @@ class TestPromptBuilderContributor:
         # Mock a contributor
         contributor = MagicMock()
         contributor.get_priority.return_value = 5
-        contributor.get_system_prompt_section.return_value = (
-            "Contributor section content"
-        )
+        contributor.get_system_prompt_section.return_value = "Contributor section content"
         contributor.get_grounding_rules.return_value = None
         contributor.get_task_type_hints.return_value = {}
 
@@ -741,17 +733,12 @@ class TestPromptSectionsImports:
         reloaded_module = importlib.reload(prompt_sections_module)
         try:
             assert (
-                reloaded_module.GROUNDING_RULES_MINIMAL
-                == "Registry framework minimal grounding."
+                reloaded_module.GROUNDING_RULES_MINIMAL == "Registry framework minimal grounding."
             )
             assert (
-                reloaded_module.GROUNDING_RULES_EXTENDED
-                == "Registry framework strict grounding."
+                reloaded_module.GROUNDING_RULES_EXTENDED == "Registry framework strict grounding."
             )
-            assert (
-                reloaded_module.PARALLEL_READ_GUIDANCE
-                == "Registry framework parallel reads."
-            )
+            assert reloaded_module.PARALLEL_READ_GUIDANCE == "Registry framework parallel reads."
         finally:
             monkeypatch.setattr(registry_module, "_registry", None)
             importlib.reload(prompt_sections_module)
@@ -764,9 +751,7 @@ class TestPromptSectionsImports:
     def test_devops_identity_content(self):
         """Test DEVOPS_IDENTITY has expected content."""
         assert "Victor" in DEVOPS_IDENTITY
-        assert any(
-            term in DEVOPS_IDENTITY for term in ["DevOps", "infrastructure", "Docker"]
-        )
+        assert any(term in DEVOPS_IDENTITY for term in ["DevOps", "infrastructure", "Docker"])
 
     def test_research_identity_content(self):
         """Test RESEARCH_IDENTITY has expected content."""

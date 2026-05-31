@@ -132,9 +132,7 @@ class ToolCallClassifier(IToolCallClassifier):
         """
         canonical_tool_name = normalize_tool_name_for_policy(tool_name.lower())
         if canonical_tool_name in self._write_tools:
-            self._write_tools = set(
-                self._write_tools
-            )  # Convert from frozenset if needed
+            self._write_tools = set(self._write_tools)  # Convert from frozenset if needed
             self._write_tools.discard(canonical_tool_name)
             logger.debug(f"ToolCallClassifier: removed write tool '{tool_name}'")
 

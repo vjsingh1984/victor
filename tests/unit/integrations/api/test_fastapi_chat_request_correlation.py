@@ -127,9 +127,7 @@ async def test_recent_events_endpoint_filters_by_correlation_id(
 
 
 @pytest.mark.asyncio
-async def test_chat_assigns_request_id_header_and_context(
-    monkeypatch, tmp_path: Path
-) -> None:
+async def test_chat_assigns_request_id_header_and_context(monkeypatch, tmp_path: Path) -> None:
     """POST /chat should expose and use a stable per-request correlation ID."""
     orchestrator = _FakeOrchestrator()
     server = _create_server(monkeypatch, tmp_path, orchestrator)
@@ -148,9 +146,7 @@ async def test_chat_assigns_request_id_header_and_context(
 
 
 @pytest.mark.asyncio
-async def test_chat_stream_emits_request_event_and_context(
-    monkeypatch, tmp_path: Path
-) -> None:
+async def test_chat_stream_emits_request_event_and_context(monkeypatch, tmp_path: Path) -> None:
     """POST /chat/stream should align SSE request IDs with backend correlation IDs."""
     orchestrator = _FakeOrchestrator()
     server = _create_server(monkeypatch, tmp_path, orchestrator)
@@ -193,9 +189,7 @@ async def test_chat_stream_prefers_execution_context_chat_runtime_over_legacy_at
 
     class _LegacyChatRuntime:
         async def stream_chat(self, _message: str):
-            raise AssertionError(
-                "legacy orchestrator-bound chat runtime should not be used"
-            )
+            raise AssertionError("legacy orchestrator-bound chat runtime should not be used")
 
     class _RuntimeChatService:
         def __init__(self) -> None:
@@ -207,9 +201,7 @@ async def test_chat_stream_prefers_execution_context_chat_runtime_over_legacy_at
 
     orchestrator = _FakeOrchestrator()
     runtime_chat = _RuntimeChatService()
-    orchestrator._execution_context = SimpleNamespace(
-        services=SimpleNamespace(chat=runtime_chat)
-    )
+    orchestrator._execution_context = SimpleNamespace(services=SimpleNamespace(chat=runtime_chat))
     orchestrator._chat_service = _LegacyChatRuntime()
     server = _create_server(monkeypatch, tmp_path, orchestrator)
 

@@ -84,8 +84,7 @@ def test_wheel_omits_extracted_vertical_runtime_assets(tmp_path: Path) -> None:
         # Verify no contrib remnants leaked into the wheel.
         contrib_files = sorted(name for name in names if "verticals/contrib/" in name)
         assert not contrib_files, (
-            "Core wheel should not contain extracted-vertical remnants: "
-            f"{contrib_files}"
+            "Core wheel should not contain extracted-vertical remnants: " f"{contrib_files}"
         )
 
         bundled_legacy_assets = sorted(legacy_vertical_assets & names)
@@ -94,7 +93,5 @@ def test_wheel_omits_extracted_vertical_runtime_assets(tmp_path: Path) -> None:
             f"{bundled_legacy_assets}"
         )
 
-        entry_point_files = [
-            name for name in names if name.endswith("entry_points.txt")
-        ]
+        entry_point_files = [name for name in names if name.endswith("entry_points.txt")]
         assert entry_point_files, "Expected wheel entry_points metadata"

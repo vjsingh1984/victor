@@ -428,9 +428,7 @@ class ContextCompactor:
                     pass
 
             provider = ProviderRegistry.create(spec.provider, **provider_kwargs)
-            logger.debug(
-                f"Created provider for tier '{tier}': {spec.provider}/{spec.model}"
-            )
+            logger.debug(f"Created provider for tier '{tier}': {spec.provider}/{spec.model}")
             return provider
 
         except Exception as e:
@@ -460,9 +458,7 @@ class ContextCompactor:
         try:
             raw_messages = self.controller.get_messages()
         except Exception as exc:
-            logger.debug(
-                "Could not inspect messages for compaction eligibility: %s", exc
-            )
+            logger.debug("Could not inspect messages for compaction eligibility: %s", exc)
             return True
 
         try:
@@ -540,9 +536,7 @@ class ContextCompactor:
                 "recent_failures": recent_failures or [],
                 "compaction_count": self._compaction_count,
                 "utilization": (
-                    self.controller.get_context_metrics().utilization
-                    if self.controller
-                    else 0.0
+                    self.controller.get_context_metrics().utilization if self.controller else 0.0
                 ),
             }
 
@@ -704,9 +698,7 @@ class ContextCompactor:
         # Always preserve the root system prompt (index 0)
         start_idx = 1 if messages and messages[0].role == "system" else 0
         # Summarize up to N oldest turns
-        end_turn_idx = min(
-            SUMMARIZATION_CONFIG.max_turns_to_summarize, len(turn_boundaries) - 3
-        )
+        end_turn_idx = min(SUMMARIZATION_CONFIG.max_turns_to_summarize, len(turn_boundaries) - 3)
         if end_turn_idx <= 0:
             return None
 
@@ -719,9 +711,7 @@ class ContextCompactor:
         # Determine complexity and select provider
         provider = None
         complexity = "complex" if len(turns_to_summarize) > 8 else "simple"
-        estimated_tokens = sum(
-            self.estimate_message_tokens(m) for m in turns_to_summarize
-        )
+        estimated_tokens = sum(self.estimate_message_tokens(m) for m in turns_to_summarize)
 
         # Try decision service for tier-based routing
         if self._has_decision_support():
@@ -818,9 +808,7 @@ class ContextCompactor:
             # Extract file paths
             import re
 
-            paths = re.findall(
-                r"[\w./]+\.(?:py|js|ts|rs|go|java|yaml|json)", msg.content[:500]
-            )
+            paths = re.findall(r"[\w./]+\.(?:py|js|ts|rs|go|java|yaml|json)", msg.content[:500])
             files_mentioned.update(paths[:5])
 
             # Extract decisions from assistant
@@ -833,17 +821,13 @@ class ContextCompactor:
         if tool_names:
             summary_parts.append(f"Tools used: {', '.join(sorted(tool_names)[:10])}")
         if files_mentioned:
-            summary_parts.append(
-                f"Files touched: {', '.join(sorted(files_mentioned)[:8])}"
-            )
+            summary_parts.append(f"Files touched: {', '.join(sorted(files_mentioned)[:8])}")
         if key_decisions:
             summary_parts.append("Key points:")
             for d in key_decisions[:5]:
                 summary_parts.append(f"  - {d}")
 
-        return (
-            "\n".join(summary_parts) if summary_parts else "Prior history summarized."
-        )
+        return "\n".join(summary_parts) if summary_parts else "Prior history summarized."
 
     def check_and_compact(
         self,
@@ -913,9 +897,7 @@ class ContextCompactor:
 
         # Get effective thresholds (RL config overrides phase-aware)
         effective_threshold = (
-            rl_config.get("compaction_threshold", base_threshold)
-            if rl_config
-            else base_threshold
+            rl_config.get("compaction_threshold", base_threshold) if rl_config else base_threshold
         )
         effective_min_messages = (
             rl_config.get("min_messages_keep", self.config.min_messages_after_compact)
@@ -979,10 +961,7 @@ class ContextCompactor:
                 )
 
                 # Only perform fast pruning if we'd save at least 20%
-                if (
-                    original_size > 0
-                    and (original_size - estimated_size) / original_size > 0.2
-                ):
+                if original_size > 0 and (original_size - estimated_size) / original_size > 0.2:
                     pruned_messages = fast_pruner.prune_old_tool_results(
                         messages_before, current_turn=len(messages_before)
                     )
@@ -992,17 +971,13 @@ class ContextCompactor:
                         # This is done by replacing the message list
                         from victor.agent.message_history import _TrackedList
 
-                        self.controller._history._messages = _TrackedList(
-                            pruned_messages
-                        )
+                        self.controller._history._messages = _TrackedList(pruned_messages)
                         logger.info(
                             f"[fast-pruning] Pruned {fast_pruner.get_pruned_count()} messages "
                             f"before LLM compaction (saved {original_size - estimated_size} chars)"
                         )
             except Exception as e:
-                logger.debug(
-                    f"Fast pruning failed (continuing with LLM compaction): {e}"
-                )
+                logger.debug(f"Fast pruning failed (continuing with LLM compaction): {e}")
 
         # Perform compaction
         chars_before = metrics.char_count
@@ -1018,19 +993,13 @@ class ContextCompactor:
         truncations_applied = 0
 
         if messages_removed == 0 and chars_freed <= 0:
-            truncations_applied, fallback_chars_freed = (
-                self._truncate_large_tool_messages()
-            )
+            truncations_applied, fallback_chars_freed = self._truncate_large_tool_messages()
             if truncations_applied:
                 metrics_after = self.controller.get_context_metrics()
-                chars_freed = max(
-                    fallback_chars_freed, chars_before - metrics_after.char_count
-                )
+                chars_freed = max(fallback_chars_freed, chars_before - metrics_after.char_count)
                 tokens_freed = self._estimate_tokens(chars_freed)
 
-        action_taken = (
-            messages_removed > 0 or truncations_applied > 0 or chars_freed > 0
-        )
+        action_taken = messages_removed > 0 or truncations_applied > 0 or chars_freed > 0
         if action_taken:
             self._total_chars_freed += chars_freed
             self._total_tokens_freed += tokens_freed
@@ -1247,9 +1216,7 @@ class ContextCompactor:
         strategy = self.config.truncation_strategy
 
         if strategy == TruncationStrategy.SMART:
-            truncated = self._smart_truncate(
-                content, max_chars, max_lines, content_type
-            )
+            truncated = self._smart_truncate(content, max_chars, max_lines, content_type)
         elif strategy == TruncationStrategy.HEAD:
             truncated = self._head_truncate(content, max_chars, max_lines)
         elif strategy == TruncationStrategy.TAIL:
@@ -1413,25 +1380,17 @@ class ContextCompactor:
         # Try adaptive threshold first (if enabled and messages available)
         if self._adaptive_enabled and messages:
             try:
-                adaptive_threshold = self._adaptive_threshold.calculate_threshold(
-                    messages
-                )
+                adaptive_threshold = self._adaptive_threshold.calculate_threshold(messages)
                 logger.debug(
                     f"Using adaptive threshold: {adaptive_threshold:.0%} "
                     f"(pattern: {self._adaptive_threshold.get_current_analysis().pattern.value if self._adaptive_threshold.get_current_analysis() else 'unknown'})"
                 )
                 return adaptive_threshold
             except Exception as e:
-                logger.warning(
-                    f"Adaptive threshold calculation failed, falling back: {e}"
-                )
+                logger.warning(f"Adaptive threshold calculation failed, falling back: {e}")
 
         # Use phase-aware threshold if enabled and phase is provided
-        if (
-            self.config.enable_phase_aware
-            and phase
-            and phase in self.config.phase_thresholds
-        ):
+        if self.config.enable_phase_aware and phase and phase in self.config.phase_thresholds:
             return self.config.phase_thresholds[phase]
 
         # Fall back to default threshold
@@ -1551,9 +1510,7 @@ class ContextCompactor:
     # Adaptive Threshold Management
     # ========================================================================
 
-    def set_adaptive_threshold(
-        self, adaptive_threshold: "AdaptiveCompactionThreshold"
-    ) -> None:
+    def set_adaptive_threshold(self, adaptive_threshold: "AdaptiveCompactionThreshold") -> None:
         """Set or update the adaptive threshold system.
 
         If a ``DomainKeywordsProviderProtocol`` is registered in the capability
@@ -1752,9 +1709,7 @@ class ContextCompactor:
                     should, trigger = await self.should_compact_async()
 
                     if should and trigger != CompactionTrigger.NONE:
-                        logger.debug(
-                            f"Background compaction triggered: {trigger.value}"
-                        )
+                        logger.debug(f"Background compaction triggered: {trigger.value}")
                         await self.check_and_compact_async()
 
                     self._last_check_time = time.time()

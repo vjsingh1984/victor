@@ -172,12 +172,8 @@ class ToolExecutionHandler:
         handle_force_completion_with_handler: Callable[
             [StreamingChatContext], Optional[StreamChunk]
         ],
-        handle_budget_exhausted: Callable[
-            [StreamingChatContext], AsyncIterator[StreamChunk]
-        ],
-        handle_force_final_response: Callable[
-            [StreamingChatContext], AsyncIterator[StreamChunk]
-        ],
+        handle_budget_exhausted: Callable[[StreamingChatContext], AsyncIterator[StreamChunk]],
+        handle_force_final_response: Callable[[StreamingChatContext], AsyncIterator[StreamChunk]],
         execute_tool_calls: Callable[[List[Dict]], Any],
         get_tool_status_message: Callable[[str, Dict], str],
         set_tool_budget_limit: Optional[Callable[[int], int]] = None,
@@ -210,9 +206,7 @@ class ToolExecutionHandler:
         self._settings = settings
         self._recovery_context_factory = recovery_context_factory
         self._check_progress_with_handler = check_progress_with_handler
-        self._handle_force_completion_with_handler = (
-            handle_force_completion_with_handler
-        )
+        self._handle_force_completion_with_handler = handle_force_completion_with_handler
         self._handle_budget_exhausted = handle_budget_exhausted
         self._handle_force_final_response = handle_force_final_response
         self._set_tool_budget_limit = set_tool_budget_limit
@@ -430,9 +424,7 @@ class ToolExecutionHandler:
 
         # Filter and truncate tool calls
         pre_filter_chunk_count = len(result.chunks)
-        tool_calls = await self._filter_and_truncate_tools(
-            stream_ctx, tool_calls, result
-        )
+        tool_calls = await self._filter_and_truncate_tools(stream_ctx, tool_calls, result)
         for chunk in result.chunks[pre_filter_chunk_count:]:
             yield chunk
 
@@ -451,13 +443,9 @@ class ToolExecutionHandler:
     ) -> Optional[StreamChunk]:
         """Check if budget warning should be shown."""
         recovery_ctx = self._recovery_context_factory(stream_ctx)
-        warning_threshold = getattr(
-            self._settings, "tool_call_budget_warning_threshold", 250
-        )
+        warning_threshold = getattr(self._settings, "tool_call_budget_warning_threshold", 250)
         warning_pct = getattr(self._settings, "tool_call_budget_warning_pct", 0.8)
-        warning_remaining = getattr(
-            self._settings, "tool_call_budget_warning_remaining", 5
-        )
+        warning_remaining = getattr(self._settings, "tool_call_budget_warning_remaining", 5)
         budget_warning = self._recovery_runtime.check_tool_budget(
             recovery_ctx,
             warning_threshold,
@@ -480,9 +468,7 @@ class ToolExecutionHandler:
             return None
         if not getattr(self._settings, "tool_budget_progress_relief_enabled", True):
             return None
-        max_uses = max(
-            0, int(getattr(self._settings, "tool_budget_progress_relief_max_uses", 1))
-        )
+        max_uses = max(0, int(getattr(self._settings, "tool_budget_progress_relief_max_uses", 1)))
         if getattr(stream_ctx, "budget_relief_uses", 0) >= max_uses:
             return None
         if not stream_ctx.is_action_task:
@@ -495,12 +481,8 @@ class ToolExecutionHandler:
             return None
 
         executed_tool_names = {name.lower() for name in stream_ctx.executed_tool_names}
-        has_progress_signal = bool(
-            executed_tool_names & {"edit", "write", "shell", "test"}
-        )
-        has_progress_signal = (
-            has_progress_signal or len(stream_ctx.unique_resources) >= 3
-        )
+        has_progress_signal = bool(executed_tool_names & {"edit", "write", "shell", "test"})
+        has_progress_signal = has_progress_signal or len(stream_ctx.unique_resources) >= 3
         has_progress_signal = has_progress_signal or len(self._observed_files) >= 3
         if not has_progress_signal:
             return None
@@ -610,9 +592,7 @@ class ToolExecutionHandler:
         )
         result.add_chunks(blocked_chunks)
         filtered_call_ids = {id(call) for call in filtered_calls}
-        blocked_calls = [
-            call for call in tool_calls if id(call) not in filtered_call_ids
-        ]
+        blocked_calls = [call for call in tool_calls if id(call) not in filtered_call_ids]
         for blocked_call in blocked_calls:
             self._record_omitted_tool_call_response(
                 result,
@@ -645,9 +625,7 @@ class ToolExecutionHandler:
     ) -> None:
         """Execute tool calls and generate result chunks."""
         last_tool_name = self._add_tool_start_chunks(tool_calls, result)
-        await self._execute_tool_call_batch(
-            stream_ctx, tool_calls, result, last_tool_name
-        )
+        await self._execute_tool_call_batch(stream_ctx, tool_calls, result, last_tool_name)
 
     async def _execute_filtered_tool_calls_streaming(
         self,
@@ -662,9 +640,7 @@ class ToolExecutionHandler:
             yield chunk
 
         pre_result_chunk_count = len(result.chunks)
-        await self._execute_tool_call_batch(
-            stream_ctx, tool_calls, result, last_tool_name
-        )
+        await self._execute_tool_call_batch(stream_ctx, tool_calls, result, last_tool_name)
         for chunk in result.chunks[pre_result_chunk_count:]:
             yield chunk
 
@@ -839,9 +815,7 @@ def create_tool_execution_handler(
         effective_budget = int(budget)
         if unified_tracker is not None and hasattr(unified_tracker, "set_tool_budget"):
             unified_tracker.set_tool_budget(effective_budget)
-            effective_budget = int(
-                getattr(unified_tracker, "tool_budget", effective_budget)
-            )
+            effective_budget = int(getattr(unified_tracker, "tool_budget", effective_budget))
 
         orchestrator.tool_budget = effective_budget
 
@@ -850,9 +824,7 @@ def create_tool_execution_handler(
             try:
                 task_coordinator.tool_budget = effective_budget
             except Exception:
-                logger.debug(
-                    "Failed to sync task coordinator tool budget", exc_info=True
-                )
+                logger.debug("Failed to sync task coordinator tool budget", exc_info=True)
 
         tool_service = getattr(orchestrator, "_tool_service", None)
         if tool_service is not None and hasattr(tool_service, "set_tool_budget"):
@@ -865,8 +837,7 @@ def create_tool_execution_handler(
 
     return ToolExecutionHandler(
         recovery_runtime=(
-            getattr(orchestrator, "_recovery_service", None)
-            or orchestrator._recovery_coordinator
+            getattr(orchestrator, "_recovery_service", None) or orchestrator._recovery_coordinator
         ),
         chunk_generator=orchestrator._chunk_generator,
         message_adder=orchestrator,
@@ -893,7 +864,5 @@ def create_tool_execution_handler(
         set_tool_budget_limit=_set_budget_limit,
         execute_tool_calls=orchestrator.execute_tool_calls,
         get_tool_status_message=get_tool_status_message,
-        observed_files=(
-            set(orchestrator.observed_files) if orchestrator.observed_files else set()
-        ),
+        observed_files=(set(orchestrator.observed_files) if orchestrator.observed_files else set()),
     )

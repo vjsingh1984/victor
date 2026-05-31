@@ -40,9 +40,7 @@ def __getattr__(name: str):
         safety_py_path = framework_path / "safety.py"
 
         if not safety_py_path.exists():
-            raise ImportError(
-                f"Cannot find victor.framework.safety.py at {safety_py_path}"
-            )
+            raise ImportError(f"Cannot find victor.framework.safety.py at {safety_py_path}")
 
         # Load the module
         spec = importlib.util.spec_from_file_location(

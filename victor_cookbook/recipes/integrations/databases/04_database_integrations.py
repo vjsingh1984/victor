@@ -38,9 +38,7 @@ async def sqlite_schema_analysis(db_path: str):
     """Analyze SQLite database schema."""
     from victor import Agent
 
-    agent = Agent.create(
-        tools=["read", "python"], vertical="dataanalysis", temperature=0.3
-    )
+    agent = Agent.create(tools=["read", "python"], vertical="dataanalysis", temperature=0.3)
 
     result = await agent.run(f"""Analyze the SQLite database at {db_path}.
 
@@ -105,8 +103,7 @@ async def etl_pipeline():
 
     agent = Agent.create(tools=["python", "read", "write"], temperature=0.3)
 
-    result = await agent.run(
-        """Design an ETL pipeline to migrate data from PostgreSQL to MongoDB.
+    result = await agent.run("""Design an ETL pipeline to migrate data from PostgreSQL to MongoDB.
 
         Source (PostgreSQL):
         - Table: users(id, email, name, created_at, updated_at)
@@ -129,8 +126,7 @@ async def etl_pipeline():
         2. Transformation logic
         3. Loading strategy
         4. Error handling
-        """
-    )
+        """)
 
     return result.content
 
@@ -141,8 +137,7 @@ async def data_validation_rules():
 
     agent = Agent.create(temperature=0.2)
 
-    result = await agent.run(
-        """Generate Python data validation rules for user registration data.
+    result = await agent.run("""Generate Python data validation rules for user registration data.
 
         Fields to validate:
         - email (required, valid format, unique)
@@ -156,8 +151,7 @@ async def data_validation_rules():
         2. Error messages
         3. Pydantic schema
         4. Unit tests
-        """
-    )
+        """)
 
     return result.content
 

@@ -62,9 +62,7 @@ class TestPluginSystem(unittest.TestCase):
         self.assertEqual(len(plugins), 1)
         self.assertEqual(plugins[0].name, "test_plugin")
         # discover() scans victor.plugins
-        mock_get_entry_point_values.assert_called_once_with(
-            "victor.plugins", force=True
-        )
+        mock_get_entry_point_values.assert_called_once_with("victor.plugins", force=True)
 
     def test_plugin_registration(self):
         container = ServiceContainer()

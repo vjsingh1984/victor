@@ -68,9 +68,7 @@ class DelegateFollowUpCommand(BaseSlashCommand):
         contract_path = ctx.args[1]
         step_id = ctx.args[2] if len(ctx.args) > 2 else None
 
-        ctx.console.print(
-            "[dim]Routing delegate follow-up through workflow TeamStep runtime...[/]"
-        )
+        ctx.console.print("[dim]Routing delegate follow-up through workflow TeamStep runtime...[/]")
         try:
             await run_workflow_mode(
                 workflow_path=workflow_path,
@@ -106,9 +104,7 @@ class DelegateFollowUpCommand(BaseSlashCommand):
                 contract=contract,
             )
         except FileNotFoundError:
-            ctx.console.print(
-                f"[red]Delegate follow-up contract not found:[/] {contract_path}"
-            )
+            ctx.console.print(f"[red]Delegate follow-up contract not found:[/] {contract_path}")
             return
         except DelegateFollowUpContractError as e:
             ctx.console.print(f"[red]Invalid delegate follow-up contract:[/] {e}")

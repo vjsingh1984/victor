@@ -62,9 +62,7 @@ class SafetyRule:
 
     def __post_init__(self) -> None:
         """Normalize configured tool names to canonical runtime forms."""
-        self.tool_names = list(
-            dict.fromkeys(get_canonical_name(name) for name in self.tool_names)
-        )
+        self.tool_names = list(dict.fromkeys(get_canonical_name(name) for name in self.tool_names))
 
     def matches(self, tool_name: str, args: List[str]) -> bool:
         """Check whether the rule matches a tool invocation."""
@@ -302,9 +300,7 @@ class SafetyCoordinator:
         for rule in self._rules:
             if rule.matches(tool_name, args):
                 matched_rules.append(rule)
-                self._stats.rule_hits[rule.rule_id] = (
-                    self._stats.rule_hits.get(rule.rule_id, 0) + 1
-                )
+                self._stats.rule_hits[rule.rule_id] = self._stats.rule_hits.get(rule.rule_id, 0) + 1
 
                 if rule.action == SafetyAction.WARN:
                     warnings.append(f"{rule.description} (severity: {rule.severity})")
@@ -320,10 +316,7 @@ class SafetyCoordinator:
         if self._strict_mode and action == SafetyAction.WARN:
             action = SafetyAction.BLOCK
 
-        if (
-            action != SafetyAction.BLOCK
-            and most_severe_rule.severity > self._max_severity_to_allow
-        ):
+        if action != SafetyAction.BLOCK and most_severe_rule.severity > self._max_severity_to_allow:
             action = SafetyAction.BLOCK
 
         if action == SafetyAction.BLOCK:

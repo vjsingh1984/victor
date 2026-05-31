@@ -163,9 +163,7 @@ class TestMCPVertical:
         mock_registry.get_server = Mock(return_value=mock_server)
         vertical._registry = mock_registry
 
-        result = await vertical.call_mcp_tool(
-            "test-server", "test_tool", {"arg1": "value1"}
-        )
+        result = await vertical.call_mcp_tool("test-server", "test_tool", {"arg1": "value1"})
 
         assert result == {"result": "success"}
         mock_server.call_tool.assert_called_once_with("test_tool", {"arg1": "value1"})

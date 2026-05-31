@@ -128,9 +128,7 @@ class VerticalMetadataProvider(ABC):
             return {}
 
         last_error: Optional[Exception] = None
-        for module_path in vertical_runtime_module_candidates(
-            vertical_name, "capabilities"
-        ):
+        for module_path in vertical_runtime_module_candidates(vertical_name, "capabilities"):
             try:
                 module = importlib.import_module(module_path)
             except ImportError as exc:

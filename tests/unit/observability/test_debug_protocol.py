@@ -504,9 +504,7 @@ class TestAttachConfiguration:
             host="localhost",
             port=5678,
             language="python",
-            extra_options={
-                "pathMappings": [{"localRoot": "/src", "remoteRoot": "/app"}]
-            },
+            extra_options={"pathMappings": [{"localRoot": "/src", "remoteRoot": "/app"}]},
         )
         assert config.host == "localhost"
         assert config.port == 5678

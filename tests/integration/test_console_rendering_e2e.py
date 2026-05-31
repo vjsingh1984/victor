@@ -49,9 +49,7 @@ class TestConsoleRenderingE2E:
             # Simulate DeepSeek thinking pattern
             yield StreamChunk(
                 content="",
-                metadata={
-                    "reasoning_content": "Let me think about this step by step..."
-                },
+                metadata={"reasoning_content": "Let me think about this step by step..."},
             )
             yield StreamChunk(content="Here's my analysis:", metadata=None)
             yield StreamChunk(content="**Step 1:** Analyze the problem", metadata=None)
@@ -108,10 +106,7 @@ class TestConsoleRenderingE2E:
 
         # Content should still be visible
         assert len(content_buffer) > 0
-        assert (
-            "answer" in content_buffer.lower()
-            or "machine learning" in content_buffer.lower()
-        )
+        assert "answer" in content_buffer.lower() or "machine learning" in content_buffer.lower()
 
     @pytest.mark.asyncio
     async def test_content_not_lost_at_tool_boundaries(self):
@@ -218,10 +213,7 @@ class TestConsoleRenderingE2E:
         )
 
         # All content should be present
-        assert (
-            "First thinking" in content_buffer
-            or "requirements" in content_buffer.lower()
-        )
+        assert "First thinking" in content_buffer or "requirements" in content_buffer.lower()
         assert "Second thinking" in content_buffer or "option" in content_buffer.lower()
         assert "solution" in content_buffer.lower()
 

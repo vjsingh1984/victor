@@ -70,12 +70,8 @@ class TestCodeIntelligencePrewarm:
                 side_effect=fake_get_or_build_index,
             ) as mock_get,
         ):
-            first = await _prewarm_code_intelligence_index(
-                tmp_path, warmed, timeout=1.0
-            )
-            second = await _prewarm_code_intelligence_index(
-                tmp_path, warmed, timeout=1.0
-            )
+            first = await _prewarm_code_intelligence_index(tmp_path, warmed, timeout=1.0)
+            second = await _prewarm_code_intelligence_index(tmp_path, warmed, timeout=1.0)
 
         assert first.status == "ready"
         assert first.graph_nodes == 12
@@ -100,12 +96,8 @@ class TestCodeIntelligencePrewarm:
                 side_effect=fake_get_or_build_index,
             ) as mock_get,
         ):
-            first = await _prewarm_code_intelligence_index(
-                tmp_path, warmed, timeout=1.0
-            )
-            second = await _prewarm_code_intelligence_index(
-                tmp_path, warmed, timeout=1.0
-            )
+            first = await _prewarm_code_intelligence_index(tmp_path, warmed, timeout=1.0)
+            second = await _prewarm_code_intelligence_index(tmp_path, warmed, timeout=1.0)
 
         assert first.status == "failed"
         assert "missing embedding dependency" in first.message
@@ -184,9 +176,7 @@ class TestBenchmarkCodeIntelligenceDiagnostics:
         passed_without_graph.used_graph = False
         passed_without_graph.status = TaskStatus.PASSED
 
-        result = MagicMock(
-            task_results=[passed, failed_without_intel, passed_without_graph]
-        )
+        result = MagicMock(task_results=[passed, failed_without_intel, passed_without_graph])
 
         diagnostics = _summarize_code_intelligence_diagnostics(result)
 
@@ -214,9 +204,7 @@ class TestBenchmarkCodeIntelligenceDiagnostics:
         task.used_graph = True
         task.status = TaskStatus.PASSED
 
-        diagnostics = _summarize_code_intelligence_diagnostics(
-            MagicMock(task_results=[task])
-        )
+        diagnostics = _summarize_code_intelligence_diagnostics(MagicMock(task_results=[task]))
 
         assert diagnostics["tasks_without_code_intelligence"] == 0
         assert diagnostics["failed_tasks_without_code_intelligence"] == 0

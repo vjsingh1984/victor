@@ -107,12 +107,8 @@ console = Console()
 # Define doctor_command BEFORE registering it
 @app.command("doctor")
 def doctor_command(
-    verbose: bool = typer.Option(
-        False, "--verbose", "-v", help="Show detailed diagnostic output"
-    ),
-    fix: bool = typer.Option(
-        False, "--fix", "-f", help="Automatically fix common issues"
-    ),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Show detailed diagnostic output"),
+    fix: bool = typer.Option(False, "--fix", "-f", help="Automatically fix common issues"),
     config: bool = typer.Option(
         False,
         "--config",
@@ -197,14 +193,10 @@ def doctor_command(
 def run_command(
     message: str = typer.Argument(..., help="Message to send"),
     profile: str = typer.Option("default", "-p", "--profile", help="Profile to use"),
-    provider: Optional[str] = typer.Option(
-        None, "--provider", help="Override provider"
-    ),
+    provider: Optional[str] = typer.Option(None, "--provider", help="Override provider"),
     model: Optional[str] = typer.Option(None, "--model", "-m", help="Override model"),
     json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
-    code_only: bool = typer.Option(
-        False, "--code-only", help="Extract only code blocks"
-    ),
+    code_only: bool = typer.Option(False, "--code-only", help="Extract only code blocks"),
     stdin: bool = typer.Option(False, "--stdin", help="Read input from stdin"),
     input_file: Optional[str] = typer.Option(
         None, "-f", "--input-file", help="Read input from file"
@@ -370,9 +362,7 @@ def profile_alias(
 
 # --- Core Commands (default panel, shown first) ---
 app.add_typer(chat_app)
-app.add_typer(
-    auth_app, name="auth", help="Manage authentication and provider accounts."
-)
+app.add_typer(auth_app, name="auth", help="Manage authentication and provider accounts.")
 app.add_typer(init_app)
 app.add_typer(models_app)
 app.add_typer(profiles_app, name="profiles")
@@ -468,9 +458,7 @@ def _register_plugin_commands():
                         # Register command under its specified name at top level
                         app.add_typer(sub_app, name=name)
                 except Exception as e:
-                    console.print(
-                        f"[yellow]Warning:[/] Failed to load CLI command '{name}': {e}"
-                    )
+                    console.print(f"[yellow]Warning:[/] Failed to load CLI command '{name}': {e}")
 
         # 2. Register apps from get_cli_app (Legacy method)
         for plugin in registry.discover():
@@ -544,9 +532,7 @@ def callback(
 
                 exit_code = run_onboarding()
                 if exit_code != 0:
-                    console.print(
-                        "\n[yellow]Onboarding interrupted. Starting chat anyway...[/]"
-                    )
+                    console.print("\n[yellow]Onboarding interrupted. Starting chat anyway...[/]")
                 else:
                     console.print("\n[green]✓[/] Setup complete! Starting chat...\n")
 

@@ -74,9 +74,7 @@ class TestApprovalRequestLifecycle:
 
         assert request.id.startswith("req_")
         assert request.title == "Database Migration"
-        assert (
-            request.description == "Migrate production database schema with user data"
-        )
+        assert request.description == "Migrate production database schema with user data"
         assert request.context == context
         assert request.timeout_seconds == 600
         assert request.status == ApprovalStatus.PENDING
@@ -377,9 +375,7 @@ class TestRejectionFlowWithReasonPropagation:
                 reasons.append("Production environment requires additional approval")
 
             if request.context.get("changes_count", 0) > 100:
-                reasons.append(
-                    f"Large change set ({request.context.get('changes_count')} files)"
-                )
+                reasons.append(f"Large change set ({request.context.get('changes_count')} files)")
 
             if not request.context.get("tests_passed", False):
                 reasons.append("Tests must pass before approval")

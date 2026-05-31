@@ -126,9 +126,7 @@ def _migrate_legacy_schema(conn: sqlite3.Connection, cursor: sqlite3.Cursor) -> 
     return True
 
 
-def _verify_and_fix_partial_migration(
-    conn: sqlite3.Connection, cursor: sqlite3.Cursor
-) -> bool:
+def _verify_and_fix_partial_migration(conn: sqlite3.Connection, cursor: sqlite3.Cursor) -> bool:
     """Verify and fix partially migrated schemas.
 
     Args:
@@ -189,9 +187,7 @@ def _migrate_messages_table(conn: sqlite3.Connection, cursor: sqlite3.Cursor) ->
     apply_migration_0_3_0(str(conn.execute("SELECT :db_path:").fetchone()[0]))
 
 
-def _create_context_sizes_table(
-    conn: sqlite3.Connection, cursor: sqlite3.Cursor
-) -> None:
+def _create_context_sizes_table(conn: sqlite3.Connection, cursor: sqlite3.Cursor) -> None:
     """Create context_sizes table with correct schema."""
     # Drop old table if exists
     cursor.execute("DROP TABLE IF EXISTS context_sizes")
@@ -212,9 +208,7 @@ def _recreate_context_sizes(conn: sqlite3.Connection, cursor: sqlite3.Cursor) ->
     _create_context_sizes_table(conn, cursor)
 
 
-def _create_context_summaries_table(
-    conn: sqlite3.Connection, cursor: sqlite3.Cursor
-) -> None:
+def _create_context_summaries_table(conn: sqlite3.Connection, cursor: sqlite3.Cursor) -> None:
     """Create context_summaries table with correct schema."""
     cursor.execute("DROP TABLE IF EXISTS context_summaries")
 
@@ -237,9 +231,7 @@ def _create_context_summaries_table(
     """)
 
 
-def _migrate_model_families_table(
-    conn: sqlite3.Connection, cursor: sqlite3.Cursor
-) -> None:
+def _migrate_model_families_table(conn: sqlite3.Connection, cursor: sqlite3.Cursor) -> None:
     """Migrate model_families table."""
     # Rename old table
     cursor.execute("ALTER TABLE model_families RENAME TO model_families_legacy")
@@ -256,9 +248,7 @@ def _migrate_model_families_table(
     """)
 
 
-def _migrate_model_sizes_table(
-    conn: sqlite3.Connection, cursor: sqlite3.Cursor
-) -> None:
+def _migrate_model_sizes_table(conn: sqlite3.Connection, cursor: sqlite3.Cursor) -> None:
     """Migrate model_sizes table."""
     cursor.execute("ALTER TABLE model_sizes RENAME TO model_sizes_legacy")
 

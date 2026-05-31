@@ -98,9 +98,7 @@ class SessionFacade:
     def session_ledger(self) -> Any:
         """SessionLedger for append-only event log."""
         if self._runtime_state_host is not None:
-            return getattr(
-                self._runtime_state_host, "_session_ledger", self._session_ledger
-            )
+            return getattr(self._runtime_state_host, "_session_ledger", self._session_ledger)
         return self._session_ledger
 
     @session_ledger.setter

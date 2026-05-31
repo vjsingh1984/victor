@@ -156,7 +156,9 @@ class URLResolver(ContextResolver):
                     # Truncate if too long
                     if len(content) > self.max_content_length:
                         content = content[: self.max_content_length]
-                        content += f"\n\n[Content truncated at {self.max_content_length} characters]"
+                        content += (
+                            f"\n\n[Content truncated at {self.max_content_length} characters]"
+                        )
 
                     return ContextItem(
                         source_type="url",
@@ -339,9 +341,7 @@ class FolderResolver(ContextResolver):
         lines = []
 
         try:
-            entries = sorted(
-                path.iterdir(), key=lambda x: (not x.is_dir(), x.name.lower())
-            )
+            entries = sorted(path.iterdir(), key=lambda x: (not x.is_dir(), x.name.lower()))
         except PermissionError:
             return f"{prefix}[Permission denied]\n"
 
@@ -359,9 +359,7 @@ class FolderResolver(ContextResolver):
 
             if entry.is_dir():
                 lines.append(f"{prefix}{connector}{entry.name}/\n")
-                subtree = self._build_tree(
-                    entry, prefix + extension, depth + 1, file_count
-                )
+                subtree = self._build_tree(entry, prefix + extension, depth + 1, file_count)
                 lines.append(subtree)
             else:
                 file_count[0] += 1
@@ -417,15 +415,11 @@ class FolderResolver(ContextResolver):
                     key_path = folder_path / key_file
                     if key_path.exists() and key_path.is_file():
                         try:
-                            content = key_path.read_text(
-                                encoding="utf-8", errors="replace"
-                            )
+                            content = key_path.read_text(encoding="utf-8", errors="replace")
                             lines = content.split("\n")[: self.preview_lines]
                             preview = "\n".join(lines)
                             if len(content.split("\n")) > self.preview_lines:
-                                preview += (
-                                    f"\n... ({len(content.split(chr(10)))} total lines)"
-                                )
+                                preview += f"\n... ({len(content.split(chr(10)))} total lines)"
                             previews += f"\n\n--- {key_file} ---\n{preview}"
                         except Exception:
                             pass

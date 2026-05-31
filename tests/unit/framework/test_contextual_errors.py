@@ -69,19 +69,13 @@ class TestProviderConnectionError:
 
     def test_anthropic_provider_error(self):
         """Anthropic provider error has correct suggestion."""
-        error = ProviderConnectionError(
-            provider="anthropic", error=Exception("API Error")
-        )
+        error = ProviderConnectionError(provider="anthropic", error=Exception("API Error"))
         error_str = str(error)
-        assert "ANTHROPIC_API_KEY" in error_str or "ANTHROPIC_API_KEY" in (
-            error.suggestion or ""
-        )
+        assert "ANTHROPIC_API_KEY" in error_str or "ANTHROPIC_API_KEY" in (error.suggestion or "")
 
     def test_ollama_provider_error(self):
         """Ollama provider error has correct suggestion."""
-        error = ProviderConnectionError(
-            provider="ollama", error=Exception("Not running")
-        )
+        error = ProviderConnectionError(provider="ollama", error=Exception("Not running"))
         error_str = str(error)
         assert "ollama serve" in error_str or "Ollama" in error_str
 

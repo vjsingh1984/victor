@@ -73,9 +73,7 @@ class TestBuildFormatter:
             "tool": "cargo",
             "operation": "build",
             "success": False,
-            "errors": [
-                {"file": "src/main.rs", "line": 42, "message": "expected identifier"}
-            ],
+            "errors": [{"file": "src/main.rs", "line": 42, "message": "expected identifier"}],
         }
 
         result = formatter.format(data)
@@ -145,10 +143,7 @@ class TestBuildFormatter:
     def test_format_with_max_errors(self):
         """Test formatting with max_errors limit."""
         formatter = BuildFormatter()
-        errors = [
-            {"file": f"file{i}.py", "line": i, "message": f"error {i}"}
-            for i in range(20)
-        ]
+        errors = [{"file": f"file{i}.py", "line": i, "message": f"error {i}"} for i in range(20)]
         data = {
             "tool": "python",
             "operation": "compile",

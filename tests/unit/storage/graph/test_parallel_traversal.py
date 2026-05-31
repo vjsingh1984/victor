@@ -67,15 +67,11 @@ async def populated_graph_store(graph_store: SqliteGraphStore) -> SqliteGraphSto
         )
 
     # Create edges - center to each branch
-    edges = [
-        GraphEdge(src="center", dst=f"branch_{i}", type="CALLS") for i in range(20)
-    ]
+    edges = [GraphEdge(src="center", dst=f"branch_{i}", type="CALLS") for i in range(20)]
 
     # Create some cross-branch edges
     for i in range(10):
-        edges.append(
-            GraphEdge(src=f"branch_{i}", dst=f"branch_{i+10}", type="REFERENCES")
-        )
+        edges.append(GraphEdge(src=f"branch_{i}", dst=f"branch_{i+10}", type="REFERENCES"))
 
     await graph_store.upsert_nodes(nodes)
     await graph_store.upsert_edges(edges)
@@ -87,9 +83,7 @@ class TestParallelNeighborBatch:
     """Tests for parallel neighbor batch retrieval."""
 
     @pytest.mark.asyncio
-    async def test_get_neighbors_batch_single(
-        self, populated_graph_store: SqliteGraphStore
-    ):
+    async def test_get_neighbors_batch_single(self, populated_graph_store: SqliteGraphStore):
         """Test getting neighbors for a single node."""
         result = await populated_graph_store.get_neighbors_batch(["center"])
 
@@ -97,13 +91,9 @@ class TestParallelNeighborBatch:
         assert len(result["center"]) == 20  # 20 branches
 
     @pytest.mark.asyncio
-    async def test_get_neighbors_batch_multiple(
-        self, populated_graph_store: SqliteGraphStore
-    ):
+    async def test_get_neighbors_batch_multiple(self, populated_graph_store: SqliteGraphStore):
         """Test getting neighbors for multiple nodes in parallel."""
-        result = await populated_graph_store.get_neighbors_batch(
-            ["center", "branch_0", "branch_1"]
-        )
+        result = await populated_graph_store.get_neighbors_batch(["center", "branch_0", "branch_1"])
 
         # All nodes should have results
         assert "center" in result
@@ -140,9 +130,7 @@ class TestParallelNeighborBatch:
         assert result["nonexistent2"] == []
 
     @pytest.mark.asyncio
-    async def test_get_neighbors_batch_filtered(
-        self, populated_graph_store: SqliteGraphStore
-    ):
+    async def test_get_neighbors_batch_filtered(self, populated_graph_store: SqliteGraphStore):
         """Test getting neighbors with edge type filter."""
         result = await populated_graph_store.get_neighbors_batch(
             ["center", "branch_0"],
@@ -155,9 +143,7 @@ class TestParallelNeighborBatch:
                 assert edge.type == "CALLS"
 
     @pytest.mark.asyncio
-    async def test_get_neighbors_batch_in_direction(
-        self, populated_graph_store: SqliteGraphStore
-    ):
+    async def test_get_neighbors_batch_in_direction(self, populated_graph_store: SqliteGraphStore):
         """Test getting neighbors with incoming direction."""
         result = await populated_graph_store.get_neighbors_batch(
             ["branch_0", "branch_1"],
@@ -177,9 +163,7 @@ class TestParallelMultiHopTraversal:
     """Tests for parallel multi-hop traversal."""
 
     @pytest.mark.asyncio
-    async def test_parallel_traverse_single_seed(
-        self, populated_graph_store: SqliteGraphStore
-    ):
+    async def test_parallel_traverse_single_seed(self, populated_graph_store: SqliteGraphStore):
         """Test parallel traversal with single seed node."""
         result = await populated_graph_store.multi_hop_traverse_parallel(
             start_node_ids=["center"],
@@ -193,9 +177,7 @@ class TestParallelMultiHopTraversal:
         assert result.metadata["hops_completed"] >= 1
 
     @pytest.mark.asyncio
-    async def test_parallel_traverse_multiple_seeds(
-        self, populated_graph_store: SqliteGraphStore
-    ):
+    async def test_parallel_traverse_multiple_seeds(self, populated_graph_store: SqliteGraphStore):
         """Test parallel traversal with multiple seed nodes."""
         result = await populated_graph_store.multi_hop_traverse_parallel(
             start_node_ids=["center", "branch_0", "branch_1"],
@@ -226,9 +208,7 @@ class TestParallelMultiHopTraversal:
         assert len(result.edges) == 0
 
     @pytest.mark.asyncio
-    async def test_parallel_traverse_max_nodes_limit(
-        self, populated_graph_store: SqliteGraphStore
-    ):
+    async def test_parallel_traverse_max_nodes_limit(self, populated_graph_store: SqliteGraphStore):
         """Test that max_nodes limit is respected."""
         result = await populated_graph_store.multi_hop_traverse_parallel(
             start_node_ids=["center"],
@@ -257,9 +237,7 @@ class TestParallelMultiHopTraversal:
             assert edge.type == "CALLS"
 
     @pytest.mark.asyncio
-    async def test_parallel_traverse_max_workers(
-        self, populated_graph_store: SqliteGraphStore
-    ):
+    async def test_parallel_traverse_max_workers(self, populated_graph_store: SqliteGraphStore):
         """Test parallel traversal with different worker counts."""
         result_2 = await populated_graph_store.multi_hop_traverse_parallel(
             start_node_ids=["center"],
@@ -282,9 +260,7 @@ class TestParallelMultiHopTraversal:
         assert result_8.metadata["max_workers"] == 8
 
     @pytest.mark.asyncio
-    async def test_parallel_traverse_execution_time(
-        self, populated_graph_store: SqliteGraphStore
-    ):
+    async def test_parallel_traverse_execution_time(self, populated_graph_store: SqliteGraphStore):
         """Test that parallel traversal returns execution time."""
         result = await populated_graph_store.multi_hop_traverse_parallel(
             start_node_ids=["center"],
@@ -299,9 +275,7 @@ class TestParallelRetrieverIntegration:
     """Integration tests for parallel retrieval with MultiHopRetriever."""
 
     @pytest.mark.asyncio
-    async def test_retriever_parallel_method(
-        self, populated_graph_store: SqliteGraphStore
-    ):
+    async def test_retriever_parallel_method(self, populated_graph_store: SqliteGraphStore):
         """Test that MultiHopRetriever has parallel retrieval method."""
         from victor.core.graph_rag.retrieval import MultiHopRetriever
 
@@ -331,9 +305,7 @@ class TestParallelRetrieverIntegration:
         assert retriever._should_use_parallel(config) is False
 
     @pytest.mark.asyncio
-    async def test_retriever_parallel_threshold(
-        self, populated_graph_store: SqliteGraphStore
-    ):
+    async def test_retriever_parallel_threshold(self, populated_graph_store: SqliteGraphStore):
         """Test parallel retrieval threshold based on seed count."""
         from victor.core.graph_rag.retrieval import MultiHopRetriever
 
@@ -354,9 +326,7 @@ class TestParallelRetrieverIntegration:
         assert retriever._should_use_parallel(LargeConfig())
 
     @pytest.mark.asyncio
-    async def test_parallel_vs_consistency(
-        self, populated_graph_store: SqliteGraphStore
-    ):
+    async def test_parallel_vs_consistency(self, populated_graph_store: SqliteGraphStore):
         """Test that parallel and sequential results are consistent."""
         from victor.core.graph_rag.retrieval import MultiHopRetriever
 
@@ -387,9 +357,7 @@ class TestParallelPerformance:
     """Performance tests for parallel traversal."""
 
     @pytest.mark.asyncio
-    async def test_parallel_batch_efficiency(
-        self, populated_graph_store: SqliteGraphStore
-    ):
+    async def test_parallel_batch_efficiency(self, populated_graph_store: SqliteGraphStore):
         """Test that parallel batch fetching is efficient."""
         import time
 
@@ -420,9 +388,7 @@ class TestParallelPerformance:
         # the difference may be minimal due to lock contention.
 
     @pytest.mark.asyncio
-    async def test_parallel_handles_errors(
-        self, populated_graph_store: SqliteGraphStore
-    ):
+    async def test_parallel_handles_errors(self, populated_graph_store: SqliteGraphStore):
         """Test that parallel traversal handles errors gracefully."""
         # Mix of valid and invalid node IDs
         result = await populated_graph_store.get_neighbors_batch(

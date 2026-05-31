@@ -74,9 +74,7 @@ class SpinDetectorConfig:
     max_no_tool_turns: int = MAX_NO_TOOL_TURNS
     repetition_threshold: int = 3
     read_only_escalation_threshold: int = READ_ONLY_ESCALATION_THRESHOLD
-    read_only_tools: frozenset = field(
-        default_factory=lambda: frozenset({"read", "ls", "grep"})
-    )
+    read_only_tools: frozenset = field(default_factory=lambda: frozenset({"read", "ls", "grep"}))
 
 
 # ============================================================================
@@ -328,14 +326,9 @@ class NudgePolicy:
                 return nudge
 
         # Too many read-only turns: tailor based on intent
-        if (
-            detector.consecutive_read_only_turns
-            >= self._config.read_only_escalation_threshold
-        ):
+        if detector.consecutive_read_only_turns >= self._config.read_only_escalation_threshold:
             _is_write_task = (
-                intent is not None
-                and hasattr(intent, "value")
-                and intent.value == "write_allowed"
+                intent is not None and hasattr(intent, "value") and intent.value == "write_allowed"
             )
             if _is_write_task:
                 # Model has gathered enough context — push it to edit, not search

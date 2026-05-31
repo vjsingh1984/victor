@@ -88,9 +88,7 @@ class RoutingProfile:
         Returns:
             List of provider names in fallback order
         """
-        return self.fallback_chains.get(
-            task_type, self.fallback_chains.get("default", [])
-        )
+        return self.fallback_chains.get(task_type, self.fallback_chains.get("default", []))
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for YAML serialization."""

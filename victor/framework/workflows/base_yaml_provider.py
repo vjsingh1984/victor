@@ -390,9 +390,7 @@ class BaseYAMLWorkflowProvider(WorkflowProviderProtocol, ABC):
                     pattern="*.yaml",
                     config=config,
                 )
-                logger.debug(
-                    f"Loaded {len(self._workflows)} YAML workflows from {workflows_dir}"
-                )
+                logger.debug(f"Loaded {len(self._workflows)} YAML workflows from {workflows_dir}")
             except Exception as e:
                 logger.warning(f"Failed to load YAML workflows: {e}")
                 self._workflows = {}

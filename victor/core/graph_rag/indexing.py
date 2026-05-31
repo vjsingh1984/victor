@@ -491,9 +491,7 @@ class GraphIndexingPipeline:
             )
             self._merge_stats(stats, batch_stats)
             files_done += (
-                batch_stats.files_processed
-                + batch_stats.files_skipped
-                + batch_stats.files_deleted
+                batch_stats.files_processed + batch_stats.files_skipped + batch_stats.files_deleted
             )
 
         graph_changed = bool(
@@ -658,9 +656,7 @@ class GraphIndexingPipeline:
                     for callee_id in typed_candidates:
                         if callee_id == caller_id:
                             continue
-                        edges.append(
-                            GraphEdge(src=caller_id, dst=callee_id, type=EdgeType.CALLS)
-                        )
+                        edges.append(GraphEdge(src=caller_id, dst=callee_id, type=EdgeType.CALLS))
                 else:
                     receiver_typed_unresolved += 1
                 continue
@@ -689,9 +685,7 @@ class GraphIndexingPipeline:
             # that appear in many test modules.
             caller_file = node_file_index.get(caller_id)
             if caller_file is not None:
-                same_file = [
-                    c for c in candidates if node_file_index.get(c) == caller_file
-                ]
+                same_file = [c for c in candidates if node_file_index.get(c) == caller_file]
                 if same_file:
                     candidates = same_file
 
@@ -701,9 +695,7 @@ class GraphIndexingPipeline:
             for callee_id in candidates:
                 if callee_id == caller_id:
                     continue
-                edges.append(
-                    GraphEdge(src=caller_id, dst=callee_id, type=EdgeType.CALLS)
-                )
+                edges.append(GraphEdge(src=caller_id, dst=callee_id, type=EdgeType.CALLS))
 
         if edges:
             async with self._graph_store_write_batch():
@@ -860,9 +852,7 @@ class GraphIndexingPipeline:
                 # Source vanished between extraction and resolution — skip
                 # to keep the IMPORTS endpoints anchored at real nodes.
                 continue
-            module_names = self._parse_imports_for_language(
-                raw, src_file, language, root_path
-            )
+            module_names = self._parse_imports_for_language(raw, src_file, language, root_path)
             if module_names is None:
                 unsupported += 1
                 continue
@@ -1005,9 +995,7 @@ class GraphIndexingPipeline:
         return []
 
     @staticmethod
-    def _resolve_module_to_path(
-        module: str, language: str, root_path: Path
-    ) -> Optional[Path]:
+    def _resolve_module_to_path(module: str, language: str, root_path: Path) -> Optional[Path]:
         """Resolve a dotted module name to a project file path.
 
         Python: prefers ``foo/bar/baz.py``, falls back to
@@ -1076,8 +1064,7 @@ class GraphIndexingPipeline:
             # Check include patterns (if specified)
             if include_patterns:
                 included = any(
-                    fnmatch.fnmatch(path_str, pattern)
-                    or fnmatch.fnmatch(path_str, f"**/{pattern}")
+                    fnmatch.fnmatch(path_str, pattern) or fnmatch.fnmatch(path_str, f"**/{pattern}")
                     for pattern in include_patterns
                 )
                 if not included:
@@ -1107,16 +1094,12 @@ class GraphIndexingPipeline:
     ) -> GraphIndexStats:
         """Prepare an incremental indexing plan based on file mtimes and deletions."""
         root = (root_path or self.config.root_path).resolve()
-        self._files_to_process = {
-            self._graph_file_key(file_path, root) for file_path in files
-        }
+        self._files_to_process = {self._graph_file_key(file_path, root) for file_path in files}
         if not self.config.incremental:
             return GraphIndexStats()
 
         stats = GraphIndexStats()
-        current_files = {
-            self._graph_file_key(file_path, root): file_path for file_path in files
-        }
+        current_files = {self._graph_file_key(file_path, root): file_path for file_path in files}
         file_mtimes: Dict[str, float] = {}
         for path_str, file_path in list(current_files.items()):
             try:
@@ -1217,9 +1200,7 @@ class GraphIndexingPipeline:
             lang_func = getattr(lang_module, func_name)
             lang_obj = lang_func()
             ts_language = (
-                ts.Language(lang_obj)
-                if not isinstance(lang_obj, ts.Language)
-                else lang_obj
+                ts.Language(lang_obj) if not isinstance(lang_obj, ts.Language) else lang_obj
             )
             return ts.Parser(ts_language)
         except Exception:
@@ -1251,9 +1232,7 @@ class GraphIndexingPipeline:
             try:
                 from victor.core.indexing import CodeContextGraphBuilder
 
-                self._thread_local.ccg_builder = CodeContextGraphBuilder(
-                    self.graph_store
-                )
+                self._thread_local.ccg_builder = CodeContextGraphBuilder(self.graph_store)
             except ImportError:
                 self._thread_local.ccg_builder = None
         return self._thread_local.ccg_builder
@@ -1278,9 +1257,7 @@ class GraphIndexingPipeline:
             return [], []
         try:
             loop = self._get_thread_loop()
-            return loop.run_until_complete(
-                builder.build_ccg_for_file(file_path, language)
-            )
+            return loop.run_until_complete(builder.build_ccg_for_file(file_path, language))
         except Exception as exc:
             logger.debug("Thread CCG failed for %s: %s", file_path, exc)
             return [], []
@@ -1429,9 +1406,7 @@ class GraphIndexingPipeline:
                 ast_kind or sym.get("symbol_type") or "unknown",
                 sym.get("symbol_type") or "unknown",
             )
-            node_id = hashlib.sha256(
-                f"{file_str}:{name}:{line_int}".encode()
-            ).hexdigest()[:16]
+            node_id = hashlib.sha256(f"{file_str}:{name}:{line_int}".encode()).hexdigest()[:16]
             node = GraphNode(
                 node_id=node_id,
                 type=node_type,
@@ -1517,9 +1492,7 @@ class GraphIndexingPipeline:
                         file_path=str(file_path),
                     )
                     nodes.extend(
-                        self._provider_symbols_to_graph_nodes(
-                            symbol_dicts, file_path, language
-                        )
+                        self._provider_symbols_to_graph_nodes(symbol_dicts, file_path, language)
                     )
                     # Best-effort import capture — failure here must not poison
                     # symbol extraction, so missing extract_imports or a
@@ -1584,14 +1557,10 @@ class GraphIndexingPipeline:
             if parser is not None:
                 tree = parser.parse(bytes(source_code, "utf-8"))
                 nodes.extend(
-                    self._extract_definitions(
-                        tree.root_node, file_path, language, source_code
-                    )
+                    self._extract_definitions(tree.root_node, file_path, language, source_code)
                 )
             else:
-                nodes.extend(
-                    self._extract_symbols_fallback(source_code, file_path, language)
-                )
+                nodes.extend(self._extract_symbols_fallback(source_code, file_path, language))
         except Exception as e:
             logger.debug(
                 "Thread parse failed for %s (%s): %s — using fallback",
@@ -1600,9 +1569,7 @@ class GraphIndexingPipeline:
                 e,
             )
             try:
-                nodes.extend(
-                    self._extract_symbols_fallback(source_code, file_path, language)
-                )
+                nodes.extend(self._extract_symbols_fallback(source_code, file_path, language))
             except Exception:
                 pass
 
@@ -1631,9 +1598,7 @@ class GraphIndexingPipeline:
             stats.files_skipped += 1
             return stats
 
-        symbol_edges = await self._build_symbol_edges(
-            result.symbol_nodes, result.file_path
-        )
+        symbol_edges = await self._build_symbol_edges(result.symbol_nodes, result.file_path)
 
         async with self._graph_store_write_batch():
             await self.graph_store.upsert_nodes(result.symbol_nodes)
@@ -1658,9 +1623,7 @@ class GraphIndexingPipeline:
         # write path produces IMPORTS edges too.
         if result.raw_imports and result.language:
             for raw in result.raw_imports:
-                self._pending_import_records.append(
-                    (str(result.file_path), raw, result.language)
-                )
+                self._pending_import_records.append((str(result.file_path), raw, result.language))
         return stats
 
     async def _process_batch(
@@ -1763,9 +1726,7 @@ class GraphIndexingPipeline:
         try:
             await self.graph_store.delete_by_file(str(file_path))
         except Exception as exc:
-            logger.debug(
-                "Failed to clean vanished file %s from graph store: %s", file_path, exc
-            )
+            logger.debug("Failed to clean vanished file %s from graph store: %s", file_path, exc)
 
     @asynccontextmanager
     async def _graph_store_write_batch(self):
@@ -1846,19 +1807,13 @@ class GraphIndexingPipeline:
 
             # Extract function/class definitions
             nodes.extend(
-                self._extract_definitions(
-                    tree.root_node, file_path, language, source_code
-                )
+                self._extract_definitions(tree.root_node, file_path, language, source_code)
             )
 
         except (ImportError, AttributeError, ValueError, Exception) as e:
             # Fall back to simple regex-based extraction
-            logger.debug(
-                f"Tree-sitter extraction failed for {language}: {e}, using fallback"
-            )
-            nodes.extend(
-                self._extract_symbols_fallback(source_code, file_path, language)
-            )
+            logger.debug(f"Tree-sitter extraction failed for {language}: {e}, using fallback")
+            nodes.extend(self._extract_symbols_fallback(source_code, file_path, language))
 
         return nodes
 
@@ -1901,9 +1856,7 @@ class GraphIndexingPipeline:
                 name = self._extract_name(node)
 
                 # Get signature
-                signature = self._extract_signature(
-                    node, source_lines, start_line, end_line
-                )
+                signature = self._extract_signature(node, source_lines, start_line, end_line)
 
                 # Get docstring
                 docstring = self._extract_docstring(
@@ -1913,9 +1866,9 @@ class GraphIndexingPipeline:
                 # Generate node ID
                 import hashlib
 
-                node_id = hashlib.sha256(
-                    f"{file_str}:{name}:{start_line}".encode()
-                ).hexdigest()[:16]
+                node_id = hashlib.sha256(f"{file_str}:{name}:{start_line}".encode()).hexdigest()[
+                    :16
+                ]
 
                 # Determine visibility
                 visibility = self._determine_visibility(node, name, language)
@@ -2172,9 +2125,7 @@ class GraphIndexingPipeline:
                 func_match = re.match(func_pattern, line.strip())
                 if func_match:
                     name = func_match.group(2)
-                    node_id = hashlib.sha256(
-                        f"{file_path}:{name}:{i}".encode()
-                    ).hexdigest()[:16]
+                    node_id = hashlib.sha256(f"{file_path}:{name}:{i}".encode()).hexdigest()[:16]
                     nodes.append(
                         GraphNode(
                             node_id=node_id,
@@ -2190,9 +2141,7 @@ class GraphIndexingPipeline:
                 class_match = re.match(class_pattern, line.strip())
                 if class_match:
                     name = class_match.group(1)
-                    node_id = hashlib.sha256(
-                        f"{file_path}:{name}:{i}".encode()
-                    ).hexdigest()[:16]
+                    node_id = hashlib.sha256(f"{file_path}:{name}:{i}".encode()).hexdigest()[:16]
                     nodes.append(
                         GraphNode(
                             node_id=node_id,
@@ -2296,9 +2245,7 @@ class GraphIndexingPipeline:
             if handler is not None:
                 logger.debug(f"Using edge handler for language: {language}")
                 edges.extend(
-                    await self._build_edges_with_handler(
-                        handler, nodes, file_path, name_to_ids
-                    )
+                    await self._build_edges_with_handler(handler, nodes, file_path, name_to_ids)
                 )
                 return edges
         except ImportError:
@@ -2435,9 +2382,7 @@ class GraphIndexingPipeline:
 
             # Find function calls
             calls = self._extract_function_calls(tree.root_node, language)
-            logger.debug(
-                f"Legacy: Found {len(calls)} function calls in {file_path.name}"
-            )
+            logger.debug(f"Legacy: Found {len(calls)} function calls in {file_path.name}")
 
             # Buffer raw records for project-wide resolution in
             # _resolve_cross_file_calls(); see the handler path for the
@@ -2447,13 +2392,9 @@ class GraphIndexingPipeline:
             buffered = 0
             for caller_name, callee_name in calls:
                 for caller_id in name_to_ids.get(caller_name, []):
-                    self._pending_call_records.append(
-                        (caller_id, callee_name, None, False)
-                    )
+                    self._pending_call_records.append((caller_id, callee_name, None, False))
                     buffered += 1
-            logger.debug(
-                f"Legacy: Buffered {buffered} call records for cross-file resolution"
-            )
+            logger.debug(f"Legacy: Buffered {buffered} call records for cross-file resolution")
 
         except (ImportError, Exception) as e:
             logger.debug(f"Legacy CALLS edge extraction failed: {e}")
@@ -2497,10 +2438,7 @@ class GraphIndexingPipeline:
                 if callee_name and current_function:
                     calls.append((current_function, callee_name))
 
-            elif (
-                language in ("javascript", "typescript")
-                and node_type == "call_expression"
-            ):
+            elif language in ("javascript", "typescript") and node_type == "call_expression":
                 callee_name = self._extract_callee_name(node, language)
                 if callee_name and current_function:
                     calls.append((current_function, callee_name))
@@ -2632,9 +2570,7 @@ class GraphIndexingPipeline:
             # Get embedding service for direct text embeddings
             embedding_service = get_embedding_service()
             if embedding_service is None:
-                logger.warning(
-                    "EmbeddingService not available, skipping embedding generation"
-                )
+                logger.warning("EmbeddingService not available, skipping embedding generation")
                 return stats
 
             # Get all nodes from graph store
@@ -2721,9 +2657,7 @@ class GraphIndexingPipeline:
         target.module_metrics_computed += source.module_metrics_computed
         target.provider_fallbacks += source.provider_fallbacks
         target.cross_file_calls_resolved += source.cross_file_calls_resolved
-        target.cross_file_relationships_resolved += (
-            source.cross_file_relationships_resolved
-        )
+        target.cross_file_relationships_resolved += source.cross_file_relationships_resolved
         target.imports_resolved += source.imports_resolved
         target.error_count += source.error_count
         target.errors.extend(source.errors)
@@ -2796,16 +2730,12 @@ class _IndexingStreamPipeline:
 
         async def _parse_and_put(fp: Path) -> None:
             try:
-                result = await loop.run_in_executor(
-                    executor, self._pipeline._parse_file_sync, fp
-                )
+                result = await loop.run_in_executor(executor, self._pipeline._parse_file_sync, fp)
             except Exception as exc:
                 result = ParseResult(file_path=fp, language=None, error=exc)
             await queue.put(result)  # blocks when queue full → natural back-pressure
 
-        await asyncio.gather(
-            *(_parse_and_put(fp) for fp in files), return_exceptions=True
-        )
+        await asyncio.gather(*(_parse_and_put(fp) for fp in files), return_exceptions=True)
         await queue.put(self._STREAM_DONE)
 
     # ── Consumer ───────────────────────────────────────────────────────────
@@ -2857,9 +2787,7 @@ class _IndexingStreamPipeline:
             pending.append(result)
 
             if len(pending) >= self._write_batch_size:
-                flush_stats = await self._flush(
-                    pending, files_done, total_files, progress_callback
-                )
+                flush_stats = await self._flush(pending, files_done, total_files, progress_callback)
                 self._pipeline._merge_stats(stats, flush_stats)
                 files_done += len(pending)
                 pending.clear()
@@ -2951,9 +2879,7 @@ class _IndexingStreamPipeline:
                     stats.errors.append(f"{result.file_path}: {e}")
 
         if progress_callback and batch:
-            progress_callback(
-                done_offset + len(batch), total_files, str(batch[-1].file_path)
-            )
+            progress_callback(done_offset + len(batch), total_files, str(batch[-1].file_path))
 
         return stats
 

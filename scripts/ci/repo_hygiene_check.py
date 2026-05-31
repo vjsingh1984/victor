@@ -579,9 +579,7 @@ def _check_text_requirements(
 ) -> None:
     for requirement in requirements:
         if requirement.needle not in text:
-            findings.append(
-                HygieneFinding(path, f"{contract.label} {requirement.missing_message}")
-            )
+            findings.append(HygieneFinding(path, f"{contract.label} {requirement.missing_message}"))
 
 
 def _workflow_on_config(data: object) -> object | None:
@@ -603,23 +601,17 @@ def check_workflow_yaml(root: Path) -> list[HygieneFinding]:
         try:
             loaded = yaml.safe_load(path.read_text())
         except yaml.YAMLError as exc:
-            findings.append(
-                HygieneFinding(rel_path, f"workflow YAML failed to parse: {exc}")
-            )
+            findings.append(HygieneFinding(rel_path, f"workflow YAML failed to parse: {exc}"))
             continue
 
         if not isinstance(loaded, dict):
-            findings.append(
-                HygieneFinding(rel_path, "workflow must parse to a mapping")
-            )
+            findings.append(HygieneFinding(rel_path, "workflow must parse to a mapping"))
             continue
 
         name = loaded.get("name")
         if not isinstance(name, str) or not name.strip():
             findings.append(
-                HygieneFinding(
-                    rel_path, "workflow is missing a non-empty top-level name"
-                )
+                HygieneFinding(rel_path, "workflow is missing a non-empty top-level name")
             )
 
         on_config = _workflow_on_config(loaded)
@@ -722,9 +714,7 @@ def check_makefile_lint_gate(root: Path) -> list[HygieneFinding]:
 
     mypy_lines = [line.strip() for line in lint_block if "mypy " in line]
     if not mypy_lines:
-        findings.append(
-            HygieneFinding(rel_path, "lint target is missing a mypy command")
-        )
+        findings.append(HygieneFinding(rel_path, "lint target is missing a mypy command"))
         return findings
 
     if not any("mypy victor" in line for line in mypy_lines):
@@ -732,9 +722,7 @@ def check_makefile_lint_gate(root: Path) -> list[HygieneFinding]:
 
     if any("|| true" in line for line in mypy_lines):
         findings.append(
-            HygieneFinding(
-                rel_path, "lint target must not suppress mypy failure with `|| true`"
-            )
+            HygieneFinding(rel_path, "lint target must not suppress mypy failure with `|| true`")
         )
 
     return findings
@@ -755,9 +743,7 @@ def check_vertical_extra_metadata(root: Path) -> list[HygieneFinding]:
     project = data.get("project", {})
     optional_deps = project.get("optional-dependencies", {})
     if not isinstance(optional_deps, dict):
-        return [
-            HygieneFinding(rel_path, "project.optional-dependencies must be a mapping")
-        ]
+        return [HygieneFinding(rel_path, "project.optional-dependencies must be a mapping")]
     project_name = str(project.get("name", "")).strip().lower()
 
     findings: list[HygieneFinding] = []
@@ -886,9 +872,7 @@ def _workflow_has_blocking_pip_audit_step(path: Path) -> bool:
                 continue
             uses = step.get("uses")
             run = step.get("run")
-            has_pip_audit_action = (
-                isinstance(uses, str) and "pypa/gh-action-pip-audit" in uses
-            )
+            has_pip_audit_action = isinstance(uses, str) and "pypa/gh-action-pip-audit" in uses
             has_pip_audit_command = isinstance(run, str) and "pip-audit" in run
             if not has_pip_audit_action and not has_pip_audit_command:
                 continue
@@ -927,10 +911,7 @@ def _workflow_has_blocking_bandit_high_step(path: Path) -> bool:
                 continue
             if "bandit -r victor/" not in run:
                 continue
-            if (
-                "--severity-level high" not in run
-                or "--confidence-level high" not in run
-            ):
+            if "--severity-level high" not in run or "--confidence-level high" not in run:
                 continue
             if bool(step.get("continue-on-error", False)):
                 continue
@@ -947,9 +928,7 @@ def check_security_baseline(root: Path) -> list[HygieneFinding]:
         root / ".github" / "workflows" / "security.yml",
     ]
     if not any(
-        _workflow_has_blocking_trivy_step(path)
-        for path in blocking_sources
-        if path.is_file()
+        _workflow_has_blocking_trivy_step(path) for path in blocking_sources if path.is_file()
     ):
         findings.append(
             HygieneFinding(
@@ -1001,9 +980,7 @@ def check_security_baseline(root: Path) -> list[HygieneFinding]:
             )
         if "### Current Thresholds" not in text:
             findings.append(
-                HygieneFinding(
-                    Path("SECURITY.md"), "missing the Current Thresholds section"
-                ),
+                HygieneFinding(Path("SECURITY.md"), "missing the Current Thresholds section"),
             )
         if "Trivy filesystem scan" not in text:
             findings.append(
@@ -1027,16 +1004,12 @@ def check_security_baseline(root: Path) -> list[HygieneFinding]:
                 ),
             )
     else:
-        findings.append(
-            HygieneFinding(Path("SECURITY.md"), "security policy document is missing")
-        )
+        findings.append(HygieneFinding(Path("SECURITY.md"), "security policy document is missing"))
 
     return findings
 
 
-def check_deprecation_contract(
-    root: Path, contract: DeprecationContract
-) -> list[HygieneFinding]:
+def check_deprecation_contract(root: Path, contract: DeprecationContract) -> list[HygieneFinding]:
     """Validate one public deprecation contract across code and docs.
 
     If the compatibility surface still exists in runtime files, its warning
@@ -1150,9 +1123,7 @@ def run_checks(root: Path) -> list[HygieneFinding]:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--root", type=Path, default=Path.cwd(), help="Repository root to scan"
-    )
+    parser.add_argument("--root", type=Path, default=Path.cwd(), help="Repository root to scan")
     args = parser.parse_args(argv)
 
     root = args.root.resolve()

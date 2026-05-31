@@ -38,9 +38,7 @@ def _normalize_tool_list(tools: Any) -> list[str]:
     """Normalize configured tool lists to canonical runtime names."""
     if not isinstance(tools, list):
         return []
-    return [
-        get_canonical_name(tool) if isinstance(tool, str) else tool for tool in tools
-    ]
+    return [get_canonical_name(tool) if isinstance(tool, str) else tool for tool in tools]
 
 
 def _normalize_task_tool_config(config: Dict[str, Any]) -> Dict[str, Any]:
@@ -54,9 +52,7 @@ def _normalize_task_tool_config(config: Dict[str, Any]) -> Dict[str, Any]:
         if not isinstance(task_data, dict):
             continue
         task_copy = dict(task_data)
-        task_copy["required_tools"] = _normalize_tool_list(
-            task_data.get("required_tools", [])
-        )
+        task_copy["required_tools"] = _normalize_tool_list(task_data.get("required_tools", []))
 
         raw_stage_tools = task_data.get("stage_tools", {})
         normalized_stage_tools = {}
@@ -217,9 +213,7 @@ class TaskToolConfigLoader:
                     self._config = _normalize_task_tool_config(yaml.safe_load(f) or {})
                     logger.debug(f"Loaded task tool config from {self._config_path}")
             else:
-                logger.warning(
-                    f"Task tool config not found at {self._config_path}, using defaults"
-                )
+                logger.warning(f"Task tool config not found at {self._config_path}, using defaults")
                 self._config = _normalize_task_tool_config(self.DEFAULT_CONFIG)
         except Exception as e:
             logger.error(f"Failed to load task tool config: {e}")

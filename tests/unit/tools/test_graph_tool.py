@@ -18,21 +18,11 @@ async def _seed_graph(store: MemoryGraphStore) -> None:
         [
             GraphNode(node_id="file:a.py", type="file", name="a.py", file="a.py"),
             GraphNode(node_id="file:b.py", type="file", name="b.py", file="b.py"),
-            GraphNode(
-                node_id="symbol:a.py:start", type="function", name="start", file="a.py"
-            ),
-            GraphNode(
-                node_id="symbol:a.py:mid", type="function", name="mid", file="a.py"
-            ),
-            GraphNode(
-                node_id="symbol:b.py:end", type="function", name="end", file="b.py"
-            ),
-            GraphNode(
-                node_id="module:pkg.alpha", type="module", name="pkg.alpha", file="a.py"
-            ),
-            GraphNode(
-                node_id="module:pkg.beta", type="module", name="pkg.beta", file="b.py"
-            ),
+            GraphNode(node_id="symbol:a.py:start", type="function", name="start", file="a.py"),
+            GraphNode(node_id="symbol:a.py:mid", type="function", name="mid", file="a.py"),
+            GraphNode(node_id="symbol:b.py:end", type="function", name="end", file="b.py"),
+            GraphNode(node_id="module:pkg.alpha", type="module", name="pkg.alpha", file="a.py"),
+            GraphNode(node_id="module:pkg.beta", type="module", name="pkg.beta", file="b.py"),
         ]
     )
     await store.upsert_edges(
@@ -91,12 +81,8 @@ async def _seed_relationship_graph(store: MemoryGraphStore) -> None:
     )
     await store.upsert_edges(
         [
-            GraphEdge(
-                src="symbol:flow.py:caller", dst="symbol:flow.py:callee", type="CALLS"
-            ),
-            GraphEdge(
-                src="symbol:types.py:Child", dst="symbol:types.py:Base", type="INHERITS"
-            ),
+            GraphEdge(src="symbol:flow.py:caller", dst="symbol:flow.py:callee", type="CALLS"),
+            GraphEdge(src="symbol:types.py:Child", dst="symbol:types.py:Base", type="INHERITS"),
             GraphEdge(
                 src="symbol:parts.py:Whole",
                 dst="symbol:parts.py:Part",
@@ -117,9 +103,7 @@ async def test_graph_tool_stats_and_path(monkeypatch, tmp_path: Path):
     async def _fake_get_or_build_index(*args, **kwargs):
         return fake_index, False
 
-    monkeypatch.setattr(
-        graph_tool_module, "_get_or_build_index", _fake_get_or_build_index
-    )
+    monkeypatch.setattr(graph_tool_module, "_get_or_build_index", _fake_get_or_build_index)
 
     exec_ctx = {"settings": SimpleNamespace(codebase_graph_store="memory")}
 
@@ -155,9 +139,7 @@ async def test_graph_tool_stats_and_path(monkeypatch, tmp_path: Path):
 async def test_expensive_graph_analysis_uses_cache(monkeypatch, tmp_path: Path):
     from victor.tools import graph_tool as graph_tool_module
 
-    monkeypatch.setattr(
-        graph_tool_module, "_graph_store_fingerprint", lambda _root: 1.0
-    )
+    monkeypatch.setattr(graph_tool_module, "_graph_store_fingerprint", lambda _root: 1.0)
     graph_tool_module._GRAPH_ANALYTICS_CACHE.clear()
     calls = 0
 
@@ -246,9 +228,7 @@ async def test_expensive_graph_analysis_does_not_block_event_loop(tmp_path: Path
 
 
 @pytest.mark.asyncio
-async def test_graph_tool_connected_components_alias_honors_edge_group(
-    monkeypatch, tmp_path: Path
-):
+async def test_graph_tool_connected_components_alias_honors_edge_group(monkeypatch, tmp_path: Path):
     from victor.tools import graph_tool as graph_tool_module
 
     store = MemoryGraphStore()
@@ -258,9 +238,7 @@ async def test_graph_tool_connected_components_alias_honors_edge_group(
     async def _fake_get_or_build_index(*args, **kwargs):
         return fake_index, False
 
-    monkeypatch.setattr(
-        graph_tool_module, "_get_or_build_index", _fake_get_or_build_index
-    )
+    monkeypatch.setattr(graph_tool_module, "_get_or_build_index", _fake_get_or_build_index)
 
     result = await graph_tool_module.graph(
         mode="connectedComponents",
@@ -275,9 +253,7 @@ async def test_graph_tool_connected_components_alias_honors_edge_group(
     assert result["requested_mode"] == "connectedComponents"
     assert result["edge_group"] == "type_hierarchy"
     assert result["effective_edge_types"] == ["IMPLEMENTS", "INHERITS", "IS_A"]
-    components = [
-        set(component["nodes"]) for component in result["result"]["components"]
-    ]
+    components = [set(component["nodes"]) for component in result["result"]["components"]]
     assert {"symbol:types.py:Child", "symbol:types.py:Base"} in components
     assert {"symbol:flow.py:caller", "symbol:flow.py:callee"} not in components
 
@@ -295,9 +271,7 @@ async def test_graph_tool_edge_type_alias_filters_relationship_components(
     async def _fake_get_or_build_index(*args, **kwargs):
         return fake_index, False
 
-    monkeypatch.setattr(
-        graph_tool_module, "_get_or_build_index", _fake_get_or_build_index
-    )
+    monkeypatch.setattr(graph_tool_module, "_get_or_build_index", _fake_get_or_build_index)
 
     result = await graph_tool_module.graph(
         mode="components",
@@ -310,9 +284,7 @@ async def test_graph_tool_edge_type_alias_filters_relationship_components(
     assert result["success"] is True
     assert result["mode"] == "clusters"
     assert result["effective_edge_types"] == ["CALLS"]
-    components = [
-        set(component["nodes"]) for component in result["result"]["components"]
-    ]
+    components = [set(component["nodes"]) for component in result["result"]["components"]]
     assert {"symbol:flow.py:caller", "symbol:flow.py:callee"} in components
     assert {"symbol:types.py:Child", "symbol:types.py:Base"} not in components
 
@@ -330,9 +302,7 @@ async def test_graph_tool_subgraph_recovers_query_to_best_matching_node(
     async def _fake_get_or_build_index(*args, **kwargs):
         return fake_index, False
 
-    monkeypatch.setattr(
-        graph_tool_module, "_get_or_build_index", _fake_get_or_build_index
-    )
+    monkeypatch.setattr(graph_tool_module, "_get_or_build_index", _fake_get_or_build_index)
 
     result = await graph_tool_module.graph(
         mode="subgraph",
@@ -387,9 +357,7 @@ async def test_graph_tool_supports_overview_alias(monkeypatch, tmp_path: Path):
     async def _fake_get_or_build_index(*args, **kwargs):
         return fake_index, False
 
-    monkeypatch.setattr(
-        graph_tool_module, "_get_or_build_index", _fake_get_or_build_index
-    )
+    monkeypatch.setattr(graph_tool_module, "_get_or_build_index", _fake_get_or_build_index)
 
     exec_ctx = {"settings": SimpleNamespace(codebase_graph_store="memory")}
 
@@ -418,12 +386,8 @@ async def test_graph_tool_overview_uses_project_db_summary_without_index_rebuild
     await store.upsert_nodes(
         [
             GraphNode(node_id="file:a.py", type="file", name="a.py", file="a.py"),
-            GraphNode(
-                node_id="symbol:a.py:run", type="function", name="run", file="a.py"
-            ),
-            GraphNode(
-                node_id="symbol:b.py:call", type="function", name="call", file="b.py"
-            ),
+            GraphNode(node_id="symbol:a.py:run", type="function", name="run", file="a.py"),
+            GraphNode(node_id="symbol:b.py:call", type="function", name="call", file="b.py"),
         ]
     )
     await store.upsert_edges(
@@ -436,9 +400,7 @@ async def test_graph_tool_overview_uses_project_db_summary_without_index_rebuild
         raise AssertionError("overview should use the project-db summary fast path")
 
     monkeypatch.setattr(graph_tool_module, "_load_graph", _unexpected_load_graph)
-    monkeypatch.setattr(
-        graph_tool_module, "_project_graph_watch_daemon_active", lambda _root: True
-    )
+    monkeypatch.setattr(graph_tool_module, "_project_graph_watch_daemon_active", lambda _root: True)
 
     result = await graph_tool_module.graph(mode="overview", path=str(tmp_path), top_k=5)
 
@@ -461,12 +423,8 @@ async def test_graph_tool_broad_analytics_requires_project_db_or_explicit_reinde
         raise AssertionError("broad analytics should not implicitly rebuild indexes")
 
     monkeypatch.setattr(graph_tool_module, "_load_graph", _unexpected_load_graph)
-    monkeypatch.setattr(
-        graph_tool_module, "_project_graph_has_data", lambda _root: False
-    )
-    monkeypatch.setattr(
-        graph_tool_module, "_project_graph_watch_daemon_active", lambda _root: True
-    )
+    monkeypatch.setattr(graph_tool_module, "_project_graph_has_data", lambda _root: False)
+    monkeypatch.setattr(graph_tool_module, "_project_graph_watch_daemon_active", lambda _root: True)
 
     result = await graph_tool_module.graph(mode="module_pagerank", path=str(tmp_path))
 
@@ -483,12 +441,8 @@ async def test_graph_tool_symbol_rankings_keep_absolute_ids_and_qualified_names(
     store = MemoryGraphStore()
     await store.upsert_nodes(
         [
-            GraphNode(
-                node_id="symbol:a.py:run", type="function", name="run", file="a.py"
-            ),
-            GraphNode(
-                node_id="symbol:b.py:run", type="function", name="run", file="b.py"
-            ),
+            GraphNode(node_id="symbol:a.py:run", type="function", name="run", file="a.py"),
+            GraphNode(node_id="symbol:b.py:run", type="function", name="run", file="b.py"),
             GraphNode(
                 node_id="symbol:c.py:caller",
                 type="function",
@@ -508,9 +462,7 @@ async def test_graph_tool_symbol_rankings_keep_absolute_ids_and_qualified_names(
     async def _fake_get_or_build_index(*args, **kwargs):
         return fake_index, False
 
-    monkeypatch.setattr(
-        graph_tool_module, "_get_or_build_index", _fake_get_or_build_index
-    )
+    monkeypatch.setattr(graph_tool_module, "_get_or_build_index", _fake_get_or_build_index)
 
     exec_ctx = {"settings": SimpleNamespace(codebase_graph_store="memory")}
 
@@ -543,9 +495,7 @@ async def test_graph_tool_supports_hub_analysis_alias(monkeypatch, tmp_path: Pat
     async def _fake_get_or_build_index(*args, **kwargs):
         return fake_index, False
 
-    monkeypatch.setattr(
-        graph_tool_module, "_get_or_build_index", _fake_get_or_build_index
-    )
+    monkeypatch.setattr(graph_tool_module, "_get_or_build_index", _fake_get_or_build_index)
 
     exec_ctx = {"settings": SimpleNamespace(codebase_graph_store="memory")}
 
@@ -563,9 +513,7 @@ async def test_graph_tool_supports_hub_analysis_alias(monkeypatch, tmp_path: Pat
 
 
 @pytest.mark.asyncio
-async def test_graph_tool_supports_top_k_alias_for_search_queries(
-    monkeypatch, tmp_path: Path
-):
+async def test_graph_tool_supports_top_k_alias_for_search_queries(monkeypatch, tmp_path: Path):
     from victor.tools import graph_tool as graph_tool_module
 
     store = MemoryGraphStore()
@@ -575,9 +523,7 @@ async def test_graph_tool_supports_top_k_alias_for_search_queries(
     async def _fake_get_or_build_index(*args, **kwargs):
         return fake_index, False
 
-    monkeypatch.setattr(
-        graph_tool_module, "_get_or_build_index", _fake_get_or_build_index
-    )
+    monkeypatch.setattr(graph_tool_module, "_get_or_build_index", _fake_get_or_build_index)
 
     exec_ctx = {"settings": SimpleNamespace(codebase_graph_store="memory")}
 
@@ -607,9 +553,7 @@ async def test_graph_tool_accepts_enum_mode_values(monkeypatch, tmp_path: Path):
     async def _fake_get_or_build_index(*args, **kwargs):
         return fake_index, False
 
-    monkeypatch.setattr(
-        graph_tool_module, "_get_or_build_index", _fake_get_or_build_index
-    )
+    monkeypatch.setattr(graph_tool_module, "_get_or_build_index", _fake_get_or_build_index)
 
     exec_ctx = {"settings": SimpleNamespace(codebase_graph_store="memory")}
 
@@ -640,12 +584,8 @@ async def test_graph_tool_skips_local_background_refresh_when_daemon_is_active(
 
     fake_manager = SimpleNamespace(ensure_background_refresh=AsyncMock())
 
-    monkeypatch.setattr(
-        graph_tool_module, "_get_or_build_index", _fake_get_or_build_index
-    )
-    monkeypatch.setattr(
-        graph_tool_module, "_project_graph_watch_daemon_active", lambda _root: True
-    )
+    monkeypatch.setattr(graph_tool_module, "_get_or_build_index", _fake_get_or_build_index)
+    monkeypatch.setattr(graph_tool_module, "_project_graph_watch_daemon_active", lambda _root: True)
     monkeypatch.setattr(
         "victor.core.indexing.graph_manager.GraphManager.get_instance",
         staticmethod(lambda: fake_manager),
@@ -662,9 +602,7 @@ async def test_graph_tool_skips_local_background_refresh_when_daemon_is_active(
 
 
 @pytest.mark.asyncio
-async def test_graph_tool_reuses_project_root_for_nested_node_queries(
-    monkeypatch, tmp_path: Path
-):
+async def test_graph_tool_reuses_project_root_for_nested_node_queries(monkeypatch, tmp_path: Path):
     from victor.tools import graph_tool as graph_tool_module
 
     project_root = tmp_path.resolve()
@@ -749,9 +687,7 @@ async def test_graph_tool_unsupported_mode_returns_follow_up_suggestions(
     async def _fake_get_or_build_index(*args, **kwargs):
         return fake_index, False
 
-    monkeypatch.setattr(
-        graph_tool_module, "_get_or_build_index", _fake_get_or_build_index
-    )
+    monkeypatch.setattr(graph_tool_module, "_get_or_build_index", _fake_get_or_build_index)
 
     exec_ctx = {"settings": SimpleNamespace(codebase_graph_store="memory")}
 
@@ -768,9 +704,7 @@ async def test_graph_tool_unsupported_mode_returns_follow_up_suggestions(
     assert "metadata" in result
     suggestions = result["metadata"]["follow_up_suggestions"]
     assert suggestions
-    assert any(
-        'graph(mode="search"' in suggestion["command"] for suggestion in suggestions
-    )
+    assert any('graph(mode="search"' in suggestion["command"] for suggestion in suggestions)
 
 
 @pytest.mark.asyncio
@@ -786,9 +720,7 @@ async def test_graph_tool_unresolved_node_returns_follow_up_suggestions(
     async def _fake_get_or_build_index(*args, **kwargs):
         return fake_index, False
 
-    monkeypatch.setattr(
-        graph_tool_module, "_get_or_build_index", _fake_get_or_build_index
-    )
+    monkeypatch.setattr(graph_tool_module, "_get_or_build_index", _fake_get_or_build_index)
 
     exec_ctx = {"settings": SimpleNamespace(codebase_graph_store="memory")}
 
@@ -807,9 +739,7 @@ async def test_graph_tool_unresolved_node_returns_follow_up_suggestions(
 
 
 @pytest.mark.asyncio
-async def test_graph_tool_resolves_file_scoped_symbol_reference(
-    monkeypatch, tmp_path: Path
-):
+async def test_graph_tool_resolves_file_scoped_symbol_reference(monkeypatch, tmp_path: Path):
     from victor.tools import graph_tool as graph_tool_module
 
     store = MemoryGraphStore()
@@ -819,9 +749,7 @@ async def test_graph_tool_resolves_file_scoped_symbol_reference(
     async def _fake_get_or_build_index(*args, **kwargs):
         return fake_index, False
 
-    monkeypatch.setattr(
-        graph_tool_module, "_get_or_build_index", _fake_get_or_build_index
-    )
+    monkeypatch.setattr(graph_tool_module, "_get_or_build_index", _fake_get_or_build_index)
 
     exec_ctx = {"settings": SimpleNamespace(codebase_graph_store="memory")}
 
@@ -840,9 +768,7 @@ async def test_graph_tool_resolves_file_scoped_symbol_reference(
 
 
 @pytest.mark.asyncio
-async def test_graph_tool_file_dependencies_use_index_metadata(
-    monkeypatch, tmp_path: Path
-):
+async def test_graph_tool_file_dependencies_use_index_metadata(monkeypatch, tmp_path: Path):
     from victor.tools import graph_tool as graph_tool_module
 
     fake_index = SimpleNamespace(
@@ -856,9 +782,7 @@ async def test_graph_tool_file_dependencies_use_index_metadata(
     async def _fake_get_or_build_index(*args, **kwargs):
         return fake_index, False
 
-    monkeypatch.setattr(
-        graph_tool_module, "_get_or_build_index", _fake_get_or_build_index
-    )
+    monkeypatch.setattr(graph_tool_module, "_get_or_build_index", _fake_get_or_build_index)
 
     exec_ctx = {"settings": SimpleNamespace(codebase_graph_store="memory")}
 
@@ -900,12 +824,8 @@ async def test_graph_tool_file_deps_with_directory_path_falls_back_to_overview(
         return fake_index, False
 
     # Mock both the fast-path check and the index builder
-    monkeypatch.setattr(
-        graph_tool_module, "_get_or_build_index", _fake_get_or_build_index
-    )
-    monkeypatch.setattr(
-        graph_tool_module, "_project_graph_has_data", lambda *args, **kwargs: False
-    )
+    monkeypatch.setattr(graph_tool_module, "_get_or_build_index", _fake_get_or_build_index)
+    monkeypatch.setattr(graph_tool_module, "_project_graph_has_data", lambda *args, **kwargs: False)
 
     exec_ctx = {"settings": SimpleNamespace(codebase_graph_store="memory")}
 
@@ -936,12 +856,8 @@ async def test_graph_tool_file_deps_with_root_path_falls_back_to_overview(
     async def _fake_get_or_build_index(*args, **kwargs):
         return fake_index, False
 
-    monkeypatch.setattr(
-        graph_tool_module, "_get_or_build_index", _fake_get_or_build_index
-    )
-    monkeypatch.setattr(
-        graph_tool_module, "_project_graph_has_data", lambda *args, **kwargs: False
-    )
+    monkeypatch.setattr(graph_tool_module, "_get_or_build_index", _fake_get_or_build_index)
+    monkeypatch.setattr(graph_tool_module, "_project_graph_has_data", lambda *args, **kwargs: False)
 
     exec_ctx = {"settings": SimpleNamespace(codebase_graph_store="memory")}
 
@@ -981,12 +897,8 @@ async def test_graph_tool_file_deps_with_file_path_uses_path_as_subject(
         return fake_index, False
 
     # Mock both the fast-path check and the index builder
-    monkeypatch.setattr(
-        graph_tool_module, "_get_or_build_index", _fake_get_or_build_index
-    )
-    monkeypatch.setattr(
-        graph_tool_module, "_project_graph_has_data", lambda *args, **kwargs: False
-    )
+    monkeypatch.setattr(graph_tool_module, "_get_or_build_index", _fake_get_or_build_index)
+    monkeypatch.setattr(graph_tool_module, "_project_graph_has_data", lambda *args, **kwargs: False)
 
     exec_ctx = {"settings": SimpleNamespace(codebase_graph_store="memory")}
 
@@ -1028,9 +940,7 @@ async def test_graph_tool_call_flow_with_file_falls_back_to_file_dependencies(
     async def _fake_get_or_build_index(*args, **kwargs):
         return fake_index, False
 
-    monkeypatch.setattr(
-        graph_tool_module, "_get_or_build_index", _fake_get_or_build_index
-    )
+    monkeypatch.setattr(graph_tool_module, "_get_or_build_index", _fake_get_or_build_index)
 
     exec_ctx = {"settings": SimpleNamespace(codebase_graph_store="memory")}
 
@@ -1060,12 +970,8 @@ async def test_graph_tool_requires_graph_support(monkeypatch, tmp_path: Path):
         return fake_index, False
 
     # Mock fast-path check to force the old code path
-    monkeypatch.setattr(
-        graph_tool_module, "_get_or_build_index", _fake_get_or_build_index
-    )
-    monkeypatch.setattr(
-        graph_tool_module, "_project_graph_has_data", lambda *args, **kwargs: False
-    )
+    monkeypatch.setattr(graph_tool_module, "_get_or_build_index", _fake_get_or_build_index)
+    monkeypatch.setattr(graph_tool_module, "_project_graph_has_data", lambda *args, **kwargs: False)
 
     exec_ctx = {"settings": SimpleNamespace(codebase_graph_store="memory")}
 
@@ -1081,9 +987,7 @@ async def test_graph_tool_requires_graph_support(monkeypatch, tmp_path: Path):
 
 
 @pytest.mark.asyncio
-async def test_graph_tool_falls_back_to_project_graph_store(
-    monkeypatch, tmp_path: Path
-):
+async def test_graph_tool_falls_back_to_project_graph_store(monkeypatch, tmp_path: Path):
     from victor.tools import graph_tool as graph_tool_module
 
     store = SqliteGraphStore(tmp_path)
@@ -1153,14 +1057,11 @@ async def test_graph_tool_query_uses_project_db_fast_path(monkeypatch, tmp_path:
     assert result["result"]["success"] is True
     assert result["result"]["row_count"] >= 1
     assert any(
-        row["type"] == "function" and row["count"] == 3
-        for row in result["result"]["results"]
+        row["type"] == "function" and row["count"] == 3 for row in result["result"]["results"]
     )
 
 
-def test_graph_tool_is_available_with_persisted_project_graph(
-    monkeypatch, tmp_path: Path
-):
+def test_graph_tool_is_available_with_persisted_project_graph(monkeypatch, tmp_path: Path):
     from victor.tools import graph_tool as graph_tool_module
 
     class _MissingProviderRegistry:
@@ -1195,9 +1096,7 @@ def test_graph_tool_is_available_with_persisted_project_graph(
     assert graph_tool_module.graph.Tool.is_available() is True
 
 
-def test_graph_tool_is_unavailable_without_provider_or_graph_data(
-    monkeypatch, tmp_path: Path
-):
+def test_graph_tool_is_unavailable_without_provider_or_graph_data(monkeypatch, tmp_path: Path):
     from victor.tools import graph_tool as graph_tool_module
 
     class _MissingProviderRegistry:
@@ -1241,9 +1140,7 @@ async def test_graph_tool_semantic_mode_gracefully_skips_when_index_has_no_seman
     async def _fake_get_or_build_index(*args, **kwargs):
         return fake_index, False
 
-    monkeypatch.setattr(
-        graph_tool_module, "_get_or_build_index", _fake_get_or_build_index
-    )
+    monkeypatch.setattr(graph_tool_module, "_get_or_build_index", _fake_get_or_build_index)
 
     exec_ctx = {"settings": SimpleNamespace(codebase_graph_store="memory")}
 

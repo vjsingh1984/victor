@@ -87,9 +87,7 @@ def count_architecture_patterns(content: str) -> int:
         return 0
 
     start_idx, end_idx = bounds
-    return sum(
-        1 for line in lines[start_idx + 1 : end_idx] if _LIST_ITEM_RE.match(line)
-    )
+    return sum(1 for line in lines[start_idx + 1 : end_idx] if _LIST_ITEM_RE.match(line))
 
 
 def _build_graph_fallback_patterns(graph_context: Optional[dict]) -> list[str]:
@@ -181,9 +179,7 @@ def _build_architecture_evidence_lines(graph_context: Optional[dict]) -> list[st
     return lines
 
 
-def ensure_architecture_patterns_section(
-    content: str, graph_context: Optional[dict]
-) -> str:
+def ensure_architecture_patterns_section(content: str, graph_context: Optional[dict]) -> str:
     """Ensure init.md has a minimally useful Architecture Patterns section.
 
     If the LLM omits or under-produces the section, use graph-derived fallback
@@ -222,9 +218,7 @@ def ensure_architecture_patterns_section(
     }
 
     missing_lines = [
-        f"- {pattern}"
-        for pattern in fallback_patterns
-        if pattern.lower() not in existing_items
+        f"- {pattern}" for pattern in fallback_patterns if pattern.lower() not in existing_items
     ]
     if not missing_lines:
         return content
@@ -237,21 +231,15 @@ def ensure_architecture_patterns_section(
     return "\n".join(new_lines).rstrip() + "\n"
 
 
-def ensure_architecture_evidence_section(
-    content: str, graph_context: Optional[dict]
-) -> str:
+def ensure_architecture_evidence_section(content: str, graph_context: Optional[dict]) -> str:
     """Insert or refresh a graph-backed Architecture Evidence section."""
     evidence_lines = _build_architecture_evidence_lines(graph_context)
     if not evidence_lines:
         return content
 
     lines = content.splitlines()
-    evidence_bounds = _find_top_level_section_bounds(
-        lines, _ARCHITECTURE_EVIDENCE_SECTION_TITLES
-    )
-    architecture_bounds = _find_top_level_section_bounds(
-        lines, _ARCHITECTURE_SECTION_TITLES
-    )
+    evidence_bounds = _find_top_level_section_bounds(lines, _ARCHITECTURE_EVIDENCE_SECTION_TITLES)
+    architecture_bounds = _find_top_level_section_bounds(lines, _ARCHITECTURE_SECTION_TITLES)
 
     block = ["## Architecture Evidence", ""]
     block.extend(evidence_lines)
@@ -307,9 +295,7 @@ def ensure_quality_baseline_section(content: str) -> str:
         if _LIST_ITEM_RE.match(line)
     }
     missing = [
-        line
-        for line in _QUALITY_BASELINE_LINES
-        if _normalize_list_item(line) not in existing_norm
+        line for line in _QUALITY_BASELINE_LINES if _normalize_list_item(line) not in existing_norm
     ]
     if not missing:
         return content

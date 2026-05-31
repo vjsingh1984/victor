@@ -58,9 +58,7 @@ async def debugging_agent(code: str, error_message: str, context: str = ""):
     """Debug code with error information."""
     from victor import Agent
 
-    agent = Agent.create(
-        vertical="coding", tools=["read", "grep", "python"], temperature=0.3
-    )
+    agent = Agent.create(vertical="coding", tools=["read", "grep", "python"], temperature=0.3)
 
     result = await agent.run(f"""Debug this code:
 
@@ -322,8 +320,7 @@ async def docker_compose_agent(services: list[str]):
 
     services_str = ", ".join(services)
 
-    result = await agent.run(
-        f"""Generate Docker Compose configuration for: {services_str}
+    result = await agent.run(f"""Generate Docker Compose configuration for: {services_str}
 
 Provide:
 1. docker-compose.yml
@@ -332,8 +329,7 @@ Provide:
 4. Network configuration
 5. Environment variables
 6. Health checks
-7. Deployment instructions"""
-    )
+7. Deployment instructions""")
 
     return result.content
 

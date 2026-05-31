@@ -32,10 +32,7 @@ def _count_global_manager_calls(root: Path) -> list:
                 func = node.func
                 if isinstance(func, ast.Name) and func.id == "get_global_manager":
                     calls.append((rel, node.lineno))
-                elif (
-                    isinstance(func, ast.Attribute)
-                    and func.attr == "get_global_manager"
-                ):
+                elif isinstance(func, ast.Attribute) and func.attr == "get_global_manager":
                     calls.append((rel, node.lineno))
     return calls
 
@@ -58,9 +55,7 @@ class TestGlobalStateGuard:
         # - victor/runtime/context.py — transitional bridge in ExecutionContext.create()
         allowed_prefixes = ("victor/state/", "victor/runtime/")
         non_allowed_calls = [
-            (f, line)
-            for f, line in calls
-            if not any(f.startswith(p) for p in allowed_prefixes)
+            (f, line) for f, line in calls if not any(f.startswith(p) for p in allowed_prefixes)
         ]
         assert not non_allowed_calls, (
             f"Found {len(non_allowed_calls)} get_global_manager() call(s) outside allowed locations. "

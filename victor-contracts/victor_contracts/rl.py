@@ -54,9 +54,7 @@ class BaseRLConfig:
     )
     task_type_mappings: Dict[str, List[str]] = field(default_factory=dict)
     quality_thresholds: Dict[str, float] = field(default_factory=dict)
-    default_patience: Dict[str, int] = field(
-        default_factory=lambda: dict(DEFAULT_PATIENCE_MAP)
-    )
+    default_patience: Dict[str, int] = field(default_factory=lambda: dict(DEFAULT_PATIENCE_MAP))
     exploration_bonus: float = 0.15
 
     def get_tools_for_task(self, task_type: str) -> List[str]:

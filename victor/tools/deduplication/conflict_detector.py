@@ -104,9 +104,7 @@ class ConflictDetector:
             if capability_result.is_conflict:
                 return capability_result
 
-        return ConflictResult(
-            is_conflict=False, confidence=0.0, reason="No conflict detected"
-        )
+        return ConflictResult(is_conflict=False, confidence=0.0, reason="No conflict detected")
 
     def _exact_name_match(self, tool1: Any, tool2: Any) -> bool:
         """Check if tools have exact same normalized name."""
@@ -132,9 +130,7 @@ class ConflictDetector:
             # Compute cosine similarity
             import numpy as np
 
-            similarity = np.dot(emb1, emb2) / (
-                np.linalg.norm(emb1) * np.linalg.norm(emb2)
-            )
+            similarity = np.dot(emb1, emb2) / (np.linalg.norm(emb1) * np.linalg.norm(emb2))
 
             if similarity >= self._semantic_threshold:
                 return ConflictResult(
@@ -145,9 +141,7 @@ class ConflictDetector:
                 )
 
         except ImportError:
-            logger.debug(
-                "sentence-transformers not available, skipping semantic detection"
-            )
+            logger.debug("sentence-transformers not available, skipping semantic detection")
         except Exception as e:
             logger.warning(f"Semantic similarity detection failed: {e}")
 

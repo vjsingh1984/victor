@@ -52,9 +52,7 @@ class ResumeCommand(BaseSlashCommand):
             ctx.console.print("[yellow]No conversation controller available.[/]")
             return
 
-        current_plan: ExecutionPlan = getattr(
-            conversation_controller, "current_plan", None
-        )
+        current_plan: ExecutionPlan = getattr(conversation_controller, "current_plan", None)
         if not current_plan:
             ctx.console.print(
                 "[red]No plan found to resume.[/]\n"
@@ -79,9 +77,7 @@ class ResumeCommand(BaseSlashCommand):
         ctx.console.print(
             f"[cyan]Continuing plan:[/] {current_plan.goal[:80]}{'...' if len(current_plan.goal) > 80 else ''}"
         )
-        ctx.console.print(
-            f"[dim]Incomplete steps: {len(incomplete)}/{len(current_plan.steps)}[/]"
-        )
+        ctx.console.print(f"[dim]Incomplete steps: {len(incomplete)}/{len(current_plan.steps)}[/]")
 
         # Parse optional step number
         start_from = None
@@ -135,9 +131,7 @@ class ResumeCommand(BaseSlashCommand):
             result = await planner.execute_plan(
                 plan,
                 auto_approve=False,  # Use smart defaults from _default_approval
-                progress_callback=lambda step, status: self._on_progress(
-                    ctx, step, status
-                ),
+                progress_callback=lambda step, status: self._on_progress(ctx, step, status),
             )
 
             # Show final results
@@ -187,6 +181,4 @@ class ResumeCommand(BaseSlashCommand):
             ctx.console.print(f"[red]✗[/] {step.description[:60]}...")
             ctx.console.print(f"  [dim]Error: {error_msg[:80]}...[/]")
         elif status == StepStatus.BLOCKED:
-            ctx.console.print(
-                f"[yellow]⏸[/] {step.description[:60]}... [dim](blocked)[/]"
-            )
+            ctx.console.print(f"[yellow]⏸[/] {step.description[:60]}... [dim](blocked)[/]")

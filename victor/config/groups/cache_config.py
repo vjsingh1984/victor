@@ -150,9 +150,7 @@ class CacheSettings(BaseModel):
             ValueError: If max connections per host is not positive
         """
         if v < 1:
-            raise ValueError(
-                "http_connection_pool_max_connections_per_host must be >= 1"
-            )
+            raise ValueError("http_connection_pool_max_connections_per_host must be >= 1")
         return v
 
     @field_validator("http_connection_pool_connection_timeout")

@@ -232,9 +232,7 @@ class MockChatOrchestrator(ChatOrchestratorProtocol):
     ) -> Any:
         return {"valid": True}
 
-    async def _prepare_runtime_intelligence_request(
-        self, task: str, task_type: str
-    ) -> Any:
+    async def _prepare_runtime_intelligence_request(self, task: str, task_type: str) -> Any:
         return {"mock": "intelligent_context"}
 
     # Presentation & output

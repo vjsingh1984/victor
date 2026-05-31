@@ -115,9 +115,7 @@ class AggregationService:
         """
         if key in self._cache:
             timestamp, result = self._cache[key]
-            if datetime.now() - timestamp < timedelta(
-                seconds=self.config.cache_ttl_seconds
-            ):
+            if datetime.now() - timestamp < timedelta(seconds=self.config.cache_ttl_seconds):
                 return result
             else:
                 del self._cache[key]
@@ -293,9 +291,7 @@ class AggregationService:
                         if stats["total_calls"] > 0
                         else 0
                     ),
-                    "avg_duration_ms": (
-                        statistics.mean(durations) if durations else None
-                    ),
+                    "avg_duration_ms": (statistics.mean(durations) if durations else None),
                     "p50_duration_ms": percentile(durations, 0.50),
                     "p95_duration_ms": percentile(durations, 0.95),
                     "p99_duration_ms": percentile(durations, 0.99),

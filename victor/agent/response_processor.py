@@ -300,9 +300,7 @@ class ResponseProcessor:
                 valid_calls.append(tc)
 
         if invalid_count:
-            logger.warning(
-                f"Marked {invalid_count} invalid tool calls for error responses"
-            )
+            logger.warning(f"Marked {invalid_count} invalid tool calls for error responses")
 
         return valid_calls if valid_calls else None
 

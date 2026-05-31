@@ -33,9 +33,7 @@ def _method_source(relative_path: str, class_name: str, method_name: str) -> str
                             f"Could not recover source for {class_name}.{method_name} in {relative_path}"
                         )
                     return segment
-    raise AssertionError(
-        f"Method {class_name}.{method_name} not found in {relative_path}"
-    )
+    raise AssertionError(f"Method {class_name}.{method_name} not found in {relative_path}")
 
 
 def test_api_chat_surfaces_use_canonical_runtime_resolution() -> None:
@@ -70,13 +68,11 @@ def test_api_chat_surfaces_use_canonical_runtime_resolution() -> None:
     )
     assert "resolve_chat_runtime" not in fastapi_chat_source
     assert "orchestrator._chat_service" not in fastapi_chat_source
-    assert (
-        "from victor.runtime.chat_runtime import resolve_chat_service, resolve_chat_runtime"
-        in (fastapi_agent_source)
+    assert "from victor.runtime.chat_runtime import resolve_chat_service, resolve_chat_runtime" in (
+        fastapi_agent_source
     )
-    assert (
-        "from victor.framework.message_execution import resolve_chat_service"
-        not in (fastapi_agent_source)
+    assert "from victor.framework.message_execution import resolve_chat_service" not in (
+        fastapi_agent_source
     )
     assert "resolve_chat_service" in fastapi_agent_source
     assert "orchestrator._chat_service" not in fastapi_agent_source
@@ -90,15 +86,11 @@ def test_api_chat_surfaces_use_canonical_runtime_resolution() -> None:
     assert "orchestrator._chat_service" not in aiohttp_agent_source
 
 
-def test_fastapi_server_uses_framework_client_factory_for_conversation_helpers() -> (
-    None
-):
+def test_fastapi_server_uses_framework_client_factory_for_conversation_helpers() -> None:
     """FastAPI server should not instantiate framework clients directly."""
     fastapi_server_source = _read("victor/integrations/api/fastapi_server.py")
 
-    assert (
-        "from victor.framework.client import VictorClient" not in fastapi_server_source
-    )
+    assert "from victor.framework.client import VictorClient" not in fastapi_server_source
     assert "VictorClient(" not in fastapi_server_source
     assert "FrameworkSessionRunner" in fastapi_server_source
     assert "create_victor_client" in fastapi_server_source

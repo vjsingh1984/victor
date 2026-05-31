@@ -61,9 +61,7 @@ class WorkflowCompilerImpl:
         self._node_executor_factory = node_factory
         self._workflow_parser = WorkflowParser(yaml_loader)
         self._workflow_definition_validator = WorkflowDefinitionValidator(validator)
-        self._graph_compiler = NativeWorkflowGraphCompiler(
-            node_executor_factory=node_factory
-        )
+        self._graph_compiler = NativeWorkflowGraphCompiler(node_executor_factory=node_factory)
 
     def compile(
         self,

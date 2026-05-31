@@ -65,9 +65,7 @@ def sample_tool():
         description="Get the weather for a location",
         parameters={
             "type": "object",
-            "properties": {
-                "location": {"type": "string", "description": "The city name"}
-            },
+            "properties": {"location": {"type": "string", "description": "The city name"}},
             "required": ["location"],
         },
     )
@@ -152,9 +150,7 @@ class TestExtractThinkingContent:
 
     def test_extract_multiple_thinking_blocks(self):
         """Test extracting multiple thinking blocks."""
-        response = (
-            "<think>First thought</think>Text<think>Second thought</think>More text"
-        )
+        response = "<think>First thought</think>Text<think>Second thought</think>More text"
         thinking, content = _extract_thinking_content(response)
         assert "First thought" in thinking
         assert "Second thought" in thinking
@@ -181,9 +177,7 @@ class TestExtractToolCallsFromContent:
 
     def test_extract_json_block(self):
         """Test extracting tool call from JSON code block."""
-        content = (
-            '```json\n{"name": "read_file", "arguments": {"path": "test.py"}}\n```'
-        )
+        content = '```json\n{"name": "read_file", "arguments": {"path": "test.py"}}\n```'
         tool_calls, remaining = _extract_tool_calls_from_content(content)
         assert len(tool_calls) == 1
         assert tool_calls[0]["name"] == "read_file"
@@ -357,9 +351,7 @@ class TestVLLMAvailableModel:
         """Test available model is set when connecting to server."""
         mock_response = MagicMock()
         mock_response.status_code = 200
-        mock_response.json.return_value = {
-            "data": [{"id": "Qwen/Qwen2.5-Coder-7B-Instruct"}]
-        }
+        mock_response.json.return_value = {"data": [{"id": "Qwen/Qwen2.5-Coder-7B-Instruct"}]}
 
         with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
             mock_get.return_value = mock_response

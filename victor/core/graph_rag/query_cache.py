@@ -287,9 +287,7 @@ class GraphQueryCache:
         ]
 
         # Convert edges to minimal representation
-        edges_data = [
-            {"src": e.src, "dst": e.dst, "type": e.type} for e in result.edges
-        ]
+        edges_data = [{"src": e.src, "dst": e.dst, "type": e.type} for e in result.edges]
 
         return {
             "nodes": nodes_data,
@@ -508,9 +506,7 @@ class GraphQueryCache:
             self._stats["invalidations"] += count
 
         if count > 0:
-            logger.info(
-                f"Invalidated {count} graph query cache entries for repo: {repo_name}"
-            )
+            logger.info(f"Invalidated {count} graph query cache entries for repo: {repo_name}")
 
         return count
 

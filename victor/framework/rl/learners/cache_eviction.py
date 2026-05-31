@@ -141,30 +141,20 @@ class CacheEvictionLearner(BaseLearner):
         self.epsilon = epsilon
 
         # In-memory caches for fast access
-        self._q_values: Dict[str, Dict[str, float]] = (
-            {}
-        )  # state_key -> {action -> Q-value}
-        self._visit_counts: Dict[str, Dict[str, int]] = (
-            {}
-        )  # state_key -> {action -> count}
-        self._tool_value_estimates: Dict[str, float] = (
-            {}
-        )  # tool_name -> estimated value
+        self._q_values: Dict[str, Dict[str, float]] = {}  # state_key -> {action -> Q-value}
+        self._visit_counts: Dict[str, Dict[str, int]] = {}  # state_key -> {action -> count}
+        self._tool_value_estimates: Dict[str, float] = {}  # tool_name -> estimated value
         self._total_decisions: int = 0
 
         # Hit rate tracking per tool type
-        self._tool_hit_rates: Dict[str, Tuple[int, int]] = (
-            {}
-        )  # tool_name -> (hits, misses)
+        self._tool_hit_rates: Dict[str, Tuple[int, int]] = {}  # tool_name -> (hits, misses)
 
         # Load state from database
         self._load_state()
 
     def _ensure_tables(self) -> None:
         """Migrate legacy per-learner tables to unified RL tables."""
-        RLTableMigrator(self.db).run_if_needed(
-            self.name, RLTableMigrator.migrate_cache_eviction
-        )
+        RLTableMigrator(self.db).run_if_needed(self.name, RLTableMigrator.migrate_cache_eviction)
 
     def _load_state(self) -> None:
         """Load state from database."""
@@ -207,9 +197,7 @@ class CacheEvictionLearner(BaseLearner):
                 tool_stats[tool_name][row_dict["stat_key"]] = row_dict["stat_value"]
 
             for tool_name, stats in tool_stats.items():
-                self._tool_value_estimates[tool_name] = stats.get(
-                    "estimated_value", 0.5
-                )
+                self._tool_value_estimates[tool_name] = stats.get("estimated_value", 0.5)
                 self._tool_hit_rates[tool_name] = (
                     int(stats.get("hit_count", 0)),
                     int(stats.get("miss_count", 0)),
@@ -219,9 +207,7 @@ class CacheEvictionLearner(BaseLearner):
             logger.debug(f"RL: Could not load tool values: {e}")
 
         if self._q_values:
-            logger.info(
-                f"RL: Loaded {len(self._q_values)} cache eviction states from database"
-            )
+            logger.info(f"RL: Loaded {len(self._q_values)} cache eviction states from database")
 
     def record_outcome(self, outcome: RLOutcome) -> None:
         """Record cache eviction outcome and update Q-values.
@@ -260,9 +246,7 @@ class CacheEvictionLearner(BaseLearner):
             self._visit_counts[state_key] = {}
 
         self._q_values[state_key][action] = new_q
-        self._visit_counts[state_key][action] = (
-            self._visit_counts[state_key].get(action, 0) + 1
-        )
+        self._visit_counts[state_key][action] = self._visit_counts[state_key].get(action, 0) + 1
         self._total_decisions += 1
 
         # Update tool value estimate

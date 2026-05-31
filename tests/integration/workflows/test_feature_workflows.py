@@ -234,9 +234,7 @@ class TestWorkflowIntegration:
             # workflow is a WorkflowDefinition object
             assert workflow.description, f"{workflow_name} missing description"
             assert workflow.nodes, f"{workflow_name} missing nodes"
-            assert isinstance(
-                workflow.nodes, dict
-            ), f"{workflow_name} nodes must be a dict"
+            assert isinstance(workflow.nodes, dict), f"{workflow_name} nodes must be a dict"
 
             # Check each node has required fields
             for node_id, node in workflow.nodes.items():
@@ -279,6 +277,4 @@ class TestWorkflowNodeDefinitions:
         assert "create_feature_files" in node_ids
 
         # Check that create_git_branch comes before create_feature_files
-        assert node_ids.index("create_git_branch") < node_ids.index(
-            "create_feature_files"
-        )
+        assert node_ids.index("create_git_branch") < node_ids.index("create_feature_files")

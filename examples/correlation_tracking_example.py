@@ -77,8 +77,8 @@ def example_1_correlation_detection():
     print("=" * 80)
 
     # Setup
-    service, consensus_builder, correlation_tracker, conn = (
-        setup_bayesian_system_with_correlations("example1_correlation.db")
+    service, consensus_builder, correlation_tracker, conn = setup_bayesian_system_with_correlations(
+        "example1_correlation.db"
     )
 
     # Simulate tasks where agents always agree
@@ -116,9 +116,7 @@ def example_1_correlation_detection():
 
     # Get correlation matrix
     print("\n[Correlation Matrix]")
-    matrix = correlation_tracker.get_correlation_matrix(
-        ["agent_a", "agent_b", "agent_c"]
-    )
+    matrix = correlation_tracker.get_correlation_matrix(["agent_a", "agent_b", "agent_c"])
     for agent_1, correlations in matrix.items():
         for agent_2, corr in correlations.items():
             print(f"  {agent_1} ↔ {agent_2}: {corr:.3f}")
@@ -136,8 +134,8 @@ def example_2_effective_sample_size():
     print("=" * 80)
 
     # Setup
-    service, consensus_builder, correlation_tracker, conn = (
-        setup_bayesian_system_with_correlations("example2_ess.db")
+    service, consensus_builder, correlation_tracker, conn = setup_bayesian_system_with_correlations(
+        "example2_ess.db"
     )
 
     # Create three agents with different correlations
@@ -180,8 +178,8 @@ def example_3_correlation_adjusted_consensus():
     print("=" * 80)
 
     # Setup
-    service, consensus_builder, correlation_tracker, conn = (
-        setup_bayesian_system_with_correlations("example3_consensus.db")
+    service, consensus_builder, correlation_tracker, conn = setup_bayesian_system_with_correlations(
+        "example3_consensus.db"
     )
 
     # Train agents with different reliabilities and correlations
@@ -279,8 +277,8 @@ def example_4_identify_correlated_agents():
     print("=" * 80)
 
     # Setup
-    service, consensus_builder, correlation_tracker, conn = (
-        setup_bayesian_system_with_correlations("example4_identify.db")
+    service, consensus_builder, correlation_tracker, conn = setup_bayesian_system_with_correlations(
+        "example4_identify.db"
     )
 
     # Create various correlation patterns

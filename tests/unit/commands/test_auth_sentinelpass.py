@@ -48,9 +48,7 @@ def test_auth_add_openai_codex_oauth_source_stores_generation_defaults():
     """`--source codex` should configure OpenAI OAuth without prompting for an API key."""
     runner = CliRunner()
     manager = MagicMock()
-    manager.load_config.return_value = SimpleNamespace(
-        defaults=SimpleNamespace(account="default")
-    )
+    manager.load_config.return_value = SimpleNamespace(defaults=SimpleNamespace(account="default"))
 
     with patch("victor.ui.commands.auth.get_account_manager", return_value=manager):
         with patch("victor.ui.commands.auth.Prompt.ask") as prompt:

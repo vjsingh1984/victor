@@ -72,9 +72,7 @@ def test_intent_handler_finishes_early_on_malformed_tool_style_plaintext():
     assert result.action_result["action"] is ContinuationActionType.FINISH
     assert "Malformed tool-style plaintext" in result.action_result["reason"]
     assert any(chunk.is_final for chunk in result.chunks)
-    assert any(
-        "malformed tool-style text" in chunk.content.lower() for chunk in result.chunks
-    )
+    assert any("malformed tool-style text" in chunk.content.lower() for chunk in result.chunks)
     intent_classifier.classify_intent_sync.assert_not_called()
 
 

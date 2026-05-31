@@ -108,9 +108,7 @@ class TestSpinDetector:
     def test_code_search_breaks_read_only(self):
         detector = SpinDetector()
         detector.record_turn(has_tool_calls=True, tool_names={"read"}, tool_count=1)
-        detector.record_turn(
-            has_tool_calls=True, tool_names={"code_search"}, tool_count=1
-        )
+        detector.record_turn(has_tool_calls=True, tool_names={"code_search"}, tool_count=1)
         assert detector.has_used_code_search is True
 
     def test_non_read_only_resets_counter(self):
@@ -186,9 +184,7 @@ class TestNudgePolicy:
     def test_no_code_search_nudge_after_use(self):
         policy = NudgePolicy()
         detector = SpinDetector()
-        detector.record_turn(
-            has_tool_calls=True, tool_names={"code_search"}, tool_count=1
-        )
+        detector.record_turn(has_tool_calls=True, tool_names={"code_search"}, tool_count=1)
         for _ in range(READ_ONLY_ESCALATION_THRESHOLD):
             detector.record_turn(has_tool_calls=True, tool_names={"read"}, tool_count=1)
         decision = policy.evaluate(detector)
@@ -415,15 +411,9 @@ class TestPaginationSupport:
         )
 
         # Get signatures for pagination calls
-        sig1 = tracker._get_signature(
-            "read", {"path": "src/main.py", "offset": 0, "limit": 500}
-        )
-        sig2 = tracker._get_signature(
-            "read", {"path": "src/main.py", "offset": 500, "limit": 500}
-        )
-        sig3 = tracker._get_signature(
-            "read", {"path": "src/main.py", "offset": 1000, "limit": 100}
-        )
+        sig1 = tracker._get_signature("read", {"path": "src/main.py", "offset": 0, "limit": 500})
+        sig2 = tracker._get_signature("read", {"path": "src/main.py", "offset": 500, "limit": 500})
+        sig3 = tracker._get_signature("read", {"path": "src/main.py", "offset": 1000, "limit": 100})
 
         # All should have the SAME signature because offset/limit are NOT in signature_params
         assert (
@@ -456,9 +446,7 @@ class TestPaginationSupport:
         sig3 = tracker._get_signature("read", {"path": "README.md", "offset": 0})
 
         # All should have DIFFERENT signatures because paths differ
-        assert (
-            sig1 != sig2 != sig3
-        ), "Different paths should generate different signatures"
+        assert sig1 != sig2 != sig3, "Different paths should generate different signatures"
         assert "main.py" in sig1
         assert "utils.py" in sig2
         assert "README.md" in sig3
@@ -480,15 +468,9 @@ class TestPaginationSupport:
             side_effect=mock_get_signature_params,
         )
 
-        sig1 = tracker._get_signature(
-            "code_search", {"query": "dataclass", "path": ".", "k": 10}
-        )
-        sig2 = tracker._get_signature(
-            "code_search", {"query": "dataclass", "path": ".", "k": 20}
-        )
-        sig3 = tracker._get_signature(
-            "code_search", {"query": "dataclass", "path": ".", "k": 50}
-        )
+        sig1 = tracker._get_signature("code_search", {"query": "dataclass", "path": ".", "k": 10})
+        sig2 = tracker._get_signature("code_search", {"query": "dataclass", "path": ".", "k": 20})
+        sig3 = tracker._get_signature("code_search", {"query": "dataclass", "path": ".", "k": 50})
 
         # All should have the SAME signature because k is NOT in signature_params
         assert (
@@ -517,9 +499,7 @@ class TestPaginationSupport:
         sig3 = tracker._get_signature("ls", {"path": "src", "depth": 3})
 
         # All should have DIFFERENT signatures because depth IS in signature_params
-        assert (
-            sig1 != sig2 != sig3
-        ), "Different depth values should generate different signatures"
+        assert sig1 != sig2 != sig3, "Different depth values should generate different signatures"
 
 
 # ============================================================================

@@ -85,9 +85,7 @@ class HelpCommand(BaseSlashCommand):
             command = registry.get(cmd_name)
             if command:
                 meta = command.metadata
-                aliases = (
-                    ", ".join(f"/{a}" for a in meta.aliases) if meta.aliases else "none"
-                )
+                aliases = ", ".join(f"/{a}" for a in meta.aliases) if meta.aliases else "none"
                 ctx.console.print(
                     Panel(
                         f"[bold]/{meta.name}[/]\n\n"
@@ -201,9 +199,7 @@ class StatusCommand(BaseSlashCommand):
             if learner:
                 rec = learner.recommend(agent.provider_name, "coding")
                 if rec and rec.confidence > 0:
-                    content += (
-                        f"\n[dim]RL: Using optimal provider (Q={rec.confidence:.2f})[/]"
-                    )
+                    content += f"\n[dim]RL: Using optimal provider (Q={rec.confidence:.2f})[/]"
         except Exception:
             pass
 
@@ -398,9 +394,7 @@ class CleanupHistoryCommand(BaseSlashCommand):
         removed = original_lines - new_lines
 
         ctx.console.print("[green]✓[/] Cleaned up history file:")
-        ctx.console.print(
-            f"  Entries: {original_lines:,} → {new_lines:,} (removed {removed:,})"
-        )
+        ctx.console.print(f"  Entries: {original_lines:,} → {new_lines:,} (removed {removed:,})")
         ctx.console.print(f"  File size: {history_file.stat().st_size / 1024:.1f} KB")
         ctx.console.print()
         ctx.console.print("[dim]Typing should feel snappier now![/]")

@@ -69,9 +69,7 @@ class TaskTypeResult:
     top_matches: List[Tuple[str, float]]  # Top matching phrases with scores
     has_file_context: bool  # Whether the prompt mentions specific files
     nudge_applied: Optional[str] = None  # Name of nudge rule applied, if any
-    preprocessed_prompt: Optional[str] = (
-        None  # Preprocessed prompt used for classification
-    )
+    preprocessed_prompt: Optional[str] = None  # Preprocessed prompt used for classification
 
 
 # NudgeRule is now imported from victor.classification.nudge_engine
@@ -1437,9 +1435,7 @@ class TaskTypeClassifier:
 
             registry = CapabilityRegistry.get_instance()
             contributor = registry.get(TaskClassifierPhraseProtocol)
-            if contributor is None or not registry.is_enhanced(
-                TaskClassifierPhraseProtocol
-            ):
+            if contributor is None or not registry.is_enhanced(TaskClassifierPhraseProtocol):
                 return
 
             extra_phrases = contributor.get_classifier_phrases()
@@ -1619,9 +1615,7 @@ class TaskTypeClassifier:
         self._collection.initialize_sync(all_items)
 
         self._initialized = True
-        logger.info(
-            f"TaskTypeClassifier initialized with {len(all_items)} canonical phrases"
-        )
+        logger.info(f"TaskTypeClassifier initialized with {len(all_items)} canonical phrases")
 
     async def initialize(self) -> None:
         """Initialize unified task classifier collection (async version)."""
@@ -1644,9 +1638,7 @@ class TaskTypeClassifier:
         await self._collection.initialize(all_items)
 
         self._initialized = True
-        logger.info(
-            f"TaskTypeClassifier initialized with {len(all_items)} canonical phrases"
-        )
+        logger.info(f"TaskTypeClassifier initialized with {len(all_items)} canonical phrases")
 
     def _detect_file_context(self, prompt: str) -> bool:
         """Detect if prompt mentions specific file paths.
@@ -1780,10 +1772,7 @@ class TaskTypeClassifier:
                     nudge_applied=nudge_name,
                     preprocessed_prompt=preprocessed,
                 )
-            elif (
-                triage.triage_outcome == ClassificationTriage.VERIFY
-                and triage.result is not None
-            ):
+            elif triage.triage_outcome == ClassificationTriage.VERIFY and triage.result is not None:
                 embedding_type = triage.result
                 embedding_score = triage.confidence
 

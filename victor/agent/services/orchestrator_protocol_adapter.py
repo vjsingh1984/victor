@@ -119,9 +119,7 @@ class OrchestratorProtocolAdapter:
         """Return the canonical context-limit runtime helper from the orchestrator host."""
         return self._get_required_runtime_helper("_get_context_limit_runtime")
 
-    def _require_runtime_helper_handler(
-        self, getter_name: str, handler_name: str
-    ) -> Any:
+    def _require_runtime_helper_handler(self, getter_name: str, handler_name: str) -> Any:
         """Return a canonical runtime helper method or raise a clear compatibility error."""
         runtime = self._get_required_runtime_helper(getter_name)
         runtime_handler = getattr(runtime, handler_name, None)

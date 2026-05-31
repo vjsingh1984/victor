@@ -152,9 +152,7 @@ class TestSdkIntegration:
 
         assert definition.prompt_metadata.templates[0].task_type == "analysis"
         assert definition.prompt_metadata.task_type_hints[0].tool_budget == 10
-        assert definition.workflow_metadata.provider_hints["preferred_providers"] == [
-            "anthropic"
-        ]
+        assert definition.workflow_metadata.provider_hints["preferred_providers"] == ["anthropic"]
         assert definition.workflow_metadata.evaluation_criteria == ["accuracy"]
 
     def test_sdk_definition_captures_team_metadata(self):
@@ -196,9 +194,7 @@ class TestSdkIntegration:
         assert definition.team_metadata.default_team == "review_team"
         assert definition.team_metadata.teams[0].team_id == "review_team"
         assert TestVertical.get_team_spec_provider().get_default_team() == "review_team"
-        assert (
-            TestVertical.get_team_specs()["review_team"].members[0].role == "researcher"
-        )
+        assert TestVertical.get_team_specs()["review_team"].members[0].role == "researcher"
 
     def test_backward_compatibility_class_attributes(self):
         """Existing class attributes should still work."""

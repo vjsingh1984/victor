@@ -123,9 +123,7 @@ class CPUProfiler(BaseProfiler):
         hotspots = self._detect_hotspots(function_stats)
 
         # Build call graph
-        call_graph = (
-            self._build_call_graph(stats) if self.config.generate_flame_graph else None
-        )
+        call_graph = self._build_call_graph(stats) if self.config.generate_flame_graph else None
 
         result = ProfileResult(
             profiler_type=ProfilerType.CPU,

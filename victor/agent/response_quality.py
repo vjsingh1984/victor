@@ -73,9 +73,7 @@ class ScorerConfig:
     """
 
     min_threshold: float = 0.6
-    dimension_weights: Dict[ResponseQualityDimension, float] = field(
-        default_factory=dict
-    )
+    dimension_weights: Dict[ResponseQualityDimension, float] = field(default_factory=dict)
     enable_code_quality: bool = True
     enable_grounding: bool = True
     strict_mode: bool = False
@@ -178,9 +176,7 @@ class ResponseQualityScorer:
                 return
 
             # Extract dimension scores for metadata
-            dimension_data = {
-                ds.dimension.value: ds.score for ds in result.dimension_scores
-            }
+            dimension_data = {ds.dimension.value: ds.score for ds in result.dimension_scores}
 
             event = RLEvent(
                 type=RLEventType.QUALITY_ASSESSED,
@@ -220,9 +216,7 @@ class ResponseQualityScorer:
 
         # Score each dimension
         dimension_scores.append(await self._score_relevance(query, response))
-        dimension_scores.append(
-            await self._score_completeness(query, response, context)
-        )
+        dimension_scores.append(await self._score_completeness(query, response, context))
         dimension_scores.append(await self._score_accuracy(response, context))
         dimension_scores.append(await self._score_conciseness(response))
         dimension_scores.append(await self._score_actionability(query, response))
@@ -348,9 +342,7 @@ class ResponseQualityScorer:
         if query_parts:
             part_coverage = addressed_parts / len(query_parts)
             score = 0.3 + (part_coverage * 0.5)
-            evidence.append(
-                f"Query parts addressed: {addressed_parts}/{len(query_parts)}"
-            )
+            evidence.append(f"Query parts addressed: {addressed_parts}/{len(query_parts)}")
 
         # Check for expected sections in longer responses
         response_words = len(response.split())
@@ -381,9 +373,7 @@ class ResponseQualityScorer:
         files_read = context.get("files_read", [])
         if files_read:
             files_mentioned = sum(
-                1
-                for f in files_read
-                if f.split("/")[-1].split(".")[0] in response.lower()
+                1 for f in files_read if f.split("/")[-1].split(".")[0] in response.lower()
             )
             if files_mentioned > 0:
                 score += 0.1
@@ -397,9 +387,7 @@ class ResponseQualityScorer:
             evidence=evidence,
         )
 
-    async def _score_accuracy(
-        self, response: str, context: Dict[str, Any]
-    ) -> DimensionScore:
+    async def _score_accuracy(self, response: str, context: Dict[str, Any]) -> DimensionScore:
         """Score factual accuracy of the response."""
         score = 0.7  # Default score when no verification possible
         evidence = []
@@ -407,13 +395,9 @@ class ResponseQualityScorer:
         # Use grounding verifier if available
         if self.grounding_verifier and self.config.enable_grounding:
             try:
-                grounding_result = await self.grounding_verifier.verify(
-                    response, context
-                )
+                grounding_result = await self.grounding_verifier.verify(response, context)
                 score = grounding_result.confidence
-                evidence.append(
-                    f"Grounding confidence: {grounding_result.confidence:.2f}"
-                )
+                evidence.append(f"Grounding confidence: {grounding_result.confidence:.2f}")
 
                 if grounding_result.issues:
                     evidence.append(f"Grounding issues: {len(grounding_result.issues)}")
@@ -680,9 +664,7 @@ class ResponseQualityScorer:
 
             # Check for proper indentation
             lines = code.split("\n")
-            has_indentation = any(
-                line.startswith(("  ", "\t")) for line in lines if line.strip()
-            )
+            has_indentation = any(line.startswith(("  ", "\t")) for line in lines if line.strip())
             if has_indentation:
                 evidence.append("Proper indentation")
 
@@ -700,9 +682,7 @@ class ResponseQualityScorer:
         """Check if response contains code."""
         return bool(re.search(r"```\w*\n", response))
 
-    def _generate_suggestions(
-        self, dimension_scores: List[DimensionScore]
-    ) -> List[str]:
+    def _generate_suggestions(self, dimension_scores: List[DimensionScore]) -> List[str]:
         """Generate improvement suggestions based on scores."""
         suggestions = []
 
@@ -711,9 +691,7 @@ class ResponseQualityScorer:
                 if ds.dimension == ResponseQualityDimension.RELEVANCE:
                     suggestions.append("Address the specific question more directly")
                 elif ds.dimension == ResponseQualityDimension.COMPLETENESS:
-                    suggestions.append(
-                        "Provide more comprehensive coverage of all aspects"
-                    )
+                    suggestions.append("Provide more comprehensive coverage of all aspects")
                 elif ds.dimension == ResponseQualityDimension.ACCURACY:
                     suggestions.append("Verify claims against actual codebase content")
                 elif ds.dimension == ResponseQualityDimension.CONCISENESS:
@@ -777,10 +755,7 @@ class QualityGate:
         # Check required dimensions
         for dim in self.required_dimensions:
             dim_score = result.get_dimension_score(dim)
-            if (
-                dim_score is not None
-                and dim_score < self.scorer.config.dimension_threshold
-            ):
+            if dim_score is not None and dim_score < self.scorer.config.dimension_threshold:
                 return False, result
 
         return True, result

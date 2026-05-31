@@ -89,9 +89,7 @@ def _format_duration(seconds: Optional[float]) -> str:
 @experiment_app.command("list")
 def list_experiments(
     status: Optional[str] = typer.Option(None, "--status", help="Filter by status"),
-    tags: Optional[str] = typer.Option(
-        None, "--tags", help="Filter by tags (comma-separated)"
-    ),
+    tags: Optional[str] = typer.Option(None, "--tags", help="Filter by tags (comma-separated)"),
     limit: int = typer.Option(20, "--limit", "-n", help="Maximum number to show"),
     log_level: Optional[str] = typer.Option(None, "--log-level", hidden=True),
 ):
@@ -185,11 +183,7 @@ def show_experiment(
     info_table.add_row("Created", _format_timestamp(experiment.created_at.isoformat()))
     info_table.add_row(
         "Started",
-        (
-            _format_timestamp(experiment.started_at.isoformat())
-            if experiment.started_at
-            else "-"
-        ),
+        (_format_timestamp(experiment.started_at.isoformat()) if experiment.started_at else "-"),
     )
     info_table.add_row(
         "Completed",
@@ -246,9 +240,7 @@ def show_experiment(
 @experiment_app.command("create")
 def create_experiment(
     name: str = typer.Option(..., "--name", "-n", help="Experiment name"),
-    description: str = typer.Option(
-        "", "--description", "-d", help="Experiment description"
-    ),
+    description: str = typer.Option("", "--description", "-d", help="Experiment description"),
     hypothesis: str = typer.Option("", "--hypothesis", help="Hypothesis being tested"),
     tags: str = typer.Option("", "--tags", "-t", help="Comma-separated tags"),
     params: str = typer.Option("", "--params", "-p", help="JSON parameters"),
@@ -378,9 +370,7 @@ def list_runs(
 
     for run in runs:
         # Format metrics summary
-        metrics_str = ", ".join(
-            f"{k}={v:.3f}" for k, v in list(run.metrics_summary.items())[:3]
-        )
+        metrics_str = ", ".join(f"{k}={v:.3f}" for k, v in list(run.metrics_summary.items())[:3])
         if len(run.metrics_summary) > 3:
             metrics_str += f" +{len(run.metrics_summary) - 3}"
 
@@ -422,9 +412,7 @@ def show_run(
 
     info_table.add_row("Run ID", run.run_id)
     info_table.add_row("Name", run.name)
-    info_table.add_row(
-        "Experiment", experiment.name if experiment else run.experiment_id
-    )
+    info_table.add_row("Experiment", experiment.name if experiment else run.experiment_id)
     info_table.add_row("Status", f"[{run.status}]{run.status}[/]")
     info_table.add_row("Started", _format_timestamp(run.started_at.isoformat()))
     info_table.add_row(
@@ -486,11 +474,7 @@ def show_run(
 
         for artifact in artifacts:
             size_mb = artifact.file_size_bytes / (1024 * 1024)
-            size_str = (
-                f"{size_mb:.2f} MB"
-                if size_mb >= 1
-                else f"{artifact.file_size_bytes} bytes"
-            )
+            size_str = f"{size_mb:.2f} MB" if size_mb >= 1 else f"{artifact.file_size_bytes} bytes"
 
             artifacts_table.add_row(
                 artifact.artifact_type.value,

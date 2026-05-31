@@ -102,9 +102,7 @@ def example_1_single_agent_workflow():
         print("\n[Step 3] Querying agent_a...")
         agent_message = "Yes, this will work"
         agent_confidence = 0.8
-        print(
-            f"  Agent response: '{agent_message}' (confidence: {agent_confidence:.2%})"
-        )
+        print(f"  Agent response: '{agent_message}' (confidence: {agent_confidence:.2%})")
 
         # Step 4: Update belief with agent's message
         print("\n[Step 4] Updating belief using Bayesian posterior update...")
@@ -115,9 +113,7 @@ def example_1_single_agent_workflow():
             confidence=agent_confidence,
         )
 
-        print(
-            f"  Posterior: P(success) = {updated_belief.outcome_belief['success']:.2%}"
-        )
+        print(f"  Posterior: P(success) = {updated_belief.outcome_belief['success']:.2%}")
         print(f"  Entropy: {updated_belief.belief_entropy:.3f} nats")
         print(
             f"  Entropy reduction: {belief.belief_entropy - updated_belief.belief_entropy:.3f} nats"
@@ -365,9 +361,7 @@ def example_3_voi_based_agent_selection():
     )
 
     print(f"  Posterior: P(success) = {updated_belief.outcome_belief['success']:.2%}")
-    print(
-        f"  Entropy reduction: {belief.belief_entropy - updated_belief.belief_entropy:.3f} nats"
-    )
+    print(f"  Entropy reduction: {belief.belief_entropy - updated_belief.belief_entropy:.3f} nats")
 
     # Cleanup
     service.cleanup_belief_state(belief.belief_id)
@@ -445,9 +439,7 @@ def example_4_learning_from_execution():
     print(f"  agent_a reliability weight: {reliability_weight:.3f}")
 
     # Get reliability stats if available
-    reliability_stats = service.reliability_learner.get_agent_reliability_stats(
-        "agent_a"
-    )
+    reliability_stats = service.reliability_learner.get_agent_reliability_stats("agent_a")
     if reliability_stats:
         print(f"  agent_a sample count: {reliability_stats['sample_count']}")
 

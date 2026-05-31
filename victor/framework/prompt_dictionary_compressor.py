@@ -54,9 +54,7 @@ class PromptCompressionResult:
         if not self.compressed:
             return self.original_prompt
 
-        expanded_blocks = [
-            self.dictionary.get(block, block) for block in self.compressed_blocks
-        ]
+        expanded_blocks = [self.dictionary.get(block, block) for block in self.compressed_blocks]
         return "\n\n".join(expanded_blocks)
 
 
@@ -109,9 +107,7 @@ def compress_prompt_blocks(
         dictionary[alias] = block
         alias_by_block[block] = alias
 
-    compressed_blocks = [
-        alias_by_block.get(block, block) for block in normalized_blocks
-    ]
+    compressed_blocks = [alias_by_block.get(block, block) for block in normalized_blocks]
     result = PromptCompressionResult(
         original_blocks=normalized_blocks,
         compressed_blocks=compressed_blocks,

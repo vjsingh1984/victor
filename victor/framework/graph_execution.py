@@ -192,9 +192,7 @@ class NodeExecutor:
                 )
 
             remaining = timeout_manager.get_remaining()
-            use_copy_on_write = self.use_copy_on_write and not isinstance(
-                state, BaseModel
-            )
+            use_copy_on_write = self.use_copy_on_write and not isinstance(state, BaseModel)
 
             if use_copy_on_write:
                 cow_state: CopyOnWriteState[Any] = CopyOnWriteState(state)
@@ -213,9 +211,7 @@ class NodeExecutor:
                     state = cow_state.get_state()
             else:
                 if remaining is not None:
-                    state = await asyncio.wait_for(
-                        node.execute(state), timeout=remaining
-                    )
+                    state = await asyncio.wait_for(node.execute(state), timeout=remaining)
                 else:
                     state = await node.execute(state)
 
@@ -373,9 +369,7 @@ class GraphEventEmitter:
             },
         )
 
-    def _emit_rl_completion(
-        self, success: bool, iterations: int, duration: float
-    ) -> None:
+    def _emit_rl_completion(self, success: bool, iterations: int, duration: float) -> None:
         try:
             from victor.framework.rl.hooks import RLEvent, RLEventType, get_rl_hooks
 

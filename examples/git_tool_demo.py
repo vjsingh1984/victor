@@ -157,9 +157,7 @@ def test_main():
 
             # Test 8: Commit with manual message
             result = await git(operation="commit", message="test: Add basic test file")
-            print(
-                f"\nCommit result: {result['output'] if result['success'] else result['error']}"
-            )
+            print(f"\nCommit result: {result['output'] if result['success'] else result['error']}")
 
             # Test 9: Switch back to main
             print("\n9️⃣ Switching Branches")
@@ -192,9 +190,7 @@ def test_main():
 """)
 
             result = await git(operation="stage")
-            result = await git(
-                operation="commit", message="feat: Add utility functions"
-            )
+            result = await git(operation="commit", message="feat: Add utility functions")
             if result["success"]:
                 print(result["output"])
             else:
@@ -230,9 +226,7 @@ def test_main():
             print("  ✓ Conflict analysis")
 
             print("\n\n🤖 With AI Provider Available:")
-            print(
-                "  • AI-generated commit messages from diff analysis (git_suggest_commit)"
-            )
+            print("  • AI-generated commit messages from diff analysis (git_suggest_commit)")
             print("  • Auto-generated PR titles and descriptions (git_create_pr)")
             print("  • Conflict resolution suggestions (conflicts)")
 

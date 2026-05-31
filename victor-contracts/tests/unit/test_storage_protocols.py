@@ -62,9 +62,7 @@ class TestGraphEdgeData:
 
 class TestEmbeddingSearchResultData:
     def test_fields(self):
-        r = EmbeddingSearchResultData(
-            file_path="a.py", content="def foo():", score=0.95
-        )
+        r = EmbeddingSearchResultData(file_path="a.py", content="def foo():", score=0.95)
         assert r.file_path == "a.py"
         assert r.score == 0.95
         assert r.symbol_name is None

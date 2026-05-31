@@ -56,9 +56,7 @@ def clean_data(df: pd.DataFrame) -> pd.DataFrame:
         mean_val = df_clean[col].mean()
         df_clean[col].fillna(mean_val, inplace=True)
     for col in cat_cols:
-        mode_val = (
-            df_clean[col].mode().iloc[0] if not df_clean[col].mode().empty else None
-        )
+        mode_val = df_clean[col].mode().iloc[0] if not df_clean[col].mode().empty else None
         df_clean[col].fillna(mode_val, inplace=True)
     # After cleaning, ensure no missing values remain
     if df_clean.isnull().any().any():
@@ -89,9 +87,7 @@ def transform_data(df: pd.DataFrame) -> pd.DataFrame:
     # Build new column names
     num_features = numeric_cols
     cat_features = (
-        preprocessor.named_transformers_["cat"].get_feature_names_out(cat_cols)
-        if cat_cols
-        else []
+        preprocessor.named_transformers_["cat"].get_feature_names_out(cat_cols) if cat_cols else []
     )
     all_features = num_features + cat_features.tolist()
     df_transformed = pd.DataFrame(transformed_array, columns=all_features)

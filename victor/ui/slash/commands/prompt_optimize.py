@@ -75,15 +75,11 @@ class PromptOptimizeCommand(BaseSlashCommand):
                 return
 
             if show_section:
-                self._show_candidate(
-                    ctx, learner, show_section, coordinator.db_path, args
-                )
+                self._show_candidate(ctx, learner, show_section, coordinator.db_path, args)
                 return
 
             if diff_section:
-                self._diff_candidates(
-                    ctx, learner, diff_section, coordinator.db_path, args
-                )
+                self._diff_candidates(ctx, learner, diff_section, coordinator.db_path, args)
                 return
 
             # Determine which sections to evolve
@@ -104,8 +100,7 @@ class PromptOptimizeCommand(BaseSlashCommand):
                     sections = matched
                 else:
                     ctx.console.print(
-                        f"[red]Unknown section '{args[0]}'.[/] "
-                        f"Available: {', '.join(sections)}"
+                        f"[red]Unknown section '{args[0]}'.[/] " f"Available: {', '.join(sections)}"
                     )
                     return
 
@@ -118,9 +113,7 @@ class PromptOptimizeCommand(BaseSlashCommand):
             # are preserved when GEPA creates its own provider instance.
             if resolved_provider and resolved_provider != "default":
                 if hasattr(learner, "set_main_model_spec"):
-                    active_base_url = (
-                        getattr(ctx.agent, "provider_base_url", None) or ""
-                    )
+                    active_base_url = getattr(ctx.agent, "provider_base_url", None) or ""
                     learner.set_main_model_spec(
                         resolved_provider, resolved_model, base_url=active_base_url
                     )
@@ -138,9 +131,7 @@ class PromptOptimizeCommand(BaseSlashCommand):
                 for section in sections:
                     current = section_text.get(section)
                     if current is None:
-                        results.add_row(
-                            section, "-", "-", "[yellow]Not available[/]", "-", "-"
-                        )
+                        results.add_row(section, "-", "-", "[yellow]Not available[/]", "-", "-")
                         continue
 
                     short = (
@@ -150,12 +141,8 @@ class PromptOptimizeCommand(BaseSlashCommand):
                         .replace("_EXAMPLES", "")
                     )
 
-                    def _on_phase(
-                        sec: str, phase: str, strat: str = "", _s: str = short
-                    ) -> None:
-                        phase_label = (
-                            "reflecting…" if phase == "reflect" else "mutating…"
-                        )
+                    def _on_phase(sec: str, phase: str, strat: str = "", _s: str = short) -> None:
+                        phase_label = "reflecting…" if phase == "reflect" else "mutating…"
                         evolve_status.update(f"[cyan]{_s}[/] [dim]{phase_label}[/]")
 
                     evolve_status.update(f"[cyan]{short}[/] [dim]collecting traces…[/]")
@@ -174,9 +161,7 @@ class PromptOptimizeCommand(BaseSlashCommand):
                             f"{candidate.parent_hash[:8]} -> {candidate.text_hash[:8]}",
                         )
                     else:
-                        results.add_row(
-                            section, "-", "-", "[dim]No change[/]", "-", "-"
-                        )
+                        results.add_row(section, "-", "-", "[dim]No change[/]", "-", "-")
 
             ctx.console.print(results)
             ctx.console.print(
@@ -262,20 +247,14 @@ class PromptOptimizeCommand(BaseSlashCommand):
             return None
         return (f"{section}:{provider}:{candidate.generation}", candidate.text)
 
-    def _show_candidate(
-        self, ctx: CommandContext, learner, section: str, db_path, args
-    ) -> None:
+    def _show_candidate(self, ctx: CommandContext, learner, section: str, db_path, args) -> None:
         """Display the full text for one stored prompt candidate."""
         resolved_provider, _ = self._resolve_prompt_identity(ctx)
         provider = self._option_value(args, "--provider") or resolved_provider
-        selector = self._option_value(args, "--hash") or self._option_value(
-            args, "--ordinal"
-        )
+        selector = self._option_value(args, "--hash") or self._option_value(args, "--ordinal")
         selector = selector or "baseline"
         if selector.strip().lower() == "baseline":
-            resolved = self._resolve_candidate_or_baseline(
-                learner, section, provider, selector
-            )
+            resolved = self._resolve_candidate_or_baseline(learner, section, provider, selector)
             if resolved is None:
                 ctx.console.print(
                     f"[red]No prompt candidate found for {section} selector '{selector}' (provider={provider}).[/]"
@@ -294,10 +273,7 @@ class PromptOptimizeCommand(BaseSlashCommand):
                     f"[red]No prompt candidate found for {section} selector '{selector}' (provider={provider}).[/]"
                 )
                 return
-            label = (
-                f"{section}:{provider}:{candidate.generation}"
-                f" [{candidate.text_hash[:8]}]"
-            )
+            label = f"{section}:{provider}:{candidate.generation}" f" [{candidate.text_hash[:8]}]"
             text = candidate.text
             subtitle = f"Hash: {candidate.text_hash} | Parent: {candidate.parent_hash} | Database: {db_path}"
         ctx.console.print(
@@ -309,26 +285,18 @@ class PromptOptimizeCommand(BaseSlashCommand):
             )
         )
 
-    def _diff_candidates(
-        self, ctx: CommandContext, learner, section: str, db_path, args
-    ) -> None:
+    def _diff_candidates(self, ctx: CommandContext, learner, section: str, db_path, args) -> None:
         """Display a unified diff between two prompt candidates or baseline."""
         resolved_provider, _ = self._resolve_prompt_identity(ctx)
         provider = self._option_value(args, "--provider") or resolved_provider
         from_selector = self._option_value(args, "--from") or "baseline"
         to_selector = self._option_value(args, "--to")
         if not to_selector:
-            ctx.console.print(
-                "[red]Missing --to selector for /prompt-optimize --diff.[/]"
-            )
+            ctx.console.print("[red]Missing --to selector for /prompt-optimize --diff.[/]")
             return
 
-        left = self._resolve_candidate_or_baseline(
-            learner, section, provider, from_selector
-        )
-        right = self._resolve_candidate_or_baseline(
-            learner, section, provider, to_selector
-        )
+        left = self._resolve_candidate_or_baseline(learner, section, provider, from_selector)
+        right = self._resolve_candidate_or_baseline(learner, section, provider, to_selector)
         if left is None or right is None:
             ctx.console.print(
                 f"[red]Unable to resolve diff selectors for {section} "

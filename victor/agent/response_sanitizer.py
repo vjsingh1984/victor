@@ -695,9 +695,7 @@ class ResponseSanitizer:
         if not text:
             return []
         return [
-            line.strip()
-            for line in text.splitlines()
-            if self._is_plaintext_tool_command_line(line)
+            line.strip() for line in text.splitlines() if self._is_plaintext_tool_command_line(line)
         ]
 
     def has_tool_format_confusion(self, text: str | None) -> bool:
@@ -1040,9 +1038,7 @@ class ResponseSanitizer:
                 elif len(line) - len(line.lstrip()) <= base_indent and line.strip():
                     break
                 else:
-                    func_lines.append(
-                        line[base_indent:] if len(line) > base_indent else ""
-                    )
+                    func_lines.append(line[base_indent:] if len(line) > base_indent else "")
 
         if func_lines:
             return "\n".join(func_lines)
@@ -1113,9 +1109,7 @@ class ResponseSanitizer:
         except SyntaxError:
             return False
 
-    def extract_function(
-        self, code: str, function_name: Optional[str] = None
-    ) -> Optional[str]:
+    def extract_function(self, code: str, function_name: Optional[str] = None) -> Optional[str]:
         """Extract a function from code.
 
         Args:
@@ -1132,11 +1126,7 @@ class ResponseSanitizer:
                     if function_name is None or node.name == function_name:
                         lines = code.split("\n")
                         start = node.lineno - 1
-                        end = (
-                            node.end_lineno
-                            if hasattr(node, "end_lineno")
-                            else len(lines)
-                        )
+                        end = node.end_lineno if hasattr(node, "end_lineno") else len(lines)
                         return "\n".join(lines[start:end])
         except SyntaxError:
             pass

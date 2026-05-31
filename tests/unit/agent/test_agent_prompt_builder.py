@@ -50,12 +50,8 @@ class TestSystemPromptBuilder:
         assert CONCISE_MODE_GUIDANCE == CANONICAL_CONCISE_MODE_GUIDANCE
         assert COMPLETION_GUIDANCE == CANONICAL_COMPLETION_GUIDANCE
         assert GROUNDING_RULES_EXTENDED == CANONICAL_GROUNDING_RULES_EXTENDED
-        assert (
-            LARGE_FILE_PAGINATION_GUIDANCE == CANONICAL_LARGE_FILE_PAGINATION_GUIDANCE
-        )
-        assert (
-            ASI_TOOL_EFFECTIVENESS_GUIDANCE == CANONICAL_ASI_TOOL_EFFECTIVENESS_GUIDANCE
-        )
+        assert LARGE_FILE_PAGINATION_GUIDANCE == CANONICAL_LARGE_FILE_PAGINATION_GUIDANCE
+        assert ASI_TOOL_EFFECTIVENESS_GUIDANCE == CANONICAL_ASI_TOOL_EFFECTIVENESS_GUIDANCE
 
     def test_is_cloud_provider_returns_true_for_cloud(self):
         """Test cloud provider detection."""
@@ -198,9 +194,7 @@ class TestSystemPromptBuilder:
 
     def test_build_lmstudio_prompt_native_support(self):
         """Test LMStudio prompt for models with native support."""
-        builder = SystemPromptBuilder(
-            provider_name="lmstudio", model="qwen2.5-coder:7b"
-        )
+        builder = SystemPromptBuilder(provider_name="lmstudio", model="qwen2.5-coder:7b")
         result = builder._build_lmstudio_prompt()
         # Native support models get the expanded capabilities prompt
         assert "CAPABILITIES:" in result

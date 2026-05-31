@@ -25,9 +25,7 @@ class DuckDBGraphStore(GraphStoreProtocol):
         try:
             import duckdb  # type: ignore
         except Exception as exc:  # pragma: no cover - import guard
-            raise RuntimeError(
-                "duckdb must be installed to use DuckDBGraphStore"
-            ) from exc
+            raise RuntimeError("duckdb must be installed to use DuckDBGraphStore") from exc
 
         self.duckdb = duckdb
         self.db_path = Path(db_path)
@@ -192,9 +190,7 @@ class DuckDBGraphStore(GraphStoreProtocol):
             finally:
                 conn.close()
 
-        return sorted(
-            seen_edges.values(), key=lambda edge: (edge.src, edge.dst, edge.type)
-        )
+        return sorted(seen_edges.values(), key=lambda edge: (edge.src, edge.dst, edge.type))
 
     def _select_frontier_edges(
         self,

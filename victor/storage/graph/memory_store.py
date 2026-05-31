@@ -88,9 +88,7 @@ class MemoryGraphStore(GraphStoreProtocol):
             visited_nodes.update(next_frontier)
             frontier = next_frontier
 
-        return sorted(
-            seen_edges.values(), key=lambda edge: (edge.src, edge.dst, edge.type)
-        )
+        return sorted(seen_edges.values(), key=lambda edge: (edge.src, edge.dst, edge.type))
 
     async def find_nodes(
         self,
@@ -172,13 +170,9 @@ class MemoryGraphStore(GraphStoreProtocol):
 
     async def delete_by_file(self, file: str) -> None:
         file_variants = self._file_path_variants(file)
-        node_ids = {
-            node.node_id for node in self._nodes.values() if node.file in file_variants
-        }
+        node_ids = {node.node_id for node in self._nodes.values() if node.file in file_variants}
         self._nodes = {
-            node_id: node
-            for node_id, node in self._nodes.items()
-            if node_id not in node_ids
+            node_id: node for node_id, node in self._nodes.items() if node_id not in node_ids
         }
         self._edges = {
             key: edge
@@ -201,6 +195,4 @@ class MemoryGraphStore(GraphStoreProtocol):
         }
 
     async def get_all_edges(self) -> List[GraphEdge]:
-        return sorted(
-            self._edges.values(), key=lambda edge: (edge.src, edge.dst, edge.type)
-        )
+        return sorted(self._edges.values(), key=lambda edge: (edge.src, edge.dst, edge.type))

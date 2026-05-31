@@ -163,9 +163,7 @@ async def slack(
 
         elif operation == "list_channels":
             logger.info("[slack] Listing channels")
-            response = slack_client.conversations_list(
-                types="public_channel,private_channel"
-            )
+            response = slack_client.conversations_list(types="public_channel,private_channel")
             if response.get("ok"):
                 channels_data = response.get("channels", [])
                 results: List[Dict[str, Any]] = [

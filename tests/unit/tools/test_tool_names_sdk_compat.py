@@ -28,6 +28,4 @@ def test_legacy_tool_aliases_share_sdk_contract() -> None:
 
     assert legacy_tool_aliases is sdk_tool_aliases
     assert legacy_tool_aliases["git_create_pr"] == SdkToolNames.PR
-    assert legacy_get_canonical_name("git_create_pr") == sdk_get_canonical_name(
-        "git_create_pr"
-    )
+    assert legacy_get_canonical_name("git_create_pr") == sdk_get_canonical_name("git_create_pr")

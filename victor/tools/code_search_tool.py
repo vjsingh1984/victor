@@ -221,9 +221,7 @@ def _resolve_codebase_embedding_model(settings: Any) -> Any:
     codebase_model = _get_search_setting(settings, "codebase_embedding_model", None)
     if codebase_model not in (None, ""):
         return codebase_model
-    return _get_embedding_setting(
-        settings, "unified_embedding_model", "BAAI/bge-small-en-v1.5"
-    )
+    return _get_embedding_setting(settings, "unified_embedding_model", "BAAI/bge-small-en-v1.5")
 
 
 def _get_index_build_failure_cache(exec_ctx: Optional[Any] = None) -> Any:
@@ -289,9 +287,7 @@ async def _probe_index_integrity(
             if table is not None:
                 row_count = table.count_rows() if hasattr(table, "count_rows") else -1
                 if isinstance(row_count, (int, float)) and row_count > 0:
-                    logger.info(
-                        "Persistent index healthy: %d rows in vector store", row_count
-                    )
+                    logger.info("Persistent index healthy: %d rows in vector store", row_count)
                     return IntegrityProbeOutcome()  # Healthy
 
         # Fallback: try a semantic search with timeout
@@ -336,9 +332,7 @@ async def _probe_index_integrity(
         ]
 
         if any(kw in error_msg.lower() for kw in transient_keywords):
-            logger.debug(
-                "Transient init issue detected (%s), skipping rebuild", error_msg
-            )
+            logger.debug("Transient init issue detected (%s), skipping rebuild", error_msg)
             return IntegrityProbeOutcome()  # Don't rebuild for transient issues
 
         # Log with full error details for debugging
@@ -380,9 +374,7 @@ def _build_codebase_embedding_extra_config(
         ),
     }
 
-    custom_extra = _get_search_setting(
-        settings, "codebase_embedding_extra_config", None
-    )
+    custom_extra = _get_search_setting(settings, "codebase_embedding_extra_config", None)
     if isinstance(custom_extra, dict):
         extra_config.update(custom_extra)
 
@@ -399,16 +391,12 @@ def _build_codebase_embedding_config(settings: Any, root: Path) -> Dict[str, Any
 
     default_persist_dir = str(get_project_paths(root).embeddings_dir)
     config = {
-        "vector_store": _get_search_setting(
-            settings, "codebase_vector_store", "lancedb"
-        ),
+        "vector_store": _get_search_setting(settings, "codebase_vector_store", "lancedb"),
         "embedding_model_type": _get_search_setting(
             settings, "codebase_embedding_provider", "sentence-transformers"
         ),
         "embedding_model_name": _resolve_codebase_embedding_model(settings),
-        "persist_directory": _get_search_setting(
-            settings, "codebase_persist_directory", None
-        )
+        "persist_directory": _get_search_setting(settings, "codebase_persist_directory", None)
         or default_persist_dir,
         "extra_config": _build_codebase_embedding_extra_config(settings, root),
     }
@@ -429,29 +417,20 @@ def _collect_code_search_backend_metadata(index: Any, settings: Any) -> Dict[str
     if config is not None:
         extra_config = getattr(config, "extra_config", None)
         raw_vector_store = getattr(config, "vector_store", None)
-        if raw_vector_store == STRUCTURAL_CODEBASE_VECTOR_STORE and isinstance(
-            extra_config, dict
-        ):
-            _assign_if_present(
-                "vector_store", extra_config.get("upstream_vector_store")
-            )
+        if raw_vector_store == STRUCTURAL_CODEBASE_VECTOR_STORE and isinstance(extra_config, dict):
+            _assign_if_present("vector_store", extra_config.get("upstream_vector_store"))
             metadata["indexing_backend"] = "structural_bridge"
             metadata["structural_indexing_enabled"] = True
         else:
             _assign_if_present("vector_store", raw_vector_store)
-        _assign_if_present(
-            "embedding_provider", getattr(config, "embedding_model_type", None)
-        )
-        _assign_if_present(
-            "embedding_model", getattr(config, "embedding_model_name", None)
-        )
+        _assign_if_present("embedding_provider", getattr(config, "embedding_model_type", None))
+        _assign_if_present("embedding_model", getattr(config, "embedding_model_name", None))
         if isinstance(extra_config, dict):
             _assign_if_present("embedding_dimension", extra_config.get("dimension"))
             _assign_if_present("embedding_batch_size", extra_config.get("batch_size"))
             _assign_if_present(
                 "chunking_strategy",
-                extra_config.get("code_chunking_strategy")
-                or extra_config.get("chunking_strategy"),
+                extra_config.get("code_chunking_strategy") or extra_config.get("chunking_strategy"),
             )
 
     # Fall back to settings when the backend does not expose explicit config.
@@ -461,9 +440,7 @@ def _collect_code_search_backend_metadata(index: Any, settings: Any) -> Dict[str
     )
     metadata.setdefault(
         "embedding_provider",
-        _get_search_setting(
-            settings, "codebase_embedding_provider", "sentence-transformers"
-        ),
+        _get_search_setting(settings, "codebase_embedding_provider", "sentence-transformers"),
     )
     metadata.setdefault(
         "embedding_model",
@@ -499,14 +476,10 @@ async def _finalize_index_storage(index: Any) -> None:
     try:
         await get_stats()
     except Exception as exc:
-        logger.debug(
-            "Failed to finalize structural code_search provider writes: %s", exc
-        )
+        logger.debug("Failed to finalize structural code_search provider writes: %s", exc)
 
 
-def _ensure_graph_enrichment_for_root(
-    root: Path, latest_mtime: Optional[float]
-) -> None:
+def _ensure_graph_enrichment_for_root(root: Path, latest_mtime: Optional[float]) -> None:
     """Persist synthetic architecture edges alongside the indexed project graph."""
     try:
         ensure_project_graph_enriched(root, latest_mtime=latest_mtime)
@@ -536,9 +509,7 @@ def _cleanup_nested_victor_dirs(root: Path) -> None:
     for nested_path in nested_patterns:
         if nested_path.exists():
             try:
-                size = sum(
-                    f.stat().st_size for f in nested_path.rglob("*") if f.is_file()
-                )
+                size = sum(f.stat().st_size for f in nested_path.rglob("*") if f.is_file())
                 logger.info(
                     "[code_search] Removing nested .victor directory: %s (%.1f MB)",
                     nested_path.relative_to(root),
@@ -546,9 +517,7 @@ def _cleanup_nested_victor_dirs(root: Path) -> None:
                 )
                 shutil.rmtree(nested_path)
             except (OSError, PermissionError) as exc:
-                logger.warning(
-                    "[code_search] Failed to remove %s: %s", nested_path, exc
-                )
+                logger.warning("[code_search] Failed to remove %s: %s", nested_path, exc)
 
 
 def _load_codebase_index_factory_via_importlib() -> Optional[Any]:
@@ -727,9 +696,7 @@ def _raise_if_cached_index_build_failure(failure_cache: Any, key: str) -> None:
     failure_entry = _failure_cache_get(failure_cache, key)
     error_text = _get_active_failure_error(failure_entry)
     if error_text:
-        logger.info(
-            "[code_search] Skipping index build due to recent failure: %s", error_text
-        )
+        logger.info("[code_search] Skipping index build due to recent failure: %s", error_text)
         raise ImportError(
             f"Semantic index build recently failed: {error_text}\n"
             f"Use reindex=True to retry, or mode='literal' for keyword search."
@@ -876,12 +843,8 @@ def _calculate_index_build_timeout(root_path: Path) -> float:
 
         # Calculate timeout
         file_timeout = min(py_file_count * 5.0, 300.0)  # Max 5 minutes from files
-        symbol_timeout = min(
-            estimated_symbols / 1000.0 * 10.0, 300.0
-        )  # Max 5 minutes from symbols
-        size_timeout = min(
-            total_size_bytes / (1024 * 1024) * 30.0, 200.0
-        )  # Max 200s from size
+        symbol_timeout = min(estimated_symbols / 1000.0 * 10.0, 300.0)  # Max 5 minutes from symbols
+        size_timeout = min(total_size_bytes / (1024 * 1024) * 30.0, 200.0)  # Max 200s from size
 
         calculated_timeout = base_timeout + file_timeout + symbol_timeout + size_timeout
         final_timeout = min(calculated_timeout, max_timeout)
@@ -937,9 +900,7 @@ def _failure_cache_delete(failure_cache: Any, key: str) -> None:
         failure_cache.pop(key, None)
 
 
-def _is_cached_index_stale(
-    root: Path, exec_ctx: Optional[Dict[str, Any]] = None
-) -> bool:
+def _is_cached_index_stale(root: Path, exec_ctx: Optional[Dict[str, Any]] = None) -> bool:
     """Return True when the current cached semantic index for a root is marked stale."""
 
     cache_entry = _get_index_cache(exec_ctx).get(str(root), {})
@@ -1156,9 +1117,7 @@ def _normalize_code_search_path(path_text: str) -> str:
     return normalized
 
 
-def _matches_literal_file_pattern(
-    file_path: str, file_pattern: str, *, search_root: str
-) -> bool:
+def _matches_literal_file_pattern(file_path: str, file_pattern: str, *, search_root: str) -> bool:
     """Return whether a literal-search hit matches the caller's file pattern."""
 
     normalized_pattern = _normalize_code_search_path(file_pattern.strip())
@@ -1166,9 +1125,7 @@ def _matches_literal_file_pattern(
         return True
 
     try:
-        relative_path = (
-            Path(file_path).resolve().relative_to(Path(search_root).resolve())
-        )
+        relative_path = Path(file_path).resolve().relative_to(Path(search_root).resolve())
         candidate_path = _normalize_code_search_path(str(relative_path))
     except Exception:
         candidate_path = _normalize_code_search_path(file_path)
@@ -1228,9 +1185,7 @@ def _filter_search_results_by_file_pattern(
         file_path = result_dict.get("file_path") or result_dict.get("path")
         if not isinstance(file_path, str):
             continue
-        if _matches_literal_file_pattern(
-            file_path, file_pattern, search_root=str(search_root)
-        ):
+        if _matches_literal_file_pattern(file_path, file_pattern, search_root=str(search_root)):
             filtered_results.append(result)
     return filtered_results
 
@@ -1290,11 +1245,7 @@ def _filter_search_results_by_language(
 ) -> List[Any]:
     """Filter result objects by normalized language."""
 
-    return [
-        result
-        for result in results
-        if _result_matches_language_filter(result, language)
-    ]
+    return [result for result in results if _result_matches_language_filter(result, language)]
 
 
 def _filter_search_results_by_test_only(
@@ -1307,9 +1258,7 @@ def _filter_search_results_by_test_only(
     for result in results:
         result_dict = _normalize_result_dict(result)
         metadata = result_dict.get("metadata")
-        if isinstance(metadata, dict) and isinstance(
-            metadata.get("is_test_file"), bool
-        ):
+        if isinstance(metadata, dict) and isinstance(metadata.get("is_test_file"), bool):
             is_test_file = metadata["is_test_file"]
         else:
             file_path = result_dict.get("file_path") or result_dict.get("path")
@@ -1349,14 +1298,12 @@ def _result_matches_symbol_filter(result: Any, symbol: str) -> bool:
             or normalized_candidate.endswith(f":{target_symbol}")
         ):
             return True
-        if (
-            "." in target_symbol or ":" in target_symbol
-        ) and normalized_candidate.endswith(target_symbol):
+        if ("." in target_symbol or ":" in target_symbol) and normalized_candidate.endswith(
+            target_symbol
+        ):
             return True
 
-    symbol_pattern = re.compile(
-        rf"(?<![A-Za-z0-9_]){re.escape(target_symbol)}(?![A-Za-z0-9_])"
-    )
+    symbol_pattern = re.compile(rf"(?<![A-Za-z0-9_]){re.escape(target_symbol)}(?![A-Za-z0-9_])")
     for text in (result_dict.get("content"), result_dict.get("snippet")):
         if isinstance(text, str) and symbol_pattern.search(text):
             return True
@@ -1370,17 +1317,13 @@ def _filter_search_results_by_symbol(
 ) -> List[Any]:
     """Filter result objects by symbol name."""
 
-    return [
-        result for result in results if _result_matches_symbol_filter(result, symbol)
-    ]
+    return [result for result in results if _result_matches_symbol_filter(result, symbol)]
 
 
 def _language_filter_extensions(language: str) -> Optional[List[str]]:
     """Return known file extensions for a language filter."""
 
-    known_extensions = _LANGUAGE_EXTENSION_MAP.get(
-        _canonicalize_language_name(language)
-    )
+    known_extensions = _LANGUAGE_EXTENSION_MAP.get(_canonicalize_language_name(language))
     if not known_extensions:
         return None
     return sorted(known_extensions)
@@ -1403,15 +1346,10 @@ def _build_literal_search_extensions(
 def _needs_literal_postfilter_overfetch(filters: Optional["SearchFilters"]) -> bool:
     """Return whether literal results are narrowed by shared post-filters after retrieval."""
 
-    return bool(
-        filters
-        and (filters.symbol or filters.language or filters.test_only is not None)
-    )
+    return bool(filters and (filters.symbol or filters.language or filters.test_only is not None))
 
 
-def _literal_search_fetch_limit(
-    requested_limit: int, filters: Optional["SearchFilters"]
-) -> int:
+def _literal_search_fetch_limit(requested_limit: int, filters: Optional["SearchFilters"]) -> int:
     """Return the candidate count to fetch before applying literal post-filters."""
 
     if requested_limit <= 0:
@@ -1435,19 +1373,13 @@ def _apply_literal_result_filters(
     filtered_result = dict(result)
     filtered_hits: List[Any] = list(result["results"])
     if filters.extensions:
-        filtered_hits = _filter_search_results_by_extensions(
-            filtered_hits, filters.extensions
-        )
+        filtered_hits = _filter_search_results_by_extensions(filtered_hits, filters.extensions)
     if filters.symbol:
         filtered_hits = _filter_search_results_by_symbol(filtered_hits, filters.symbol)
     if filters.language:
-        filtered_hits = _filter_search_results_by_language(
-            filtered_hits, filters.language
-        )
+        filtered_hits = _filter_search_results_by_language(filtered_hits, filters.language)
     if filters.test_only is not None:
-        filtered_hits = _filter_search_results_by_test_only(
-            filtered_hits, filters.test_only
-        )
+        filtered_hits = _filter_search_results_by_test_only(filtered_hits, filters.test_only)
     if max_results is not None:
         filtered_hits = filtered_hits[:max_results]
     filtered_result["results"] = filtered_hits
@@ -1615,9 +1547,7 @@ GRAPH_FOLLOW_UP_SYMBOL_TYPES = {"function", "method"}
 ENTRYPOINT_SYMBOL_NAMES = {"main", "run", "start", "serve", "cli", "bootstrap"}
 
 
-def _calculate_importance_score(
-    file_path: str, symbol_type: Optional[str] = None
-) -> float:
+def _calculate_importance_score(file_path: str, symbol_type: Optional[str] = None) -> float:
     """Calculate importance score for a search result.
 
     Higher scores = more architecturally important.
@@ -1679,9 +1609,7 @@ async def _subscribe_to_file_watcher(
         file_watcher = await watcher_registry.get_watcher(root)
 
         # Subscribe to file changes (synchronous method)
-        file_watcher.subscribe(
-            lambda e: _schedule_file_change_refresh(e, root, exec_ctx)
-        )
+        file_watcher.subscribe(lambda e: _schedule_file_change_refresh(e, root, exec_ctx))
 
         logger.info(f"[code_search] Subscribed to file watcher for {root}")
         return True
@@ -1743,17 +1671,11 @@ async def _ensure_file_watcher_subscription(
     try:
         subscribed = bool(await asyncio.shield(pending_task))
     except asyncio.CancelledError:
-        if (
-            cache_entry.get("watcher_subscription_task") is pending_task
-            and pending_task.done()
-        ):
+        if cache_entry.get("watcher_subscription_task") is pending_task and pending_task.done():
             cache_entry.pop("watcher_subscription_task", None)
         raise
     finally:
-        if (
-            cache_entry.get("watcher_subscription_task") is pending_task
-            and pending_task.done()
-        ):
+        if cache_entry.get("watcher_subscription_task") is pending_task and pending_task.done():
             cache_entry.pop("watcher_subscription_task", None)
 
     cache_entry["watcher_subscribed"] = subscribed
@@ -1876,9 +1798,7 @@ def _gather_files(root: str, exts: Optional[List[str]], max_files: int) -> List[
     ext_set: Set[str] = _normalize_extensions(exts)
     files: List[str] = []
     for dirpath, dirnames, filenames in os.walk(root):
-        dirnames[:] = [
-            d for d in dirnames if d not in EXCLUDE_DIRS and not d.startswith(".")
-        ]
+        dirnames[:] = [d for d in dirnames if d not in EXCLUDE_DIRS and not d.startswith(".")]
         for fname in filenames:
             if os.path.splitext(fname)[1] in ext_set:
                 files.append(os.path.join(dirpath, fname))
@@ -2072,8 +1992,7 @@ def _prepare_ranked_results(
         content = result_dict.get("content", "")
         if isinstance(content, str) and len(content) > max_content_chars:
             result_dict["content"] = (
-                content[:max_content_chars]
-                + f"... [truncated, {len(content)} chars total]"
+                content[:max_content_chars] + f"... [truncated, {len(content)} chars total]"
             )
             result_dict["content_truncated"] = True
 
@@ -2330,9 +2249,7 @@ async def _get_or_build_index(
 
         factory = _load_codebase_index_factory_via_importlib()
         if factory is not None:
-            registry.register(
-                CodebaseIndexFactoryProtocol, factory, CapabilityStatus.ENHANCED
-            )
+            registry.register(CodebaseIndexFactoryProtocol, factory, CapabilityStatus.ENHANCED)
             _index_factory = factory
             logger.info(
                 "[code_search] Recovered CodebaseIndex factory via importlib fallback "
@@ -2375,9 +2292,7 @@ async def _get_or_build_index(
             logger.info(f"[code_search] Cache marked stale for {root}, will rebuild")
             # Fall through to rebuild below
         elif not _cache_entry_matches_manifest(cache_entry, index_manifest):
-            logger.info(
-                "[code_search] Cache manifest mismatch for %s, rebuilding", root
-            )
+            logger.info("[code_search] Cache manifest mismatch for %s, rebuilding", root)
             # Fall through to rebuild below
         elif latest <= last_mtime:
             # No files changed, use cache directly
@@ -2387,9 +2302,7 @@ async def _get_or_build_index(
 
             return cached_index, False
         else:
-            logger.info(
-                "[code_search] Cache changed for %s, refreshing under lock", root
-            )
+            logger.info("[code_search] Cache changed for %s, refreshing under lock", root)
 
     # Acquire lock for this path to prevent concurrent indexing
     lock_registry = IndexLockRegistry.get_instance()
@@ -2439,9 +2352,7 @@ async def _get_or_build_index(
                     return cached_index, False
 
         # Build index with exclusive access to this path
-        logger.info(
-            f"[code_search] Building index for {root} (exclusive lock acquired)"
-        )
+        logger.info(f"[code_search] Building index for {root} (exclusive lock acquired)")
 
         graph_store_name = getattr(settings, "codebase_graph_store", "sqlite")
         graph_path = getattr(settings, "codebase_graph_path", None)
@@ -2500,9 +2411,7 @@ async def _get_or_build_index(
                 # Spawn background rebuild task (fire and forget)
                 async def _rebuildInBackground():
                     try:
-                        logger.info(
-                            "[code_search] Background rebuild started for %s", root
-                        )
+                        logger.info("[code_search] Background rebuild started for %s", root)
                         await index.index_codebase()
                         await _finalize_index_storage(index)
                         # Write manifest after successful rebuild
@@ -2523,9 +2432,7 @@ async def _get_or_build_index(
                             current_cache["stale"] = False
                             current_cache["latest_mtime"] = _latest_mtime(root)
                             current_cache["index_manifest"] = index_manifest
-                        logger.info(
-                            "[code_search] Background rebuild complete for %s", root
-                        )
+                        logger.info("[code_search] Background rebuild complete for %s", root)
                     except Exception as exc:
                         error_str = str(exc).lower()
                         # Detect embedding-specific errors
@@ -2606,13 +2513,9 @@ async def _get_or_build_index(
             # the persisted data without triggering a full rebuild.
             if hasattr(index, "_is_indexed"):
                 index._is_indexed = True
-            logger.info(
-                "Using persistent embeddings from %s (skip full rebuild)", persist_path
-            )
+            logger.info("Using persistent embeddings from %s (skip full rebuild)", persist_path)
             # Validate integrity — corrupt LanceDB data will fail silently
-            probe_outcome = _coerce_integrity_probe_outcome(
-                await _probe_index_integrity(index)
-            )
+            probe_outcome = _coerce_integrity_probe_outcome(await _probe_index_integrity(index))
             rebuilt = probe_outcome.rebuilt
             cache_stale = probe_outcome.stale
 
@@ -2650,13 +2553,9 @@ async def _get_or_build_index(
                 _failure_cache_delete(failure_cache, key)
                 cleared_any = True
         if cleared_any:
-            logger.info(
-                "[code_search] Cleared index build failure cache after successful build"
-            )
+            logger.info("[code_search] Cleared index build failure cache after successful build")
     except Exception as cache_err:
-        logger.debug(
-            f"[code_search] Failed to clear index build failure cache: {cache_err}"
-        )
+        logger.debug(f"[code_search] Failed to clear index build failure cache: {cache_err}")
 
     return index, rebuilt
 
@@ -2746,9 +2645,7 @@ async def _literal_search(
             query_has_glob = any(token in normalized_filename_query for token in "*?[]")
             query_suffix = normalized_filename_query.lower()
             filename_filter_pattern = file_pattern
-            if filename_filter_pattern is None and _looks_like_filename_query(
-                search_query
-            ):
+            if filename_filter_pattern is None and _looks_like_filename_query(search_query):
                 filename_filter_pattern = normalized_filename_query
             logger.info(
                 f"Filename query detected: using {'dir' if system == 'Windows' else 'find'} "
@@ -2783,9 +2680,7 @@ async def _literal_search(
                     (object,),
                     {"stdout": stdout.decode("utf-8", errors="ignore")},
                 )
-                found_files = [
-                    f.strip() for f in find_result.stdout.splitlines() if f.strip()
-                ]
+                found_files = [f.strip() for f in find_result.stdout.splitlines() if f.strip()]
                 if query_has_path_components and not query_has_glob:
                     found_files = [
                         fpath
@@ -2809,9 +2704,7 @@ async def _literal_search(
                         results.append(
                             {
                                 "path": fpath,
-                                "score": (
-                                    10 if normalized_path.endswith(query_suffix) else 5
-                                ),
+                                "score": (10 if normalized_path.endswith(query_suffix) else 5),
                                 "snippet": f"[File found: {fpath}]",
                             }
                         )
@@ -2897,9 +2790,7 @@ async def _literal_search(
             stderr=asyncio.subprocess.PIPE,
         )
         stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=30)
-        result = type(
-            "obj", (object,), {"stdout": stdout.decode("utf-8", errors="ignore")}
-        )
+        result = type("obj", (object,), {"stdout": stdout.decode("utf-8", errors="ignore")})
 
         # Parse results: group by file, take top k files
         file_matches: Dict[str, List[str]] = {}
@@ -2934,9 +2825,7 @@ async def _literal_search(
             file_matches = {
                 fpath: matches
                 for fpath, matches in file_matches.items()
-                if _matches_literal_file_pattern(
-                    fpath, file_pattern, search_root=search_path
-                )
+                if _matches_literal_file_pattern(fpath, file_pattern, search_root=search_path)
             }
 
         # Sort by number of matches (most matches = most relevant)
@@ -3115,18 +3004,11 @@ async def code_search(
     literal_escalation_metadata: Dict[str, Any] = {}
     mode_fallback_to_semantic = False
     allow_filename_autodetect = requested_mode not in {"literal", "text"}
-    literal_file_pattern = (
-        filters.file_pattern if filters and filters.file_pattern else None
-    )
+    literal_file_pattern = filters.file_pattern if filters and filters.file_pattern else None
 
     # Auto-detect filename search mode
     if mode == "semantic":
-        if (
-            query_from_file_pattern
-            and filters
-            and filters.file_pattern
-            and not filters.symbol
-        ):
+        if query_from_file_pattern and filters and filters.file_pattern and not filters.symbol:
             # If only file_pattern is provided, treat as filename search.
             mode = "filename"
         elif _looks_like_filename_query(query) and not (filters and filters.symbol):
@@ -3240,14 +3122,10 @@ async def code_search(
             }
 
         # Check if embeddings are disabled for this agent (workflow-level service mode)
-        disable_embeddings = (
-            _exec_ctx.get("disable_embeddings", False) if _exec_ctx else False
-        )
+        disable_embeddings = _exec_ctx.get("disable_embeddings", False) if _exec_ctx else False
         fallback_search_path = str(root_path)
         if disable_embeddings:
-            logger.info(
-                "Embeddings disabled for this agent, falling back to literal search"
-            )
+            logger.info("Embeddings disabled for this agent, falling back to literal search")
             literal_fetch_limit = _literal_search_fetch_limit(k, filters)
             exts = _build_literal_search_extensions(filters)
             result = await _literal_search(
@@ -3319,9 +3197,7 @@ async def code_search(
             # Calculate dynamic timeout based on codebase size
             build_timeout = _calculate_index_build_timeout(root_path)
             index, rebuilt = await asyncio.wait_for(
-                _get_or_build_index(
-                    root_path, settings, force_reindex=reindex, exec_ctx=_exec_ctx
-                ),
+                _get_or_build_index(root_path, settings, force_reindex=reindex, exec_ctx=_exec_ctx),
                 timeout=build_timeout,
             )
         except (asyncio.TimeoutError, Exception) as exc:
@@ -3383,9 +3259,7 @@ async def code_search(
                         )
                     logger.info("[code_search] Cached index build failure for 1 hour")
                 except Exception as cache_err:
-                    logger.debug(
-                        f"[code_search] Failed to cache index build failure: {cache_err}"
-                    )
+                    logger.debug(f"[code_search] Failed to cache index build failure: {cache_err}")
 
             literal_fetch_limit = _literal_search_fetch_limit(k, filters)
             exts = _build_literal_search_extensions(filters)
@@ -3483,9 +3357,7 @@ async def code_search(
                 extra_metadata.update(enrichment_metadata)
                 if ignored_filters:
                     extra_metadata["ignored_filters"] = ignored_filters
-                follow_up_suggestions = _build_graph_follow_up_suggestions(
-                    ranked_results
-                )
+                follow_up_suggestions = _build_graph_follow_up_suggestions(ranked_results)
                 return _build_search_response(
                     results=ranked_results,
                     mode="bugs",
@@ -3549,9 +3421,7 @@ async def code_search(
                 extra_metadata.update(enrichment_metadata)
                 if ignored_filters:
                     extra_metadata["ignored_filters"] = ignored_filters
-                follow_up_suggestions = _build_graph_follow_up_suggestions(
-                    ranked_results
-                )
+                follow_up_suggestions = _build_graph_follow_up_suggestions(ranked_results)
                 return _build_search_response(
                     results=ranked_results,
                     mode="localize",
@@ -3613,9 +3483,7 @@ async def code_search(
                 extra_metadata.update(enrichment_metadata)
                 if ignored_filters:
                     extra_metadata["ignored_filters"] = ignored_filters
-                follow_up_suggestions = _build_graph_follow_up_suggestions(
-                    ranked_results
-                )
+                follow_up_suggestions = _build_graph_follow_up_suggestions(ranked_results)
                 return _build_search_response(
                     results=ranked_results,
                     mode="impact",
@@ -3648,9 +3516,7 @@ async def code_search(
             ) and flag_manager.is_enabled(FeatureFlag.USE_MULTI_HOP_RETRIEVAL)
 
             if not graph_enabled:
-                logger.info(
-                    "Graph search features not enabled, falling back to semantic search"
-                )
+                logger.info("Graph search features not enabled, falling back to semantic search")
                 filters_applied.append("mode_fallback=semantic")
                 fallback_metadata = {
                     "requested_mode": "graph",
@@ -3674,11 +3540,9 @@ async def code_search(
                             graph_results["results"],
                             search_mode="graph",
                         )
-                        ranked_results, enrichment_metadata = (
-                            enrich_code_search_results(
-                                ranked_results,
-                                root_path=root_path,
-                            )
+                        ranked_results, enrichment_metadata = enrich_code_search_results(
+                            ranked_results,
+                            root_path=root_path,
                         )
 
                         extra_metadata = {
@@ -3687,19 +3551,13 @@ async def code_search(
                                 "max_hops": max_hops,
                                 "edge_types": graph_edge_types
                                 or graph_results.get("edge_types_used", []),
-                                "nodes_traversed": graph_results.get(
-                                    "nodes_traversed", 0
-                                ),
-                                "execution_time_ms": graph_results.get(
-                                    "execution_time_ms", 0
-                                ),
+                                "nodes_traversed": graph_results.get("nodes_traversed", 0),
+                                "execution_time_ms": graph_results.get("execution_time_ms", 0),
                             },
                         }
                         extra_metadata.update(enrichment_metadata)
 
-                        follow_up_suggestions = _build_graph_follow_up_suggestions(
-                            ranked_results
-                        )
+                        follow_up_suggestions = _build_graph_follow_up_suggestions(ranked_results)
                         return _build_search_response(
                             results=ranked_results,
                             mode="graph",
@@ -3724,9 +3582,7 @@ async def code_search(
                         }
 
                 except Exception as exc:
-                    logger.warning(
-                        "Graph search failed (%s), falling back to semantic search", exc
-                    )
+                    logger.warning("Graph search failed (%s), falling back to semantic search", exc)
                     filters_applied.append("mode_fallback=semantic")
                     fallback_metadata = {
                         "requested_mode": "graph",
@@ -3757,9 +3613,7 @@ async def code_search(
         }
         safe_filter = None
         if filter_metadata:
-            safe_filter = {
-                k: v for k, v in filter_metadata.items() if k in _INDEX_FILTER_FIELDS
-            }
+            safe_filter = {k: v for k, v in filter_metadata.items() if k in _INDEX_FILTER_FIELDS}
             dropped = set(filter_metadata) - set(safe_filter)
             if dropped:
                 logger.debug("Dropped unsupported filter fields: %s", dropped)
@@ -3788,9 +3642,7 @@ async def code_search(
                 timeout=15.0,
             )
         except (asyncio.TimeoutError, Exception) as exc:
-            logger.warning(
-                "Semantic search failed (%s), falling back to literal search", exc
-            )
+            logger.warning("Semantic search failed (%s), falling back to literal search", exc)
             literal_fetch_limit = _literal_search_fetch_limit(k, filters)
             result = await _literal_search(
                 query,
@@ -3821,24 +3673,16 @@ async def code_search(
                 search_root=root_path,
             )
         if manual_extension_filter:
-            results = _filter_search_results_by_extensions(
-                results, manual_extension_filter
-            )
+            results = _filter_search_results_by_extensions(results, manual_extension_filter)
         if manual_symbol_filter:
             results = _filter_search_results_by_symbol(results, manual_symbol_filter)
         if manual_language_filter:
-            results = _filter_search_results_by_language(
-                results, manual_language_filter
-            )
+            results = _filter_search_results_by_language(results, manual_language_filter)
         if manual_test_only_filter is not None:
-            results = _filter_search_results_by_test_only(
-                results, manual_test_only_filter
-            )
+            results = _filter_search_results_by_test_only(results, manual_test_only_filter)
 
         # Record outcome for RL threshold learning if enabled
-        if _get_search_setting(
-            settings, "enable_semantic_threshold_rl_learning", False
-        ):
+        if _get_search_setting(settings, "enable_semantic_threshold_rl_learning", False):
             try:
                 from victor.framework.rl.coordinator import get_rl_coordinator
                 from victor.framework.rl.base import RLOutcome
@@ -3849,9 +3693,7 @@ async def code_search(
                 embedding_model = _resolve_codebase_embedding_model(settings)
 
                 # Get task type from execution context (default to "search")
-                task_type = (
-                    _exec_ctx.get("task_type", "search") if _exec_ctx else "search"
-                )
+                task_type = _exec_ctx.get("task_type", "search") if _exec_ctx else "search"
 
                 # Create outcome with semantic search metadata
                 outcome = RLOutcome(
@@ -3931,15 +3773,9 @@ async def code_search(
                     ]
 
                     # Create hybrid search engine with configured weights
-                    semantic_weight = getattr(
-                        settings, "hybrid_search_semantic_weight", 0.6
-                    )
-                    keyword_weight = getattr(
-                        settings, "hybrid_search_keyword_weight", 0.4
-                    )
-                    engine = create_hybrid_search_engine(
-                        semantic_weight, keyword_weight
-                    )
+                    semantic_weight = getattr(settings, "hybrid_search_semantic_weight", 0.6)
+                    keyword_weight = getattr(settings, "hybrid_search_keyword_weight", 0.4)
+                    engine = create_hybrid_search_engine(semantic_weight, keyword_weight)
 
                     # Combine results using RRF
                     hybrid_results = engine.combine_results(

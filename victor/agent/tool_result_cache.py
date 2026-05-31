@@ -398,16 +398,12 @@ class ToolResultCache:
             try:
                 # FAISS search
                 query = query_vec.reshape(1, -1).astype(np.float32)
-                distances, indices = self._faiss_index.search(
-                    query, min(10, len(self._entries))
-                )
+                distances, indices = self._faiss_index.search(query, min(10, len(self._entries)))
 
                 for dist, idx in zip(distances[0], indices[0]):
                     if idx < 0:
                         continue
-                    similarity = float(
-                        dist
-                    )  # Already cosine similarity for IndexFlatIP
+                    similarity = float(dist)  # Already cosine similarity for IndexFlatIP
                     if similarity < threshold:
                         continue
 
@@ -502,11 +498,7 @@ class ToolResultCache:
 
                 # Add to FAISS index
                 if self._faiss_index is not None:
-                    normalized = (
-                        self._normalize(embedding_array)
-                        .reshape(1, -1)
-                        .astype(np.float32)
-                    )
+                    normalized = self._normalize(embedding_array).reshape(1, -1).astype(np.float32)
                     self._faiss_index.add(normalized)
                     self._hash_to_idx[args_hash] = self._faiss_index.ntotal - 1
 
@@ -538,9 +530,7 @@ class ToolResultCache:
         """
         with self._lock:
             to_remove = [
-                key
-                for key, entry in self._entries.items()
-                if entry.file_path == file_path
+                key for key, entry in self._entries.items() if entry.file_path == file_path
             ]
             for key in to_remove:
                 self._remove_entry(key)
@@ -562,9 +552,7 @@ class ToolResultCache:
         """
         with self._lock:
             to_remove = [
-                key
-                for key, entry in self._entries.items()
-                if entry.tool_name == tool_name
+                key for key, entry in self._entries.items() if entry.tool_name == tool_name
             ]
             for key in to_remove:
                 self._remove_entry(key)

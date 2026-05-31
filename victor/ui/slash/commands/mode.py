@@ -102,9 +102,7 @@ class ModeCommand(BaseSlashCommand):
             if mode_controller:
                 mode_controller.switch_mode(new_mode)
             else:
-                ctx.console.print(
-                    "[yellow]Mode controller not available, mode not switched[/]"
-                )
+                ctx.console.print("[yellow]Mode controller not available, mode not switched[/]")
                 return
 
             if hasattr(ctx.agent, "refresh_system_prompt"):
@@ -390,9 +388,7 @@ class PlanCommand(BaseSlashCommand):
                 return
 
             # Attach plan to agent using public interface
-            conversation_controller = getattr(
-                ctx.agent, "conversation_controller", None
-            )
+            conversation_controller = getattr(ctx.agent, "conversation_controller", None)
             if conversation_controller:
                 conversation_controller.set_current_plan(plan)
 
@@ -505,9 +501,7 @@ class PlanCommand(BaseSlashCommand):
             for idx, step in enumerate(current_plan.steps, 1):
                 # Format status with icon and color
                 status_str = (
-                    step.status.value
-                    if hasattr(step.status, "value")
-                    else str(step.status)
+                    step.status.value if hasattr(step.status, "value") else str(step.status)
                 )
                 status_formatted = format_task_status(status_str)
 

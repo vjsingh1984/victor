@@ -68,9 +68,7 @@ async def test_context_limit_runtime_forces_summary_on_iteration_limit():
     assert handled is True
     assert chunk.content == "summary"
     assert chunk.is_final is True
-    runtime_host.add_message.assert_called_once_with(
-        "assistant", "summary", metadata=ANY
-    )
+    runtime_host.add_message.assert_called_once_with("assistant", "summary", metadata=ANY)
     runtime_host._record_runtime_intelligence_outcome.assert_called_once_with(
         success=True,
         quality_score=0.8,

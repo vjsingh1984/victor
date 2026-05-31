@@ -99,9 +99,7 @@ class TypeStatistics:
     def get_heuristic_accuracy(self) -> float:
         """Get accuracy of heuristic-only decisions."""
         heuristic_decisions = [
-            d
-            for d in self.recent_decisions
-            if not d.used_llm and d.was_correct is not None
+            d for d in self.recent_decisions if not d.used_llm and d.was_correct is not None
         ]
 
         if not heuristic_decisions:
@@ -363,9 +361,7 @@ class ConfidenceCalibrator:
 
         # Also need at least 10 heuristic decisions with known outcomes
         heuristic_decisions = [
-            d
-            for d in stats.recent_decisions
-            if not d.used_llm and d.was_correct is not None
+            d for d in stats.recent_decisions if not d.used_llm and d.was_correct is not None
         ]
 
         if len(heuristic_decisions) < 10:
@@ -389,9 +385,7 @@ class ConfidenceCalibrator:
             return
 
         # Clamp to allowed range
-        new_threshold = max(
-            self._min_threshold, min(self._max_threshold, new_threshold)
-        )
+        new_threshold = max(self._min_threshold, min(self._max_threshold, new_threshold))
 
         # Update threshold
         old_threshold = current_threshold
@@ -478,9 +472,7 @@ class ConfidenceCalibrator:
         """Export calibrated runtime-evaluation thresholds for live execution."""
         threshold = self._get_threshold(decision_type)
         stats = self._statistics.get(decision_type)
-        heuristic_accuracy = (
-            stats.get_heuristic_accuracy() if stats is not None else None
-        )
+        heuristic_accuracy = stats.get_heuristic_accuracy() if stats is not None else None
         accuracy_gap = 0.0
         if heuristic_accuracy is not None:
             accuracy_gap = max(0.0, self._target_accuracy - heuristic_accuracy)

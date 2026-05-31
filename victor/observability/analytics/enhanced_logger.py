@@ -452,26 +452,16 @@ class EnhancedUsageLogger:
                 sanitized: Dict[Any, Any] = {}
                 for key, value in dict(data).items():
                     safe_key = (
-                        key
-                        if isinstance(key, (str, int, float, bool)) or key is None
-                        else str(key)
+                        key if isinstance(key, (str, int, float, bool)) or key is None else str(key)
                     )
-                    sanitized[safe_key] = self._sanitize_log_data_inner(
-                        value, seen, depth + 1
-                    )
+                    sanitized[safe_key] = self._sanitize_log_data_inner(value, seen, depth + 1)
                 return sanitized
 
             if isinstance(data, (list, tuple)):
-                return [
-                    self._sanitize_log_data_inner(item, seen, depth + 1)
-                    for item in data
-                ]
+                return [self._sanitize_log_data_inner(item, seen, depth + 1) for item in data]
 
             if isinstance(data, (set, frozenset)):
-                return [
-                    self._sanitize_log_data_inner(item, seen, depth + 1)
-                    for item in data
-                ]
+                return [self._sanitize_log_data_inner(item, seen, depth + 1) for item in data]
 
             if hasattr(data, "model_dump") and callable(data.model_dump):
                 return self._sanitize_log_data_inner(data.model_dump(), seen, depth + 1)
@@ -505,9 +495,7 @@ class EnhancedUsageLogger:
             return
 
         # Semantic sampling: drop noise events before disk I/O
-        if self._sampling_filter and not self._sampling_filter.should_emit(
-            event_type, data
-        ):
+        if self._sampling_filter and not self._sampling_filter.should_emit(event_type, data):
             return
 
         try:

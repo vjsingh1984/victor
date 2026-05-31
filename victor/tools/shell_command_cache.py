@@ -124,9 +124,7 @@ class ShellCommandCache:
         key_str = json.dumps(key_data, sort_keys=True)
         return hashlib.sha256(key_str.encode()).hexdigest()
 
-    def get(
-        self, command: str, cwd: Optional[str] = None
-    ) -> Optional[Tuple[int, str, str]]:
+    def get(self, command: str, cwd: Optional[str] = None) -> Optional[Tuple[int, str, str]]:
         """Get cached command result if available and not expired.
 
         Args:
@@ -153,9 +151,7 @@ class ShellCommandCache:
 
         return None
 
-    def set(
-        self, command: str, result: Tuple[int, str, str], cwd: Optional[str] = None
-    ) -> None:
+    def set(self, command: str, result: Tuple[int, str, str], cwd: Optional[str] = None) -> None:
         """Cache a command result.
 
         Args:
@@ -208,8 +204,7 @@ class ShellCommandCache:
                 "entries": len(self._cache),
                 "default_ttl_minutes": int(self._default_ttl.total_seconds() / 60),
                 "command_ttls": {
-                    cmd: int(ttl.total_seconds() / 60)
-                    for cmd, ttl in self._command_ttls.items()
+                    cmd: int(ttl.total_seconds() / 60) for cmd, ttl in self._command_ttls.items()
                 },
             }
 

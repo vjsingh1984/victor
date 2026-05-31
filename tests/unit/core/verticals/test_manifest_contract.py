@@ -13,9 +13,7 @@ from victor.core.verticals.manifest_contract import (
 from victor_contracts.verticals.manifest import ExtensionManifest, ExtensionType
 
 
-def _write_sidecar_package(
-    root: Path, package_name: str = "sample_vertical_pkg"
-) -> str:
+def _write_sidecar_package(root: Path, package_name: str = "sample_vertical_pkg") -> str:
     package_dir = root / package_name
     package_dir.mkdir()
     (package_dir / "__init__.py").write_text("", encoding="utf-8")

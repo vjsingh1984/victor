@@ -224,11 +224,7 @@ async def metrics(
                     issues.append("Below average maintainability")
                     debt_hours += 4
 
-                debt_level = (
-                    "low"
-                    if debt_hours < 4
-                    else ("medium" if debt_hours < 12 else "high")
-                )
+                debt_level = "low" if debt_hours < 4 else ("medium" if debt_hours < 12 else "high")
 
                 results["debt"].append(
                     {
@@ -243,12 +239,8 @@ async def metrics(
             # Code profile
             if "profile" in metrics_list:
                 tree = ast.parse(code)
-                functions = sum(
-                    1 for node in ast.walk(tree) if isinstance(node, ast.FunctionDef)
-                )
-                classes = sum(
-                    1 for node in ast.walk(tree) if isinstance(node, ast.ClassDef)
-                )
+                functions = sum(1 for node in ast.walk(tree) if isinstance(node, ast.FunctionDef))
+                classes = sum(1 for node in ast.walk(tree) if isinstance(node, ast.ClassDef))
                 lines = len([line for line in code.split("\n") if line.strip()])
 
                 results["profile"].append(
@@ -291,9 +283,7 @@ async def metrics(
             f"Total technical debt ({total_debt_hours} hours) is significant - prioritize refactoring"
         )
     if "profile" in metrics_list and total_lines > 10000:
-        recommendations.append(
-            f"Large codebase ({total_lines} lines) - consider modularization"
-        )
+        recommendations.append(f"Large codebase ({total_lines} lines) - consider modularization")
 
     if not recommendations:
         recommendations.append("Code quality metrics look good")
@@ -313,9 +303,7 @@ async def metrics(
         report.append("Complexity Analysis:")
         report.append(f"  Average complexity: {avg_complexity:.2f}")
         report.append(f"  Threshold: {complexity_threshold}")
-        high_complexity_files = [
-            r for r in results["complexity"] if r["status"] == "warning"
-        ]
+        high_complexity_files = [r for r in results["complexity"] if r["status"] == "warning"]
         if high_complexity_files:
             report.append(f"  High complexity files: {len(high_complexity_files)}")
             for item in high_complexity_files[:5]:
@@ -328,9 +316,7 @@ async def metrics(
     if "maintainability" in metrics_list:
         report.append("Maintainability Analysis:")
         report.append(f"  Average maintainability: {avg_maintainability:.2f}/100")
-        poor_files = [
-            r for r in results["maintainability"] if r["rating"] in ["poor", "fair"]
-        ]
+        poor_files = [r for r in results["maintainability"] if r["rating"] in ["poor", "fair"]]
         if poor_files:
             report.append(f"  Files needing improvement: {len(poor_files)}")
             for item in poor_files[:5]:
@@ -345,9 +331,7 @@ async def metrics(
     if "debt" in metrics_list:
         report.append("Technical Debt:")
         report.append(f"  Total debt: {total_debt_hours} hours")
-        high_debt_files = [
-            r for r in results["debt"] if r["debt_level"] in ["medium", "high"]
-        ]
+        high_debt_files = [r for r in results["debt"] if r["debt_level"] in ["medium", "high"]]
         if high_debt_files:
             report.append(f"  Files with debt: {len(high_debt_files)}")
             for item in high_debt_files[:5]:
@@ -383,13 +367,9 @@ async def metrics(
         "results": results,
         "files_analyzed": files_analyzed,
         "summary": {
-            "avg_complexity": (
-                round(avg_complexity, 2) if "complexity" in metrics_list else None
-            ),
+            "avg_complexity": (round(avg_complexity, 2) if "complexity" in metrics_list else None),
             "avg_maintainability": (
-                round(avg_maintainability, 2)
-                if "maintainability" in metrics_list
-                else None
+                round(avg_maintainability, 2) if "maintainability" in metrics_list else None
             ),
             "total_debt_hours": total_debt_hours if "debt" in metrics_list else None,
             "total_lines": total_lines if "profile" in metrics_list else None,

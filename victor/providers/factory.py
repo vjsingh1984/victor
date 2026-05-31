@@ -397,9 +397,7 @@ class ProviderPool:
         logger.debug("Created new provider for %s/%s", provider_name, model)
         return provider
 
-    async def release(
-        self, provider_name: str, model: str, provider: "ManagedProvider"
-    ) -> None:
+    async def release(self, provider_name: str, model: str, provider: "ManagedProvider") -> None:
         """Return a provider to the pool.
 
         Checks provider health before re-pooling. Unhealthy providers
@@ -428,9 +426,7 @@ class ProviderPool:
                     try:
                         await provider.shutdown()
                     except Exception as e:
-                        logger.warning(
-                            "Error shutting down pooled provider %s: %s", key, e
-                        )
+                        logger.warning("Error shutting down pooled provider %s: %s", key, e)
             self._pools.clear()
             self._in_use.clear()
 
@@ -733,9 +729,7 @@ class ManagedProviderFactory:
             provider_names = profile.get_fallback_chain("default")
 
         # If provider_name suggested, prepend it if not already in chain
-        if provider_name and provider_name.lower() not in [
-            p.lower() for p in provider_names
-        ]:
+        if provider_name and provider_name.lower() not in [p.lower() for p in provider_names]:
             provider_names.insert(0, provider_name)
 
         # Create all providers in the chain
@@ -753,9 +747,7 @@ class ManagedProviderFactory:
                 continue
 
         if not providers:
-            raise Exception(
-                f"No providers could be created from chain: {provider_names}"
-            )
+            raise Exception(f"No providers could be created from chain: {provider_names}")
 
         # Create smart routing config
         config = SmartRoutingConfig(

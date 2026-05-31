@@ -95,10 +95,7 @@ class StreamingConfidenceMonitor:
         Pure function — does not modify state.
         """
         # Hard stop: token budget from TaskTypeHint
-        if (
-            self._config.token_budget
-            and self._tokens_generated >= self._config.token_budget
-        ):
+        if self._config.token_budget and self._tokens_generated >= self._config.token_budget:
             logger.debug(
                 "[ConfidenceMonitor] Token budget reached (%d >= %d)",
                 self._tokens_generated,
@@ -132,16 +129,12 @@ class StreamingConfidenceMonitor:
         async for chunk in stream:
             content = getattr(chunk, "content", "") or ""
             usage = getattr(chunk, "usage", {}) or {}
-            completion_tokens = (
-                usage.get("completion_tokens", 0) if isinstance(usage, dict) else 0
-            )
+            completion_tokens = usage.get("completion_tokens", 0) if isinstance(usage, dict) else 0
 
             self.record(content, completion_tokens)
             yield chunk
 
             is_final = getattr(chunk, "is_final", False)
             if not is_final and self.should_stop():
-                logger.info(
-                    "[ConfidenceMonitor] Early stop triggered — breaking stream"
-                )
+                logger.info("[ConfidenceMonitor] Early stop triggered — breaking stream")
                 break

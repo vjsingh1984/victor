@@ -85,9 +85,7 @@ class TestAgenticLoopGraphBuilder:
         assert compiled is not None
 
     @pytest.mark.asyncio
-    async def test_builder_resolves_runtime_dependencies_at_node_execution(
-        self, monkeypatch
-    ):
+    async def test_builder_resolves_runtime_dependencies_at_node_execution(self, monkeypatch):
         """Resolver-backed dependencies should be evaluated when the node runs."""
         captured = {}
 
@@ -184,9 +182,9 @@ class TestAgenticLoopGraphExecutor:
         assert result.response == "Processed: Hello"
         assert result.iterations == 3
         assert result.termination_reason == "max_iterations"
-        assert result.metadata["final_state"]["planning_events"][-1][
-            "selection_policy"
-        ] == ("heuristic_fast_path")
+        assert result.metadata["final_state"]["planning_events"][-1]["selection_policy"] == (
+            "heuristic_fast_path"
+        )
 
     @pytest.mark.asyncio
     async def test_executor_with_context(self):

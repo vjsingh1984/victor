@@ -207,9 +207,7 @@ def test_typed_service_accessors_bridge_internal_and_sdk_service_keys(monkeypatc
             return []
 
     class FakeVectorStore:
-        async def index_document(
-            self, doc_id: str, content: str, embedding, metadata=None
-        ):
+        async def index_document(self, doc_id: str, content: str, embedding, metadata=None):
             return None
 
         async def search_similar(self, query_embedding, limit: int = 10):
@@ -288,9 +286,7 @@ def test_get_memory_coordinator_falls_back_to_global_accessor(monkeypatch):
             return {}
 
     sentinel = FakeMemoryCoordinator()
-    monkeypatch.setattr(
-        "victor.storage.memory.get_memory_coordinator", lambda: sentinel
-    )
+    monkeypatch.setattr("victor.storage.memory.get_memory_coordinator", lambda: sentinel)
 
     ctx = HostPluginContext(container=SimpleNamespace(get_optional=lambda *_args: None))
 

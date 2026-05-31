@@ -59,16 +59,9 @@ class TestCapabilityConfigService:
         service.set_config("citation_config", {"style": "apa"}, scope_key="session-a")
         service.set_config("citation_config", {"style": "mla"}, scope_key="session-b")
 
-        assert service.get_config("citation_config", scope_key="session-a") == {
-            "style": "apa"
-        }
-        assert service.get_config("citation_config", scope_key="session-b") == {
-            "style": "mla"
-        }
-        assert (
-            service.get_config("citation_config", scope_key="missing", default=None)
-            is None
-        )
+        assert service.get_config("citation_config", scope_key="session-a") == {"style": "apa"}
+        assert service.get_config("citation_config", scope_key="session-b") == {"style": "mla"}
+        assert service.get_config("citation_config", scope_key="missing", default=None) is None
 
     def test_clear_scope_only_does_not_remove_other_scopes(self):
         service = CapabilityConfigService()

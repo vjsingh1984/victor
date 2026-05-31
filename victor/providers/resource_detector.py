@@ -313,9 +313,7 @@ class ResourceAvailabilityDetector:
             return GPUAvailability(available=False, reason="system_profiler not found")
         except Exception as e:
             logger.debug(f"Apple GPU check failed: {e}")
-            return GPUAvailability(
-                available=False, reason=f"Apple GPU check failed: {e}"
-            )
+            return GPUAvailability(available=False, reason=f"Apple GPU check failed: {e}")
 
         return GPUAvailability(available=False, reason="No Apple Silicon GPU detected")
 

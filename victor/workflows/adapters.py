@@ -245,9 +245,7 @@ class WorkflowToGraphAdapter:
         from victor.framework.graph import StateGraph, END
 
         # Create StateGraph with workflow state (Pydantic model)
-        graph: StateGraph[AdapterWorkflowStateModel] = StateGraph(
-            AdapterWorkflowStateModel
-        )
+        graph: StateGraph[AdapterWorkflowStateModel] = StateGraph(AdapterWorkflowStateModel)
 
         # Convert each node
         for node in workflow.nodes:
@@ -269,8 +267,7 @@ class WorkflowToGraphAdapter:
             graph.set_entry_point(workflow.nodes[0].name)
 
         logger.debug(
-            f"Adapted workflow '{workflow.name}' to StateGraph "
-            f"({len(workflow.nodes)} nodes)"
+            f"Adapted workflow '{workflow.name}' to StateGraph " f"({len(workflow.nodes)} nodes)"
         )
 
         return graph
@@ -311,9 +308,7 @@ class WorkflowToGraphAdapter:
                 results[n.name] = {
                     "status": "pending",
                     "node_type": (
-                        n.node_type.value
-                        if hasattr(n.node_type, "value")
-                        else str(n.node_type)
+                        n.node_type.value if hasattr(n.node_type, "value") else str(n.node_type)
                     ),
                 }
                 new_state.results = results

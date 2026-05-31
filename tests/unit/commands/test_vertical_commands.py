@@ -447,9 +447,7 @@ class TestVerticalRegistryManager:
         manager = VerticalRegistryManager(dry_run=False)
         spec = PackageSpec(name="victor-security")
 
-        mock_run.side_effect = subprocess.CalledProcessError(
-            1, "pip", stderr="Installation failed"
-        )
+        mock_run.side_effect = subprocess.CalledProcessError(1, "pip", stderr="Installation failed")
 
         with patch(
             "victor.core.verticals.registry_manager.invalidate_vertical_runtime_state",
@@ -605,10 +603,7 @@ class TestVerticalCommands:
         result = runner.invoke(vertical_app, ["install"])
         assert result.exit_code != 0
         # Typer puts error messages in result.output, not result.stdout
-        assert (
-            "Missing argument" in result.output
-            or "requires an argument" in result.output
-        )
+        assert "Missing argument" in result.output or "requires an argument" in result.output
 
     @patch("victor.core.verticals.registry_manager.VerticalRegistryManager.install")
     def test_install_command_success(self, mock_install):
@@ -645,9 +640,7 @@ class TestVerticalCommands:
         assert result.exit_code == 1
         assert "Cannot uninstall built-in" in result.stdout
 
-    @patch(
-        "victor.core.verticals.registry_manager.VerticalRegistryManager.list_verticals"
-    )
+    @patch("victor.core.verticals.registry_manager.VerticalRegistryManager.list_verticals")
     def test_list_command(self, mock_list):
         """Test list command."""
         mock_list.return_value = [
@@ -822,9 +815,7 @@ good = "victor_good.plugin:get_plugin"
 class TestVerticalFiltering:
     """Tests for vertical filtering functionality."""
 
-    @patch(
-        "victor.core.verticals.registry_manager.VerticalRegistryManager.list_verticals"
-    )
+    @patch("victor.core.verticals.registry_manager.VerticalRegistryManager.list_verticals")
     def test_list_with_category_filter(self, mock_list):
         """Test list command with category filter."""
         mock_list.return_value = [
@@ -874,9 +865,7 @@ class TestVerticalFiltering:
         assert "security" in result.stdout
         # Only security should be shown when filtering by security category
 
-    @patch(
-        "victor.core.verticals.registry_manager.VerticalRegistryManager.list_verticals"
-    )
+    @patch("victor.core.verticals.registry_manager.VerticalRegistryManager.list_verticals")
     def test_list_with_tags_filter(self, mock_list):
         """Test list command with tags filter."""
         mock_list.return_value = [
@@ -906,9 +895,7 @@ class TestVerticalFiltering:
         assert result.exit_code == 0
         assert "security" in result.stdout
 
-    @patch(
-        "victor.core.verticals.registry_manager.VerticalRegistryManager.list_verticals"
-    )
+    @patch("victor.core.verticals.registry_manager.VerticalRegistryManager.list_verticals")
     def test_list_with_verbose_output(self, mock_list):
         """Test list command with verbose output."""
         mock_list.return_value = [
@@ -942,9 +929,7 @@ class TestVerticalFiltering:
         # Verbose output should include additional columns
         assert "Category" in result.stdout or "Tools" in result.stdout
 
-    @patch(
-        "victor.core.verticals.registry_manager.VerticalRegistryManager.list_verticals"
-    )
+    @patch("victor.core.verticals.registry_manager.VerticalRegistryManager.list_verticals")
     def test_list_no_results_after_filtering(self, mock_list):
         """Test list command when filtering returns no results."""
         mock_list.return_value = [
@@ -972,19 +957,14 @@ class TestVerticalFiltering:
         result = runner.invoke(vertical_app, ["list", "--category", "security"])
 
         assert result.exit_code == 0
-        assert (
-            "No verticals found" in result.stdout
-            or "no verticals" in result.stdout.lower()
-        )
+        assert "No verticals found" in result.stdout or "no verticals" in result.stdout.lower()
 
 
 class TestVerticalInstallation:
     """Tests for vertical installation workflow."""
 
     @patch("subprocess.run")
-    @patch(
-        "victor.core.verticals.registry_manager.VerticalRegistryManager._validate_package"
-    )
+    @patch("victor.core.verticals.registry_manager.VerticalRegistryManager._validate_package")
     def test_install_with_validation_success(self, mock_validate, mock_run):
         """Test installation with validation enabled passes."""
         mock_validate.return_value = []  # No errors
@@ -1001,9 +981,7 @@ class TestVerticalInstallation:
         mock_validate.assert_called_once()
 
     @patch("subprocess.run")
-    @patch(
-        "victor.core.verticals.registry_manager.VerticalRegistryManager._validate_package"
-    )
+    @patch("victor.core.verticals.registry_manager.VerticalRegistryManager._validate_package")
     def test_install_skip_validation(self, mock_validate, mock_run):
         """Test installation with validation skipped."""
         mock_run.return_value = Mock(
@@ -1012,9 +990,7 @@ class TestVerticalInstallation:
             stderr="",
         )
 
-        result = runner.invoke(
-            vertical_app, ["install", "victor-security", "--no-validate"]
-        )
+        result = runner.invoke(vertical_app, ["install", "victor-security", "--no-validate"])
 
         assert result.exit_code == 0
         # Validation should not be called when --no-validate is used
@@ -1025,17 +1001,13 @@ class TestVerticalInstallation:
         """Test installation in dry-run mode."""
         mock_install.return_value = (True, "Would install: pip install victor-security")
 
-        result = runner.invoke(
-            vertical_app, ["install", "victor-security", "--dry-run"]
-        )
+        result = runner.invoke(vertical_app, ["install", "victor-security", "--dry-run"])
 
         assert result.exit_code == 0
         assert "Would install" in result.stdout
 
     @patch("subprocess.run")
-    @patch(
-        "victor.core.verticals.registry_manager.VerticalRegistryManager._validate_package"
-    )
+    @patch("victor.core.verticals.registry_manager.VerticalRegistryManager._validate_package")
     def test_install_validation_failure(self, mock_validate, mock_run):
         """Test installation fails validation."""
         from victor.core.verticals.registry_manager import PackageSpec
@@ -1044,20 +1016,14 @@ class TestVerticalInstallation:
         result = runner.invoke(vertical_app, ["install", "victor-security"])
 
         assert result.exit_code == 1
-        assert (
-            "Validation failed" in result.stdout or "conflicts" in result.stdout.lower()
-        )
+        assert "Validation failed" in result.stdout or "conflicts" in result.stdout.lower()
 
     @patch("subprocess.run")
-    @patch(
-        "victor.core.verticals.registry_manager.VerticalRegistryManager._validate_package"
-    )
+    @patch("victor.core.verticals.registry_manager.VerticalRegistryManager._validate_package")
     def test_install_pip_failure(self, mock_validate, mock_run):
         """Test installation when pip install fails."""
         mock_validate.return_value = []
-        mock_run.side_effect = subprocess.CalledProcessError(
-            1, "pip", stderr="Package not found"
-        )
+        mock_run.side_effect = subprocess.CalledProcessError(1, "pip", stderr="Package not found")
 
         result = runner.invoke(vertical_app, ["install", "nonexistent-package"])
 
@@ -1099,9 +1065,7 @@ class TestVerticalUninstallation:
     @patch("subprocess.run")
     def test_uninstall_dry_run(self, mock_run):
         """Test uninstallation in dry-run mode."""
-        result = runner.invoke(
-            vertical_app, ["uninstall", "victor-security", "--dry-run"]
-        )
+        result = runner.invoke(vertical_app, ["uninstall", "victor-security", "--dry-run"])
 
         assert result.exit_code == 0
         assert "Would uninstall" in result.stdout
@@ -1147,10 +1111,7 @@ class TestVerticalSearch:
         result = runner.invoke(vertical_app, ["search", "nonexistent"])
 
         assert result.exit_code == 0
-        assert (
-            "No verticals found" in result.stdout
-            or "not found" in result.stdout.lower()
-        )
+        assert "No verticals found" in result.stdout or "not found" in result.stdout.lower()
 
     @patch("victor.core.verticals.registry_manager.VerticalRegistryManager.search")
     def test_search_multiple_results(self, mock_search):

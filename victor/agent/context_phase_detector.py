@@ -371,9 +371,7 @@ class PhaseTransitionDetector:
             return False
 
         # Check for thrashing (too many transitions in time window)
-        recent_transitions = [
-            t for t in self._transition_history if now - t < self._window_seconds
-        ]
+        recent_transitions = [t for t in self._transition_history if now - t < self._window_seconds]
 
         if len(recent_transitions) >= self._max_transitions:
             logger.debug(
@@ -433,9 +431,7 @@ class PhaseTransitionDetector:
         """
         now = time.monotonic()
 
-        recent_transitions = [
-            t for t in self._transition_history if now - t < self._window_seconds
-        ]
+        recent_transitions = [t for t in self._transition_history if now - t < self._window_seconds]
 
         return {
             "current_phase": self._current_phase.value if self._current_phase else None,
@@ -463,9 +459,7 @@ def create_phase_detector(
     try:
         strategy_enum = PhaseDetectionStrategy(strategy.lower())
     except ValueError:
-        logger.warning(
-            "Invalid phase detection strategy '%s', using 'stage_mapping'", strategy
-        )
+        logger.warning("Invalid phase detection strategy '%s', using 'stage_mapping'", strategy)
         strategy_enum = PhaseDetectionStrategy.STAGE_MAPPING
 
     return PhaseDetector(strategy=strategy_enum, **kwargs)

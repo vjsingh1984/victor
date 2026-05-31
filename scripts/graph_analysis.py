@@ -201,9 +201,7 @@ def find_similar_connections(nodes, adj):
         if node_id in nodes and nodes[node_id]["type"] == "function":
             # Create signature from sorted neighbor names
             neighbor_names = tuple(
-                sorted(
-                    nodes.get(n, {}).get("name", "") for n in neighbors if n in nodes
-                )
+                sorted(nodes.get(n, {}).get("name", "") for n in neighbors if n in nodes)
             )
             if len(neighbor_names) >= 3:  # Only consider nodes with 3+ connections
                 connection_signatures[neighbor_names].append(node_id)
@@ -214,9 +212,7 @@ def find_similar_connections(nodes, adj):
         if len(node_ids) > 1:
             similar_groups.append(
                 {
-                    "nodes": [
-                        (nodes[nid]["name"], nodes[nid]["file"]) for nid in node_ids
-                    ],
+                    "nodes": [(nodes[nid]["name"], nodes[nid]["file"]) for nid in node_ids],
                     "shared_connections": len(sig),
                     "connection_sample": list(sig)[:5],
                 }
@@ -240,9 +236,7 @@ def main():
         for k, v in nodes.items()
         if v["file"] and "victor/" in v["file"] and "test" not in v["file"].lower()
     }
-    victor_edges = [
-        e for e in edges if e["src"] in victor_nodes and e["dst"] in victor_nodes
-    ]
+    victor_edges = [e for e in edges if e["src"] in victor_nodes and e["dst"] in victor_nodes]
     print(f"Victor codebase: {len(victor_nodes)} nodes, {len(victor_edges)} edges")
 
     print("\n" + "=" * 60)
@@ -274,9 +268,7 @@ def main():
     module_nodes, module_edges = analyze_module_dependencies(victor_nodes, victor_edges)
 
     print(f"\nFound {len(module_nodes)} modules")
-    top_modules = sorted(module_nodes.items(), key=lambda x: len(x[1]), reverse=True)[
-        :20
-    ]
+    top_modules = sorted(module_nodes.items(), key=lambda x: len(x[1]), reverse=True)[:20]
     print("\nTop modules by size:")
     for module, node_set in top_modules:
         print(f"  {module}: {len(node_set)} nodes")
@@ -284,9 +276,7 @@ def main():
     # Find modules with most cross-module dependencies
     print("\nModules with most outgoing cross-module edges:")
     module_out_degree = [(m, sum(deps.values())) for m, deps in module_edges.items()]
-    for module, count in sorted(module_out_degree, key=lambda x: x[1], reverse=True)[
-        :10
-    ]:
+    for module, count in sorted(module_out_degree, key=lambda x: x[1], reverse=True)[:10]:
         print(f"  {module}: {count} outgoing edges")
 
     print("\n" + "=" * 60)
@@ -295,14 +285,10 @@ def main():
 
     # Compute PageRank for the main component
     if components:
-        main_component_nodes = {
-            k: victor_nodes[k] for k in components[0] if k in victor_nodes
-        }
+        main_component_nodes = {k: victor_nodes[k] for k in components[0] if k in victor_nodes}
         main_adj, _ = build_adjacency_list(main_component_nodes, victor_edges)
 
-        print(
-            f"\nComputing PageRank for main component ({len(main_component_nodes)} nodes)..."
-        )
+        print(f"\nComputing PageRank for main component ({len(main_component_nodes)} nodes)...")
         pr = compute_pagerank(main_component_nodes, main_adj, iterations=50)
 
         # Top PageRank nodes
@@ -361,8 +347,7 @@ def main():
         "component_sizes": [len(c) for c in components[:10]],
         "top_modules": [(m, len(n)) for m, n in top_modules],
         "module_dependencies": [
-            (s, d, c)
-            for s, d, c in sorted(module_pairs, key=lambda x: x[2], reverse=True)[:50]
+            (s, d, c) for s, d, c in sorted(module_pairs, key=lambda x: x[2], reverse=True)[:50]
         ],
         "top_pagerank": (
             [
@@ -378,8 +363,7 @@ def main():
             else []
         ),
         "duplicates": [
-            {"name": d["name"], "type": d["type"], "count": d["count"]}
-            for d in duplicates[:30]
+            {"name": d["name"], "type": d["type"], "count": d["count"]} for d in duplicates[:30]
         ],
     }
 

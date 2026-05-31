@@ -13,9 +13,7 @@ async def literature_review_agent(topic: str, num_papers: int = 10):
     """Conduct literature review on a topic."""
     from victor import Agent
 
-    agent = Agent.create(
-        vertical="research", tools=["web_search", "web_fetch"], temperature=0.3
-    )
+    agent = Agent.create(vertical="research", tools=["web_search", "web_fetch"], temperature=0.3)
 
     result = await agent.run(f"""Conduct a literature review on: {topic}
 
@@ -37,9 +35,7 @@ async def fact_check_agent(claims: list[str]):
     """Fact-check claims against reliable sources."""
     from victor import Agent
 
-    agent = Agent.create(
-        vertical="research", tools=["web_search", "web_fetch"], temperature=0.2
-    )
+    agent = Agent.create(vertical="research", tools=["web_search", "web_fetch"], temperature=0.2)
 
     claims_str = "\n".join(f"- {c}" for c in claims)
 
@@ -61,9 +57,7 @@ async def citation_verification_agent(text: str):
     """Verify citations in academic text."""
     from victor import Agent
 
-    agent = Agent.create(
-        vertical="research", tools=["web_search", "web_fetch"], temperature=0.2
-    )
+    agent = Agent.create(vertical="research", tools=["web_search", "web_fetch"], temperature=0.2)
 
     result = await agent.run(f"""Verify all citations in this text:
 
@@ -79,9 +73,7 @@ For each citation:
     return result.content
 
 
-async def academic_writing_agent(
-    topic: str, paper_type: str = "review", target_venue: str = ""
-):
+async def academic_writing_agent(topic: str, paper_type: str = "review", target_venue: str = ""):
     """Assist with academic writing."""
     from victor import Agent
 
@@ -339,8 +331,7 @@ async def presentation_script_agent(slides_content: str, duration_minutes: int):
 
     agent = Agent.create(vertical="research", temperature=0.4)
 
-    result = await agent.run(
-        f"""Write {duration_minutes}-minute presentation script for:
+    result = await agent.run(f"""Write {duration_minutes}-minute presentation script for:
 
 {slides_content}
 
@@ -351,8 +342,7 @@ Provide:
 4. Timing cues
 5. Emphasis points
 6. Closing statement
-7. Q&A preparation"""
-    )
+7. Q&A preparation""")
 
     return result.content
 

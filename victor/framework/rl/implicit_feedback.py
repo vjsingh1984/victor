@@ -300,9 +300,7 @@ class ImplicitFeedbackCollector:
         """
         session.iteration_count += 1
 
-    def record_grounding_result(
-        self, session: SessionContext, confidence: float
-    ) -> None:
+    def record_grounding_result(self, session: SessionContext, confidence: float) -> None:
         """Record a grounding verification result.
 
         Args:
@@ -402,9 +400,7 @@ class ImplicitFeedbackCollector:
 
         # Grounding score (average of all results)
         if session.grounding_results:
-            grounding_score = sum(session.grounding_results) / len(
-                session.grounding_results
-            )
+            grounding_score = sum(session.grounding_results) / len(session.grounding_results)
         else:
             grounding_score = 0.7  # Default if no grounding
 

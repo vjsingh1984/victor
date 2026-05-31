@@ -470,10 +470,7 @@ class DoctorChecks:
         for check in self.checks:
             if check.severity == Severity.SUCCESS:
                 continue
-            if (
-                check.severity == Severity.INFO
-                and check.name != "Configuration Directory"
-            ):
+            if check.severity == Severity.INFO and check.name != "Configuration Directory":
                 continue
 
             # Attempt fixes for specific checks
@@ -498,10 +495,7 @@ class DoctorChecks:
                         )
                     )
 
-            elif (
-                check.name == "performance_settings"
-                and "disabled" in check.message.lower()
-            ):
+            elif check.name == "performance_settings" and "disabled" in check.message.lower():
                 # Enable performance settings
                 try:
                     import subprocess
@@ -627,9 +621,7 @@ def run_doctor(verbose: bool = False, fix: bool = False) -> int:
                 doctor.checks.clear()  # Clear previous checks
                 doctor.run_all_checks()
             else:
-                console.print(
-                    "[yellow]⚠ No auto-fixes available for detected issues[/]\n"
-                )
+                console.print("[yellow]⚠ No auto-fixes available for detected issues[/]\n")
 
         return doctor.print_results()
     except Exception as e:

@@ -53,10 +53,7 @@ class TestGetConfigCrashContainment:
         V = _make_crashing_vertical(get_tools=RuntimeError("tools broke"))
         with caplog.at_level(logging.WARNING):
             V.get_config(use_cache=False)
-        assert any(
-            "tools broke" in r.message or "get_tools" in r.message
-            for r in caplog.records
-        )
+        assert any("tools broke" in r.message or "get_tools" in r.message for r in caplog.records)
 
     def test_normal_vertical_unaffected(self):
         """Non-crashing verticals should work exactly as before."""

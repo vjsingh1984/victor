@@ -277,9 +277,7 @@ class ExecutionTracer:
         except Exception as e:
             logger.warning(f"Failed to publish span_ended event: {e}")
 
-        logger.debug(
-            f"Span ended: {span_id} (status={status}, duration={span.duration_ms:.2f}ms)"
-        )
+        logger.debug(f"Span ended: {span_id} (status={status}, duration={span.duration_ms:.2f}ms)")
 
     def get_span(self, span_id: str) -> Optional[ExecutionSpan]:
         """Get a span by ID.
@@ -365,9 +363,7 @@ class ExecutionTracer:
         Returns:
             List of spans with status "running"
         """
-        return [
-            span for span in self._spans.values() if span.status == SpanStatus.RUNNING
-        ]
+        return [span for span in self._spans.values() if span.status == SpanStatus.RUNNING]
 
     def get_span_count(self) -> int:
         """Get total number of spans.
@@ -409,9 +405,7 @@ class ExecutionTracer:
         # Calculate durations for completed spans
         completed_spans = [s for s in self._spans.values() if s.end_time is not None]
         if completed_spans:
-            durations = [
-                s.duration_ms for s in completed_spans if s.duration_ms is not None
-            ]
+            durations = [s.duration_ms for s in completed_spans if s.duration_ms is not None]
             if durations:
                 avg_duration = sum(durations) / len(durations)
                 max_duration = max(durations)

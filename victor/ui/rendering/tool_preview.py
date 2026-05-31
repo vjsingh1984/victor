@@ -134,14 +134,10 @@ class _DiffPreviewStrategy(_ToolPreviewStrategy):
 
                 # Count additions and removals from clean lines
                 added = sum(
-                    1
-                    for line in clean_lines
-                    if line.startswith("+") and not line.startswith("+++")
+                    1 for line in clean_lines if line.startswith("+") and not line.startswith("+++")
                 )
                 removed = sum(
-                    1
-                    for line in clean_lines
-                    if line.startswith("-") and not line.startswith("---")
+                    1 for line in clean_lines if line.startswith("-") and not line.startswith("---")
                 )
 
                 # Extract file paths from the formatted diff
@@ -173,14 +169,10 @@ class _DiffPreviewStrategy(_ToolPreviewStrategy):
 
                 # Count additions and removals
                 added = sum(
-                    1
-                    for line in diff_lines
-                    if line.startswith("+") and not line.startswith("+++")
+                    1 for line in diff_lines if line.startswith("+") and not line.startswith("+++")
                 )
                 removed = sum(
-                    1
-                    for line in diff_lines
-                    if line.startswith("-") and not line.startswith("---")
+                    1 for line in diff_lines if line.startswith("-") and not line.startswith("---")
                 )
 
                 # Extract file paths
@@ -250,18 +242,14 @@ class _DiffPreviewStrategy(_ToolPreviewStrategy):
         if isinstance(parsed, dict):
             applied = parsed.get("operations_applied", parsed.get("ops_applied", "?"))
             file_path = (
-                arguments.get("file_path")
-                or arguments.get("path")
-                or parsed.get("file_path", "")
+                arguments.get("file_path") or arguments.get("path") or parsed.get("file_path", "")
             )
             summary = f"{applied} operation(s) applied"
             if file_path:
                 summary += f" → {file_path}"
             return RenderedPreview(lines=[summary], header=None, total_line_count=1)
 
-        return _GenericPreviewStrategy().render(
-            tool_name, arguments, raw_result, max_lines
-        )
+        return _GenericPreviewStrategy().render(tool_name, arguments, raw_result, max_lines)
 
 
 class _WritePreviewStrategy(_ToolPreviewStrategy):
@@ -273,9 +261,7 @@ class _WritePreviewStrategy(_ToolPreviewStrategy):
         if content:
             line_count = content.count("\n") + 1
             header = (
-                f"{line_count} lines → {file_path}"
-                if file_path
-                else f"{line_count} lines written"
+                f"{line_count} lines → {file_path}" if file_path else f"{line_count} lines written"
             )
             preview = _first_lines(content, max_lines)
             return RenderedPreview(
@@ -291,9 +277,7 @@ class _WritePreviewStrategy(_ToolPreviewStrategy):
             summary = f"Written: {file_path}" if file_path else "Write succeeded"
             return RenderedPreview(lines=[summary], total_line_count=1)
 
-        return _GenericPreviewStrategy().render(
-            tool_name, arguments, raw_result, max_lines
-        )
+        return _GenericPreviewStrategy().render(tool_name, arguments, raw_result, max_lines)
 
 
 class _ReadPreviewStrategy(_ToolPreviewStrategy):
@@ -311,10 +295,7 @@ class _ReadPreviewStrategy(_ToolPreviewStrategy):
         content_start = 0
         for i, line in enumerate(lines[:5]):
             if line.startswith("[") and (
-                "File:" in line
-                or "Lines" in line
-                or "Size:" in line
-                or "TRUNCATED" in line
+                "File:" in line or "Lines" in line or "Size:" in line or "TRUNCATED" in line
             ):
                 meta_lines.append(line)
                 content_start = i + 1
@@ -340,9 +321,7 @@ class _ShellPreviewStrategy(_ToolPreviewStrategy):
     def render(self, tool_name, arguments, raw_result, max_lines) -> RenderedPreview:
         parsed = _try_parse(raw_result)
         if not isinstance(parsed, dict):
-            return _GenericPreviewStrategy().render(
-                tool_name, arguments, raw_result, max_lines
-            )
+            return _GenericPreviewStrategy().render(tool_name, arguments, raw_result, max_lines)
 
         rc = parsed.get("return_code", parsed.get("returncode", 0))
         stdout = str(parsed.get("stdout", "")).strip()
@@ -358,11 +337,7 @@ class _ShellPreviewStrategy(_ToolPreviewStrategy):
         elif stderr and not success:
             lines = _first_lines(stderr, max_lines)
 
-        total = (
-            stdout.count("\n") + 1
-            if stdout
-            else (stderr.count("\n") + 1 if stderr else 0)
-        )
+        total = stdout.count("\n") + 1 if stdout else (stderr.count("\n") + 1 if stderr else 0)
         return RenderedPreview(lines=lines, header=header, total_line_count=total)
 
 
@@ -390,19 +365,12 @@ class _SearchPreviewStrategy(_ToolPreviewStrategy):
 
         # Structured result (glob/code_search style)
         if isinstance(parsed, dict):
-            matches = (
-                parsed.get("matches")
-                or parsed.get("results")
-                or parsed.get("files")
-                or []
-            )
+            matches = parsed.get("matches") or parsed.get("results") or parsed.get("files") or []
             if matches:
                 count = len(matches)
                 header = f"{count} match{'es' if count != 1 else ''}"
                 visible_items = [str(m) for m in matches[:max_lines]]
-                return RenderedPreview(
-                    lines=visible_items, header=header, total_line_count=count
-                )
+                return RenderedPreview(lines=visible_items, header=header, total_line_count=count)
 
         # Plain text result (grep-style: file:line:content)
         lines = [line for line in raw_result.splitlines() if line.strip()]
@@ -421,12 +389,7 @@ class _DirectoryPreviewStrategy(_ToolPreviewStrategy):
     def render(self, tool_name, arguments, raw_result, max_lines) -> RenderedPreview:
         parsed = _try_parse(raw_result)
         if isinstance(parsed, dict):
-            items = (
-                parsed.get("items")
-                or parsed.get("files")
-                or parsed.get("entries")
-                or []
-            )
+            items = parsed.get("items") or parsed.get("files") or parsed.get("entries") or []
             count = len(items)
             header = f"{count} item{'s' if count != 1 else ''}"
             names: List[str] = []
@@ -437,9 +400,7 @@ class _DirectoryPreviewStrategy(_ToolPreviewStrategy):
                     names.append(str(item))
             return RenderedPreview(lines=names, header=header, total_line_count=count)
 
-        return _GenericPreviewStrategy().render(
-            tool_name, arguments, raw_result, max_lines
-        )
+        return _GenericPreviewStrategy().render(tool_name, arguments, raw_result, max_lines)
 
 
 class _TestPreviewStrategy(_ToolPreviewStrategy):
@@ -482,9 +443,7 @@ class _TestPreviewStrategy(_ToolPreviewStrategy):
                 total_line_count=1,
             )
 
-        return _GenericPreviewStrategy().render(
-            tool_name, arguments, raw_result, max_lines
-        )
+        return _GenericPreviewStrategy().render(tool_name, arguments, raw_result, max_lines)
 
 
 class _GenericPreviewStrategy(_ToolPreviewStrategy):

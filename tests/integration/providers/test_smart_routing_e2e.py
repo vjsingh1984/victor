@@ -93,9 +93,7 @@ class TestSmartRoutingE2E:
 
         # Make first request - should use Ollama (local first in balanced profile)
         messages = [Message(role="user", content="test")]
-        response1 = await smart_provider.chat(
-            messages, model="test-model", task_type="default"
-        )
+        response1 = await smart_provider.chat(messages, model="test-model", task_type="default")
 
         # Verify Ollama was called
         mock_providers[0].chat.assert_called_once()
@@ -117,9 +115,7 @@ class TestSmartRoutingE2E:
         )
 
         # Make second request - should fallback to Anthropic
-        response2 = await smart_provider.chat(
-            messages, model="test-model", task_type="default"
-        )
+        response2 = await smart_provider.chat(messages, model="test-model", task_type="default")
 
         # Verify Anthropic (second provider) was called
         mock_providers[1].chat.assert_called_once()
@@ -192,12 +188,10 @@ class TestSmartRoutingE2E:
 
         # Mock health: Ollama healthy, Anthropic healthy
         for provider_name in ["ollama", "anthropic"]:
-            smart_provider.checker._provider_health[provider_name] = (
-                ProviderHealthResult(
-                    healthy=True,
-                    provider=provider_name,
-                    model="test",
-                )
+            smart_provider.checker._provider_health[provider_name] = ProviderHealthResult(
+                healthy=True,
+                provider=provider_name,
+                model="test",
             )
 
         # Mock GPU available
@@ -247,10 +241,7 @@ class TestSmartRoutingE2E:
         # So the best provider from the custom chain is selected
         assert decision.selected_provider in ["openai", "anthropic", "ollama"]
         # Verify custom chain is respected in candidates
-        assert (
-            "anthropic" in decision.fallback_chain
-            or "ollama" in decision.fallback_chain
-        )
+        assert "anthropic" in decision.fallback_chain or "ollama" in decision.fallback_chain
 
 
 @pytest.mark.integration

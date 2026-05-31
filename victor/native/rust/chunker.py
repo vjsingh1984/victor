@@ -54,9 +54,7 @@ class RustTextChunker(InstrumentedAccelerator):
     def get_version(self) -> Optional[str]:
         return self._version
 
-    def chunk_with_overlap(
-        self, text: str, chunk_size: int, overlap: int
-    ) -> List[ChunkInfo]:
+    def chunk_with_overlap(self, text: str, chunk_size: int, overlap: int) -> List[ChunkInfo]:
         """Chunk text with overlap, respecting line boundaries.
 
         Delegates to Rust implementation with pre-computed line boundaries.

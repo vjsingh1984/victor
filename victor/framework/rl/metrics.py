@@ -196,15 +196,9 @@ class RLMetricsExporter:
         # Get exploration metrics from hooks
         if self._hooks is not None:
             try:
-                metrics.exploration_rate = self._hooks.get_exploration_rate(
-                    learner_name
-                )
-                metrics.exploration_count = self._hooks._exploration_counts.get(
-                    learner_name, 0
-                )
-                metrics.exploitation_count = self._hooks._exploitation_counts.get(
-                    learner_name, 0
-                )
+                metrics.exploration_rate = self._hooks.get_exploration_rate(learner_name)
+                metrics.exploration_count = self._hooks._exploration_counts.get(learner_name, 0)
+                metrics.exploitation_count = self._hooks._exploitation_counts.get(learner_name, 0)
 
                 # Get current epsilon from history
                 history = self._hooks.get_epsilon_trend(learner_name, limit=1)
@@ -238,9 +232,7 @@ class RLMetricsExporter:
                 if row and row[0]:
                     metrics.total_outcomes = row[0]
                     success_count = row[1] or 0
-                    metrics.overall_success_rate = (
-                        success_count / metrics.total_outcomes
-                    )
+                    metrics.overall_success_rate = success_count / metrics.total_outcomes
                     metrics.overall_quality = row[2] or 0.5
 
                 # Get active learners (those with outcomes)
@@ -251,9 +243,7 @@ class RLMetricsExporter:
                 active = {row[0] for row in cursor.fetchall()}
                 metrics.active_learners = list(active)
                 metrics.inactive_learners = [
-                    learner
-                    for learner in self.EXPECTED_LEARNERS
-                    if learner not in active
+                    learner for learner in self.EXPECTED_LEARNERS if learner not in active
                 ]
                 metrics.total_learners = len(active)
 
@@ -361,9 +351,7 @@ class RLMetricsExporter:
         try:
             from victor.core.feature_flags import FeatureFlag, get_feature_flag_manager
 
-            if get_feature_flag_manager().is_enabled(
-                FeatureFlag.USE_LEARNING_FROM_EXECUTION
-            ):
+            if get_feature_flag_manager().is_enabled(FeatureFlag.USE_LEARNING_FROM_EXECUTION):
                 lines.extend(self._export_priority4_metrics())
         except Exception:
             pass
@@ -386,13 +374,9 @@ class RLMetricsExporter:
             if fb_learner is not None:
                 stats = fb_learner.get_feedback_stats()  # type: ignore[attr-defined]
                 lines.append("")
-                lines.append(
-                    "# HELP victor_rl_user_feedback_total Total user feedback events"
-                )
+                lines.append("# HELP victor_rl_user_feedback_total Total user feedback events")
                 lines.append("# TYPE victor_rl_user_feedback_total counter")
-                lines.append(
-                    f"victor_rl_user_feedback_total {stats.get('total_feedback', 0)}"
-                )
+                lines.append(f"victor_rl_user_feedback_total {stats.get('total_feedback', 0)}")
 
                 avg_rating = stats.get("avg_rating")
                 if avg_rating is not None:
@@ -408,9 +392,7 @@ class RLMetricsExporter:
         # Model selector confidence thresholds
         try:
             model_learner = self._coordinator.get_learner("model_selector")
-            if model_learner is not None and hasattr(
-                model_learner, "get_optimal_threshold"
-            ):
+            if model_learner is not None and hasattr(model_learner, "get_optimal_threshold"):
                 for decision_type in ("tool_necessity", "complexity", "task_type"):
                     threshold = model_learner.get_optimal_threshold(decision_type)
                     if threshold is not None:
@@ -419,9 +401,7 @@ class RLMetricsExporter:
                             f"# HELP victor_rl_confidence_threshold_{decision_type} "
                             f"Learned confidence threshold for {decision_type}"
                         )
-                        lines.append(
-                            f"# TYPE victor_rl_confidence_threshold_{decision_type} gauge"
-                        )
+                        lines.append(f"# TYPE victor_rl_confidence_threshold_{decision_type} gauge")
                         lines.append(
                             f"victor_rl_confidence_threshold_{decision_type} {threshold:.4f}"
                         )

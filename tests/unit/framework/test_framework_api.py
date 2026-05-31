@@ -58,9 +58,7 @@ class TestFrameworkAPI:
 
         fw.__dict__.pop("FrameworkShim", None)
 
-        with pytest.warns(
-            DeprecationWarning, match="victor\\.framework\\.FrameworkShim"
-        ) as caught:
+        with pytest.warns(DeprecationWarning, match="victor\\.framework\\.FrameworkShim") as caught:
             alias = fw.FrameworkShim
 
         assert alias is ShimFrameworkShim

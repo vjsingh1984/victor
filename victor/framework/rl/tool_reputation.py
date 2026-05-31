@@ -113,9 +113,7 @@ class ToolReputationTracker:
 
         # Update EMA reputation
         old_rep = self._reputation[tool_name]
-        self._reputation[tool_name] = (
-            self._alpha * reward + (1.0 - self._alpha) * old_rep
-        )
+        self._reputation[tool_name] = self._alpha * reward + (1.0 - self._alpha) * old_rep
 
         # Track call count and recent history
         self._call_count[tool_name] += 1

@@ -16,9 +16,7 @@ class TestMergeVerticalPhrases:
 
     def test_no_enhanced_provider_leaves_phrases_unchanged(self):
         classifier = self._make_stub()
-        with patch(
-            "victor.core.capability_registry.CapabilityRegistry.get_instance"
-        ) as mock_reg:
+        with patch("victor.core.capability_registry.CapabilityRegistry.get_instance") as mock_reg:
             registry = MagicMock()
             registry.get.return_value = None
             mock_reg.return_value = registry
@@ -31,9 +29,7 @@ class TestMergeVerticalPhrases:
         contributor.get_classifier_phrases.return_value = {
             "edit": ["modify config", "change settings"],
         }
-        with patch(
-            "victor.core.capability_registry.CapabilityRegistry.get_instance"
-        ) as mock_reg:
+        with patch("victor.core.capability_registry.CapabilityRegistry.get_instance") as mock_reg:
             registry = MagicMock()
             registry.get.return_value = contributor
             registry.is_enhanced.return_value = True
@@ -48,9 +44,7 @@ class TestMergeVerticalPhrases:
         contributor.get_classifier_phrases.return_value = {
             "search": ["find documents"],
         }
-        with patch(
-            "victor.core.capability_registry.CapabilityRegistry.get_instance"
-        ) as mock_reg:
+        with patch("victor.core.capability_registry.CapabilityRegistry.get_instance") as mock_reg:
             registry = MagicMock()
             registry.get.return_value = contributor
             registry.is_enhanced.return_value = True
@@ -65,9 +59,7 @@ class TestMergeVerticalPhrases:
         contributor.get_classifier_phrases.return_value = {
             "nonexistent_type": ["some phrase"],
         }
-        with patch(
-            "victor.core.capability_registry.CapabilityRegistry.get_instance"
-        ) as mock_reg:
+        with patch("victor.core.capability_registry.CapabilityRegistry.get_instance") as mock_reg:
             registry = MagicMock()
             registry.get.return_value = contributor
             registry.is_enhanced.return_value = True

@@ -77,15 +77,11 @@ class EmbeddingSearchResult(BaseModel):
     """
 
     file_path: str = Field(description="Path to the file")
-    symbol_name: Optional[str] = Field(
-        default=None, description="Symbol name if applicable"
-    )
+    symbol_name: Optional[str] = Field(default=None, description="Symbol name if applicable")
     content: str = Field(description="Content that matched")
     score: float = Field(description="Relevance score (0-1, higher is better)")
     line_number: Optional[int] = Field(default=None, description="Line number in file")
-    metadata: Dict[str, Any] = Field(
-        default_factory=dict, description="Additional metadata"
-    )
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
 
     def to_search_hit(self) -> SearchHit:
         """Convert to a generic SearchHit for cross-layer consumers."""
@@ -168,9 +164,7 @@ class BaseEmbeddingProvider(ABC):
         pass
 
     @abstractmethod
-    async def index_document(
-        self, doc_id: str, content: str, metadata: Dict[str, Any]
-    ) -> None:
+    async def index_document(self, doc_id: str, content: str, metadata: Dict[str, Any]) -> None:
         """Index a single document.
 
         Args:

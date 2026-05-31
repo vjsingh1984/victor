@@ -260,9 +260,7 @@ class ToolSequenceTracker:
         if len(self._history) > self.config.max_history:
             self._history = self._history[-self.config.max_history :]
 
-        logger.debug(
-            f"Recorded tool execution: {tool_name} (history: {len(self._history)})"
-        )
+        logger.debug(f"Recorded tool execution: {tool_name} (history: {len(self._history)})")
 
     def get_next_suggestions(
         self,
@@ -278,9 +276,7 @@ class ToolSequenceTracker:
         Returns:
             List of (tool_name, confidence) tuples sorted by confidence
         """
-        exclude = {
-            self._canonicalize_tool_name(tool) for tool in (exclude_tools or set())
-        }
+        exclude = {self._canonicalize_tool_name(tool) for tool in (exclude_tools or set())}
         suggestions: Dict[str, float] = {}
 
         if not self._history:
@@ -292,9 +288,7 @@ class ToolSequenceTracker:
             for next_tool, stats in self._transitions[last_tool].items():
                 if next_tool not in exclude:
                     # Calculate confidence based on count and success rate
-                    total_from_last = sum(
-                        s.count for s in self._transitions[last_tool].values()
-                    )
+                    total_from_last = sum(s.count for s in self._transitions[last_tool].values())
                     if total_from_last > 0:
                         base_prob = stats.count / total_from_last
                         confidence = base_prob * stats.success_rate
@@ -310,9 +304,7 @@ class ToolSequenceTracker:
                     suggestions[suggested] = max(current, weight)
 
         # Sort by confidence and return top_k
-        sorted_suggestions = sorted(
-            suggestions.items(), key=lambda x: x[1], reverse=True
-        )
+        sorted_suggestions = sorted(suggestions.items(), key=lambda x: x[1], reverse=True)
 
         return sorted_suggestions[:top_k]
 
@@ -406,8 +398,7 @@ class ToolSequenceTracker:
             Dictionary with tracker stats
         """
         total_transitions = sum(
-            sum(s.count for s in targets.values())
-            for targets in self._transitions.values()
+            sum(s.count for s in targets.values()) for targets in self._transitions.values()
         )
 
         return {
@@ -460,9 +451,7 @@ class ToolSequenceTracker:
                 # Blend with existing count (don't override)
                 stats.count = max(stats.count, 3)  # At least 3 pseudo-observations
 
-        logger.debug(
-            f"Set {len(self._vertical_dependencies)} vertical tool dependencies"
-        )
+        logger.debug(f"Set {len(self._vertical_dependencies)} vertical tool dependencies")
 
     def set_sequences(self, sequences: Dict[str, List[Tuple[str, float]]]) -> None:
         """Set vertical-provided tool sequences.
@@ -476,8 +465,7 @@ class ToolSequenceTracker:
         """
         self._vertical_sequences = {
             self._canonicalize_tool_name(from_tool): [
-                (self._canonicalize_tool_name(to_tool), weight)
-                for to_tool, weight in transitions
+                (self._canonicalize_tool_name(to_tool), weight) for to_tool, weight in transitions
             ]
             for from_tool, transitions in (sequences or {}).items()
         }

@@ -214,19 +214,11 @@ class TestCodeContextGraphBuilder:
         assert id1 == id2  # Same inputs should produce same ID
         assert len(id1) == 16  # SHA256 truncated to 16 chars
 
-    def test_generate_statement_id_unique(
-        self, builder: CodeContextGraphBuilder
-    ) -> None:
+    def test_generate_statement_id_unique(self, builder: CodeContextGraphBuilder) -> None:
         """Test that different inputs produce different IDs."""
-        id1 = builder._generate_statement_id(
-            "/path/to/file.py", 10, 20, "function_definition"
-        )
-        id2 = builder._generate_statement_id(
-            "/path/to/file.py", 11, 20, "function_definition"
-        )
-        id3 = builder._generate_statement_id(
-            "/path/to/other.py", 10, 20, "function_definition"
-        )
+        id1 = builder._generate_statement_id("/path/to/file.py", 10, 20, "function_definition")
+        id2 = builder._generate_statement_id("/path/to/file.py", 11, 20, "function_definition")
+        id3 = builder._generate_statement_id("/path/to/other.py", 10, 20, "function_definition")
 
         assert id1 != id2  # Different line
         assert id1 != id3  # Different file
@@ -243,13 +235,8 @@ class TestCodeContextGraphBuilder:
         assert builder._classify_statement("call") == StatementType.CALL
         assert builder._classify_statement("return_statement") == StatementType.RETURN
         assert builder._classify_statement("yield_statement") == StatementType.YIELD
-        assert (
-            builder._classify_statement("function_definition")
-            == StatementType.FUNCTION_DEF
-        )
-        assert (
-            builder._classify_statement("class_definition") == StatementType.CLASS_DEF
-        )
+        assert builder._classify_statement("function_definition") == StatementType.FUNCTION_DEF
+        assert builder._classify_statement("class_definition") == StatementType.CLASS_DEF
 
     def test_classify_statement_unknown(self, builder: CodeContextGraphBuilder) -> None:
         """Test statement classification for unknown types."""
@@ -264,9 +251,7 @@ class TestCodeContextGraphBuilder:
         # Create a temporary file
         import tempfile
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".unknown", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".unknown", delete=False) as f:
             f.write("test content")
             temp_path = Path(f.name)
 
@@ -406,23 +391,15 @@ class TestCodeContextGraphBuilder:
         """Test CFG connection logic."""
         from victor.storage.graph.protocol import GraphNode
 
-        node1 = GraphNode(
-            node_id="n1", type="stmt", name="stmt1", file="file.py", line=10
-        )
-        node2 = GraphNode(
-            node_id="n2", type="stmt", name="stmt2", file="file.py", line=11
-        )
-        node3 = GraphNode(
-            node_id="n3", type="stmt", name="stmt3", file="file.py", line=50
-        )
+        node1 = GraphNode(node_id="n1", type="stmt", name="stmt1", file="file.py", line=10)
+        node2 = GraphNode(node_id="n2", type="stmt", name="stmt2", file="file.py", line=11)
+        node3 = GraphNode(node_id="n3", type="stmt", name="stmt3", file="file.py", line=50)
 
         assert builder._should_connect_cfg(node1, node2) is True
         assert builder._should_connect_cfg(node1, node3) is False
 
     @pytest.mark.asyncio
-    async def test_enhanced_builder_delegation(
-        self, mock_graph_store: AsyncMock
-    ) -> None:
+    async def test_enhanced_builder_delegation(self, mock_graph_store: AsyncMock) -> None:
         """Test that enhanced builder from capability registry is used."""
         from victor.core.capability_registry import CapabilityRegistry, CapabilityStatus
         from victor.framework.vertical_protocols import CCGBuilderProtocol
@@ -530,9 +507,7 @@ class TestCodeContextGraphBuilder:
             CapabilityRegistry.reset()
 
     @pytest.mark.asyncio
-    async def test_enhanced_builder_fallback_on_error(
-        self, mock_graph_store: AsyncMock
-    ) -> None:
+    async def test_enhanced_builder_fallback_on_error(self, mock_graph_store: AsyncMock) -> None:
         """Test that builder falls back to built-in if enhanced builder fails."""
         from victor.core.capability_registry import CapabilityRegistry, CapabilityStatus
         from victor.framework.vertical_protocols import CCGBuilderProtocol

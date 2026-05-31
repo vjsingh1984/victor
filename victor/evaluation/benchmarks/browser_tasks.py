@@ -78,38 +78,24 @@ class BrowserTaskBenchmarkRunner(BaseBenchmarkRunner):
         spec = self._task_specs.get(task.task_id, {})
         required_actions = self._normalize_list(spec.get("required_actions"))
         forbidden_actions = self._normalize_list(spec.get("forbidden_actions"))
-        expected_answer_contains = self._normalize_list(
-            spec.get("expected_answer_contains")
-        )
+        expected_answer_contains = self._normalize_list(spec.get("expected_answer_contains"))
 
         parsed_output = self._parse_agent_output(agent_output)
         action_names = parsed_output["actions"]
         final_answer = parsed_output["final_answer"]
-        matched_actions = [
-            action for action in required_actions if action in action_names
-        ]
-        missing_actions = [
-            action for action in required_actions if action not in matched_actions
-        ]
-        forbidden_hits = [
-            action for action in forbidden_actions if action in action_names
-        ]
+        matched_actions = [action for action in required_actions if action in action_names]
+        missing_actions = [action for action in required_actions if action not in matched_actions]
+        forbidden_hits = [action for action in forbidden_actions if action in action_names]
         matched_answer_phrases = self._match_text_requirements(
             expected_answer_contains, final_answer
         )
         missing_answer_phrases = [
-            phrase
-            for phrase in expected_answer_contains
-            if phrase not in matched_answer_phrases
+            phrase for phrase in expected_answer_contains if phrase not in matched_answer_phrases
         ]
 
         action_coverage = self._coverage(matched_actions, required_actions)
-        answer_coverage = self._coverage(
-            matched_answer_phrases, expected_answer_contains
-        )
-        result.completion_score = round(
-            (action_coverage * 0.65) + (answer_coverage * 0.35), 4
-        )
+        answer_coverage = self._coverage(matched_answer_phrases, expected_answer_contains)
+        result.completion_score = round((action_coverage * 0.65) + (answer_coverage * 0.35), 4)
         result.failure_details = {
             "action_coverage": action_coverage,
             "answer_coverage": answer_coverage,
@@ -131,15 +117,11 @@ class BrowserTaskBenchmarkRunner(BaseBenchmarkRunner):
             return result
 
         result.status = TaskStatus.FAILED
-        result.error_message = (
-            "Output did not complete required browser actions or answer coverage"
-        )
+        result.error_message = "Output did not complete required browser actions or answer coverage"
         result.failure_category = BenchmarkFailureCategory.TASK_COMPLETION
         return result
 
-    def _load_manifest(
-        self, dataset_path: Path
-    ) -> tuple[list[dict[str, Any]], BenchmarkMetadata]:
+    def _load_manifest(self, dataset_path: Path) -> tuple[list[dict[str, Any]], BenchmarkMetadata]:
         if not dataset_path.exists():
             raise FileNotFoundError(f"Benchmark dataset not found: {dataset_path}")
 
@@ -155,9 +137,7 @@ class BrowserTaskBenchmarkRunner(BaseBenchmarkRunner):
             return payload, self._build_manifest_metadata({}, payload)
 
         if not isinstance(payload, dict):
-            raise ValueError(
-                "Browser benchmark dataset payload must be a list or object manifest"
-            )
+            raise ValueError("Browser benchmark dataset payload must be a list or object manifest")
 
         records = payload.get("tasks", [])
         if not isinstance(records, list):
@@ -181,29 +161,21 @@ class BrowserTaskBenchmarkRunner(BaseBenchmarkRunner):
     ) -> BenchmarkMetadata:
         catalog = get_benchmark_metadata(self._benchmark_type)
         if catalog is None:
-            raise ValueError(
-                f"Missing benchmark metadata for {self._benchmark_type.value}"
-            )
+            raise ValueError(f"Missing benchmark metadata for {self._benchmark_type.value}")
 
         return BenchmarkMetadata(
             name=str(metadata.get("name") or catalog.name),
             type=self._benchmark_type,
             version=str(metadata.get("version") or catalog.version),
             total_tasks=int(metadata.get("total_tasks") or len(records)),
-            languages=self._normalize_list(metadata.get("languages"))
-            or list(catalog.languages),
-            categories=self._normalize_list(metadata.get("categories"))
-            or list(catalog.categories),
+            languages=self._normalize_list(metadata.get("languages")) or list(catalog.languages),
+            categories=self._normalize_list(metadata.get("categories")) or list(catalog.categories),
             description=str(metadata.get("description") or catalog.description),
             source_name=str(metadata.get("source_name") or catalog.source_name),
             source_url=str(metadata.get("source_url") or catalog.source_url),
             paper_url=str(metadata.get("paper_url") or catalog.paper_url),
-            aliases=tuple(
-                self._normalize_list(metadata.get("aliases")) or list(catalog.aliases)
-            ),
-            evaluation_mode=str(
-                metadata.get("evaluation_mode") or catalog.evaluation_mode
-            ),
+            aliases=tuple(self._normalize_list(metadata.get("aliases")) or list(catalog.aliases)),
+            evaluation_mode=str(metadata.get("evaluation_mode") or catalog.evaluation_mode),
             runner_status="implemented",
         )
 
@@ -216,9 +188,7 @@ class BrowserTaskBenchmarkRunner(BaseBenchmarkRunner):
             raise ValueError(f"Task #{index} is missing a prompt")
 
         task_id = str(
-            merged.get("task_id")
-            or merged.get("id")
-            or f"{self._benchmark_type.value}-{index}"
+            merged.get("task_id") or merged.get("id") or f"{self._benchmark_type.value}-{index}"
         )
         self._task_specs[task_id] = {
             "required_actions": self._normalize_list(merged.get("required_actions")),
@@ -265,9 +235,7 @@ class BrowserTaskBenchmarkRunner(BaseBenchmarkRunner):
                 elif item:
                     actions.append(str(item).strip().lower())
 
-        final_answer = str(
-            payload.get("final_answer") or payload.get("answer") or ""
-        ).strip()
+        final_answer = str(payload.get("final_answer") or payload.get("answer") or "").strip()
         return {
             "actions": actions,
             "final_answer": final_answer,

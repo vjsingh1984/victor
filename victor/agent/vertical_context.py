@@ -623,9 +623,7 @@ class VerticalContext:
         except Exception as e:
             import logging
 
-            logging.getLogger(__name__).debug(
-                f"Could not get tiered config from vertical: {e}"
-            )
+            logging.getLogger(__name__).debug(f"Could not get tiered config from vertical: {e}")
         return None
 
     # ==========================================================================
@@ -721,9 +719,7 @@ class VerticalContext:
         child.team_specs = dict(self.team_specs)
 
         # Per-agent mutable state (fresh or overridden)
-        child.enabled_tools = (
-            set(enabled_tools) if enabled_tools else set(self.enabled_tools)
-        )
+        child.enabled_tools = set(enabled_tools) if enabled_tools else set(self.enabled_tools)
         child.prompt_sections = []  # Fresh — child builds its own
         child.capability_configs = {}  # Fresh — child gets own capabilities
 

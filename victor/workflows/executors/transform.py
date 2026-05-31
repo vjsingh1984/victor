@@ -52,9 +52,7 @@ class TransformNodeExecutor:
         """
         self._context = context
 
-    async def execute(
-        self, node: "TransformNode", state: "WorkflowState"
-    ) -> "WorkflowState":
+    async def execute(self, node: "TransformNode", state: "WorkflowState") -> "WorkflowState":
         """Execute a transform node.
 
         Args:

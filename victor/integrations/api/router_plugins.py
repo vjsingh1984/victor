@@ -75,9 +75,7 @@ def load_fastapi_router_registrations(
         if not group_obj:
             return registrations
 
-        entry_points_list = [
-            (ep, loaded) for ep, loaded in group_obj.entry_points.values()
-        ]
+        entry_points_list = [(ep, loaded) for ep, loaded in group_obj.entry_points.values()]
     except Exception as exc:
         logger.debug("Failed to discover API router entry points: %s", exc)
         return registrations

@@ -107,9 +107,7 @@ class TestCompactionBonusIntegration:
         compaction_occurred = True
         messages_removed = 64
 
-        bonus = bonus_calculator.get_bonus(
-            provider, model, compaction_occurred, messages_removed
-        )
+        bonus = bonus_calculator.get_bonus(provider, model, compaction_occurred, messages_removed)
         total_budget = base_budget + bonus
 
         # DeepSeek with 64 messages removed should get at least +3 bonus

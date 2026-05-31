@@ -22,9 +22,7 @@ class TestPromptRolloutCoordinator:
             treatment_hash="candidate123",
         )
 
-        assert (
-            experiment_id == "prompt_optimizer_grounding_rules_anthropic_candidate123"
-        )
+        assert experiment_id == "prompt_optimizer_grounding_rules_anthropic_candidate123"
 
     def test_create_prompt_rollout_experiment_delegates_to_prompt_optimizer(self):
         from victor.framework.rl.coordinator import RLCoordinator
@@ -138,10 +136,7 @@ class TestPromptRolloutCoordinator:
             )
 
         assert report is not None
-        assert (
-            report["experiment_id"]
-            == "prompt_optimizer_grounding_rules_anthropic_candidate123"
-        )
+        assert report["experiment_id"] == "prompt_optimizer_grounding_rules_anthropic_candidate123"
         assert report["analysis_available"] is True
         assert report["auto_action"] == "rollout"
         assert report["recommendation"].startswith("Roll out treatment")

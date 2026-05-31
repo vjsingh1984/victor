@@ -133,9 +133,7 @@ class ToolResultDeduplicator:
             if msg.role != "user" or len(msg.content) < min_chars:
                 continue
             # Already a stub? Skip
-            if msg.content.startswith("[Previously") or msg.content.startswith(
-                "[Duplicate"
-            ):
+            if msg.content.startswith("[Previously") or msg.content.startswith("[Duplicate"):
                 continue
 
             fingerprint = hash(msg.content[:2000] + msg.content[-500:])

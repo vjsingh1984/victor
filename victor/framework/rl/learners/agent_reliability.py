@@ -312,9 +312,7 @@ class AgentReliabilityLearner(BaseLearner):
         calibration_error = outcome.metadata.get("calibration_error", 0.5)
 
         if not agent_id:
-            logger.warning(
-                f"Missing agent_id in outcome metadata: " f"{outcome.metadata.keys()}"
-            )
+            logger.warning(f"Missing agent_id in outcome metadata: " f"{outcome.metadata.keys()}")
             return
 
         # Record the prediction result

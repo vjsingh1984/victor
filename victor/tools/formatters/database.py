@@ -16,9 +16,7 @@ class DatabaseFormatter(ToolFormatter):
 
     def validate_input(self, data: Dict) -> bool:
         """Validate database result has required fields."""
-        return isinstance(data, dict) and (
-            "rows" in data or "error" in data or "success" in data
-        )
+        return isinstance(data, dict) and ("rows" in data or "error" in data or "success" in data)
 
     def format(
         self, data: Dict[str, Any], max_rows: int = 50, max_columns: int = 10, **kwargs
@@ -97,9 +95,7 @@ class DatabaseFormatter(ToolFormatter):
 
                 # Header row
                 if columns:
-                    header = "  |  ".join(
-                        str(col)[:15] for col in columns[:max_columns]
-                    )
+                    header = "  |  ".join(str(col)[:15] for col in columns[:max_columns])
                     lines.append(f"[cyan]{header}[/]")
                     lines.append("-" * len(header))
 
@@ -114,13 +110,9 @@ class DatabaseFormatter(ToolFormatter):
 
             # Add indicator if truncated
             if len(rows) > max_rows:
-                lines.append(
-                    f"[dim]... and {len(rows) - max_rows} more rows truncated[/]"
-                )
+                lines.append(f"[dim]... and {len(rows) - max_rows} more rows truncated[/]")
             if len(columns) > max_columns:
-                lines.append(
-                    f"[dim]... and {len(columns) - max_columns} more columns truncated[/]"
-                )
+                lines.append(f"[dim]... and {len(columns) - max_columns} more columns truncated[/]")
 
         content = "\n".join(lines)
 

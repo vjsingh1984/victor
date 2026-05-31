@@ -70,13 +70,8 @@ class TestCompactorConfig:
         config = CompactorConfig()
 
         # These now come from centralized orchestrator_constants
-        assert (
-            config.proactive_threshold == CONTEXT_LIMITS.proactive_compaction_threshold
-        )
-        assert (
-            config.min_messages_after_compact
-            == COMPACTION_CONFIG.min_messages_after_compact
-        )
+        assert config.proactive_threshold == CONTEXT_LIMITS.proactive_compaction_threshold
+        assert config.min_messages_after_compact == COMPACTION_CONFIG.min_messages_after_compact
         assert config.tool_result_max_chars == COMPACTION_CONFIG.tool_result_max_chars
         assert config.tool_result_max_lines == COMPACTION_CONFIG.tool_result_max_lines
         assert config.truncation_strategy == TruncationStrategy.SMART
@@ -136,10 +131,7 @@ class TestContextCompactorInit:
         compactor = ContextCompactor(mock_controller)
 
         assert compactor.controller is mock_controller
-        assert (
-            compactor.config.proactive_threshold
-            == CONTEXT_LIMITS.proactive_compaction_threshold
-        )
+        assert compactor.config.proactive_threshold == CONTEXT_LIMITS.proactive_compaction_threshold
         assert compactor._compaction_count == 0
 
     def test_custom_config(self, mock_controller):
@@ -284,14 +276,10 @@ class TestCheckAndCompact:
         assert action.trigger == CompactionTrigger.MANUAL
         assert action.action_taken is True
 
-    def test_fallback_truncates_large_tool_outputs_when_no_messages_removed(
-        self, mock_controller
-    ):
+    def test_fallback_truncates_large_tool_outputs_when_no_messages_removed(self, mock_controller):
         """Large tool outputs are still compacted when history is too short to prune."""
         large_tool_output = "line\n" * 500
-        tool_message = Message(
-            role="tool", content=large_tool_output, tool_call_id="call_1"
-        )
+        tool_message = Message(role="tool", content=large_tool_output, tool_call_id="call_1")
         mock_controller.get_messages.return_value = [tool_message]
         mock_controller.smart_compact_history.return_value = 0
         mock_controller.get_context_metrics.side_effect = [
@@ -631,10 +619,7 @@ class TestParallelReadBudget:
         assert budget.usable_tokens > 0
         assert budget.max_parallel_files == COMPACTION_CONFIG.parallel_read_target_files
         assert budget.chars_per_file >= 4096  # Minimum useful read size
-        assert (
-            budget.total_read_budget
-            == budget.chars_per_file * budget.max_parallel_files
-        )
+        assert budget.total_read_budget == budget.chars_per_file * budget.max_parallel_files
 
     def test_calculate_parallel_read_budget_custom(self):
         """Test calculate_parallel_read_budget with custom parameters."""
@@ -676,16 +661,9 @@ class TestMessagePriorityAssignment:
 
         # Test various pinned patterns
         assert compactor._is_pinned_requirement("You must output a JSON file") is True
-        assert (
-            compactor._is_pinned_requirement("Required format: markdown table") is True
-        )
-        assert (
-            compactor._is_pinned_requirement("Create a findings table with results")
-            is True
-        )
-        assert (
-            compactor._is_pinned_requirement("Provide top 10 recommendations") is True
-        )
+        assert compactor._is_pinned_requirement("Required format: markdown table") is True
+        assert compactor._is_pinned_requirement("Create a findings table with results") is True
+        assert compactor._is_pinned_requirement("Provide top 10 recommendations") is True
         assert compactor._is_pinned_requirement("Deliverables: summary report") is True
         assert compactor._is_pinned_requirement("Output must include the diff") is True
         assert compactor._is_pinned_requirement("Required outputs: metrics") is True
@@ -1138,10 +1116,7 @@ class TestTruncationStrategies:
         result = compactor.truncate_tool_result(content)
 
         assert result.truncated is True
-        assert (
-            "[content truncated]" in result.content
-            or "truncated" in result.content.lower()
-        )
+        assert "[content truncated]" in result.content or "truncated" in result.content.lower()
 
     def test_smart_truncation_preserves_file_paths(self, mock_controller):
         """Test smart truncation preserves file paths."""
@@ -1600,9 +1575,7 @@ class TestRuntimeIntelligenceCompaction:
         controller.messages = [Message(role="system", content="System prompt")]
         for i in range(18):
             controller.messages.append(Message(role="user", content=f"User turn {i}"))
-            controller.messages.append(
-                Message(role="assistant", content=f"Assistant turn {i}")
-            )
+            controller.messages.append(Message(role="assistant", content=f"Assistant turn {i}"))
 
         runtime_intelligence = MagicMock()
         runtime_intelligence.decide_sync.return_value = DecisionResult(
@@ -1618,9 +1591,7 @@ class TestRuntimeIntelligenceCompaction:
         )
         compactor._get_provider_for_tier = MagicMock(return_value=MagicMock())
 
-        with patch(
-            "victor.agent.llm_compaction_summarizer.LLMCompactionSummarizer"
-        ) as mock_cls:
+        with patch("victor.agent.llm_compaction_summarizer.LLMCompactionSummarizer") as mock_cls:
             mock_cls.return_value.summarize.return_value = "summarized context"
 
             action = compactor._maybe_summarize_turns()

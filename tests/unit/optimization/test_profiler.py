@@ -206,9 +206,7 @@ def test_detect_bottlenecks_failing_nodes(profiler):
     bottlenecks = profiler._detect_bottlenecks(node_stats)
 
     # Should detect unreliable node
-    unreliable_bottlenecks = [
-        b for b in bottlenecks if b.type == BottleneckType.UNRELIABLE_NODE
-    ]
+    unreliable_bottlenecks = [b for b in bottlenecks if b.type == BottleneckType.UNRELIABLE_NODE]
     assert len(unreliable_bottlenecks) > 0
     assert any(b.node_id == "unreliable_node" for b in unreliable_bottlenecks)
 
@@ -236,9 +234,7 @@ def test_detect_bottlenecks_expensive_tools(profiler):
     bottlenecks = profiler._detect_bottlenecks(node_stats)
 
     # Should detect expensive tool
-    expensive_bottlenecks = [
-        b for b in bottlenecks if b.type == BottleneckType.EXPENSIVE_TOOL
-    ]
+    expensive_bottlenecks = [b for b in bottlenecks if b.type == BottleneckType.EXPENSIVE_TOOL]
     assert len(expensive_bottlenecks) > 0
     assert any(b.tool_id == "expensive_tool" for b in expensive_bottlenecks)
 

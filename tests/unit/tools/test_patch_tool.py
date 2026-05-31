@@ -286,9 +286,7 @@ class TestApplyPatch:
 +    print('Hello, World!')
 +    return True
 """
-            result = await patch(
-                patch_content=diff_content, file_path=test_file, backup=False
-            )
+            result = await patch(patch_content=diff_content, file_path=test_file, backup=False)
 
             assert result["success"] is True
             # Path may be resolved differently on macOS (/var vs /private/var)
@@ -315,9 +313,7 @@ class TestApplyPatch:
 -old content
 +new content
 """
-            result = await patch(
-                patch_content=diff_content, file_path=test_file, dry_run=True
-            )
+            result = await patch(patch_content=diff_content, file_path=test_file, dry_run=True)
 
             assert "preview" in result
 

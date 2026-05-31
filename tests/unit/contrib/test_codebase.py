@@ -102,9 +102,7 @@ class TestBasicCodebaseAnalyzer:
         assert len(result.files) == 2
 
     @pytest.mark.asyncio
-    async def test_analyze_codebase_multiple_languages(
-        self, sample_codebase: Path
-    ) -> None:
+    async def test_analyze_codebase_multiple_languages(self, sample_codebase: Path) -> None:
         """Test analyzing codebase with multiple file types."""
         analyzer = BasicCodebaseAnalyzer()
         result = await analyzer.analyze_codebase(

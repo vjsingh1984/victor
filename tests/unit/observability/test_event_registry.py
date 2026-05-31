@@ -182,12 +182,8 @@ class TestGetObservabilityBusFactory:
         assert config.extra["queue_maxsize"] == 42
         assert config.extra["queue_overflow_policy"] == "drop_oldest"
         assert config.extra["queue_overflow_block_timeout_ms"] == 33.0
-        assert config.extra["queue_overflow_topic_policies"] == {
-            "critical.*": "block_with_timeout"
-        }
-        assert config.extra["queue_overflow_topic_block_timeout_ms"] == {
-            "critical.*": 77.0
-        }
+        assert config.extra["queue_overflow_topic_policies"] == {"critical.*": "block_with_timeout"}
+        assert config.extra["queue_overflow_topic_block_timeout_ms"] == {"critical.*": 77.0}
 
 
 # =============================================================================
@@ -531,10 +527,7 @@ class TestSubscriptionPatternResolution:
     def test_resolve_direct_pattern_passthrough(self):
         """Direct topic patterns should be passed through unchanged."""
         assert resolve_subscription_topic_pattern("tool.*") == "tool.*"
-        assert (
-            resolve_subscription_topic_pattern("security_scan.vuln.*")
-            == "security_scan.vuln.*"
-        )
+        assert resolve_subscription_topic_pattern("security_scan.vuln.*") == "security_scan.vuln.*"
 
     def test_resolve_unknown_category_raises(self):
         """Unknown category names should raise ValueError."""

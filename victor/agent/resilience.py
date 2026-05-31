@@ -224,9 +224,7 @@ class MultiCircuitBreaker:
         """
         # Check if exception should be excluded
         if error and isinstance(error, self.config.exclude_exceptions):
-            logger.debug(
-                f"Circuit '{name}' - excluded exception: {type(error).__name__}"
-            )
+            logger.debug(f"Circuit '{name}' - excluded exception: {type(error).__name__}")
             return
 
         stats = self._circuits[name]
@@ -280,9 +278,7 @@ class MultiCircuitBreaker:
             "last_failure_time": stats.last_failure_time,
             "last_state_change": stats.last_state_change,
             "time_since_failure": (
-                time.time() - stats.last_failure_time
-                if stats.last_failure_time
-                else None
+                time.time() - stats.last_failure_time if stats.last_failure_time else None
             ),
         }
 
@@ -367,8 +363,7 @@ class RetryHandler:
 
         # Create canonical retry strategy
         self._strategy = ExponentialBackoffStrategy(
-            max_attempts=self.config.max_retries
-            + 1,  # +1 because max_attempts includes initial
+            max_attempts=self.config.max_retries + 1,  # +1 because max_attempts includes initial
             base_delay=self.config.base_delay,
             max_delay=self.config.max_delay,
             multiplier=self.config.exponential_base,
@@ -376,9 +371,7 @@ class RetryHandler:
                 0.5 if self.config.jitter else 0.0
             ),  # 0.5 = 50% jitter to match legacy behavior
             retryable_exceptions=(
-                set(self.config.retryable_exceptions)
-                if self.config.retryable_exceptions
-                else None
+                set(self.config.retryable_exceptions) if self.config.retryable_exceptions else None
             ),
         )
 
@@ -469,9 +462,7 @@ class RetryHandler:
         # Preserve on_retry callback if provided
         if on_retry:
             self._strategy.on_retry = lambda ctx: (
-                on_retry(ctx.attempt, ctx.last_exception)
-                if ctx.last_exception
-                else None
+                on_retry(ctx.attempt, ctx.last_exception) if ctx.last_exception else None
             )
 
         # Use canonical executor
@@ -673,9 +664,7 @@ class ResilientExecutor:
             result = await self.retry_handler.execute_with_retry(
                 func,
                 *args,
-                on_retry=lambda attempt, e: self.circuit_breaker.record_failure(
-                    name, e
-                ),
+                on_retry=lambda attempt, e: self.circuit_breaker.record_failure(name, e),
                 **kwargs,
             )
             self.circuit_breaker.record_success(name)

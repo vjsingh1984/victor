@@ -299,8 +299,7 @@ class ConfigValidator:
                 key_field = f"{provider}_api_key"
                 api_key = getattr(settings, key_field, None)
                 if api_key is None or (
-                    hasattr(api_key, "get_secret_value")
-                    and not api_key.get_secret_value()
+                    hasattr(api_key, "get_secret_value") and not api_key.get_secret_value()
                 ):
                     result.add_error(
                         category="api_key",

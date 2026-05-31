@@ -62,9 +62,7 @@ class TestScaffold:
             old_cwd = os.getcwd()
             os.chdir(tmpdir)
             try:
-                result = await scaffold(
-                    operation="create", template="fastapi", name="test_project"
-                )
+                result = await scaffold(operation="create", template="fastapi", name="test_project")
                 assert result["success"] is True
                 # Check project directory was created
                 project_dir = Path(tmpdir) / "test_project"

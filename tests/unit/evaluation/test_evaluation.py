@@ -214,9 +214,7 @@ def complex(x):
         simple_metrics = await analyzer.analyze(simple_code, language="python")
         complex_metrics = await analyzer.analyze(complex_code, language="python")
 
-        assert (
-            complex_metrics.cyclomatic_complexity > simple_metrics.cyclomatic_complexity
-        )
+        assert complex_metrics.cyclomatic_complexity > simple_metrics.cyclomatic_complexity
 
 
 class TestTaskResult:
@@ -593,13 +591,9 @@ class TestEvaluationResult:
             "heuristic_fast_path": 1,
             "experiment_forced_slow_path": 1,
         }
-        assert metrics["planning_force_reasons"] == {
-            "experiment_constraints: tests_pass": 1
-        }
+        assert metrics["planning_force_reasons"] == {"experiment_constraints: tests_pass": 1}
         assert metrics["planning_used_llm_rate"] == pytest.approx(0.5)
-        assert metrics["planning_forced_slow_path_completion_delta"] == pytest.approx(
-            0.7
-        )
+        assert metrics["planning_forced_slow_path_completion_delta"] == pytest.approx(0.7)
 
     def test_get_metrics_includes_team_feedback_summary(self):
         """Aggregate metrics should expose team/worktree coverage and merge risk."""
@@ -785,17 +779,11 @@ class TestEvaluationResult:
         assert metrics["code_intelligence_pass_rate"] == pytest.approx(0.5)
         assert metrics["non_code_intelligence_pass_rate"] == pytest.approx(1.0)
         assert metrics["code_intelligence_avg_tokens_per_task"] == pytest.approx(90.0)
-        assert metrics["non_code_intelligence_avg_tokens_per_task"] == pytest.approx(
-            30.0
-        )
+        assert metrics["non_code_intelligence_avg_tokens_per_task"] == pytest.approx(30.0)
         assert metrics["code_intelligence_avg_duration_seconds"] == pytest.approx(6.0)
-        assert metrics["non_code_intelligence_avg_duration_seconds"] == pytest.approx(
-            2.0
-        )
+        assert metrics["non_code_intelligence_avg_duration_seconds"] == pytest.approx(2.0)
         assert metrics["code_intelligence_accepted_patch_rate"] == pytest.approx(0.5)
-        assert metrics["non_code_intelligence_accepted_patch_rate"] == pytest.approx(
-            0.0
-        )
+        assert metrics["non_code_intelligence_accepted_patch_rate"] == pytest.approx(0.0)
 
 
 class TestPassAtKResult:

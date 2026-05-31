@@ -12,16 +12,12 @@ import os
 import pytest
 
 
-def pytest_collection_modifyitems(
-    config: pytest.Config, items: list[pytest.Item]
-) -> None:
+def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
     """Skip benchmark timing assertions in xdist worker processes."""
     if not (hasattr(config, "workerinput") or os.environ.get("PYTEST_XDIST_WORKER")):
         return
 
-    skip_xdist = pytest.mark.skip(
-        reason="benchmark timing tests run serially, not under xdist"
-    )
+    skip_xdist = pytest.mark.skip(reason="benchmark timing tests run serially, not under xdist")
     for item in items:
         if "tests/benchmarks" in item.path.as_posix():
             item.add_marker(skip_xdist)

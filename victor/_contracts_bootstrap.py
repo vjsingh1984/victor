@@ -47,9 +47,7 @@ def prefer_repo_local_victor_contracts(
             loaded_path = Path(loaded_contracts_file).resolve()
             if contracts_root not in loaded_path.parents:
                 for name in list(module_map):
-                    if name == "victor_contracts" or name.startswith(
-                        "victor_contracts."
-                    ):
+                    if name == "victor_contracts" or name.startswith("victor_contracts."):
                         module_map.pop(name, None)
         except OSError:
             pass

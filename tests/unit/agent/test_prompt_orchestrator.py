@@ -69,9 +69,7 @@ class TestPromptOrchestrator:
         """Test auto-detection of framework builder."""
         orchestrator = PromptOrchestrator()
 
-        builder_type = orchestrator._detect_builder_type(
-            base_prompt="You are an assistant."
-        )
+        builder_type = orchestrator._detect_builder_type(base_prompt="You are an assistant.")
 
         assert builder_type == "framework"
 
@@ -96,9 +94,7 @@ class TestPromptOrchestrator:
         orchestrator = PromptOrchestrator()
 
         # Should detect legacy builder from prompt_contributors
-        prompt = orchestrator.build_system_prompt(
-            builder_type="auto", prompt_contributors=[]
-        )
+        prompt = orchestrator.build_system_prompt(builder_type="auto", prompt_contributors=[])
 
         # Should return a string (even if minimal)
         assert isinstance(prompt, str)
@@ -197,9 +193,7 @@ class TestPromptOrchestrator:
 
         orchestrator = PromptOrchestrator()
 
-        fallbacks = orchestrator._get_fallback_texts(
-            ["COMPLETION_GUIDANCE", "GROUNDING_RULES"]
-        )
+        fallbacks = orchestrator._get_fallback_texts(["COMPLETION_GUIDANCE", "GROUNDING_RULES"])
 
         assert fallbacks == {
             "COMPLETION_GUIDANCE": COMPLETION_GUIDANCE,

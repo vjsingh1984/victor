@@ -184,9 +184,7 @@ class TestPreComputedDecisionTrees:
         with tempfile.TemporaryDirectory() as tmpdir:
             # Test with directory (should use ls)
             context_dir = {"path": tmpdir, "query": "list directory"}
-            result_dir = PreComputedDecisionTrees.evaluate_tree(
-                "file_read_tool", context_dir
-            )
+            result_dir = PreComputedDecisionTrees.evaluate_tree("file_read_tool", context_dir)
 
             assert result_dir is not None
             assert result_dir.action == DecisionAction.TOOL_CALL
@@ -199,9 +197,7 @@ class TestPreComputedDecisionTrees:
 
         try:
             context_file = {"path": temp_path, "query": "read file"}
-            result_file = PreComputedDecisionTrees.evaluate_tree(
-                "file_read_tool", context_file
-            )
+            result_file = PreComputedDecisionTrees.evaluate_tree("file_read_tool", context_file)
 
             # Note: The tree implementation checks if path exists and is file
             # Since we can't easily test without implementing actual path checking,
@@ -260,17 +256,12 @@ class TestConvenienceFunctions:
     def test_can_decide_without_llm_true(self):
         """Test can_decide_without_llm returns True when confident."""
         context = {"query": "List files"}
-        assert (
-            can_decide_without_llm("model_tier_selection", context, min_confidence=0.7)
-            is True
-        )
+        assert can_decide_without_llm("model_tier_selection", context, min_confidence=0.7) is True
 
     def test_can_decide_without_llm_false(self):
         """Test can_decide_without_llm returns False when not confident."""
         context = {"query": "Complex multi-step task"}
         # Most decisions will have lower confidence for complex tasks
-        result = can_decide_without_llm(
-            "model_tier_selection", context, min_confidence=0.99
-        )
+        result = can_decide_without_llm("model_tier_selection", context, min_confidence=0.99)
         # Might be False depending on the tree logic
         assert isinstance(result, bool)

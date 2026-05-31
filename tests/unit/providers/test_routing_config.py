@@ -142,9 +142,7 @@ class TestSmartRoutingConfig:
 
     def test_invalid_window_size(self):
         """Test that invalid window size raises error."""
-        with pytest.raises(
-            ValueError, match="performance_window_size must be at least 1"
-        ):
+        with pytest.raises(ValueError, match="performance_window_size must be at least 1"):
             SmartRoutingConfig(performance_window_size=0)
 
 

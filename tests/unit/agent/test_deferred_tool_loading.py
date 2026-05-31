@@ -141,10 +141,7 @@ class TestCreatePlaceholderForToolResult:
 
         assert "read" in placeholder.content
         assert "5000" in placeholder.content  # original length
-        assert (
-            "result_123" in placeholder.content
-            or "deferred" in placeholder.content.lower()
-        )
+        assert "result_123" in placeholder.content or "deferred" in placeholder.content.lower()
 
     def test_placeholder_is_shorter(self):
         """Placeholder should be much shorter than original."""
@@ -338,9 +335,7 @@ class TestIntegrationScenarios:
             Message(role="user", content="Read file"),
             Message(role="tool", content="x" * 2000, tool_call_id="call_1"),
             Message(role="assistant", content="Let me analyze"),
-            Message(
-                role="tool", content="y" * 500, tool_call_id="call_2"
-            ),  # Small, not deferred
+            Message(role="tool", content="y" * 500, tool_call_id="call_2"),  # Small, not deferred
         ]
 
         # Process messages (would be done by compactor)

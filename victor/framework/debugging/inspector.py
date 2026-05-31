@@ -85,8 +85,7 @@ class StateSnapshot:
         """
         # Calculate approximate size
         size_bytes = sum(
-            len(k) + len(str(v)) if not isinstance(v, (dict, list)) else 0
-            for k, v in state.items()
+            len(k) + len(str(v)) if not isinstance(v, (dict, list)) else 0 for k, v in state.items()
         )
 
         # Create summary
@@ -190,8 +189,7 @@ class StateDiff:
             "added_keys": list(self.added_keys),
             "removed_keys": list(self.removed_keys),
             "changed_keys": [
-                {"key": k, "old": v[0], "new": v[1]}
-                for k, v in self.changed_keys.items()
+                {"key": k, "old": v[0], "new": v[1]} for k, v in self.changed_keys.items()
             ],
             "unchanged_count": len(self.unchanged_keys),
         }
@@ -256,9 +254,7 @@ class StateInspector:
 
         return snapshot
 
-    def compare_states(
-        self, before: Dict[str, Any], after: Dict[str, Any]
-    ) -> StateDiff:
+    def compare_states(self, before: Dict[str, Any], after: Dict[str, Any]) -> StateDiff:
         """Compare two state dictionaries.
 
         Args:
@@ -270,9 +266,7 @@ class StateInspector:
         """
         return StateDiff.compare(before, after)
 
-    def get_value(
-        self, state: Dict[str, Any], key_path: str, default: Any = None
-    ) -> Any:
+    def get_value(self, state: Dict[str, Any], key_path: str, default: Any = None) -> Any:
         """Get a value from state by key path.
 
         Supports nested key paths with dot notation:
@@ -323,9 +317,7 @@ class StateInspector:
             return self._snapshots[-limit:]
         return self._snapshots.copy()
 
-    def get_snapshot_history(
-        self, session_id: Optional[str] = None
-    ) -> List[Dict[str, Any]]:
+    def get_snapshot_history(self, session_id: Optional[str] = None) -> List[Dict[str, Any]]:
         """Get snapshot history as dictionaries.
 
         Args:
@@ -340,9 +332,7 @@ class StateInspector:
         """Clear all snapshots."""
         self._snapshots.clear()
 
-    def get_large_state_keys(
-        self, state: Dict[str, Any], threshold_bytes: int = 1024
-    ) -> List[str]:
+    def get_large_state_keys(self, state: Dict[str, Any], threshold_bytes: int = 1024) -> List[str]:
         """Find state keys with large values.
 
         Args:

@@ -32,9 +32,7 @@ class TestGraphTurnExecutorCompilerRouting:
         compiler = MagicMock(name="unified_compiler")
         compiler.compile_graph.return_value = cached_graph
 
-        with patch.object(
-            coordinator, "_get_unified_compiler", return_value=compiler
-        ) as getter:
+        with patch.object(coordinator, "_get_unified_compiler", return_value=compiler) as getter:
             result = await coordinator.execute_workflow_graph(
                 graph,
                 initial_state={"input": "value"},
@@ -57,9 +55,7 @@ class TestGraphTurnExecutorCompilerRouting:
         compiler = MagicMock(name="unified_compiler")
         compiler.compile_definition.return_value = cached_graph
 
-        with patch.object(
-            coordinator, "_get_unified_compiler", return_value=compiler
-        ) as getter:
+        with patch.object(coordinator, "_get_unified_compiler", return_value=compiler) as getter:
             result = await coordinator.execute_definition_compiled(
                 workflow,
                 initial_state={"input": "value"},

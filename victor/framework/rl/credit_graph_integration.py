@@ -317,18 +317,14 @@ class CreditTracer:
 
         # Create integration with config
         ca_integration = CreditAssignmentIntegration(default_config=config)
-        signals = ca_integration.assign_credit(
-            trajectory, trace.rewards, methodology, config
-        )
+        signals = ca_integration.assign_credit(trajectory, trace.rewards, methodology, config)
 
         # Attach to trace
         trace.credit_signals = signals
 
         return signals
 
-    def get_agent_attribution(
-        self, trace: ExecutionTrace, agent_id: str
-    ) -> Dict[str, float]:
+    def get_agent_attribution(self, trace: ExecutionTrace, agent_id: str) -> Dict[str, float]:
         """Get credit attribution for a specific agent.
 
         Args:
@@ -340,9 +336,7 @@ class CreditTracer:
         """
         # Filter signals by agent
         agent_signals = [
-            s
-            for s in trace.credit_signals
-            if s.metadata and s.metadata.agent_id == agent_id
+            s for s in trace.credit_signals if s.metadata and s.metadata.agent_id == agent_id
         ]
 
         # Aggregate attribution
@@ -565,9 +559,7 @@ class CompiledCreditAwareGraph:
 
         agent_attribution = {}
         for agent in agents:
-            agent_attribution[agent] = self._tracer.get_agent_attribution(
-                self._last_trace, agent
-            )
+            agent_attribution[agent] = self._tracer.get_agent_attribution(self._last_trace, agent)
 
         return {
             "trace_id": self._last_trace.trace_id,

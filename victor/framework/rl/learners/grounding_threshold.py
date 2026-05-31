@@ -226,9 +226,7 @@ class GroundingThresholdLearner(BaseLearner):
                 result_type = "fn"  # False negative - missed hallucination
 
         if not result_type:
-            logger.debug(
-                "RL: grounding_threshold outcome missing result info, skipping"
-            )
+            logger.debug("RL: grounding_threshold outcome missing result info, skipping")
             return
 
         # Build context key
@@ -277,9 +275,7 @@ class GroundingThresholdLearner(BaseLearner):
         }
         return rewards.get(result_type, 0.0)
 
-    def _update_beta_params(
-        self, context_key: str, threshold: float, result_type: str
-    ) -> None:
+    def _update_beta_params(self, context_key: str, threshold: float, result_type: str) -> None:
         """Update Beta distribution parameters for Thompson Sampling.
 
         For each threshold level, we track:
@@ -489,9 +485,7 @@ class GroundingThresholdLearner(BaseLearner):
             f" WHERE learner_id = ? AND task_type = ?",
             (self.name, provider),
         )
-        counts = {
-            dict(r)["stat_key"]: int(dict(r)["stat_value"]) for r in cursor.fetchall()
-        }
+        counts = {dict(r)["stat_key"]: int(dict(r)["stat_value"]) for r in cursor.fetchall()}
 
         if not counts:
             return {"fp_rate": 0.0, "fn_rate": 0.0, "precision": 0.0, "recall": 0.0}
@@ -529,9 +523,7 @@ class GroundingThresholdLearner(BaseLearner):
         )
         providers = [dict(r)["task_type"] for r in cursor.fetchall()]
 
-        return {
-            provider: self.get_provider_error_rates(provider) for provider in providers
-        }
+        return {provider: self.get_provider_error_rates(provider) for provider in providers}
 
     def export_metrics(self) -> Dict[str, Any]:
         """Export learner metrics for monitoring.

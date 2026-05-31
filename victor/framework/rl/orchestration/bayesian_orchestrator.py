@@ -89,8 +89,7 @@ class BayesianOrchestrationService:
 
         # Create indexes
         self.db.execute(
-            "CREATE INDEX IF NOT EXISTS idx_belief_history_id "
-            "ON rl_belief_history(belief_id)"
+            "CREATE INDEX IF NOT EXISTS idx_belief_history_id " "ON rl_belief_history(belief_id)"
         )
         self.db.execute(
             "CREATE INDEX IF NOT EXISTS idx_belief_history_timestamp "
@@ -392,9 +391,7 @@ class BayesianOrchestrationService:
         self.reliability_learner.record_prediction_result(
             agent_id=agent_id,
             was_correct=was_correct,
-            calibration_error=abs(
-                agent_confidence - (1.0 if actual_outcome == "success" else 0.0)
-            ),
+            calibration_error=abs(agent_confidence - (1.0 if actual_outcome == "success" else 0.0)),
         )
 
         logger.info(
@@ -402,9 +399,7 @@ class BayesianOrchestrationService:
             f"correct={was_correct}"
         )
 
-    def get_belief_history(
-        self, belief_id: str, limit: int = 100
-    ) -> List[Dict[str, Any]]:
+    def get_belief_history(self, belief_id: str, limit: int = 100) -> List[Dict[str, Any]]:
         """Get history of belief state changes.
 
         Args:

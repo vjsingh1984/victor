@@ -517,9 +517,7 @@ class TestComplexityMapping:
     def test_refactor_is_complex_complexity(self):
         """REFACTOR should map to COMPLEX complexity."""
         matcher = PatternMatcher()
-        result = matcher.match(
-            "refactor the authentication module using SOLID principles"
-        )
+        result = matcher.match("refactor the authentication module using SOLID principles")
         assert result is not None
         assert result.complexity == TaskComplexity.COMPLEX
 

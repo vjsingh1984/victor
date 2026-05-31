@@ -201,9 +201,7 @@ class ToonFormatter:
             json_tokens = self._estimate_tokens(json_result)
             toon_tokens = self._estimate_tokens(toon_result)
 
-            savings = (
-                (json_tokens - toon_tokens) / json_tokens if json_tokens > 0 else 0
-            )
+            savings = (json_tokens - toon_tokens) / json_tokens if json_tokens > 0 else 0
 
             # Only use TOON if savings meet threshold
             if savings >= self.config.token_savings_threshold:

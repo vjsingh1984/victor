@@ -33,11 +33,7 @@ def _tool_result_matches_checkpoint(
     tool_call = getattr(checkpoint, "triggering_tool_call", None) or {}
     checkpoint_tool_name = str(tool_call.get("name") or "")
     result_tool_name = str(result.get("name") or "")
-    if (
-        checkpoint_tool_name
-        and result_tool_name
-        and checkpoint_tool_name != result_tool_name
-    ):
+    if checkpoint_tool_name and result_tool_name and checkpoint_tool_name != result_tool_name:
         return False
 
     checkpoint_tool_call_id = tool_call.get("id")
@@ -54,17 +50,13 @@ class ToolExecutionRuntime:
     def __init__(self, runtime_host: Any) -> None:
         self._runtime = runtime_host
 
-    async def execute_tool_calls(
-        self, tool_calls: List[Dict[str, Any]]
-    ) -> List[Dict[str, Any]]:
+    async def execute_tool_calls(self, tool_calls: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Execute tool calls and post-process results through the canonical services."""
         runtime = self._runtime
         if not tool_calls:
             return []
 
-        tool_calls = [
-            tool_call for tool_call in tool_calls if isinstance(tool_call, dict)
-        ]
+        tool_calls = [tool_call for tool_call in tool_calls if isinstance(tool_call, dict)]
         if not tool_calls:
             return []
 
@@ -114,9 +106,7 @@ class ToolExecutionRuntime:
         runtime._asking_input_prompts = ctx.asking_input_prompts
         return results
 
-    def format_tool_output(
-        self, tool_name: str, args: Dict[str, Any], output: Any
-    ) -> str:
+    def format_tool_output(self, tool_name: str, args: Dict[str, Any], output: Any) -> str:
         """Format tool output with provider/context-aware boundaries."""
         runtime = self._runtime
         controller = getattr(runtime, "_conversation_controller", None)
@@ -185,9 +175,7 @@ class ToolExecutionRuntime:
         return None
 
     @staticmethod
-    async def _save_conversation_checkpoint(
-        runtime: Any, tool_name: str
-    ) -> Optional[str]:
+    async def _save_conversation_checkpoint(runtime: Any, tool_name: str) -> Optional[str]:
         save_checkpoint = getattr(runtime, "save_checkpoint", None)
         if not callable(save_checkpoint):
             session_service = getattr(runtime, "_session_service", None)
@@ -208,9 +196,7 @@ class ToolExecutionRuntime:
             return None
 
     @staticmethod
-    async def _create_filesystem_checkpoint(
-        runtime: Any, tool_name: str
-    ) -> Optional[str]:
+    async def _create_filesystem_checkpoint(runtime: Any, tool_name: str) -> Optional[str]:
         checkpoint_owner = (
             getattr(runtime, "git_checkpoint_manager", None)
             or getattr(runtime, "_git_checkpoint_manager", None)
@@ -317,9 +303,7 @@ class ToolExecutionRuntime:
             estimated_output_tokens,
         )
         if lifecycle_decision is not None:
-            self._record_compaction_decision(
-                runtime, lifecycle_decision, estimated_output_tokens
-            )
+            self._record_compaction_decision(runtime, lifecycle_decision, estimated_output_tokens)
             return
 
         context_service = getattr(runtime, "_context_service", None)
@@ -436,9 +420,7 @@ class ToolExecutionRuntime:
                 )
             else:
                 stream_ctx.compaction_occurred = True
-                stream_ctx.last_compaction_turn = getattr(
-                    stream_ctx, "total_iterations", 0
-                )
+                stream_ctx.last_compaction_turn = getattr(stream_ctx, "total_iterations", 0)
                 stream_ctx.compaction_message_removed_count = removed
                 stream_ctx.compaction_summary = compaction_summary
 
@@ -470,9 +452,7 @@ class ToolExecutionRuntime:
             try:
                 return list(get_messages() or [])
             except Exception as exc:
-                logger.debug(
-                    "Failed to collect runtime messages for lifecycle: %s", exc
-                )
+                logger.debug("Failed to collect runtime messages for lifecycle: %s", exc)
         controller = getattr(runtime, "_conversation_controller", None)
         messages = getattr(controller, "messages", None)
         return list(messages or [])
@@ -481,9 +461,7 @@ class ToolExecutionRuntime:
     def _resolve_provider_name(runtime: Any) -> str:
         """Resolve the active provider identifier for context-service policy decisions."""
         provider = getattr(runtime, "provider", None)
-        return str(
-            getattr(provider, "name", getattr(runtime, "provider_name", "")) or ""
-        )
+        return str(getattr(provider, "name", getattr(runtime, "provider_name", "")) or "")
 
     @staticmethod
     def _iter_pipeline_results(pipeline_result: Any) -> List[Any]:
@@ -610,8 +588,7 @@ class ToolExecutionRuntime:
         missing_ids = [
             tool_call_id
             for tool_call_id in expected_by_id
-            if tool_call_id not in observed_result_ids
-            and tool_call_id not in message_by_id
+            if tool_call_id not in observed_result_ids and tool_call_id not in message_by_id
         ]
         if missing_ids:
             logger.error(
@@ -679,10 +656,7 @@ class ToolExecutionRuntime:
             )
 
         for tool_call_id, message in message_by_id.items():
-            if (
-                tool_call_id in observed_result_ids
-                or tool_call_id not in expected_by_id
-            ):
+            if tool_call_id in observed_result_ids or tool_call_id not in expected_by_id:
                 continue
             message_content = getattr(message, "content", "")
             results.append(

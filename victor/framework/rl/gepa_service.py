@@ -34,9 +34,7 @@ class _BackgroundLoop:
 
     def __init__(self) -> None:
         self._loop: asyncio.AbstractEventLoop = asyncio.new_event_loop()
-        self._thread = threading.Thread(
-            target=self._run, daemon=True, name="gepa-event-loop"
-        )
+        self._thread = threading.Thread(target=self._run, daemon=True, name="gepa-event-loop")
         self._thread.start()
 
     def _run(self) -> None:
@@ -115,9 +113,7 @@ Create a merged version that preserves the strengths of both. Requirements:
 class GEPAServiceProtocol(Protocol):
     """Protocol for GEPA reflection and mutation LLM calls."""
 
-    def reflect(
-        self, traces_summary: str, section_name: str, current_text: str
-    ) -> str: ...
+    def reflect(self, traces_summary: str, section_name: str, current_text: str) -> str: ...
 
     def mutate(
         self,
@@ -275,9 +271,7 @@ class GEPAService:
     def _strip_thinking(content: str) -> str:
         """Strip <think> blocks and 'Thinking Process:' preamble."""
         if "<think>" in content:
-            content = re.sub(
-                r"<think>.*?</think>", "", content, flags=re.DOTALL
-            ).strip()
+            content = re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL).strip()
         if "Thinking Process:" in content:
             parts = re.split(r"\n(?=[A-Z]{3,}[:\s])", content)
             for part in reversed(parts):

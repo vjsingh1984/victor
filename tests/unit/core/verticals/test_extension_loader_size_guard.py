@@ -74,15 +74,9 @@ class TestExtensionLoaderSizeGuard:
             "get_workflow_provider",
         }
         for node in ast.walk(tree):
-            if (
-                isinstance(node, ast.ClassDef)
-                and node.name == "VerticalExtensionLoader"
-            ):
+            if isinstance(node, ast.ClassDef) and node.name == "VerticalExtensionLoader":
                 for method in node.body:
-                    if (
-                        isinstance(method, ast.FunctionDef)
-                        and method.name in DELEGATION_METHODS
-                    ):
+                    if isinstance(method, ast.FunctionDef) and method.name in DELEGATION_METHODS:
                         body_lines = method.end_lineno - method.lineno
                         assert body_lines <= 6, (
                             f"{method.name}() has {body_lines} body lines (max 6). "

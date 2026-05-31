@@ -86,9 +86,7 @@ def get_global_manager() -> GlobalStateManager:
 
                 # Register all scope managers
                 manager.register_manager(StateScope.WORKFLOW, WorkflowStateManager())
-                manager.register_manager(
-                    StateScope.CONVERSATION, ConversationStateManager()
-                )
+                manager.register_manager(StateScope.CONVERSATION, ConversationStateManager())
                 manager.register_manager(StateScope.TEAM, TeamStateManager())
                 manager.register_manager(StateScope.GLOBAL, GlobalStateManagerImpl())
 
@@ -180,9 +178,7 @@ async def initialize_with_existing(
             conv_mgr = manager.get_manager(StateScope.CONVERSATION)
             if conv_mgr:
                 await conv_mgr.update(conversation_state)
-                logger.info(
-                    f"Imported {len(conversation_state)} keys to conversation scope"
-                )
+                logger.info(f"Imported {len(conversation_state)} keys to conversation scope")
         except Exception as e:
             logger.error(f"Failed to import conversation state: {e}")
             raise

@@ -330,9 +330,7 @@ class WorkflowGraph(Generic[S]):
             description: Optional workflow description
         """
         self.state_type = state_type
-        self.name = (
-            name or state_type.__name__.replace("State", "").lower() + "_workflow"
-        )
+        self.name = name or state_type.__name__.replace("State", "").lower() + "_workflow"
         self.description = description
 
         self._nodes: Dict[str, GraphNode[S]] = {}
@@ -512,9 +510,7 @@ class WorkflowGraph(Generic[S]):
             routes["__default__"] = default
 
         self._conditional_edges[from_node] = (router, routes)
-        logger.debug(
-            f"Added conditional edges from '{from_node}': {list(routes.keys())}"
-        )
+        logger.debug(f"Added conditional edges from '{from_node}': {list(routes.keys())}")
         return self
 
     def set_entry_point(self, node: str) -> "WorkflowGraph[S]":
@@ -728,9 +724,7 @@ class WorkflowGraph(Generic[S]):
         for from_node, targets in self._edges.items():
             for target in targets:
                 if target != self.END and target not in self._nodes:
-                    errors.append(
-                        f"Edge from '{from_node}' to non-existent node '{target}'"
-                    )
+                    errors.append(f"Edge from '{from_node}' to non-existent node '{target}'")
 
         return errors
 
@@ -800,9 +794,7 @@ class WorkflowGraph(Generic[S]):
                 condition_node = ConditionNode(
                     id=from_node,
                     name=original.name,
-                    condition=lambda ctx, r=router, st=self.state_type: r(
-                        st.from_dict(ctx)
-                    ),
+                    condition=lambda ctx, r=router, st=self.state_type: r(st.from_dict(ctx)),
                     branches={k: v for k, v in routes.items() if v != self.END},
                     next_nodes=[],  # Conditions use branches, not next_nodes
                 )
@@ -910,9 +902,7 @@ def create_graph(
     return WorkflowGraph(state_type, name=name, description=description)
 
 
-def compile_graph(
-    graph: WorkflowGraph[S], name: Optional[str] = None
-) -> WorkflowDefinition:
+def compile_graph(graph: WorkflowGraph[S], name: Optional[str] = None) -> WorkflowDefinition:
     """Compile a state graph to workflow definition.
 
     Args:

@@ -207,9 +207,7 @@ class ContextLifecycleService:
         """Build a bounded child-to-parent handoff payload."""
         payload = runtime_context.identity_metadata()
         payload["status"] = status
-        payload["summary"] = self._bounded_summary(
-            summary, max_summary_chars=max_summary_chars
-        )
+        payload["summary"] = self._bounded_summary(summary, max_summary_chars=max_summary_chars)
         payload.update(dict(metadata or {}))
         return payload
 
@@ -224,9 +222,7 @@ class ContextLifecycleService:
         for message in messages:
             payload = self._normalize_message(message)
             metadata = dict(payload.get("metadata") or {})
-            metadata.update(
-                {key: value for key, value in identity.items() if value is not None}
-            )
+            metadata.update({key: value for key, value in identity.items() if value is not None})
             payload["metadata"] = metadata
             service.add_message(payload)
 
@@ -281,9 +277,7 @@ class ContextLifecycleService:
             for message in messages_before
             if id(message) not in retained_ids
         ]
-        retained_messages = [
-            self._normalize_message(message) for message in messages_after
-        ]
+        retained_messages = [self._normalize_message(message) for message in messages_after]
         if self._compaction_summarizer is not None:
             summarize = getattr(self._compaction_summarizer, "summarize", None)
             if callable(summarize):
@@ -297,9 +291,7 @@ class ContextLifecycleService:
                     summary = await summary
                 if summary:
                     return str(summary)
-        return self._deterministic_summary(
-            runtime_context, removed_messages, reason=reason
-        )
+        return self._deterministic_summary(runtime_context, removed_messages, reason=reason)
 
     @staticmethod
     def _deterministic_summary(
@@ -329,9 +321,7 @@ class ContextLifecycleService:
         count = len(removed_messages)
         parts = [f"{count} messages compacted for {runtime_context.display_name}"]
         if role_counts:
-            role_summary = ", ".join(
-                f"{role}={role_counts[role]}" for role in sorted(role_counts)
-            )
+            role_summary = ", ".join(f"{role}={role_counts[role]}" for role in sorted(role_counts))
             parts.append(f"roles: {role_summary}")
         if topics:
             parts.append(f"topics: {', '.join(topics[:5])}")

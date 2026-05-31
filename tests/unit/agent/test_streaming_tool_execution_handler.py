@@ -50,9 +50,7 @@ async def test_execute_tools_invokes_callback_without_signature_collision():
     )
     chunk_generator = SimpleNamespace(
         generate_tool_start_chunk=MagicMock(return_value=StreamChunk(content="start")),
-        generate_tool_result_chunks=MagicMock(
-            return_value=[StreamChunk(content="done")]
-        ),
+        generate_tool_result_chunks=MagicMock(return_value=[StreamChunk(content="done")]),
     )
     reminder_manager = SimpleNamespace(
         update_state=MagicMock(),
@@ -84,9 +82,7 @@ async def test_execute_tools_invokes_callback_without_signature_collision():
     )
 
     stream_ctx = StreamingChatContext(user_message="Run the read tool")
-    tool_calls = [
-        {"name": "read", "arguments": {"path": "victor/agent/orchestrator.py"}}
-    ]
+    tool_calls = [{"name": "read", "arguments": {"path": "victor/agent/orchestrator.py"}}]
 
     result = await handler.execute_tools(
         stream_ctx=stream_ctx,
@@ -117,9 +113,7 @@ async def test_execute_tools_streaming_yields_tool_start_before_callback_awaits(
     )
     chunk_generator = SimpleNamespace(
         generate_tool_start_chunk=MagicMock(return_value=StreamChunk(content="start")),
-        generate_tool_result_chunks=MagicMock(
-            return_value=[StreamChunk(content="done")]
-        ),
+        generate_tool_result_chunks=MagicMock(return_value=[StreamChunk(content="done")]),
     )
     reminder_manager = SimpleNamespace(
         update_state=MagicMock(),
@@ -245,9 +239,7 @@ async def test_execute_tools_marks_system_reminders_as_noninteractive_history():
     )
     chunk_generator = SimpleNamespace(
         generate_tool_start_chunk=MagicMock(return_value=StreamChunk(content="start")),
-        generate_tool_result_chunks=MagicMock(
-            return_value=[StreamChunk(content="done")]
-        ),
+        generate_tool_result_chunks=MagicMock(return_value=[StreamChunk(content="done")]),
     )
     message_adder = SimpleNamespace(add_message=MagicMock())
     reminder_manager = SimpleNamespace(
@@ -280,9 +272,7 @@ async def test_execute_tools_marks_system_reminders_as_noninteractive_history():
     )
 
     stream_ctx = StreamingChatContext(user_message="Run the read tool")
-    tool_calls = [
-        {"name": "read", "arguments": {"path": "victor/agent/orchestrator.py"}}
-    ]
+    tool_calls = [{"name": "read", "arguments": {"path": "victor/agent/orchestrator.py"}}]
 
     await handler.execute_tools(
         stream_ctx=stream_ctx,
@@ -314,9 +304,7 @@ async def test_execute_tools_forces_completion_after_terminal_skips():
     )
     chunk_generator = SimpleNamespace(
         generate_tool_start_chunk=MagicMock(return_value=StreamChunk(content="start")),
-        generate_tool_result_chunks=MagicMock(
-            return_value=[StreamChunk(content="blocked")]
-        ),
+        generate_tool_result_chunks=MagicMock(return_value=[StreamChunk(content="blocked")]),
     )
     message_adder = SimpleNamespace(add_message=MagicMock())
     reminder_manager = SimpleNamespace(
@@ -359,9 +347,7 @@ async def test_execute_tools_forces_completion_after_terminal_skips():
 
     await handler.execute_tools(
         stream_ctx=stream_ctx,
-        tool_calls=[
-            {"name": "read", "arguments": {"path": "victor/agent/orchestrator.py"}}
-        ],
+        tool_calls=[{"name": "read", "arguments": {"path": "victor/agent/orchestrator.py"}}],
         user_message="Run the read tool",
         full_content="read the file",
         tool_calls_used=0,
@@ -470,9 +456,7 @@ async def test_execute_tools_records_shell_alias_canonically():
     )
     chunk_generator = SimpleNamespace(
         generate_tool_start_chunk=MagicMock(return_value=StreamChunk(content="start")),
-        generate_tool_result_chunks=MagicMock(
-            return_value=[StreamChunk(content="done")]
-        ),
+        generate_tool_result_chunks=MagicMock(return_value=[StreamChunk(content="done")]),
     )
     reminder_manager = SimpleNamespace(
         update_state=MagicMock(),
@@ -507,9 +491,7 @@ async def test_execute_tools_records_shell_alias_canonically():
 
     await handler.execute_tools(
         stream_ctx=stream_ctx,
-        tool_calls=[
-            {"name": "bash", "arguments": {"cmd": 'sqlite3 data.db ".tables"'}}
-        ],
+        tool_calls=[{"name": "bash", "arguments": {"cmd": 'sqlite3 data.db ".tables"'}}],
         user_message="Run bash",
         full_content="inspect the db",
         tool_calls_used=0,
@@ -542,9 +524,7 @@ async def test_execute_tools_persists_skipped_responses_for_truncated_calls():
     )
     chunk_generator = SimpleNamespace(
         generate_tool_start_chunk=MagicMock(return_value=StreamChunk(content="start")),
-        generate_tool_result_chunks=MagicMock(
-            return_value=[StreamChunk(content="done")]
-        ),
+        generate_tool_result_chunks=MagicMock(return_value=[StreamChunk(content="done")]),
     )
     message_adder = SimpleNamespace(add_message=MagicMock())
     reminder_manager = SimpleNamespace(
@@ -616,14 +596,8 @@ async def test_execute_tools_persists_skipped_responses_for_truncated_calls():
         tool_call_id="call_2",
         persist_synchronously=True,
     )
-    assert any(
-        tool_result.get("tool_call_id") == "call_2"
-        for tool_result in result.tool_results
-    )
-    assert any(
-        tool_result.get("tool_call_id") == "call_1"
-        for tool_result in result.tool_results
-    )
+    assert any(tool_result.get("tool_call_id") == "call_2" for tool_result in result.tool_results)
+    assert any(tool_result.get("tool_call_id") == "call_1" for tool_result in result.tool_results)
 
 
 @pytest.mark.asyncio
@@ -696,14 +670,8 @@ async def test_execute_tools_budget_exhaustion_emits_fallback_and_synthetic_tool
             "increase the tool budget if more tool work is required.\n"
         ),
     ]
-    assert any(
-        tool_result.get("tool_call_id") == "call_1"
-        for tool_result in result.tool_results
-    )
-    assert any(
-        tool_result.get("tool_call_id") == "call_2"
-        for tool_result in result.tool_results
-    )
+    assert any(tool_result.get("tool_call_id") == "call_1" for tool_result in result.tool_results)
+    assert any(tool_result.get("tool_call_id") == "call_2" for tool_result in result.tool_results)
     assert message_adder.add_message.call_count == 2
 
 
@@ -724,9 +692,7 @@ async def test_execute_tools_grants_progress_based_budget_relief_from_current_tr
     )
     chunk_generator = SimpleNamespace(
         generate_tool_start_chunk=MagicMock(return_value=StreamChunk(content="start")),
-        generate_tool_result_chunks=MagicMock(
-            return_value=[StreamChunk(content="done")]
-        ),
+        generate_tool_result_chunks=MagicMock(return_value=[StreamChunk(content="done")]),
     )
     execute_tool_calls = AsyncMock(
         return_value=[
@@ -748,9 +714,7 @@ async def test_execute_tools_grants_progress_based_budget_relief_from_current_tr
             update_state=MagicMock(),
             get_consolidated_reminder=MagicMock(return_value=None),
         ),
-        unified_tracker=SimpleNamespace(
-            unique_resources={"graph.py", "builder.py", "state.py"}
-        ),
+        unified_tracker=SimpleNamespace(unique_resources={"graph.py", "builder.py", "state.py"}),
         settings=SimpleNamespace(
             tool_call_budget_warning_threshold=250,
             tool_call_budget_warning_pct=0.8,

@@ -28,9 +28,7 @@ class FakeStreamChunk:
 
 
 class FakeProvider:
-    def __init__(
-        self, *, stream_chunks: List[FakeStreamChunk], supports_tools: bool = True
-    ):
+    def __init__(self, *, stream_chunks: List[FakeStreamChunk], supports_tools: bool = True):
         self._stream_chunks = stream_chunks
         self._supports_tools = supports_tools
         self.called_chat = False
@@ -105,9 +103,7 @@ def _make_orchestrator(provider: FakeProvider) -> AgentOrchestrator:
     settings.load_tool_config = lambda: {}
 
     with patch("victor.core.bootstrap_services.bootstrap_new_services"):
-        orchestrator = AgentOrchestrator(
-            settings=settings, provider=provider, model="fake"
-        )
+        orchestrator = AgentOrchestrator(settings=settings, provider=provider, model="fake")
 
     def _detect_task_type(_: str) -> TrackerTaskType:
         orchestrator.unified_tracker.set_task_type(TrackerTaskType.GENERAL)

@@ -43,10 +43,7 @@ def test_worktree_planner_builds_assignments_and_manager_last_merge_order():
         "docs/reference",
     )
     assert plan.merge_order[-1] == "lead"
-    assert (
-        plan.assignment_for("lead").to_context_overrides()["isolation_mode"]
-        == "worktree"
-    )
+    assert plan.assignment_for("lead").to_context_overrides()["isolation_mode"] == "worktree"
 
 
 def _init_git_repo(path: Path) -> None:
@@ -65,17 +62,11 @@ def _init_git_repo(path: Path) -> None:
         capture_output=True,
     )
     (path / "README.md").write_text("seed\n")
-    subprocess.run(
-        ["git", "add", "README.md"], cwd=path, check=True, capture_output=True
-    )
-    subprocess.run(
-        ["git", "commit", "-m", "init"], cwd=path, check=True, capture_output=True
-    )
+    subprocess.run(["git", "add", "README.md"], cwd=path, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "init"], cwd=path, check=True, capture_output=True)
 
 
-def _write_and_commit(
-    worktree_path: Path, relative_path: str, content: str, message: str
-) -> None:
+def _write_and_commit(worktree_path: Path, relative_path: str, content: str, message: str) -> None:
     target = worktree_path / relative_path
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(content)

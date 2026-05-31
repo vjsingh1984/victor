@@ -16,9 +16,7 @@ class TaskGuidanceRuntime:
     def __init__(self, runtime_host: Any) -> None:
         self._runtime = runtime_host
 
-    def prepare_task(
-        self, user_message: str, unified_task_type: Any
-    ) -> tuple[Any, int]:
+    def prepare_task(self, user_message: str, unified_task_type: Any) -> tuple[Any, int]:
         """Prepare task-specific guidance and budget adjustments."""
         runtime = self._runtime
         task_coordinator = runtime.task_coordinator
@@ -34,9 +32,7 @@ class TaskGuidanceRuntime:
         """Detect intent and sync the result back to runtime state."""
         runtime = self._runtime
         task_coordinator = runtime.task_coordinator
-        task_coordinator.apply_intent_guard(
-            user_message, runtime.conversation_controller
-        )
+        task_coordinator.apply_intent_guard(user_message, runtime.conversation_controller)
         runtime._current_intent = task_coordinator.current_intent
         runtime._current_user_message = user_message
 

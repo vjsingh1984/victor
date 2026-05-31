@@ -56,18 +56,9 @@ def simulate_workload(num_tasks: int = 100):
         *[(("debug", "debug error", 8, 0.5, 70, "debug")) for _ in range(10)],
         *[(("refactor", "refactor module", 6, 0.5, 60, "refactor")) for _ in range(5)],
         # 25% complex tasks (design, analysis_deep, test)
-        *[
-            (("design", "design architecture", 15, 0.8, 150, "code_generation"))
-            for _ in range(15)
-        ],
-        *[
-            (("analysis_deep", "analyze performance", 12, 0.7, 120, "analysis"))
-            for _ in range(7)
-        ],
-        *[
-            (("test", "write comprehensive tests", 10, 0.6, 100, "test"))
-            for _ in range(3)
-        ],
+        *[(("design", "design architecture", 15, 0.8, 150, "code_generation")) for _ in range(15)],
+        *[(("analysis_deep", "analyze performance", 12, 0.7, 120, "analysis")) for _ in range(7)],
+        *[(("test", "write comprehensive tests", 10, 0.6, 100, "test")) for _ in range(3)],
     ]
 
     # Take only num_tasks
@@ -158,9 +149,7 @@ def simulate_workload(num_tasks: int = 100):
     direct_paradigm_percentage = (direct_paradigm_count / total_tasks) * 100
 
     if total_original_lines > 0:
-        token_reduction = (
-            (total_original_lines - total_pruned_lines) / total_original_lines
-        ) * 100
+        token_reduction = ((total_original_lines - total_pruned_lines) / total_original_lines) * 100
     else:
         token_reduction = 0.0
 
@@ -175,18 +164,14 @@ def simulate_workload(num_tasks: int = 100):
     print(f"  Original lines: {total_original_lines}")
     print(f"  Pruned lines: {total_pruned_lines}")
     print(f"  Reduction: {token_reduction:.1f}%")
-    print(
-        f"  Target: ≥40% | Status: {'✅ PASS' if token_reduction >= 40 else '❌ FAIL'}"
-    )
+    print(f"  Target: ≥40% | Status: {'✅ PASS' if token_reduction >= 40 else '❌ FAIL'}")
     print("")
 
     print("Fast-Path Execution:")
     print(f"  Fast-path tasks: {fast_path_count}/{total_tasks}")
     print(f"  Fast-path rate: {fast_path_percentage:.1f}%")
     print(f"  Gate decisions: {gate_stats['total_decisions']}")
-    print(
-        f"  Target: ≥30% | Status: {'✅ PASS' if fast_path_percentage >= 30 else '❌ FAIL'}"
-    )
+    print(f"  Target: ≥30% | Status: {'✅ PASS' if fast_path_percentage >= 30 else '❌ FAIL'}")
     print("")
 
     print("Small Model Usage:")
@@ -194,9 +179,7 @@ def simulate_workload(num_tasks: int = 100):
     print(f"  Small model rate: {small_model_percentage:.1f}%")
     print(f"  Direct paradigm: {direct_paradigm_percentage:.1f}%")
     print(f"  Total routings: {router_stats['total_routings']}")
-    print(
-        f"  Target: ≥40% | Status: {'✅ PASS' if small_model_percentage >= 40 else '❌ FAIL'}"
-    )
+    print(f"  Target: ≥40% | Status: {'✅ PASS' if small_model_percentage >= 40 else '❌ FAIL'}")
     print("")
 
     print("Component Statistics:")
@@ -208,11 +191,7 @@ def simulate_workload(num_tasks: int = 100):
     print("")
 
     # Overall validation
-    all_pass = (
-        token_reduction >= 40
-        and fast_path_percentage >= 30
-        and small_model_percentage >= 40
-    )
+    all_pass = token_reduction >= 40 and fast_path_percentage >= 30 and small_model_percentage >= 40
 
     print(f"{'='*80}")
     if all_pass:

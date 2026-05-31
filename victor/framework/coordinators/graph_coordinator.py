@@ -97,9 +97,7 @@ class GraphTurnExecutor:
         self._runner_registry = registry
         self._unified_compilers = {}
 
-    def _get_unified_compiler(
-        self, *, use_node_runners: bool
-    ) -> "UnifiedWorkflowCompiler":
+    def _get_unified_compiler(self, *, use_node_runners: bool) -> "UnifiedWorkflowCompiler":
         """Get or create a canonical unified compiler for graph execution."""
         compiler = self._unified_compilers.get(use_node_runners)
         if compiler is None:
@@ -163,9 +161,7 @@ class GraphTurnExecutor:
                     nodes_executed
                     if nodes_executed
                     else (
-                        list(graph._execution_order)
-                        if hasattr(graph, "_execution_order")
-                        else []
+                        list(graph._execution_order) if hasattr(graph, "_execution_order") else []
                     )
                 ),
                 duration_seconds=duration,

@@ -82,10 +82,7 @@ class TestPluginManifest:
         }
         with pytest.raises(ManifestValidationError) as exc:
             PluginManifest.from_dict(data)
-        assert any(
-            "invalid" in e.lower() or "permission" in e.lower()
-            for e in exc.value.errors
-        )
+        assert any("invalid" in e.lower() or "permission" in e.lower() for e in exc.value.errors)
 
     def test_valid_permissions(self):
         data = {

@@ -136,9 +136,7 @@ def clear_vertical_integration_pipeline_cache() -> None:
     if callable(clear_fn):
         clear_fn()
     else:
-        logger.debug(
-            "Shared pipeline does not expose clear_cache(); skipping cache clear"
-        )
+        logger.debug("Shared pipeline does not expose clear_cache(); skipping cache clear")
 
 
 __all__ = [

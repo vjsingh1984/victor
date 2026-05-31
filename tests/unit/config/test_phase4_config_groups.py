@@ -55,9 +55,7 @@ class TestRecoverySettings:
         assert settings.recovery_empty_response_threshold == 1
 
         # Invalid threshold (zero)
-        with pytest.raises(
-            ValueError, match="recovery_empty_response_threshold must be >= 1"
-        ):
+        with pytest.raises(ValueError, match="recovery_empty_response_threshold must be >= 1"):
             RecoverySettings(recovery_empty_response_threshold=0)
 
     def test_blocked_consecutive_threshold_validation(self):
@@ -67,9 +65,7 @@ class TestRecoverySettings:
         assert settings.recovery_blocked_consecutive_threshold == 1
 
         # Invalid threshold (zero)
-        with pytest.raises(
-            ValueError, match="recovery_blocked_consecutive_threshold must be >= 1"
-        ):
+        with pytest.raises(ValueError, match="recovery_blocked_consecutive_threshold must be >= 1"):
             RecoverySettings(recovery_blocked_consecutive_threshold=0)
 
     def test_blocked_total_threshold_validation(self):
@@ -82,9 +78,7 @@ class TestRecoverySettings:
         assert settings.recovery_blocked_total_threshold == 1
 
         # Invalid threshold (zero)
-        with pytest.raises(
-            ValueError, match="recovery_blocked_total_threshold must be >= 1"
-        ):
+        with pytest.raises(ValueError, match="recovery_blocked_total_threshold must be >= 1"):
             RecoverySettings(recovery_blocked_total_threshold=0)
 
     def test_blocked_total_threshold_must_not_be_lower_than_consecutive(self):
@@ -141,15 +135,11 @@ class TestAnalyticsSettings:
         assert settings.streaming_metrics_history_size == 10000
 
         # Invalid history size (zero)
-        with pytest.raises(
-            ValueError, match="streaming_metrics_history_size must be >= 1"
-        ):
+        with pytest.raises(ValueError, match="streaming_metrics_history_size must be >= 1"):
             AnalyticsSettings(streaming_metrics_history_size=0)
 
         # Invalid history size (too large)
-        with pytest.raises(
-            ValueError, match="streaming_metrics_history_size must be <= 10000"
-        ):
+        with pytest.raises(ValueError, match="streaming_metrics_history_size must be <= 10000"):
             AnalyticsSettings(streaming_metrics_history_size=10001)
 
 
@@ -249,13 +239,8 @@ class TestPhase4ConfigGroupsIntegration:
         assert isinstance(settings.network, NetworkSettings)
 
         # NOTE: Flat access removed - use nested access only
-        assert (
-            settings.network.tool_retry_enabled == settings.network.tool_retry_enabled
-        )
-        assert (
-            settings.network.tool_retry_max_attempts
-            == settings.network.tool_retry_max_attempts
-        )
+        assert settings.network.tool_retry_enabled == settings.network.tool_retry_enabled
+        assert settings.network.tool_retry_max_attempts == settings.network.tool_retry_max_attempts
 
     def test_flat_field_overrides_sync_to_nested_groups(self):
         """Test that nested initialization works correctly."""

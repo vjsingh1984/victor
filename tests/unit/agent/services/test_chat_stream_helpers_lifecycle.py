@@ -40,14 +40,10 @@ async def test_pre_iteration_uses_context_lifecycle_before_legacy_compactor():
         ),
         tool_calls_used=0,
     )
-    stream_ctx = StreamingChatContext(
-        user_message="investigate runtime", total_iterations=1
-    )
+    stream_ctx = StreamingChatContext(user_message="investigate runtime", total_iterations=1)
     helper = _Helper(orch)
 
-    chunks = [
-        chunk async for chunk in helper._run_iteration_pre_checks(stream_ctx, "hello")
-    ]
+    chunks = [chunk async for chunk in helper._run_iteration_pre_checks(stream_ctx, "hello")]
 
     assert chunks == []
     lifecycle.after_agent_turn.assert_awaited_once()
@@ -86,14 +82,10 @@ async def test_pre_iteration_uses_context_service_before_legacy_compactor():
         ),
         tool_calls_used=0,
     )
-    stream_ctx = StreamingChatContext(
-        user_message="investigate runtime", total_iterations=1
-    )
+    stream_ctx = StreamingChatContext(user_message="investigate runtime", total_iterations=1)
     helper = _Helper(orch)
 
-    chunks = [
-        chunk async for chunk in helper._run_iteration_pre_checks(stream_ctx, "hello")
-    ]
+    chunks = [chunk async for chunk in helper._run_iteration_pre_checks(stream_ctx, "hello")]
 
     assert chunks == []
     context_service.get_compaction_recommendation.assert_called_once()

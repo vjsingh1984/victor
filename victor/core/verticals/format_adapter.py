@@ -109,9 +109,7 @@ class VerticalFormatAdapter:
                 temperature=getattr(mode_config, "temperature", 0.7),
                 description=getattr(mode_config, "description", ""),
                 allowed_stages=getattr(mode_config, "allowed_stages", None),
-                exploration_multiplier=getattr(
-                    mode_config, "exploration_multiplier", 1.0
-                ),
+                exploration_multiplier=getattr(mode_config, "exploration_multiplier", 1.0),
             )
 
         raise ValueError(f"Cannot normalize mode config of type {type(mode_config)}")

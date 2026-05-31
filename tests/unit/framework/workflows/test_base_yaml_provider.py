@@ -100,9 +100,7 @@ def yaml_workflow_file(sample_yaml_content: str, tmp_path: Path) -> Path:
 
 
 @pytest.fixture
-def test_provider(
-    tmp_path: Path, yaml_workflow_file: Path
-) -> "ConcreteYAMLWorkflowProvider":
+def test_provider(tmp_path: Path, yaml_workflow_file: Path) -> "ConcreteYAMLWorkflowProvider":
     """Create a test provider with a temporary workflow directory."""
     return ConcreteYAMLWorkflowProvider(workflows_dir=tmp_path)
 
@@ -173,9 +171,7 @@ class TestCompileWorkflow:
                 compiled = test_provider.provider.compile_workflow("test_workflow")
                 assert isinstance(compiled, CachedCompiledGraph)
 
-    def test_compile_workflow_has_workflow_name(
-        self, test_provider, yaml_workflow_file
-    ):
+    def test_compile_workflow_has_workflow_name(self, test_provider, yaml_workflow_file):
         """Test that compiled workflow has correct workflow_name."""
         with patch.object(
             test_provider.provider,
@@ -188,9 +184,7 @@ class TestCompileWorkflow:
                 compiled = test_provider.provider.compile_workflow("test_workflow")
                 assert compiled.workflow_name == "test_workflow"
 
-    def test_compile_workflow_raises_for_unknown_workflow(
-        self, test_provider, tmp_path
-    ):
+    def test_compile_workflow_raises_for_unknown_workflow(self, test_provider, tmp_path):
         """Test that compile_workflow raises ValueError for unknown workflow."""
         with pytest.raises(ValueError, match="Workflow not found"):
             test_provider.provider.compile_workflow("nonexistent_workflow")

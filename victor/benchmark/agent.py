@@ -89,9 +89,7 @@ class BenchmarkAgentConfig:
     enable_thinking: bool = True
     enable_observability: bool = True
     # Workflow execution options
-    use_workflow: bool = (
-        False  # If True, use YAML workflow instead of direct Agent.run()
-    )
+    use_workflow: bool = False  # If True, use YAML workflow instead of direct Agent.run()
     workflow_name: Optional[str] = None  # Workflow to use (auto-detected if None)
 
 
@@ -189,9 +187,7 @@ class ExecutionTrace:
         if self.compaction_messages_removed:
             metadata["compaction_messages_removed"] = self.compaction_messages_removed
         if self.time_to_first_tool_call_seconds is not None:
-            metadata["time_to_first_tool_call_seconds"] = (
-                self.time_to_first_tool_call_seconds
-            )
+            metadata["time_to_first_tool_call_seconds"] = self.time_to_first_tool_call_seconds
         if self.time_to_first_edit_seconds is not None:
             metadata["time_to_first_edit_seconds"] = self.time_to_first_edit_seconds
         if self.first_edit_tool_name:
@@ -359,9 +355,7 @@ class BenchmarkAgent:
             framework_task = benchmark_task_to_framework_task(task)
 
             # Build enriched prompt
-            prompt = build_benchmark_prompt(
-                task, str(workspace_path) if workspace_path else None
-            )
+            prompt = build_benchmark_prompt(task, str(workspace_path) if workspace_path else None)
 
             # Execute with timeout
             try:
@@ -487,9 +481,7 @@ class BenchmarkAgent:
                     trace.success = test_results.get("pass_rate", 0) >= 0.95
 
             except asyncio.TimeoutError:
-                trace.error = (
-                    f"Workflow timed out after {self._config.timeout_per_task}s"
-                )
+                trace.error = f"Workflow timed out after {self._config.timeout_per_task}s"
                 trace.success = False
                 logger.warning(f"Task {task.task_id} workflow timed out")
 
@@ -651,9 +643,7 @@ class BenchmarkAgent:
     ) -> None:
         """Project framework task-result metadata into benchmark trace fields."""
         task_report = (
-            metadata.get("task_report")
-            if isinstance(metadata.get("task_report"), dict)
-            else {}
+            metadata.get("task_report") if isinstance(metadata.get("task_report"), dict) else {}
         )
         usage = metadata.get("usage") if isinstance(metadata.get("usage"), dict) else {}
         prompt_details = (
@@ -767,9 +757,7 @@ class BenchmarkAgent:
         normalized_name = str(tool_name or "unknown")
         trace.tool_calls.append({"name": normalized_name, "timestamp": event_time})
         if trace.time_to_first_tool_call_seconds is None:
-            trace.time_to_first_tool_call_seconds = max(
-                0.0, event_time - trace.start_time
-            )
+            trace.time_to_first_tool_call_seconds = max(0.0, event_time - trace.start_time)
         if (
             trace.time_to_first_edit_seconds is None
             and normalized_name.strip().lower() in _EDIT_TOOL_NAMES

@@ -60,9 +60,7 @@ class TrivialResolver(ConflictResolverProtocol):
 
         return ours_normalized == theirs_normalized
 
-    async def resolve(
-        self, conflict: FileConflict, hunk_index: int
-    ) -> Resolution | None:
+    async def resolve(self, conflict: FileConflict, hunk_index: int) -> Resolution | None:
         """Resolve trivial conflicts by taking the cleaner version."""
         if not await self.can_resolve(conflict, hunk_index):
             return None
@@ -151,9 +149,7 @@ class UnionResolver(ConflictResolverProtocol):
 
         return False
 
-    async def resolve(
-        self, conflict: FileConflict, hunk_index: int
-    ) -> Resolution | None:
+    async def resolve(self, conflict: FileConflict, hunk_index: int) -> Resolution | None:
         """Resolve by combining both changes."""
         if not await self.can_resolve(conflict, hunk_index):
             return None
@@ -255,15 +251,12 @@ class ImportResolver(ConflictResolverProtocol):
             re.match(combined_pattern, line) or not line.strip() for line in ours_lines
         )
         theirs_all_imports = all(
-            re.match(combined_pattern, line) or not line.strip()
-            for line in theirs_lines
+            re.match(combined_pattern, line) or not line.strip() for line in theirs_lines
         )
 
         return ours_all_imports and theirs_all_imports
 
-    async def resolve(
-        self, conflict: FileConflict, hunk_index: int
-    ) -> Resolution | None:
+    async def resolve(self, conflict: FileConflict, hunk_index: int) -> Resolution | None:
         """Resolve import conflicts by combining and sorting."""
         if not await self.can_resolve(conflict, hunk_index):
             return None
@@ -272,9 +265,7 @@ class ImportResolver(ConflictResolverProtocol):
 
         # Combine imports
         ours_imports = {line.strip() for line in hunk.ours.split("\n") if line.strip()}
-        theirs_imports = {
-            line.strip() for line in hunk.theirs.split("\n") if line.strip()
-        }
+        theirs_imports = {line.strip() for line in hunk.theirs.split("\n") if line.strip()}
 
         combined = ours_imports | theirs_imports
 
@@ -330,9 +321,7 @@ class ImportResolver(ConflictResolverProtocol):
 class DefaultMergeAnalyzer(MergeAnalyzerProtocol):
     """Default implementation of merge analysis."""
 
-    async def analyze_conflicts(
-        self, conflicts: list[FileConflict]
-    ) -> ConflictAnalysis:
+    async def analyze_conflicts(self, conflicts: list[FileConflict]) -> ConflictAnalysis:
         """Analyze a set of conflicts."""
         total_hunks = sum(len(c.hunks) for c in conflicts)
 

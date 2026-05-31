@@ -70,12 +70,8 @@ class LiveDisplayRenderer:
         self._in_thinking_mode = False
         self._content_shown_before_pause = ""
         self._tool_section_shown = False  # Track if tool section separator shown
-        self._current_tool_start_time: float | None = (
-            None  # Track tool execution start time
-        )
-        self._current_tool_category: str | None = (
-            None  # Track current tool category for grouping
-        )
+        self._current_tool_start_time: float | None = None  # Track tool execution start time
+        self._current_tool_category: str | None = None  # Track current tool category for grouping
 
     def start(self) -> None:
         """Start the Live display."""
@@ -110,9 +106,7 @@ class LiveDisplayRenderer:
         blocks that contain tool calls).
         """
         if self._pause_count <= 0:
-            logger.debug(
-                "LiveDisplayRenderer: resume() called with no matching pause — ignoring"
-            )
+            logger.debug("LiveDisplayRenderer: resume() called with no matching pause — ignoring")
             return
         self._pause_count -= 1
         if self._pause_count == 0 and self._is_paused:
@@ -284,9 +278,7 @@ class LiveDisplayRenderer:
 
         # Show pruning transparency
         if was_pruned and tool_settings.tool_output_show_transparency:
-            self.console.print(
-                "[dim yellow]! Preview truncated (full output sent to model)[/]"
-            )
+            self.console.print("[dim yellow]! Preview truncated (full output sent to model)[/]")
 
         # Store result for potential expansion
         self._last_tool_result = {
@@ -357,9 +349,7 @@ class LiveDisplayRenderer:
         """
         # Always buffer — cap to prevent unbounded memory growth
         if len(self._content_buffer) + len(text) > self._MAX_CONTENT_BUFFER_SIZE:
-            excess = (
-                len(self._content_buffer) + len(text) - self._MAX_CONTENT_BUFFER_SIZE
-            )
+            excess = len(self._content_buffer) + len(text) - self._MAX_CONTENT_BUFFER_SIZE
             self._content_buffer = self._content_buffer[excess:]
         self._content_buffer += text
 
@@ -476,9 +466,7 @@ class LiveDisplayRenderer:
         if elapsed > 3.0 and int(elapsed) % 2 == 0:  # Every 2 seconds after 3s
             dots = "." * (int(elapsed) % 3 + 1)
             display_name = format_tool_display_name(tool_name)
-            self.console.print(
-                f"[dim]  {display_name} still running{dots} ({elapsed:.1f}s)[/]"
-            )
+            self.console.print(f"[dim]  {display_name} still running{dots} ({elapsed:.1f}s)[/]")
 
     def had_tool_calls(self) -> bool:
         """Return True if at least one tool call was processed this turn."""
@@ -502,9 +490,7 @@ class LiveDisplayRenderer:
             self.console.print(Markdown(unshown))
         elif self._live and self._content_buffer:
             # Live display exists - ensure final update
-            final_content = self._content_buffer[
-                len(self._content_shown_before_pause) :
-            ]
+            final_content = self._content_buffer[len(self._content_shown_before_pause) :]
             if final_content.strip():
                 self._live.update(Markdown(final_content))
                 # Small delay to ensure user sees final content

@@ -117,9 +117,7 @@ class FileLock:
                 # Write PID to lock file for debugging
                 os.write(self._lock_fd, str(current_pid).encode())
 
-                logger.debug(
-                    f"[FileLock] Acquired lock {self.lock_file} (PID: {current_pid})"
-                )
+                logger.debug(f"[FileLock] Acquired lock {self.lock_file} (PID: {current_pid})")
                 return True
 
             except IOError as e:
@@ -131,9 +129,7 @@ class FileLock:
 
                     # Check timeout
                     if time.time() - start_time >= timeout:
-                        logger.warning(
-                            f"[FileLock] Timeout waiting for lock {self.lock_file}"
-                        )
+                        logger.warning(f"[FileLock] Timeout waiting for lock {self.lock_file}")
                         return False
 
                     # Wait a bit and retry
@@ -397,8 +393,7 @@ class IndexLockRegistry:
             idle_paths = [
                 path_str
                 for path_str, stats in self._lock_stats.items()
-                if current_time - stats.get("last_used", stats["created_at"])
-                > max_idle_seconds
+                if current_time - stats.get("last_used", stats["created_at"]) > max_idle_seconds
             ]
 
             # Remove idle locks

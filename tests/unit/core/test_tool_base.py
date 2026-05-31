@@ -30,9 +30,7 @@ class TestToolParameter:
 
     def test_tool_parameter_creation(self):
         """Test creating a ToolParameter."""
-        param = ToolParameter(
-            name="test_param", type="string", description="A test parameter"
-        )
+        param = ToolParameter(name="test_param", type="string", description="A test parameter")
 
         assert param.name == "test_param"
         assert param.type == "string"
@@ -123,12 +121,8 @@ class TestBaseTool:
     def test_convert_parameters_to_schema_basic(self):
         """Test converting parameters to JSON schema."""
         params = [
-            ToolParameter(
-                name="param1", type="string", description="First", required=True
-            ),
-            ToolParameter(
-                name="param2", type="number", description="Second", required=False
-            ),
+            ToolParameter(name="param1", type="string", description="First", required=True),
+            ToolParameter(name="param2", type="number", description="Second", required=False),
         ]
 
         schema = BaseTool.convert_parameters_to_schema(params)
@@ -158,11 +152,7 @@ class TestBaseTool:
 
     def test_convert_parameters_to_schema_no_required(self):
         """Test schema with no required parameters."""
-        params = [
-            ToolParameter(
-                name="opt1", type="string", description="Optional", required=False
-            )
-        ]
+        params = [ToolParameter(name="opt1", type="string", description="Optional", required=False)]
 
         schema = BaseTool.convert_parameters_to_schema(params)
 

@@ -51,9 +51,7 @@ class SafetyOperation:
             "tool_name": self.tool_name,
             "args": self.args,
             "result": (
-                self.result.to_dict()
-                if hasattr(self.result, "to_dict")
-                else str(self.result)
+                self.result.to_dict() if hasattr(self.result, "to_dict") else str(self.result)
             ),
             "timestamp": self.timestamp.isoformat(),
         }

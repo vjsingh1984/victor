@@ -172,9 +172,7 @@ class ConfirmationRequest:
     details: List[str]
     arguments: Dict[str, Any]
 
-    def format_message(
-        self, presentation: Optional["PresentationProtocol"] = None
-    ) -> str:
+    def format_message(self, presentation: Optional["PresentationProtocol"] = None) -> str:
         """Format confirmation request as a user-friendly message.
 
         Args:
@@ -292,15 +290,13 @@ class SafetyChecker:
 
         # Compile regex patterns for efficiency
         self._critical_patterns = [
-            (re.compile(p, re.IGNORECASE), desc)
-            for p, desc in self.BASH_CRITICAL_PATTERNS
+            (re.compile(p, re.IGNORECASE), desc) for p, desc in self.BASH_CRITICAL_PATTERNS
         ]
         self._high_patterns = [
             (re.compile(p, re.IGNORECASE), desc) for p, desc in self.BASH_HIGH_PATTERNS
         ]
         self._medium_patterns = [
-            (re.compile(p, re.IGNORECASE), desc)
-            for p, desc in self.BASH_MEDIUM_PATTERNS
+            (re.compile(p, re.IGNORECASE), desc) for p, desc in self.BASH_MEDIUM_PATTERNS
         ]
 
         # Custom patterns from vertical extensions
@@ -338,9 +334,7 @@ class SafetyChecker:
         except re.error as e:
             logger.warning(f"Invalid regex pattern for safety checker: {pattern} - {e}")
 
-    def check_bash_command(
-        self, command: str
-    ) -> tuple[OperationalRiskLevel, List[str]]:
+    def check_bash_command(self, command: str) -> tuple[OperationalRiskLevel, List[str]]:
         """Check a bash command for dangerous patterns.
 
         Args:
@@ -448,9 +442,7 @@ class SafetyChecker:
         """
         # Primary: check decorator-driven registry
         canonical_tool_name = get_canonical_name(tool_name)
-        registry_write_tools = {
-            get_canonical_name(name) for name in registry_get_write_tools()
-        }
+        registry_write_tools = {get_canonical_name(name) for name in registry_get_write_tools()}
         if canonical_tool_name in registry_write_tools:
             return True
         # Fallback: check static list for tools without decorator metadata
@@ -491,20 +483,13 @@ class SafetyChecker:
         # Check file write operations
         elif canonical_tool_name == "write":
             file_path = arguments.get("path", arguments.get("file_path", ""))
-            risk_level, details = self.check_file_operation(
-                "write", file_path, overwrite=True
-            )
+            risk_level, details = self.check_file_operation("write", file_path, overwrite=True)
             if details:
                 descriptions.append(f"Write to: {file_path}")
 
         # Check file edit operations
         elif canonical_tool_name == "edit":
-            edits = (
-                arguments.get("ops")
-                or arguments.get("edits")
-                or arguments.get("files")
-                or []
-            )
+            edits = arguments.get("ops") or arguments.get("edits") or arguments.get("files") or []
             for edit in edits:
                 if not isinstance(edit, dict):
                     continue
@@ -541,10 +526,7 @@ class SafetyChecker:
 
         # RISKY_ONLY mode: only require confirmation for high-risk operations
         elif self.approval_mode == ApprovalMode.RISKY_ONLY:
-            if (
-                _RISK_ORDER[risk_level]
-                >= _RISK_ORDER[self.require_confirmation_threshold]
-            ):
+            if _RISK_ORDER[risk_level] >= _RISK_ORDER[self.require_confirmation_threshold]:
                 requires_confirmation = True
 
         # Auto-approve if confirmation not required
@@ -570,9 +552,7 @@ class SafetyChecker:
             tool_name=canonical_tool_name,
             risk_level=risk_level,
             description=(
-                "; ".join(descriptions)
-                if descriptions
-                else f"Execute {canonical_tool_name}"
+                "; ".join(descriptions) if descriptions else f"Execute {canonical_tool_name}"
             ),
             details=details,
             arguments=arguments,
@@ -622,9 +602,7 @@ def get_safety_checker() -> SafetyChecker:
             from victor.config.settings import load_settings
 
             settings = load_settings()
-            approval_mode = _resolve_approval_mode(
-                settings.security.write_approval_mode
-            )
+            approval_mode = _resolve_approval_mode(settings.security.write_approval_mode)
         except Exception:
             # Default to RISKY_ONLY if settings unavailable
             approval_mode = ApprovalMode.RISKY_ONLY
@@ -746,9 +724,7 @@ def create_hitl_confirmation_callback(
                     )
                     return True
                 else:
-                    logger.warning(
-                        f"Safety confirmation timed out, aborting: {request.tool_name}"
-                    )
+                    logger.warning(f"Safety confirmation timed out, aborting: {request.tool_name}")
                     return False
             else:
                 # Rejected or other status

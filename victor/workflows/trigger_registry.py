@@ -171,8 +171,7 @@ class WorkflowTriggerRegistry:
                 self._by_task_type[task_lower].append(trigger)
 
             logger.debug(
-                f"Registered trigger: {trigger.workflow_name} "
-                f"(vertical={trigger.vertical})"
+                f"Registered trigger: {trigger.workflow_name} " f"(vertical={trigger.vertical})"
             )
 
     def register_from_vertical(

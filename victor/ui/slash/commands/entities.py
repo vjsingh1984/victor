@@ -141,9 +141,7 @@ class EntitiesCommand(BaseSlashCommand):
                 return
 
             # Filter by type if specified
-            _type_filter = (
-                None  # noqa: F841 - Will be used when async context is available
-            )
+            _type_filter = None  # noqa: F841 - Will be used when async context is available
             if args:
                 try:
                     _type_filter = EntityType(args[0].lower())

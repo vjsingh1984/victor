@@ -96,34 +96,24 @@ def test_loader_raises_for_missing_vertical(tmp_path: Path) -> None:
 def test_yaml_provider_merges_without_mutating_cached_config(yaml_path: Path) -> None:
     """Provider-level merge operations should not corrupt shared cached configs."""
 
-    base_config = load_tool_dependency_yaml(
-        yaml_path, canonicalize=True, use_cache=True
-    )
+    base_config = load_tool_dependency_yaml(yaml_path, canonicalize=True, use_cache=True)
 
     provider = YAMLToolDependencyProvider(
         yaml_path,
         additional_dependencies=[
-            ToolDependency(
-                tool_name="graph", depends_on={"read"}, enables={"write"}, weight=0.5
-            )
+            ToolDependency(tool_name="graph", depends_on={"read"}, enables={"write"}, weight=0.5)
         ],
         additional_sequences={"review": ["read", "graph", "write"]},
     )
 
     assert provider.vertical == "sdk_test"
     assert provider.yaml_path == yaml_path
-    assert any(
-        dependency.tool_name == "graph" for dependency in provider.get_dependencies()
-    )
+    assert any(dependency.tool_name == "graph" for dependency in provider.get_dependencies())
     assert ["read", "graph", "write"] in provider.get_tool_sequences()
 
-    cached_again = load_tool_dependency_yaml(
-        yaml_path, canonicalize=True, use_cache=True
-    )
+    cached_again = load_tool_dependency_yaml(yaml_path, canonicalize=True, use_cache=True)
     assert cached_again is base_config
-    assert all(
-        dependency.tool_name != "graph" for dependency in cached_again.dependencies
-    )
+    assert all(dependency.tool_name != "graph" for dependency in cached_again.dependencies)
     assert "review" not in cached_again.sequences
 
 

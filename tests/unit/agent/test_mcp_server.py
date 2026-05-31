@@ -58,9 +58,7 @@ class MockToolWithListParams(BaseTool):
         from victor.tools.base import ToolParameter
 
         self._parameters = [
-            ToolParameter(
-                name="path", type="string", description="File path", required=True
-            ),
+            ToolParameter(name="path", type="string", description="File path", required=True),
             ToolParameter(
                 name="recursive",
                 type="boolean",
@@ -132,12 +130,8 @@ class TestMCPServerRegisterResource:
     def test_register_multiple_resources(self):
         """Test registering multiple resources."""
         server = MCPServer()
-        server.register_resource(
-            MCPResource(uri="file:///a.txt", name="A", description="File A")
-        )
-        server.register_resource(
-            MCPResource(uri="file:///b.txt", name="B", description="File B")
-        )
+        server.register_resource(MCPResource(uri="file:///a.txt", name="A", description="File A"))
+        server.register_resource(MCPResource(uri="file:///b.txt", name="B", description="File B"))
         assert len(server.resources) == 2
 
 
@@ -438,9 +432,7 @@ class TestMCPServerHelpers:
         registry = ToolRegistry()
         registry.register(MockTool())
         server = MCPServer(tool_registry=registry)
-        server.register_resource(
-            MCPResource(uri="file:///a.txt", name="A", description="File A")
-        )
+        server.register_resource(MCPResource(uri="file:///a.txt", name="A", description="File A"))
 
         info = server.get_server_info()
 
@@ -492,9 +484,7 @@ class TestMCPServerCallToolErrors:
         server.initialized = True
 
         # Mock execute to raise error
-        with patch.object(
-            registry, "execute", side_effect=Exception("Execution failed")
-        ):
+        with patch.object(registry, "execute", side_effect=Exception("Execution failed")):
             response = await server.handle_message(
                 {
                     "jsonrpc": "2.0",

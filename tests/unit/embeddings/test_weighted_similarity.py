@@ -75,9 +75,7 @@ class TestWeightedCosineSimilarity:
             query_emb, query_text, corpus_emb, corpus_texts
         )
 
-        base_similarities = EmbeddingService.cosine_similarity_matrix(
-            query_emb, corpus_emb
-        )
+        base_similarities = EmbeddingService.cosine_similarity_matrix(query_emb, corpus_emb)
 
         np.testing.assert_array_almost_equal(similarities, base_similarities)
 
@@ -166,9 +164,7 @@ class TestWeightedCosineSimilarity:
 
         # Generate embeddings
         query_emb = embedding_service.embed_text_sync(query_text)
-        corpus_emb = np.vstack(
-            [embedding_service.embed_text_sync(text) for text in corpus_texts]
-        )
+        corpus_emb = np.vstack([embedding_service.embed_text_sync(text) for text in corpus_texts])
 
         # Test weighted similarity
         weighted_similarities = EmbeddingService.weighted_cosine_similarity(
@@ -176,9 +172,7 @@ class TestWeightedCosineSimilarity:
         )
 
         # Test base cosine similarity
-        base_similarities = EmbeddingService.cosine_similarity_matrix(
-            query_emb, corpus_emb
-        )
+        base_similarities = EmbeddingService.cosine_similarity_matrix(query_emb, corpus_emb)
 
         # "analyze the structure" should get higher or equal score with weighting
         # (may be equal if already at 1.0)
@@ -347,17 +341,13 @@ class TestWeightedSimilarityIntegration:
                 text="analyze the code structure",
                 metadata={"task_type": "analyze"},
             ),
-            CollectionItem(
-                id="2", text="create a new file", metadata={"task_type": "create"}
-            ),
+            CollectionItem(id="2", text="create a new file", metadata={"task_type": "create"}),
             CollectionItem(
                 id="3",
                 text="review the architecture",
                 metadata={"task_type": "analyze"},
             ),
-            CollectionItem(
-                id="4", text="search for functions", metadata={"task_type": "search"}
-            ),
+            CollectionItem(id="4", text="search for functions", metadata={"task_type": "search"}),
         ]
 
         import asyncio

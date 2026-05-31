@@ -49,9 +49,7 @@ class BayesianMetricsMonitor:
         """
         self.db = db_connection
 
-    def get_belief_evolution(
-        self, belief_id: str, limit: int = 100
-    ) -> List[Dict[str, Any]]:
+    def get_belief_evolution(self, belief_id: str, limit: int = 100) -> List[Dict[str, Any]]:
         """Get belief state evolution over time.
 
         Args:
@@ -194,9 +192,7 @@ class BayesianMetricsMonitor:
 
         return calibration
 
-    def get_voi_statistics(
-        self, agent_id: Optional[str] = None, days: int = 7
-    ) -> Dict[str, Any]:
+    def get_voi_statistics(self, agent_id: Optional[str] = None, days: int = 7) -> Dict[str, Any]:
         """Get Value of Information statistics.
 
         Args:
@@ -273,9 +269,7 @@ class BayesianMetricsMonitor:
                 stats["mean_predicted_voi"] /= stats["total_queries"]
                 stats["mean_actual_gain"] /= stats["total_queries"]
                 stats["mean_query_cost"] /= stats["total_queries"]
-                stats["beneficial_rate"] = (
-                    stats["beneficial_queries"] / stats["total_queries"]
-                )
+                stats["beneficial_rate"] = stats["beneficial_queries"] / stats["total_queries"]
 
             for agent_id, agent_stats in stats["per_agent"].items():
                 if agent_stats["total_queries"] > 0:
@@ -419,9 +413,7 @@ class BayesianMetricsMonitor:
                 matrix[agent_id_1] = {}
                 for agent_id_2 in agent_ids:
                     # Identity matrix: 1.0 on diagonal, 0.0 elsewhere
-                    matrix[agent_id_1][agent_id_2] = (
-                        1.0 if agent_id_1 == agent_id_2 else 0.0
-                    )
+                    matrix[agent_id_1][agent_id_2] = 1.0 if agent_id_1 == agent_id_2 else 0.0
             return matrix
 
     def get_system_summary(self, days: int = 7) -> Dict[str, Any]:

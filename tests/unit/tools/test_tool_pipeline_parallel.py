@@ -61,9 +61,7 @@ class TestExecuteToolCallsParallel:
         )
 
         with (
-            patch.object(
-                pipeline, "execute_tool_calls", new_callable=AsyncMock
-            ) as sequential,
+            patch.object(pipeline, "execute_tool_calls", new_callable=AsyncMock) as sequential,
             patch.object(
                 pipeline.parallel_executor,
                 "execute_parallel",
@@ -71,9 +69,7 @@ class TestExecuteToolCallsParallel:
                 return_value=parallel_result,
             ) as execute_parallel,
         ):
-            result = await pipeline.execute_tool_calls_parallel(
-                [tc1, tc2], force_parallel=True
-            )
+            result = await pipeline.execute_tool_calls_parallel([tc1, tc2], force_parallel=True)
 
         sequential.assert_not_awaited()
         execute_parallel.assert_awaited_once()
@@ -123,9 +119,7 @@ class TestCrossTurnDedup:
 
         registry = MagicMock()
         executor = MagicMock()
-        config = ToolPipelineConfig(
-            enable_cross_turn_dedup=True, cross_turn_dedup_ttl=60.0
-        )
+        config = ToolPipelineConfig(enable_cross_turn_dedup=True, cross_turn_dedup_ttl=60.0)
         pipeline = ToolPipeline(registry, executor, config=config)
         assert pipeline._cross_turn_enabled is True
 

@@ -391,13 +391,10 @@ async def cicd(
                 # Check for best practices
                 if "steps" in job:
                     has_checkout = any(
-                        step.get("uses", "").startswith("actions/checkout")
-                        for step in job["steps"]
+                        step.get("uses", "").startswith("actions/checkout") for step in job["steps"]
                     )
                     if not has_checkout:
-                        warnings.append(
-                            f"Job '{job_name}': No checkout step (usually needed)"
-                        )
+                        warnings.append(f"Job '{job_name}': No checkout step (usually needed)")
 
         external_output = None
         if validate_command:
@@ -412,16 +409,10 @@ async def cicd(
                 )
                 stdout, stderr = await proc.communicate()
                 if proc.returncode != 0:
-                    raise subprocess.CalledProcessError(
-                        proc.returncode, validate_command, stderr
-                    )
+                    raise subprocess.CalledProcessError(proc.returncode, validate_command, stderr)
                 external_output = stdout.decode("utf-8").strip()
             except (subprocess.CalledProcessError, Exception) as exc:
-                error_msg = (
-                    str(getattr(exc, "stderr", b""))
-                    if hasattr(exc, "stderr")
-                    else str(exc)
-                )
+                error_msg = str(getattr(exc, "stderr", b"")) if hasattr(exc, "stderr") else str(exc)
                 if error_msg:
                     issues.append(f"External validator failed: {error_msg}")
                 else:

@@ -178,8 +178,7 @@ def get_bundles_for_vertical(vertical_name: str) -> List[ProductBundle]:
     return [
         bundle
         for bundle in _BUNDLE_REGISTRY.values()
-        if vertical_name in bundle.verticals
-        or vertical_name in bundle.optional_verticals
+        if vertical_name in bundle.verticals or vertical_name in bundle.optional_verticals
     ]
 
 

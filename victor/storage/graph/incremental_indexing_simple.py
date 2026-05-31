@@ -142,9 +142,7 @@ class SimpleIncrementalIndexer:
         cursor = self.db.cursor()
 
         # Get all node_ids for nodes in this file
-        cursor.execute(
-            f"SELECT node_id FROM {Tables.GRAPH_NODE} WHERE file = ?", (file_path,)
-        )
+        cursor.execute(f"SELECT node_id FROM {Tables.GRAPH_NODE} WHERE file = ?", (file_path,))
         node_ids = [row[0] for row in cursor.fetchall()]
 
         if not node_ids:
@@ -154,14 +152,10 @@ class SimpleIncrementalIndexer:
         placeholders = ",".join("?" for _ in node_ids)
 
         # Delete all edges connected to these nodes (both src and dst)
-        cursor.execute(
-            f"DELETE FROM {Tables.GRAPH_EDGE} WHERE src IN ({placeholders})", node_ids
-        )
+        cursor.execute(f"DELETE FROM {Tables.GRAPH_EDGE} WHERE src IN ({placeholders})", node_ids)
         edges_deleted_src = cursor.rowcount
 
-        cursor.execute(
-            f"DELETE FROM {Tables.GRAPH_EDGE} WHERE dst IN ({placeholders})", node_ids
-        )
+        cursor.execute(f"DELETE FROM {Tables.GRAPH_EDGE} WHERE dst IN ({placeholders})", node_ids)
         edges_deleted = edges_deleted_src + cursor.rowcount
 
         # Delete the nodes themselves
@@ -291,9 +285,7 @@ class SimpleIncrementalIndexer:
             logger.info("[IncrementalIndex] No changed files detected")
             return IncrementalUpdateStats(duration_seconds=0.0)
 
-        logger.info(
-            f"[IncrementalIndex] Incremental update: {len(changed_files)} changed files"
-        )
+        logger.info(f"[IncrementalIndex] Incremental update: {len(changed_files)} changed files")
 
         total_stats = IncrementalUpdateStats()
 
@@ -324,9 +316,7 @@ class SimpleIncrementalIndexer:
 
         return total_stats
 
-    def _delete_embeddings_from_vector_store(
-        self, file_path: str, embeddings_deleted: int
-    ) -> int:
+    def _delete_embeddings_from_vector_store(self, file_path: str, embeddings_deleted: int) -> int:
         """Delete embeddings for a file from the vector store.
 
         This integrates with the vector store to ensure embeddings are cleaned up

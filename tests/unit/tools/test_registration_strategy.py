@@ -60,9 +60,7 @@ class TestFunctionDecoratorStrategy:
 
         strategy.register(registry, mock_tool)
 
-        registry._register_direct.assert_called_once_with(
-            "test_tool", mock_tool.Tool, True
-        )
+        registry._register_direct.assert_called_once_with("test_tool", mock_tool.Tool, True)
 
     def test_priority(self):
         """Test strategy priority."""
@@ -171,8 +169,7 @@ class TestToolRegistrationStrategyRegistry:
 
         # get_instance should return the same instance
         assert (
-            registry2 is registry1
-            or registry2 is ToolRegistrationStrategyRegistry.get_instance()
+            registry2 is registry1 or registry2 is ToolRegistrationStrategyRegistry.get_instance()
         )
 
     def test_default_strategies_registered(self):
@@ -266,9 +263,7 @@ class TestStrategyPatternIntegration:
         from victor.core.feature_flags import FeatureFlag, get_feature_flag_manager
 
         # Enable the flag
-        get_feature_flag_manager().enable(
-            FeatureFlag.USE_STRATEGY_BASED_TOOL_REGISTRATION
-        )
+        get_feature_flag_manager().enable(FeatureFlag.USE_STRATEGY_BASED_TOOL_REGISTRATION)
 
         # Create a tool registry
         registry = ToolRegistry()
@@ -310,9 +305,7 @@ class TestStrategyPatternIntegration:
         from victor.core.feature_flags import FeatureFlag, get_feature_flag_manager
 
         # Enable strategy flag
-        get_feature_flag_manager().enable(
-            FeatureFlag.USE_STRATEGY_BASED_TOOL_REGISTRATION
-        )
+        get_feature_flag_manager().enable(FeatureFlag.USE_STRATEGY_BASED_TOOL_REGISTRATION)
 
         # Create a mock @tool decorated function
         def my_tool():

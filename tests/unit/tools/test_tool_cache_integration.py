@@ -44,9 +44,7 @@ async def _run_twice_with_cache(tmpdir: str) -> int:
     settings.tools.tool_cache_enabled = True
     settings.tools.tool_cache_allowlist = ["code_search"]
     with patch("victor.core.bootstrap_services.bootstrap_new_services"):
-        orch = AgentOrchestrator(
-            settings=settings, provider=_DummyProvider(), model="dummy"
-        )
+        orch = AgentOrchestrator(settings=settings, provider=_DummyProvider(), model="dummy")
 
     call_count = {"count": 0}
 
@@ -89,6 +87,4 @@ async def _run_twice_with_cache(tmpdir: str) -> int:
 
 def test_tool_cache_hits_on_repeat_calls(tmp_path):
     call_count = asyncio.run(_run_twice_with_cache(str(tmp_path)))
-    assert (
-        call_count == 1
-    ), "tool execution should run once and then be served from cache"
+    assert call_count == 1, "tool execution should run once and then be served from cache"

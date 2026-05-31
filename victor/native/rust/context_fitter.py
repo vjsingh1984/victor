@@ -93,9 +93,7 @@ class RustContextFitter(InstrumentedAccelerator):
             # Build MessageSlot objects for Rust
             slots = []
             for i, msg in enumerate(messages):
-                token_count = msg.get(
-                    "token_count", len(msg.get("content", "").split()) * 13 // 10
-                )
+                token_count = msg.get("token_count", len(msg.get("content", "").split()) * 13 // 10)
                 priority = msg.get("priority", 1.0)
                 role = msg.get("role", "user")
                 recency = float(i) / max(len(messages), 1)

@@ -340,9 +340,7 @@ class PersonaRegistry:
             self._factories[key] = factory
             logger.debug(f"Registered persona factory: {key}")
 
-    def create(
-        self, name: str, vertical: Optional[str] = None
-    ) -> Optional[PersonaSpec]:
+    def create(self, name: str, vertical: Optional[str] = None) -> Optional[PersonaSpec]:
         """Create a persona from a registered factory.
 
         Invokes the factory function and returns the created persona.
@@ -383,9 +381,7 @@ class PersonaRegistry:
             return persona_obj
         except Exception as e:
             logger.error(f"Failed to create persona '{key}': {e}")
-            raise RuntimeError(
-                f"Persona factory execution failed for '{key}': {e}"
-            ) from e
+            raise RuntimeError(f"Persona factory execution failed for '{key}': {e}") from e
 
     def has(self, name: str, vertical: Optional[str] = None) -> bool:
         """Check if a persona or factory is registered.
@@ -531,9 +527,7 @@ class PersonaRegistry:
             keys = self._tag_index.get(tag, set())
             return [self._personas[k] for k in keys if k in self._personas]
 
-    def find_by_tags(
-        self, tags: List[str], match_all: bool = False
-    ) -> List[PersonaSpec]:
+    def find_by_tags(self, tags: List[str], match_all: bool = False) -> List[PersonaSpec]:
         """Find personas matching multiple tags.
 
         Args:
@@ -558,9 +552,7 @@ class PersonaRegistry:
                         keys &= tag_keys
                         if not keys:  # Early exit if no match
                             return []
-                return [
-                    self._personas[k] for k in (keys or set()) if k in self._personas
-                ]
+                return [self._personas[k] for k in (keys or set()) if k in self._personas]
             else:
                 # Find keys that have any tag (union)
                 keys = set()
@@ -681,9 +673,7 @@ def register_persona_spec(
     )
 
 
-def get_persona_spec(
-    name: str, vertical: Optional[str] = None
-) -> Optional[PersonaSpec]:
+def get_persona_spec(name: str, vertical: Optional[str] = None) -> Optional[PersonaSpec]:
     """Get a persona from the global registry.
 
     Args:
@@ -696,9 +686,7 @@ def get_persona_spec(
     return get_persona_registry().get(name, vertical=vertical)
 
 
-def create_persona_spec(
-    name: str, vertical: Optional[str] = None
-) -> Optional[PersonaSpec]:
+def create_persona_spec(name: str, vertical: Optional[str] = None) -> Optional[PersonaSpec]:
     """Create a persona from a registered factory.
 
     Convenience function for creating personas from factories.

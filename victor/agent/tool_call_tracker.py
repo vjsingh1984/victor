@@ -122,17 +122,11 @@ class ToolCallTracker:
             file_state = capture_file_state(
                 args.get("path") or args.get("file_path") or args.get("file")
             )
-        call = TrackedToolCall(
-            tool_name=canonical_tool_name, args=args, file_state=file_state
-        )
+        call = TrackedToolCall(tool_name=canonical_tool_name, args=args, file_state=file_state)
         self.recent_calls.append(call)
-        logger.debug(
-            f"Tracking tool call: {canonical_tool_name}({self._format_args(args)})"
-        )
+        logger.debug(f"Tracking tool call: {canonical_tool_name}({self._format_args(args)})")
 
-    def is_redundant(
-        self, tool_name: str, args: Dict[str, Any], explain: bool = False
-    ) -> bool:
+    def is_redundant(self, tool_name: str, args: Dict[str, Any], explain: bool = False) -> bool:
         """Check if a tool call is redundant given recent history.
 
         Args:
@@ -246,9 +240,7 @@ class ToolCallTracker:
                 continue
 
             recent_path = (
-                recent.args.get("path")
-                or recent.args.get("file_path")
-                or recent.args.get("file")
+                recent.args.get("path") or recent.args.get("file_path") or recent.args.get("file")
             )
             if not recent_path:
                 continue
@@ -266,9 +258,7 @@ class ToolCallTracker:
 
         return False
 
-    def _is_recent_unchanged_read(
-        self, recent: TrackedToolCall, args: Dict[str, Any]
-    ) -> bool:
+    def _is_recent_unchanged_read(self, recent: TrackedToolCall, args: Dict[str, Any]) -> bool:
         """Only deduplicate rereads when the file snapshot is unchanged."""
         if (time.time() - recent.timestamp) >= self.read_redundancy_ttl_seconds:
             return False
@@ -385,15 +375,11 @@ class ToolCallTracker:
                 continue
 
             recent_path = (
-                recent.args.get("path")
-                or recent.args.get("file_path")
-                or recent.args.get("file")
+                recent.args.get("path") or recent.args.get("file_path") or recent.args.get("file")
             )
             if recent_path:
                 try:
-                    normalized_recent = str(
-                        Path(str(recent_path)).expanduser().resolve()
-                    )
+                    normalized_recent = str(Path(str(recent_path)).expanduser().resolve())
                 except Exception:
                     normalized_recent = str(recent_path)
                 if normalized_recent == normalized_target:

@@ -118,9 +118,7 @@ class TestIndexingPerformance:
             incremental=True,
             chunk_size=25,
         )
-        incremental_pipeline = GraphIndexingPipeline(
-            populated_store, incremental_config
-        )
+        incremental_pipeline = GraphIndexingPipeline(populated_store, incremental_config)
 
         start = time.time()
         incremental_stats = await incremental_pipeline.index_repository()
@@ -130,9 +128,7 @@ class TestIndexingPerformance:
         # (DELETE + INSERT is faster than millions of UPSERTs)
         # This is a weak assertion - just verify both complete
         assert force_time < 60, f"Force rebuild took {force_time:.2f}s, expected < 60s"
-        assert (
-            incremental_time < 60
-        ), f"Incremental took {incremental_time:.2f}s, expected < 60s"
+        assert incremental_time < 60, f"Incremental took {incremental_time:.2f}s, expected < 60s"
 
     async def test_adaptive_chunk_size_in_force_mode(self, tmp_path: Path) -> None:
         """Verify chunk size is adaptive based on indexing mode."""

@@ -36,9 +36,7 @@ def project_with_git(tmp_path: Path) -> Path:
         cwd=tmp_path,
         capture_output=True,
     )
-    subprocess.run(
-        ["git", "config", "user.name", "Test"], cwd=tmp_path, capture_output=True
-    )
+    subprocess.run(["git", "config", "user.name", "Test"], cwd=tmp_path, capture_output=True)
 
     # Create a file
     test_file = tmp_path / "src" / "lib.rs"

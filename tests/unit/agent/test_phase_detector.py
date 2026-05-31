@@ -362,6 +362,4 @@ class TestIntegration:
                 current_stage=stage,
                 recent_tools=None,
             )
-            assert (
-                detected == expected_phase
-            ), f"Stage {stage} should map to {expected_phase}"
+            assert detected == expected_phase, f"Stage {stage} should map to {expected_phase}"

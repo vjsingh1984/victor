@@ -66,9 +66,7 @@ def test_output_state_buffers_exact_response_streams():
 def test_output_state_passthrough_for_non_exact_responses():
     state = DirectResponseOutputState("What is Python?")
 
-    assert (
-        state.consume_stream_content("Python is a language.") == "Python is a language."
-    )
+    assert state.consume_stream_content("Python is a language.") == "Python is a language."
 
     content, metadata = state.flush_stream_content()
 

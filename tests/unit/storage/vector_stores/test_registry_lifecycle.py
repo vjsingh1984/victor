@@ -74,8 +74,7 @@ class TestResetWarning:
             EmbeddingRegistry.reset()
 
         assert any(
-            "reset() called with 1 active providers" in rec.message
-            for rec in caplog.records
+            "reset() called with 1 active providers" in rec.message for rec in caplog.records
         )
         assert len(EmbeddingRegistry._provider_cache) == 0
 
@@ -85,8 +84,6 @@ class TestResetWarning:
             EmbeddingRegistry.reset()
 
         warning_records = [
-            r
-            for r in caplog.records
-            if r.levelno == logging.WARNING and "reset()" in r.message
+            r for r in caplog.records if r.levelno == logging.WARNING and "reset()" in r.message
         ]
         assert len(warning_records) == 0

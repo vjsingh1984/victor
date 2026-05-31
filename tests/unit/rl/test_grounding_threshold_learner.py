@@ -131,9 +131,7 @@ class TestGroundingThresholdLearner:
         )
 
         context_key = f"{provider}:{response_type}"
-        alpha, beta, count = _get_beta_params_from_db(
-            coordinator, context_key, threshold
-        )
+        alpha, beta, count = _get_beta_params_from_db(coordinator, context_key, threshold)
         assert count == 1
         # Alpha should increase for success (tp)
         assert alpha > learner.PRIOR_ALPHA
@@ -156,9 +154,7 @@ class TestGroundingThresholdLearner:
             )
 
         context_key = f"{provider}:{response_type}"
-        alpha, beta, count = _get_beta_params_from_db(
-            coordinator, context_key, threshold
-        )
+        alpha, beta, count = _get_beta_params_from_db(coordinator, context_key, threshold)
         assert count == 5
         assert alpha > learner.PRIOR_ALPHA + 0.4  # 5 * learning_rate
 
@@ -180,9 +176,7 @@ class TestGroundingThresholdLearner:
             )
 
         context_key = f"{provider}:{response_type}"
-        alpha, beta, count = _get_beta_params_from_db(
-            coordinator, context_key, threshold
-        )
+        alpha, beta, count = _get_beta_params_from_db(coordinator, context_key, threshold)
         assert count == 5
         # Beta should increase for failures
         assert beta > learner.PRIOR_BETA + 0.4
@@ -204,9 +198,7 @@ class TestGroundingThresholdLearner:
         )
 
         context_key = f"{provider}:{response_type}"
-        alpha, beta, count = _get_beta_params_from_db(
-            coordinator, context_key, threshold
-        )
+        alpha, beta, count = _get_beta_params_from_db(coordinator, context_key, threshold)
         assert count == 1
         assert beta > learner.PRIOR_BETA
 
@@ -235,17 +227,13 @@ class TestGroundingThresholdLearner:
         learner2 = coordinator2.get_learner("grounding_threshold")  # type: ignore
 
         context_key = f"{provider}:{response_type}"
-        alpha, beta, count = _get_beta_params_from_db(
-            coordinator2, context_key, threshold
-        )
+        alpha, beta, count = _get_beta_params_from_db(coordinator2, context_key, threshold)
         assert count == 1
 
         # Check state was loaded correctly
         assert context_key in learner2._beta_params
 
-    def test_get_recommendation_thompson_sampling(
-        self, learner: GroundingThresholdLearner
-    ) -> None:
+    def test_get_recommendation_thompson_sampling(self, learner: GroundingThresholdLearner) -> None:
         """Test get_recommendation uses Thompson Sampling."""
         provider = "anthropic"
         response_type = "code_generation"
@@ -334,14 +322,8 @@ class TestGroundingThresholdLearner:
 
     def test_context_key_building(self, learner: GroundingThresholdLearner) -> None:
         """Test context key construction."""
-        assert (
-            learner._build_context_key("openai", "code_generation")
-            == "openai:code_generation"
-        )
-        assert (
-            learner._build_context_key("anthropic", "explanation")
-            == "anthropic:explanation"
-        )
+        assert learner._build_context_key("openai", "code_generation") == "openai:code_generation"
+        assert learner._build_context_key("anthropic", "explanation") == "anthropic:explanation"
         # Unknown response type defaults to general
         assert learner._build_context_key("ollama", "unknown_type") == "ollama:general"
 
@@ -387,9 +369,7 @@ class TestGroundingThresholdLearner:
         alpha, beta, count = _get_beta_params_from_db(coordinator, context_key, 0.75)
         assert count == 1
 
-    def test_response_type_normalization(
-        self, learner: GroundingThresholdLearner
-    ) -> None:
+    def test_response_type_normalization(self, learner: GroundingThresholdLearner) -> None:
         """Test that response types are normalized."""
         valid_types = learner.RESPONSE_TYPES
 
@@ -401,9 +381,7 @@ class TestGroundingThresholdLearner:
         key = learner._build_context_key("test", "invalid_type")
         assert "general" in key
 
-    def test_mixed_outcomes_convergence(
-        self, learner: GroundingThresholdLearner
-    ) -> None:
+    def test_mixed_outcomes_convergence(self, learner: GroundingThresholdLearner) -> None:
         """Test that learner converges with mixed outcomes."""
         provider = "test_provider"
         response_type = "code_generation"

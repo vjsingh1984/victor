@@ -147,8 +147,7 @@ async def chat_service_node(
         # Call chat service
         response = await services.chat.chat(
             message=query,
-            conversation_history=conversation_history
-            or list(state.conversation_history or []),
+            conversation_history=conversation_history or list(state.conversation_history or []),
         )
 
         # Store response in state
@@ -299,9 +298,7 @@ async def context_service_node(
                 context["context_items"] = items_result[:max_results]
             else:
                 context["context_items"] = list(items_result)[:max_results]
-        elif hasattr(context_result, "items") and isinstance(
-            context_result.items, list
-        ):
+        elif hasattr(context_result, "items") and isinstance(context_result.items, list):
             # Context result has a direct .items list attribute
             context["context_items"] = context_result.items[:max_results]
         elif isinstance(context_result, list):
@@ -426,9 +423,7 @@ async def prompt_service_node(
     activated = False
     try:
         if constraints is not None:
-            activated = bool(
-                prompt_orchestrator.activate_constraints(constraints, vertical)
-            )
+            activated = bool(prompt_orchestrator.activate_constraints(constraints, vertical))
 
         prompt = prompt_orchestrator.build_system_prompt(
             builder_type=builder_type,

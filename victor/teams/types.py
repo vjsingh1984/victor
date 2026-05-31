@@ -173,9 +173,7 @@ class AgentMessage:
         """Check if this is a reply to another message."""
         return self.reply_to is not None
 
-    def to_context_string(
-        self, presentation: Optional["PresentationProtocol"] = None
-    ) -> str:
+    def to_context_string(self, presentation: Optional["PresentationProtocol"] = None) -> str:
         """Format message for inclusion in agent context.
 
         Args:
@@ -242,9 +240,7 @@ class MemoryConfig:
     enabled: bool = True
     persist_across_sessions: bool = False
     search_own_memories_only: bool = False
-    memory_types: Set[str] = field(
-        default_factory=lambda: {"entity", "episodic", "semantic"}
-    )
+    memory_types: Set[str] = field(default_factory=lambda: {"entity", "episodic", "semantic"})
     max_memories_per_query: int = 10
     relevance_threshold: float = 0.5
     auto_summarize: bool = True
@@ -270,9 +266,7 @@ class MemoryConfig:
             enabled=data.get("enabled", True),
             persist_across_sessions=data.get("persist_across_sessions", False),
             search_own_memories_only=data.get("search_own_memories_only", False),
-            memory_types=set(
-                data.get("memory_types", ["entity", "episodic", "semantic"])
-            ),
+            memory_types=set(data.get("memory_types", ["entity", "episodic", "semantic"])),
             max_memories_per_query=data.get("max_memories_per_query", 10),
             relevance_threshold=data.get("relevance_threshold", 0.5),
             auto_summarize=data.get("auto_summarize", True),
@@ -608,9 +602,7 @@ class TeamMember:
             # Apply relevance threshold from config
             if config.relevance_threshold > 0:
                 results = [
-                    r
-                    for r in results
-                    if getattr(r, "score", 1.0) >= config.relevance_threshold
+                    r for r in results if getattr(r, "score", 1.0) >= config.relevance_threshold
                 ]
 
             return results
@@ -661,9 +653,7 @@ class TeamMember:
             "personality": self.personality,
             "max_delegation_depth": self.max_delegation_depth,
             "memory": self.memory,
-            "memory_config": (
-                self.memory_config.to_dict() if self.memory_config else None
-            ),
+            "memory_config": (self.memory_config.to_dict() if self.memory_config else None),
             "cache": self.cache,
             "verbose": self.verbose,
             "max_iterations": self.max_iterations,
@@ -768,9 +758,7 @@ class TeamConfig:
                     "personality": m.personality,
                     "max_delegation_depth": m.max_delegation_depth,
                     "memory": m.memory,
-                    "memory_config": (
-                        m.memory_config.to_dict() if m.memory_config else None
-                    ),
+                    "memory_config": (m.memory_config.to_dict() if m.memory_config else None),
                     "cache": m.cache,
                     "verbose": m.verbose,
                     "max_iterations": m.max_iterations,

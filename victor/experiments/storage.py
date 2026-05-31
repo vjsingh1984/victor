@@ -102,9 +102,7 @@ class IStorageBackend(Protocol):
         """
         ...
 
-    def list_experiments(
-        self, query: Optional[ExperimentQuery] = None
-    ) -> List[Experiment]:
+    def list_experiments(self, query: Optional[ExperimentQuery] = None) -> List[Experiment]:
         """List experiments with optional filtering.
 
         Args:

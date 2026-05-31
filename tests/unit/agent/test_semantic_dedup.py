@@ -49,12 +49,8 @@ class TestSemanticDeduplication:
         assembler = TurnBoundaryContextAssembler.__new__(TurnBoundaryContextAssembler)
 
         msgs = [
-            MockMessage(
-                role="assistant", content="File auth.py has authentication logic"
-            ),
-            MockMessage(
-                role="assistant", content="File db.py has database connection pooling"
-            ),
+            MockMessage(role="assistant", content="File auth.py has authentication logic"),
+            MockMessage(role="assistant", content="File db.py has database connection pooling"),
             MockMessage(role="user", content="Compare the two approaches"),
         ]
 

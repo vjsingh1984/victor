@@ -235,9 +235,7 @@ class TestBackgroundAgentManager:
 
         async def _inner():
             with pytest.raises(RuntimeError, match="Cannot use run_sync\\(\\)"):
-                BackgroundAgentManager.from_factory(
-                    factory, chat_service=mock_chat_service
-                )
+                BackgroundAgentManager.from_factory(factory, chat_service=mock_chat_service)
 
         asyncio.run(_inner())
         factory.create_agent.assert_called_once_with(mode="foreground")

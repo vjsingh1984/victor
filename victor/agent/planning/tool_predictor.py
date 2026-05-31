@@ -239,29 +239,19 @@ class ToolPredictor:
 
         # Source 1: Keyword matching
         if self.config.enable_keyword_matching:
-            keyword_predictions = self._predict_from_keywords(
-                task_description, current_step
-            )
+            keyword_predictions = self._predict_from_keywords(task_description, current_step)
             for tool, score in keyword_predictions.items():
-                predictions[tool] = (
-                    predictions.get(tool, 0) + score * self.config.keyword_weight
-                )
+                predictions[tool] = predictions.get(tool, 0) + score * self.config.keyword_weight
 
         # Source 2: Semantic similarity
         if self.config.enable_semantic_matching and embedding_fn:
-            semantic_predictions = self._predict_from_semantic(
-                task_description, embedding_fn
-            )
+            semantic_predictions = self._predict_from_semantic(task_description, embedding_fn)
             for tool, score in semantic_predictions.items():
-                predictions[tool] = (
-                    predictions.get(tool, 0) + score * self.config.semantic_weight
-                )
+                predictions[tool] = predictions.get(tool, 0) + score * self.config.semantic_weight
 
         # Source 3: Co-occurrence patterns
         if self.config.enable_cooccurrence and self._cooccurrence_tracker:
-            cooccurrence_predictions = self._predict_from_cooccurrence(
-                recent_tools, task_type
-            )
+            cooccurrence_predictions = self._predict_from_cooccurrence(recent_tools, task_type)
             for tool, score in cooccurrence_predictions.items():
                 predictions[tool] = (
                     predictions.get(tool, 0) + score * self.config.cooccurrence_weight
@@ -282,9 +272,9 @@ class ToolPredictor:
             normalized = {}
 
         # Sort and convert to ToolPrediction objects
-        sorted_predictions = sorted(
-            normalized.items(), key=lambda x: x[1], reverse=True
-        )[: self.config.top_k]
+        sorted_predictions = sorted(normalized.items(), key=lambda x: x[1], reverse=True)[
+            : self.config.top_k
+        ]
 
         result = []
         for tool_name, probability in sorted_predictions:
@@ -435,9 +425,7 @@ class ToolPredictor:
         """
         if self._cooccurrence_tracker:
             try:
-                return self._cooccurrence_tracker._get_tool_success_rate(
-                    tool, task_type
-                )
+                return self._cooccurrence_tracker._get_tool_success_rate(tool, task_type)
             except Exception:
                 pass
 
@@ -464,17 +452,15 @@ class ToolPredictor:
         sources = []
 
         # Check keyword contribution
-        keyword_score = self._predict_from_keywords(
-            task_description, "exploration"
-        ).get(tool_name, 0)
+        keyword_score = self._predict_from_keywords(task_description, "exploration").get(
+            tool_name, 0
+        )
         if keyword_score > 0:
             sources.append("keyword")
 
         # Check co-occurrence contribution
         if recent_tools and self._cooccurrence_tracker:
-            cooccurrence_scores = self._predict_from_cooccurrence(
-                recent_tools, task_type
-            )
+            cooccurrence_scores = self._predict_from_cooccurrence(recent_tools, task_type)
             if tool_name in cooccurrence_scores:
                 sources.append("cooccurrence")
 

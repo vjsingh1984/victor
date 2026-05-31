@@ -120,9 +120,7 @@ class TestOrchestratorPropertyInstallation:
 
         orchestrator = object.__new__(AgentOrchestrator)
         facade = MagicMock(name="orchestration_facade")
-        orchestrator._orchestration_facade = SimpleNamespace(
-            get_instance=lambda: facade
-        )
+        orchestrator._orchestration_facade = SimpleNamespace(get_instance=lambda: facade)
 
         assert orchestrator.orchestration_facade is facade
         assert orchestrator._orchestration_facade is facade

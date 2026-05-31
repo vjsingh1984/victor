@@ -61,9 +61,7 @@ class StubEmbeddingModel:
 
 
 class FakeClient:
-    def create_collection(
-        self, name: str, config: Any = None, **kwargs: Any
-    ) -> dict[str, Any]:
+    def create_collection(self, name: str, config: Any = None, **kwargs: Any) -> dict[str, Any]:
         del config, kwargs
         return {"name": name}
 

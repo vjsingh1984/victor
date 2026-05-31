@@ -281,9 +281,7 @@ class TestTogetherProviderResponseParsing:
             },
         }
 
-        result = provider._parse_response(
-            response, "meta-llama/Llama-3.3-70B-Instruct-Turbo"
-        )
+        result = provider._parse_response(response, "meta-llama/Llama-3.3-70B-Instruct-Turbo")
 
         assert result.content == "Hello! How can I help you?"
         assert result.role == "assistant"
@@ -317,9 +315,7 @@ class TestTogetherProviderResponseParsing:
             ],
         }
 
-        result = provider._parse_response(
-            response, "meta-llama/Llama-3.3-70B-Instruct-Turbo"
-        )
+        result = provider._parse_response(response, "meta-llama/Llama-3.3-70B-Instruct-Turbo")
 
         assert result.tool_calls is not None
         assert len(result.tool_calls) == 1
@@ -605,9 +601,7 @@ class TestTogetherProviderChat:
                     model="test-model",
                 )
 
-            assert "401" in str(exc_info.value) or "Authentication" in str(
-                exc_info.value
-            )
+            assert "401" in str(exc_info.value) or "Authentication" in str(exc_info.value)
 
 
 class TestTogetherProviderCleanup:
@@ -618,8 +612,6 @@ class TestTogetherProviderCleanup:
         """Test provider cleanup."""
         provider = TogetherProvider(api_key="test-key")
 
-        with patch.object(
-            provider.client, "aclose", new_callable=AsyncMock
-        ) as mock_close:
+        with patch.object(provider.client, "aclose", new_callable=AsyncMock) as mock_close:
             await provider.close()
             mock_close.assert_called_once()

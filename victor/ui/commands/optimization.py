@@ -532,16 +532,10 @@ async def _profile_async(
         click.echo("\nNo bottlenecks detected!")
 
     if workflow_profile.opportunities:
-        click.echo(
-            f"\nOptimization opportunities ({len(workflow_profile.opportunities)}):"
-        )
+        click.echo(f"\nOptimization opportunities ({len(workflow_profile.opportunities)}):")
         for i, opportunity in enumerate(workflow_profile.opportunities[:5], 1):
-            click.echo(
-                f"  {i}. {opportunity.strategy_type.value}: {opportunity.target}"
-            )
-            click.echo(
-                f"     Expected improvement: {opportunity.expected_improvement:.1%}"
-            )
+            click.echo(f"  {i}. {opportunity.strategy_type.value}: {opportunity.target}")
+            click.echo(f"     Expected improvement: {opportunity.expected_improvement:.1%}")
             click.echo(f"     Risk level: {opportunity.risk_level.value}")
             click.echo(f"     Confidence: {opportunity.confidence:.1%}")
     else:
@@ -586,22 +580,16 @@ async def _suggest_async(
 
     click.echo(f"\nFound {len(suggestions)} optimization suggestions:\n")
     for i, suggestion in enumerate(suggestions, 1):
-        click.echo(
-            f"{i}. {suggestion.strategy_type.value.upper()}: {suggestion.target}"
-        )
+        click.echo(f"{i}. {suggestion.strategy_type.value.upper()}: {suggestion.target}")
         click.echo(f"   Description: {suggestion.description}")
         click.echo(f"   Expected improvement: {suggestion.expected_improvement:.1%}")
         click.echo(f"   Risk level: {suggestion.risk_level.value}")
         click.echo(f"   Confidence: {suggestion.confidence:.1%}")
 
         if suggestion.estimated_cost_reduction > 0:
-            click.echo(
-                f"   Estimated cost reduction: ${suggestion.estimated_cost_reduction:.4f}"
-            )
+            click.echo(f"   Estimated cost reduction: ${suggestion.estimated_cost_reduction:.4f}")
         if suggestion.estimated_duration_reduction > 0:
-            click.echo(
-                f"   Estimated time saved: {suggestion.estimated_duration_reduction:.2f}s"
-            )
+            click.echo(f"   Estimated time saved: {suggestion.estimated_duration_reduction:.2f}s")
         click.echo()
 
     if output:
@@ -781,9 +769,7 @@ def _echo_prompt_optimizer_sync_summary(sync_result: Any) -> None:
     click.echo("Prompt optimizer benchmark sync:")
     for decision in decisions:
         status_parts = []
-        status_parts.append(
-            "recorded" if getattr(decision, "recorded", False) else "missing"
-        )
+        status_parts.append("recorded" if getattr(decision, "recorded", False) else "missing")
         if getattr(decision, "passed", False):
             status_parts.append("approved")
         if getattr(decision, "promoted", False):
@@ -816,9 +802,7 @@ def _echo_prompt_rollout_analysis_summary(report: dict[str, Any]) -> None:
     click.echo(f"  Recommendation: {report.get('recommendation', '-')}")
     click.echo(f"  Auto-apply action: {report.get('auto_action') or 'none'}")
     click.echo(f"  Significant: {'yes' if report.get('is_significant') else 'no'}")
-    click.echo(
-        f"  Treatment better: {'yes' if report.get('treatment_better') else 'no'}"
-    )
+    click.echo(f"  Treatment better: {'yes' if report.get('treatment_better') else 'no'}")
     click.echo(f"  Effect size: {float(report.get('effect_size', 0.0)):.1%}")
     click.echo(f"  P-value: {float(report.get('p_value', 1.0)):.4f}")
 
@@ -886,9 +870,7 @@ async def _process_prompt_suite_artifact_async(
         _echo_prompt_optimizer_sync_summary(sync_result)
     if prompt_rollout is not None:
         if prompt_rollout.get("created"):
-            click.echo(
-                f"Prompt rollout experiment started: {prompt_rollout.get('experiment_id')}"
-            )
+            click.echo(f"Prompt rollout experiment started: {prompt_rollout.get('experiment_id')}")
         else:
             click.echo(
                 "Prompt rollout not created: "
@@ -964,9 +946,7 @@ def _list_prompt_rollouts(
             continue
         if auto_action_filter is not None:
             result = coordinator.analyze_experiment(experiment_id)
-            action = (
-                _get_prompt_rollout_auto_action(result) if result is not None else None
-            )
+            action = _get_prompt_rollout_auto_action(result) if result is not None else None
             if action != auto_action_filter:
                 continue
         experiments.append(experiment)
@@ -1063,9 +1043,7 @@ def _show_prompt_rollout_results(experiment_id: str) -> None:
         f"[{result.confidence_interval[0]:.4f}, {result.confidence_interval[1]:.4f}]"
     )
     click.echo(f"  Recommendation: {result.recommendation}")
-    click.echo(
-        f"  Auto-apply action: {_get_prompt_rollout_auto_action(result) or 'none'}"
-    )
+    click.echo(f"  Auto-apply action: {_get_prompt_rollout_auto_action(result) or 'none'}")
     click.echo(
         "  Control: "
         f"samples={control.get('samples', 0)} "
@@ -1108,24 +1086,14 @@ def _get_prompt_rollout_auto_action(result: object) -> Optional[str]:
     is_significant = bool(getattr(result, "is_significant", False))
     treatment_better = bool(getattr(result, "treatment_better", False))
 
-    if (
-        recommendation.startswith("Roll out treatment")
-        and is_significant
-        and treatment_better
-    ):
+    if recommendation.startswith("Roll out treatment") and is_significant and treatment_better:
         return "rollout"
-    if (
-        recommendation.startswith("Keep control")
-        and is_significant
-        and not treatment_better
-    ):
+    if recommendation.startswith("Keep control") and is_significant and not treatment_better:
         return "rollback"
     return None
 
 
-def _describe_prompt_rollout_auto_action(
-    action: str, experiment_id: str, dry_run: bool
-) -> str:
+def _describe_prompt_rollout_auto_action(action: str, experiment_id: str, dry_run: bool) -> str:
     if action == "rollout":
         return (
             f"Prompt rollout {'dry-run: would roll out' if dry_run else 'auto-applied: rolled out'} "
@@ -1137,9 +1105,7 @@ def _describe_prompt_rollout_auto_action(
     )
 
 
-def _auto_apply_prompt_rollout_decision(
-    experiment_id: str, dry_run: bool = False
-) -> None:
+def _auto_apply_prompt_rollout_decision(experiment_id: str, dry_run: bool = False) -> None:
     if not experiment_id.startswith(PROMPT_ROLLOUT_EXPERIMENT_PREFIX):
         click.echo(f"Experiment is not a prompt rollout: {experiment_id}", err=True)
         return
@@ -1158,9 +1124,7 @@ def _auto_apply_prompt_rollout_decision(
         return
 
     if dry_run:
-        click.echo(
-            _describe_prompt_rollout_auto_action(action, experiment_id, dry_run=True)
-        )
+        click.echo(_describe_prompt_rollout_auto_action(action, experiment_id, dry_run=True))
         return
 
     if action == "rollout":
@@ -1175,9 +1139,7 @@ def _auto_apply_prompt_rollout_decision(
         )
         return
 
-    click.echo(
-        _describe_prompt_rollout_auto_action(action, experiment_id, dry_run=False)
-    )
+    click.echo(_describe_prompt_rollout_auto_action(action, experiment_id, dry_run=False))
 
 
 def _auto_apply_all_prompt_rollouts(
@@ -1230,9 +1192,7 @@ def _auto_apply_all_prompt_rollouts(
         considered += 1
         result = coordinator.analyze_experiment(experiment_id)
         if result is None:
-            click.echo(
-                f"Prompt rollout analysis unavailable: {experiment_id}", err=True
-            )
+            click.echo(f"Prompt rollout analysis unavailable: {experiment_id}", err=True)
             failed += 1
             if stop_on_failure:
                 click.echo("Stopping prompt rollout bulk auto-apply after failure.")
@@ -1255,11 +1215,7 @@ def _auto_apply_all_prompt_rollouts(
             continue
 
         if dry_run:
-            click.echo(
-                _describe_prompt_rollout_auto_action(
-                    action, experiment_id, dry_run=True
-                )
-            )
+            click.echo(_describe_prompt_rollout_auto_action(action, experiment_id, dry_run=True))
             planned += 1
             continue
 
@@ -1279,9 +1235,7 @@ def _auto_apply_all_prompt_rollouts(
                 break
             continue
 
-        click.echo(
-            _describe_prompt_rollout_auto_action(action, experiment_id, dry_run=False)
-        )
+        click.echo(_describe_prompt_rollout_auto_action(action, experiment_id, dry_run=False))
         applied += 1
 
     if dry_run:

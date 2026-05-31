@@ -171,9 +171,7 @@ def emit_event_sync(
             error = done_future.exception()
         except Exception as callback_error:
             _increment_emit_stat("failed")
-            logger.debug(
-                f"Failed reading emit task result for {topic}: {callback_error}"
-            )
+            logger.debug(f"Failed reading emit task result for {topic}: {callback_error}")
             return
 
         if error is None:
@@ -208,9 +206,7 @@ def emit_event_sync(
         if loop is None:
             if track_metrics:
                 _increment_emit_stat("dropped_no_loop")
-            logger.debug(
-                f"No background loop available, skipping event emission: {topic}"
-            )
+            logger.debug(f"No background loop available, skipping event emission: {topic}")
             return
 
         try:
@@ -221,9 +217,7 @@ def emit_event_sync(
         except Exception as e:
             if track_metrics:
                 _increment_emit_stat("schedule_errors")
-            logger.debug(
-                f"Failed to schedule background event emission for {topic}: {e}"
-            )
+            logger.debug(f"Failed to schedule background event emission for {topic}: {e}")
 
 
 def emit_sync_metrics_event(
@@ -257,9 +251,7 @@ def emit_sync_metrics_event(
 
             bus = get_observability_bus()
         except Exception as e:
-            logger.debug(
-                f"Failed to resolve observability bus for sync metrics event: {e}"
-            )
+            logger.debug(f"Failed to resolve observability bus for sync metrics event: {e}")
             bus = None
 
     if bus is not None:

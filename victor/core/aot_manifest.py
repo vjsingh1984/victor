@@ -83,8 +83,7 @@ class AOTManifest:
             "version": self.version,
             "env_hash": self.env_hash,
             "entries": {
-                group: [asdict(e) for e in entries]
-                for group, entries in self.entries.items()
+                group: [asdict(e) for e in entries] for group, entries in self.entries.items()
             },
         }
 
@@ -246,9 +245,7 @@ class AOTManifestManager:
                 )
 
             entries[group] = group_entries
-            logger.debug(
-                "Found %d entry points for group %s", len(group_entries), group
-            )
+            logger.debug("Found %d entry points for group %s", len(group_entries), group)
 
         return AOTManifest(MANIFEST_VERSION, self.compute_env_hash(), entries)
 

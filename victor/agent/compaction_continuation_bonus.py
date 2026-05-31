@@ -128,15 +128,9 @@ class CompactionContinuationBonus:
         )
 
         for model_key, bonus in sorted_keys:
-            if (
-                model_key in provider_lower
-                or model_key in model_lower
-                or model_key in combined
-            ):
+            if model_key in provider_lower or model_key in model_lower or model_key in combined:
                 # Scale bonus based on severity (more messages removed = more help needed)
-                scale = min(
-                    2.0, messages_removed / 50
-                )  # Max 2x multiplier at 50+ messages
+                scale = min(2.0, messages_removed / 50)  # Max 2x multiplier at 50+ messages
                 result = int(bonus * (1 + scale))
                 logger.debug(
                     f"Compaction bonus for {provider}:{model}: {result} "

@@ -71,9 +71,7 @@ FASTAPI_AVAILABLE = _check_fastapi_available()
 WEBSOCKET_AVAILABLE = _check_websocket_available()
 
 # Skip conditions
-skip_if_no_fastapi = pytest.mark.skipif(
-    not FASTAPI_AVAILABLE, reason="FastAPI not available"
-)
+skip_if_no_fastapi = pytest.mark.skipif(not FASTAPI_AVAILABLE, reason="FastAPI not available")
 
 skip_if_ci_no_websocket = pytest.mark.skipif(
     IS_CI and not WEBSOCKET_AVAILABLE,

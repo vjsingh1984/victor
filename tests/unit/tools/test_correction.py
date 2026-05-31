@@ -154,27 +154,21 @@ class TestCorrectionFeedback:
 
     def test_to_prompt_with_syntax_error(self):
         """Test to_prompt with syntax feedback."""
-        feedback = CorrectionFeedback(
-            has_issues=True, syntax_feedback="Line 5: SyntaxError"
-        )
+        feedback = CorrectionFeedback(has_issues=True, syntax_feedback="Line 5: SyntaxError")
         prompt = feedback.to_prompt()
         assert "SYNTAX ERROR" in prompt
         assert "Line 5: SyntaxError" in prompt
 
     def test_to_prompt_with_import_feedback(self):
         """Test to_prompt with import feedback."""
-        feedback = CorrectionFeedback(
-            has_issues=True, import_feedback="Missing import: os"
-        )
+        feedback = CorrectionFeedback(has_issues=True, import_feedback="Missing import: os")
         prompt = feedback.to_prompt()
         assert "IMPORT ISSUES" in prompt
         assert "Missing import: os" in prompt
 
     def test_to_prompt_with_test_feedback(self):
         """Test to_prompt with test feedback."""
-        feedback = CorrectionFeedback(
-            has_issues=True, test_feedback="Tests: 3/10 passed"
-        )
+        feedback = CorrectionFeedback(has_issues=True, test_feedback="Tests: 3/10 passed")
         prompt = feedback.to_prompt()
         assert "TEST FAILURES" in prompt
         assert "3/10 passed" in prompt
@@ -613,18 +607,13 @@ class TestSelfCorrector:
         """Test should_retry when tests fail."""
         corrector = SelfCorrector()
         validation = CodeValidationResult.success()
-        assert (
-            corrector.should_retry(0, validation, test_passed=3, test_total=10) is True
-        )
+        assert corrector.should_retry(0, validation, test_passed=3, test_total=10) is True
 
     def test_should_retry_tests_passed(self):
         """Test should_retry when all tests pass."""
         corrector = SelfCorrector()
         validation = CodeValidationResult.success()
-        assert (
-            corrector.should_retry(0, validation, test_passed=10, test_total=10)
-            is False
-        )
+        assert corrector.should_retry(0, validation, test_passed=10, test_total=10) is False
 
     def test_generate_feedback(self):
         """Test generate_feedback method."""

@@ -104,13 +104,9 @@ class PromptOrchestrator:
 
         # Get the appropriate builder
         if builder_type == "legacy":
-            prompt = self._build_with_legacy(
-                provider, model, task_type, **builder_kwargs
-            )
+            prompt = self._build_with_legacy(provider, model, task_type, **builder_kwargs)
         else:
-            prompt = self._build_with_framework(
-                provider, model, task_type, **builder_kwargs
-            )
+            prompt = self._build_with_framework(provider, model, task_type, **builder_kwargs)
 
         return prompt
 
@@ -150,11 +146,7 @@ class PromptOrchestrator:
             "legacy" or "framework"
         """
         # If has prompt_contributors, use legacy
-        if (
-            "prompt_contributors" in kwargs
-            or "builder" in kwargs
-            or "legacy_builder" in kwargs
-        ):
+        if "prompt_contributors" in kwargs or "builder" in kwargs or "legacy_builder" in kwargs:
             return "legacy"
 
         # If has base_prompt, use framework
@@ -262,9 +254,7 @@ class PromptOrchestrator:
         """
         resolver = self._get_resolver()
         sections_to_inject = self._get_framework_evolved_sections()
-        fallback_map = self._get_fallback_texts(
-            [section.name for section in sections_to_inject]
-        )
+        fallback_map = self._get_fallback_texts([section.name for section in sections_to_inject])
 
         # Resolve evolved content
         resolved_list = resolver.resolve_multiple(
@@ -324,9 +314,7 @@ class PromptOrchestrator:
         if self._resolver is None:
             from victor.agent.evolved_content_resolver import EvolvedContentResolver
 
-            self._resolver = EvolvedContentResolver(
-                optimization_injector=self._injector
-            )
+            self._resolver = EvolvedContentResolver(optimization_injector=self._injector)
         return self._resolver
 
     def _get_constraint_activator(self) -> Any:

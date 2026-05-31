@@ -141,14 +141,10 @@ class ConversationSession:
     tags: List[str] = field(default_factory=list)  # User-assigned tags
 
     # State persistence (for session resume)
-    conversation_state: Optional[Dict[str, Any]] = (
-        None  # ConversationStateMachine.to_dict()
-    )
+    conversation_state: Optional[Dict[str, Any]] = None  # ConversationStateMachine.to_dict()
     execution_state: Optional[Dict[str, Any]] = None  # ExecutionState.to_dict()
     session_ledger: Optional[Dict[str, Any]] = None  # SessionLedger.to_dict()
-    compaction_hierarchy: Optional[Dict[str, Any]] = (
-        None  # Message compaction hierarchy
-    )
+    compaction_hierarchy: Optional[Dict[str, Any]] = None  # Message compaction hierarchy
 
     # Preview messages (separated from regular messages for display)
     preview_messages: List[ConversationMessage] = field(default_factory=list)
@@ -369,9 +365,7 @@ class ConversationStore:
             migrate_database(str(self.db_path))
             logger.debug(f"Database migrations completed for {self.db_path}")
         except Exception as e:
-            logger.warning(
-                f"Database migration failed (will continue with existing schema): {e}"
-            )
+            logger.warning(f"Database migration failed (will continue with existing schema): {e}")
 
         with sqlite3.connect(self.db_path) as conn:
             # SQLite performance optimizations
@@ -876,15 +870,11 @@ class ConversationStore:
 
             for col_name, col_def in messages_columns:
                 try:
-                    conn.execute(
-                        f"ALTER TABLE messages ADD COLUMN {col_name} {col_def}"
-                    )
+                    conn.execute(f"ALTER TABLE messages ADD COLUMN {col_name} {col_def}")
                     logger.info(f"Added column {col_name} to messages table")
                 except sqlite3.OperationalError as e:
                     if "duplicate column name" not in str(e).lower():
-                        logger.warning(
-                            f"Failed to add column {col_name} to messages: {e}"
-                        )
+                        logger.warning(f"Failed to add column {col_name} to messages: {e}")
 
             lineage_columns = [
                 ("agent_id", "TEXT"),
@@ -896,15 +886,11 @@ class ConversationStore:
             ]
             for col_name, col_def in lineage_columns:
                 try:
-                    conn.execute(
-                        f"ALTER TABLE messages ADD COLUMN {col_name} {col_def}"
-                    )
+                    conn.execute(f"ALTER TABLE messages ADD COLUMN {col_name} {col_def}")
                     logger.info(f"Added column {col_name} to messages table")
                 except sqlite3.OperationalError as e:
                     if "duplicate column name" not in str(e).lower():
-                        logger.warning(
-                            f"Failed to add column {col_name} to messages: {e}"
-                        )
+                        logger.warning(f"Failed to add column {col_name} to messages: {e}")
             self._backfill_message_lineage_columns(conn)
 
             # Add new columns to context_summaries table (if not exist)
@@ -924,15 +910,11 @@ class ConversationStore:
 
             for col_name, col_def in summary_columns:
                 try:
-                    conn.execute(
-                        f"ALTER TABLE context_summaries ADD COLUMN {col_name} {col_def}"
-                    )
+                    conn.execute(f"ALTER TABLE context_summaries ADD COLUMN {col_name} {col_def}")
                     logger.info(f"Added column {col_name} to context_summaries table")
                 except sqlite3.OperationalError as e:
                     if "duplicate column name" not in str(e).lower():
-                        logger.warning(
-                            f"Failed to add column {col_name} to context_summaries: {e}"
-                        )
+                        logger.warning(f"Failed to add column {col_name} to context_summaries: {e}")
 
             # Create compaction_history table for analytics
             conn.execute("""
@@ -1221,16 +1203,12 @@ class ConversationStore:
             # Check if column exists in table definition
             if col_name not in table_sql:
                 try:
-                    conn.execute(
-                        f"ALTER TABLE sessions ADD COLUMN {col_name} {col_def}"
-                    )
+                    conn.execute(f"ALTER TABLE sessions ADD COLUMN {col_name} {col_def}")
                     columns_added.append(col_name)
                 except sqlite3.OperationalError as e:
                     # Column might already exist (race condition or partial migration)
                     if "duplicate column name" not in str(e).lower():
-                        logger.warning(
-                            f"Failed to add column {col_name} to sessions: {e}"
-                        )
+                        logger.warning(f"Failed to add column {col_name} to sessions: {e}")
 
         if columns_added:
             logger.info(f"Migrated sessions table: added columns {columns_added}")
@@ -1366,9 +1344,7 @@ class ConversationStore:
 
         fam = model_family.value if model_family else "unknown"
         sz = model_size.value if model_size else "unknown"
-        logger.info(
-            f"Created session {session_id} for project: " f"{project_path} [{fam}/{sz}]"
-        )
+        logger.info(f"Created session {session_id} for project: " f"{project_path} [{fam}/{sz}]")
 
         return session
 
@@ -1440,14 +1416,10 @@ class ConversationStore:
             else conversation_state
         )
         exec_state_dict = (
-            execution_state.to_dict()
-            if hasattr(execution_state, "to_dict")
-            else execution_state
+            execution_state.to_dict() if hasattr(execution_state, "to_dict") else execution_state
         )
         ledger_dict = (
-            session_ledger.to_dict()
-            if hasattr(session_ledger, "to_dict")
-            else session_ledger
+            session_ledger.to_dict() if hasattr(session_ledger, "to_dict") else session_ledger
         )
 
         # Create or update session
@@ -1485,9 +1457,7 @@ class ConversationStore:
                 metadata = msg.get("metadata", {})
                 timestamp_str = msg.get("timestamp")
                 timestamp = (
-                    datetime.fromisoformat(timestamp_str)
-                    if timestamp_str
-                    else datetime.now()
+                    datetime.fromisoformat(timestamp_str) if timestamp_str else datetime.now()
                 )
 
                 conversation_msg = ConversationMessage(
@@ -2048,8 +2018,7 @@ class ConversationStore:
         # This reduces write overhead and file proliferation
 
         logger.debug(
-            f"Added {role.value} message to {session_id}. "
-            f"Tokens: {message.token_count}"
+            f"Added {role.value} message to {session_id}. " f"Tokens: {message.token_count}"
         )
 
         return message
@@ -2450,9 +2419,7 @@ class ConversationStore:
             "tool_usage_count": session.tool_usage_count,
             "created_at": session.created_at.isoformat(),
             "last_activity": session.last_activity.isoformat(),
-            "duration_seconds": (
-                session.last_activity - session.created_at
-            ).total_seconds(),
+            "duration_seconds": (session.last_activity - session.created_at).total_seconds(),
         }
 
     # =========================================================================
@@ -2480,9 +2447,7 @@ class ConversationStore:
                 return priority
             # AGENT_RESPONSE, LEDGER_RENDER, SYSTEM_INJECTED, UNKNOWN → fall through
 
-        canonical_tool_name = (
-            canonicalize_core_tool_name(tool_name) if tool_name else None
-        )
+        canonical_tool_name = canonicalize_core_tool_name(tool_name) if tool_name else None
 
         if role == MessageRole.SYSTEM:
             return MessagePriority.CRITICAL
@@ -2578,9 +2543,7 @@ class ConversationStore:
     ) -> str:
         """Create a compact lexical representation for execution-oriented recall."""
         parts: List[str] = []
-        canonical_tool_name = (
-            canonicalize_core_tool_name(tool_name) if tool_name else None
-        )
+        canonical_tool_name = canonicalize_core_tool_name(tool_name) if tool_name else None
         extracted_tool_name = self._extract_trace_attribute(content, "tool")
         effective_tool_name = canonical_tool_name or extracted_tool_name
 
@@ -2628,11 +2591,7 @@ class ConversationStore:
         trace_kind = metadata.get("memory_trace_kind")
         if trace_kind in {"semantic", "execution"}:
             return trace_kind
-        role = (
-            message.role
-            if isinstance(message.role, MessageRole)
-            else MessageRole(message.role)
-        )
+        role = message.role if isinstance(message.role, MessageRole) else MessageRole(message.role)
         if self._is_execution_trace_message(
             role,
             getattr(message, "tool_name", None),
@@ -2655,9 +2614,7 @@ class ConversationStore:
             if existing:
                 return str(existing)
             role = (
-                message.role
-                if isinstance(message.role, MessageRole)
-                else MessageRole(message.role)
+                message.role if isinstance(message.role, MessageRole) else MessageRole(message.role)
             )
             return self._build_execution_trace_text(
                 role=role,
@@ -2840,9 +2797,7 @@ class ConversationStore:
         )
 
         # Separate by priority
-        critical = [
-            m for m in session.messages if m.priority == MessagePriority.CRITICAL
-        ]
+        critical = [m for m in session.messages if m.priority == MessagePriority.CRITICAL]
         others = [m for m in session.messages if m.priority != MessagePriority.CRITICAL]
 
         # Sort others by score
@@ -2893,8 +2848,7 @@ class ConversationStore:
                         batch,
                     )
             logger.debug(
-                f"Deleted {len(message_ids)} pruned messages from DB "
-                f"for session {session_id}"
+                f"Deleted {len(message_ids)} pruned messages from DB " f"for session {session_id}"
             )
         except sqlite3.Error as e:
             logger.warning(f"Failed to delete pruned messages from DB: {e}")
@@ -2930,9 +2884,7 @@ class ConversationStore:
                     {
                         "role": msg.role.value,
                         "content": msg.content,
-                        "timestamp": (
-                            msg.timestamp.isoformat() if msg.timestamp else None
-                        ),
+                        "timestamp": (msg.timestamp.isoformat() if msg.timestamp else None),
                         "token_count": msg.token_count,
                         "priority": msg.priority.value if msg.priority else 50,
                         "tool_name": msg.tool_name,
@@ -3033,9 +2985,7 @@ class ConversationStore:
             return metadata
         except (TypeError, ValueError):
             # If that fails, sanitize the metadata
-            logger.debug(
-                f"Sanitizing metadata for JSON serialization: {list(metadata.keys())}"
-            )
+            logger.debug(f"Sanitizing metadata for JSON serialization: {list(metadata.keys())}")
             return {k: _sanitize_value(v) for k, v in metadata.items()}
 
     def _persist_message(self, session_id: str, message: ConversationMessage):
@@ -3277,9 +3227,7 @@ class ConversationStore:
                 cost_usd_micros = row["cost_usd_micros"] or 0
 
                 total_tokens = prompt_tokens + completion_tokens
-                cache_hit_rate = (
-                    (cached_tokens / prompt_tokens * 100) if prompt_tokens > 0 else 0.0
-                )
+                cache_hit_rate = (cached_tokens / prompt_tokens * 100) if prompt_tokens > 0 else 0.0
 
                 return {
                     "prompt_tokens": prompt_tokens,
@@ -3354,9 +3302,7 @@ class ConversationStore:
                     "total_cost_usd_micros": row["total_cost_usd_micros"] or 0,
                     "total_cost_usd": (row["total_cost_usd_micros"] or 0) / 1_000_000,
                     "cache_hit_rate": (
-                        round(total_cached / total_prompt * 100, 2)
-                        if total_prompt > 0
-                        else 0.0
+                        round(total_cached / total_prompt * 100, 2) if total_prompt > 0 else 0.0
                     ),
                 }
         except Exception as e:
@@ -3485,9 +3431,7 @@ class ConversationStore:
 
         # Parse model family from joined lookup table
         model_family = None
-        family_name = (
-            row["model_family_name"] if "model_family_name" in row_keys else None
-        )
+        family_name = row["model_family_name"] if "model_family_name" in row_keys else None
         if family_name:
             try:
                 model_family = ModelFamily(family_name)
@@ -3547,20 +3491,12 @@ class ConversationStore:
             profile=row["profile"] if "profile" in row_keys else None,
             model_family=model_family,
             model_size=model_size,
-            model_params_b=(
-                row["model_params_b"] if "model_params_b" in row_keys else None
-            ),
+            model_params_b=(row["model_params_b"] if "model_params_b" in row_keys else None),
             context_size=context_size,
-            context_tokens=(
-                row["context_tokens"] if "context_tokens" in row_keys else None
-            ),
-            tool_capable=(
-                bool(row["tool_capable"]) if "tool_capable" in row_keys else False
-            ),
+            context_tokens=(row["context_tokens"] if "context_tokens" in row_keys else None),
+            tool_capable=(bool(row["tool_capable"]) if "tool_capable" in row_keys else False),
             is_moe=bool(row["is_moe"]) if "is_moe" in row_keys else False,
-            is_reasoning=(
-                bool(row["is_reasoning"]) if "is_reasoning" in row_keys else False
-            ),
+            is_reasoning=(bool(row["is_reasoning"]) if "is_reasoning" in row_keys else False),
             # Rich session metadata (from metadata column)
             title=metadata.get("title"),
             tags=metadata.get("tags", []),
@@ -3728,9 +3664,7 @@ class ConversationStore:
             )
         )
 
-    def _get_excluded_message_ids(
-        self, session_id: str, exclude_recent: int
-    ) -> List[str]:
+    def _get_excluded_message_ids(self, session_id: str, exclude_recent: int) -> List[str]:
         """Fetch recent message IDs that should be excluded from semantic search."""
         # Get recent message IDs to exclude
         exclude_ids: List[str] = []
@@ -3846,9 +3780,7 @@ class ConversationStore:
                     continue
 
                 # Compute similarity
-                msg_embedding = self._embedding_service.embed_text_sync(
-                    message.content[:2000]
-                )
+                msg_embedding = self._embedding_service.embed_text_sync(message.content[:2000])
                 similarity = self._cosine_similarity(
                     query_embedding.tolist(), msg_embedding.tolist()
                 )
@@ -4062,8 +3994,7 @@ class ConversationStore:
                     tokens_saved
                     + len(summary_xml or summary_text)
                     // self.chars_per_token,  # token_count_before (estimated)
-                    len(summary_xml or summary_text)
-                    // self.chars_per_token,  # token_count_after
+                    len(summary_xml or summary_text) // self.chars_per_token,  # token_count_after
                     duration_ms,
                     llm_provider,
                     llm_model,
@@ -4139,9 +4070,7 @@ class ConversationStore:
                 summary = {
                     "id": row[0],
                     "summary_xml": row[1] if format_preference != "natural" else None,
-                    "summary_text": (
-                        row[2] if format_preference == "natural" else row[2]
-                    ),
+                    "summary_text": (row[2] if format_preference == "natural" else row[2]),
                     "strategy_used": row[3],
                     "complexity_score": row[4],
                     "estimated_tokens_saved": row[5],
@@ -4378,9 +4307,7 @@ class ConversationStore:
             # Calculate cutoff time
             from datetime import timedelta
 
-            cutoff_time = (
-                datetime.now(timezone.utc) - timedelta(hours=hours_back)
-            ).isoformat()
+            cutoff_time = (datetime.now(timezone.utc) - timedelta(hours=hours_back)).isoformat()
 
             # Build query with optional session filter
             session_filter = "AND session_id = ?" if session_id else ""
@@ -4412,8 +4339,7 @@ class ConversationStore:
                         "message_count_after": row["message_count_after"],
                         "token_count_before": row["token_count_before"],
                         "token_count_after": row["token_count_after"],
-                        "tokens_saved": row["token_count_before"]
-                        - row["token_count_after"],
+                        "tokens_saved": row["token_count_before"] - row["token_count_after"],
                         "duration_ms": row["duration_ms"],
                         "success": bool(row["success"]),
                         "error_message": row["error_message"],
@@ -4590,9 +4516,7 @@ class ConversationStore:
             except sqlite3.OperationalError as e:
                 # FTS5 may not be available in all SQLite builds
                 logger.warning(f"FTS5 search failed, falling back to LIKE: {e}")
-                return self._fallback_content_search(
-                    conn, session_id, query, limit, roles
-                )
+                return self._fallback_content_search(conn, session_id, query, limit, roles)
 
     def _fallback_content_search(
         self,

@@ -219,9 +219,7 @@ async def _run_graph_execution_loop(
             )
 
             if hook:
-                await hook.after_node(
-                    current_node, state, error if not success else None
-                )
+                await hook.after_node(current_node, state, error if not success else None)
 
             if not success:
                 return GraphRuntimeOutcome(
@@ -282,13 +280,9 @@ async def _run_graph_execution_loop(
                 for send in next_target:
                     node_history.append(f"send:{send.node}")
 
-                join_node = next(
-                    (send.join_at for send in next_target if send.join_at), None
-                )
+                join_node = next((send.join_at for send in next_target if send.join_at), None)
                 if join_node is not None:
-                    logger.debug(
-                        "Fan-out complete, continuing at join node '%s'", join_node
-                    )
+                    logger.debug("Fan-out complete, continuing at join node '%s'", join_node)
                     current_node = join_node
                 else:
                     current_node = end_node_token

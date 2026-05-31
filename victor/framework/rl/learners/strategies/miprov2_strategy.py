@@ -57,9 +57,7 @@ class MIPROv2Strategy:
         self._example_diversity = example_diversity
         self._max_example_chars = max_example_chars
 
-    def select_similar_traces(
-        self, traces: List[Any], query: str, top_k: int = 3
-    ) -> List[Any]:
+    def select_similar_traces(self, traces: List[Any], query: str, top_k: int = 3) -> List[Any]:
         """KNNFewShot: select traces most similar to the current query.
 
         Embeds trace descriptions and the query, then returns the top-k
@@ -97,9 +95,7 @@ class MIPROv2Strategy:
             top_indices = np.argsort(similarities)[::-1][:top_k]
             return [embedded[i][0] for i in top_indices]
         except Exception:
-            logger.debug(
-                "KNNFewShot: embedding similarity failed, falling back to top-k"
-            )
+            logger.debug("KNNFewShot: embedding similarity failed, falling back to top-k")
             return traces[:top_k]
 
     def _embed_traces(self, traces: List[Any]) -> List[Tuple[Any, Any]]:
@@ -125,8 +121,7 @@ class MIPROv2Strategy:
         for trace in traces:
             task = getattr(trace, "task_type", "default")
             tools = [
-                getattr(d, "tool_name", "")
-                for d in getattr(trace, "tool_call_details", [])[:5]
+                getattr(d, "tool_name", "") for d in getattr(trace, "tool_call_details", [])[:5]
             ]
             failures = list(getattr(trace, "tool_failures", {}).keys())
             desc = f"{task}: {' '.join(tools)} failures={','.join(failures)}"
@@ -174,16 +169,12 @@ class MIPROv2Strategy:
         if not successful:
             return current_text
 
-        successful.sort(
-            key=lambda trace: getattr(trace, "completion_score", 0.0), reverse=True
-        )
+        successful.sort(key=lambda trace: getattr(trace, "completion_score", 0.0), reverse=True)
 
         # Use KNN selection when query is available and we have more
         # traces than needed
         if query and len(successful) > self._max_examples:
-            successful = self.select_similar_traces(
-                successful, query, self._max_examples
-            )
+            successful = self.select_similar_traces(successful, query, self._max_examples)
 
         if self._example_diversity:
             successful = self._dedupe_traces(successful)
@@ -209,9 +200,7 @@ class MIPROv2Strategy:
                 provider = getattr(trace, "provider", "unknown")
                 model = getattr(trace, "model", "unknown")
                 tool_calls = getattr(trace, "tool_calls", 0)
-                descriptor = (
-                    f"provider={provider}, model={model}, tool_calls={tool_calls}"
-                )
+                descriptor = f"provider={provider}, model={model}, tool_calls={tool_calls}"
             if failures:
                 descriptor = f"{descriptor}, failures=[{', '.join(failures)}]"
             examples.append(f"Example {i} ({task}, score={score:.1f}): {descriptor}")

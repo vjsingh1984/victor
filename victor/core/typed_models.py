@@ -118,9 +118,7 @@ class ToolMetadata:
             priority=getattr(tool, "priority", Priority.MEDIUM),
             access_mode=getattr(tool, "access_mode", AccessMode.READONLY),
             danger_level=getattr(tool, "danger_level", DangerLevel.SAFE),
-            execution_category=getattr(
-                tool, "execution_category", ExecutionCategory.READ_ONLY
-            ),
+            execution_category=getattr(tool, "execution_category", ExecutionCategory.READ_ONLY),
             aliases=getattr(tool, "aliases", set()),
             category=getattr(tool, "category", None),
             keywords=getattr(tool, "keywords", []),

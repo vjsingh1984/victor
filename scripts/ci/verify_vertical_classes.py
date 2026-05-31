@@ -47,9 +47,7 @@ def load_class_spec(toml_path: Path) -> tuple[str, str]:
     class_name = class_spec.get("class_name")
 
     if not module_name or not class_name:
-        raise ValueError(
-            f"{toml_path} does not declare vertical.class.module/class_name"
-        )
+        raise ValueError(f"{toml_path} does not declare vertical.class.module/class_name")
 
     return str(module_name), str(class_name)
 
@@ -96,9 +94,7 @@ def verify_vertical_class(vertical_dir: Path) -> VerifiedVerticalClass:
         module = importlib.import_module(module_name)
         cls = getattr(module, class_name)
         if not isinstance(cls, type) or not issubclass(cls, ContractVerticalBase):
-            raise TypeError(
-                f"{class_name} does not inherit from victor_contracts.VerticalBase"
-            )
+            raise TypeError(f"{class_name} does not inherit from victor_contracts.VerticalBase")
 
         instance_name: str | None = None
         instantiate_error: str | None = None

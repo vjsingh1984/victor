@@ -121,9 +121,7 @@ class ITeamMember(IAgent, Protocol):
         """
         ...
 
-    async def receive_message(
-        self, message: "AgentMessage"
-    ) -> Optional["AgentMessage"]:
+    async def receive_message(self, message: "AgentMessage") -> Optional["AgentMessage"]:
         """Receive and optionally respond to a message.
 
         Args:
@@ -177,9 +175,7 @@ class ITeamCoordinator(Protocol):
         """
         ...
 
-    async def broadcast(
-        self, message: "AgentMessage"
-    ) -> List[Optional["AgentMessage"]]:
+    async def broadcast(self, message: "AgentMessage") -> List[Optional["AgentMessage"]]:
         """Broadcast a message to all team members.
 
         Args:
@@ -195,9 +191,7 @@ class ITeamCoordinator(Protocol):
 class IDelegateFollowUpCoordinator(Protocol):
     """Optional protocol for coordinators that resume delegate follow-up flows."""
 
-    async def execute_follow_up_request(
-        self, request: Mapping[str, Any]
-    ) -> Dict[str, Any]:
+    async def execute_follow_up_request(self, request: Mapping[str, Any]) -> Dict[str, Any]:
         """Execute a task-plus-context follow-up request.
 
         Args:

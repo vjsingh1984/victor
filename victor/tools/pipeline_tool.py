@@ -263,9 +263,7 @@ class PipelineAnalyzerTool(BaseTool):
         lines = ["**Pipeline Health Summary**", ""]
 
         lines.append(f"**Platforms:** {summary['platforms_detected']} detected")
-        lines.append(
-            f"**Configs:** {summary['pipeline_configs']} pipeline configuration(s)"
-        )
+        lines.append(f"**Configs:** {summary['pipeline_configs']} pipeline configuration(s)")
         lines.append("")
 
         # Issues
@@ -291,9 +289,7 @@ class PipelineAnalyzerTool(BaseTool):
             lines.append(f"- Uncovered files: {cov['uncovered_files']}")
             lines.append("")
 
-        lines.append(
-            f"**Recommendations:** {summary['recommendations_count']} available"
-        )
+        lines.append(f"**Recommendations:** {summary['recommendations_count']} available")
 
         return "\n".join(lines)
 
@@ -305,9 +301,7 @@ class PipelineAnalyzerTool(BaseTool):
         lines.append(f"**Configurations:** {len(result.configs)} found")
         for config in result.configs:
             lines.append(f"- {config.file_path.name} ({config.platform.value})")
-            lines.append(
-                f"  Steps: {len(config.steps)}, Triggers: {', '.join(config.triggers)}"
-            )
+            lines.append(f"  Steps: {len(config.steps)}, Triggers: {', '.join(config.triggers)}")
         lines.append("")
 
         # Issues by severity
@@ -321,9 +315,7 @@ class PipelineAnalyzerTool(BaseTool):
             for issue in critical[:5]:
                 lines.append(f"  - [{issue.category}] {issue.message}")
                 if issue.recommendation:
-                    lines.append(
-                        f"    {_get_icon('arrow_right')} {issue.recommendation}"
-                    )
+                    lines.append(f"    {_get_icon('arrow_right')} {issue.recommendation}")
 
         if warnings:
             lines.append(f"\n{_get_icon('warning')} **Warnings ({len(warnings)}):**")
@@ -358,14 +350,10 @@ class PipelineAnalyzerTool(BaseTool):
         lines.append(f"- Line Coverage: {coverage.line_coverage:.1f}%")
         lines.append(f"  ({coverage.covered_lines}/{coverage.total_lines} lines)")
         lines.append(f"- Branch Coverage: {coverage.branch_coverage:.1f}%")
-        lines.append(
-            f"  ({coverage.covered_branches}/{coverage.total_branches} branches)"
-        )
+        lines.append(f"  ({coverage.covered_branches}/{coverage.total_branches} branches)")
         if coverage.total_functions > 0:
             lines.append(f"- Function Coverage: {coverage.function_coverage:.1f}%")
-            lines.append(
-                f"  ({coverage.covered_functions}/{coverage.total_functions} functions)"
-            )
+            lines.append(f"  ({coverage.covered_functions}/{coverage.total_functions} functions)")
         lines.append("")
 
         if coverage.uncovered_files:
@@ -397,32 +385,22 @@ class PipelineAnalyzerTool(BaseTool):
         lines.append(f"- Line Coverage: {line_delta:+.1f}%")
         lines.append(f"- Branch Coverage: {branch_delta:+.1f}%")
         if "function_coverage_delta" in comparison:
-            lines.append(
-                f"- Function Coverage: {comparison['function_coverage_delta']:+.1f}%"
-            )
+            lines.append(f"- Function Coverage: {comparison['function_coverage_delta']:+.1f}%")
         lines.append("")
 
         # Changed files
         if comparison.get("improved_files"):
             lines.append(f"**Improved Files ({len(comparison['improved_files'])}):**")
             for item in comparison["improved_files"][:5]:
-                lines.append(
-                    f"  {_get_icon('success')} {item['file']} (+{item['delta']:.1f}%)"
-                )
+                lines.append(f"  {_get_icon('success')} {item['file']} (+{item['delta']:.1f}%)")
 
         if comparison.get("regressed_files"):
-            lines.append(
-                f"\n**Regressed Files ({len(comparison['regressed_files'])}):**"
-            )
+            lines.append(f"\n**Regressed Files ({len(comparison['regressed_files'])}):**")
             for item in comparison["regressed_files"][:5]:
-                lines.append(
-                    f"  {_get_icon('error')} {item['file']} ({item['delta']:.1f}%)"
-                )
+                lines.append(f"  {_get_icon('error')} {item['file']} ({item['delta']:.1f}%)")
 
         if comparison.get("new_uncovered_files"):
-            lines.append(
-                f"\n**New Uncovered Files ({len(comparison['new_uncovered_files'])}):**"
-            )
+            lines.append(f"\n**New Uncovered Files ({len(comparison['new_uncovered_files'])}):**")
             for f in comparison["new_uncovered_files"][:5]:
                 lines.append(f"  {_get_icon('warning')} {f}")
 

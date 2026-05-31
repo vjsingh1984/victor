@@ -95,21 +95,16 @@ class MergeAnalysis:
         return {
             "risk_level": self.risk_level.value,
             "conflict_count": self.conflict_count,
-            "overlapping_files": [
-                conflict.to_dict() for conflict in self.overlapping_files
-            ],
+            "overlapping_files": [conflict.to_dict() for conflict in self.overlapping_files],
             "readonly_violations": {
-                member_id: list(paths)
-                for member_id, paths in self.readonly_violations.items()
+                member_id: list(paths) for member_id, paths in self.readonly_violations.items()
             },
             "out_of_scope_writes": {
-                member_id: list(paths)
-                for member_id, paths in self.out_of_scope_writes.items()
+                member_id: list(paths) for member_id, paths in self.out_of_scope_writes.items()
             },
             "potential_scope_overlaps": list(self.potential_scope_overlaps),
             "member_changed_files": {
-                member_id: list(paths)
-                for member_id, paths in self.member_changed_files.items()
+                member_id: list(paths) for member_id, paths in self.member_changed_files.items()
             },
             "recommended_merge_order": list(self.recommended_merge_order),
             "notes": list(self.notes),
@@ -126,10 +121,7 @@ class MergeAnalyzer:
         worktree_plan: Optional[WorktreeExecutionPlan] = None,
     ) -> MergeAnalysis:
         assignments = (
-            {
-                assignment.member_id: assignment
-                for assignment in worktree_plan.assignments
-            }
+            {assignment.member_id: assignment for assignment in worktree_plan.assignments}
             if worktree_plan is not None
             else {}
         )
@@ -188,22 +180,14 @@ class MergeAnalyzer:
         if out_of_scope_writes:
             notes.append("Some members wrote outside their claimed worktree scope.")
         if readonly_violations:
-            notes.append(
-                "Readonly shared paths were modified during isolated execution."
-            )
+            notes.append("Readonly shared paths were modified during isolated execution.")
         if potential_scope_overlaps:
-            notes.append(
-                "Claimed write scopes overlap and may require manual merge ordering."
-            )
+            notes.append("Claimed write scopes overlap and may require manual merge ordering.")
 
         risk_level = self._classify_risk(
             overlap_count=len(overlapping_files),
-            out_of_scope_count=sum(
-                len(paths) for paths in out_of_scope_writes.values()
-            ),
-            readonly_violation_count=sum(
-                len(paths) for paths in readonly_violations.values()
-            ),
+            out_of_scope_count=sum(len(paths) for paths in out_of_scope_writes.values()),
+            readonly_violation_count=sum(len(paths) for paths in readonly_violations.values()),
             scope_overlap_count=len(potential_scope_overlaps),
         )
         conflict_count = (

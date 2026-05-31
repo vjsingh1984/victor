@@ -45,15 +45,12 @@ class ContinuationStatePatch:
             continuation_prompts=updates_dict.get("continuation_prompts"),
             asking_input_prompts=updates_dict.get("asking_input_prompts"),
             synthesis_nudge_count=updates_dict.get("synthesis_nudge_count"),
-            cumulative_prompt_interventions=updates_dict.get(
-                "cumulative_prompt_interventions"
-            ),
+            cumulative_prompt_interventions=updates_dict.get("cumulative_prompt_interventions"),
             final_summary_requested=bool(
                 final_summary_requested or updates_dict.get("final_summary_requested")
             ),
             max_prompts_summary_requested=bool(
-                max_prompts_summary_requested
-                or updates_dict.get("max_prompts_summary_requested")
+                max_prompts_summary_requested or updates_dict.get("max_prompts_summary_requested")
             ),
         )
 
@@ -68,9 +65,7 @@ class ContinuationStatePatch:
         if self.synthesis_nudge_count is not None:
             updates["synthesis_nudge_count"] = self.synthesis_nudge_count
         if self.cumulative_prompt_interventions is not None:
-            updates["cumulative_prompt_interventions"] = (
-                self.cumulative_prompt_interventions
-            )
+            updates["cumulative_prompt_interventions"] = self.cumulative_prompt_interventions
         if self.final_summary_requested:
             updates["final_summary_requested"] = True
         if self.max_prompts_summary_requested:

@@ -159,9 +159,7 @@ class HttpxOpenAICompatProvider(BaseProvider):
         """
         return {"temperature": temperature, "max_tokens": max_tokens}
 
-    def _extract_response_metadata(
-        self, message: Dict[str, Any]
-    ) -> Optional[Dict[str, Any]]:
+    def _extract_response_metadata(self, message: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Extract provider-specific metadata from a non-streaming response message.
 
         Override to capture fields like ``reasoning_content`` (ZAI, DeepSeek).
@@ -169,9 +167,7 @@ class HttpxOpenAICompatProvider(BaseProvider):
         """
         return None
 
-    def _extract_stream_metadata(
-        self, delta: Dict[str, Any]
-    ) -> Optional[Dict[str, Any]]:
+    def _extract_stream_metadata(self, delta: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Extract provider-specific metadata from a streaming delta.
 
         Override to capture ``reasoning_content`` in thinking-mode streams.
@@ -197,9 +193,7 @@ class HttpxOpenAICompatProvider(BaseProvider):
     def _convert_tools(self, tools: List[ToolDefinition]) -> List[Dict[str, Any]]:
         return convert_tools_to_openai_format(tools)
 
-    async def _send_chat_completion_request(
-        self, payload: Dict[str, Any]
-    ) -> httpx.Response:
+    async def _send_chat_completion_request(self, payload: Dict[str, Any]) -> httpx.Response:
         """Send a non-streaming chat-completions request with status validation.
 
         This helper ensures transient HTTP failures are raised inside the shared
@@ -209,9 +203,7 @@ class HttpxOpenAICompatProvider(BaseProvider):
         response.raise_for_status()
         return response
 
-    async def _open_chat_completion_stream(
-        self, payload: Dict[str, Any]
-    ) -> httpx.Response:
+    async def _open_chat_completion_stream(self, payload: Dict[str, Any]) -> httpx.Response:
         """Open a streaming chat-completions response with status validation.
 
         For non-200 responses we eagerly read the body so the raised
@@ -254,9 +246,7 @@ class HttpxOpenAICompatProvider(BaseProvider):
                 "This usually indicates a conversation initialization issue."
             )
 
-        provider_params = self._get_provider_params(
-            model, temperature, max_tokens, **kwargs
-        )
+        provider_params = self._get_provider_params(model, temperature, max_tokens, **kwargs)
 
         payload: Dict[str, Any] = {
             "model": model,
@@ -277,9 +267,7 @@ class HttpxOpenAICompatProvider(BaseProvider):
 
         # Log detailed message structure for debugging tool pairing issues
         tool_messages = [
-            (i, m)
-            for i, m in enumerate(formatted)
-            if m.get("role") in ("tool", "assistant")
+            (i, m) for i, m in enumerate(formatted) if m.get("role") in ("tool", "assistant")
         ]
         if tool_messages:
             for i, msg in tool_messages:
@@ -376,9 +364,7 @@ class HttpxOpenAICompatProvider(BaseProvider):
                     args_str = tc.get("arguments", "{}")
                     try:
                         parsed_args = (
-                            json.loads(args_str)
-                            if isinstance(args_str, str)
-                            else args_str
+                            json.loads(args_str) if isinstance(args_str, str) else args_str
                         )
                     except json.JSONDecodeError:
                         parsed_args = {}
@@ -495,9 +481,7 @@ class HttpxOpenAICompatProvider(BaseProvider):
 
                     try:
                         chunk_data = json.loads(data_str)
-                        chunk = self._parse_stream_chunk(
-                            chunk_data, accumulated_tool_calls
-                        )
+                        chunk = self._parse_stream_chunk(chunk_data, accumulated_tool_calls)
                         if chunk:
                             if chunk.is_final:
                                 has_sent_final = True
@@ -527,9 +511,7 @@ class HttpxOpenAICompatProvider(BaseProvider):
         except httpx.ReadError as e:
             # Mid-stream connection drop — surface a clear message rather than an empty error_msg.
             # The classify_error() path sets error_msg=str(e) which is "" for bare ReadError().
-            error_detail = (
-                str(e) or "connection dropped mid-stream (no additional detail)"
-            )
+            error_detail = str(e) or "connection dropped mid-stream (no additional detail)"
             logger.warning(
                 "%s stream ReadError: %s — retrying once",
                 self.name,

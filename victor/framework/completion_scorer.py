@@ -226,9 +226,7 @@ class CompletionScorer:
         fulfillment_score = self._extract_fulfillment_score(fulfillment_result)
         keyword_score = self._extract_keyword_score(keyword_result)
         confidence_score = self._extract_confidence_score(perception)
-        complexity_adjustment = self._calculate_complexity_adjustment(
-            perception, task_type
-        )
+        complexity_adjustment = self._calculate_complexity_adjustment(perception, task_type)
 
         # Calculate weighted sum
         total_score = (
@@ -286,9 +284,7 @@ class CompletionScorer:
             breakdown=breakdown,
         )
 
-    def _extract_requirement_score(
-        self, requirement_result: Optional[ValidationResult]
-    ) -> float:
+    def _extract_requirement_score(self, requirement_result: Optional[ValidationResult]) -> float:
         """Extract requirement satisfaction score."""
         if requirement_result is None:
             # No requirements available - neutral score
@@ -315,10 +311,7 @@ class CompletionScorer:
         if hasattr(fulfillment_result, "is_fulfilled"):
             if fulfillment_result.is_fulfilled:
                 return 0.95
-            elif (
-                hasattr(fulfillment_result, "is_partial")
-                and fulfillment_result.is_partial
-            ):
+            elif hasattr(fulfillment_result, "is_partial") and fulfillment_result.is_partial:
                 return 0.6
             else:
                 return 0.3
@@ -326,9 +319,7 @@ class CompletionScorer:
         # Unknown format - neutral score
         return 0.5
 
-    def _extract_keyword_score(
-        self, keyword_result: Optional[CompletionSignal]
-    ) -> float:
+    def _extract_keyword_score(self, keyword_result: Optional[CompletionSignal]) -> float:
         """Extract keyword confidence score."""
         if keyword_result is None:
             # No keyword detection - neutral score

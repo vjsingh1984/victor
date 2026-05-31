@@ -44,9 +44,7 @@ async def test_graph_query_security_block():
         result = await graph(mode=GraphMode.QUERY, query=sql)
 
         assert result["success"] is True  # graph() itself succeeded
-        assert (
-            result["result"]["success"] is False
-        )  # but the inner query failed security
+        assert result["result"]["success"] is False  # but the inner query failed security
         assert "Only SELECT queries are allowed" in result["result"]["error"]
 
 

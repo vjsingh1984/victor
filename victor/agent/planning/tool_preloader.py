@@ -227,8 +227,7 @@ class ToolPreloader:
                 )
 
             logger.debug(
-                f"Preloading {len(to_preload)} tools: "
-                f"{[p.tool_name for p in to_preload]}"
+                f"Preloading {len(to_preload)} tools: " f"{[p.tool_name for p in to_preload]}"
             )
 
             self._preload_count += len(to_preload)
@@ -364,9 +363,7 @@ class ToolPreloader:
 
         return schema
 
-    async def _load_schema_from_registry(
-        self, tool_name: str
-    ) -> Optional[Dict[str, Any]]:
+    async def _load_schema_from_registry(self, tool_name: str) -> Optional[Dict[str, Any]]:
         """Load tool schema from registry.
 
         Args:

@@ -53,9 +53,7 @@ class ComputeNodeExecutor:
         """
         self._context = context
 
-    async def execute(
-        self, node: "ComputeNode", state: "WorkflowState"
-    ) -> "WorkflowState":
+    async def execute(self, node: "ComputeNode", state: "WorkflowState") -> "WorkflowState":
         """Execute a compute node.
 
         Args:
@@ -140,9 +138,7 @@ class ComputeNodeExecutor:
                 output = result.output if result else None
                 tool_calls_used = result.tool_calls_used if result else 0
             else:
-                logger.warning(
-                    f"Handler '{node.handler}' not found for node '{node.id}'"
-                )
+                logger.warning(f"Handler '{node.handler}' not found for node '{node.id}'")
                 output = {"error": f"Handler '{node.handler}' not found"}
         else:
             # Step 4: Execute tools directly
@@ -167,8 +163,7 @@ class ComputeNodeExecutor:
                                     "workflow_context": state,
                                     "constraints": (
                                         node.constraints.to_dict()
-                                        if hasattr(node, "constraints")
-                                        and node.constraints
+                                        if hasattr(node, "constraints") and node.constraints
                                         else {}
                                     ),
                                 },
@@ -183,11 +178,7 @@ class ComputeNodeExecutor:
                         else:
                             outputs[tool_name] = {"error": result.error}
 
-                        if (
-                            hasattr(node, "fail_fast")
-                            and node.fail_fast
-                            and not result.success
-                        ):
+                        if hasattr(node, "fail_fast") and node.fail_fast and not result.success:
                             break
 
                     except asyncio.TimeoutError:
@@ -269,8 +260,7 @@ class ComputeNodeExecutor:
         runnable = create_chain(name, vertical=vertical)
         if runnable is None:
             logger.warning(
-                f"Chain '{chain_ref}' not found in registry "
-                f"(vertical={vertical}, name={name})"
+                f"Chain '{chain_ref}' not found in registry " f"(vertical={vertical}, name={name})"
             )
             return None
 
@@ -304,18 +294,14 @@ class ComputeNodeExecutor:
             # Prepare input data from context and input_mapping
             input_data = self._prepare_chain_input(node, context)
 
-            logger.debug(
-                f"Executing chain '{chain_ref}' with input: {list(input_data.keys())}"
-            )
+            logger.debug(f"Executing chain '{chain_ref}' with input: {list(input_data.keys())}")
 
             # Get timeout from node
             timeout = getattr(node, "timeout", 300)
 
             try:
                 # Execute chain with timeout
-                output = await asyncio.wait_for(
-                    runnable.invoke(input_data), timeout=timeout
-                )
+                output = await asyncio.wait_for(runnable.invoke(input_data), timeout=timeout)
 
                 # Update context with output
                 self._update_context(context, node, output)
@@ -329,16 +315,12 @@ class ComputeNodeExecutor:
             except asyncio.TimeoutError:
                 error = f"Chain '{chain_ref}' timed out after {timeout}s"
                 logger.error(error)
-                return NodeResult(
-                    node_id=node.id, status=ExecutorNodeStatus.FAILED, error=error
-                )
+                return NodeResult(node_id=node.id, status=ExecutorNodeStatus.FAILED, error=error)
 
             except Exception as e:
                 error = f"Chain '{chain_ref}' execution failed: {e}"
                 logger.error(error, exc_info=True)
-                return NodeResult(
-                    node_id=node.id, status=ExecutorNodeStatus.FAILED, error=error
-                )
+                return NodeResult(node_id=node.id, status=ExecutorNodeStatus.FAILED, error=error)
 
         return chain_handler
 

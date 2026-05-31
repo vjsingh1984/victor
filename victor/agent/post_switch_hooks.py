@@ -187,9 +187,7 @@ class SystemPromptHook:
             project_context = self._get_project_context()
 
             if project_context and project_context.content:
-                full_prompt = (
-                    base_prompt + "\n\n" + project_context.get_system_prompt_addition()
-                )
+                full_prompt = base_prompt + "\n\n" + project_context.get_system_prompt_addition()
             else:
                 full_prompt = base_prompt
 

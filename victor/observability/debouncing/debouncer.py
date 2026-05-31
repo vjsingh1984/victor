@@ -314,18 +314,14 @@ class SessionStartDebouncer:
         """
         if event_key in self._events:
             self._events[event_key] = [
-                record
-                for record in self._events[event_key]
-                if record.timestamp > window_start
+                record for record in self._events[event_key] if record.timestamp > window_start
             ]
 
             # Clean up empty lists
             if not self._events[event_key]:
                 del self._events[event_key]
 
-    def _cleanup_old_events_for_session(
-        self, session_id: str, window_start: datetime
-    ) -> None:
+    def _cleanup_old_events_for_session(self, session_id: str, window_start: datetime) -> None:
         """
         Remove old events for all event keys belonging to a session.
 
@@ -334,9 +330,7 @@ class SessionStartDebouncer:
             window_start: Start of the current window.
         """
         keys_to_clean = [
-            key
-            for key in self._events.keys()
-            if key.startswith(session_id) or key == session_id
+            key for key in self._events.keys() if key.startswith(session_id) or key == session_id
         ]
 
         for key in keys_to_clean:

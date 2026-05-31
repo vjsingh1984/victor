@@ -7,14 +7,9 @@ from victor.framework.request_scope_heuristics import (
 
 
 def test_contains_keyword_marker_uses_whole_word_matching():
+    assert contains_keyword_marker("please implement this change", ("implement", "change")) is True
     assert (
-        contains_keyword_marker("please implement this change", ("implement", "change"))
-        is True
-    )
-    assert (
-        contains_keyword_marker(
-            "clean code implementations and changes", ("implement", "change")
-        )
+        contains_keyword_marker("clean code implementations and changes", ("implement", "change"))
         is False
     )
 
@@ -54,8 +49,6 @@ def test_conversation_history_has_explicit_target_detects_recent_file_reference(
 
 
 def test_conversation_history_has_explicit_target_returns_false_without_scope():
-    history = [
-        {"role": "assistant", "content": "Start with the biggest migration first."}
-    ]
+    history = [{"role": "assistant", "content": "Start with the biggest migration first."}]
 
     assert conversation_history_has_explicit_target(history) is False

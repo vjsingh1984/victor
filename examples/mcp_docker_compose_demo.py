@@ -81,9 +81,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 # Set up logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 # Docker Compose configuration for MCP servers
@@ -605,14 +603,10 @@ async def demo_multi_server_registry():
     if "playwright" in results and results["playwright"]:
         print("\n   [Playwright]")
         pw_tools = registry.get_tools_by_server("playwright")
-        navigate_tool = next(
-            (t for t in pw_tools if "navigate" in t.name.lower()), None
-        )
+        navigate_tool = next((t for t in pw_tools if "navigate" in t.name.lower()), None)
         if navigate_tool:
             print(f"   Calling: {navigate_tool.name}")
-            result = await registry.call_tool(
-                navigate_tool.name, url="https://example.com"
-            )
+            result = await registry.call_tool(navigate_tool.name, url="https://example.com")
             if result.success:
                 print("   Navigation successful!")
             else:
@@ -796,9 +790,7 @@ Examples:
     if not check_docker_compose_available():
         print("\nError: Docker Compose is not available.")
         print("\nInstallation:")
-        print(
-            "  - Docker Desktop includes Compose: https://www.docker.com/products/docker-desktop"
-        )
+        print("  - Docker Desktop includes Compose: https://www.docker.com/products/docker-desktop")
         print("  - Or install standalone: https://docs.docker.com/compose/install/")
         return
 

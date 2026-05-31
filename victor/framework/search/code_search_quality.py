@@ -134,9 +134,7 @@ def enrich_code_search_results(
             if fallback_snippet:
                 result["snippet"] = fallback_snippet
 
-        if resolved_snippet and _should_replace_content(
-            result.get("content"), metadata_dict
-        ):
+        if resolved_snippet and _should_replace_content(result.get("content"), metadata_dict):
             result["content"] = resolved_snippet
             metadata_dict.setdefault("content_source", "line_window")
 
@@ -177,9 +175,7 @@ def rerank_code_search_results(
     for position, raw_result in enumerate(results):
         result = dict(raw_result)
         base_score = _coerce_float(
-            result.get(
-                "combined_score", result.get("score", result.get("similarity", 0.0))
-            )
+            result.get("combined_score", result.get("score", result.get("similarity", 0.0)))
         )
         total_relevance += base_score
         utility_score = base_score
@@ -215,17 +211,13 @@ def rerank_code_search_results(
             utility_score += quality_config.identifier_bonus
 
         result["utility_rank_score"] = round(max(0.0, utility_score), 6)
-        rescored_results.append(
-            (result["utility_rank_score"], base_score, -position, result)
-        )
+        rescored_results.append((result["utility_rank_score"], base_score, -position, result))
 
     rescored_results.sort(reverse=True)
     reranked_results = [result for _, _, _, result in rescored_results]
     average_relevance = total_relevance / len(results) if results else 0.0
     average_rank_score = (
-        sum(score for score, _, _, _ in rescored_results) / len(results)
-        if results
-        else 0.0
+        sum(score for score, _, _, _ in rescored_results) / len(results) if results else 0.0
     )
 
     reranking_metadata = {
@@ -309,10 +301,7 @@ def _resolve_file_window(
     if not snippet:
         return None
     if len(snippet) > config.max_snippet_chars:
-        snippet = (
-            snippet[: config.max_snippet_chars - 24].rstrip()
-            + "... [snippet truncated]"
-        )
+        snippet = snippet[: config.max_snippet_chars - 24].rstrip() + "... [snippet truncated]"
     return snippet
 
 
@@ -384,9 +373,7 @@ def _extract_query_signals(query: str) -> List[str]:
         if len(normalized) < 3 or normalized in _QUERY_STOPWORDS:
             continue
         is_high_signal = (
-            any(ch in normalized for ch in "._/-:")
-            or "_" in normalized
-            or token[:1].isupper()
+            any(ch in normalized for ch in "._/-:") or "_" in normalized or token[:1].isupper()
         )
         if not is_high_signal or normalized in seen:
             continue
@@ -404,9 +391,7 @@ def _is_implementation_path(file_path: str) -> bool:
     lowered = file_path.lower()
     if not lowered or _is_test_path(lowered):
         return False
-    return not any(
-        lowered.startswith(prefix) for prefix in _NON_IMPLEMENTATION_PREFIXES
-    )
+    return not any(lowered.startswith(prefix) for prefix in _NON_IMPLEMENTATION_PREFIXES)
 
 
 def _as_non_empty_str(value: Any) -> str:

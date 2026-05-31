@@ -232,9 +232,7 @@ class BasicCodebaseAnalyzer(CodebaseAnalyzerProtocol):
             imports=imports,
         )
 
-    async def get_dependencies(
-        self, file_path: Path, **kwargs: Any
-    ) -> FileDependencies:
+    async def get_dependencies(self, file_path: Path, **kwargs: Any) -> FileDependencies:
         """Get dependencies for a file.
 
         Args:
@@ -365,11 +363,7 @@ class BasicCodebaseAnalyzer(CodebaseAnalyzerProtocol):
                     # "import X" style - the first name is the module
                     first_name = import_names[0].strip() if import_names else ""
                     module = first_name
-                    names = (
-                        [n.strip() for n in import_names[1:]]
-                        if len(import_names) > 1
-                        else []
-                    )
+                    names = [n.strip() for n in import_names[1:]] if len(import_names) > 1 else []
                     is_from = False
 
                 imports.append(

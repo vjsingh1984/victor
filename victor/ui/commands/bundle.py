@@ -34,12 +34,8 @@ app = typer.Typer(help="Product bundle management commands")
 
 @app.command()
 def list(
-    bundle: Optional[str] = typer.Option(
-        None, "--bundle", "-b", help="Filter by bundle"
-    ),
-    status: Optional[str] = typer.Option(
-        None, "--status", "-s", help="Filter by status"
-    ),
+    bundle: Optional[str] = typer.Option(None, "--bundle", "-b", help="Filter by bundle"),
+    status: Optional[str] = typer.Option(None, "--status", "-s", help="Filter by status"),
 ):
     """
     List installed verticals.
@@ -106,9 +102,7 @@ def list(
                 typer.echo(f"  {status_icon} {info.name} ({version_str})")
 
                 if info.capabilities:
-                    typer.echo(
-                        f"    Capabilities: {', '.join(sorted(info.capabilities))}"
-                    )
+                    typer.echo(f"    Capabilities: {', '.join(sorted(info.capabilities))}")
 
     run_sync(_list())
 
@@ -128,9 +122,7 @@ def bundles():
         typer.echo(f"  {bundle.name} - {bundle.display_name} [{tier_str}]")
         typer.echo(f"    {bundle.description}")
 
-        verticals_str = (
-            ", ".join(bundle.verticals) if bundle.verticals else "None (core framework)"
-        )
+        verticals_str = ", ".join(bundle.verticals) if bundle.verticals else "None (core framework)"
         typer.echo(f"    Verticals: {verticals_str}")
 
         if bundle.optional_verticals:
@@ -197,9 +189,7 @@ def info(
 @app.command()
 def install(
     bundle: str = typer.Argument(..., help="Bundle name to install"),
-    dry_run: bool = typer.Option(
-        False, "--dry-run", help="Show command without executing"
-    ),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show command without executing"),
 ):
     """
     Install a product bundle.
@@ -216,9 +206,7 @@ def install(
         raise typer.Exit(1)
 
     typer.echo(f"\nInstalling {bundle_obj.display_name}...")
-    typer.echo(
-        f"\nThis will install: {', '.join(bundle_obj.verticals) or 'core framework only'}"
-    )
+    typer.echo(f"\nThis will install: {', '.join(bundle_obj.verticals) or 'core framework only'}")
 
     if bundle_obj.optional_verticals:
         typer.echo(f"\nOptional verticals: {', '.join(bundle_obj.optional_verticals)}")
@@ -237,9 +225,7 @@ def install(
 
 @app.command()
 def check(
-    bundle: Optional[str] = typer.Option(
-        None, "--bundle", "-b", help="Check specific bundle"
-    ),
+    bundle: Optional[str] = typer.Option(None, "--bundle", "-b", help="Check specific bundle"),
 ):
     """
     Check vertical installation status.

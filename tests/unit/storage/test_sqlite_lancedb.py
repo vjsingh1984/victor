@@ -146,9 +146,7 @@ class TestCombineScores:
 
 
 def _symbol(uid: str = "sym:src/foo.py:Foo", name: str = "Foo") -> UnifiedSymbol:
-    return UnifiedSymbol(
-        unified_id=uid, name=name, type="class", file_path="src/foo.py"
-    )
+    return UnifiedSymbol(unified_id=uid, name=name, type="class", file_path="src/foo.py")
 
 
 # ---------------------------------------------------------------------------
@@ -271,14 +269,11 @@ class TestHybridSearch:
     async def test_results_limited_to_params_limit(self, store):
         store._initialized = True
         results_mock = [
-            MagicMock(symbol=MagicMock(unified_id=f"s{i}"), score=float(i))
-            for i in range(10)
+            MagicMock(symbol=MagicMock(unified_id=f"s{i}"), score=float(i)) for i in range(10)
         ]
 
         with (
-            patch.object(
-                store, "_semantic_search", AsyncMock(return_value=results_mock)
-            ),
+            patch.object(store, "_semantic_search", AsyncMock(return_value=results_mock)),
             patch.object(store, "_keyword_search", AsyncMock(return_value=[])),
         ):
             params = SearchParams(query="foo", limit=3, mode=SearchMode.SEMANTIC)

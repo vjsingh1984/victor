@@ -408,9 +408,7 @@ class TestPathResolverSuggestSimilar:
         suggestions = resolver.suggest_similar("xyzabc123.zzz", limit=5)
         assert isinstance(suggestions, list)
 
-    def test_prefers_package_entry_files_for_missing_module_path(
-        self, resolver, temp_project
-    ):
+    def test_prefers_package_entry_files_for_missing_module_path(self, resolver, temp_project):
         """Package-backed modules should suggest concrete package files first."""
         package_dir = temp_project / "victor" / "core" / "registry"
         package_dir.mkdir(parents=True)

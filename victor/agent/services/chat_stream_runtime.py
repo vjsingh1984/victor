@@ -101,9 +101,7 @@ class ServiceStreamingRuntime(ChatStreamHelperMixin):
 
     def __init__(self, orchestrator: Any) -> None:
         self._orchestrator = orchestrator
-        self._intent_classification_handler: Optional["IntentClassificationHandler"] = (
-            None
-        )
+        self._intent_classification_handler: Optional["IntentClassificationHandler"] = None
         self._continuation_handler: Optional["ContinuationHandler"] = None
         self._tool_execution_handler: Optional["ToolExecutionHandler"] = None
         self._streaming_executor: Optional["StreamingChatExecutor"] = None
@@ -114,10 +112,7 @@ class ServiceStreamingRuntime(ChatStreamHelperMixin):
     ) -> StreamingRuntimeBindings:
         """Return resolved runtime state/capability bindings for the active owner."""
         owner = runtime_owner if runtime_owner is not None else self._orchestrator
-        if (
-            self._runtime_bindings is None
-            or self._runtime_bindings.runtime_owner is not owner
-        ):
+        if self._runtime_bindings is None or self._runtime_bindings.runtime_owner is not owner:
             self._runtime_bindings = StreamingRuntimeBindings.resolve(owner)
         return self._runtime_bindings
 
@@ -185,9 +180,7 @@ class ServiceStreamingRuntime(ChatStreamHelperMixin):
         text = str(getattr(value, "value", value)).strip()
         return text or None
 
-    def _classify_stream_outcome(
-        self, ctx: Any, *, failed: bool = False
-    ) -> Dict[str, Any]:
+    def _classify_stream_outcome(self, ctx: Any, *, failed: bool = False) -> Dict[str, Any]:
         """Derive a shared stream outcome snapshot for telemetry finalizers."""
         quality_score = self._coerce_unit_float(getattr(ctx, "last_quality_score", 0.0))
         has_substantial_content = False
@@ -228,10 +221,7 @@ class ServiceStreamingRuntime(ChatStreamHelperMixin):
         action = self._coerce_optional_text(event.get("action"))
         reason = self._coerce_optional_text(event.get("reason"))
         strategy_name = self._coerce_optional_text(event.get("strategy_name"))
-        failure_type = (
-            self._coerce_optional_text(event.get("failure_type"))
-            or "STREAMING_RECOVERY"
-        )
+        failure_type = self._coerce_optional_text(event.get("failure_type")) or "STREAMING_RECOVERY"
         reasons = []
         for value in (action, strategy_name, reason):
             if value and value not in reasons:
@@ -239,9 +229,7 @@ class ServiceStreamingRuntime(ChatStreamHelperMixin):
 
         adaptation_cost = event.get("adaptation_cost")
         try:
-            adaptation_cost_value = (
-                float(adaptation_cost) if adaptation_cost is not None else 1.0
-            )
+            adaptation_cost_value = float(adaptation_cost) if adaptation_cost is not None else 1.0
         except (TypeError, ValueError):
             adaptation_cost_value = 1.0
 
@@ -252,8 +240,7 @@ class ServiceStreamingRuntime(ChatStreamHelperMixin):
             confidence_value = None
 
         normalized = {
-            "source": self._coerce_optional_text(event.get("source"))
-            or "streaming_recovery",
+            "source": self._coerce_optional_text(event.get("source")) or "streaming_recovery",
             "kind": self._coerce_optional_text(event.get("kind")) or "recovery_action",
             "failure_type": failure_type,
             "provider": self._coerce_optional_text(event.get("provider")),
@@ -269,9 +256,7 @@ class ServiceStreamingRuntime(ChatStreamHelperMixin):
             "reason": reason,
             "strategy_name": strategy_name,
             "confidence": confidence_value,
-            "fallback_provider": self._coerce_optional_text(
-                event.get("fallback_provider")
-            ),
+            "fallback_provider": self._coerce_optional_text(event.get("fallback_provider")),
             "fallback_model": self._coerce_optional_text(event.get("fallback_model")),
         }
         return normalized
@@ -383,20 +368,15 @@ class ServiceStreamingRuntime(ChatStreamHelperMixin):
             parts.append(f"files examined: {preview}")
 
         recent_tools = sorted(
-            str(item)
-            for item in (getattr(ctx, "executed_tool_names", set()) or set())
-            if item
+            str(item) for item in (getattr(ctx, "executed_tool_names", set()) or set()) if item
         )
         if recent_tools:
             parts.append(f"tools used: {', '.join(recent_tools[:4])}")
 
         if cls._has_degraded_resume_state(ctx, failed=failed):
-            provider_status_events = list(
-                getattr(ctx, "provider_status_events", []) or []
-            )
+            provider_status_events = list(getattr(ctx, "provider_status_events", []) or [])
             if any(
-                event.get("kind") == "tool_history_repaired"
-                for event in provider_status_events
+                event.get("kind") == "tool_history_repaired" for event in provider_status_events
             ):
                 parts.append("previous provider request required tool-history repair")
             elif failed:
@@ -406,9 +386,7 @@ class ServiceStreamingRuntime(ChatStreamHelperMixin):
 
         return "; ".join(parts)
 
-    async def stream_chat(
-        self, user_message: str, **kwargs: Any
-    ) -> AsyncIterator["StreamChunk"]:
+    async def stream_chat(self, user_message: str, **kwargs: Any) -> AsyncIterator["StreamChunk"]:
         """Stream a response through the canonical service-owned executor."""
         _ = kwargs.pop("_preserve_iteration", None)
         fallback_iteration = kwargs.pop("_fallback_iteration", 0)
@@ -433,9 +411,7 @@ class ServiceStreamingRuntime(ChatStreamHelperMixin):
             raise
         finally:
             ctx = None
-            current_stream_context = bindings.get_capability_value(
-                "current_stream_context"
-            )
+            current_stream_context = bindings.get_capability_value("current_stream_context")
             if current_stream_context is not None:
                 ctx = current_stream_context
             else:
@@ -448,10 +424,7 @@ class ServiceStreamingRuntime(ChatStreamHelperMixin):
                     for key in cumulative_usage or {}:
                         if key in ctx.cumulative_usage:
                             cumulative_usage[key] += ctx.cumulative_usage[key]
-                    if (
-                        isinstance(cumulative_usage, dict)
-                        and cumulative_usage["total_tokens"] == 0
-                    ):
+                    if isinstance(cumulative_usage, dict) and cumulative_usage["total_tokens"] == 0:
                         cumulative_usage["total_tokens"] = (
                             cumulative_usage["prompt_tokens"]
                             + cumulative_usage["completion_tokens"]
@@ -466,52 +439,40 @@ class ServiceStreamingRuntime(ChatStreamHelperMixin):
                         except Exception:
                             pass
 
-                topology_feedback_payload = (
-                    self._build_stream_topology_feedback_payload(
-                        ctx,
-                        failed=stream_failed,
-                    )
+                topology_feedback_payload = self._build_stream_topology_feedback_payload(
+                    ctx,
+                    failed=stream_failed,
                 )
                 if topology_feedback_payload is not None:
-                    ctx.topology_events = list(
-                        topology_feedback_payload["topology_events"]
-                    )
+                    ctx.topology_events = list(topology_feedback_payload["topology_events"])
                     runtime_intelligence = state_dict.get("_runtime_intelligence")
                     if runtime_intelligence is not None and hasattr(
                         runtime_intelligence, "record_topology_outcome"
                     ):
                         try:
-                            runtime_intelligence.record_topology_outcome(
-                                topology_feedback_payload
-                            )
+                            runtime_intelligence.record_topology_outcome(topology_feedback_payload)
                         except Exception as exc:
                             logger.debug(
                                 "Failed to record streaming topology runtime outcome: %s",
                                 exc,
                             )
 
-                degradation_feedback_payload = (
-                    self._build_stream_degradation_feedback_payload(
-                        ctx,
-                        failed=stream_failed,
-                    )
+                degradation_feedback_payload = self._build_stream_degradation_feedback_payload(
+                    ctx,
+                    failed=stream_failed,
                 )
                 if degradation_feedback_payload is not None:
                     ctx.degradation_events = list(
                         degradation_feedback_payload["degradation_events"]
                     )
-                    ctx.recovery_events = list(
-                        degradation_feedback_payload["recovery_events"]
-                    )
+                    ctx.recovery_events = list(degradation_feedback_payload["recovery_events"])
 
                 degraded_resume_state = self._has_degraded_resume_state(
                     ctx,
                     failed=stream_failed,
                 )
                 resume_recent_resources = sorted(
-                    str(item)
-                    for item in (getattr(ctx, "unique_resources", set()) or set())
-                    if item
+                    str(item) for item in (getattr(ctx, "unique_resources", set()) or set()) if item
                 )[:8]
                 resume_recent_tools = sorted(
                     str(item)
@@ -522,16 +483,12 @@ class ServiceStreamingRuntime(ChatStreamHelperMixin):
                     ctx,
                     failed=stream_failed,
                 )
-                provider_status_events = list(
-                    getattr(ctx, "provider_status_events", []) or []
-                )
+                provider_status_events = list(getattr(ctx, "provider_status_events", []) or [])
 
                 state_host._last_stream_task_context = {
                     "unified_task_type": getattr(ctx, "unified_task_type", None),
                     "task_classification": getattr(ctx, "task_classification", None),
-                    "complexity_tool_budget": getattr(
-                        ctx, "complexity_tool_budget", None
-                    ),
+                    "complexity_tool_budget": getattr(ctx, "complexity_tool_budget", None),
                     "coarse_task_type": getattr(ctx, "coarse_task_type", None),
                     "is_analysis_task": bool(getattr(ctx, "is_analysis_task", False)),
                     "is_action_task": bool(getattr(ctx, "is_action_task", False)),

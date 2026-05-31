@@ -334,9 +334,7 @@ class SimilarityComputerProtocol(NativeAcceleratorProtocol, Protocol):
         """
         ...
 
-    def batch_cosine(
-        self, query: List[float], corpus: List[List[float]]
-    ) -> List[float]:
+    def batch_cosine(self, query: List[float], corpus: List[List[float]]) -> List[float]:
         """Compute cosine similarity of query against corpus.
 
         Args:
@@ -389,9 +387,7 @@ class TextChunkerProtocol(NativeAcceleratorProtocol, Protocol):
     Optimized for code chunking where line boundaries matter.
     """
 
-    def chunk_with_overlap(
-        self, text: str, chunk_size: int, overlap: int
-    ) -> List[ChunkInfo]:
+    def chunk_with_overlap(self, text: str, chunk_size: int, overlap: int) -> List[ChunkInfo]:
         """Chunk text with overlap, respecting line boundaries.
 
         Args:
@@ -490,9 +486,7 @@ class AstIndexerProtocol(NativeAcceleratorProtocol, Protocol):
         """
         ...
 
-    def extract_identifiers_with_positions(
-        self, source: str
-    ) -> List[Tuple[str, int, int]]:
+    def extract_identifiers_with_positions(self, source: str) -> List[Tuple[str, int, int]]:
         """Extract identifiers with their positions.
 
         Args:

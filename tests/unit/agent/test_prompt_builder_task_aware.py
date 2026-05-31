@@ -131,9 +131,7 @@ class TestTaskGuidance:
         assert builder._map_edge_focus_to_builder_sections({"concise_mode"}) == set()
 
         builder.concise_mode = True
-        assert builder._map_edge_focus_to_builder_sections({"concise_mode"}) == {
-            "concise_mode"
-        }
+        assert builder._map_edge_focus_to_builder_sections({"concise_mode"}) == {"concise_mode"}
 
 
 class TestGEPAPromptIntegration:
@@ -170,9 +168,7 @@ class TestGEPAPromptIntegration:
         from victor.agent.prompt_builder import ASI_TOOL_EFFECTIVENESS_GUIDANCE
 
         builder = _make_builder()
-        with patch.object(
-            builder, "_get_active_sections", return_value={"tool_guidance"}
-        ):
+        with patch.object(builder, "_get_active_sections", return_value={"tool_guidance"}):
             prompt = builder.build()
         assert ASI_TOOL_EFFECTIVENESS_GUIDANCE in prompt
 
@@ -317,9 +313,7 @@ class TestGEPAPromptIntegration:
         )
 
         with (
-            patch.object(
-                builder, "_get_active_sections", return_value={"tool_guidance"}
-            ),
+            patch.object(builder, "_get_active_sections", return_value={"tool_guidance"}),
             patch(
                 "victor.agent.evolved_content_resolver.EvolvedContentResolver.resolve_section",
                 side_effect=lambda section_name, *args, **kwargs: ResolvedContent(
@@ -330,9 +324,7 @@ class TestGEPAPromptIntegration:
                         else kwargs.get("fallback_text") or ""
                     ),
                     source=(
-                        "evolved"
-                        if section_name == "ASI_TOOL_EFFECTIVENESS_GUIDANCE"
-                        else "static"
+                        "evolved" if section_name == "ASI_TOOL_EFFECTIVENESS_GUIDANCE" else "static"
                     ),
                     metadata={},
                 ),
@@ -378,9 +370,7 @@ class TestGEPAPromptIntegration:
             ),
         ):
             injector = OptimizationInjector()
-            sections = injector.get_evolved_sections(
-                "deepseek", "deepseek-chat", "edit"
-            )
+            sections = injector.get_evolved_sections("deepseek", "deepseek-chat", "edit")
 
         assert any(evolved_text in s for s in sections)
 
@@ -421,9 +411,7 @@ class TestGEPAPromptIntegration:
             ),
         ):
             injector = OptimizationInjector()
-            sections = injector.get_evolved_sections(
-                "deepseek", "deepseek-chat", "edit"
-            )
+            sections = injector.get_evolved_sections("deepseek", "deepseek-chat", "edit")
 
             # System prompt retains static COMPLETION_GUIDANCE
             builder = _make_builder()
@@ -564,9 +552,7 @@ class TestPromptOptimizationSettings:
         assert s.gepa.max_prompt_chars == 1500
         assert s.gepa.default_tier == "balanced"
         assert s.get_strategies_for_section("CONCISE_MODE_GUIDANCE") == ["prefpo"]
-        assert s.get_strategies_for_section("LARGE_FILE_PAGINATION_GUIDANCE") == [
-            "gepa"
-        ]
+        assert s.get_strategies_for_section("LARGE_FILE_PAGINATION_GUIDANCE") == ["gepa"]
 
 
 class TestOptimizationInjectorFewShots:
@@ -615,9 +601,7 @@ class TestOptimizationInjectorFewShots:
             )
 
         grounding = next(
-            payload
-            for payload in payloads
-            if payload["section_name"] == "GROUNDING_RULES"
+            payload for payload in payloads if payload["section_name"] == "GROUNDING_RULES"
         )
         assert grounding["text"] == "BOUND GROUNDING"
         assert grounding["provider"] == "anthropic"
@@ -672,9 +656,7 @@ class TestOptimizationInjectorFewShots:
             )
 
         grounding = next(
-            payload
-            for payload in payloads
-            if payload["section_name"] == "GROUNDING_RULES"
+            payload for payload in payloads if payload["section_name"] == "GROUNDING_RULES"
         )
         assert grounding["text"] == "EVOLVED GROUNDING"
         assert grounding["provider"] == "anthropic"
@@ -791,9 +773,7 @@ class TestOptimizationInjectorFewShots:
         names = [payload["section_name"] for payload in payloads]
         assert "CUSTOM_REVIEW_GUIDANCE" in names
         custom_payload = next(
-            payload
-            for payload in payloads
-            if payload["section_name"] == "CUSTOM_REVIEW_GUIDANCE"
+            payload for payload in payloads if payload["section_name"] == "CUSTOM_REVIEW_GUIDANCE"
         )
         assert custom_payload["text"] == "EVOLVED CUSTOM REVIEW"
         assert custom_payload["prompt_candidate_hash"] == "cand-custom"
@@ -873,9 +853,7 @@ class TestOptimizationInjectorFewShots:
         )
 
         mock_learner = MagicMock()
-        mock_learner.get_query_aware_few_shots.side_effect = (
-            lambda query: f"few-shot for {query}"
-        )
+        mock_learner.get_query_aware_few_shots.side_effect = lambda query: f"few-shot for {query}"
         mock_coordinator = MagicMock()
         mock_coordinator.get_learner.return_value = mock_learner
 
@@ -954,9 +932,7 @@ class TestOptimizationInjectorFewShots:
         )
 
         mock_learner = MagicMock()
-        mock_learner.get_query_aware_few_shots.return_value = (
-            "few-shot for fix auth bug"
-        )
+        mock_learner.get_query_aware_few_shots.return_value = "few-shot for fix auth bug"
         mock_coordinator = MagicMock()
         mock_coordinator.get_learner.return_value = mock_learner
 

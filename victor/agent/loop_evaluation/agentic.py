@@ -174,9 +174,7 @@ class AgenticLoopEvaluator(LoopEvaluator):
 
         return EvaluationDecision.CONTINUE
 
-    def _map_decision(
-        self, decision: EvaluationDecision, ctx: LoopContext
-    ) -> LoopDecision:
+    def _map_decision(self, decision: EvaluationDecision, ctx: LoopContext) -> LoopDecision:
         """Map EvaluationDecision to a LoopDecision with continuation action."""
 
         if decision == EvaluationDecision.COMPLETE:
@@ -242,9 +240,7 @@ class AgenticLoopEvaluator(LoopEvaluator):
             set_max_prompts_summary_requested=True,
         )
 
-    def _prompt_tool_call(
-        self, reason: str, continuation_prompts: int = 0
-    ) -> LoopDecision:
+    def _prompt_tool_call(self, reason: str, continuation_prompts: int = 0) -> LoopDecision:
         patch = ContinuationStatePatch(continuation_prompts=continuation_prompts + 1)
         return LoopDecision(
             action=ContinuationActionType.PROMPT_TOOL_CALL,

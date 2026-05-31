@@ -105,9 +105,7 @@ class TestEventTaxonomyDomainRegistrations:
         from victor.workflows.streaming import WorkflowEventType
 
         self._ensure_registrations()
-        canonical = EventTaxonomyRegistry.to_canonical(
-            "workflow", WorkflowEventType.AGENT_CONTENT
-        )
+        canonical = EventTaxonomyRegistry.to_canonical("workflow", WorkflowEventType.AGENT_CONTENT)
         assert canonical == EventType.CONTENT
 
     def test_team_error_maps_to_canonical(self):

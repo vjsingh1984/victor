@@ -197,9 +197,7 @@ class ContextWindowMonitor:
 
             if isinstance(content, list):
                 # Handle multimodal content
-                content = " ".join(
-                    c.get("text", "") for c in content if isinstance(c, dict)
-                )
+                content = " ".join(c.get("text", "") for c in content if isinstance(c, dict))
 
             tokens = self.estimate_tokens(str(content))
 
@@ -393,9 +391,7 @@ class ContextWindowMonitor:
 
         growth_total = tokens[-1] - tokens[0]
         time_span_ms = times[-1] - times[0]
-        growth_rate_per_sec = (
-            growth_total / (time_span_ms / 1000) if time_span_ms > 0 else 0
-        )
+        growth_rate_per_sec = growth_total / (time_span_ms / 1000) if time_span_ms > 0 else 0
 
         # Determine trend
         if growth_rate_per_sec > 100:

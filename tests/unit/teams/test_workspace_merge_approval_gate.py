@@ -39,9 +39,7 @@ def _contract(**overrides) -> dict:
 class TestGateRules:
     def test_fix_validation_action_always_blocks(self):
         decision = _gate().evaluate(
-            _contract(
-                next_action="fix_validation", merge_ready=True, merge_risk_level="low"
-            ),
+            _contract(next_action="fix_validation", merge_ready=True, merge_risk_level="low"),
             context={},
         )
         assert decision.approved is False
@@ -96,9 +94,7 @@ class TestMergeApprovalDecision:
             requires_human_review=False,
             blocking_issues=[],
         )
-        with pytest.raises(
-            (dataclasses.FrozenInstanceError, TypeError, AttributeError)
-        ):
+        with pytest.raises((dataclasses.FrozenInstanceError, TypeError, AttributeError)):
             d.approved = False  # type: ignore[misc]
 
     def test_decision_serializable_via_asdict(self):
@@ -124,9 +120,7 @@ class TestShouldExecuteMergeWithReview:
         service = WorkspaceIsolationService(runtime=MagicMock())
         contract = _contract(merge_ready=True, merge_risk_level="low")
 
-        decision = service.should_execute_merge_with_review(
-            {}, merge_review_contract=contract
-        )
+        decision = service.should_execute_merge_with_review({}, merge_review_contract=contract)
 
         assert isinstance(decision, MergeApprovalDecision)
         assert decision.approved is True
@@ -135,9 +129,7 @@ class TestShouldExecuteMergeWithReview:
         service = WorkspaceIsolationService(runtime=MagicMock())
         contract = _contract(next_action="fix_validation")
 
-        decision = service.should_execute_merge_with_review(
-            {}, merge_review_contract=contract
-        )
+        decision = service.should_execute_merge_with_review({}, merge_review_contract=contract)
 
         assert decision.approved is False
 
@@ -161,9 +153,7 @@ class TestGateAttachedToResultPayload:
             requires_human_review=True,
             blocking_issues=[],
         )
-        coordinator._workspace_isolation.should_execute_merge_with_review.return_value = (
-            approval
-        )
+        coordinator._workspace_isolation.should_execute_merge_with_review.return_value = approval
 
         result = {}
         result["merge_approval_decision"] = dataclasses.asdict(approval)

@@ -126,9 +126,7 @@ class TestCodeSandbox:
             mock_client = MagicMock()
             mock_docker.return_value = mock_client
             mock_container = MagicMock()
-            mock_container.remove.side_effect = docker.errors.NotFound(
-                "Container not found"
-            )
+            mock_container.remove.side_effect = docker.errors.NotFound("Container not found")
 
             manager = CodeSandbox()
             manager.container = mock_container
@@ -308,9 +306,7 @@ class TestSandboxTool:
         }
 
         context = {"code_manager": mock_sandbox}
-        result = await sandbox(
-            operation="execute", code="print('Hello')", context=context
-        )
+        result = await sandbox(operation="execute", code="print('Hello')", context=context)
 
         assert "Exit Code: 0" in result
         assert "Hello" in result
@@ -327,9 +323,7 @@ class TestSandboxTool:
         }
 
         context = {"code_manager": mock_sandbox}
-        result = await sandbox(
-            operation="execute", code="raise Exception('test')", context=context
-        )
+        result = await sandbox(operation="execute", code="raise Exception('test')", context=context)
 
         assert "Exit Code: 1" in result
         assert "STDERR" in result
@@ -339,9 +333,7 @@ class TestSandboxTool:
     async def test_execute_no_manager(self):
         """Test execution without code manager in context."""
         context = {}
-        result = await sandbox(
-            operation="execute", code="print('test')", context=context
-        )
+        result = await sandbox(operation="execute", code="print('test')", context=context)
 
         assert "Error" in result
         assert "CodeSandbox not found" in result
@@ -367,9 +359,7 @@ class TestSandboxTool:
         mock_sandbox.put_files.side_effect = Exception("Upload failed")
 
         context = {"code_manager": mock_sandbox}
-        result = await sandbox(
-            operation="upload", file_paths=["file.txt"], context=context
-        )
+        result = await sandbox(operation="upload", file_paths=["file.txt"], context=context)
 
         assert "Error uploading files" in result
         assert "Upload failed" in result
@@ -378,9 +368,7 @@ class TestSandboxTool:
     async def test_upload_no_manager(self):
         """Test upload without code manager in context."""
         context = {}
-        result = await sandbox(
-            operation="upload", file_paths=["file.txt"], context=context
-        )
+        result = await sandbox(operation="upload", file_paths=["file.txt"], context=context)
 
         assert "Error" in result
         assert "CodeSandbox not found" in result

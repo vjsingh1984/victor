@@ -186,9 +186,7 @@ async def _list_lmstudio_models(settings, endpoint: str = None) -> None:
             console.print("\n[dim]Load a model in LMStudio to see it here[/]")
             return
 
-        table = Table(
-            title=f"Available Models (LMStudio @ {base_url})", show_header=True
-        )
+        table = Table(title=f"Available Models (LMStudio @ {base_url})", show_header=True)
         table.add_column("Model", style="cyan", no_wrap=True)
         table.add_column("Tools", style="green", justify="center")
         table.add_column("Thinking", style="yellow", justify="center")
@@ -306,9 +304,7 @@ async def _list_llamacpp_models(settings, endpoint: str = None) -> None:
                     if "n_ctx" in gen:
                         console.print(f"  Context: {gen.get('n_ctx', 'unknown')}")
         else:
-            table = Table(
-                title=f"Available Models (llama.cpp @ {base_url})", show_header=True
-            )
+            table = Table(title=f"Available Models (llama.cpp @ {base_url})", show_header=True)
             table.add_column("Model", style="cyan", no_wrap=True)
             table.add_column("Type", style="yellow")
 
@@ -430,9 +426,7 @@ async def _list_anthropic_models(settings) -> None:
 
     if not api_key:
         console.print("[red]Anthropic API key not configured[/]")
-        console.print(
-            "Set ANTHROPIC_API_KEY environment variable or configure in profiles.yaml"
-        )
+        console.print("Set ANTHROPIC_API_KEY environment variable or configure in profiles.yaml")
         return
 
     anthropic = AnthropicProvider(**provider_settings)
@@ -474,9 +468,7 @@ async def _list_openai_models(settings) -> None:
 
     if not api_key:
         console.print("[red]OpenAI API key not configured[/]")
-        console.print(
-            "Set OPENAI_API_KEY environment variable or configure in profiles.yaml"
-        )
+        console.print("Set OPENAI_API_KEY environment variable or configure in profiles.yaml")
         return
 
     openai = OpenAIProvider(**provider_settings)
@@ -528,9 +520,7 @@ async def _list_google_models(settings) -> None:
 
     if not api_key:
         console.print("[red]Google API key not configured[/]")
-        console.print(
-            "Set GOOGLE_API_KEY environment variable or configure in profiles.yaml"
-        )
+        console.print("Set GOOGLE_API_KEY environment variable or configure in profiles.yaml")
         return
 
     try:
@@ -585,9 +575,7 @@ async def _list_cerebras_models(settings) -> None:
 
     if not api_key:
         console.print("[red]Cerebras API key not configured[/]")
-        console.print(
-            "Set CEREBRAS_API_KEY or use: [bold]victor keys set cerebras[/bold]"
-        )
+        console.print("Set CEREBRAS_API_KEY or use: [bold]victor keys set cerebras[/bold]")
         return
 
     try:
@@ -689,9 +677,7 @@ async def _list_groqcloud_models(settings) -> None:
             console.print("[yellow]No models found[/]")
             return
 
-        table = Table(
-            title="Groq Cloud Models (Ultra-Fast LPU Inference)", show_header=True
-        )
+        table = Table(title="Groq Cloud Models (Ultra-Fast LPU Inference)", show_header=True)
         table.add_column("Model ID", style="cyan", no_wrap=True)
         table.add_column("Description", style="yellow")
         table.add_column("Context", style="green")
@@ -702,9 +688,7 @@ async def _list_groqcloud_models(settings) -> None:
             model_id = model_info.get("id", "unknown")
             # Get additional info from our model registry
             local_info = GROQ_MODELS.get(model_id, {})
-            description = local_info.get(
-                "description", model_info.get("description", "-")
-            )
+            description = local_info.get("description", model_info.get("description", "-"))
             context = local_info.get("context_window", 131072)
             supports_tools = "✓" if local_info.get("supports_tools", True) else "-"
             is_preview = "preview" if local_info.get("preview", False) else "stable"

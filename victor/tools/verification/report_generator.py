@@ -217,20 +217,14 @@ class VerificationReportGenerator:
             fp_confidence = 0.0
             fp_reason = ""
             if self._fp_detector:
-                is_fp, fp_reason, fp_confidence = (
-                    self._fp_detector.is_likely_false_positive(issue)
-                )
+                is_fp, fp_reason, fp_confidence = self._fp_detector.is_likely_false_positive(issue)
 
             # Skip false positives from main issue list
             if is_fp and fp_confidence > 0.7:
                 summary.false_positives += 1
                 report.false_positives.append(
                     {
-                        **(
-                            issue_input
-                            if isinstance(issue_input, dict)
-                            else issue.model_dump()
-                        ),
+                        **(issue_input if isinstance(issue_input, dict) else issue.model_dump()),
                         "fp_reason": fp_reason,
                         "fp_confidence": fp_confidence,
                     }
@@ -243,9 +237,7 @@ class VerificationReportGenerator:
             severity = SeverityLevel.INFO
             severity_score = 0.0
             if self._weighting:
-                severity_score, severity = self._weighting.score_and_classify(
-                    issue.model_dump()
-                )
+                severity_score, severity = self._weighting.score_and_classify(issue.model_dump())
 
             # Update severity counts
             if severity == SeverityLevel.CRITICAL:
@@ -263,9 +255,7 @@ class VerificationReportGenerator:
             temporal_nature = TemporalNature.UNKNOWN
             if self._temporal and issue.file_path:
                 temporal_ctx = self._temporal.analyze_issue_temporal_context(issue)
-                temporal_nature = temporal_ctx.get(
-                    "temporal_nature", TemporalNature.UNKNOWN
-                )
+                temporal_nature = temporal_ctx.get("temporal_nature", TemporalNature.UNKNOWN)
 
                 if temporal_nature == TemporalNature.TEMPORARY:
                     summary.temporary += 1
@@ -283,9 +273,7 @@ class VerificationReportGenerator:
 
             # Build issue result
             issue_result = {
-                **(
-                    issue_input if isinstance(issue_input, dict) else issue.model_dump()
-                ),
+                **(issue_input if isinstance(issue_input, dict) else issue.model_dump()),
                 "verified": result.is_grounded,
                 "confidence": result.confidence,
                 "evidence_count": len(result.evidence.get("sources", [])),
@@ -316,21 +304,13 @@ class VerificationReportGenerator:
 
         # Priority recommendations based on severity
         if summary.critical > 0:
-            recommendations.append(
-                f"Address {summary.critical} critical issue(s) immediately"
-            )
+            recommendations.append(f"Address {summary.critical} critical issue(s) immediately")
 
         if summary.high > 5:
-            recommendations.append(
-                f"Consider prioritizing the {summary.high} high-severity issues"
-            )
+            recommendations.append(f"Consider prioritizing the {summary.high} high-severity issues")
 
         # False positive recommendations
-        fp_rate = (
-            summary.false_positives / summary.total_issues
-            if summary.total_issues > 0
-            else 0
-        )
+        fp_rate = summary.false_positives / summary.total_issues if summary.total_issues > 0 else 0
         if fp_rate > 0.3:
             recommendations.append(
                 f"High false positive rate ({fp_rate:.0%}) - review analysis filters"
@@ -473,12 +453,8 @@ class VerificationReportGenerator:
         table.add_column("Metric", style="cyan")
         table.add_column("Value")
         table.add_row("Total Issues", str(report.summary.total_issues))
-        table.add_row(
-            "Genuine Issues", f"[green]{report.summary.genuine_issues}[/green]"
-        )
-        table.add_row(
-            "False Positives", f"[yellow]{report.summary.false_positives}[/yellow]"
-        )
+        table.add_row("Genuine Issues", f"[green]{report.summary.genuine_issues}[/green]")
+        table.add_row("False Positives", f"[yellow]{report.summary.false_positives}[/yellow]")
         console.print(table)
 
         # Severity table

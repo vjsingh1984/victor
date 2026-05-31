@@ -34,9 +34,7 @@ def parse_agent_ids(raw_agent_ids: Optional[str]) -> Optional[list[str]]:
     """Parse a comma-separated agent ID list."""
     if raw_agent_ids is None:
         return None
-    agent_ids = [
-        agent_id.strip() for agent_id in raw_agent_ids.split(",") if agent_id.strip()
-    ]
+    agent_ids = [agent_id.strip() for agent_id in raw_agent_ids.split(",") if agent_id.strip()]
     return agent_ids or None
 
 
@@ -51,9 +49,7 @@ class BayesianMonitoringService:
     def render_summary(self, days: int = DEFAULT_BAYESIAN_LOOKBACK_DAYS) -> str:
         """Render a system summary."""
         system_summary = self.monitor.get_system_summary(days)
-        lines = self._header(
-            f"Bayesian Orchestration System Summary (Last {days} days)"
-        )
+        lines = self._header(f"Bayesian Orchestration System Summary (Last {days} days)")
         lines.extend(
             [
                 "Belief States:",
@@ -107,11 +103,7 @@ class BayesianMonitoringService:
             )
 
         lines.append("")
-        lines.append(
-            self.renderer.render_bar_chart(
-                chart_data, "Reliability Comparison"
-            ).rstrip()
-        )
+        lines.append(self.renderer.render_bar_chart(chart_data, "Reliability Comparison").rstrip())
         return "\n".join(lines)
 
     def render_consensus(self, days: int = DEFAULT_BAYESIAN_LOOKBACK_DAYS) -> str:
@@ -187,9 +179,7 @@ class BayesianMonitoringService:
         """Render an agent correlation matrix and notable pairs."""
         matrix = self.monitor.get_correlation_matrix(list(agent_ids), days)
         lines = [
-            self.renderer.render_heatmap(
-                matrix, f"Agent Correlations (Last {days} days)"
-            ).rstrip()
+            self.renderer.render_heatmap(matrix, f"Agent Correlations (Last {days} days)").rstrip()
         ]
         lines.append("")
         lines.append("Highly Correlated Pairs (|correlation| > 0.7):")

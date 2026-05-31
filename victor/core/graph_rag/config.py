@@ -89,9 +89,7 @@ class GraphIndexConfig:
     respect_gitignore: bool = True
     detect_languages: bool = True
     enable_module_metrics: bool = True
-    parse_workers: int = (
-        0  # Thread-pool workers for parallel AST parsing (0 = cpu_count)
-    )
+    parse_workers: int = 0  # Thread-pool workers for parallel AST parsing (0 = cpu_count)
     write_batch_size: int = 20  # Files per mini-batch flush in the streaming pipeline
     queue_maxsize: int = 100  # Bounded queue depth between producers and consumer
 

@@ -167,12 +167,7 @@ def _parse_hunk(lines: List[str], start_idx: int) -> Tuple[Optional[Hunk], int]:
             break
 
         # Accept context (+/-/space) lines
-        if (
-            line.startswith("+")
-            or line.startswith("-")
-            or line.startswith(" ")
-            or line == ""
-        ):
+        if line.startswith("+") or line.startswith("-") or line.startswith(" ") or line == "":
             hunk_lines.append(line)
             i += 1
         # Handle "\ No newline at end of file" marker
@@ -232,9 +227,7 @@ def apply_patch_to_content(
         match_line = _find_matching_location(lines, old_lines, target_line, fuzz)
 
         if match_line is None:
-            warnings.append(
-                f"Could not apply hunk at line {hunk.old_start}: context mismatch"
-            )
+            warnings.append(f"Could not apply hunk at line {hunk.old_start}: context mismatch")
             continue
 
         # Apply the hunk

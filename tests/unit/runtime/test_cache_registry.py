@@ -140,9 +140,7 @@ class TestCacheEntry:
         assert called == [True]
 
     def test_get_size_with_len(self):
-        entry = CacheEntry(
-            name="test", cache={"a": 1, "b": 2}, category=CacheCategory.GENERAL
-        )
+        entry = CacheEntry(name="test", cache={"a": 1, "b": 2}, category=CacheCategory.GENERAL)
         assert entry.get_size() == 2
 
     def test_get_size_returns_none_for_unsized(self):

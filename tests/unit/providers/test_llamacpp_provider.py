@@ -63,9 +63,7 @@ def sample_tool():
         description="Get the weather for a location",
         parameters={
             "type": "object",
-            "properties": {
-                "location": {"type": "string", "description": "The city name"}
-            },
+            "properties": {"location": {"type": "string", "description": "The city name"}},
             "required": ["location"],
         },
     )
@@ -153,9 +151,7 @@ class TestExtractToolCallsFromContent:
 
     def test_extract_json_block(self):
         """Test extracting tool call from JSON code block."""
-        content = (
-            '```json\n{"name": "read_file", "arguments": {"path": "test.py"}}\n```'
-        )
+        content = '```json\n{"name": "read_file", "arguments": {"path": "test.py"}}\n```'
         tool_calls, remaining = _extract_tool_calls_from_content(content)
         assert len(tool_calls) == 1
         assert tool_calls[0]["name"] == "read_file"

@@ -158,25 +158,16 @@ class TestOrchestrationFacadeProperties:
         assert facade.iteration_coordinator._mock_name == "iteration_coordinator"
         assert facade.task_analyzer._mock_name == "task_analyzer"
         assert facade.exploration_state_passed._mock_name == "exploration_state_passed"
-        assert (
-            facade.system_prompt_state_passed._mock_name == "system_prompt_state_passed"
-        )
+        assert facade.system_prompt_state_passed._mock_name == "system_prompt_state_passed"
         assert facade.safety_state_passed._mock_name == "safety_state_passed"
-        assert (
-            facade.coordination_state_passed._mock_name == "coordination_state_passed"
-        )
+        assert facade.coordination_state_passed._mock_name == "coordination_state_passed"
         assert facade.presentation._mock_name == "presentation"
-        assert (
-            facade.vertical_integration_adapter._mock_name
-            == "vertical_integration_adapter"
-        )
+        assert facade.vertical_integration_adapter._mock_name == "vertical_integration_adapter"
         assert facade.vertical_context._mock_name == "vertical_context"
         assert facade.observability._mock_name == "observability"
         assert facade.execution_tracer._mock_name == "execution_tracer"
         assert facade.tool_call_tracer._mock_name == "tool_call_tracer"
-        assert (
-            facade.runtime_intelligence_integration._mock_name == "runtime_intelligence"
-        )
+        assert facade.runtime_intelligence_integration._mock_name == "runtime_intelligence"
         assert facade.subagent_orchestrator._mock_name == "subagent_orchestrator"
 
     def test_lazy_getters_resolve_supported_runtime_surfaces(self):
@@ -254,9 +245,7 @@ class TestRuntimeStateHostIntegration:
 
         runtime_state_host._chat_stream_adapter = MagicMock(name="updated_adapter")
         runtime_state_host._turn_executor = MagicMock(name="updated_turn_executor")
-        runtime_state_host._protocol_adapter = MagicMock(
-            name="updated_protocol_adapter"
-        )
+        runtime_state_host._protocol_adapter = MagicMock(name="updated_protocol_adapter")
         runtime_state_host._iteration_coordinator = MagicMock(name="updated_iteration")
         runtime_state_host._observability = MagicMock(name="updated_observability")
         runtime_state_host._runtime_intelligence_integration = MagicMock(

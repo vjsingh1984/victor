@@ -16,9 +16,7 @@ async def test_victor_client_reset_conversation_delegates_to_chat_service() -> N
     client = VictorClient(config, container=object())
 
     mock_chat_service = AsyncMock()
-    execution_context = SimpleNamespace(
-        services=SimpleNamespace(chat=mock_chat_service)
-    )
+    execution_context = SimpleNamespace(services=SimpleNamespace(chat=mock_chat_service))
 
     client._context = execution_context
     client._initialized = True
@@ -48,9 +46,7 @@ async def test_victor_client_get_messages_delegates_to_context_service() -> None
     mock_context_service = AsyncMock()
     mock_context_service.get_messages.return_value = fake_messages
 
-    execution_context = SimpleNamespace(
-        services=SimpleNamespace(context=mock_context_service)
-    )
+    execution_context = SimpleNamespace(services=SimpleNamespace(context=mock_context_service))
 
     client._context = execution_context
     client._initialized = True
@@ -72,9 +68,7 @@ async def test_victor_client_get_messages_raises_when_not_initialized() -> None:
 
 
 @pytest.mark.asyncio
-async def test_victor_client_get_messages_returns_empty_when_service_unavailable() -> (
-    None
-):
+async def test_victor_client_get_messages_returns_empty_when_service_unavailable() -> None:
     """Test get_messages returns empty list when ContextService unavailable."""
     config = SessionConfig()
     client = VictorClient(config, container=object())
@@ -131,9 +125,7 @@ async def test_victor_client_reset_conversation_resolves_chat_service_from_conte
 
 
 @pytest.mark.asyncio
-async def test_victor_client_get_messages_resolves_context_service_from_context_container() -> (
-    None
-):
+async def test_victor_client_get_messages_resolves_context_service_from_context_container() -> None:
     """Test get_messages uses canonical runtime service resolution."""
     config = SessionConfig()
     client = VictorClient(config, container=object())

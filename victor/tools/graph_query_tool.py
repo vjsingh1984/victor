@@ -41,18 +41,10 @@ class GraphSemanticSearchInput(BaseModel):
     """Input for graph_semantic_search tool."""
 
     query: str = Field(description="Natural language query about the codebase")
-    path: str = Field(
-        default=".", description="Path to search within (default: current directory)"
-    )
-    mode: str = Field(
-        default="semantic", description="Query mode: semantic, structural, or hybrid"
-    )
-    max_hops: int = Field(
-        default=2, description="Maximum hops for graph traversal (1-3)"
-    )
-    max_results: int = Field(
-        default=10, description="Maximum number of results to return"
-    )
+    path: str = Field(default=".", description="Path to search within (default: current directory)")
+    mode: str = Field(default="semantic", description="Query mode: semantic, structural, or hybrid")
+    max_hops: int = Field(default=2, description="Maximum hops for graph traversal (1-3)")
+    max_results: int = Field(default=10, description="Maximum number of results to return")
 
 
 class ImpactAnalysisInput(BaseModel):
@@ -65,15 +57,11 @@ class ImpactAnalysisInput(BaseModel):
         default="forward",
         description="Analysis type: forward (downstream) or backward (upstream)",
     )
-    max_depth: int = Field(
-        default=3, description="Maximum depth for impact analysis (1-5)"
-    )
+    max_depth: int = Field(default=3, description="Maximum depth for impact analysis (1-5)")
     include_test_impact: bool = Field(
         default=True, description="Whether to include test impact in analysis"
     )
-    path: str = Field(
-        default=".", description="Path to search within (default: current directory)"
-    )
+    path: str = Field(default=".", description="Path to search within (default: current directory)")
 
 
 # =============================================================================

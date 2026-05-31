@@ -38,10 +38,7 @@ class TestTreeSitterCapabilityPattern:
 
             for node in ast.walk(tree):
                 if isinstance(node, ast.ImportFrom) and node.module:
-                    if (
-                        "tree_sitter_manager" in node.module
-                        and "victor_coding" in node.module
-                    ):
+                    if "tree_sitter_manager" in node.module and "victor_coding" in node.module:
                         rel = py_file.relative_to(CORE_DIR.parent)
                         violations.append(f"{rel}:{node.lineno}: from {node.module}")
 
@@ -92,9 +89,7 @@ class TestTreeSitterCapabilityPattern:
             for node in ast.walk(tree):
                 if isinstance(node, ast.ImportFrom) and node.module:
                     if node.module.startswith("victor_coding"):
-                        violations.append(
-                            f"{rel_path}:{node.lineno}: from {node.module}"
-                        )
+                        violations.append(f"{rel_path}:{node.lineno}: from {node.module}")
 
         assert not violations, (
             "Core tree-sitter consumers must use CapabilityRegistry, not victor_coding.\n"

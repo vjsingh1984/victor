@@ -118,9 +118,7 @@ class RuntimeEvaluationPolicy:
     empty_request_reason: str = "request is empty"
     empty_request_prompt: str = "What would you like me to do?"
     underspecified_target_reason: str = "target artifact or scope is underspecified"
-    underspecified_target_prompt: str = (
-        "Which file, component, or bug should I target first?"
-    )
+    underspecified_target_prompt: str = "Which file, component, or bug should I target first?"
     confirmation_reason: str = "task intent requires confirmation"
     confirmation_prompt: str = (
         "Should I modify files directly, or keep this read-only and provide guidance first?"
@@ -135,9 +133,7 @@ class RuntimeEvaluationPolicy:
     completion_success_reason_template: str = (
         "Requirements satisfied: {score:.2f} >= {threshold:.2f}"
     )
-    completion_progress_reason_template: str = (
-        "Progress: {score:.2f} (threshold: {threshold:.2f})"
-    )
+    completion_progress_reason_template: str = "Progress: {score:.2f} (threshold: {threshold:.2f})"
     completion_retry_reason_template: str = "Insufficient progress: {score:.2f}"
     retry_exhausted_reason_template: str = (
         "Low confidence retry budget exhausted after {retry_count} retries"
@@ -153,10 +149,7 @@ class RuntimeEvaluationPolicy:
         ]:
             if val < 0.0:
                 raise ValueError(f"{name} must be >= 0.0, got {val}")
-        total = (
-            self.calibrated_completion_raw_weight
-            + self.calibrated_completion_evidence_weight
-        )
+        total = self.calibrated_completion_raw_weight + self.calibrated_completion_evidence_weight
         if total <= 0.0:
             raise ValueError(
                 f"calibrated_completion_raw_weight + calibrated_completion_evidence_weight "
@@ -184,9 +177,7 @@ class RuntimeEvaluationPolicy:
         """Return a cloned policy with non-None overrides applied."""
         allowed = {field.name for field in fields(self)}
         filtered = {
-            key: value
-            for key, value in overrides.items()
-            if key in allowed and value is not None
+            key: value for key, value in overrides.items() if key in allowed and value is not None
         }
         if not filtered:
             return self
@@ -214,9 +205,7 @@ class RuntimeEvaluationPolicy:
             confidence=confidence,
         )
 
-    def underspecified_target_decision(
-        self, confidence: float
-    ) -> ClarificationDecision:
+    def underspecified_target_decision(self, confidence: float) -> ClarificationDecision:
         """Return the canonical clarification response for missing targets."""
         return ClarificationDecision(
             requires_clarification=True,
@@ -225,9 +214,7 @@ class RuntimeEvaluationPolicy:
             confidence=confidence,
         )
 
-    def confirmation_required_decision(
-        self, confidence: float
-    ) -> ClarificationDecision:
+    def confirmation_required_decision(self, confidence: float) -> ClarificationDecision:
         """Return the canonical clarification response for confirmation-needed tasks."""
         return ClarificationDecision(
             requires_clarification=True,
@@ -236,9 +223,7 @@ class RuntimeEvaluationPolicy:
             confidence=confidence,
         )
 
-    def get_clarification_decision(
-        self, perception: Optional[Any]
-    ) -> ClarificationDecision:
+    def get_clarification_decision(self, perception: Optional[Any]) -> ClarificationDecision:
         """Normalize clarification policy into one typed runtime decision."""
         if not getattr(perception, "needs_clarification", False):
             return ClarificationDecision(
@@ -247,12 +232,10 @@ class RuntimeEvaluationPolicy:
             )
 
         reason = (
-            getattr(perception, "clarification_reason", None)
-            or self.fallback_clarification_reason
+            getattr(perception, "clarification_reason", None) or self.fallback_clarification_reason
         )
         prompt = (
-            getattr(perception, "clarification_prompt", None)
-            or self.default_clarification_prompt
+            getattr(perception, "clarification_prompt", None) or self.default_clarification_prompt
         )
         confidence = float(getattr(perception, "confidence", 0.0) or 0.0)
         return ClarificationDecision(
@@ -307,10 +290,7 @@ class RuntimeEvaluationPolicy:
             support_penalty += self.continuation_request_penalty
             resolved_reasons.append("continuation_requested")
 
-        if (
-            not requirements_satisfied
-            and evidence_score < self.minimum_supported_evidence_score
-        ):
+        if not requirements_satisfied and evidence_score < self.minimum_supported_evidence_score:
             support_penalty += self.unsupported_requirement_penalty
             resolved_reasons.append("requirements_not_fully_satisfied")
 
@@ -321,9 +301,7 @@ class RuntimeEvaluationPolicy:
         weighted_score = (
             (raw_score * raw_weight) + (evidence_score * evidence_weight)
         ) / total_weight
-        resolved_threshold = (
-            self.completion_threshold if threshold is None else threshold
-        )
+        resolved_threshold = self.completion_threshold if threshold is None else threshold
         calibrated_score = max(0.0, min(1.0, weighted_score - support_penalty))
         requires_additional_support = (
             raw_score >= resolved_threshold and calibrated_score < resolved_threshold
@@ -420,10 +398,7 @@ class RuntimeEvaluationPolicy:
             if low_confidence_threshold is None
             else low_confidence_threshold
         )
-        if (
-            not getattr(evaluation, "should_retry", False)
-            or evaluation.score >= threshold
-        ):
+        if not getattr(evaluation, "should_retry", False) or evaluation.score >= threshold:
             return evaluation
 
         effective_retry_limit = (
@@ -435,9 +410,7 @@ class RuntimeEvaluationPolicy:
             return EvaluationResult(
                 decision=EvaluationDecision.FAIL,
                 score=evaluation.score,
-                reason=self.retry_exhausted_reason_template.format(
-                    retry_count=retry_count
-                ),
+                reason=self.retry_exhausted_reason_template.format(retry_count=retry_count),
                 metrics=dict(evaluation.metrics),
                 metadata={
                     **dict(evaluation.metadata),

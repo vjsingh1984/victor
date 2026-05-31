@@ -623,9 +623,7 @@ class TestRoundTripConversion:
         """CONTENT event should survive CQRS roundtrip."""
         original = content_event("Hello world", metadata={"key": "value"})
         cqrs_data = registry.to_external(original, EventTarget.CQRS)
-        restored = registry.from_external(
-            cqrs_data, cqrs_data["event_type"], EventTarget.CQRS
-        )
+        restored = registry.from_external(cqrs_data, cqrs_data["event_type"], EventTarget.CQRS)
 
         assert restored.type == original.type
         assert restored.content == original.content
@@ -638,9 +636,7 @@ class TestRoundTripConversion:
             arguments={"path": "/tmp/test.txt"},
         )
         cqrs_data = registry.to_external(original, EventTarget.CQRS)
-        restored = registry.from_external(
-            cqrs_data, cqrs_data["event_type"], EventTarget.CQRS
-        )
+        restored = registry.from_external(cqrs_data, cqrs_data["event_type"], EventTarget.CQRS)
 
         assert restored.type == original.type
         assert restored.tool_name == original.tool_name
@@ -651,9 +647,7 @@ class TestRoundTripConversion:
         """STAGE_CHANGE event should survive CQRS roundtrip."""
         original = stage_change_event(old_stage="initial", new_stage="planning")
         cqrs_data = registry.to_external(original, EventTarget.CQRS)
-        restored = registry.from_external(
-            cqrs_data, cqrs_data["event_type"], EventTarget.CQRS
-        )
+        restored = registry.from_external(cqrs_data, cqrs_data["event_type"], EventTarget.CQRS)
 
         assert restored.type == original.type
         assert restored.old_stage == original.old_stage
@@ -663,9 +657,7 @@ class TestRoundTripConversion:
         """ERROR event should survive CQRS roundtrip."""
         original = error_event(error="Something broke", recoverable=False)
         cqrs_data = registry.to_external(original, EventTarget.CQRS)
-        restored = registry.from_external(
-            cqrs_data, cqrs_data["event_type"], EventTarget.CQRS
-        )
+        restored = registry.from_external(cqrs_data, cqrs_data["event_type"], EventTarget.CQRS)
 
         assert restored.type == original.type
         assert restored.error == original.error

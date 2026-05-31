@@ -284,10 +284,7 @@ def format_and_prune_tool_output(
     from victor.tools.output_pruner import get_output_pruner
 
     tool_settings = get_tool_settings()
-    if (
-        tool_settings.tool_output_preview_enabled
-        and tool_settings.tool_output_pruning_enabled
-    ):
+    if tool_settings.tool_output_preview_enabled and tool_settings.tool_output_pruning_enabled:
         pruner = get_output_pruner()
         # Prune only for user preview, NOT for LLM input
         preview_output, pruning_info = pruner.prune(
@@ -322,9 +319,7 @@ def process_tool_results_with_context(
 
     for call_result in pipeline_result.results:
         tool_name = getattr(call_result, "tool_name", "unknown") or "unknown"
-        normalized_args = normalize_tool_result_arguments(
-            getattr(call_result, "arguments", {})
-        )
+        normalized_args = normalize_tool_result_arguments(getattr(call_result, "arguments", {}))
         elapsed_ms = float(getattr(call_result, "execution_time_ms", 0.0) or 0.0)
         skipped = bool(getattr(call_result, "skipped", False))
         skip_reason = getattr(call_result, "skip_reason", None)
@@ -358,9 +353,7 @@ def process_tool_results_with_context(
 
             error_type = type(error_msg).__name__ if error_msg and not success else None
             if ctx.record_tool_execution:
-                ctx.record_tool_execution(
-                    tool_name, success, elapsed_ms, error_type=error_type
-                )
+                ctx.record_tool_execution(tool_name, success, elapsed_ms, error_type=error_type)
             if ctx.conversation_state:
                 ctx.conversation_state.record_tool_execution(tool_name, normalized_args)
 
@@ -368,9 +361,7 @@ def process_tool_results_with_context(
             if output is not None:
                 result_dict["result"] = output
             if ctx.unified_tracker:
-                ctx.unified_tracker.update_from_tool_call(
-                    tool_name, normalized_args, result_dict
-                )
+                ctx.unified_tracker.update_from_tool_call(tool_name, normalized_args, result_dict)
 
             follow_up_suggestions = None
             tool_diagnostics = _extract_tool_diagnostics(output)
@@ -389,9 +380,7 @@ def process_tool_results_with_context(
             if semantic_success:
                 error_display = None
             else:
-                error_display = (
-                    user_message or error_msg or skip_reason or "Unknown error"
-                )
+                error_display = user_message or error_msg or skip_reason or "Unknown error"
 
             if ctx.usage_logger and hasattr(ctx.usage_logger, "set_duration_context"):
                 ctx.usage_logger.set_duration_context(elapsed_ms)
@@ -486,9 +475,7 @@ def process_tool_results_with_context(
             if tool_diagnostics:
                 error_output["tool_diagnostics"] = tool_diagnostics
             if ctx.format_tool_output:
-                formatted_error = ctx.format_tool_output(
-                    tool_name, normalized_args, error_output
-                )
+                formatted_error = ctx.format_tool_output(tool_name, normalized_args, error_output)
             else:
                 formatted_error, _, _, _, _ = format_and_prune_tool_output(
                     tool_name=tool_name,
@@ -528,7 +515,9 @@ def process_tool_results_with_context(
                 tool_name,
                 tool_call_id,
             )
-            fallback_error = f"Tool result post-processing failed for '{tool_name}': {type(exc).__name__}"
+            fallback_error = (
+                f"Tool result post-processing failed for '{tool_name}': {type(exc).__name__}"
+            )
             fallback_content = (
                 f"Tool result unavailable for '{tool_name}'. Victor failed to post-process this "
                 "tool call, so treat it as failed and continue with the available context."
@@ -725,8 +714,7 @@ class ToolService:
             "confidence": confidence,
             "warning_count": len(warning_list),
             "warnings": warning_list,
-            "fallback_used": parse_method
-            not in {"none", "native", "native_passthrough"},
+            "fallback_used": parse_method not in {"none", "native", "native_passthrough"},
             "native_passthrough": parse_method == "native_passthrough",
         }
         self._last_tool_call_parse_diagnostics = diagnostics
@@ -1082,9 +1070,7 @@ class ToolService:
         current_budget = self.budget
         new_budget = int(current_budget * multiplier)
         self.budget = new_budget
-        self._logger.info(
-            f"Budget multiplied by {multiplier}: {current_budget} -> {new_budget}"
-        )
+        self._logger.info(f"Budget multiplied by {multiplier}: {current_budget} -> {new_budget}")
 
     def consume_budget(self, amount: int = 1) -> None:
         """Consume budget for tool calls.
@@ -1177,9 +1163,7 @@ class ToolService:
                     session_id,
                 )
             except Exception:
-                logger.debug(
-                    "on_tool_complete observability hook failed", exc_info=True
-                )
+                logger.debug("on_tool_complete observability hook failed", exc_info=True)
 
     def is_healthy(self) -> bool:
         """Check if the tool service is healthy.
@@ -1366,9 +1350,7 @@ class ToolService:
 
         return ToolAccessContext(
             session_enabled_tools=self._enabled_tools,
-            current_mode=(
-                self._mode_controller.config.name if self._mode_controller else None
-            ),
+            current_mode=(self._mode_controller.config.name if self._mode_controller else None),
         )
 
     def validate_tool_call(
@@ -1439,13 +1421,9 @@ class ToolService:
 
         validator = self._tool_call_validator
         if validator is not None and canonical in validator._tool_schemas:
-            schema_result = validator.validate(
-                canonical, tool_call.get("arguments", {})
-            )
+            schema_result = validator.validate(canonical, tool_call.get("arguments", {}))
             if not schema_result.valid:
-                self._logger.warning(
-                    "Schema validation: %s: %s", canonical, schema_result.errors
-                )
+                self._logger.warning("Schema validation: %s: %s", canonical, schema_result.errors)
 
         return ToolCallValidation(
             valid=True,
@@ -1480,9 +1458,7 @@ class ToolService:
         elif tool_args is None:
             tool_args = {}
 
-        normalized_args, strategy = argument_normalizer.normalize_arguments(
-            tool_args, tool_name
-        )
+        normalized_args, strategy = argument_normalizer.normalize_arguments(tool_args, tool_name)
         normalized_args = tool_adapter.normalize_arguments(normalized_args, tool_name)
         normalized_args = infer_git_operation(original_name, tool_name, normalized_args)
 
@@ -1532,15 +1508,11 @@ class ToolService:
         if not isinstance(tool_call, dict):
             return False, "Tool call must be a dictionary"
 
-        tool_name = normalize_model_tool_name(
-            tool_call.get("name") or tool_call.get("tool")
-        )
+        tool_name = normalize_model_tool_name(tool_call.get("name") or tool_call.get("tool"))
         if not tool_name:
             return False, "Tool call missing 'name' field"
 
-        canonical_name = canonicalize_core_tool_name(
-            self.resolve_tool_alias(str(tool_name))
-        )
+        canonical_name = canonicalize_core_tool_name(self.resolve_tool_alias(str(tool_name)))
 
         # Check if tool is available
         if available_tools is None:
@@ -1564,12 +1536,8 @@ class ToolService:
                 sandbox_dir = getattr(self._mode_controller.config, "sandbox_dir", None)
                 if (
                     canonical_name in {"edit", "write"}
-                    and not getattr(
-                        self._mode_controller.config, "allow_all_tools", False
-                    )
-                    and getattr(
-                        self._mode_controller.config, "allow_sandbox_edits", False
-                    )
+                    and not getattr(self._mode_controller.config, "allow_all_tools", False)
+                    and getattr(self._mode_controller.config, "allow_sandbox_edits", False)
                     and sandbox_dir
                 ):
                     return (
@@ -1586,9 +1554,8 @@ class ToolService:
                         f"Available tools: {available_preview}",
                     )
 
-            if (
-                self._enabled_tools is not None
-                and canonical_name not in _normalize_tools(self._enabled_tools)
+            if self._enabled_tools is not None and canonical_name not in _normalize_tools(
+                self._enabled_tools
             ):
                 return (
                     False,
@@ -1836,9 +1803,7 @@ class ToolService:
                             if isinstance(item, dict) and "name" in item:
                                 tool_call = {
                                     "name": item.get("name"),
-                                    "arguments": item.get(
-                                        "arguments", item.get("parameters", {})
-                                    ),
+                                    "arguments": item.get("arguments", item.get("parameters", {})),
                                 }
                                 if tool_call_id:
                                     tool_call["id"] = tool_call_id
@@ -1891,9 +1856,7 @@ class ToolService:
             if len(normalized_tool_calls) != len(tool_calls):
                 self._logger.warning(f"Dropped non-dict tool_calls: {tool_calls}")
             tool_calls = normalized_tool_calls or None
-            self._logger.debug(
-                "After normalization: %s tool_calls", len(tool_calls or [])
-            )
+            self._logger.debug("After normalization: %s tool_calls", len(tool_calls or []))
 
         if tool_calls:
             valid_tool_calls = []
@@ -1914,21 +1877,15 @@ class ToolService:
                 else:
                     invalid_count += 1
                     tc["_invalid"] = True
-                    tc["_error"] = (
-                        f"Unknown tool '{name}'. Use one of the available tools."
-                    )
+                    tc["_error"] = f"Unknown tool '{name}'. Use one of the available tools."
                     valid_tool_calls.append(tc)
-                    self._logger.debug(
-                        "Marked invalid tool for error response: %s", name
-                    )
+                    self._logger.debug("Marked invalid tool for error response: %s", name)
             if invalid_count:
                 self._logger.warning(
                     "Marked %s invalid tool calls for error responses", invalid_count
                 )
             tool_calls = valid_tool_calls or None
-            self._logger.debug(
-                "After filtering: %s valid tool_calls", len(tool_calls or [])
-            )
+            self._logger.debug("After filtering: %s valid tool_calls", len(tool_calls or []))
 
         parser = self._tool_call_parser
         if parser is None:
@@ -1953,9 +1910,7 @@ class ToolService:
 
                 parsed_args = tc.get("arguments")
                 if isinstance(parsed_args, dict):
-                    tc["arguments"] = parser.normalize_args(
-                        tc.get("name", ""), parsed_args
-                    )
+                    tc["arguments"] = parser.normalize_args(tc.get("name", ""), parsed_args)
 
         self._record_tool_call_parse_diagnostics(
             tool_adapter=tool_adapter,
@@ -2004,9 +1959,7 @@ class ToolService:
         arguments = tool_call.get("arguments") or tool_call.get("parameters", {})
         if isinstance(arguments, dict):
             # Remove None values
-            normalized["arguments"] = {
-                k: v for k, v in arguments.items() if v is not None
-            }
+            normalized["arguments"] = {k: v for k, v in arguments.items() if v is not None}
 
         # Preserve any other fields
         for key, value in tool_call.items():
@@ -2637,9 +2590,7 @@ class ToolService:
     # KV-Prefix Strategy Methods (extracted from AgentOrchestrator)
     # ==========================================================================
 
-    def sort_tools_for_kv_stability(
-        self, tools, *, kv_optimization_enabled: bool = True
-    ) -> list:
+    def sort_tools_for_kv_stability(self, tools, *, kv_optimization_enabled: bool = True) -> list:
         """Sort tools by schema level then name for KV-cache-optimal ordering.
 
         Produces a deterministic ordering — FULL → COMPACT → STUB then
@@ -2660,9 +2611,7 @@ class ToolService:
             ),
         )
 
-    def estimate_tool_tokens(
-        self, tool, *, provider_category: Optional[str] = None
-    ) -> int:
+    def estimate_tool_tokens(self, tool, *, provider_category: Optional[str] = None) -> int:
         """Estimate token cost for a tool at its current schema level.
 
         Falls back to a name-length heuristic when the tool's schema cannot be
@@ -2709,9 +2658,7 @@ class ToolService:
             return tools
 
         if kv_tool_strategy == "session_stable":
-            return (
-                session_semantic_tools if session_semantic_tools is not None else tools
-            )
+            return session_semantic_tools if session_semantic_tools is not None else tools
 
         if kv_tool_strategy == "per_turn":
             return tools
@@ -2735,8 +2682,7 @@ class ToolService:
         context_window = self._get_tool_context_window(provider, model)
         provider_category = get_provider_category(context_window)
         tool_tokens = sum(
-            self.estimate_tool_tokens(t, provider_category=provider_category)
-            for t in tools
+            self.estimate_tool_tokens(t, provider_category=provider_category) for t in tools
         )
         max_tool_tokens = int(context_window * 0.25)
 
@@ -2767,13 +2713,10 @@ class ToolService:
         from victor.tools.enums import Priority
 
         core_tools = [
-            t
-            for t in tools
-            if hasattr(t, "priority") and t.priority == Priority.CRITICAL
+            t for t in tools if hasattr(t, "priority") and t.priority == Priority.CRITICAL
         ]
         core_tokens = sum(
-            self.estimate_tool_tokens(t, provider_category=provider_category)
-            for t in core_tools
+            self.estimate_tool_tokens(t, provider_category=provider_category) for t in core_tools
         )
 
         if core_tokens > max_tokens:
@@ -2809,10 +2752,7 @@ class ToolService:
         return 8192
 
     def _should_session_lock_tools(self, provider: Any, context_window: int) -> bool:
-        if (
-            hasattr(provider, "supports_prompt_caching")
-            and provider.supports_prompt_caching()
-        ):
+        if hasattr(provider, "supports_prompt_caching") and provider.supports_prompt_caching():
             return True
         return context_window >= 32000
 

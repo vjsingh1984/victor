@@ -65,9 +65,7 @@ async def test_turn_executor_uses_shared_state_passed_exploration_coordinator() 
     with (
         patch(
             "victor.config.settings.load_settings",
-            return_value=SimpleNamespace(
-                pipeline=SimpleNamespace(parallel_exploration=True)
-            ),
+            return_value=SimpleNamespace(pipeline=SimpleNamespace(parallel_exploration=True)),
         ),
         patch(
             "victor.config.settings.get_project_paths",
@@ -97,8 +95,7 @@ async def test_turn_executor_uses_shared_state_passed_exploration_coordinator() 
         "victor/agent/services/exploration_runtime.py"
     ]
     assert (
-        orchestrator.conversation_state["exploration_summary"]
-        == "shared state-passed exploration"
+        orchestrator.conversation_state["exploration_summary"] == "shared state-passed exploration"
     )
     chat_context.add_message.assert_called_once_with(
         "user",

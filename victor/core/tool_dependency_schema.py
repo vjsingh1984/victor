@@ -355,19 +355,13 @@ class ToolDependencySpec(BaseModel):
     @classmethod
     def validate_clusters(cls, v: Dict[str, List[str]]) -> Dict[str, List[str]]:
         """Clean cluster tool names."""
-        return {
-            name: [t.strip() for t in tools if t and t.strip()]
-            for name, tools in v.items()
-        }
+        return {name: [t.strip() for t in tools if t and t.strip()] for name, tools in v.items()}
 
     @field_validator("sequences")
     @classmethod
     def validate_sequences(cls, v: Dict[str, List[str]]) -> Dict[str, List[str]]:
         """Clean sequence tool names."""
-        return {
-            name: [t.strip() for t in tools if t and t.strip()]
-            for name, tools in v.items()
-        }
+        return {name: [t.strip() for t in tools if t and t.strip()] for name, tools in v.items()}
 
     @field_validator("required_tools", "optional_tools", "default_sequence")
     @classmethod

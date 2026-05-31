@@ -638,9 +638,7 @@ class BatchConfigYAML:
             batch_size=self.batch_size,
             max_concurrent=self.max_concurrent,
             delay_seconds=self.delay_seconds,
-            retry_strategy=strategy_map.get(
-                self.retry_strategy, BatchRetryStrategy.END_OF_BATCH
-            ),
+            retry_strategy=strategy_map.get(self.retry_strategy, BatchRetryStrategy.END_OF_BATCH),
             max_retries=self.max_retries,
             retry_delay_seconds=self.retry_delay_seconds,
             timeout_per_item=self.timeout_per_item,
@@ -1118,8 +1116,7 @@ def _parse_constraints(constraints_data: Any, timeout: float = 60.0) -> TaskCons
         else:
             valid_values = [c.value for c in ConstraintType]
             raise YAMLWorkflowError(
-                f"Invalid constraint string: '{constraints_data}'. "
-                f"Valid values: {valid_values}"
+                f"Invalid constraint string: '{constraints_data}'. " f"Valid values: {valid_values}"
             )
 
     # Handle list format (compact)
@@ -1237,8 +1234,7 @@ def _parse_compute_node(node_data: Dict[str, Any]) -> ComputeNode:
     except ValueError:
         valid_targets = [t.value for t in ExecutionTarget]
         raise YAMLWorkflowError(
-            f"Invalid execution_target '{exec_target_str}'. "
-            f"Valid values: {valid_targets}"
+            f"Invalid execution_target '{exec_target_str}'. " f"Valid values: {valid_targets}"
         )
 
     return ComputeNode(
@@ -1298,9 +1294,7 @@ def _parse_node(
         return _parse_hitl_node(node_data)
     else:
         valid_types = [t.value for t in YAMLNodeType]
-        raise YAMLWorkflowError(
-            f"Unknown node type: '{node_type_str}'. Valid types: {valid_types}"
-        )
+        raise YAMLWorkflowError(f"Unknown node type: '{node_type_str}'. Valid types: {valid_types}")
 
 
 def load_workflow_from_dict(
@@ -1399,9 +1393,7 @@ def load_workflow_from_dict(
         or data.get("default_node_timeout")
         or data.get("default_node_timeout_seconds")
     )
-    max_iterations = (
-        execution_settings.get("max_iterations") or data.get("max_iterations") or 25
-    )
+    max_iterations = execution_settings.get("max_iterations") or data.get("max_iterations") or 25
     max_retries = execution_settings.get("max_retries") or data.get("max_retries") or 0
 
     # Parse schedule configuration if present
@@ -1420,9 +1412,7 @@ def load_workflow_from_dict(
         if schedule_data.get("interval"):
             schedule_config["interval"] = schedule_data["interval"]
         metadata["schedule"] = schedule_config
-        logger.debug(
-            f"Parsed schedule for workflow '{name}': {schedule_config.get('cron')}"
-        )
+        logger.debug(f"Parsed schedule for workflow '{name}': {schedule_config.get('cron')}")
 
     workflow = WorkflowDefinition(
         name=name,
@@ -1477,9 +1467,7 @@ def load_workflow_from_yaml(
     if workflow_name:
         if workflow_name not in workflows_data:
             raise YAMLWorkflowError(f"Workflow '{workflow_name}' not found")
-        return load_workflow_from_dict(
-            workflows_data[workflow_name], workflow_name, config
-        )
+        return load_workflow_from_dict(workflows_data[workflow_name], workflow_name, config)
 
     # Load all workflows
     workflows = {}
@@ -1526,9 +1514,7 @@ def load_and_validate(
     config: Optional[YAMLWorkflowConfig] = None,
     tool_registry: Optional[Any] = None,
     strict: bool = True,
-) -> Tuple[
-    Union[WorkflowDefinition, Dict[str, WorkflowDefinition]], "ToolValidationResult"
-]:
+) -> Tuple[Union[WorkflowDefinition, Dict[str, WorkflowDefinition]], "ToolValidationResult"]:
     """Load workflow(s) from a YAML file and validate tool dependencies.
 
     This function combines workflow loading with tool dependency validation,
@@ -1606,16 +1592,12 @@ def load_and_validate(
         if isinstance(workflows, dict):
             for workflow in workflows.values():
                 for node in workflow.nodes.values():
-                    tools = getattr(node, "allowed_tools", None) or getattr(
-                        node, "tools", None
-                    )
+                    tools = getattr(node, "allowed_tools", None) or getattr(node, "tools", None)
                     if tools:
                         validation_result.validated_tools.update(tools)
         else:
             for node in workflows.nodes.values():
-                tools = getattr(node, "allowed_tools", None) or getattr(
-                    node, "tools", None
-                )
+                tools = getattr(node, "allowed_tools", None) or getattr(node, "tools", None)
                 if tools:
                     validation_result.validated_tools.update(tools)
 
@@ -1789,9 +1771,7 @@ class YAMLWorkflowLoader:
         """
         # Check if source is a file path
         source_path = (
-            Path(source)
-            if not source.strip().startswith(("workflows:", "-", "{"))
-            else None
+            Path(source) if not source.strip().startswith(("workflows:", "-", "{")) else None
         )
 
         if source_path:
@@ -1803,9 +1783,7 @@ class YAMLWorkflowLoader:
             )
         else:
             # Parse as YAML string
-            return load_workflow_from_yaml(
-                source, workflow_name=workflow_name, config=self._config
-            )
+            return load_workflow_from_yaml(source, workflow_name=workflow_name, config=self._config)
 
 
 # =============================================================================
@@ -1882,8 +1860,7 @@ class WorkflowArgument:
         # Validate choices
         if self.choices and converted not in self.choices:
             raise YAMLWorkflowError(
-                f"Invalid value for argument '{self.name}': "
-                f"'{converted}' not in {self.choices}"
+                f"Invalid value for argument '{self.name}': " f"'{converted}' not in {self.choices}"
             )
 
         return converted
@@ -1939,11 +1916,7 @@ def parse_workflow_args(
 
     # Parse each defined argument
     for arg_data in args_defs:
-        arg = (
-            WorkflowArgument.from_dict(arg_data)
-            if isinstance(arg_data, dict)
-            else arg_data
-        )
+        arg = WorkflowArgument.from_dict(arg_data) if isinstance(arg_data, dict) else arg_data
 
         # Try to get value from cli_args
         value = cli_args.get(arg.name)

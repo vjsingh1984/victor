@@ -75,25 +75,17 @@ class ToolMetadata:
     access_mode: Optional["AccessMode"] = None  # Default: READONLY when None
     danger_level: Optional["DangerLevel"] = None  # Default: SAFE when None
     # Stage affinity for conversation state machine
-    stages: List[str] = field(
-        default_factory=list
-    )  # e.g., ["initial", "reading", "execution"]
+    stages: List[str] = field(default_factory=list)  # e.g., ["initial", "reading", "execution"]
     # NEW: Mandatory keyword triggers that force tool inclusion
-    mandatory_keywords: List[str] = field(
-        default_factory=list
-    )  # e.g., ["show diff", "compare"]
+    mandatory_keywords: List[str] = field(default_factory=list)  # e.g., ["show diff", "compare"]
     # NEW: Task types for classification-aware selection
-    task_types: List[str] = field(
-        default_factory=list
-    )  # e.g., ["analysis", "search", "default"]
+    task_types: List[str] = field(default_factory=list)  # e.g., ["analysis", "search", "default"]
     # NEW: Signature parameters for loop detection
     signature_params: List[str] = field(
         default_factory=list
     )  # e.g., ["path"] (excludes offset/limit)
     # NEW: Execution category for parallel execution
-    execution_category: Optional["ExecutionCategory"] = (
-        None  # Default: READ_ONLY when None
-    )
+    execution_category: Optional["ExecutionCategory"] = None  # Default: READ_ONLY when None
 
     def __post_init__(self):
         """Apply defaults for None values to support backward compatibility."""
@@ -114,10 +106,7 @@ class ToolMetadata:
     @property
     def requires_approval(self) -> bool:
         """Check if this tool requires user approval."""
-        return (
-            self.access_mode.requires_approval
-            or self.danger_level.requires_confirmation
-        )
+        return self.access_mode.requires_approval or self.danger_level.requires_confirmation
 
     @property
     def is_safe(self) -> bool:
@@ -140,9 +129,7 @@ class ToolMetadata:
             "task_types": self.task_types,
             "signature_params": self.signature_params,
             "execution_category": (
-                self.execution_category.value
-                if self.execution_category
-                else "read_only"
+                self.execution_category.value if self.execution_category else "read_only"
             ),
         }
 
@@ -567,10 +554,7 @@ class ToolMetadataRegistry:
         return sorted(matches)
 
     def export_all(self) -> Dict[str, Dict[str, Any]]:
-        return {
-            name: metadata.to_dict()
-            for name, metadata in self.get_all_metadata().items()
-        }
+        return {name: metadata.to_dict() for name, metadata in self.get_all_metadata().items()}
 
     def get_statistics(self) -> Dict[str, Any]:
         return self._delegate.get_statistics()

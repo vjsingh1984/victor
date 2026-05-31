@@ -226,9 +226,7 @@ def auth_add(
     provider: str = typer.Option(
         ..., "--provider", "-p", help="Provider name (e.g., anthropic, openai)"
     ),
-    model: str = typer.Option(
-        ..., "--model", "-m", help="Model name (e.g., claude-sonnet-4-5)"
-    ),
+    model: str = typer.Option(..., "--model", "-m", help="Model name (e.g., claude-sonnet-4-5)"),
     name: str = typer.Option("default", "--name", "-n", help="Account name"),
     auth_method: str = typer.Option(
         "api_key", "--auth-method", help="Authentication method (api_key, oauth, none)"
@@ -238,9 +236,7 @@ def auth_add(
         "--source",
         help="Credential source (keyring, env, file, sentinelpass)",
     ),
-    endpoint: Optional[str] = typer.Option(
-        None, "--endpoint", "-e", help="Custom endpoint URL"
-    ),
+    endpoint: Optional[str] = typer.Option(None, "--endpoint", "-e", help="Custom endpoint URL"),
     api_key: Optional[str] = typer.Option(
         None, "--api-key", help="API key (will prompt if not provided)"
     ),
@@ -250,15 +246,9 @@ def auth_add(
         help="SentinelPass lookup domain when --source sentinelpass is used",
     ),
     tags: Optional[str] = typer.Option(None, "--tags", help="Comma-separated tags"),
-    temperature: Optional[float] = typer.Option(
-        None, "--temperature", "-t", help="Temperature"
-    ),
-    max_tokens: Optional[int] = typer.Option(
-        None, "--max-tokens", help="Max output tokens"
-    ),
-    set_default: bool = typer.Option(
-        False, "--default", help="Set this account as default"
-    ),
+    temperature: Optional[float] = typer.Option(None, "--temperature", "-t", help="Temperature"),
+    max_tokens: Optional[int] = typer.Option(None, "--max-tokens", help="Max output tokens"),
+    set_default: bool = typer.Option(False, "--default", help="Set this account as default"),
 ) -> None:
     """Quick add a provider account.
 
@@ -276,20 +266,14 @@ def auth_add(
         console.print(f"[dim]Valid sources: {', '.join(sorted(valid_sources))}[/]")
         raise typer.Exit(1)
     if source == "codex" and not (provider == "openai" and auth_method == "oauth"):
-        console.print(
-            "[red]✗[/] --source codex is only valid with OpenAI OAuth accounts"
-        )
+        console.print("[red]✗[/] --source codex is only valid with OpenAI OAuth accounts")
         console.print(
             "[dim]Use: victor auth add --provider openai --model gpt-5-nano "
             "--auth-method oauth --source codex[/]"
         )
         raise typer.Exit(1)
-    if source == "claude-code" and not (
-        provider == "anthropic" and auth_method == "oauth"
-    ):
-        console.print(
-            "[red]✗[/] --source claude-code is only valid with Anthropic OAuth accounts"
-        )
+    if source == "claude-code" and not (provider == "anthropic" and auth_method == "oauth"):
+        console.print("[red]✗[/] --source claude-code is only valid with Anthropic OAuth accounts")
         console.print(
             "[dim]Use: victor auth add --provider anthropic --model claude-haiku-4-5-20251001 "
             "--auth-method oauth --source claude-code[/]"
@@ -384,9 +368,7 @@ def auth_list() -> None:
     oauth_status: dict[str, str] = {}
     for account in accounts:
         if account.auth.method == "oauth":
-            oauth_status[account.name] = _get_oauth_status(
-                account.provider, account.auth.source
-            )
+            oauth_status[account.name] = _get_oauth_status(account.provider, account.auth.source)
 
     table = Table(title="Configured Accounts", show_header=True)
     table.add_column("Name", style="cyan", no_wrap=True)
@@ -412,11 +394,7 @@ def auth_list() -> None:
             status_display = (
                 "[green]authenticated[/]"
                 if status == "authenticated"
-                else (
-                    "[yellow]pending login[/]"
-                    if status == "pending"
-                    else f"[red]{status}[/]"
-                )
+                else ("[yellow]pending login[/]" if status == "pending" else f"[red]{status}[/]")
             )
         elif account.auth.method == "none":
             status_display = "[dim]local[/]"
@@ -483,9 +461,7 @@ def auth_remove(
 
 @auth_app.command("migrate")
 def auth_migrate(
-    force: bool = typer.Option(
-        False, "--force", "-f", help="Overwrite existing config"
-    ),
+    force: bool = typer.Option(False, "--force", "-f", help="Overwrite existing config"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Show what would be done"),
 ) -> None:
     """Migrate from old configuration format.
@@ -558,12 +534,8 @@ def auth_migrate(
 
 @auth_app.command("test")
 def auth_test(
-    name: Optional[str] = typer.Option(
-        None, "--name", "-n", help="Account name to test"
-    ),
-    provider: Optional[str] = typer.Option(
-        None, "--provider", "-p", help="Provider to test"
-    ),
+    name: Optional[str] = typer.Option(None, "--name", "-n", help="Account name to test"),
+    provider: Optional[str] = typer.Option(None, "--provider", "-p", help="Provider to test"),
 ) -> None:
     """Test a provider connection.
 
@@ -597,9 +569,7 @@ def auth_test(
                 console.print(f"[red]✗[/] No account or provider named '{provider}'")
                 console.print("[dim]Hint: use --name/-n to test by account name[/]")
                 raise typer.Exit(1)
-            console.print(
-                f"[dim]Matched account '{provider}' (hint: use -n for account names)[/]"
-            )
+            console.print(f"[dim]Matched account '{provider}' (hint: use -n for account names)[/]")
     else:
         # Use default account
         account = manager.get_account()
@@ -608,9 +578,7 @@ def auth_test(
             console.print("[dim]Run 'victor auth setup' to configure[/]")
             raise typer.Exit(1)
 
-    console.print(
-        f"[cyan]Testing connection to {account.provider}/{account.model}...[/]"
-    )
+    console.print(f"[cyan]Testing connection to {account.provider}/{account.model}...[/]")
     console.print()
 
     # Run test
@@ -702,9 +670,7 @@ def auth_login(
         try:
             token = await mgr.get_valid_token()
             if token:
-                console.print(
-                    f"[green]\u2713[/] Successfully authenticated with {provider}"
-                )
+                console.print(f"[green]\u2713[/] Successfully authenticated with {provider}")
             else:
                 console.print(f"[red]\u2717[/] Authentication failed for {provider}")
                 raise typer.Exit(1)
@@ -719,9 +685,7 @@ def auth_login(
 
 @auth_app.command("import-codex")
 def auth_import_codex(
-    provider: str = typer.Argument(
-        "openai", help="Provider to import for (currently: openai)"
-    ),
+    provider: str = typer.Argument("openai", help="Provider to import for (currently: openai)"),
     codex_auth: Optional[Path] = typer.Option(
         None,
         "--codex-auth",
@@ -732,12 +696,8 @@ def auth_import_codex(
         "--storage-dir",
         help="Victor config directory (default: ~/.victor)",
     ),
-    force: bool = typer.Option(
-        False, "--force", "-f", help="Overwrite existing Victor token"
-    ),
-    dry_run: bool = typer.Option(
-        False, "--dry-run", help="Validate without writing tokens"
-    ),
+    force: bool = typer.Option(False, "--force", "-f", help="Overwrite existing Victor token"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Validate without writing tokens"),
 ) -> None:
     """Import OpenAI OAuth tokens from an existing Codex CLI login.
 
@@ -766,9 +726,7 @@ def auth_import_codex(
     manager = OAuthTokenManager(provider, storage_dir=victor_storage_dir)
     if manager._load_cached() is not None and not force:
         console.print("[yellow]Victor already has OpenAI OAuth tokens.[/]")
-        console.print(
-            "[dim]Use --force to replace them, or --dry-run to validate Codex tokens.[/]"
-        )
+        console.print("[dim]Use --force to replace them, or --dry-run to validate Codex tokens.[/]")
         raise typer.Exit(1)
 
     console.print(f"[dim]Source: {codex_auth_path}[/]")
@@ -903,22 +861,14 @@ def auth_oauth_status(
             table.add_row(
                 prov,
                 "[yellow]Expired[/]",
-                (
-                    cached.expires_at.strftime("%Y-%m-%d %H:%M UTC")
-                    if cached.expires_at
-                    else ""
-                ),
+                (cached.expires_at.strftime("%Y-%m-%d %H:%M UTC") if cached.expires_at else ""),
                 "stored",
             )
         else:
             table.add_row(
                 prov,
                 "[green]\u2713 Active[/]",
-                (
-                    cached.expires_at.strftime("%Y-%m-%d %H:%M UTC")
-                    if cached.expires_at
-                    else ""
-                ),
+                (cached.expires_at.strftime("%Y-%m-%d %H:%M UTC") if cached.expires_at else ""),
                 "stored",
             )
 
@@ -1035,9 +985,7 @@ class AuthSetupWizard:
         if Confirm.ask("Migrate to new format?", default=True):
             result = run_migration(prompt=False)
             if result.success:
-                self.console.print(
-                    f"[green]✓[/] Migrated {result.migrated_accounts} accounts"
-                )
+                self.console.print(f"[green]✓[/] Migrated {result.migrated_accounts} accounts")
                 self.console.print()
                 return True
             else:
@@ -1169,9 +1117,7 @@ class AuthSetupWizard:
             self.state["selected_model"] = Prompt.ask("Enter model name")
 
         self.console.print()
-        self.console.print(
-            f"[green]✓[/] Selected: {provider}/{self.state['selected_model']}"
-        )
+        self.console.print(f"[green]✓[/] Selected: {provider}/{self.state['selected_model']}")
         return True
 
     def _configure_authentication(self) -> bool:
@@ -1195,9 +1141,7 @@ class AuthSetupWizard:
 
         # Check if OAuth is available
         if provider in OAUTH_PROVIDERS:
-            self.console.print(
-                f"[cyan]OAuth is available for {provider.capitalize()}[/]"
-            )
+            self.console.print(f"[cyan]OAuth is available for {provider.capitalize()}[/]")
             use_oauth = Confirm.ask(
                 "Use OAuth (recommended)?",
                 default=True,
@@ -1211,9 +1155,7 @@ class AuthSetupWizard:
         # Default to API key
         self.state["auth_method"] = "api_key"
         self.console.print("[cyan]Enter your API key[/]")
-        self.console.print(
-            "[dim]Your key will be stored securely in the system keyring[/]"
-        )
+        self.console.print("[dim]Your key will be stored securely in the system keyring[/]")
 
         api_key = Prompt.ask("API key", password=True)
         self.state["api_key"] = api_key
@@ -1350,9 +1292,7 @@ class AuthSetupWizard:
 
         self.console.print(f"[green]✓[/] Account '{account.name}' saved")
         if profile_synced:
-            self.console.print(
-                f"[green]✓[/] Profile '{account.name}' added to profiles.yaml"
-            )
+            self.console.print(f"[green]✓[/] Profile '{account.name}' added to profiles.yaml")
 
     def _show_completion(self) -> None:
         """Show completion message."""

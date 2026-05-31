@@ -62,16 +62,12 @@ def test_discover_by_vertical_uses_shared_team_and_workflow_catalog_surfaces() -
             "victor.framework.persona_registry.get_persona_registry",
             side_effect=Exception,
         ),
-        patch(
-            "victor.framework.chain_registry.get_chain_registry", side_effect=Exception
-        ),
+        patch("victor.framework.chain_registry.get_chain_registry", side_effect=Exception),
         patch(
             "victor.framework.handler_registry.get_handler_registry",
             side_effect=Exception,
         ),
-        patch(
-            "victor.framework.task_types.get_task_type_registry", side_effect=Exception
-        ),
+        patch("victor.framework.task_types.get_task_type_registry", side_effect=Exception),
     ):
         manifest = discovery.discover_by_vertical("coding")
 

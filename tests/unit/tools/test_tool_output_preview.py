@@ -115,9 +115,7 @@ def test_settings_defaults():
     settings = ToolSettings()
     assert settings.tool_output_preview_enabled is True  # Show preview by default
     assert settings.tool_output_pruning_enabled is True  # Safe-default pruning enabled
-    assert (
-        settings.tool_output_pruning_safe_only is True
-    )  # Limited to safe verbose tools
+    assert settings.tool_output_pruning_safe_only is True  # Limited to safe verbose tools
     assert settings.tool_output_show_transparency is True
     assert settings.tool_output_preview_lines == 3
     assert settings.tool_output_expand_hotkey == "^O"
@@ -201,9 +199,7 @@ def _make_formatter() -> OutputFormatter:
     from victor.ui.output_formatter import OutputConfig, OutputMode
 
     console = Console(record=True, width=120)
-    f = OutputFormatter(
-        OutputConfig(mode=OutputMode.RICH, show_tools=True, stream=False)
-    )
+    f = OutputFormatter(OutputConfig(mode=OutputMode.RICH, show_tools=True, stream=False))
     f._console = console
     return f
 
@@ -211,16 +207,12 @@ def _make_formatter() -> OutputFormatter:
 def test_integration_shell_preview_shows_exit_and_stdout():
     """shell tool_result renders exit code header + stdout lines."""
     f = _make_formatter()
-    raw = str(
-        {"success": True, "stdout": "hello\nworld", "stderr": "", "return_code": 0}
-    )
+    raw = str({"success": True, "stdout": "hello\nworld", "stderr": "", "return_code": 0})
     # Prime _pending_tool so args are available
     import time
 
     f._pending_tool = ("shell", {}, time.time())
-    f.tool_result(
-        "shell", success=True, original_result=raw, show_preview=True, preview_lines=3
-    )
+    f.tool_result("shell", success=True, original_result=raw, show_preview=True, preview_lines=3)
     rendered = f._console.export_text()
     assert "exit 0" in rendered
     assert "hello" in rendered
@@ -233,9 +225,7 @@ def test_integration_edit_preview_shows_diff():
 
     args = {"old_string": "x = 1", "new_string": "x = 99"}
     f._pending_tool = ("edit", args, time.time())
-    f.tool_result(
-        "edit", success=True, original_result="", show_preview=True, preview_lines=5
-    )
+    f.tool_result("edit", success=True, original_result="", show_preview=True, preview_lines=5)
     rendered = f._console.export_text()
     # Header shows +1/-1 lines
     assert "+1" in rendered and "-1" in rendered
@@ -248,9 +238,7 @@ def test_integration_read_preview_shows_file_header():
 
     raw = "[File: foo.py]\n[Lines 1-3 of 100]\nprint('hello')\nprint('world')"
     f._pending_tool = ("read", {"path": "foo.py"}, time.time())
-    f.tool_result(
-        "read", success=True, original_result=raw, show_preview=True, preview_lines=2
-    )
+    f.tool_result("read", success=True, original_result=raw, show_preview=True, preview_lines=2)
     rendered = f._console.export_text()
     assert "File:" in rendered
     assert "Lines" in rendered
@@ -263,9 +251,7 @@ def test_integration_ls_preview_shows_item_count():
 
     raw = str({"items": [{"path": "a.py"}, {"path": "b.py"}, {"path": "c.py"}]})
     f._pending_tool = ("ls", {}, time.time())
-    f.tool_result(
-        "ls", success=True, original_result=raw, show_preview=True, preview_lines=3
-    )
+    f.tool_result("ls", success=True, original_result=raw, show_preview=True, preview_lines=3)
     rendered = f._console.export_text()
     assert "3 items" in rendered
 

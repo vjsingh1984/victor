@@ -289,11 +289,7 @@ class TestDockerFormatter:
 
         # Test images
         result = formatter.format(
-            {
-                "images": [
-                    {"id": "abc", "tags": ["test"], "size": "100MB", "created": "now"}
-                ]
-            },
+            {"images": [{"id": "abc", "tags": ["test"], "size": "100MB", "created": "now"}]},
             operation="images",
         )
         assert "1 images" in result.summary  # Summary field has the count

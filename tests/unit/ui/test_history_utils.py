@@ -21,9 +21,7 @@ def test_is_interactive_history_entry_filters_internal_prompts():
     assert is_interactive_history_entry("fix the failing test")
     assert not is_interactive_history_entry("[SYSTEM-REMINDER: use tools]")
     assert not is_interactive_history_entry("[GROUNDING-FEEDBACK: correction required]")
-    assert not is_interactive_history_entry(
-        "Continue. Use appropriate tools if needed."
-    )
+    assert not is_interactive_history_entry("Continue. Use appropriate tools if needed.")
     assert not is_interactive_history_entry(
         "- Call tools sequentially, waiting for results\n\nGROUNDING:\n- Use ONLY content in <TOOL_OUTPUT> markers."
     )
@@ -33,10 +31,7 @@ def test_is_interactive_history_entry_filters_internal_prompts():
 
 
 def test_classify_internal_history_entry_assigns_prompt_kinds():
-    assert (
-        classify_internal_history_entry("[SYSTEM-REMINDER: use tools]")
-        == "system_reminder"
-    )
+    assert classify_internal_history_entry("[SYSTEM-REMINDER: use tools]") == "system_reminder"
     assert (
         classify_internal_history_entry("Continue. Use appropriate tools if needed.")
         == "continuation_prompt"

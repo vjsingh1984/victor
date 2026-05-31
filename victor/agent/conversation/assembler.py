@@ -107,8 +107,7 @@ class TurnBoundaryContextAssembler:
             content = getattr(msg, "content", "") or ""
             content_lower = content.lower()
             if any(
-                kw in content_lower
-                for kw in ("read(", "read_file", "code_search", "grep", "ls(")
+                kw in content_lower for kw in ("read(", "read_file", "code_search", "grep", "ls(")
             ):
                 tool_types.append("exploration")
             elif any(
@@ -125,8 +124,7 @@ class TurnBoundaryContextAssembler:
             ):
                 tool_types.append("mutation")
             elif any(
-                kw in content_lower
-                for kw in ("shell(", "execute_bash", "bash", "test", "git ")
+                kw in content_lower for kw in ("shell(", "execute_bash", "bash", "test", "git ")
             ):
                 tool_types.append("execution")
 
@@ -171,8 +169,7 @@ class TurnBoundaryContextAssembler:
             content_lower = content.lower()
 
             is_exploration = any(
-                kw in content_lower
-                for kw in ("read(", "read_file", "search", "grep", "ls(")
+                kw in content_lower for kw in ("read(", "read_file", "search", "grep", "ls(")
             )
             is_mutation = any(
                 kw in content_lower
@@ -187,8 +184,7 @@ class TurnBoundaryContextAssembler:
                 )
             )
             is_execution = any(
-                kw in content_lower
-                for kw in ("shell(", "execute_bash", "bash", "test", "git ")
+                kw in content_lower for kw in ("shell(", "execute_bash", "bash", "test", "git ")
             )
 
             if focus_phase == "mutation" and is_exploration:
@@ -205,11 +201,7 @@ class TurnBoundaryContextAssembler:
                 adjusted.append(score)
 
         # Predictive pruning: double-compress messages irrelevant to both phases
-        if (
-            predicted_phase
-            and predicted_phase != focus_phase
-            and predicted_phase != "mixed"
-        ):
+        if predicted_phase and predicted_phase != focus_phase and predicted_phase != "mixed":
             current_kws = phase_keywords.get(focus_phase, ())
             predicted_kws = phase_keywords.get(predicted_phase, ())
 
@@ -273,9 +265,7 @@ class TurnBoundaryContextAssembler:
                     ledger_msg = Message(
                         role="assistant",
                         content=ledger_text,
-                        metadata={
-                            MESSAGE_SOURCE_METADATA_KEY: MessageSource.LEDGER_RENDER.value
-                        },
+                        metadata={MESSAGE_SOURCE_METADATA_KEY: MessageSource.LEDGER_RENDER.value},
                     )
                     result.append(ledger_msg)
                     chars_used += len(ledger_text)
@@ -327,20 +317,14 @@ class TurnBoundaryContextAssembler:
                             current_turn=len(turn_boundaries) - full_turn_count,
                             recent_tool_names=recent_tool_names,
                         )
-                        multipliers = (
-                            self._temperature_classifier.get_score_multipliers(
-                                classified
-                            )
-                        )
+                        multipliers = self._temperature_classifier.get_score_multipliers(classified)
                         if multipliers:
                             scored = [
                                 (msg, score * multipliers.get(id(msg), 1.0))
                                 for msg, score in scored
                             ]
                     except Exception as _te:
-                        logger.debug(
-                            f"Context temperature classification skipped: {_te}"
-                        )
+                        logger.debug(f"Context temperature classification skipped: {_te}")
                 scored.sort(key=lambda x: x[1], reverse=True)
                 selected_older = []
                 older_chars = 0
@@ -368,12 +352,9 @@ class TurnBoundaryContextAssembler:
                 # Convert chars budget to token budget (approx 4 chars/token)
                 token_budget = older_budget // 4
                 msg_dicts = [
-                    {"role": m.role, "content": m.content, "priority": 50}
-                    for m in older_messages
+                    {"role": m.role, "content": m.content, "priority": 50} for m in older_messages
                 ]
-                fit_result = fit_context(
-                    msg_dicts, budget=token_budget, strategy="smart"
-                )
+                fit_result = fit_context(msg_dicts, budget=token_budget, strategy="smart")
                 for idx in fit_result.kept_indices:
                     result.append(older_messages[idx])
                     older_chars += len(older_messages[idx].content)
@@ -387,9 +368,7 @@ class TurnBoundaryContextAssembler:
 
         # 5. Semantic augmentation: retrieve relevant compacted context
         if self._conversation_controller and current_query:
-            retrieve_fn = getattr(
-                self._conversation_controller, "retrieve_relevant_history", None
-            )
+            retrieve_fn = getattr(self._conversation_controller, "retrieve_relevant_history", None)
             if retrieve_fn:
                 try:
                     remaining_budget = older_budget - older_chars

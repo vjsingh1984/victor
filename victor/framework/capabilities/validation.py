@@ -123,9 +123,7 @@ class Validator(ABC):
         pass
 
     @abstractmethod
-    def validate(
-        self, value: Any, context: Optional[Dict[str, Any]] = None
-    ) -> ValidationResult:
+    def validate(self, value: Any, context: Optional[Dict[str, Any]] = None) -> ValidationResult:
         """Validate a value.
 
         Args:
@@ -168,9 +166,7 @@ class FilePathValidator(Validator):
     def validator_id(self) -> str:
         return "file_path"
 
-    def validate(
-        self, value: Any, context: Optional[Dict[str, Any]] = None
-    ) -> ValidationResult:
+    def validate(self, value: Any, context: Optional[Dict[str, Any]] = None) -> ValidationResult:
         """Validate a file path.
 
         Args:
@@ -206,8 +202,7 @@ class FilePathValidator(Validator):
         # Check allowed directories
         if self._allowed_dirs:
             is_allowed = any(
-                str(path).startswith(str(allowed_dir))
-                for allowed_dir in self._allowed_dirs
+                str(path).startswith(str(allowed_dir)) for allowed_dir in self._allowed_dirs
             )
             if not is_allowed:
                 return ValidationResult.failure(
@@ -248,9 +243,7 @@ class CodeSyntaxValidator(Validator):
     def validator_id(self) -> str:
         return f"code_syntax_{self._language}"
 
-    def validate(
-        self, value: Any, context: Optional[Dict[str, Any]] = None
-    ) -> ValidationResult:
+    def validate(self, value: Any, context: Optional[Dict[str, Any]] = None) -> ValidationResult:
         """Validate code syntax.
 
         Args:
@@ -392,9 +385,7 @@ class ConfigurationValidator(Validator):
     def validator_id(self) -> str:
         return "configuration"
 
-    def validate(
-        self, value: Any, context: Optional[Dict[str, Any]] = None
-    ) -> ValidationResult:
+    def validate(self, value: Any, context: Optional[Dict[str, Any]] = None) -> ValidationResult:
         """Validate a configuration dictionary.
 
         Args:
@@ -475,9 +466,7 @@ class OutputFormatValidator(Validator):
     def validator_id(self) -> str:
         return "output_format"
 
-    def validate(
-        self, value: Any, context: Optional[Dict[str, Any]] = None
-    ) -> ValidationResult:
+    def validate(self, value: Any, context: Optional[Dict[str, Any]] = None) -> ValidationResult:
         """Validate output format.
 
         Args:
@@ -572,9 +561,7 @@ class ValidationCapabilityProvider:
         # Output format validator
         self.register_validator(OutputFormatValidator())
 
-    def register_validator(
-        self, validator: Validator, validator_id: Optional[str] = None
-    ) -> None:
+    def register_validator(self, validator: Validator, validator_id: Optional[str] = None) -> None:
         """Register a validator.
 
         Args:

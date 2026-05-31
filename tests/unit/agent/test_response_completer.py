@@ -201,9 +201,7 @@ class TestResponseCompleter:
     async def test_all_retries_exhausted(self):
         """Test behavior when all retries fail."""
         self.mock_provider.chat = AsyncMock(
-            return_value=CompletionResponse(
-                content="", role="assistant", tool_calls=None
-            )
+            return_value=CompletionResponse(content="", role="assistant", tool_calls=None)
         )
 
         config = CompletionConfig(max_recovery_attempts=2)

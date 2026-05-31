@@ -54,16 +54,10 @@ class TestISPRoleProtocols:
             CapabilityRegistryProtocol,
         )
 
-        full_methods = {
-            m for m in dir(CapabilityRegistryProtocol) if not m.startswith("_")
-        }
-        discovery_methods = {
-            m for m in dir(CapabilityDiscoveryProtocol) if not m.startswith("_")
-        }
+        full_methods = {m for m in dir(CapabilityRegistryProtocol) if not m.startswith("_")}
+        discovery_methods = {m for m in dir(CapabilityDiscoveryProtocol) if not m.startswith("_")}
         read_methods = {m for m in dir(CapabilityReadProtocol) if not m.startswith("_")}
-        mutation_methods = {
-            m for m in dir(CapabilityMutationProtocol) if not m.startswith("_")
-        }
+        mutation_methods = {m for m in dir(CapabilityMutationProtocol) if not m.startswith("_")}
 
         assert len(discovery_methods) < len(full_methods)
         assert len(read_methods) < len(full_methods)

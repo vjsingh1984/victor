@@ -94,8 +94,7 @@ class TestSystemPromptClassify:
         task_type_transitions = [
             t
             for t in result.transitions.transitions
-            if t.transition_type == TransitionType.UPDATE_STATE
-            and t.data.get("key") == "task_type"
+            if t.transition_type == TransitionType.UPDATE_STATE and t.data.get("key") == "task_type"
         ]
         assert len(task_type_transitions) == 1
         assert task_type_transitions[0].data["value"] == "research"
@@ -161,9 +160,7 @@ class TestSystemPromptClassify:
 
         await coord.classify(snapshot, "follow up question")
         call_args = analyzer.classify_task_with_context.call_args
-        history = (
-            call_args[0][1] if len(call_args[0]) > 1 else call_args[1].get("history")
-        )
+        history = call_args[0][1] if len(call_args[0]) > 1 else call_args[1].get("history")
         assert len(history) == 2
         assert history[0]["role"] == "user"
         assert history[1]["role"] == "assistant"

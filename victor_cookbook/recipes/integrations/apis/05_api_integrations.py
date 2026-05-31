@@ -14,8 +14,7 @@ async def slack_bot_integration():
 
     agent = Agent.create(temperature=0.5)
 
-    result = await agent.run(
-        """Generate Python code for a Slack bot that integrates Victor agents.
+    result = await agent.run("""Generate Python code for a Slack bot that integrates Victor agents.
 
         Requirements:
         - Use Slack SDK (slack-sdk)
@@ -41,8 +40,7 @@ async def slack_bot_integration():
         2. Event handling
         3. Error handling
         4. Environment variables needed
-        """
-    )
+        """)
 
     return result.content
 
@@ -122,8 +120,7 @@ async def rest_api_wrapper():
 
     agent = Agent.create(temperature=0.3)
 
-    result = await agent.run(
-        """Generate FastAPI code that wraps Victor agent in REST API.
+    result = await agent.run("""Generate FastAPI code that wraps Victor agent in REST API.
 
         API Endpoints:
         POST /api/v1/chat - Single-turn conversation
@@ -146,8 +143,7 @@ async def rest_api_wrapper():
         2. Pydantic schemas
         3. Middleware setup
         4. Dockerfile
-        """
-    )
+        """)
 
     return result.content
 

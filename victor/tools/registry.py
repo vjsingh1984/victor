@@ -114,9 +114,7 @@ class ToolRegistry(BaseRegistry[str, _ToolType]):
         self._ToolResult = ToolResult
         # Note: self._items is inherited from BaseRegistry, aliased to _tools for compatibility
         self._tool_enabled: Dict[str, bool] = {}  # Track enabled/disabled state
-        self._before_hooks: List[Union[Hook, Callable[[str, Dict[str, Any]], None]]] = (
-            []
-        )
+        self._before_hooks: List[Union[Hook, Callable[[str, Dict[str, Any]], None]]] = []
         self._after_hooks: List[Union[Hook, Callable[..., Any]]] = []
 
         # Schema cache: version-counter based invalidation for O(1) cache checks.
@@ -226,9 +224,7 @@ class ToolRegistry(BaseRegistry[str, _ToolType]):
             return True, None, None
 
         if tool_name in self._deduplication_blacklist:
-            logger.debug(
-                "Skipping blacklisted tool '%s' during registration", tool_name
-            )
+            logger.debug("Skipping blacklisted tool '%s' during registration", tool_name)
             return False, None, None
 
         normalized_name = self._normalize_name(tool_name)
@@ -566,11 +562,9 @@ class ToolRegistry(BaseRegistry[str, _ToolType]):
                 f"register() takes 1 or 2 positional arguments but {len(args)} were given"
             )
 
-        should_register, losing_tool_name, tool_source = (
-            self._prepare_deduplicated_registration(
-                tool_to_register,
-                tool_name,
-            )
+        should_register, losing_tool_name, tool_source = self._prepare_deduplicated_registration(
+            tool_to_register,
+            tool_name,
         )
         if not should_register:
             return
@@ -597,9 +591,7 @@ class ToolRegistry(BaseRegistry[str, _ToolType]):
 
         strategy = self._strategy_registry.get_strategy_for(tool)
         if strategy is None:
-            raise TypeError(
-                f"No registration strategy found for tool type: {type(tool)}"
-            )
+            raise TypeError(f"No registration strategy found for tool type: {type(tool)}")
 
         strategy.register(self, tool, enabled)
 
@@ -614,11 +606,9 @@ class ToolRegistry(BaseRegistry[str, _ToolType]):
             tool: Tool instance
             enabled: Whether tool is enabled
         """
-        should_register, losing_tool_name, tool_source = (
-            self._prepare_deduplicated_registration(
-                tool,
-                name,
-            )
+        should_register, losing_tool_name, tool_source = self._prepare_deduplicated_registration(
+            tool,
+            name,
         )
         if not should_register:
             return
@@ -699,9 +689,7 @@ class ToolRegistry(BaseRegistry[str, _ToolType]):
             def parameters(self) -> Dict[str, Any]:
                 return parameters
 
-            async def execute(
-                self, _exec_ctx: Dict[str, Any], **kwargs: Any
-            ) -> ToolResult:
+            async def execute(self, _exec_ctx: Dict[str, Any], **kwargs: Any) -> ToolResult:
                 # MCP tools are executed via mcp_call, not directly
                 return ToolResult(
                     success=False,
@@ -879,8 +867,7 @@ class ToolRegistry(BaseRegistry[str, _ToolType]):
                 schemas = [
                     tool.to_json_schema()
                     for name, tool in self._tools.items()
-                    if self._tool_enabled.get(name, False)
-                    and self._tool_is_available(tool)
+                    if self._tool_enabled.get(name, False) and self._tool_is_available(tool)
                 ]
             else:
                 schemas = [tool.to_json_schema() for tool in self._tools.values()]
@@ -926,9 +913,7 @@ class ToolRegistry(BaseRegistry[str, _ToolType]):
             return tool.cost_tier
         return None
 
-    def get_tools_by_cost(
-        self, max_tier: CostTier = CostTier.HIGH, only_enabled: bool = True
-    ):
+    def get_tools_by_cost(self, max_tier: CostTier = CostTier.HIGH, only_enabled: bool = True):
         """Get tools filtered by maximum cost tier.
 
         Args:
@@ -992,9 +977,7 @@ class ToolRegistry(BaseRegistry[str, _ToolType]):
             # Use detailed validation for better error messages
             validation = tool.validate_parameters_detailed(**kwargs)
             if not validation.valid:
-                error_msg = f"Invalid parameters for tool '{name}': " + "; ".join(
-                    validation.errors
-                )
+                error_msg = f"Invalid parameters for tool '{name}': " + "; ".join(validation.errors)
                 result = ToolResult(
                     success=False,
                     output=None,
@@ -1060,9 +1043,7 @@ class ToolRegistry(BaseRegistry[str, _ToolType]):
             registry.register_plugin(plugin)
         """
         if not hasattr(plugin, "register"):
-            raise AttributeError(
-                f"Tool plugin must have a 'register' method. Got: {type(plugin)}"
-            )
+            raise AttributeError(f"Tool plugin must have a 'register' method. Got: {type(plugin)}")
 
         # Call plugin's register method
         plugin.register(self)
@@ -1182,9 +1163,7 @@ class ToolRegistry(BaseRegistry[str, _ToolType]):
                             tool_instance = getattr(obj, "Tool", None)
                             if tool_instance:
                                 name = tool_instance.name
-                                description = (
-                                    tool_instance.description or "No description"
-                                )
+                                description = tool_instance.description or "No description"
                                 cost_tier = getattr(tool_instance, "cost_tier", None)
                                 cost_str = cost_tier.value if cost_tier else "unknown"
                                 discovered_tools.append((name, description, cost_str))
@@ -1198,9 +1177,7 @@ class ToolRegistry(BaseRegistry[str, _ToolType]):
                             try:
                                 tool_instance = obj()
                                 name = tool_instance.name
-                                description = (
-                                    tool_instance.description or "No description"
-                                )
+                                description = tool_instance.description or "No description"
                                 cost_tier = getattr(tool_instance, "cost_tier", None)
                                 cost_str = cost_tier.value if cost_tier else "unknown"
                                 discovered_tools.append((name, description, cost_str))

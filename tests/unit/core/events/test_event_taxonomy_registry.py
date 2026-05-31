@@ -50,9 +50,7 @@ class TestEventTaxonomyRegistry:
             MockWorkflowEventType.AGENT_CONTENT: EventType.CONTENT,
             MockWorkflowEventType.AGENT_ERROR: EventType.ERROR,
         }
-        EventTaxonomyRegistry.register_domain(
-            "workflow", MockWorkflowEventType, mapping
-        )
+        EventTaxonomyRegistry.register_domain("workflow", MockWorkflowEventType, mapping)
         assert "workflow" in EventTaxonomyRegistry.list_domains()
 
     def test_to_canonical(self):
@@ -63,12 +61,8 @@ class TestEventTaxonomyRegistry:
             MockWorkflowEventType.AGENT_CONTENT: EventType.CONTENT,
             MockWorkflowEventType.AGENT_ERROR: EventType.ERROR,
         }
-        EventTaxonomyRegistry.register_domain(
-            "workflow", MockWorkflowEventType, mapping
-        )
-        result = EventTaxonomyRegistry.to_canonical(
-            "workflow", MockWorkflowEventType.AGENT_CONTENT
-        )
+        EventTaxonomyRegistry.register_domain("workflow", MockWorkflowEventType, mapping)
+        result = EventTaxonomyRegistry.to_canonical("workflow", MockWorkflowEventType.AGENT_CONTENT)
         assert result == EventType.CONTENT
 
     def test_unmapped_returns_custom(self):
@@ -78,12 +72,8 @@ class TestEventTaxonomyRegistry:
         mapping = {
             MockWorkflowEventType.AGENT_CONTENT: EventType.CONTENT,
         }
-        EventTaxonomyRegistry.register_domain(
-            "workflow", MockWorkflowEventType, mapping
-        )
-        result = EventTaxonomyRegistry.to_canonical(
-            "workflow", MockWorkflowEventType.STEP_COMPLETE
-        )
+        EventTaxonomyRegistry.register_domain("workflow", MockWorkflowEventType, mapping)
+        result = EventTaxonomyRegistry.to_canonical("workflow", MockWorkflowEventType.STEP_COMPLETE)
         assert result == EventType.CUSTOM
 
     def test_from_canonical(self):
@@ -128,9 +118,7 @@ class TestEventTaxonomyRegistry:
             MockWorkflowEventType,
             {MockWorkflowEventType.AGENT_CONTENT: EventType.THINKING},
         )
-        result = EventTaxonomyRegistry.to_canonical(
-            "workflow", MockWorkflowEventType.AGENT_CONTENT
-        )
+        result = EventTaxonomyRegistry.to_canonical("workflow", MockWorkflowEventType.AGENT_CONTENT)
         assert result == EventType.THINKING
 
     def test_clear_registry(self):

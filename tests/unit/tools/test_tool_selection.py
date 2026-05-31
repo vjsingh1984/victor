@@ -158,9 +158,7 @@ class TestToolSelectorRuntimeIntelligence:
         registry = MagicMock()
         registry.list_tools.return_value = []
         runtime_intelligence = MagicMock()
-        selector = ToolSelector(
-            tools=registry, runtime_intelligence=runtime_intelligence
-        )
+        selector = ToolSelector(tools=registry, runtime_intelligence=runtime_intelligence)
         selector._get_core_tools_cached = MagicMock(return_value={"read", "ls"})
         tools = [
             SimpleNamespace(name="read"),

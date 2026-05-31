@@ -267,18 +267,12 @@ class InfrastructureBuildersMixin:
 
         config = IntegrationConfig(
             enable_resilient_calls=resolve_runtime_intelligence_enabled(self.settings),
-            enable_quality_scoring=getattr(
-                self.settings, "intelligent_quality_scoring", True
-            ),
-            enable_mode_learning=getattr(
-                self.settings, "intelligent_mode_learning", True
-            ),
+            enable_quality_scoring=getattr(self.settings, "intelligent_quality_scoring", True),
+            enable_mode_learning=getattr(self.settings, "intelligent_mode_learning", True),
             enable_prompt_optimization=getattr(
                 self.settings, "intelligent_prompt_optimization", True
             ),
-            min_quality_threshold=getattr(
-                self.settings, "intelligent_min_quality_threshold", 0.5
-            ),
+            min_quality_threshold=getattr(self.settings, "intelligent_min_quality_threshold", 0.5),
             grounding_confidence_threshold=getattr(
                 self.settings, "intelligent_grounding_threshold", 0.7
             ),
@@ -379,12 +373,8 @@ class InfrastructureBuildersMixin:
                 if provider is None:
                     provider = getattr(self, "provider", None)
                 if provider is not None:
-                    summarizer = LLMCompactionSummarizer(
-                        provider=provider, fallback=fallback
-                    )
-                    logger.debug(
-                        "LLMCompactionSummarizer created with LedgerAware fallback"
-                    )
+                    summarizer = LLMCompactionSummarizer(provider=provider, fallback=fallback)
+                    logger.debug("LLMCompactionSummarizer created with LedgerAware fallback")
                     return summarizer
             except Exception as e:
                 logger.debug(f"LLM summarizer unavailable, using LedgerAware: {e}")

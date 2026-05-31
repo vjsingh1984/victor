@@ -145,15 +145,11 @@ class StreamingChatExecutor:
 
     def _prepare_visible_content(self, content: str, *, user_message: str = "") -> str:
         """Normalize model output for display and conversation history."""
-        display_content = self._normalize_visible_candidate(
-            content, user_message=user_message
-        )
+        display_content = self._normalize_visible_candidate(content, user_message=user_message)
         if not display_content:
             return ""
 
-        display_content = self._visible_output_deduplicator.process(
-            display_content
-        ).strip()
+        display_content = self._visible_output_deduplicator.process(display_content).strip()
         if not display_content:
             return ""
 
@@ -201,9 +197,7 @@ class StreamingChatExecutor:
 
         sanitizer = getattr(orch, "sanitizer", None)
         for source, candidate in candidates:
-            normalized = self._normalize_visible_candidate(
-                candidate, user_message=user_message
-            )
+            normalized = self._normalize_visible_candidate(candidate, user_message=user_message)
             if not normalized:
                 continue
 
@@ -243,9 +237,7 @@ class StreamingChatExecutor:
                 "assistant",
                 terminal_content,
                 persist_synchronously=True,
-                metadata={
-                    MESSAGE_SOURCE_METADATA_KEY: MessageSource.AGENT_RESPONSE.value
-                },
+                metadata={MESSAGE_SOURCE_METADATA_KEY: MessageSource.AGENT_RESPONSE.value},
             )
             self._append_stream_event(
                 stream_ctx,
@@ -263,9 +255,7 @@ class StreamingChatExecutor:
                     "Terminal response content recovered from %s fallback (provider output was not visible)",
                     content_source,
                 )
-            return orch._chunk_generator.generate_content_chunk(
-                terminal_content, is_final=True
-            )
+            return orch._chunk_generator.generate_content_chunk(terminal_content, is_final=True)
 
         self._append_stream_event(
             stream_ctx,
@@ -285,9 +275,7 @@ class StreamingChatExecutor:
     def _resolve_provider_identity(orch: Any) -> tuple[str, str]:
         """Resolve provider and model names for model-aware continuation policy."""
         provider = getattr(orch, "provider", None)
-        provider_name = getattr(provider, "name", None) or getattr(
-            orch, "provider_name", ""
-        )
+        provider_name = getattr(provider, "name", None) or getattr(orch, "provider_name", "")
         model = getattr(orch, "model", "") or ""
         return str(provider_name or "unknown"), str(model or "unknown")
 
@@ -306,9 +294,7 @@ class StreamingChatExecutor:
             or "default"
         )
         provider_name, model_name = self._resolve_provider_identity(orch)
-        messages_removed = int(
-            getattr(stream_ctx, "compaction_message_removed_count", 0) or 0
-        )
+        messages_removed = int(getattr(stream_ctx, "compaction_message_removed_count", 0) or 0)
         reminder = get_post_compaction_reminder(
             task_type=task_type,
             compaction_summary=str(getattr(stream_ctx, "compaction_summary", "") or ""),
@@ -349,9 +335,7 @@ class StreamingChatExecutor:
         )
 
     @staticmethod
-    def _append_stream_event(
-        stream_ctx: Any, field_name: str, event: dict[str, Any]
-    ) -> None:
+    def _append_stream_event(stream_ctx: Any, field_name: str, event: dict[str, Any]) -> None:
         """Append a structured event list onto the mutable stream context."""
         events = getattr(stream_ctx, field_name, None)
         if not isinstance(events, list):
@@ -373,9 +357,7 @@ class StreamingChatExecutor:
         if intent_value in {"write_allowed", "edit", "write"}:
             return True
 
-        task_type = str(
-            getattr(getattr(stream_ctx, "unified_task_type", None), "value", "") or ""
-        )
+        task_type = str(getattr(getattr(stream_ctx, "unified_task_type", None), "value", "") or "")
         coarse_type = str(getattr(stream_ctx, "coarse_task_type", "") or "")
         task_text = f"{task_type} {coarse_type}".lower()
         return any(token in task_text for token in ("edit", "write", "code", "coding"))
@@ -524,9 +506,7 @@ class StreamingChatExecutor:
             ),
             "task_type": task_type,
             "iteration": getattr(stream_ctx, "total_iterations", 0),
-            "reason": self._normalize_optional_text(
-                getattr(recovery_action, "reason", None)
-            ),
+            "reason": self._normalize_optional_text(getattr(recovery_action, "reason", None)),
             "strategy_name": self._normalize_optional_text(
                 getattr(recovery_action, "strategy_name", None)
             ),
@@ -660,9 +640,7 @@ class StreamingChatExecutor:
     @staticmethod
     def _should_execute_prepared_team(stream_ctx: Any) -> bool:
         """Check whether streaming topology resolved a concrete team execution."""
-        runtime_context_overrides = getattr(
-            stream_ctx, "runtime_context_overrides", None
-        )
+        runtime_context_overrides = getattr(stream_ctx, "runtime_context_overrides", None)
         return bool(
             isinstance(runtime_context_overrides, dict)
             and runtime_context_overrides.get("execution_mode") == "team_execution"
@@ -675,20 +653,14 @@ class StreamingChatExecutor:
         stream_ctx: Any,
     ) -> dict[str, Any]:
         """Build shared context for framework team execution in streaming mode."""
-        runtime_context_overrides = (
-            getattr(stream_ctx, "runtime_context_overrides", {}) or {}
-        )
+        runtime_context_overrides = getattr(stream_ctx, "runtime_context_overrides", {}) or {}
         context = {
             "query": user_message,
             "task_type": getattr(stream_ctx, "coarse_task_type", None),
             "task_complexity": getattr(
-                getattr(
-                    getattr(stream_ctx, "task_classification", None), "complexity", None
-                ),
+                getattr(getattr(stream_ctx, "task_classification", None), "complexity", None),
                 "value",
-                getattr(
-                    getattr(stream_ctx, "task_classification", None), "complexity", None
-                ),
+                getattr(getattr(stream_ctx, "task_classification", None), "complexity", None),
             ),
             "topology_plan": getattr(stream_ctx, "topology_plan", None),
             "topology_decision": getattr(stream_ctx, "topology_decision", None),
@@ -720,9 +692,7 @@ class StreamingChatExecutor:
         stream_ctx: Any,
     ) -> Optional[StreamChunk]:
         """Execute a prepared framework team and convert it into a final stream chunk."""
-        runtime_context_overrides = getattr(
-            stream_ctx, "runtime_context_overrides", None
-        )
+        runtime_context_overrides = getattr(stream_ctx, "runtime_context_overrides", None)
         if not isinstance(runtime_context_overrides, dict):
             return None
 
@@ -752,9 +722,7 @@ class StreamingChatExecutor:
 
         resolved_team, team_result = team_execution
         final_output = (
-            team_result.final_output.strip()
-            or team_result.error
-            or "Team execution completed."
+            team_result.final_output.strip() or team_result.error or "Team execution completed."
         )
         if final_output:
             from victor.agent.conversation.types import (
@@ -765,9 +733,7 @@ class StreamingChatExecutor:
             orch.add_message(
                 "assistant",
                 final_output,
-                metadata={
-                    MESSAGE_SOURCE_METADATA_KEY: MessageSource.AGENT_RESPONSE.value
-                },
+                metadata={MESSAGE_SOURCE_METADATA_KEY: MessageSource.AGENT_RESPONSE.value},
             )
             if hasattr(stream_ctx, "accumulate_content"):
                 stream_ctx.accumulate_content(final_output)
@@ -797,9 +763,7 @@ class StreamingChatExecutor:
         """Run the streaming executor for the provided message."""
         runtime_owner = self._runtime_owner
         orch = runtime_owner._orchestrator
-        recovery = (
-            getattr(orch, "_recovery_service", None) or orch._recovery_coordinator
-        )
+        recovery = getattr(orch, "_recovery_service", None) or orch._recovery_coordinator
         create_recovery_context = orch.create_recovery_context
 
         self._reset_streaming_turn_state(orch)
@@ -926,9 +890,7 @@ class StreamingChatExecutor:
             self._runtime_intelligence.reset_decision_budget()
         else:
             decision_service = _get_decision_service(orch)
-            if decision_service is not None and hasattr(
-                decision_service, "reset_budget"
-            ):
+            if decision_service is not None and hasattr(decision_service, "reset_budget"):
                 decision_service.reset_budget()
 
         from victor.agent.turn_policy import NudgePolicy, SpinDetector, SpinState
@@ -937,17 +899,13 @@ class StreamingChatExecutor:
         _nudge_policy = NudgePolicy()
 
         _perception = None
-        conversation_history = self._get_conversation_history(
-            runtime_owner, orch, user_message
-        )
+        conversation_history = self._get_conversation_history(runtime_owner, orch, user_message)
         if self._runtime_intelligence is not None:
             try:
                 snapshot = await self._runtime_intelligence.analyze_turn(
                     user_message,
                     context={
-                        "conversation_stage": getattr(
-                            stream_ctx, "conversation_stage", "initial"
-                        ),
+                        "conversation_stage": getattr(stream_ctx, "conversation_stage", "initial"),
                         "is_analysis_task": stream_ctx.is_analysis_task,
                         "is_action_task": stream_ctx.is_action_task,
                     },
@@ -962,9 +920,7 @@ class StreamingChatExecutor:
                         getattr(_perception, "complexity", "unknown"),
                         getattr(_perception, "confidence", 0.0),
                     )
-                    clarification = self._evaluation_policy.get_clarification_decision(
-                        _perception
-                    )
+                    clarification = self._evaluation_policy.get_clarification_decision(_perception)
                     if clarification.requires_clarification:
                         yield orch._chunk_generator.generate_content_chunk(
                             clarification.prompt
@@ -979,9 +935,7 @@ class StreamingChatExecutor:
                 _perception = await self._perception.perceive(
                     user_message,
                     context={
-                        "conversation_stage": getattr(
-                            stream_ctx, "conversation_stage", "initial"
-                        ),
+                        "conversation_stage": getattr(stream_ctx, "conversation_stage", "initial"),
                         "is_analysis_task": stream_ctx.is_analysis_task,
                         "is_action_task": stream_ctx.is_action_task,
                     },
@@ -995,9 +949,7 @@ class StreamingChatExecutor:
                         getattr(_perception, "complexity", "unknown"),
                         getattr(_perception, "confidence", 0.0),
                     )
-                    clarification = self._evaluation_policy.get_clarification_decision(
-                        _perception
-                    )
+                    clarification = self._evaluation_policy.get_clarification_decision(_perception)
                     if clarification.requires_clarification:
                         yield orch._chunk_generator.generate_content_chunk(
                             clarification.prompt
@@ -1018,9 +970,7 @@ class StreamingChatExecutor:
         self._prev_visible_content = ""
 
         if self._should_execute_prepared_team(stream_ctx):
-            team_chunk = await self._execute_prepared_team(
-                orch, user_message, stream_ctx
-            )
+            team_chunk = await self._execute_prepared_team(orch, user_message, stream_ctx)
             if team_chunk is not None:
                 yield team_chunk
                 return
@@ -1068,14 +1018,12 @@ class StreamingChatExecutor:
             if chat_service is not None and hasattr(
                 chat_service, "handle_context_and_iteration_limits"
             ):
-                handled, iter_chunk = (
-                    await chat_service.handle_context_and_iteration_limits(
-                        user_message,
-                        max_total_iterations,
-                        max_context,
-                        stream_ctx.total_iterations,
-                        stream_ctx.last_quality_score,
-                    )
+                handled, iter_chunk = await chat_service.handle_context_and_iteration_limits(
+                    user_message,
+                    max_total_iterations,
+                    max_context,
+                    stream_ctx.total_iterations,
+                    stream_ctx.last_quality_score,
                 )
             else:
                 handled, iter_chunk = await orch._handle_context_and_iteration_limits(
@@ -1111,10 +1059,7 @@ class StreamingChatExecutor:
                 )
 
             provider_kwargs = dict(getattr(stream_ctx, "provider_kwargs", {}) or {})
-            if (
-                orch.thinking
-                or provider_kwargs.get("execution_mode") == "escalated_single_agent"
-            ):
+            if orch.thinking or provider_kwargs.get("execution_mode") == "escalated_single_agent":
                 provider_kwargs["thinking"] = {
                     "type": "enabled",
                     "budget_tokens": 10000,
@@ -1136,9 +1081,7 @@ class StreamingChatExecutor:
                     )
 
                     if is_feature_enabled(FeatureFlag.USE_CONFIDENCE_MONITOR):
-                        self._confidence_monitor.record(
-                            full_content or "", stream_ctx.total_tokens
-                        )
+                        self._confidence_monitor.record(full_content or "", stream_ctx.total_tokens)
                         if self._confidence_monitor.should_stop():
                             self._record_confidence_early_stop(stream_ctx)
                             logger.info(
@@ -1170,9 +1113,7 @@ class StreamingChatExecutor:
             _has_tools = bool(tool_calls)
             _no_progress = not _has_tools and content_length < 120
 
-            tool_names_set = (
-                {tc.get("name", "") for tc in tool_calls} if tool_calls else set()
-            )
+            tool_names_set = {tc.get("name", "") for tc in tool_calls} if tool_calls else set()
             _spin.record_turn(
                 has_tool_calls=_has_tools,
                 tool_names=tool_names_set,
@@ -1235,16 +1176,12 @@ class StreamingChatExecutor:
                         return
 
                 if self._prev_full_content and len(self._prev_full_content) > 50:
-                    prev_norm = re.sub(
-                        r"\s+", " ", self._prev_full_content.strip().lower()
-                    )
+                    prev_norm = re.sub(r"\s+", " ", self._prev_full_content.strip().lower())
                     curr_norm = normalized
                     prev_words = set(prev_norm.split())
                     curr_words = set(curr_norm.split())
                     if prev_words and curr_words:
-                        overlap = len(prev_words & curr_words) / len(
-                            prev_words | curr_words
-                        )
+                        overlap = len(prev_words & curr_words) / len(prev_words | curr_words)
                         # P0 FIX: Lower threshold from 0.6 to 0.5 for earlier detection
                         if overlap > 0.5:
                             self._repetition_count += 1
@@ -1288,9 +1225,7 @@ class StreamingChatExecutor:
                 )
                 return
 
-            tool_calls, full_content = orch._parse_and_validate_tool_calls(
-                tool_calls, full_content
-            )
+            tool_calls, full_content = orch._parse_and_validate_tool_calls(tool_calls, full_content)
 
             forced_task_completion = False
             if orch._task_completion_detector and full_content:
@@ -1320,12 +1255,8 @@ class StreamingChatExecutor:
                         last_summary = getattr(
                             orch._task_completion_detector._state, "last_summary", ""
                         )
-                        sanitized_summary = strip_active_completion_markers(
-                            last_summary
-                        ).strip()
-                        if sanitized_summary and hasattr(
-                            orch, "_conversation_controller"
-                        ):
+                        sanitized_summary = strip_active_completion_markers(last_summary).strip()
+                        if sanitized_summary and hasattr(orch, "_conversation_controller"):
                             try:
                                 orch._conversation_controller.persist_compaction_summary(
                                     sanitized_summary, []
@@ -1335,9 +1266,7 @@ class StreamingChatExecutor:
                                     "VICTOR_SUMMARY persisted for next-turn context injection"
                                 )
                             except Exception as exc:
-                                logger.debug(
-                                    "Failed to persist VICTOR_SUMMARY: %s", exc
-                                )
+                                logger.debug("Failed to persist VICTOR_SUMMARY: %s", exc)
                 elif confidence == CompletionConfidence.MEDIUM:
                     logger.info(
                         "Task completion: MEDIUM confidence detected (file mods + passive signal)"
@@ -1389,9 +1318,7 @@ class StreamingChatExecutor:
 
             if recovery_action.action != "continue":
                 self._record_recovery_action(stream_ctx, recovery_action)
-                recovery_chunk = orch._apply_recovery_action(
-                    recovery_action, stream_ctx
-                )
+                recovery_chunk = orch._apply_recovery_action(recovery_action, stream_ctx)
                 if recovery_chunk:
                     yield recovery_chunk
                     if recovery_chunk.is_final:
@@ -1420,9 +1347,7 @@ class StreamingChatExecutor:
                         sanitized,
                         tool_calls=tool_calls,
                         persist_synchronously=forced_task_completion and not tool_calls,
-                        metadata={
-                            MESSAGE_SOURCE_METADATA_KEY: MessageSource.AGENT_RESPONSE.value
-                        },
+                        metadata={MESSAGE_SOURCE_METADATA_KEY: MessageSource.AGENT_RESPONSE.value},
                     )
                     assistant_content_yielded = True
                     yield orch._chunk_generator.generate_content_chunk(
@@ -1449,8 +1374,7 @@ class StreamingChatExecutor:
                             "assistant",
                             plain_text,
                             tool_calls=tool_calls,
-                            persist_synchronously=forced_task_completion
-                            and not tool_calls,
+                            persist_synchronously=forced_task_completion and not tool_calls,
                             metadata={
                                 MESSAGE_SOURCE_METADATA_KEY: MessageSource.AGENT_RESPONSE.value
                             },
@@ -1480,9 +1404,7 @@ class StreamingChatExecutor:
                     "assistant",
                     "",
                     tool_calls=tool_calls,
-                    metadata={
-                        MESSAGE_SOURCE_METADATA_KEY: MessageSource.AGENT_RESPONSE.value
-                    },
+                    metadata={MESSAGE_SOURCE_METADATA_KEY: MessageSource.AGENT_RESPONSE.value},
                 )
             else:
                 recovery_ctx = create_recovery_context(stream_ctx)
@@ -1493,23 +1415,17 @@ class StreamingChatExecutor:
                     yield final_chunk
                     return
 
-                logger.warning(
-                    "Model returned empty response - attempting aggressive recovery"
-                )
+                logger.warning("Model returned empty response - attempting aggressive recovery")
 
                 recovery_ctx = create_recovery_context(stream_ctx)
-                recovery_chunk, should_force = recovery.handle_empty_response(
-                    recovery_ctx
-                )
+                recovery_chunk, should_force = recovery.handle_empty_response(recovery_ctx)
                 _ = should_force
                 if recovery_chunk:
                     yield recovery_chunk
                     continue
 
                 recovery_success, recovered_tool_calls, final_chunk = (
-                    await runtime_owner._handle_empty_response_recovery(
-                        stream_ctx, tools
-                    )
+                    await runtime_owner._handle_empty_response_recovery(stream_ctx, tools)
                 )
 
                 if recovery_success:
@@ -1531,9 +1447,7 @@ class StreamingChatExecutor:
                         user_satisfied=False,
                         completed=False,
                     )
-                    yield orch._chunk_generator.generate_content_chunk(
-                        fallback_msg, is_final=True
-                    )
+                    yield orch._chunk_generator.generate_content_chunk(fallback_msg, is_final=True)
                     return
 
             for tc in tool_calls or []:
@@ -1611,9 +1525,7 @@ class StreamingChatExecutor:
                             issues[:3],
                         )
                     if quality_result.get("should_retry"):
-                        grounding_feedback = quality_result.get(
-                            "grounding_feedback", ""
-                        )
+                        grounding_feedback = quality_result.get("grounding_feedback", "")
                         if grounding_feedback:
                             logger.info(
                                 "Injecting grounding feedback for retry: %s chars",
@@ -1622,9 +1534,7 @@ class StreamingChatExecutor:
                             stream_ctx.pending_grounding_feedback = grounding_feedback
 
                 if quality_result:
-                    new_score = quality_result.get(
-                        "quality_score", stream_ctx.last_quality_score
-                    )
+                    new_score = quality_result.get("quality_score", stream_ctx.last_quality_score)
                     stream_ctx.update_quality_score(new_score)
 
                 if quality_result and quality_result.get("should_finalize"):
@@ -1643,9 +1553,7 @@ class StreamingChatExecutor:
                 stream_ctx, unified_loop_warning
             )
             if loop_warning_chunk:
-                logger.warning(
-                    "UnifiedTaskTracker loop warning: %s", unified_loop_warning
-                )
+                logger.warning("UnifiedTaskTracker loop warning: %s", unified_loop_warning)
                 yield loop_warning_chunk
             else:
                 recovery_ctx = create_recovery_context(stream_ctx)
@@ -1673,12 +1581,14 @@ class StreamingChatExecutor:
 
                     tracking_state = create_tracking_state(orch)
 
-                    intent_result = runtime_owner._intent_classification_handler.classify_and_determine_action(
-                        stream_ctx=stream_ctx,
-                        full_content=full_content,
-                        content_length=content_length,
-                        mentioned_tools=mentioned_tools_detected,
-                        tracking_state=tracking_state,
+                    intent_result = (
+                        runtime_owner._intent_classification_handler.classify_and_determine_action(
+                            stream_ctx=stream_ctx,
+                            full_content=full_content,
+                            content_length=content_length,
+                            mentioned_tools=mentioned_tools_detected,
+                            tracking_state=tracking_state,
+                        )
                     )
 
                     for chunk in intent_result.chunks:
@@ -1688,8 +1598,7 @@ class StreamingChatExecutor:
                         full_content = ""
 
                     force_finalize_used = (
-                        tracking_state.force_finalize
-                        and intent_result.action == "finish"
+                        tracking_state.force_finalize and intent_result.action == "finish"
                     )
                     from victor.agent.streaming import apply_tracking_state_updates
 
@@ -1717,13 +1626,10 @@ class StreamingChatExecutor:
                         and not forced_task_completion
                     ):
                         turns_since_compaction = (
-                            stream_ctx.total_iterations
-                            - stream_ctx.last_compaction_turn
+                            stream_ctx.total_iterations - stream_ctx.last_compaction_turn
                         )
                         if turns_since_compaction <= 2:
-                            is_asking_input = action_result.get(
-                                "is_asking_input", False
-                            )
+                            is_asking_input = action_result.get("is_asking_input", False)
                             is_completion = action_result.get("is_completion", False)
 
                             if not is_asking_input and not is_completion:
@@ -1749,32 +1655,23 @@ class StreamingChatExecutor:
                     if not runtime_owner._continuation_handler:
                         from victor.agent.streaming import create_continuation_handler
 
-                        runtime_owner._continuation_handler = (
-                            create_continuation_handler(orch)
-                        )
+                        runtime_owner._continuation_handler = create_continuation_handler(orch)
 
                     action_result = action_result.with_action(action)
 
-                    continuation_result = (
-                        await runtime_owner._continuation_handler.handle_action(
-                            action_result=action_result,
-                            stream_ctx=stream_ctx,
-                            full_content=full_content,
-                        )
+                    continuation_result = await runtime_owner._continuation_handler.handle_action(
+                        action_result=action_result,
+                        stream_ctx=stream_ctx,
+                        full_content=full_content,
                     )
 
                     for chunk in continuation_result.chunks:
                         yield chunk
 
-                    if (
-                        "cumulative_prompt_interventions"
-                        in continuation_result.state_updates
-                    ):
-                        orch._cumulative_prompt_interventions = (
-                            continuation_result.state_updates[
-                                "cumulative_prompt_interventions"
-                            ]
-                        )
+                    if "cumulative_prompt_interventions" in continuation_result.state_updates:
+                        orch._cumulative_prompt_interventions = continuation_result.state_updates[
+                            "cumulative_prompt_interventions"
+                        ]
 
                     if continuation_result.should_return:
                         continuation_visible = any(
@@ -1799,17 +1696,13 @@ class StreamingChatExecutor:
                 if not runtime_owner._tool_execution_handler:
                     from victor.agent.streaming import create_tool_execution_handler
 
-                    runtime_owner._tool_execution_handler = (
-                        create_tool_execution_handler(orch)
-                    )
+                    runtime_owner._tool_execution_handler = create_tool_execution_handler(orch)
 
                 runtime_owner._tool_execution_handler.update_observed_files(
                     set(orch.observed_files) if orch.observed_files else set()
                 )
 
-                if hasattr(
-                    runtime_owner._tool_execution_handler, "execute_tools_streaming"
-                ):
+                if hasattr(runtime_owner._tool_execution_handler, "execute_tools_streaming"):
                     from victor.agent.streaming.tool_execution import (
                         ToolExecutionResult,
                     )
@@ -1828,15 +1721,13 @@ class StreamingChatExecutor:
                     ):
                         yield chunk
                 else:
-                    tool_exec_result = (
-                        await runtime_owner._tool_execution_handler.execute_tools(
-                            stream_ctx=stream_ctx,
-                            tool_calls=tool_calls,
-                            user_message=user_message,
-                            full_content=full_content,
-                            tool_calls_used=orch.tool_calls_used,
-                            tool_budget=orch.tool_budget,
-                        )
+                    tool_exec_result = await runtime_owner._tool_execution_handler.execute_tools(
+                        stream_ctx=stream_ctx,
+                        tool_calls=tool_calls,
+                        user_message=user_message,
+                        full_content=full_content,
+                        tool_calls_used=orch.tool_calls_used,
+                        tool_budget=orch.tool_budget,
                     )
                     for chunk in tool_exec_result.chunks:
                         yield chunk
@@ -1895,9 +1786,7 @@ class StreamingChatExecutor:
                     except Exception as exc:
                         logger.debug("Streaming fulfillment check skipped: %s", exc)
 
-                tool_count = (
-                    tool_exec_result.tool_calls_executed if tool_exec_result else 0
-                )
+                tool_count = tool_exec_result.tool_calls_executed if tool_exec_result else 0
                 content_len = len(full_content) if full_content else 0
                 progress = min(1.0, (tool_count * 0.3 + min(content_len / 2000, 0.7)))
                 self._progress_scores.append(progress)
@@ -1909,9 +1798,7 @@ class StreamingChatExecutor:
                         # progress score is a heuristic and may flatten while the
                         # agent is doing real work (read → search → edit cycles).
                         _recent_tools = (
-                            tool_exec_result.tool_calls_executed
-                            if tool_exec_result
-                            else 0
+                            tool_exec_result.tool_calls_executed if tool_exec_result else 0
                         )
                         if _recent_tools > 0:
                             logger.info(

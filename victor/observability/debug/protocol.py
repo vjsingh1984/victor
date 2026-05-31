@@ -211,9 +211,7 @@ class DebugSession:
     environment: Dict[str, str] = field(default_factory=dict)
 
     # Debug state
-    breakpoints: Dict[str, List[Breakpoint]] = field(
-        default_factory=dict
-    )  # path -> breakpoints
+    breakpoints: Dict[str, List[Breakpoint]] = field(default_factory=dict)  # path -> breakpoints
     threads: List[Thread] = field(default_factory=list)
     current_thread_id: Optional[int] = None
     stop_reason: Optional[StopReason] = None

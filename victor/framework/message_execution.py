@@ -78,9 +78,7 @@ def _coerce_completion_response(
             else getattr(result, "tool_calls", [])
         )
         usage = (
-            result.get("usage")
-            if isinstance(result, Mapping)
-            else getattr(result, "usage", None)
+            result.get("usage") if isinstance(result, Mapping) else getattr(result, "usage", None)
         )
         stop_reason = (
             result.get("stop_reason", "stop")
@@ -209,14 +207,10 @@ def _build_task_result_metadata(
         "usage": response.usage,
         "stop_reason": response.stop_reason,
         "tokens_input": _safe_int(
-            _coalesce_value(
-                report_value("api_prompt_tokens"), usage.get("prompt_tokens")
-            )
+            _coalesce_value(report_value("api_prompt_tokens"), usage.get("prompt_tokens"))
         ),
         "tokens_output": _safe_int(
-            _coalesce_value(
-                report_value("api_completion_tokens"), usage.get("completion_tokens")
-            )
+            _coalesce_value(report_value("api_completion_tokens"), usage.get("completion_tokens"))
         ),
         "tokens_used": _safe_int(
             _coalesce_value(report_value("api_total_tokens"), usage.get("total_tokens"))
@@ -239,9 +233,7 @@ def _build_task_result_metadata(
         "cost_usd_micros": _safe_int(cost_usd_micros),
         "tool_schema_tokens": _safe_int(report_value("tool_schema_tokens")),
         "compaction_saved_tokens": _safe_int(report_value("compaction_saved_tokens")),
-        "compaction_messages_removed": _safe_int(
-            report_value("compaction_messages_removed")
-        ),
+        "compaction_messages_removed": _safe_int(report_value("compaction_messages_removed")),
     }
 
     if task_report is not None:
@@ -373,9 +365,7 @@ async def iter_runtime_stream_events(
     from victor.framework._internal import stream_with_events
 
     if hasattr(runtime, "stream_chat"):
-        async for event in stream_with_events(
-            runtime, message, response_prompt=message
-        ):
+        async for event in stream_with_events(runtime, message, response_prompt=message):
             yield event
         return
 

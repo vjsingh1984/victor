@@ -105,9 +105,7 @@ class FeatureFlagCache:
         """
         # Check local cache first (if scoped)
         if self._scoped:
-            return self._check_cache(
-                self._local_cache, self._local_stats, flag, default
-            )
+            return self._check_cache(self._local_cache, self._local_stats, flag, default)
 
         # Check global cache
         return self._check_cache(self._global_cache, self._stats, flag, default)

@@ -357,9 +357,9 @@ class TestChatSessionFlagsIntegration:
         prefix = None
         for prefix_len in range(15, 6, -1):  # Try longer prefixes first
             candidate_prefix = session_id_1[:prefix_len]
-            if not session_id_2.startswith(
+            if not session_id_2.startswith(candidate_prefix) and not session_id_3.startswith(
                 candidate_prefix
-            ) and not session_id_3.startswith(candidate_prefix):
+            ):
                 prefix = candidate_prefix
                 break  # Found a unique prefix
 

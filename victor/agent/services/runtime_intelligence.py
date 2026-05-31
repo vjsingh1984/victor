@@ -146,9 +146,7 @@ class TopologyRoutingFeedback:
     selection_policy_distribution: Dict[str, float] = field(default_factory=dict)
     selection_policy_reward_totals: Dict[str, float] = field(default_factory=dict)
     selection_policy_optimization_counts: Dict[str, float] = field(default_factory=dict)
-    selection_policy_optimization_reward_totals: Dict[str, float] = field(
-        default_factory=dict
-    )
+    selection_policy_optimization_reward_totals: Dict[str, float] = field(default_factory=dict)
     selection_policy_feasible_counts: Dict[str, float] = field(default_factory=dict)
     selection_policy_scope_metrics: Dict[str, Dict[str, Dict[str, Any]]] = field(
         default_factory=dict
@@ -157,9 +155,7 @@ class TopologyRoutingFeedback:
     @property
     def support(self) -> float:
         """Normalized trust in the learned topology preference."""
-        base_support = max(
-            0.0, min(1.0, (self.coverage * 0.55) + (self.avg_reward * 0.45))
-        )
+        base_support = max(0.0, min(1.0, (self.coverage * 0.55) + (self.avg_reward * 0.45)))
         consistency_multiplier = max(0.25, 1.0 - (self.conflict_score * 0.75))
         return round(max(0.0, min(1.0, base_support * consistency_multiplier)), 4)
 
@@ -220,9 +216,7 @@ class TopologyRoutingFeedback:
         for policy, count_value in self.selection_policy_distribution.items():
             try:
                 count = float(count_value)
-                reward_total = float(
-                    self.selection_policy_reward_totals.get(policy, 0.0)
-                )
+                reward_total = float(self.selection_policy_reward_totals.get(policy, 0.0))
             except (TypeError, ValueError):
                 continue
             if count <= 0.0:
@@ -265,9 +259,7 @@ class TopologyRoutingFeedback:
         for policy, count_value in self.selection_policy_optimization_counts.items():
             try:
                 count = float(count_value)
-                feasible_count = float(
-                    self.selection_policy_feasible_counts.get(policy, 0.0)
-                )
+                feasible_count = float(self.selection_policy_feasible_counts.get(policy, 0.0))
             except (TypeError, ValueError):
                 continue
             if count <= 0.0:
@@ -325,21 +317,15 @@ class TopologyRoutingFeedback:
             "selection_policy_reward_totals": dict(self.selection_policy_reward_totals),
             "avg_reward_by_selection_policy": dict(self.avg_reward_by_selection_policy),
             "learned_override_reward_delta": self.learned_override_reward_delta,
-            "selection_policy_optimization_counts": dict(
-                self.selection_policy_optimization_counts
-            ),
+            "selection_policy_optimization_counts": dict(self.selection_policy_optimization_counts),
             "selection_policy_optimization_reward_totals": dict(
                 self.selection_policy_optimization_reward_totals
             ),
             "avg_optimization_reward_by_selection_policy": dict(
                 self.avg_optimization_reward_by_selection_policy
             ),
-            "selection_policy_feasible_counts": dict(
-                self.selection_policy_feasible_counts
-            ),
-            "feasibility_rate_by_selection_policy": dict(
-                self.feasibility_rate_by_selection_policy
-            ),
+            "selection_policy_feasible_counts": dict(self.selection_policy_feasible_counts),
+            "feasibility_rate_by_selection_policy": dict(self.feasibility_rate_by_selection_policy),
             "learned_override_optimization_reward_delta": (
                 self.learned_override_optimization_reward_delta
             ),
@@ -380,9 +366,7 @@ class TopologyRoutingFeedback:
         selection_policy_metrics = self.resolve_selection_policy_metrics(
             scope_context=scope_context
         )
-        learned_override_reward = selection_policy_metrics.get(
-            "learned_override_policy_reward"
-        )
+        learned_override_reward = selection_policy_metrics.get("learned_override_policy_reward")
         heuristic_reward = selection_policy_metrics.get("heuristic_policy_reward")
         if learned_override_reward is not None:
             routing_context["learned_override_policy_reward"] = learned_override_reward
@@ -394,67 +378,45 @@ class TopologyRoutingFeedback:
             routing_context["heuristic_policy_count"] = int(
                 selection_policy_metrics.get("heuristic_policy_count", 0)
             )
-        if (
-            selection_policy_metrics.get("learned_override_policy_reward_delta")
-            is not None
-        ):
-            routing_context["learned_override_policy_reward_delta"] = (
-                selection_policy_metrics["learned_override_policy_reward_delta"]
-            )
-        if (
-            selection_policy_metrics.get("learned_override_policy_optimization_reward")
-            is not None
-        ):
+        if selection_policy_metrics.get("learned_override_policy_reward_delta") is not None:
+            routing_context["learned_override_policy_reward_delta"] = selection_policy_metrics[
+                "learned_override_policy_reward_delta"
+            ]
+        if selection_policy_metrics.get("learned_override_policy_optimization_reward") is not None:
             routing_context["learned_override_policy_optimization_reward"] = (
                 selection_policy_metrics["learned_override_policy_optimization_reward"]
             )
+        if selection_policy_metrics.get("heuristic_policy_optimization_reward") is not None:
+            routing_context["heuristic_policy_optimization_reward"] = selection_policy_metrics[
+                "heuristic_policy_optimization_reward"
+            ]
         if (
-            selection_policy_metrics.get("heuristic_policy_optimization_reward")
-            is not None
-        ):
-            routing_context["heuristic_policy_optimization_reward"] = (
-                selection_policy_metrics["heuristic_policy_optimization_reward"]
-            )
-        if (
-            selection_policy_metrics.get(
-                "learned_override_policy_optimization_reward_delta"
-            )
+            selection_policy_metrics.get("learned_override_policy_optimization_reward_delta")
             is not None
         ):
             routing_context["learned_override_policy_optimization_reward_delta"] = (
-                selection_policy_metrics[
-                    "learned_override_policy_optimization_reward_delta"
-                ]
+                selection_policy_metrics["learned_override_policy_optimization_reward_delta"]
             )
-        if (
-            selection_policy_metrics.get("learned_override_policy_feasibility_rate")
-            is not None
-        ):
-            routing_context["learned_override_policy_feasibility_rate"] = (
-                selection_policy_metrics["learned_override_policy_feasibility_rate"]
-            )
-        if (
-            selection_policy_metrics.get("heuristic_policy_feasibility_rate")
-            is not None
-        ):
-            routing_context["heuristic_policy_feasibility_rate"] = (
-                selection_policy_metrics["heuristic_policy_feasibility_rate"]
-            )
-        if (
-            selection_policy_metrics.get("learned_override_policy_feasibility_delta")
-            is not None
-        ):
-            routing_context["learned_override_policy_feasibility_delta"] = (
-                selection_policy_metrics["learned_override_policy_feasibility_delta"]
-            )
+        if selection_policy_metrics.get("learned_override_policy_feasibility_rate") is not None:
+            routing_context["learned_override_policy_feasibility_rate"] = selection_policy_metrics[
+                "learned_override_policy_feasibility_rate"
+            ]
+        if selection_policy_metrics.get("heuristic_policy_feasibility_rate") is not None:
+            routing_context["heuristic_policy_feasibility_rate"] = selection_policy_metrics[
+                "heuristic_policy_feasibility_rate"
+            ]
+        if selection_policy_metrics.get("learned_override_policy_feasibility_delta") is not None:
+            routing_context["learned_override_policy_feasibility_delta"] = selection_policy_metrics[
+                "learned_override_policy_feasibility_delta"
+            ]
         if selection_policy_metrics.get("scope_dimension") is not None:
-            routing_context["learned_override_policy_scope_dimension"] = (
-                selection_policy_metrics["scope_dimension"]
-            )
+            routing_context["learned_override_policy_scope_dimension"] = selection_policy_metrics[
+                "scope_dimension"
+            ]
         if selection_policy_metrics.get("scope_label") is not None:
-            routing_context["learned_override_policy_scope_label"] = (
-                selection_policy_metrics["scope_label"]
-            )
+            routing_context["learned_override_policy_scope_label"] = selection_policy_metrics[
+                "scope_label"
+            ]
         if self.preferred_action and self.action_agreement >= min_agreement:
             routing_context["learned_topology_action"] = self.preferred_action
         if self.preferred_topology and self.topology_agreement >= min_agreement:
@@ -463,9 +425,7 @@ class TopologyRoutingFeedback:
             self.preferred_execution_mode
             and max(self.action_agreement, self.topology_agreement) >= min_agreement
         ):
-            routing_context["learned_topology_execution_mode"] = (
-                self.preferred_execution_mode
-            )
+            routing_context["learned_topology_execution_mode"] = self.preferred_execution_mode
         if self.preferred_provider and self.provider_agreement >= min_agreement:
             routing_context["learned_provider_hint"] = self.preferred_provider
         if self.preferred_formation and self.formation_agreement >= min_agreement:
@@ -529,9 +489,7 @@ class TopologyRoutingFeedback:
                     provider_value = candidates[0]
             return cls._normalize_scope_token(provider_value)
         if dimension == "model_family":
-            return cls._model_family_token(
-                context.get("model") or context.get("model_name")
-            )
+            return cls._model_family_token(context.get("model") or context.get("model_name"))
         return None
 
     def resolve_selection_policy_metrics(
@@ -553,18 +511,14 @@ class TopologyRoutingFeedback:
             avg_optimization_reward_by_policy = dict(
                 bucket.get("avg_optimization_reward_by_policy") or {}
             )
-            feasibility_rate_by_policy = dict(
-                bucket.get("feasibility_rate_by_policy") or {}
-            )
+            feasibility_rate_by_policy = dict(bucket.get("feasibility_rate_by_policy") or {})
             learned_override_reward = avg_reward_by_policy.get("learned_close_override")
             heuristic_reward = avg_reward_by_policy.get("heuristic")
             learned_override_reward_delta = bucket.get("learned_override_reward_delta")
-            learned_override_optimization_reward = (
-                avg_optimization_reward_by_policy.get("learned_close_override")
+            learned_override_optimization_reward = avg_optimization_reward_by_policy.get(
+                "learned_close_override"
             )
-            heuristic_optimization_reward = avg_optimization_reward_by_policy.get(
-                "heuristic"
-            )
+            heuristic_optimization_reward = avg_optimization_reward_by_policy.get("heuristic")
             learned_override_optimization_reward_delta = bucket.get(
                 "learned_override_optimization_reward_delta"
             )
@@ -572,9 +526,7 @@ class TopologyRoutingFeedback:
                 "learned_close_override"
             )
             heuristic_feasibility_rate = feasibility_rate_by_policy.get("heuristic")
-            learned_override_feasibility_delta = bucket.get(
-                "learned_override_feasibility_delta"
-            )
+            learned_override_feasibility_delta = bucket.get("learned_override_feasibility_delta")
             if (
                 learned_override_reward is None
                 and heuristic_reward is None
@@ -608,13 +560,9 @@ class TopologyRoutingFeedback:
                 "learned_override_policy_optimization_reward_delta": (
                     learned_override_optimization_reward_delta
                 ),
-                "learned_override_policy_feasibility_rate": (
-                    learned_override_feasibility_rate
-                ),
+                "learned_override_policy_feasibility_rate": (learned_override_feasibility_rate),
                 "heuristic_policy_feasibility_rate": heuristic_feasibility_rate,
-                "learned_override_policy_feasibility_delta": (
-                    learned_override_feasibility_delta
-                ),
+                "learned_override_policy_feasibility_delta": (learned_override_feasibility_delta),
             }
 
         return {
@@ -623,18 +571,12 @@ class TopologyRoutingFeedback:
             "learned_override_policy_reward": self.avg_reward_by_selection_policy.get(
                 "learned_close_override"
             ),
-            "heuristic_policy_reward": self.avg_reward_by_selection_policy.get(
-                "heuristic"
-            ),
-            "learned_override_policy_count": self._effective_policy_count(
-                "learned_close_override"
-            ),
+            "heuristic_policy_reward": self.avg_reward_by_selection_policy.get("heuristic"),
+            "learned_override_policy_count": self._effective_policy_count("learned_close_override"),
             "heuristic_policy_count": self._effective_policy_count("heuristic"),
             "learned_override_policy_reward_delta": self.learned_override_reward_delta,
             "learned_override_policy_optimization_reward": (
-                self.avg_optimization_reward_by_selection_policy.get(
-                    "learned_close_override"
-                )
+                self.avg_optimization_reward_by_selection_policy.get("learned_close_override")
             ),
             "heuristic_policy_optimization_reward": (
                 self.avg_optimization_reward_by_selection_policy.get("heuristic")
@@ -648,9 +590,7 @@ class TopologyRoutingFeedback:
             "heuristic_policy_feasibility_rate": (
                 self.feasibility_rate_by_selection_policy.get("heuristic")
             ),
-            "learned_override_policy_feasibility_delta": (
-                self.learned_override_feasibility_delta
-            ),
+            "learned_override_policy_feasibility_delta": (self.learned_override_feasibility_delta),
         }
 
 
@@ -681,9 +621,7 @@ class TeamRoutingFeedback:
     @property
     def formation_agreement(self) -> float:
         """Estimate agreement from the dominant learned team formation."""
-        return RuntimeIntelligenceService._distribution_agreement(
-            self.formation_distribution
-        )
+        return RuntimeIntelligenceService._distribution_agreement(self.formation_distribution)
 
     @property
     def preferred_formation(self) -> Optional[str]:
@@ -781,10 +719,7 @@ class TeamRoutingFeedback:
         """Whether team execution should use isolated worktrees by default."""
         if self.support <= 0.0 or self.worktree_plan_count <= 0:
             return False
-        if (
-            self.avg_team_scoped_members >= 2.0
-            or self.avg_team_changed_file_count >= 2.0
-        ):
+        if self.avg_team_scoped_members >= 2.0 or self.avg_team_changed_file_count >= 2.0:
             return True
         return self.worktree_materialized_count > 0
 
@@ -850,9 +785,7 @@ class TeamRoutingFeedback:
             "recommended_cleanup_worktrees": self.recommended_cleanup_worktrees,
             "avg_team_assignments": round(self.avg_team_assignments, 4),
             "avg_team_scoped_members": round(self.avg_team_scoped_members, 4),
-            "avg_team_members_with_changes": round(
-                self.avg_team_members_with_changes, 4
-            ),
+            "avg_team_members_with_changes": round(self.avg_team_members_with_changes, 4),
             "avg_team_changed_file_count": round(self.avg_team_changed_file_count, 4),
             "formation_distribution": dict(self.formation_distribution),
             "merge_risk_distribution": dict(self.merge_risk_distribution),
@@ -871,11 +804,7 @@ class TeamRoutingFeedback:
         min_agreement: float = 0.55,
     ) -> Dict[str, Any]:
         """Convert learned team feedback into soft formation and parallelism hints."""
-        if (
-            self.coverage < min_coverage
-            or self.support < min_support
-            or self.task_count <= 0
-        ):
+        if self.coverage < min_coverage or self.support < min_support or self.task_count <= 0:
             return {}
 
         routing_context: Dict[str, Any] = {
@@ -890,17 +819,13 @@ class TeamRoutingFeedback:
             "team_cleanup_error_task_count": self.cleanup_error_task_count,
         }
         if self.scope_dimension:
-            routing_context["learned_team_policy_scope_dimension"] = (
-                self.scope_dimension
-            )
+            routing_context["learned_team_policy_scope_dimension"] = self.scope_dimension
         if self.scope_label:
             routing_context["learned_team_policy_scope_label"] = self.scope_label
         preferred_formation = self.preferred_formation
         if preferred_formation and self.formation_agreement >= min_agreement:
             routing_context["learned_formation_hint"] = preferred_formation
-            routing_context["learned_formation_agreement"] = round(
-                self.formation_agreement, 4
-            )
+            routing_context["learned_formation_agreement"] = round(self.formation_agreement, 4)
         recommended_max_workers = self.recommended_max_workers
         if recommended_max_workers is not None:
             routing_context["learned_team_max_workers_hint"] = recommended_max_workers
@@ -999,9 +924,7 @@ class DegradationRoutingFeedback:
 
     @property
     def dominant_failure_type(self) -> Optional[str]:
-        return RuntimeIntelligenceService._preferred_label(
-            self.failure_type_distribution
-        )
+        return RuntimeIntelligenceService._preferred_label(self.failure_type_distribution)
 
     @property
     def dominant_provider(self) -> Optional[str]:
@@ -1075,11 +998,7 @@ class DegradationRoutingFeedback:
         min_support: float = 0.2,
     ) -> Dict[str, Any]:
         """Convert long-horizon degradation feedback into soft routing hints."""
-        if (
-            self.coverage < min_coverage
-            or self.support < min_support
-            or self.event_count <= 0
-        ):
+        if self.coverage < min_coverage or self.support < min_support or self.event_count <= 0:
             return {}
 
         routing_context: Dict[str, Any] = {
@@ -1093,9 +1012,7 @@ class DegradationRoutingFeedback:
             "learned_degradation_intervention_rate": round(self.intervention_rate, 4),
             "learned_degradation_high_cost_rate": round(self.high_cost_rate, 4),
             "learned_degradation_confidence_rate": round(self.confidence_rate, 4),
-            "learned_degradation_avg_adaptation_cost": round(
-                self.avg_adaptation_cost, 4
-            ),
+            "learned_degradation_avg_adaptation_cost": round(self.avg_adaptation_cost, 4),
             "learned_degradation_avg_time_to_recover_seconds": round(
                 self.avg_time_to_recover_seconds,
                 4,
@@ -1105,9 +1022,7 @@ class DegradationRoutingFeedback:
             "learned_degradation_intervention_task_count": self.intervention_task_count,
         }
         if self.dominant_source:
-            routing_context["learned_degradation_dominant_source"] = (
-                self.dominant_source
-            )
+            routing_context["learned_degradation_dominant_source"] = self.dominant_source
         if self.dominant_kind:
             routing_context["learned_degradation_dominant_kind"] = self.dominant_kind
         if self.dominant_failure_type:
@@ -1115,9 +1030,7 @@ class DegradationRoutingFeedback:
                 self.dominant_failure_type
             )
         if self.dominant_provider:
-            routing_context["learned_degradation_dominant_provider"] = (
-                self.dominant_provider
-            )
+            routing_context["learned_degradation_dominant_provider"] = self.dominant_provider
         if self.recommends_conservative_routing:
             routing_context["learned_degradation_conservative_routing_hint"] = True
         if self.recommends_recovery_budget_buffer:
@@ -1145,9 +1058,7 @@ class RuntimeIntelligenceService:
         if not isinstance(derived_policy, RuntimeEvaluationPolicy):
             derived_policy = None
         resolved_policy = derived_policy or RuntimeEvaluationPolicy()
-        locked_feedback_fields = self._resolve_locked_feedback_fields(
-            perception_integration
-        )
+        locked_feedback_fields = self._resolve_locked_feedback_fields(perception_integration)
         resolved_feedback_scope = self._resolve_feedback_scope(
             evaluation_feedback_scope,
             perception_integration,
@@ -1184,19 +1095,17 @@ class RuntimeIntelligenceService:
         self._experiment_memory_store = self._load_experiment_memory_store(
             self._experiment_memory_path
         )
-        self._persisted_topology_routing_feedback = (
-            self._extract_topology_routing_feedback(self._runtime_feedback_metadata)
+        self._persisted_topology_routing_feedback = self._extract_topology_routing_feedback(
+            self._runtime_feedback_metadata
         )
         self._persisted_team_routing_feedback = self._extract_team_routing_feedback(
             self._runtime_feedback_metadata
         )
-        self._persisted_degradation_routing_feedback = (
-            self._extract_degradation_routing_feedback(self._runtime_feedback_metadata)
+        self._persisted_degradation_routing_feedback = self._extract_degradation_routing_feedback(
+            self._runtime_feedback_metadata
         )
         self._session_topology_feedback_records: List[Dict[str, Any]] = []
-        self._session_topology_routing_feedback: Optional[TopologyRoutingFeedback] = (
-            None
-        )
+        self._session_topology_routing_feedback: Optional[TopologyRoutingFeedback] = None
         self._evaluation_policy = resolved_policy
         self._task_analyzer = task_analyzer or get_task_analyzer()
         self._perception_integration = perception_integration or PerceptionIntegration(
@@ -1209,9 +1118,7 @@ class RuntimeIntelligenceService:
             try:
                 self._task_analyzer.set_runtime_intelligence(self)
             except Exception as exc:
-                logger.debug(
-                    "Runtime intelligence could not bind task analyzer: %s", exc
-                )
+                logger.debug("Runtime intelligence could not bind task analyzer: %s", exc)
 
     @classmethod
     def from_orchestrator(
@@ -1286,9 +1193,7 @@ class RuntimeIntelligenceService:
             if hasattr(container, "get"):
                 return container.get(LLMDecisionServiceProtocol)
         except Exception as exc:
-            logger.debug(
-                "Runtime intelligence could not resolve decision service: %s", exc
-            )
+            logger.debug("Runtime intelligence could not resolve decision service: %s", exc)
         return None
 
     @staticmethod
@@ -1328,9 +1233,7 @@ class RuntimeIntelligenceService:
         try:
             return load_runtime_evaluation_feedback(path, scope=scope)
         except Exception as exc:
-            logger.debug(
-                "Runtime intelligence could not load persisted feedback: %s", exc
-            )
+            logger.debug("Runtime intelligence could not load persisted feedback: %s", exc)
             return None
 
     @staticmethod
@@ -1340,9 +1243,7 @@ class RuntimeIntelligenceService:
         evaluation_feedback_path: Optional[Any],
     ) -> Optional[Path]:
         """Resolve the experiment-memory artifact path next to runtime feedback by default."""
-        candidate = (
-            explicit_path if explicit_path is not None else evaluation_feedback_path
-        )
+        candidate = explicit_path if explicit_path is not None else evaluation_feedback_path
         if candidate is None:
             return None
         try:
@@ -1365,9 +1266,7 @@ class RuntimeIntelligenceService:
         try:
             return ExperimentMemoryStore(persist_path=path)
         except Exception as exc:
-            logger.debug(
-                "Runtime intelligence could not load experiment memory: %s", exc
-            )
+            logger.debug("Runtime intelligence could not load experiment memory: %s", exc)
             return None
 
     @staticmethod
@@ -1393,8 +1292,7 @@ class RuntimeIntelligenceService:
         overrides = {
             field_name: getattr(feedback, field_name, None)
             for field_name in _FEEDBACK_OVERRIDE_FIELDS
-            if field_name not in locked
-            and getattr(feedback, field_name, None) is not None
+            if field_name not in locked and getattr(feedback, field_name, None) is not None
         }
         if not overrides:
             return policy
@@ -1520,9 +1418,7 @@ class RuntimeIntelligenceService:
             (provider_agreement, 0.20),
             (formation_agreement, 0.15),
         ]
-        usable = [
-            (value, weight) for value, weight in weighted_agreements if value > 0.0
-        ]
+        usable = [(value, weight) for value, weight in weighted_agreements if value > 0.0]
         if not usable:
             return 0.0
         weighted_consensus = sum(value * weight for value, weight in usable) / sum(
@@ -1539,20 +1435,14 @@ class RuntimeIntelligenceService:
         if not isinstance(metadata, dict):
             return None
 
-        coverage = cls._coerce_feedback_float(
-            metadata.get("topology_feedback_coverage")
-        )
+        coverage = cls._coerce_feedback_float(metadata.get("topology_feedback_coverage"))
         avg_reward = cls._coerce_feedback_float(metadata.get("avg_topology_reward"))
-        avg_confidence = cls._coerce_feedback_float(
-            metadata.get("avg_topology_confidence")
-        )
+        avg_confidence = cls._coerce_feedback_float(metadata.get("avg_topology_confidence"))
         observation_count_hint = cls._coerce_feedback_int(
             metadata.get("topology_observation_count") or metadata.get("task_count")
         )
         action_distribution = cls._normalize_distribution(
-            metadata.get("topology_final_actions")
-            or metadata.get("topology_actions")
-            or {}
+            metadata.get("topology_final_actions") or metadata.get("topology_actions") or {}
         )
         topology_distribution = cls._normalize_distribution(
             metadata.get("topology_final_kinds") or metadata.get("topology_kinds") or {}
@@ -1668,36 +1558,26 @@ class RuntimeIntelligenceService:
 
         coverage = cls._coerce_feedback_float(metadata.get("team_feedback_coverage"))
         task_count = cls._coerce_feedback_int(metadata.get("tasks_with_team_feedback"))
-        worktree_plan_count = cls._coerce_feedback_int(
-            metadata.get("team_worktree_plan_count")
-        )
+        worktree_plan_count = cls._coerce_feedback_int(metadata.get("team_worktree_plan_count"))
         worktree_materialized_count = cls._coerce_feedback_int(
             metadata.get("team_worktree_materialized_count")
         )
         worktree_dry_run_count = cls._coerce_feedback_int(
             metadata.get("team_worktree_dry_run_count")
         )
-        low_risk_task_count = cls._coerce_feedback_int(
-            metadata.get("team_low_risk_task_count")
-        )
+        low_risk_task_count = cls._coerce_feedback_int(metadata.get("team_low_risk_task_count"))
         medium_risk_task_count = cls._coerce_feedback_int(
             metadata.get("team_medium_risk_task_count")
         )
-        high_risk_task_count = cls._coerce_feedback_int(
-            metadata.get("team_high_risk_task_count")
-        )
+        high_risk_task_count = cls._coerce_feedback_int(metadata.get("team_high_risk_task_count"))
         merge_conflict_task_count = cls._coerce_feedback_int(
             metadata.get("team_merge_conflict_task_count")
         )
-        cleanup_task_count = cls._coerce_feedback_int(
-            metadata.get("team_cleanup_task_count")
-        )
+        cleanup_task_count = cls._coerce_feedback_int(metadata.get("team_cleanup_task_count"))
         cleanup_error_task_count = cls._coerce_feedback_int(
             metadata.get("team_cleanup_error_task_count")
         )
-        avg_team_assignments = cls._coerce_non_negative_float(
-            metadata.get("avg_team_assignments")
-        )
+        avg_team_assignments = cls._coerce_non_negative_float(metadata.get("avg_team_assignments"))
         avg_team_scoped_members = cls._coerce_non_negative_float(
             metadata.get("avg_team_scoped_members")
         )
@@ -1707,9 +1587,7 @@ class RuntimeIntelligenceService:
         avg_team_changed_file_count = cls._coerce_non_negative_float(
             metadata.get("avg_team_changed_file_count")
         )
-        formation_distribution = cls._normalize_distribution(
-            metadata.get("team_formations") or {}
-        )
+        formation_distribution = cls._normalize_distribution(metadata.get("team_formations") or {})
         merge_risk_distribution = cls._normalize_distribution(
             metadata.get("team_merge_risk_levels") or {}
         )
@@ -1756,19 +1634,11 @@ class RuntimeIntelligenceService:
         if not isinstance(metadata, dict):
             return None
 
-        coverage = cls._coerce_feedback_float(
-            metadata.get("degradation_feedback_coverage")
-        )
+        coverage = cls._coerce_feedback_float(metadata.get("degradation_feedback_coverage"))
         event_count = cls._coerce_feedback_int(metadata.get("degradation_event_count"))
-        degraded_task_count = cls._coerce_feedback_int(
-            metadata.get("degraded_task_count")
-        )
-        recovered_task_count = cls._coerce_feedback_int(
-            metadata.get("recovered_task_count")
-        )
-        recovery_rate = cls._coerce_feedback_float(
-            metadata.get("degradation_recovery_rate")
-        )
+        degraded_task_count = cls._coerce_feedback_int(metadata.get("degraded_task_count"))
+        recovered_task_count = cls._coerce_feedback_int(metadata.get("recovered_task_count"))
+        recovery_rate = cls._coerce_feedback_float(metadata.get("degradation_recovery_rate"))
         avg_adaptation_cost = cls._coerce_non_negative_float(
             metadata.get("avg_degradation_adaptation_cost")
         )
@@ -1784,12 +1654,8 @@ class RuntimeIntelligenceService:
         avg_intervention_count = cls._coerce_non_negative_float(
             metadata.get("avg_degradation_intervention_count")
         )
-        avg_confidence = cls._coerce_feedback_float(
-            metadata.get("avg_degradation_confidence")
-        )
-        avg_drift_score = cls._coerce_feedback_float(
-            metadata.get("avg_degradation_drift_score")
-        )
+        avg_confidence = cls._coerce_feedback_float(metadata.get("avg_degradation_confidence"))
+        avg_drift_score = cls._coerce_feedback_float(metadata.get("avg_degradation_drift_score"))
         content_degradation_task_count = cls._coerce_feedback_int(
             metadata.get("content_degradation_task_count")
         )
@@ -1813,12 +1679,8 @@ class RuntimeIntelligenceService:
         intervention_rate = cls._coerce_feedback_float(
             metadata.get("degradation_intervention_rate")
         )
-        high_cost_rate = cls._coerce_feedback_float(
-            metadata.get("degradation_high_cost_rate")
-        )
-        confidence_rate = cls._coerce_feedback_float(
-            metadata.get("degradation_confidence_rate")
-        )
+        high_cost_rate = cls._coerce_feedback_float(metadata.get("degradation_high_cost_rate"))
+        confidence_rate = cls._coerce_feedback_float(metadata.get("degradation_confidence_rate"))
         stability_score_raw = metadata.get("degradation_stability_score")
         if stability_score_raw is None:
             stability_score = max(
@@ -1838,21 +1700,15 @@ class RuntimeIntelligenceService:
         else:
             stability_score = cls._coerce_feedback_float(stability_score_raw)
 
-        source_distribution = cls._normalize_distribution(
-            metadata.get("degradation_sources") or {}
-        )
-        kind_distribution = cls._normalize_distribution(
-            metadata.get("degradation_kinds") or {}
-        )
+        source_distribution = cls._normalize_distribution(metadata.get("degradation_sources") or {})
+        kind_distribution = cls._normalize_distribution(metadata.get("degradation_kinds") or {})
         failure_type_distribution = cls._normalize_distribution(
             metadata.get("degradation_failure_types") or {}
         )
         provider_distribution = cls._normalize_distribution(
             metadata.get("degradation_providers") or {}
         )
-        reason_distribution = cls._normalize_distribution(
-            metadata.get("degradation_reasons") or {}
-        )
+        reason_distribution = cls._normalize_distribution(metadata.get("degradation_reasons") or {})
 
         if not any(
             (
@@ -2006,9 +1862,7 @@ class RuntimeIntelligenceService:
                     dict(bucket.get("policy_optimization_counts") or {}),
                 )
                 merged_policy_optimization_reward_totals = cls._merge_distributions(
-                    dict(
-                        existing_bucket.get("policy_optimization_reward_totals") or {}
-                    ),
+                    dict(existing_bucket.get("policy_optimization_reward_totals") or {}),
                     dict(bucket.get("policy_optimization_reward_totals") or {}),
                 )
                 merged_policy_feasible_counts = cls._merge_distributions(
@@ -2019,9 +1873,7 @@ class RuntimeIntelligenceService:
                 for policy, count_value in merged_policy_counts.items():
                     try:
                         count = float(count_value)
-                        reward_total = float(
-                            merged_policy_reward_totals.get(policy, 0.0)
-                        )
+                        reward_total = float(merged_policy_reward_totals.get(policy, 0.0))
                     except (TypeError, ValueError):
                         continue
                     if count <= 0.0:
@@ -2038,23 +1890,17 @@ class RuntimeIntelligenceService:
                         continue
                     if count <= 0.0:
                         continue
-                    avg_optimization_reward_by_policy[policy] = round(
-                        reward_total / count, 4
-                    )
+                    avg_optimization_reward_by_policy[policy] = round(reward_total / count, 4)
                 feasibility_rate_by_policy: Dict[str, float] = {}
                 for policy, count_value in merged_policy_optimization_counts.items():
                     try:
                         count = float(count_value)
-                        feasible_count = float(
-                            merged_policy_feasible_counts.get(policy, 0.0)
-                        )
+                        feasible_count = float(merged_policy_feasible_counts.get(policy, 0.0))
                     except (TypeError, ValueError):
                         continue
                     if count <= 0.0:
                         continue
-                    feasibility_rate_by_policy[policy] = round(
-                        feasible_count / count, 4
-                    )
+                    feasibility_rate_by_policy[policy] = round(feasible_count / count, 4)
                 learned_override_reward_delta = None
                 try:
                     learned_override_reward_delta = round(
@@ -2067,9 +1913,7 @@ class RuntimeIntelligenceService:
                 learned_override_optimization_reward_delta = None
                 try:
                     learned_override_optimization_reward_delta = round(
-                        float(
-                            avg_optimization_reward_by_policy["learned_close_override"]
-                        )
+                        float(avg_optimization_reward_by_policy["learned_close_override"])
                         - float(avg_optimization_reward_by_policy["heuristic"]),
                         4,
                     )
@@ -2088,9 +1932,7 @@ class RuntimeIntelligenceService:
                     "policy_counts": merged_policy_counts,
                     "policy_reward_totals": merged_policy_reward_totals,
                     "policy_optimization_counts": merged_policy_optimization_counts,
-                    "policy_optimization_reward_totals": (
-                        merged_policy_optimization_reward_totals
-                    ),
+                    "policy_optimization_reward_totals": (merged_policy_optimization_reward_totals),
                     "policy_feasible_counts": merged_policy_feasible_counts,
                     "avg_reward_by_policy": avg_reward_by_policy,
                     "learned_override_reward_delta": learned_override_reward_delta,
@@ -2116,11 +1958,8 @@ class RuntimeIntelligenceService:
         return TopologyRoutingFeedback(
             coverage=weighted_average(persisted.coverage, session.coverage),
             avg_reward=weighted_average(persisted.avg_reward, session.avg_reward),
-            avg_confidence=weighted_average(
-                persisted.avg_confidence, session.avg_confidence
-            ),
-            observation_count_hint=persisted.observation_count
-            + session.observation_count,
+            avg_confidence=weighted_average(persisted.avg_confidence, session.avg_confidence),
+            observation_count_hint=persisted.observation_count + session.observation_count,
             action_agreement=action_agreement,
             topology_agreement=topology_agreement,
             provider_agreement=provider_agreement,
@@ -2159,13 +1998,9 @@ class RuntimeIntelligenceService:
             if hasattr(perception_integration, "config") and isinstance(
                 perception_integration.config, dict
             ):
-                perception_integration.config.update(
-                    self._evaluation_policy.to_config()
-                )
+                perception_integration.config.update(self._evaluation_policy.to_config())
         except Exception as exc:
-            logger.debug(
-                "Runtime intelligence could not synchronize perception policy: %s", exc
-            )
+            logger.debug("Runtime intelligence could not synchronize perception policy: %s", exc)
 
     @property
     def perception_integration(self) -> PerceptionIntegration:
@@ -2222,16 +2057,11 @@ class RuntimeIntelligenceService:
             )
 
         team_hints: Dict[str, Any] = {}
-        team_feedback = self.resolve_team_routing_feedback(
-            scope_context=resolved_scope_context
-        )
+        team_feedback = self.resolve_team_routing_feedback(scope_context=resolved_scope_context)
         if team_feedback is not None:
             team_hints.update(team_feedback.to_routing_context())
         global_team_feedback = self.get_team_routing_feedback()
-        if (
-            global_team_feedback is not None
-            and global_team_feedback is not team_feedback
-        ):
+        if global_team_feedback is not None and global_team_feedback is not team_feedback:
             for key, value in global_team_feedback.to_routing_context().items():
                 team_hints.setdefault(key, value)
 
@@ -2279,9 +2109,7 @@ class RuntimeIntelligenceService:
         scope_context: Optional[Dict[str, Any]] = None,
     ) -> Optional[TeamRoutingFeedback]:
         """Resolve the most relevant team/worktree routing feedback for a runtime scope."""
-        scoped_feedback = self._resolve_scoped_team_routing_feedback(
-            scope_context=scope_context
-        )
+        scoped_feedback = self._resolve_scoped_team_routing_feedback(scope_context=scope_context)
         if scoped_feedback is not None:
             return scoped_feedback
         return self.get_team_routing_feedback()
@@ -2292,9 +2120,7 @@ class RuntimeIntelligenceService:
         scope_context: Optional[Dict[str, Any]] = None,
     ) -> Optional[TeamRoutingFeedback]:
         """Resolve scoped team/worktree routing feedback for the requested runtime context."""
-        scope_metrics = (
-            self._runtime_feedback_metadata.get("team_worktree_scope_metrics") or {}
-        )
+        scope_metrics = self._runtime_feedback_metadata.get("team_worktree_scope_metrics") or {}
         if not isinstance(scope_metrics, dict):
             return None
         for dimension in ("model_family", "provider", "task_type"):
@@ -2344,15 +2170,9 @@ class RuntimeIntelligenceService:
         resolved_context = dict(scope_context or {})
         if "provider" not in resolved_context and resolved_context.get("provider_hint"):
             resolved_context["provider"] = resolved_context.get("provider_hint")
-        if (
-            self._evaluation_feedback_scope.task_type
-            and "task_type" not in resolved_context
-        ):
+        if self._evaluation_feedback_scope.task_type and "task_type" not in resolved_context:
             resolved_context["task_type"] = self._evaluation_feedback_scope.task_type
-        if (
-            self._evaluation_feedback_scope.provider
-            and "provider" not in resolved_context
-        ):
+        if self._evaluation_feedback_scope.provider and "provider" not in resolved_context:
             resolved_context["provider"] = self._evaluation_feedback_scope.provider
         if self._evaluation_feedback_scope.model and "model" not in resolved_context:
             resolved_context["model"] = self._evaluation_feedback_scope.model
@@ -2377,8 +2197,7 @@ class RuntimeIntelligenceService:
         """Resolve query filters for experiment-memory retrieval."""
         resolved_context = self._resolve_routing_scope_context(scope_context)
         benchmark = self._coerce_optional_text(
-            resolved_context.get("benchmark")
-            or self._runtime_feedback_metadata.get("benchmark")
+            resolved_context.get("benchmark") or self._runtime_feedback_metadata.get("benchmark")
         )
         provider = self._coerce_optional_text(
             resolved_context.get("provider") or resolved_context.get("provider_hint")
@@ -2390,8 +2209,7 @@ class RuntimeIntelligenceService:
             resolved_context.get("prompt_candidate_hash")
         )
         section_name = self._coerce_optional_text(
-            resolved_context.get("section_name")
-            or resolved_context.get("prompt_section_name")
+            resolved_context.get("section_name") or resolved_context.get("prompt_section_name")
         )
         return {
             "benchmark": benchmark,
@@ -2453,9 +2271,7 @@ class RuntimeIntelligenceService:
         for record in records:
             record_ids.append(record.record_id)
             summary_delta = self._coerce_optional_float(
-                record.summary_metrics.get(
-                    "topology_learned_override_optimization_reward_delta"
-                )
+                record.summary_metrics.get("topology_learned_override_optimization_reward_delta")
             )
             if summary_delta is not None:
                 normalized_delta = max(-1.0, min(1.0, summary_delta / 0.25))
@@ -2467,10 +2283,7 @@ class RuntimeIntelligenceService:
                 summary_text = insight.summary.lower()
                 confidence = max(0.0, min(float(insight.confidence), 1.0))
                 if insight.kind == "failed_hypothesis":
-                    if (
-                        "learned close override" in summary_text
-                        and "heuristic" in summary_text
-                    ):
+                    if "learned close override" in summary_text and "heuristic" in summary_text:
                         bias_total -= max(0.25, confidence)
                         bias_weight += max(0.25, confidence)
                     if (
@@ -2480,10 +2293,7 @@ class RuntimeIntelligenceService:
                         planning_bias_total -= max(0.25, confidence)
                         planning_bias_weight += max(0.25, confidence)
                 elif insight.kind == "successful_transformation":
-                    if (
-                        "learned close override" in summary_text
-                        and "heuristic" in summary_text
-                    ):
+                    if "learned close override" in summary_text and "heuristic" in summary_text:
                         bias_total += max(0.25, confidence)
                         bias_weight += max(0.25, confidence)
                     if (
@@ -2528,9 +2338,7 @@ class RuntimeIntelligenceService:
 
         return {
             "experiment_memory_match_count": len(records),
-            "experiment_memory_support": round(
-                min(1.0, len(records) / max(1.0, float(limit))), 4
-            ),
+            "experiment_memory_support": round(min(1.0, len(records) / max(1.0, float(limit))), 4),
             "experiment_memory_selection_policy_bias": bias,
             "experiment_memory_preferred_selection_policy": preferred_selection_policy,
             "experiment_memory_planning_policy_bias": planning_bias,
@@ -2558,22 +2366,16 @@ class RuntimeIntelligenceService:
 
         constraint_tags = [
             str(tag).strip()
-            for tag in list(
-                experiment_hints.get("experiment_memory_constraint_tags") or []
-            )
+            for tag in list(experiment_hints.get("experiment_memory_constraint_tags") or [])
             if str(tag).strip()
         ]
         next_candidate_hints = [
             str(item).strip()
-            for item in list(
-                experiment_hints.get("experiment_memory_next_candidate_hints") or []
-            )
+            for item in list(experiment_hints.get("experiment_memory_next_candidate_hints") or [])
             if str(item).strip()
         ]
         planning_hints: Dict[str, Any] = {
-            "planning_match_count": int(
-                experiment_hints.get("experiment_memory_match_count") or 0
-            ),
+            "planning_match_count": int(experiment_hints.get("experiment_memory_match_count") or 0),
             "planning_experiment_support": float(
                 experiment_hints.get("experiment_memory_support") or 0.0
             ),
@@ -2605,12 +2407,8 @@ class RuntimeIntelligenceService:
         ):
             absolute_bias = min(1.0, abs(float(planning_hints["planning_policy_bias"])))
             planning_hints["planning_prefer_fast_path"] = True
-            planning_hints["planning_prefer_reason"] = (
-                "experiment_policy_bias: heuristic_fast_path"
-            )
-            planning_hints["planning_fast_path_tool_budget_limit"] = 4 + int(
-                absolute_bias >= 0.6
-            )
+            planning_hints["planning_prefer_reason"] = "experiment_policy_bias: heuristic_fast_path"
+            planning_hints["planning_fast_path_tool_budget_limit"] = 4 + int(absolute_bias >= 0.6)
             planning_hints["planning_fast_path_query_length_limit"] = int(
                 round(60 + (20 * absolute_bias))
             )
@@ -2640,9 +2438,7 @@ class RuntimeIntelligenceService:
                 "topology_execution_modes": dict(feedback.execution_mode_distribution),
                 "topology_providers": dict(feedback.provider_distribution),
                 "topology_formations": dict(feedback.formation_distribution),
-                "topology_selection_policies": dict(
-                    feedback.selection_policy_distribution
-                ),
+                "topology_selection_policies": dict(feedback.selection_policy_distribution),
                 "topology_selection_policy_reward_totals": dict(
                     feedback.selection_policy_reward_totals
                 ),
@@ -2698,29 +2494,21 @@ class RuntimeIntelligenceService:
                 scope=self._evaluation_feedback_scope,
             )
         except Exception as exc:
-            logger.debug(
-                "Runtime intelligence could not persist topology feedback: %s", exc
-            )
+            logger.debug("Runtime intelligence could not persist topology feedback: %s", exc)
             return None
 
-    def record_topology_outcome(
-        self, payload: Any
-    ) -> Optional[TopologyRoutingFeedback]:
+    def record_topology_outcome(self, payload: Any) -> Optional[TopologyRoutingFeedback]:
         """Record one live topology outcome and refresh session-local routing hints."""
         summary = summarize_topology_feedback(payload)
         if summary is None:
             return self.get_topology_routing_feedback()
 
-        self._session_topology_feedback_records.append(
-            {"topology_summary": dict(summary)}
-        )
+        self._session_topology_feedback_records.append({"topology_summary": dict(summary)})
         aggregate = aggregate_topology_feedback(
             self._session_topology_feedback_records,
             total_tasks=len(self._session_topology_feedback_records),
         )
-        self._session_topology_routing_feedback = (
-            self._extract_topology_routing_feedback(aggregate)
-        )
+        self._session_topology_routing_feedback = self._extract_topology_routing_feedback(aggregate)
         self._persist_session_topology_feedback()
         return self.get_topology_routing_feedback()
 
@@ -2737,9 +2525,7 @@ class RuntimeIntelligenceService:
 
     def reset_decision_budget(self) -> None:
         """Reset the decision-service per-turn budget when available."""
-        if self._decision_service is not None and hasattr(
-            self._decision_service, "reset_budget"
-        ):
+        if self._decision_service is not None and hasattr(self._decision_service, "reset_budget"):
             self._decision_service.reset_budget()
 
     def decide_sync(
@@ -2751,9 +2537,7 @@ class RuntimeIntelligenceService:
         heuristic_confidence: float = 0.0,
     ) -> Optional[Any]:
         """Delegate a synchronous decision to the underlying decision service."""
-        if self._decision_service is None or not hasattr(
-            self._decision_service, "decide_sync"
-        ):
+        if self._decision_service is None or not hasattr(self._decision_service, "decide_sync"):
             return None
         kwargs = {"heuristic_confidence": heuristic_confidence}
         if heuristic_result is not None:
@@ -2803,9 +2587,7 @@ class RuntimeIntelligenceService:
             metadata["degradation_feedback"] = degradation_feedback.to_metadata()
         routing_scope_context = dict(context or {})
         if task_analysis is not None and "task_type" not in routing_scope_context:
-            routing_scope_context["task_type"] = getattr(
-                task_analysis, "task_type", None
-            )
+            routing_scope_context["task_type"] = getattr(task_analysis, "task_type", None)
         routing_policy = self.get_structured_routing_policy(
             query=query,
             scope_context=routing_scope_context,
@@ -2840,9 +2622,7 @@ class RuntimeIntelligenceService:
             try:
                 return self._task_analyzer.classify_keywords(user_message)
             except Exception as exc:
-                logger.debug(
-                    "Runtime intelligence keyword classification failed: %s", exc
-                )
+                logger.debug("Runtime intelligence keyword classification failed: %s", exc)
         return {"task_type": "default", "confidence": 0.0}
 
     def classify_task_with_context(
@@ -2851,13 +2631,9 @@ class RuntimeIntelligenceService:
         history: Optional[List[Any]] = None,
     ) -> Dict[str, Any]:
         """Classify task intent with history context when supported."""
-        if self._task_analyzer and hasattr(
-            self._task_analyzer, "classify_with_context"
-        ):
+        if self._task_analyzer and hasattr(self._task_analyzer, "classify_with_context"):
             try:
-                return self._task_analyzer.classify_with_context(
-                    user_message, history or []
-                )
+                return self._task_analyzer.classify_with_context(user_message, history or [])
             except Exception as exc:
                 logger.debug(
                     "Runtime intelligence contextual task classification failed: %s",
@@ -3014,16 +2790,12 @@ class RuntimeIntelligenceService:
                 "provider": provider_name,
                 "model": model_name,
                 "task_type": task_type,
-                "prompt_candidate_hash": getattr(
-                    turn_context, "prompt_candidate_hash", None
-                ),
+                "prompt_candidate_hash": getattr(turn_context, "prompt_candidate_hash", None),
                 "section_name": getattr(turn_context, "prompt_section_name", None)
                 or getattr(turn_context, "section_name", None),
             },
         )
-        experiment_guidance = self._build_experiment_prompt_guidance(
-            experiment_memory_hints
-        )
+        experiment_guidance = self._build_experiment_prompt_guidance(experiment_memory_hints)
 
         return PromptOptimizationBundle(
             evolved_sections=list(evolved_sections or []),
@@ -3047,9 +2819,7 @@ class RuntimeIntelligenceService:
             if str(tag).strip()
         ]
         if constraint_tags:
-            constraint_label = (
-                "constraint" if len(constraint_tags) == 1 else "constraints"
-            )
+            constraint_label = "constraint" if len(constraint_tags) == 1 else "constraints"
             guidance.append(
                 "Experiment "
                 f"{constraint_label} from similar runs: satisfy "
@@ -3082,9 +2852,7 @@ class RuntimeIntelligenceService:
         prompt_candidate_hash = _optional_text(payload.get("prompt_candidate_hash"))
         strategy_name = _optional_text(payload.get("strategy_name"))
         source = _optional_text(payload.get("source"))
-        if not any(
-            [section_name, provider, prompt_candidate_hash, strategy_name, source]
-        ):
+        if not any([section_name, provider, prompt_candidate_hash, strategy_name, source]):
             return None
         return PromptOptimizationIdentity(
             provider=provider,

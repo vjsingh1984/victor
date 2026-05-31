@@ -112,27 +112,19 @@ def _are_tools_semantically_similar(name1: str, name2: str) -> bool:
     file_keywords = {"file", "read", "write", "edit", "directory"}
 
     # Both are search tools
-    if any(kw in norm1 for kw in search_keywords) and any(
-        kw in norm2 for kw in search_keywords
-    ):
+    if any(kw in norm1 for kw in search_keywords) and any(kw in norm2 for kw in search_keywords):
         return True
 
     # Both are fetch tools
-    if any(kw in norm1 for kw in fetch_keywords) and any(
-        kw in norm2 for kw in fetch_keywords
-    ):
+    if any(kw in norm1 for kw in fetch_keywords) and any(kw in norm2 for kw in fetch_keywords):
         return True
 
     # Both are shell tools
-    if any(kw in norm1 for kw in shell_keywords) and any(
-        kw in norm2 for kw in shell_keywords
-    ):
+    if any(kw in norm1 for kw in shell_keywords) and any(kw in norm2 for kw in shell_keywords):
         return True
 
     # Both are file tools
-    if any(kw in norm1 for kw in file_keywords) and any(
-        kw in norm2 for kw in file_keywords
-    ):
+    if any(kw in norm1 for kw in file_keywords) and any(kw in norm2 for kw in file_keywords):
         return True
 
     return False
@@ -255,9 +247,7 @@ class LangChainAdapterTool(BaseTool):
         self._lc_tool = langchain_tool
         self._name_prefix = name_prefix or DEFAULT_LANGCHAIN_PREFIX
         self._source = source
-        self._json_schema = _pydantic_to_json_schema(
-            getattr(langchain_tool, "args_schema", None)
-        )
+        self._json_schema = _pydantic_to_json_schema(getattr(langchain_tool, "args_schema", None))
 
         # Set tool source metadata for deduplication
         try:
@@ -391,10 +381,7 @@ class LangChainToolProjector:
                     )
 
                 # Check whitelist (for logging only)
-                if (
-                    ALLOWED_LANGCHAIN_TOOLS
-                    and tool_name.lower() not in ALLOWED_LANGCHAIN_TOOLS
-                ):
+                if ALLOWED_LANGCHAIN_TOOLS and tool_name.lower() not in ALLOWED_LANGCHAIN_TOOLS:
                     logger.info(
                         "LangChain tool '%s' is not in recommended whitelist. "
                         "Consider using built-in Victor tools for better integration.",
@@ -443,9 +430,7 @@ class LangChainToolProjector:
                 blocked_count,
             )
 
-        logger.info(
-            "Projected %d LangChain tools (blocked: %d)", len(adapted), blocked_count
-        )
+        logger.info("Projected %d LangChain tools (blocked: %d)", len(adapted), blocked_count)
         return adapted
 
 

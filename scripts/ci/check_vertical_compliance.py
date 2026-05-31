@@ -85,9 +85,7 @@ def main() -> int:
             level = determine_compliance_level(provides_values)
             version = manifest.version
             api_ver = manifest.api_version
-            provides_str = (
-                ", ".join(sorted(provides_values)) if provides_values else "(none)"
-            )
+            provides_str = ", ".join(sorted(provides_values)) if provides_values else "(none)"
         except (AttributeError, NotImplementedError, ImportError) as exc:
             level = "N/A"
             version = "?"
@@ -122,9 +120,7 @@ def main() -> int:
     none_verticals = [r for r in rows if r["level"] == "None"]
     if none_verticals:
         names = ", ".join(r["name"] for r in none_verticals)
-        print(
-            f"\n**Warning**: {len(none_verticals)} vertical(s) at 'None' compliance: {names}"
-        )
+        print(f"\n**Warning**: {len(none_verticals)} vertical(s) at 'None' compliance: {names}")
 
     return 0
 

@@ -86,8 +86,7 @@ async def concept_explanation(concept: str, audience: str = "beginner"):
 
     agent = Agent.create(temperature=0.4)
     result = await agent.run(
-        f"Explain '{concept}' to a {audience}.\n\n"
-        "Use simple language and relatable examples."
+        f"Explain '{concept}' to a {audience}.\n\n" "Use simple language and relatable examples."
     )
     return result
 
@@ -135,8 +134,7 @@ async def comparison(item_a: str, item_b: str):
 
     agent = Agent.create(temperature=0.4)
     result = await agent.run(
-        f"Compare {item_a} vs {item_b}.\n\n"
-        "Include similarities, differences, and use cases."
+        f"Compare {item_a} vs {item_b}.\n\n" "Include similarities, differences, and use cases."
     )
     return result
 
@@ -159,8 +157,7 @@ async def title_generation(content: str):
 
     agent = Agent.create(temperature=0.5)
     result = await agent.run(
-        f"Generate 5 catchy titles for:\n\n{content}\n\n"
-        "Make them engaging and relevant."
+        f"Generate 5 catchy titles for:\n\n{content}\n\n" "Make them engaging and relevant."
     )
     return result
 

@@ -203,9 +203,7 @@ class PluginNamespaceManager:
         with self._lock:
             # Check if plugin already exists
             if key.full_key in self._plugins:
-                logger.warning(
-                    f"Plugin '{key.full_key}' already registered, overwriting"
-                )
+                logger.warning(f"Plugin '{key.full_key}' already registered, overwriting")
 
             self._plugins[key.full_key] = key
             self._plugin_objects[key.full_key] = plugin
@@ -263,9 +261,7 @@ class PluginNamespaceManager:
                 return self._plugin_objects.get(unversioned_key)
 
         # Not found
-        logger.debug(
-            f"Plugin '{plugin_name}' not found in namespaces: {available_namespaces}"
-        )
+        logger.debug(f"Plugin '{plugin_name}' not found in namespaces: {available_namespaces}")
         return None
 
     def _find_keys_by_plugin(
@@ -391,9 +387,7 @@ class PluginNamespaceManager:
             manager.register_namespace(config)
         """
         NAMESPACES[config.name] = config
-        logger.debug(
-            f"Registered namespace '{config.name}' with priority {config.priority}"
-        )
+        logger.debug(f"Registered namespace '{config.name}' with priority {config.priority}")
 
     def list_namespaces(self) -> List[str]:
         """List all registered namespace names.

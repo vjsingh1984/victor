@@ -57,9 +57,7 @@ class TestKNNFewShotSelection:
         s = MIPROv2Strategy()
         traces = [self._make_trace(score=0.9)]
         # Should not raise with query parameter
-        result = s.reflect(
-            traces, "FEW_SHOT_EXAMPLES", "current text", query="fix auth bug"
-        )
+        result = s.reflect(traces, "FEW_SHOT_EXAMPLES", "current text", query="fix auth bug")
         assert isinstance(result, str)
 
     def test_reflect_honors_min_completion_score(self):
@@ -101,9 +99,7 @@ class TestKNNFewShotSelection:
 
         s = MIPROv2Strategy(max_examples=3, max_example_chars=50)
         traces = [
-            self._make_trace(
-                task="coding", tools=["read", "edit", "search", "shell"], score=0.95
-            ),
+            self._make_trace(task="coding", tools=["read", "edit", "search", "shell"], score=0.95),
             self._make_trace(task="debug", tools=["grep", "read", "edit"], score=0.9),
         ]
 

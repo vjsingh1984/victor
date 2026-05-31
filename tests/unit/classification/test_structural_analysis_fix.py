@@ -85,9 +85,7 @@ class TestStructuralAnalysisClassification:
             {"role": "user", "content": "I need to analyze the framework"},
             {"role": "assistant", "content": "I'll help you with structural analysis"},
         ]
-        result = classifier.classify_with_context(
-            "continue the structural analysis", history
-        )
+        result = classifier.classify_with_context("continue the structural analysis", history)
 
         # Context should maintain analysis classification
         assert result.task_type == ClassifierTaskType.ANALYSIS

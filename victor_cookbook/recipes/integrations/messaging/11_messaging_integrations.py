@@ -15,8 +15,7 @@ async def slack_message_agent(webhook_url: str):
 
     agent = Agent.create(tools=["web_fetch"], temperature=0.5)
 
-    result = await agent.run(
-        f"""Generate Python code to send messages to Slack via webhook.
+    result = await agent.run(f"""Generate Python code to send messages to Slack via webhook.
 
         Webhook URL: {webhook_url}
 
@@ -27,8 +26,7 @@ async def slack_message_agent(webhook_url: str):
         - Handle errors and retries
         - Support threading
 
-        Provide complete implementation with error handling."""
-    )
+        Provide complete implementation with error handling.""")
 
     return result.content
 
@@ -39,8 +37,7 @@ async def discord_interactions_agent():
 
     agent = Agent.create(tools=["web_fetch"], temperature=0.5)
 
-    result = await agent.run(
-        """Generate Python code for Discord bot interactions using discord.py.
+    result = await agent.run("""Generate Python code for Discord bot interactions using discord.py.
 
         Features:
         - Handle slash commands
@@ -54,8 +51,7 @@ async def discord_interactions_agent():
         1. Bot setup code
         2. Interaction handlers
         3. Victor integration
-        4. Error handling"""
-    )
+        4. Error handling""")
 
     return result.content
 
@@ -66,8 +62,7 @@ async def teams_notifications_agent():
 
     agent = Agent.create(tools=["web_fetch"], temperature=0.3)
 
-    result = await agent.run(
-        """Generate Python code to send Microsoft Teams notifications.
+    result = await agent.run("""Generate Python code to send Microsoft Teams notifications.
 
         Use Office 365 Connectors or Incoming Webhooks.
 
@@ -78,8 +73,7 @@ async def teams_notifications_agent():
         - Handle errors
         - Support actionable buttons
 
-        Provide complete implementation."""
-    )
+        Provide complete implementation.""")
 
     return result.content
 
@@ -90,8 +84,7 @@ async def telegram_updates_agent():
 
     agent = Agent.create(tools=["web_fetch"], temperature=0.5)
 
-    result = await agent.run(
-        """Generate Python code for Telegram bot using python-telegram-bot.
+    result = await agent.run("""Generate Python code for Telegram bot using python-telegram-bot.
 
         Features:
         - Handle all update types (messages, callbacks, queries)
@@ -101,8 +94,7 @@ async def telegram_updates_agent():
         - Integrate Victor for responses
         - Rate limiting and error handling
 
-        Provide complete implementation."""
-    )
+        Provide complete implementation.""")
 
     return result.content
 
@@ -113,8 +105,7 @@ async def whatsapp_business_agent():
 
     agent = Agent.create(tools=["web_fetch"], temperature=0.3)
 
-    result = await agent.run(
-        """Generate Python code for WhatsApp Business API integration.
+    result = await agent.run("""Generate Python code for WhatsApp Business API integration.
 
         Features:
         - Send text messages
@@ -124,8 +115,7 @@ async def whatsapp_business_agent():
         - Use Victor for response generation
         - Handle rate limits
 
-        Provide implementation using Meta's Graph API."""
-    )
+        Provide implementation using Meta's Graph API.""")
 
     return result.content
 
@@ -265,9 +255,7 @@ async def demo_messaging_integrations():
     print("=== Messaging Integration Recipes ===\n")
 
     print("1. Slack Message Agent:")
-    result = await slack_message_agent(
-        "https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
-    )
+    result = await slack_message_agent("https://hooks.slack.com/services/YOUR/WEBHOOK/URL")
     print(result[:400] + "...\n")
 
 

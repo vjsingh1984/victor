@@ -77,17 +77,9 @@ class HierarchicalFormation(BaseFormationStrategy):
                     is_manager = True
 
             # Check if agent has _role attribute with manager in name
-            if (
-                not is_manager
-                and hasattr(agent, "_role")
-                and hasattr(agent._role, "name")
-            ):
+            if not is_manager and hasattr(agent, "_role") and hasattr(agent._role, "name"):
                 role_name = agent._role.name.lower()
-                if (
-                    "manager" in role_name
-                    or "lead" in role_name
-                    or "coordinator" in role_name
-                ):
+                if "manager" in role_name or "lead" in role_name or "coordinator" in role_name:
                     is_manager = True
 
             if is_manager:
@@ -104,13 +96,9 @@ class HierarchicalFormation(BaseFormationStrategy):
             workers = agents[1:]
         else:
             if explicit_manager_id:
-                logger.info(
-                    f"HierarchicalFormation: using explicit manager={manager.id}"
-                )
+                logger.info(f"HierarchicalFormation: using explicit manager={manager.id}")
             else:
-                logger.info(
-                    f"HierarchicalFormation: auto-detected manager={manager.id}"
-                )
+                logger.info(f"HierarchicalFormation: auto-detected manager={manager.id}")
 
         logger.debug(
             f"HierarchicalFormation: manager={manager.id}, workers={[w.id for w in workers]}"
@@ -124,16 +112,13 @@ class HierarchicalFormation(BaseFormationStrategy):
         results.append(manager_result)
 
         # Check if manager created delegation tasks
-        if not manager_result.success or not manager_result.metadata.get(
-            "delegated_tasks"
-        ):
+        if not manager_result.success or not manager_result.metadata.get("delegated_tasks"):
             logger.info(
                 "HierarchicalFormation: manager did not delegate tasks, executing all workers with original task"
             )
             # Fallback: Execute all workers with the original task
             worker_tasks = [
-                self._execute_worker(worker, task, context, i)
-                for i, worker in enumerate(workers)
+                self._execute_worker(worker, task, context, i) for i, worker in enumerate(workers)
             ]
 
             # Execute workers in parallel
@@ -144,9 +129,7 @@ class HierarchicalFormation(BaseFormationStrategy):
             # Process worker results
             for i, result in enumerate(worker_results):
                 if isinstance(result, Exception):
-                    logger.error(
-                        f"HierarchicalFormation: worker {workers[i].id} failed: {result}"
-                    )
+                    logger.error(f"HierarchicalFormation: worker {workers[i].id} failed: {result}")
                     results.append(
                         MemberResult(
                             member_id=workers[i].id,
@@ -174,9 +157,7 @@ class HierarchicalFormation(BaseFormationStrategy):
         for i, worker in enumerate(workers):
             if i < len(delegated_tasks):
                 worker_task = delegated_tasks[i]
-                worker_tasks.append(
-                    self._execute_worker(worker, worker_task, context, i)
-                )
+                worker_tasks.append(self._execute_worker(worker, worker_task, context, i))
 
         # Execute workers in parallel
         import asyncio
@@ -186,9 +167,7 @@ class HierarchicalFormation(BaseFormationStrategy):
         # Process worker results
         for i, result in enumerate(worker_results):
             if isinstance(result, Exception):
-                logger.error(
-                    f"HierarchicalFormation: worker {workers[i].id} failed: {result}"
-                )
+                logger.error(f"HierarchicalFormation: worker {workers[i].id} failed: {result}")
                 results.append(
                     MemberResult(
                         member_id=workers[i].id,

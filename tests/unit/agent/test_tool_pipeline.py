@@ -142,9 +142,7 @@ class TestExecuteToolCalls:
         result = await pipeline.execute_tool_calls(tool_calls)
         assert result.results[0].skipped is True
 
-    async def test_camel_case_provider_tool_name_normalized_before_unknown_check(
-        self, pipeline
-    ):
+    async def test_camel_case_provider_tool_name_normalized_before_unknown_check(self, pipeline):
         pipeline.tools.is_tool_enabled.return_value = False
 
         result = await pipeline.execute_tool_calls(
@@ -183,9 +181,7 @@ class TestExecuteToolCalls:
         )
         assert "/tmp/f.py:None:None" in pipeline._read_file_timestamps
 
-    async def test_write_file_invalidates_read_dedup_key(
-        self, pipeline, mock_tool_executor
-    ):
+    async def test_write_file_invalidates_read_dedup_key(self, pipeline, mock_tool_executor):
         await pipeline.execute_tool_calls(
             [{"name": "read_file", "arguments": {"path": "/tmp/f.py"}}]
         )
@@ -203,9 +199,7 @@ class TestExecuteToolCalls:
 
         assert "/tmp/f.py:None:None" not in pipeline._read_file_timestamps
 
-    async def test_write_file_marks_code_search_index_stale(
-        self, pipeline, mock_tool_executor
-    ):
+    async def test_write_file_marks_code_search_index_stale(self, pipeline, mock_tool_executor):
         mock_tool_executor.execute.return_value = ToolExecutionResult(
             tool_name="write",
             success=True,
@@ -267,10 +261,7 @@ class TestExecuteToolCalls:
 
         assert first.results[0].success is False
         assert second.results[0].success is True
-        assert (
-            second.results[0].arguments["path"]
-            == "src/compute/distance_computation/mod.rs"
-        )
+        assert second.results[0].arguments["path"] == "src/compute/distance_computation/mod.rs"
         assert (
             mock_tool_executor.execute.await_args_list[-1].kwargs["arguments"]["path"]
             == "src/compute/distance_computation/mod.rs"
@@ -292,27 +283,18 @@ class TestExecuteToolCalls:
             ToolExecutionResult("read", success=True, result="correct file"),
         ]
 
-        result = await pipeline.execute_tool_calls(
-            [{"name": "read", "arguments": bad_args}]
-        )
+        result = await pipeline.execute_tool_calls([{"name": "read", "arguments": bad_args}])
 
         assert result.results[0].success is True
         assert pipeline.is_known_failure("read", bad_args) is False
-        assert (
-            result.results[0].arguments["path"]
-            == "src/compute/distance_computation/mod.rs"
-        )
+        assert result.results[0].arguments["path"] == "src/compute/distance_computation/mod.rs"
 
     async def test_failed_read_self_suggestion_does_not_redirect(
         self,
         pipeline,
         mock_tool_executor,
     ):
-        error = (
-            "File not found: Cargo.toml\n"
-            "Did you mean one of these?\n"
-            "  - Cargo.toml"
-        )
+        error = "File not found: Cargo.toml\n" "Did you mean one of these?\n" "  - Cargo.toml"
         mock_tool_executor.execute.return_value = ToolExecutionResult(
             "read",
             success=False,
@@ -320,9 +302,7 @@ class TestExecuteToolCalls:
             error=error,
         )
 
-        await pipeline.execute_tool_calls(
-            [{"name": "read", "arguments": {"path": "Cargo.toml"}}]
-        )
+        await pipeline.execute_tool_calls([{"name": "read", "arguments": {"path": "Cargo.toml"}}])
 
         assert pipeline._failed_path_redirects == {}
 
@@ -333,9 +313,7 @@ class TestExecuteToolCalls:
         pipeline._calls_used = 1
 
         # Execute a tool call that will be skipped due to budget
-        await pipeline.execute_tool_calls(
-            [{"name": "read", "arguments": {"path": "/tmp/f.py"}}]
-        )
+        await pipeline.execute_tool_calls([{"name": "read", "arguments": {"path": "/tmp/f.py"}}])
 
         # Check that the log message contains the actual skip reason
         log_text = " ".join(log_capture)
@@ -360,9 +338,7 @@ class TestExecuteToolCalls:
         # Should mention tools were skipped
         assert "skipped" in log_text.lower()
 
-    async def test_write_clears_search_dedup_history_for_verification(
-        self, mock_tool_registry
-    ):
+    async def test_write_clears_search_dedup_history_for_verification(self, mock_tool_registry):
         executor = MagicMock()
         executor.execute = AsyncMock(
             side_effect=[
@@ -399,9 +375,7 @@ class TestExecuteToolCalls:
         )
 
         search_call = [{"name": "code_search", "arguments": {"query": "node_ids"}}]
-        write_call = [
-            {"name": "write", "arguments": {"path": "/tmp/f.py", "content": "x"}}
-        ]
+        write_call = [{"name": "write", "arguments": {"path": "/tmp/f.py", "content": "x"}}]
 
         first = await pipeline.execute_tool_calls(search_call, {})
         assert first.results[0].skipped is False
@@ -548,9 +522,7 @@ class TestNavigationHintLoopDetection:
         # Should return None (don't rewrite) when explicit params provided
         assert result is None
 
-    async def test_navigation_hint_expires_after_max_uses(
-        self, pipeline, mock_tool_executor
-    ):
+    async def test_navigation_hint_expires_after_max_uses(self, pipeline, mock_tool_executor):
         """Navigation hints should expire after max_uses is reached."""
         import time
         from victor.agent.file_state import normalize_file_path
@@ -580,9 +552,7 @@ class TestNavigationHintLoopDetection:
         assert result is None
         assert normalized_path not in pipeline._recent_code_navigation_hints
 
-    async def test_navigation_hint_increments_use_count(
-        self, pipeline, mock_tool_executor
-    ):
+    async def test_navigation_hint_increments_use_count(self, pipeline, mock_tool_executor):
         """Using a navigation hint should increment its use_count."""
         import time
         from victor.agent.file_state import normalize_file_path
@@ -651,9 +621,7 @@ class TestNavigationHintLoopDetection:
 
         assert result is None
 
-    async def test_different_files_maintain_separate_hints(
-        self, pipeline, mock_tool_executor
-    ):
+    async def test_different_files_maintain_separate_hints(self, pipeline, mock_tool_executor):
         """Navigation hints should be tracked independently per file."""
         import time
         from victor.agent.file_state import normalize_file_path
@@ -697,16 +665,10 @@ class TestNavigationHintLoopDetection:
         assert result1[1]["offset"] == 60  # 100 - 40
         assert result2 is not None
         assert result2[1]["offset"] == 160  # 200 - 40
-        assert (
-            pipeline._recent_code_navigation_hints[normalized_path1]["use_count"] == 1
-        )
-        assert (
-            pipeline._recent_code_navigation_hints[normalized_path2]["use_count"] == 2
-        )
+        assert pipeline._recent_code_navigation_hints[normalized_path1]["use_count"] == 1
+        assert pipeline._recent_code_navigation_hints[normalized_path2]["use_count"] == 2
 
-    async def test_navigation_hint_expires_after_ttl(
-        self, pipeline, mock_tool_executor
-    ):
+    async def test_navigation_hint_expires_after_ttl(self, pipeline, mock_tool_executor):
         """Navigation hints should expire after TTL seconds."""
         import time
         from victor.agent.file_state import normalize_file_path

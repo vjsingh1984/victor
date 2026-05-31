@@ -193,9 +193,7 @@ class WorktreeMaterializationSession:
     dry_run: bool = False
     metadata: Dict[str, Any] = field(default_factory=dict)
 
-    def assignment_for(
-        self, member_id: str
-    ) -> Optional[MaterializedWorktreeAssignment]:
+    def assignment_for(self, member_id: str) -> Optional[MaterializedWorktreeAssignment]:
         normalized = _normalize_text(member_id)
         if normalized is None:
             return None
@@ -255,8 +253,7 @@ class WorktreeIsolationPlanner:
         if parent_dir is None:
             parent_dir = str(Path(repo_root) / ".victor" / "team_worktrees")
         branch_prefix = (
-            _normalize_text(context.get("branch_prefix"))
-            or f"victor/{_slug(team_name)}"
+            _normalize_text(context.get("branch_prefix")) or f"victor/{_slug(team_name)}"
         )
         base_ref = _normalize_text(context.get("base_ref")) or "HEAD"
         shared_readonly_paths = _normalize_paths(
@@ -273,9 +270,7 @@ class WorktreeIsolationPlanner:
 
         assignments: list[WorktreeAssignment] = []
         for index, member in enumerate(members):
-            member_id = (
-                _normalize_text(getattr(member, "id", None)) or f"member-{index + 1}"
-            )
+            member_id = _normalize_text(getattr(member, "id", None)) or f"member-{index + 1}"
             claimed_paths = scope_map.get(member_id, ())
             merge_priority = self._resolve_merge_priority(
                 member=member,
@@ -319,9 +314,7 @@ class WorktreeIsolationPlanner:
             rationale="worktree isolation enabled by runtime context",
             metadata={
                 "member_count": len(assignments),
-                "scoped_members": sum(
-                    1 for assignment in assignments if assignment.claimed_paths
-                ),
+                "scoped_members": sum(1 for assignment in assignments if assignment.claimed_paths),
             },
         )
 
@@ -346,14 +339,10 @@ class WorktreeIsolationPlanner:
         formation: TeamFormation,
         explicit_merge_order: Sequence[str],
     ) -> int:
-        member_id = (
-            _normalize_text(getattr(member, "id", None)) or f"member-{index + 1}"
-        )
+        member_id = _normalize_text(getattr(member, "id", None)) or f"member-{index + 1}"
         if member_id in explicit_merge_order:
             return explicit_merge_order.index(member_id)
-        if formation == TeamFormation.HIERARCHICAL and bool(
-            getattr(member, "is_manager", False)
-        ):
+        if formation == TeamFormation.HIERARCHICAL and bool(getattr(member, "is_manager", False)):
             return len(explicit_merge_order) + 1000
         return len(explicit_merge_order) + index
 
@@ -486,25 +475,17 @@ class GitWorktreeRuntime:
             else list(session.plan.merge_order)
         )
         merge_risk_level = (
-            merge_analysis.get("risk_level")
-            if isinstance(merge_analysis, dict)
-            else None
+            merge_analysis.get("risk_level") if isinstance(merge_analysis, dict) else None
         )
         executable_without_override = (
-            bool(session.materialized)
-            and not bool(session.dry_run)
-            and merge_risk_level == "low"
+            bool(session.materialized) and not bool(session.dry_run) and merge_risk_level == "low"
         )
         return {
             "materialized": session.materialized,
             "dry_run": session.dry_run,
             "recommended_merge_order": recommended_merge_order,
-            "branches": {
-                item.member_id: item.branch_name for item in session.assignments
-            },
-            "worktree_paths": {
-                item.member_id: item.worktree_path for item in session.assignments
-            },
+            "branches": {item.member_id: item.branch_name for item in session.assignments},
+            "worktree_paths": {item.member_id: item.worktree_path for item in session.assignments},
             "merge_base": session.plan.base_ref,
             "merge_risk_level": merge_risk_level,
             "merge_execution_eligible": executable_without_override,
@@ -534,13 +515,9 @@ class GitWorktreeRuntime:
         preserve_artifacts: bool = False,
     ) -> Dict[str, Any]:
         """Execute a guarded merge plan in an isolated integration worktree."""
-        orchestration = self.build_merge_orchestration(
-            session, merge_analysis=merge_analysis
-        )
+        orchestration = self.build_merge_orchestration(session, merge_analysis=merge_analysis)
         risk_level = str(orchestration.get("merge_risk_level") or "").strip().lower()
-        recommended_merge_order = list(
-            orchestration.get("recommended_merge_order") or []
-        )
+        recommended_merge_order = list(orchestration.get("recommended_merge_order") or [])
 
         result: Dict[str, Any] = {
             "status": "skipped",
@@ -591,8 +568,7 @@ class GitWorktreeRuntime:
 
         integration_branch = f"{session.plan.branch_prefix}/integration"
         integration_worktree_path = str(
-            Path(session.plan.parent_dir)
-            / f"{_slug(session.plan.team_name)}-integration"
+            Path(session.plan.parent_dir) / f"{_slug(session.plan.team_name)}-integration"
         )
         result["integration_branch"] = integration_branch
         result["integration_worktree_path"] = integration_worktree_path
@@ -603,10 +579,7 @@ class GitWorktreeRuntime:
             branch_name=integration_branch,
         )
         result["integration_artifacts"] = integration_artifacts
-        if (
-            integration_artifacts["worktree_path_exists"]
-            or integration_artifacts["branch_exists"]
-        ):
+        if integration_artifacts["worktree_path_exists"] or integration_artifacts["branch_exists"]:
             result["status"] = "blocked"
             result["blocked_reason"] = "integration_artifacts_exist"
             return result
@@ -753,9 +726,7 @@ class GitWorktreeRuntime:
 
             if self._branch_exists(session.plan.repo_root, assignment.branch_name):
                 try:
-                    self._run_git(
-                        session.plan.repo_root, "branch", "-D", assignment.branch_name
-                    )
+                    self._run_git(session.plan.repo_root, "branch", "-D", assignment.branch_name)
                     branch_deleted.append(assignment.branch_name)
                 except Exception as exc:
                     errors.append(f"{assignment.branch_name}: {exc}")

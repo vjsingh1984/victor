@@ -148,9 +148,7 @@ class TestPluginLoaderLoad:
     def test_load_disabled_returns_empty_result(self, mock_registry, mock_settings):
         """Test that load() returns empty result when disabled."""
         config = PluginLoaderConfig(enabled=False)
-        loader = PluginLoader(
-            registry=mock_registry, settings=mock_settings, config=config
-        )
+        loader = PluginLoader(registry=mock_registry, settings=mock_settings, config=config)
 
         result = loader.load()
 
@@ -182,9 +180,7 @@ class TestPluginLoaderLoad:
     def test_load_disables_specified_plugins(self, mock_registry, mock_settings):
         """Test that load() disables specified plugins."""
         config = PluginLoaderConfig(disabled_plugins={"bad_plugin"})
-        loader = PluginLoader(
-            registry=mock_registry, settings=mock_settings, config=config
-        )
+        loader = PluginLoader(registry=mock_registry, settings=mock_settings, config=config)
 
         mock_plugin_registry = MagicMock()
         mock_plugin_registry.loaded_plugins = {}
@@ -204,9 +200,7 @@ class TestPluginLoaderLoad:
     def test_load_loads_package_plugins(self, mock_registry, mock_settings):
         """Test that load() loads plugins from packages."""
         config = PluginLoaderConfig(plugin_packages=["my.plugin"])
-        loader = PluginLoader(
-            registry=mock_registry, settings=mock_settings, config=config
-        )
+        loader = PluginLoader(registry=mock_registry, settings=mock_settings, config=config)
 
         mock_plugin = MagicMock()
         mock_plugin_registry = MagicMock()
@@ -223,9 +217,7 @@ class TestPluginLoaderLoad:
                 mock_paths.return_value.global_plugins_dir = "/global/plugins"
                 loader.load()
 
-        mock_plugin_registry.load_plugin_from_package.assert_called_once_with(
-            "my.plugin"
-        )
+        mock_plugin_registry.load_plugin_from_package.assert_called_once_with("my.plugin")
         mock_plugin_registry.register_plugin.assert_called_once_with(mock_plugin)
 
     def test_load_handles_errors_gracefully(self, mock_registry, mock_settings):

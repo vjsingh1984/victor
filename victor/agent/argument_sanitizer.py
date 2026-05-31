@@ -81,9 +81,7 @@ def sanitize_arguments_for_serialization(
 
         # Handle nested dicts recursively
         if isinstance(value, dict):
-            sanitized[key] = sanitize_arguments_for_serialization(
-                value, replace_ellipsis
-            )
+            sanitized[key] = sanitize_arguments_for_serialization(value, replace_ellipsis)
             continue
 
         # Handle lists recursively (check each element)
@@ -103,9 +101,7 @@ def sanitize_arguments_for_serialization(
                     sanitized_list.append(str(item))
                 elif isinstance(item, type(lambda: None)):
                     # Handle functions in lists
-                    sanitized_list.append(
-                        f"<function: {getattr(item, '__name__', 'lambda')}>"
-                    )
+                    sanitized_list.append(f"<function: {getattr(item, '__name__', 'lambda')}>")
                 else:
                     # Keep other items as-is
                     sanitized_list.append(item)

@@ -133,9 +133,7 @@ class CapabilityDiscovery:
                 resolve_registered_coordination_catalogs,
             )
 
-            coordination_catalog = resolve_registered_coordination_catalogs().get(
-                vertical
-            )
+            coordination_catalog = resolve_registered_coordination_catalogs().get(vertical)
         except Exception:
             coordination_catalog = None
 
@@ -157,17 +155,13 @@ class CapabilityDiscovery:
 
         try:
             result["workflows"] = (
-                coordination_catalog.list_workflow_names()
-                if coordination_catalog
-                else []
+                coordination_catalog.list_workflow_names() if coordination_catalog else []
             )
         except Exception:
             result["workflows"] = []
 
         try:
-            result["teams"] = (
-                coordination_catalog.list_team_names() if coordination_catalog else []
-            )
+            result["teams"] = coordination_catalog.list_team_names() if coordination_catalog else []
         except Exception:
             result["teams"] = []
 
@@ -215,9 +209,7 @@ class CapabilityDiscovery:
             "mode": mode,
             "vertical": vertical,
             "count": len(recommendations),
-            "recommendations": serialize_catalog_coordination_suggestions(
-                recommendations
-            ),
+            "recommendations": serialize_catalog_coordination_suggestions(recommendations),
         }
 
     def _discover_tools(self) -> List[str]:
@@ -419,14 +411,12 @@ def _display_full_capabilities(manifest: CapabilityManifest) -> None:
     summary_table.add_row(
         "Providers",
         str(len(manifest.providers)),
-        ", ".join(manifest.providers[:5])
-        + ("..." if len(manifest.providers) > 5 else ""),
+        ", ".join(manifest.providers[:5]) + ("..." if len(manifest.providers) > 5 else ""),
     )
     summary_table.add_row(
         "Personas",
         str(len(manifest.personas)),
-        ", ".join(manifest.personas[:3])
-        + ("..." if len(manifest.personas) > 3 else ""),
+        ", ".join(manifest.personas[:3]) + ("..." if len(manifest.personas) > 3 else ""),
     )
     summary_table.add_row(
         "Teams",
@@ -441,20 +431,17 @@ def _display_full_capabilities(manifest: CapabilityManifest) -> None:
     summary_table.add_row(
         "Workflows",
         str(len(manifest.workflows)),
-        ", ".join(manifest.workflows[:3])
-        + ("..." if len(manifest.workflows) > 3 else ""),
+        ", ".join(manifest.workflows[:3]) + ("..." if len(manifest.workflows) > 3 else ""),
     )
     summary_table.add_row(
         "Task Types",
         str(len(manifest.task_types)),
-        ", ".join(manifest.task_types[:3])
-        + ("..." if len(manifest.task_types) > 3 else ""),
+        ", ".join(manifest.task_types[:3]) + ("..." if len(manifest.task_types) > 3 else ""),
     )
     summary_table.add_row(
         "Handlers",
         str(len(manifest.handlers)),
-        ", ".join(manifest.handlers[:3])
-        + ("..." if len(manifest.handlers) > 3 else ""),
+        ", ".join(manifest.handlers[:3]) + ("..." if len(manifest.handlers) > 3 else ""),
     )
     summary_table.add_row(
         "Event Types",
@@ -471,9 +458,7 @@ def _display_full_capabilities(manifest: CapabilityManifest) -> None:
     console.print("  [cyan]victor capabilities verticals[/cyan]  - List all verticals")
     console.print("  [cyan]victor capabilities providers[/cyan]  - List all providers")
     console.print("  [cyan]victor capabilities workflows[/cyan]  - List all workflows")
-    console.print(
-        "  [cyan]victor capabilities --vertical coding[/cyan] - Filter by vertical"
-    )
+    console.print("  [cyan]victor capabilities --vertical coding[/cyan] - Filter by vertical")
     console.print()
 
 
@@ -550,9 +535,7 @@ def _display_coordination_recommendations(
 
 @capabilities_app.command("tools")
 def list_tools(
-    category: Optional[str] = typer.Option(
-        None, "--category", "-c", help="Filter by category"
-    ),
+    category: Optional[str] = typer.Option(None, "--category", "-c", help="Filter by category"),
     json_output: bool = create_json_option(),
 ) -> None:
     """List all available tools."""
@@ -569,9 +552,7 @@ def list_tools(
         return
 
     console.print()
-    console.print(
-        Panel.fit("[bold cyan]Available Tools[/bold cyan]", border_style="cyan")
-    )
+    console.print(Panel.fit("[bold cyan]Available Tools[/bold cyan]", border_style="cyan"))
     console.print()
 
     # Show categories
@@ -591,13 +572,9 @@ def list_tools(
 @capabilities_app.command("recommend")
 def recommend_coordination(
     task_type: str = typer.Argument(..., help="Task type or short task label"),
-    complexity: str = typer.Argument(
-        ..., help="Task complexity, e.g. low, medium, high"
-    ),
+    complexity: str = typer.Argument(..., help="Task complexity, e.g. low, medium, high"),
     mode: str = typer.Option("build", "--mode", "-m", help="Mode policy to apply"),
-    vertical: Optional[str] = typer.Option(
-        None, "--vertical", "-v", help="Filter by vertical"
-    ),
+    vertical: Optional[str] = typer.Option(None, "--vertical", "-v", help="Filter by vertical"),
     json_output: bool = create_json_option(),
 ) -> None:
     """Recommend teams and workflows using shared framework coordination logic."""
@@ -635,9 +612,7 @@ def list_verticals(
         return
 
     console.print()
-    console.print(
-        Panel.fit("[bold cyan]Available Verticals[/bold cyan]", border_style="cyan")
-    )
+    console.print(Panel.fit("[bold cyan]Available Verticals[/bold cyan]", border_style="cyan"))
     console.print()
 
     for v in sorted(manifest.verticals):
@@ -660,9 +635,7 @@ def list_providers(
         return
 
     console.print()
-    console.print(
-        Panel.fit("[bold cyan]Available Providers[/bold cyan]", border_style="cyan")
-    )
+    console.print(Panel.fit("[bold cyan]Available Providers[/bold cyan]", border_style="cyan"))
     console.print()
 
     for p in sorted(manifest.providers):
@@ -674,9 +647,7 @@ def list_providers(
 
 @capabilities_app.command("teams")
 def list_teams(
-    vertical: Optional[str] = typer.Option(
-        None, "--vertical", "-v", help="Filter by vertical"
-    ),
+    vertical: Optional[str] = typer.Option(None, "--vertical", "-v", help="Filter by vertical"),
     json_output: bool = create_json_option(),
 ) -> None:
     """List all available team configurations."""
@@ -710,9 +681,7 @@ def list_teams(
 
 @capabilities_app.command("personas")
 def list_personas(
-    vertical: Optional[str] = typer.Option(
-        None, "--vertical", "-v", help="Filter by vertical"
-    ),
+    vertical: Optional[str] = typer.Option(None, "--vertical", "-v", help="Filter by vertical"),
     json_output: bool = create_json_option(),
 ) -> None:
     """List all available personas."""
@@ -746,9 +715,7 @@ def list_personas(
 
 @capabilities_app.command("workflows")
 def list_workflows(
-    vertical: Optional[str] = typer.Option(
-        None, "--vertical", "-v", help="Filter by vertical"
-    ),
+    vertical: Optional[str] = typer.Option(None, "--vertical", "-v", help="Filter by vertical"),
     json_output: bool = create_json_option(),
 ) -> None:
     """List all available workflow specs from provider registry."""

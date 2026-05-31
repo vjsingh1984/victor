@@ -105,10 +105,7 @@ class ProfileReport:
             List of (operation_name, total_time_ms) tuples
         """
         return sorted(
-            [
-                (name, metrics.total_time_ms)
-                for name, metrics in self.operations.items()
-            ],
+            [(name, metrics.total_time_ms) for name, metrics in self.operations.items()],
             key=lambda x: x[1],
             reverse=True,
         )[:top_n]
@@ -240,9 +237,7 @@ class GraphProfiler:
                 import tracemalloc
 
                 current_memory = tracemalloc.get_traced_memory()[0]
-                metrics.memory_bytes = max(
-                    metrics.memory_bytes, current_memory - start_memory
-                )
+                metrics.memory_bytes = max(metrics.memory_bytes, current_memory - start_memory)
 
             # Pop call stack
             if self._call_stack:
@@ -342,11 +337,7 @@ class GraphProfiler:
 
         # Find error-prone operations
         for op_name, metrics in self._operations.items():
-            error_rate = (
-                metrics.error_count / metrics.call_count
-                if metrics.call_count > 0
-                else 0
-            )
+            error_rate = metrics.error_count / metrics.call_count if metrics.call_count > 0 else 0
             if error_rate > 0.1:
                 recommendations.append(
                     f"High error rate in {op_name}: "

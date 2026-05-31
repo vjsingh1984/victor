@@ -239,9 +239,7 @@ class ChatService:
                     response = await self._planning_handler(user_message)
                 else:
                     executor = self._turn_executor
-                    if executor is None or not hasattr(
-                        executor, "execute_agentic_loop"
-                    ):
+                    if executor is None or not hasattr(executor, "execute_agentic_loop"):
                         raise RuntimeError(
                             "ChatService runtime is not bound: "
                             "turn_executor.execute_agentic_loop is required for chat()."
@@ -297,8 +295,7 @@ class ChatService:
         if signature is not None:
             parameters = signature.parameters
             accepts_overrides = "runtime_context_overrides" in parameters or any(
-                param.kind == inspect.Parameter.VAR_KEYWORD
-                for param in parameters.values()
+                param.kind == inspect.Parameter.VAR_KEYWORD for param in parameters.values()
             )
             if not accepts_overrides:
                 return await execute(user_message)
@@ -308,9 +305,7 @@ class ChatService:
             runtime_context_overrides=runtime_context_overrides,
         )
 
-    async def stream_chat(
-        self, user_message: str, **kwargs
-    ) -> AsyncIterator["StreamChunk"]:
+    async def stream_chat(self, user_message: str, **kwargs) -> AsyncIterator["StreamChunk"]:
         """Stream a chat response through the bound canonical runtime.
 
         Args:
@@ -350,9 +345,7 @@ class ChatService:
             failure: Optional[BaseException] = None
             try:
                 if self._planning_handler is not None:
-                    explicit_planning_request = self._is_explicit_planning_request(
-                        user_message
-                    )
+                    explicit_planning_request = self._is_explicit_planning_request(user_message)
                     should_plan = use_planning is True or (
                         use_planning is None and explicit_planning_request
                     )
@@ -387,9 +380,7 @@ class ChatService:
                 raise
             finally:
                 await self._finish_task_report(
-                    finished
-                    and failure is None
-                    and self._response_execution_success(response),
+                    finished and failure is None and self._response_execution_success(response),
                     user_message=user_message,
                     stream=True,
                     response=response,
@@ -413,9 +404,7 @@ class ChatService:
         if use_planning is False:
             return await self.chat(user_message, use_planning=False)
 
-        if self._planning_handler is not None and (
-            use_planning is True or use_planning is None
-        ):
+        if self._planning_handler is not None and (use_planning is True or use_planning is None):
             return await self._planning_handler(user_message)
 
         return await self.chat(user_message, use_planning=use_planning)
@@ -434,9 +423,7 @@ class ChatService:
         """
         self._logger.debug("Resetting conversation")
         self._context.clear_messages(retain_system=True)
-        manages_controller = getattr(
-            self._context, "manages_conversation_controller", None
-        )
+        manages_controller = getattr(self._context, "manages_conversation_controller", None)
         if callable(manages_controller) and manages_controller(self._conversation):
             return
         self._conversation.reset()
@@ -577,9 +564,7 @@ class ChatService:
     # Private Methods
     # ==========================================================================
 
-    async def _run_agentic_loop(
-        self, user_message: str, **kwargs
-    ) -> "CompletionResponse":
+    async def _run_agentic_loop(self, user_message: str, **kwargs) -> "CompletionResponse":
         """Legacy ChatService-owned loop removed in favor of bound runtimes."""
         raise RuntimeError(
             "ChatService no longer owns an internal agentic loop. "
@@ -831,8 +816,7 @@ class ChatService:
         content = "".join(chunk.content for chunk in chunks)
         # StreamChunk has optional usage field, handle safely
         total_tokens = sum(
-            (chunk.usage.get("total_tokens", 0) if chunk.usage else 0)
-            for chunk in chunks
+            (chunk.usage.get("total_tokens", 0) if chunk.usage else 0) for chunk in chunks
         )
 
         return CompletionResponse(
@@ -977,8 +961,7 @@ class ChatService:
         # Track response length
         content_length = len(response.content) if response.content else 0
         quality["average_length"] = (
-            quality["average_length"] * (quality["total_responses"] - 1)
-            + content_length
+            quality["average_length"] * (quality["total_responses"] - 1) + content_length
         ) / quality["total_responses"]
 
         # Track completion rate
@@ -1016,9 +999,7 @@ class ChatService:
 
         satisfaction_scores = quality.get("user_satisfaction_scores", [])
         avg_satisfaction = (
-            sum(satisfaction_scores) / len(satisfaction_scores)
-            if satisfaction_scores
-            else 0.0
+            sum(satisfaction_scores) / len(satisfaction_scores) if satisfaction_scores else 0.0
         )
 
         return {
@@ -1324,9 +1305,7 @@ class ChatService:
         if any(indicator in message_lower for indicator in COMPLEXITY_KEYWORDS):
             return True
 
-        step_matches = sum(
-            1 for indicator in STEP_INDICATORS if indicator in message_lower
-        )
+        step_matches = sum(1 for indicator in STEP_INDICATORS if indicator in message_lower)
         return step_matches >= 2
 
     @staticmethod
@@ -1341,9 +1320,7 @@ class ChatService:
 
         return is_explicit_planning_request(user_message)
 
-    def _prepare_task(
-        self, user_message: str, task_type: str
-    ) -> tuple[Dict[str, Any], int]:
+    def _prepare_task(self, user_message: str, task_type: str) -> tuple[Dict[str, Any], int]:
         """Prepare task-specific guidance and budget adjustments.
 
         Args:
@@ -1603,9 +1580,7 @@ class ChatService:
             except Exception as e:
                 self._logger.warning(f"Failed to add assistant message to context: {e}")
 
-    def _write_message_to_context(
-        self, role: str, content: str, **payload: Any
-    ) -> None:
+    def _write_message_to_context(self, role: str, content: str, **payload: Any) -> None:
         """Write a normalized message to either keyword- or dict-based context services."""
         add_message = getattr(self._context, "add_message", None)
         if add_message is None:
@@ -1615,9 +1590,7 @@ class ChatService:
             add_message(role=role, content=content, **payload)
             return
 
-        normalized_payload = {
-            key: value for key, value in payload.items() if value is not None
-        }
+        normalized_payload = {key: value for key, value in payload.items() if value is not None}
         add_message({"role": role, "content": content, **normalized_payload})
 
     def _context_uses_keyword_messages(self) -> bool:

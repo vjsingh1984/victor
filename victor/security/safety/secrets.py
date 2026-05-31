@@ -99,9 +99,7 @@ class SecretMatch:
         # Redact the matched text for safety
         if len(self.matched_text) > 8:
             visible = min(4, len(self.matched_text) // 4)
-            self.matched_text = (
-                self.matched_text[:visible] + "..." + self.matched_text[-visible:]
-            )
+            self.matched_text = self.matched_text[:visible] + "..." + self.matched_text[-visible:]
 
 
 # =============================================================================
@@ -131,9 +129,7 @@ STRIPE_KEY_PATTERN = r"(?:sk|pk)_(?:live|test)_[0-9a-zA-Z]{24,}"
 
 # Generic Secrets
 GENERIC_PASSWORD_PATTERN = r"(?i)(?:password|passwd|pwd)\s*[=:]\s*['\"][^'\"]{8,}['\"]"
-GENERIC_SECRET_PATTERN = (
-    r"(?i)(?:secret|token|api[_-]?key)\s*[=:]\s*['\"][^'\"]{8,}['\"]"
-)
+GENERIC_SECRET_PATTERN = r"(?i)(?:secret|token|api[_-]?key)\s*[=:]\s*['\"][^'\"]{8,}['\"]"
 GENERIC_BEARER_PATTERN = r"(?i)bearer\s+[a-zA-Z0-9\-_\.]{20,}"
 
 # Private Keys
@@ -417,9 +413,7 @@ class SecretScanner:
 # =============================================================================
 
 
-def detect_secrets(
-    content: str, include_low_severity: bool = False
-) -> List[SecretMatch]:
+def detect_secrets(content: str, include_low_severity: bool = False) -> List[SecretMatch]:
     """Quick function to detect secrets in content.
 
     Uses Rust-accelerated scanning when available (5-10x faster),

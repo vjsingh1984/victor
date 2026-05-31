@@ -32,15 +32,11 @@ def coerce_skill_catalog(skills: Any) -> Dict[str, SkillDefinition]:
 
     if isinstance(skills, Mapping):
         return {
-            str(name): skill
-            for name, skill in skills.items()
-            if isinstance(skill, SkillDefinition)
+            str(name): skill for name, skill in skills.items() if isinstance(skill, SkillDefinition)
         }
 
     if isinstance(skills, list):
-        return {
-            skill.name: skill for skill in skills if isinstance(skill, SkillDefinition)
-        }
+        return {skill.name: skill for skill in skills if isinstance(skill, SkillDefinition)}
 
     return {}
 
@@ -110,9 +106,7 @@ def enrich_plan_with_skills(
             step_type = str(step_data.get("type", "")).lower()
             step_desc = str(step_data.get("desc", step_data.get("description", "")))
             tools_raw = step_data.get("tools", "")
-            step_tools = (
-                ",".join(tools_raw) if isinstance(tools_raw, list) else str(tools_raw)
-            )
+            step_tools = ",".join(tools_raw) if isinstance(tools_raw, list) else str(tools_raw)
         else:
             step_id = step_data[0] if len(step_data) > 0 else 0
             step_type = str(step_data[1]).lower() if len(step_data) > 1 else ""

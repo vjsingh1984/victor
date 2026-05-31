@@ -54,21 +54,15 @@ def main():
     print(f"victor-ai VERSION file: {ai_version}")
     print(f"victor-ai pyproject.toml: {ai_toml_version}")
     if ai_version != ai_toml_version:
-        errors.append(
-            f"victor-ai version ({ai_toml_version}) != VERSION ({ai_version})"
-        )
+        errors.append(f"victor-ai version ({ai_toml_version}) != VERSION ({ai_version})")
 
     # Check victor-contracts version
     sdk_version = read_version(ROOT / "victor-contracts" / "VERSION")
-    sdk_toml_version = extract_toml_version(
-        ROOT / "victor-contracts" / "pyproject.toml"
-    )
+    sdk_toml_version = extract_toml_version(ROOT / "victor-contracts" / "pyproject.toml")
     print(f"victor-contracts VERSION file: {sdk_version}")
     print(f"victor-contracts pyproject.toml: {sdk_toml_version}")
     if sdk_version != sdk_toml_version:
-        errors.append(
-            f"victor-contracts version ({sdk_toml_version}) != VERSION ({sdk_version})"
-        )
+        errors.append(f"victor-contracts version ({sdk_toml_version}) != VERSION ({sdk_version})")
 
     # Check victor-ai's dependency on victor-contracts
     dep_spec = extract_sdk_dependency(ROOT / "pyproject.toml")

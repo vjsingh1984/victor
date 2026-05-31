@@ -249,9 +249,7 @@ class PromptTemplateLearner(BaseLearner):
 
     def _ensure_tables(self) -> None:
         """Migrate legacy per-learner tables to unified RL tables."""
-        RLTableMigrator(self.db).run_if_needed(
-            self.name, RLTableMigrator.migrate_prompt_template
-        )
+        RLTableMigrator(self.db).run_if_needed(self.name, RLTableMigrator.migrate_prompt_template)
 
     def _load_state(self) -> None:
         """Load state from database."""
@@ -275,18 +273,14 @@ class PromptTemplateLearner(BaseLearner):
                 # Style posteriors: "style_alpha:{style}", context="task_type:provider"
                 if key.startswith("style_alpha:") or key.startswith("style_beta:"):
                     is_alpha = key.startswith("style_alpha:")
-                    style_val = key[
-                        len("style_alpha:") if is_alpha else len("style_beta:") :
-                    ]
+                    style_val = key[len("style_alpha:") if is_alpha else len("style_beta:") :]
                     # context = "task_type:provider"
                     sep = ctx.rfind(":")
                     if sep < 0:
                         continue
                     task_type, provider = ctx[:sep], ctx[sep + 1 :]
                     posterior_key = (task_type, provider, style_val)
-                    existing = self._style_posteriors.get(
-                        posterior_key, BetaDistribution()
-                    )
+                    existing = self._style_posteriors.get(posterior_key, BetaDistribution())
                     if is_alpha:
                         self._style_posteriors[posterior_key] = BetaDistribution(
                             alpha=value, beta=existing.beta
@@ -303,17 +297,13 @@ class PromptTemplateLearner(BaseLearner):
                 # Element posteriors: "elem_alpha:{element}", context="task_type:provider"
                 elif key.startswith("elem_alpha:") or key.startswith("elem_beta:"):
                     is_alpha = key.startswith("elem_alpha:")
-                    elem_val = key[
-                        len("elem_alpha:") if is_alpha else len("elem_beta:") :
-                    ]
+                    elem_val = key[len("elem_alpha:") if is_alpha else len("elem_beta:") :]
                     sep = ctx.rfind(":")
                     if sep < 0:
                         continue
                     task_type, provider = ctx[:sep], ctx[sep + 1 :]
                     posterior_key = (task_type, provider, elem_val)
-                    existing = self._element_posteriors.get(
-                        posterior_key, BetaDistribution()
-                    )
+                    existing = self._element_posteriors.get(posterior_key, BetaDistribution())
                     if is_alpha:
                         self._element_posteriors[posterior_key] = BetaDistribution(
                             alpha=value, beta=existing.beta
@@ -324,24 +314,16 @@ class PromptTemplateLearner(BaseLearner):
                         )
 
                 # Enrichment posteriors: "enrichment_alpha:{type}", context="vertical:task_type"
-                elif key.startswith("enrichment_alpha:") or key.startswith(
-                    "enrichment_beta:"
-                ):
+                elif key.startswith("enrichment_alpha:") or key.startswith("enrichment_beta:"):
                     is_alpha = key.startswith("enrichment_alpha:")
                     enr_type = key[
-                        (
-                            len("enrichment_alpha:")
-                            if is_alpha
-                            else len("enrichment_beta:")
-                        ) :
+                        (len("enrichment_alpha:") if is_alpha else len("enrichment_beta:")) :
                     ]
                     sep = ctx.find(":")
                     vertical = ctx[:sep] if sep >= 0 else ctx
                     task_type_part = ctx[sep + 1 :] if sep >= 0 else ""
                     posterior_key = (vertical, enr_type, task_type_part)
-                    existing = self._enrichment_posteriors.get(
-                        posterior_key, BetaDistribution()
-                    )
+                    existing = self._enrichment_posteriors.get(posterior_key, BetaDistribution())
                     if is_alpha:
                         self._enrichment_posteriors[posterior_key] = BetaDistribution(
                             alpha=value, beta=existing.beta
@@ -418,12 +400,8 @@ class PromptTemplateLearner(BaseLearner):
             template = self._recent_selections[session_id]
         else:
             # No template tracking, use default
-            default_key = (
-                task_type if task_type in self.DEFAULT_TEMPLATES else "default"
-            )
-            template = self.DEFAULT_TEMPLATES.get(
-                default_key, self.DEFAULT_TEMPLATES["default"]
-            )
+            default_key = task_type if task_type in self.DEFAULT_TEMPLATES else "default"
+            template = self.DEFAULT_TEMPLATES.get(default_key, self.DEFAULT_TEMPLATES["default"])
 
         # Compute success signal
         success_score = self._compute_success_score(outcome)
@@ -435,9 +413,7 @@ class PromptTemplateLearner(BaseLearner):
 
         # Update element posteriors
         for element in template.elements:
-            element_posterior = self._get_element_posterior(
-                task_type, provider, element
-            )
+            element_posterior = self._get_element_posterior(task_type, provider, element)
             element_posterior.update(success)
 
         # Update sample count
@@ -511,9 +487,7 @@ class PromptTemplateLearner(BaseLearner):
 
         # Save element posteriors to rl_param
         for element in template.elements:
-            element_posterior = self._get_element_posterior(
-                task_type, provider, element
-            )
+            element_posterior = self._get_element_posterior(task_type, provider, element)
             for prefix, value in (
                 ("elem_alpha", element_posterior.alpha),
                 ("elem_beta", element_posterior.beta),
@@ -604,9 +578,9 @@ class PromptTemplateLearner(BaseLearner):
                     e: self._get_element_posterior(task_type, provider, e).sample()
                     for e in selected_elements
                 }
-                selected_elements = sorted(
-                    element_samples, key=element_samples.get, reverse=True
-                )[:4]
+                selected_elements = sorted(element_samples, key=element_samples.get, reverse=True)[
+                    :4
+                ]
 
             template = PromptTemplate(
                 style=best_style,
@@ -642,9 +616,7 @@ class PromptTemplateLearner(BaseLearner):
         elements = random.sample(self.ALL_ELEMENTS, k=num_elements)
         return PromptTemplate(style=style, elements=elements)
 
-    def _compute_confidence(
-        self, posterior: BetaDistribution, sample_count: int
-    ) -> float:
+    def _compute_confidence(self, posterior: BetaDistribution, sample_count: int) -> float:
         """Compute confidence from posterior and samples.
 
         Args:
@@ -677,9 +649,7 @@ class PromptTemplateLearner(BaseLearner):
         # Limit tracked selections
         if len(self._recent_selections) > self._max_tracked_selections:
             # Remove oldest entries
-            oldest = list(self._recent_selections.keys())[
-                : self._max_tracked_selections // 2
-            ]
+            oldest = list(self._recent_selections.keys())[: self._max_tracked_selections // 2]
             for key in oldest:
                 del self._recent_selections[key]
 
@@ -701,9 +671,7 @@ class PromptTemplateLearner(BaseLearner):
             return PromptTemplate.from_dict(rec.value)
         return self.DEFAULT_TEMPLATES.get(task_type, self.DEFAULT_TEMPLATES["default"])
 
-    def get_style_probabilities(
-        self, task_type: str, provider: str
-    ) -> Dict[str, float]:
+    def get_style_probabilities(self, task_type: str, provider: str) -> Dict[str, float]:
         """Get posterior mean probabilities for each style.
 
         Args:
@@ -718,9 +686,7 @@ class PromptTemplateLearner(BaseLearner):
             for style in self.ALL_STYLES
         }
 
-    def get_element_probabilities(
-        self, task_type: str, provider: str
-    ) -> Dict[str, float]:
+    def get_element_probabilities(self, task_type: str, provider: str) -> Dict[str, float]:
         """Get posterior mean probabilities for each element.
 
         Args:
@@ -731,9 +697,7 @@ class PromptTemplateLearner(BaseLearner):
             Dictionary of element -> probability
         """
         return {
-            element.value: self._get_element_posterior(
-                task_type, provider, element
-            ).mean()
+            element.value: self._get_element_posterior(task_type, provider, element).mean()
             for element in self.ALL_ELEMENTS
         }
 
@@ -891,18 +855,14 @@ class PromptTemplateLearner(BaseLearner):
                 f"{vertical.lower()}:{task_type.lower()}",
                 enrichment_type.lower(),
                 quality_improvement,
-                json.dumps(
-                    {"enrichment_count": enrichment_count, "task_success": task_success}
-                ),
+                json.dumps({"enrichment_count": enrichment_count, "task_success": task_success}),
                 timestamp,
             ),
         )
 
         self.db.commit()
 
-    def get_enrichment_probabilities(
-        self, vertical: str, task_type: str = ""
-    ) -> Dict[str, float]:
+    def get_enrichment_probabilities(self, vertical: str, task_type: str = "") -> Dict[str, float]:
         """Get posterior mean probabilities for each enrichment type.
 
         Args:
@@ -920,9 +880,7 @@ class PromptTemplateLearner(BaseLearner):
                     probabilities[etype] = posterior.mean()
         return probabilities
 
-    def get_enrichment_recommendation(
-        self, vertical: str, task_type: str = ""
-    ) -> Dict[str, bool]:
+    def get_enrichment_recommendation(self, vertical: str, task_type: str = "") -> Dict[str, bool]:
         """Get recommendation on which enrichment types to use.
 
         Uses Thompson Sampling to decide which enrichments are worth applying.
@@ -1011,9 +969,7 @@ class PromptTemplateLearner(BaseLearner):
             if context not in enrichment_stats:
                 enrichment_stats[context] = {
                     "probability": posterior.mean(),
-                    "sample_count": self._enrichment_sample_counts.get(
-                        (vertical, etype), 0
-                    ),
+                    "sample_count": self._enrichment_sample_counts.get((vertical, etype), 0),
                 }
 
         return {
@@ -1025,9 +981,7 @@ class PromptTemplateLearner(BaseLearner):
             "element_posteriors_count": len(self._element_posteriors),
             "tracked_selections": len(self._recent_selections),
             "top_styles_by_context": top_styles,
-            "samples_per_context": {
-                f"{k[0]}:{k[1]}": v for k, v in self._sample_counts.items()
-            },
+            "samples_per_context": {f"{k[0]}:{k[1]}": v for k, v in self._sample_counts.items()},
             # Enrichment stats
             "enrichment_posteriors_count": len(self._enrichment_posteriors),
             "enrichment_samples_total": sum(self._enrichment_sample_counts.values()),

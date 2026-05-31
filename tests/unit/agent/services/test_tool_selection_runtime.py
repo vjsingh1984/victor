@@ -86,9 +86,7 @@ async def test_tool_selection_runtime_selects_and_filters_tools_with_goals():
     result = await runtime.select_tools_for_turn("inspect app.py", goals=["analyze"])
 
     assert result == sorted_tools
-    tool_planner.plan_tools.assert_called_once_with(
-        ["analyze"], ["query", "file_contents"]
-    )
+    tool_planner.plan_tools.assert_called_once_with(["analyze"], ["query", "file_contents"])
     tool_selector.select_tools.assert_awaited_once_with(
         "inspect app.py",
         use_semantic=True,
@@ -96,9 +94,7 @@ async def test_tool_selection_runtime_selects_and_filters_tools_with_goals():
         conversation_depth=3,
         planned_tools=["search"],
     )
-    tool_selector.prioritize_by_stage.assert_called_once_with(
-        "inspect app.py", selected_tools
-    )
+    tool_selector.prioritize_by_stage.assert_called_once_with("inspect app.py", selected_tools)
     tool_planner.filter_tools_by_intent.assert_called_once_with(
         prioritized_tools,
         "read_only",
@@ -131,19 +127,13 @@ async def test_tool_selection_runtime_restores_edit_write_for_write_allowed_turn
         observed_files={"rust/crates/python-bindings/src/similarity.rs"},
         _tool_planner=tool_planner,
         conversation=conversation,
-        messages=[
-            _Message(
-                "user", "Address these findings one by one and update code as needed."
-            )
-        ],
+        messages=[_Message("user", "Address these findings one by one and update code as needed.")],
         tool_selector=tool_selector,
         use_semantic_selection=True,
         _current_intent=ActionIntent.WRITE_ALLOWED,
         _current_user_message="Address these findings one by one and update code as needed.",
         tools=SimpleNamespace(
-            list_tools=MagicMock(
-                return_value=[read_tool, edit_tool, write_tool, shell_tool]
-            )
+            list_tools=MagicMock(return_value=[read_tool, edit_tool, write_tool, shell_tool])
         ),
         _apply_kv_tool_strategy=MagicMock(side_effect=lambda tools: tools),
         _sort_tools_for_kv_stability=MagicMock(side_effect=lambda tools: tools),
@@ -206,9 +196,7 @@ async def test_tool_selection_runtime_keeps_frozen_user_intent_despite_assistant
         _current_intent=ActionIntent.WRITE_ALLOWED,
         _current_user_message="Address these findings one by one and update code as needed.",
         tools=SimpleNamespace(
-            list_tools=MagicMock(
-                return_value=[read_tool, edit_tool, write_tool, shell_tool]
-            )
+            list_tools=MagicMock(return_value=[read_tool, edit_tool, write_tool, shell_tool])
         ),
         _apply_kv_tool_strategy=MagicMock(side_effect=lambda tools: tools),
         _sort_tools_for_kv_stability=MagicMock(side_effect=lambda tools: tools),
@@ -272,9 +260,7 @@ async def test_tool_selection_runtime_does_not_restore_edit_write_for_display_on
         _current_intent=ActionIntent.DISPLAY_ONLY,
         _current_user_message="show me how this would look",
         tools=SimpleNamespace(
-            list_tools=MagicMock(
-                return_value=[read_tool, edit_tool, write_tool, shell_tool]
-            )
+            list_tools=MagicMock(return_value=[read_tool, edit_tool, write_tool, shell_tool])
         ),
         _apply_kv_tool_strategy=MagicMock(side_effect=lambda tools: tools),
         _sort_tools_for_kv_stability=MagicMock(side_effect=lambda tools: tools),
@@ -372,9 +358,7 @@ async def test_tool_selection_runtime_preserves_user_request_as_anchor():
     tool_selector.select_tools.assert_awaited_once_with(
         "query the sqllite db directly using shell or database tools",
         use_semantic=True,
-        conversation_history=[
-            {"role": "user", "content": "query the sqlite db directly"}
-        ],
+        conversation_history=[{"role": "user", "content": "query the sqlite db directly"}],
         conversation_depth=2,
         planned_tools=None,
     )

@@ -101,9 +101,7 @@ class FulfillmentConfig:
                 f"must sum to 1.0 (±0.01), got {code_gen_sum:.4f}"
             )
 
-        test_sum = (
-            self.test_pass_weight + self.test_error_weight + self.test_files_weight
-        )
+        test_sum = self.test_pass_weight + self.test_error_weight + self.test_files_weight
         if abs(test_sum - 1.0) > 0.01:
             raise ValueError(
                 f"Test weights (test_pass + test_error + test_files) "
@@ -337,8 +335,7 @@ class TestingFulfillment(FulfillmentStrategy):
                 errors = sum(
                     1
                     for r in test_results
-                    if getattr(r, "error_message", None)
-                    and not getattr(r, "passed", False)
+                    if getattr(r, "error_message", None) and not getattr(r, "passed", False)
                 )
                 if errors == 0:
                     fulfilled.append("no_test_errors")
@@ -355,9 +352,7 @@ class TestingFulfillment(FulfillmentStrategy):
         if test_files:
             existing_tests = sum(1 for f in test_files if Path(f).exists())
             if existing_tests > 0:
-                fulfilled.append(
-                    f"test_files_exist: {existing_tests}/{len(test_files)}"
-                )
+                fulfilled.append(f"test_files_exist: {existing_tests}/{len(test_files)}")
                 score += 0.2 * (existing_tests / len(test_files))
             else:
                 missing.append("test_files_exist")
@@ -494,9 +489,7 @@ class SearchFulfillment(FulfillmentStrategy):
             fulfilled.append("complete_info")
             score += 0.2
         else:
-            missing_required = [
-                info for info in required_info if info not in found_info
-            ]
+            missing_required = [info for info in required_info if info not in found_info]
             missing.append(f"complete_info: missing {missing_required}")
 
         # Determine status
@@ -584,9 +577,7 @@ class SetupFulfillment(FulfillmentStrategy):
         )
 
 
-def _score_to_status(
-    score: float, config: FulfillmentConfig = DEFAULT_CONFIG
-) -> FulfillmentStatus:
+def _score_to_status(score: float, config: FulfillmentConfig = DEFAULT_CONFIG) -> FulfillmentStatus:
     """Convert score to status using configurable thresholds."""
     if score >= config.fulfilled_threshold:
         return FulfillmentStatus.FULFILLED
@@ -889,16 +880,10 @@ class FulfillmentDetector:
             FulfillmentResult with status and details
         """
         normalized_task_type = self._normalize_task_type(task_type)
-        strategy = (
-            self.strategies.get(normalized_task_type) if normalized_task_type else None
-        )
+        strategy = self.strategies.get(normalized_task_type) if normalized_task_type else None
 
         if not strategy:
-            log = (
-                logger.debug
-                if normalized_task_type == TaskType.UNKNOWN
-                else logger.warning
-            )
+            log = logger.debug if normalized_task_type == TaskType.UNKNOWN else logger.warning
             log(f"No fulfillment strategy for {task_type}")
             return FulfillmentResult(
                 status=FulfillmentStatus.UNKNOWN,

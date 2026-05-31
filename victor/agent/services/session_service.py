@@ -298,10 +298,7 @@ class SessionService:
         """Get token-aware context from memory."""
         if not self._memory_manager or not self._memory_session_id:
             if messages:
-                return [
-                    msg.model_dump() if hasattr(msg, "model_dump") else msg
-                    for msg in messages
-                ]
+                return [msg.model_dump() if hasattr(msg, "model_dump") else msg for msg in messages]
             return []
 
         try:
@@ -312,10 +309,7 @@ class SessionService:
         except Exception as e:
             self._logger.warning(f"Failed to get memory context: {e}")
             if messages:
-                return [
-                    msg.model_dump() if hasattr(msg, "model_dump") else msg
-                    for msg in messages
-                ]
+                return [msg.model_dump() if hasattr(msg, "model_dump") else msg for msg in messages]
             return []
 
     def get_session_stats(self) -> Dict[str, Any]:
@@ -330,9 +324,7 @@ class SessionService:
 
         if self._memory_manager and self._memory_session_id:
             try:
-                memory_stats = self._memory_manager.get_session_stats(
-                    self._memory_session_id
-                )
+                memory_stats = self._memory_manager.get_session_stats(self._memory_session_id)
                 if memory_stats:
                     base_stats.update(memory_stats)
             except Exception as e:
@@ -579,9 +571,7 @@ class SessionService:
             "input_tokens": input_tokens,
             "output_tokens": output_tokens,
             "total_tokens": total_tokens,
-            "tool_calls": (
-                self._current_session.tool_calls if self._current_session else 0
-            ),
+            "tool_calls": (self._current_session.tool_calls if self._current_session else 0),
         }
 
     def get_session_cost_formatted(self) -> str:
@@ -686,9 +676,7 @@ class SessionService:
                     self._session_state.observed_files = set(state["observed_files"])
                 except (AttributeError, TypeError):
                     # Property is read-only or not settable - skip restoration
-                    self._logger.debug(
-                        "observed_files is read-only, skipping restoration"
-                    )
+                    self._logger.debug("observed_files is read-only, skipping restoration")
 
             self._logger.info(f"Loaded session state: {state['session_id']}")
             return True
@@ -739,14 +727,10 @@ class SessionService:
             if "observed_files" in state:
                 try:
                     if hasattr(self._session_state, "observed_files"):
-                        self._session_state.observed_files = set(
-                            state["observed_files"]
-                        )
+                        self._session_state.observed_files = set(state["observed_files"])
                 except (AttributeError, TypeError):
                     # Property is read-only or not settable
-                    self._logger.debug(
-                        "observed_files is read-only, skipping restoration"
-                    )
+                    self._logger.debug("observed_files is read-only, skipping restoration")
 
             self._logger.info(
                 f"Applied checkpoint state for session: {state.get('session_id', 'unknown')}"
@@ -782,9 +766,7 @@ class SessionService:
             self._session_state._token_usage["input"] += input_tokens
             self._session_state._token_usage["output"] += output_tokens
 
-        self._logger.debug(
-            f"Updated token usage: +{input_tokens} input, +{output_tokens} output"
-        )
+        self._logger.debug(f"Updated token usage: +{input_tokens} input, +{output_tokens} output")
 
     def reset_token_usage(self) -> None:
         """Reset token usage statistics.

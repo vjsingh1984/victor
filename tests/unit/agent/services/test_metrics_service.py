@@ -141,10 +141,7 @@ def test_task_report_captures_token_deltas_and_success_average():
     assert report["tool_schema_tokens"] == 256
     assert report["tokens_per_successful_task"] == pytest.approx(90.0)
     assert report["metadata"]["compaction_reason"] == "pre_tool_output"
-    assert (
-        report["metadata"]["compaction_policy_reason"]
-        == "tool_output_exceeds_remaining_budget"
-    )
+    assert report["metadata"]["compaction_policy_reason"] == "tool_output_exceeds_remaining_budget"
     assert coordinator.get_last_task_report()["task_id"] == report["task_id"]
 
 
@@ -159,9 +156,7 @@ def test_task_report_promotes_workspace_policy_and_diagnostics():
         },
     )
 
-    coordinator.start_task_report(
-        "Delegate isolated work", metadata={"mode": "delegate"}
-    )
+    coordinator.start_task_report("Delegate isolated work", metadata={"mode": "delegate"})
 
     report = coordinator.finish_task_report(
         False,

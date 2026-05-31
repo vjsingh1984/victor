@@ -65,9 +65,7 @@ async def compact_context_if_recommended(
     Returns handled=False when the object does not expose the required
     ContextService-like API so callers can fall back to legacy compaction.
     """
-    recommendation_getter = getattr(
-        context_service, "get_compaction_recommendation", None
-    )
+    recommendation_getter = getattr(context_service, "get_compaction_recommendation", None)
     compact_context = getattr(context_service, "compact_context", None)
     if not callable(recommendation_getter) or not callable(compact_context):
         return ContextCompactionRun(handled=False)
@@ -250,9 +248,7 @@ class ContextMetricsImpl:
     @property
     def utilization_percent(self) -> float:
         """Context utilization as percentage."""
-        return (
-            (self.total_tokens / self._max_tokens * 100) if self._max_tokens > 0 else 0
-        )
+        return (self.total_tokens / self._max_tokens * 100) if self._max_tokens > 0 else 0
 
 
 class ContextService:
@@ -316,21 +312,14 @@ class ContextService:
             ContextMetrics with current context information
         """
         total_tokens = sum(
-            self._estimate_tokens(self._message_value(m, "content", ""))
-            for m in self._messages
+            self._estimate_tokens(self._message_value(m, "content", "")) for m in self._messages
         )
 
-        user_count = sum(
-            1 for m in self._messages if self._message_value(m, "role", "") == "user"
-        )
+        user_count = sum(1 for m in self._messages if self._message_value(m, "role", "") == "user")
         assistant_count = sum(
-            1
-            for m in self._messages
-            if self._message_value(m, "role", "") == "assistant"
+            1 for m in self._messages if self._message_value(m, "role", "") == "assistant"
         )
-        tool_count = sum(
-            1 for m in self._messages if self._message_value(m, "role", "") == "tool"
-        )
+        tool_count = sum(1 for m in self._messages if self._message_value(m, "role", "") == "tool")
 
         system_tokens = self._estimate_tokens(
             next(
@@ -388,9 +377,7 @@ class ContextService:
 
         removed = original_count - len(self._messages)
         saved_tokens = max(0, original_tokens - self.get_context_size())
-        self._metrics["operation_count"] = (
-            int(self._metrics.get("operation_count", 0) or 0) + 1
-        )
+        self._metrics["operation_count"] = int(self._metrics.get("operation_count", 0) or 0) + 1
         if removed > 0:
             self._metrics["compaction_count"] = (
                 int(self._metrics.get("compaction_count", 0) or 0) + 1
@@ -451,9 +438,7 @@ class ContextService:
         decision["messages_removed"] = removed
         decision["compacted"] = removed > 0
         if removed > 0:
-            decision["saved_tokens"] = int(
-                self._metrics.get("last_compaction_saved", 0) or 0
-            )
+            decision["saved_tokens"] = int(self._metrics.get("last_compaction_saved", 0) or 0)
         return decision
 
     def add_message(self, message: Optional["Message"] = None, **kwargs: Any) -> None:
@@ -495,9 +480,7 @@ class ContextService:
         messages = self._messages
 
         if role:
-            messages = [
-                m for m in messages if self._message_value(m, "role", "") == role
-            ]
+            messages = [m for m in messages if self._message_value(m, "role", "") == role]
 
         if limit:
             messages = messages[-limit:]
@@ -512,9 +495,7 @@ class ContextService:
         """
         if retain_system:
             system_messages = [
-                m
-                for m in self._messages
-                if self._message_value(m, "role", "") == "system"
+                m for m in self._messages if self._message_value(m, "role", "") == "system"
             ]
             self._messages = system_messages
         else:
@@ -699,9 +680,7 @@ class ContextService:
         # Estimate messages to remove to get below threshold
         messages_to_remove = 0
         if should:
-            target_utilization = (
-                self._config.overflow_threshold_percent - 10
-            )  # 10% buffer
+            target_utilization = self._config.overflow_threshold_percent - 10  # 10% buffer
             target_tokens = (target_utilization / 100) * self._config.max_tokens
             excess_tokens = current_tokens - target_tokens
 
@@ -820,9 +799,7 @@ class ContextService:
         growth_rate = self._calculate_growth_rate(history)
 
         # Predict overflow time
-        predicted_overflow = self._predict_overflow_time(
-            current_utilization, growth_rate
-        )
+        predicted_overflow = self._predict_overflow_time(current_utilization, growth_rate)
 
         # Determine compaction frequency
         compaction_freq = self._determine_compaction_frequency()
@@ -936,8 +913,7 @@ class ContextService:
             "suggested_strategy": strategy,
             "estimated_tokens_after_compaction": estimated_after,
             "current_utilization": current_util,
-            "predicted_utilization_5min": trends.get("predicted_overflow_time")
-            is not None,
+            "predicted_utilization_5min": trends.get("predicted_overflow_time") is not None,
         }
 
     # ==========================================================================
@@ -1171,9 +1147,7 @@ class ContextService:
             "compaction_efficiency": self._calculate_compaction_efficiency(),
             "operation_count": self._metrics.get("operation_count", 0),
             "cache_hit_rate": self._metrics.get("cache_hit_rate", 0.0),
-            "last_compaction_saved_tokens": self._metrics.get(
-                "last_compaction_saved", 0
-            ),
+            "last_compaction_saved_tokens": self._metrics.get("last_compaction_saved", 0),
             "total_tokens_saved": self._metrics.get("total_tokens_saved", 0),
         }
 
@@ -1247,9 +1221,7 @@ class ContextService:
 
         return token_diff / time_diff if time_diff > 0 else 0.0
 
-    def _predict_overflow_time(
-        self, current_util: float, growth_rate: float
-    ) -> Optional[str]:
+    def _predict_overflow_time(self, current_util: float, growth_rate: float) -> Optional[str]:
         """Predict when context will overflow."""
         if growth_rate <= 0:
             return None
@@ -1320,9 +1292,7 @@ class ContextService:
             recommendations.append("High growth rate detected - monitor closely")
 
         if compaction_freq == "high":
-            recommendations.append(
-                "Frequent compactions - consider reducing context input"
-            )
+            recommendations.append("Frequent compactions - consider reducing context input")
 
         if optimization_score < 0.5:
             recommendations.append("Low optimization score - review context management")
@@ -1394,8 +1364,7 @@ class ContextServiceRegistry:
         metrics_before = await service.get_context_metrics()
         should_compact = (
             metrics_before.total_tokens > self._config.max_tokens
-            or metrics_before.utilization_percent
-            >= self._config.overflow_threshold_percent
+            or metrics_before.utilization_percent >= self._config.overflow_threshold_percent
         )
         if not should_compact:
             return {

@@ -258,9 +258,7 @@ class QueryComplexityDetector:
             Score from 0.0 (certain) to 1.0 (ambiguous)
         """
         query_lower = query.lower()
-        ambiguity_count = sum(
-            1 for word in self.AMBIGUITY_KEYWORDS if word in query_lower
-        )
+        ambiguity_count = sum(1 for word in self.AMBIGUITY_KEYWORDS if word in query_lower)
 
         if ambiguity_count == 0:
             return 0.0

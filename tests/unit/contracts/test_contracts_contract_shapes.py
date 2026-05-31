@@ -150,9 +150,7 @@ class TestPluginProtocolContract:
 
         async_methods = {"on_activate_async", "on_deactivate_async"}
         actual = {name for name in dir(VictorPlugin) if not name.startswith("_")}
-        assert async_methods.issubset(
-            actual
-        ), f"Missing async: {async_methods - actual}"
+        assert async_methods.issubset(actual), f"Missing async: {async_methods - actual}"
 
 
 class TestVerticalProtocolsContract:

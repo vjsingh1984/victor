@@ -37,9 +37,7 @@ def test_normalize_chat_mode_accepts_explore_as_advanced_opt_in() -> None:
     assert normalize_chat_mode("EXPLORE") == "explore"
 
 
-def test_normalize_chat_mode_rejects_unknown_with_default_and_advanced_guidance() -> (
-    None
-):
+def test_normalize_chat_mode_rejects_unknown_with_default_and_advanced_guidance() -> None:
     with pytest.raises(ValueError) as exc_info:
         normalize_chat_mode("framework")
 

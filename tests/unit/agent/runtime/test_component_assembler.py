@@ -30,9 +30,7 @@ def test_assemble_tools_prefers_canonical_registrar_registration_surface():
     factory.create_response_completer.return_value = MagicMock()
     factory.setup_semantic_selection.return_value = (False, None)
     factory.create_semantic_selector.return_value = MagicMock()
-    factory.create_unified_tracker.return_value = SimpleNamespace(
-        unique_resources=set()
-    )
+    factory.create_unified_tracker.return_value = SimpleNamespace(unique_resources=set())
     factory.create_tool_selector.return_value = MagicMock()
     factory.create_tool_access_controller.return_value = MagicMock()
     factory.create_budget_manager.return_value = MagicMock()
@@ -49,9 +47,7 @@ def test_assemble_tools_prefers_canonical_registrar_registration_surface():
         tool_selection={},
     )
 
-    ComponentAssembler.assemble_tools(
-        orchestrator, provider=MagicMock(), model="test-model"
-    )
+    ComponentAssembler.assemble_tools(orchestrator, provider=MagicMock(), model="test-model")
 
     registrar.register_default_tools.assert_called_once_with()
 

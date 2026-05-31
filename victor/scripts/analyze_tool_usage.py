@@ -337,9 +337,7 @@ def generate_tiers_yaml(
 
     # Calculate provenance
     total_calls = sum(calls for _, calls, _, _ in usage_data)
-    total_sessions = (
-        max(sessions for _, _, sessions, _ in usage_data) if usage_data else 0
-    )
+    total_sessions = max(sessions for _, _, sessions, _ in usage_data) if usage_data else 0
 
     # Preserve hand-curated provider_tiers and any non-tool_tiers keys.
     # Only the tool_tiers section is regenerated from telemetry.
@@ -481,9 +479,7 @@ def main():
 
     # Generate YAML
     if not args.print_only:
-        output_path = (
-            Path(args.output) if args.output else Path("victor/config/tool_tiers.yaml")
-        )
+        output_path = Path(args.output) if args.output else Path("victor/config/tool_tiers.yaml")
 
         # Ensure directory exists
         output_path.parent.mkdir(parents=True, exist_ok=True)

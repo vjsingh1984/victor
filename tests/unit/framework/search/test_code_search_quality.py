@@ -82,9 +82,7 @@ def test_rerank_code_search_results_prefers_implementation_hits_and_diversity() 
         },
     ]
 
-    reranked, metadata = rerank_code_search_results(
-        results, query="where is parse_json defined"
-    )
+    reranked, metadata = rerank_code_search_results(results, query="where is parse_json defined")
 
     assert reranked[0]["file_path"] == "victor/parser.py"
     assert reranked[-1]["symbol_name"] == "parse_json_or_none"

@@ -368,8 +368,7 @@ class ParadigmRouter:
             )
             self._paradigm_stats["direct"] += 1
             logger.info(
-                f"[ParadigmRouter] DIRECT: task_type={task_type}, "
-                f"model=SMALL, max_tokens=500"
+                f"[ParadigmRouter] DIRECT: task_type={task_type}, " f"model=SMALL, max_tokens=500"
             )
             return decision
 
@@ -388,13 +387,10 @@ class ParadigmRouter:
                 skip_planning=True,
                 skip_evaluation=True,
                 confidence=0.85,
-                reasoning="Direct execution: action query, short, no history, "
-                "low complexity",
+                reasoning="Direct execution: action query, short, no history, " "low complexity",
             )
             self._paradigm_stats["direct"] += 1
-            logger.info(
-                "[ParadigmRouter] DIRECT: action query, model=SMALL, max_tokens=600"
-            )
+            logger.info("[ParadigmRouter] DIRECT: action query, model=SMALL, max_tokens=600")
             return decision
 
         # Fast Pattern 3: Focused processing for medium tasks
@@ -439,8 +435,7 @@ class ParadigmRouter:
             )
             self._paradigm_stats["deep"] += 1
             logger.info(
-                f"[ParadigmRouter] DEEP: task_type={task_type}, "
-                f"model=LARGE, max_tokens=4000"
+                f"[ParadigmRouter] DEEP: task_type={task_type}, " f"model=LARGE, max_tokens=4000"
             )
             return decision
 
@@ -513,21 +508,11 @@ class ParadigmRouter:
             tool_budget=decision.tool_budget,
             iteration_budget=int(execution_context.get("iteration_budget", 1)),
             expected_depth=self._expected_depth_from_paradigm(decision.paradigm),
-            expected_breadth=self._expected_breadth(
-                task_type, query, execution_context
-            ),
-            privacy_sensitivity=str(
-                execution_context.get("privacy_sensitivity", "medium")
-            ),
-            bandwidth_pressure=str(
-                execution_context.get("bandwidth_pressure", "medium")
-            ),
-            latency_sensitivity=str(
-                execution_context.get("latency_sensitivity", "medium")
-            ),
-            token_cost_pressure=str(
-                execution_context.get("token_cost_pressure", "medium")
-            ),
+            expected_breadth=self._expected_breadth(task_type, query, execution_context),
+            privacy_sensitivity=str(execution_context.get("privacy_sensitivity", "medium")),
+            bandwidth_pressure=str(execution_context.get("bandwidth_pressure", "medium")),
+            latency_sensitivity=str(execution_context.get("latency_sensitivity", "medium")),
+            token_cost_pressure=str(execution_context.get("token_cost_pressure", "medium")),
             observability_level=str(
                 execution_context.get(
                     "observability_level",
@@ -535,21 +520,15 @@ class ParadigmRouter:
                 )
             ),
             prior_failures=int(execution_context.get("prior_failures", 0)),
-            similar_experience_count=int(
-                execution_context.get("similar_experience_count", 0)
-            ),
+            similar_experience_count=int(execution_context.get("similar_experience_count", 0)),
             available_tools=list(execution_context.get("available_tools", [])),
-            available_team_formations=list(
-                execution_context.get("available_team_formations", [])
-            ),
+            available_team_formations=list(execution_context.get("available_team_formations", [])),
             provider_candidates=list(execution_context.get("provider_candidates", [])),
             context=execution_context,
         )
 
     @staticmethod
-    def _complexity_label(
-        query_complexity: Optional[float], paradigm: ProcessingParadigm
-    ) -> str:
+    def _complexity_label(query_complexity: Optional[float], paradigm: ProcessingParadigm) -> str:
         """Convert numeric complexity or paradigm signal into low/medium/high."""
         if query_complexity is not None:
             if query_complexity >= 0.6:
@@ -586,18 +565,14 @@ class ParadigmRouter:
         query_lower = query.lower()
         if task_type in self.BREADTH_TASK_TYPES:
             return "high"
-        if any(
-            term in query_lower for term in ("all ", "across ", "multiple ", "compare ")
-        ):
+        if any(term in query_lower for term in ("all ", "across ", "multiple ", "compare ")):
             return "high"
         if task_type in self.FOCUSED_TASK_TYPES or task_type in self.DEEP_TASK_TYPES:
             return "medium"
         return "low"
 
     @staticmethod
-    def _default_observability_level(
-        task_type: str, query_complexity: Optional[float]
-    ) -> str:
+    def _default_observability_level(task_type: str, query_complexity: Optional[float]) -> str:
         """Infer a default observability level when none is explicitly provided."""
         if task_type in {"search", "exploration", "analysis_deep"}:
             return "low"

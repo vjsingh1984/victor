@@ -77,10 +77,7 @@ def _get_module_level_imports(source: str) -> List[Tuple[int, str]]:
             test = node.test
             if isinstance(test, ast.Name) and test.id == "TYPE_CHECKING":
                 continue
-            if (
-                isinstance(test, ast.Attribute)
-                and getattr(test, "attr", "") == "TYPE_CHECKING"
-            ):
+            if isinstance(test, ast.Attribute) and getattr(test, "attr", "") == "TYPE_CHECKING":
                 continue
             # Other if blocks at module level: check their imports
             for child in ast.walk(node):

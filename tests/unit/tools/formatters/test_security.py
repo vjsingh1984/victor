@@ -190,12 +190,8 @@ class TestSecurityFormatter:
         # Summary breakdown shown when there are findings
         assert "Security Scan Results:" in result.content
         assert "[red bold]1 critical[/]" in result.content
-        assert (
-            "[orange1]1 high[/]" in result.content
-        )  # Summary line doesn't have bold on the count
-        assert (
-            "[orange1 bold]HIGH[/]" in result.content
-        )  # But the detailed finding does
+        assert "[orange1]1 high[/]" in result.content  # Summary line doesn't have bold on the count
+        assert "[orange1 bold]HIGH[/]" in result.content  # But the detailed finding does
 
     def test_format_with_findings(self):
         """Test formatting with actual findings."""
@@ -230,9 +226,7 @@ class TestSecurityFormatter:
         """Test max_findings parameter limits output."""
         formatter = SecurityFormatter()
         data = {
-            "vulnerabilities": [
-                {"severity": "low", "title": f"Issue {i}"} for i in range(25)
-            ],
+            "vulnerabilities": [{"severity": "low", "title": f"Issue {i}"} for i in range(25)],
             "summary": {
                 "critical": 0,
                 "high": 0,

@@ -186,9 +186,7 @@ class TestToolServiceNode:
         mock_ctx.services = mock_services
         state = inject_execution_context(state, mock_ctx)
 
-        result = await tool_service_node(
-            state, tool_name="test_tool", tool_args={"arg1": "value1"}
-        )
+        result = await tool_service_node(state, tool_name="test_tool", tool_args={"arg1": "value1"})
 
         mock_tool.execute_tool.assert_called_once()
         tool_results = result.context.get("tool_results", [])
@@ -233,9 +231,7 @@ class TestContextServiceNode:
 
         mock_services = MagicMock()
         mock_context = AsyncMock()
-        mock_context.retrieve_context = AsyncMock(
-            return_value=MagicMock(items=["item1", "item2"])
-        )
+        mock_context.retrieve_context = AsyncMock(return_value=MagicMock(items=["item1", "item2"]))
         mock_services.context = mock_context
 
         mock_ctx = MagicMock()
@@ -415,9 +411,7 @@ class TestServiceIntegration:
             return_value={"provider": "test", "model": "test-model"}
         )
         mock_context = AsyncMock()
-        mock_context.retrieve_context = AsyncMock(
-            return_value=MagicMock(items=["ctx1"])
-        )
+        mock_context.retrieve_context = AsyncMock(return_value=MagicMock(items=["ctx1"]))
         mock_services.chat = mock_chat
         mock_services.provider = mock_provider
         mock_services.context = mock_context

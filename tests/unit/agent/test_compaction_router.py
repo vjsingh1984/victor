@@ -99,9 +99,7 @@ def complex_messages():
     messages = []
     for i in range(30):
         messages.append(
-            Message(
-                role="user", content=f"Message {i} about fixing bug in src/file{i}.py"
-            )
+            Message(role="user", content=f"Message {i} about fixing bug in src/file{i}.py")
         )
         messages.append(
             Message(
@@ -167,9 +165,7 @@ class TestCompactionRouter:
     @pytest.mark.asyncio
     async def test_compact_with_current_query(self, router, simple_messages):
         """Test compacting with current query for relevance."""
-        result = await router.compact(
-            simple_messages, current_query="continue with the task"
-        )
+        result = await router.compact(simple_messages, current_query="continue with the task")
 
         assert result.summary
         # Query should affect complexity score
@@ -267,14 +263,10 @@ class TestComplexityScoring:
         assert 0.0 <= score <= 1.0
         assert score > 0.5  # Should be high
 
-    def test_calculate_complexity_with_continuation_query(
-        self, router, simple_messages
-    ):
+    def test_calculate_complexity_with_continuation_query(self, router, simple_messages):
         """Test complexity score with continuation query."""
         score_without = router._calculate_complexity(simple_messages, None)
-        score_with = router._calculate_complexity(
-            simple_messages, "continue with the next step"
-        )
+        score_with = router._calculate_complexity(simple_messages, "continue with the next step")
 
         # Continuation query should increase complexity
         assert score_with >= score_without
@@ -295,9 +287,7 @@ class TestFallbackBehavior:
     """Test fallback behavior on errors."""
 
     @pytest.mark.asyncio
-    async def test_llm_failure_fallback_to_rule(
-        self, settings, feature_flags, rule_summarizer
-    ):
+    async def test_llm_failure_fallback_to_rule(self, settings, feature_flags, rule_summarizer):
         """Test fallback to rule-based when LLM fails."""
         llm_summarizer = Mock()
         llm_summarizer.summarize = Mock(side_effect=Exception("LLM failed"))
@@ -318,14 +308,10 @@ class TestFallbackBehavior:
         assert result.summary
 
     @pytest.mark.asyncio
-    async def test_hybrid_failure_fallback_to_rule(
-        self, settings, feature_flags, rule_summarizer
-    ):
+    async def test_hybrid_failure_fallback_to_rule(self, settings, feature_flags, rule_summarizer):
         """Test fallback to rule-based when hybrid fails."""
         hybrid_summarizer = Mock()
-        hybrid_summarizer.summarize_async = AsyncMock(
-            side_effect=Exception("Hybrid failed")
-        )
+        hybrid_summarizer.summarize_async = AsyncMock(side_effect=Exception("Hybrid failed"))
 
         router = CompactionRouter(
             settings=settings,

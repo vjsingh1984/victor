@@ -308,9 +308,7 @@ class TestSemanticRetrievalBoundaries:
         assert "call_read_1" in message.metadata["memory_execution_text"]
 
     @pytest.mark.asyncio
-    async def test_dual_trace_retrieval_separates_semantic_and_execution_messages(
-        self, store
-    ):
+    async def test_dual_trace_retrieval_separates_semantic_and_execution_messages(self, store):
         """Dual-trace retrieval should bucket semantic and execution matches separately."""
         session = store.create_session(session_id="session-4")
         semantic_message = store.add_message(
@@ -326,9 +324,7 @@ class TestSemanticRetrievalBoundaries:
             tool_call_id="call_read_2",
         )
 
-        hit = type(
-            "SearchHit", (), {"message_id": semantic_message.id, "similarity": 0.94}
-        )()
+        hit = type("SearchHit", (), {"message_id": semantic_message.id, "similarity": 0.94})()
         embedding_store = AsyncMock()
         embedding_store.search_similar = AsyncMock(return_value=[hit])
         store.set_embedding_store(embedding_store)
@@ -609,9 +605,7 @@ class TestConversationMessageSerialization:
 
         provider_format = msg.to_provider_format()
 
-        assert (
-            provider_format["role"] == "tool"
-        )  # Per OpenAI spec, tool results keep role=tool
+        assert provider_format["role"] == "tool"  # Per OpenAI spec, tool results keep role=tool
         assert provider_format["tool_call_id"] == "call-123"
 
     def test_to_dict_roundtrip(self):
@@ -637,9 +631,7 @@ class TestConversationMessageSerialization:
         assert restored.id == original.id
         # role is normalized to string after roundtrip (enum → str via to_dict)
         original_role = (
-            original.role.value
-            if isinstance(original.role, MessageRole)
-            else original.role
+            original.role.value if isinstance(original.role, MessageRole) else original.role
         )
         assert restored.role == original_role
         assert restored.content == original.content

@@ -74,9 +74,7 @@ class _FakeVictorClient:
 def test_chat_oneshot_renders_database_tool_flow_for_explicit_sqllite_request(
     monkeypatch,
 ):
-    monkeypatch.setattr(
-        "victor.framework.session_runner.create_victor_client", _FakeVictorClient
-    )
+    monkeypatch.setattr("victor.framework.session_runner.create_victor_client", _FakeVictorClient)
     monkeypatch.setattr("victor.ui.commands.chat.graceful_shutdown", AsyncMock())
 
     runner = CliRunner()

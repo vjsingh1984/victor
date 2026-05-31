@@ -269,9 +269,7 @@ class ObservationModelLearner(BaseLearner):
         elif sample_count < 10:
             posterior_mean = alpha / (alpha + beta)
             exploration_scale = sample_count / (sample_count + 5.0)
-            likelihood = posterior_mean + exploration_scale * (
-                sampled_likelihood - posterior_mean
-            )
+            likelihood = posterior_mean + exploration_scale * (sampled_likelihood - posterior_mean)
         else:
             likelihood = sampled_likelihood
 
@@ -336,9 +334,7 @@ class ObservationModelLearner(BaseLearner):
         # Default to uncertain if no clear signal
         return "uncertain"
 
-    def _get_parameters(
-        self, agent_id: str, outcome: str, category: str
-    ) -> Dict[str, float]:
+    def _get_parameters(self, agent_id: str, outcome: str, category: str) -> Dict[str, float]:
         """Get Beta parameters for (agent, outcome, category).
 
         Args:
@@ -421,9 +417,7 @@ class ObservationModelLearner(BaseLearner):
                 calibration_by_category[message_category][
                     "total_error"
                 ] += outcome_calibration_error
-                calibration_by_category[message_category][
-                    "total_samples"
-                ] += total_samples
+                calibration_by_category[message_category]["total_samples"] += total_samples
                 calibration_by_category[message_category]["outcome_count"] += 1
 
         # Compute final calibration metrics
@@ -544,9 +538,7 @@ class ObservationModelLearner(BaseLearner):
             return 0.0
 
         # Reward based on average calibration error across all categories
-        total_error = sum(
-            cat.get("calibration_error", 0.5) for cat in calibration.values()
-        )
+        total_error = sum(cat.get("calibration_error", 0.5) for cat in calibration.values())
         avg_error = total_error / len(calibration) if calibration else 0.5
 
         # Reward is negative of error (lower error = higher reward)
@@ -554,8 +546,7 @@ class ObservationModelLearner(BaseLearner):
         reward = max(-1.0, min(1.0, -avg_error))
 
         logger.debug(
-            f"Computed reward for {agent_id}: {reward:.4f} "
-            f"(calibration_error={avg_error:.4f})"
+            f"Computed reward for {agent_id}: {reward:.4f} " f"(calibration_error={avg_error:.4f})"
         )
 
         return reward

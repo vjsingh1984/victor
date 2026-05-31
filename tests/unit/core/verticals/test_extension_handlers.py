@@ -186,9 +186,7 @@ class TestSafetyHandler:
 
         result = SafetyHandler.load(ctx)
         assert result is mock_extension
-        ctx._resolve_factory_extension.assert_called_once_with(
-            "safety_extension", "safety"
-        )
+        ctx._resolve_factory_extension.assert_called_once_with("safety_extension", "safety")
 
     def test_returns_none_when_no_safety(self):
         from victor.core.verticals.extension_handlers.safety import SafetyHandler
@@ -239,9 +237,7 @@ class TestPromptHandler:
 
         result = PromptHandler.load(ctx)
         assert result is factory_contributor
-        ctx._resolve_factory_extension.assert_called_once_with(
-            "prompt_contributor", "prompts"
-        )
+        ctx._resolve_factory_extension.assert_called_once_with("prompt_contributor", "prompts")
 
     def test_returns_none_when_nothing_found(self):
         from victor.core.verticals.extension_handlers.prompt import PromptHandler

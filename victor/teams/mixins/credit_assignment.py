@@ -152,9 +152,7 @@ class CreditAssignmentMixin:
         self._credit_tracking_enabled = True
         self._credit_methodology = methodology
         self._credit_config = config or CreditAssignmentConfig()
-        self._credit_integration = CreditAssignmentIntegration(
-            default_config=self._credit_config
-        )
+        self._credit_integration = CreditAssignmentIntegration(default_config=self._credit_config)
         logger.info(f"Credit tracking enabled with methodology: {methodology.value}")
 
     def disable_credit_tracking(self) -> None:

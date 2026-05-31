@@ -339,15 +339,11 @@ class TestHITLControllerPause:
             graph_checkpoint_id="graph-ckpt-1",
         )
         controller = HITLController()
-        checkpoint_id = controller.interrupt(
-            context={"execution_checkpoint": checkpoint}
-        )
+        checkpoint_id = controller.interrupt(context={"execution_checkpoint": checkpoint})
 
         resumed = controller.resume(checkpoint_id)
 
-        assert (
-            resumed["execution_checkpoint_metadata"] == checkpoint.to_trace_metadata()
-        )
+        assert resumed["execution_checkpoint_metadata"] == checkpoint.to_trace_metadata()
         assert resumed["execution_checkpoint"] == checkpoint.to_dict()
 
 
@@ -422,10 +418,7 @@ class TestHITLControllerApproval:
             context={"execution_checkpoint": checkpoint, "risk": "write"},
         )
 
-        assert (
-            request.context["execution_checkpoint_metadata"]
-            == checkpoint.to_trace_metadata()
-        )
+        assert request.context["execution_checkpoint_metadata"] == checkpoint.to_trace_metadata()
         assert request.context["execution_checkpoint"] == checkpoint.to_dict()
         assert request.context["risk"] == "write"
 
@@ -504,10 +497,7 @@ class TestHITLControllerApproval:
             approved=True,
         )
 
-        assert (
-            updated.context["execution_checkpoint_metadata"]["approval_state"]
-            == "approved"
-        )
+        assert updated.context["execution_checkpoint_metadata"]["approval_state"] == "approved"
         assert updated.context["execution_checkpoint"]["approval_state"] == "approved"
 
     def test_respond_to_request_rejected(self):
@@ -552,10 +542,7 @@ class TestHITLControllerApproval:
             approved=False,
         )
 
-        assert (
-            updated.context["execution_checkpoint_metadata"]["approval_state"]
-            == "rejected"
-        )
+        assert updated.context["execution_checkpoint_metadata"]["approval_state"] == "rejected"
         assert updated.context["execution_checkpoint"]["approval_state"] == "rejected"
 
     def test_respond_to_invalid_request_raises(self):
@@ -684,10 +671,7 @@ class TestHITLControllerHandler:
 
         result = await controller.process_approval(request.id)
 
-        assert (
-            result.context["execution_checkpoint_metadata"]["approval_state"]
-            == "approved"
-        )
+        assert result.context["execution_checkpoint_metadata"]["approval_state"] == "approved"
         assert result.context["execution_checkpoint"]["approval_state"] == "approved"
 
     @pytest.mark.asyncio

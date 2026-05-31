@@ -297,9 +297,7 @@ class TestFormations:
         )
         coordinator.set_formation(TeamFormation.PARALLEL)
 
-        result = await coordinator.execute_task(
-            "Test task", {"request_team_id": "team_1"}
-        )
+        result = await coordinator.execute_task("Test task", {"request_team_id": "team_1"})
 
         assert result["formation"] == "parallel"
         member_1 = result["member_results"]["m1"]
@@ -344,9 +342,7 @@ class TestFormations:
         coordinator.add_member(MockTeamMember("m2", "Result2"))
         coordinator.set_formation(TeamFormation.SEQUENTIAL)
 
-        result = await coordinator.execute_task(
-            "Test task", {"formation_hint": "parallel"}
-        )
+        result = await coordinator.execute_task("Test task", {"formation_hint": "parallel"})
 
         assert result["success"] is True
         assert result["formation"] == "parallel"
@@ -407,9 +403,7 @@ class TestFormations:
         coordinator.add_member(MockTeamMember("m2", "Agreed"))
         coordinator.set_formation(TeamFormation.CONSENSUS)
 
-        result = await coordinator.execute_task(
-            "Test task", {"max_consensus_rounds": 1}
-        )
+        result = await coordinator.execute_task("Test task", {"max_consensus_rounds": 1})
 
         assert result["success"] is True
         assert result.get("consensus_achieved") is True
@@ -435,23 +429,17 @@ class TestFormations:
         )
         coordinator.set_formation(TeamFormation.CONSENSUS)
 
-        result = await coordinator.execute_task(
-            "Review proposal", {"max_consensus_rounds": 1}
-        )
+        result = await coordinator.execute_task("Review proposal", {"max_consensus_rounds": 1})
 
         assert result["formation"] == "consensus"
         assert result.get("consensus_achieved") is True
         reviewer_1 = result["member_results"]["reviewer_1"]
         reviewer_2 = result["member_results"]["reviewer_2"]
         reviewer_1_metadata = (
-            reviewer_1.metadata
-            if hasattr(reviewer_1, "metadata")
-            else reviewer_1["metadata"]
+            reviewer_1.metadata if hasattr(reviewer_1, "metadata") else reviewer_1["metadata"]
         )
         reviewer_2_metadata = (
-            reviewer_2.metadata
-            if hasattr(reviewer_2, "metadata")
-            else reviewer_2["metadata"]
+            reviewer_2.metadata if hasattr(reviewer_2, "metadata") else reviewer_2["metadata"]
         )
         assert reviewer_1_metadata["agent_id"] == "agent_reviewer_1"
         assert reviewer_2_metadata["team_id"] == "team_consensus"
@@ -503,12 +491,8 @@ class TestErrorHandling:
     ):
         """Structured member outputs should drive isolation metadata and merge analysis."""
         coordinator = UnifiedTeamCoordinator(enable_observability=False)
-        planner = StructuredMember(
-            "planner", "Planned", changed_files=["src/auth/service.py"]
-        )
-        tester = StructuredMember(
-            "tester", "Tested", changed_files=["tests/auth/test_service.py"]
-        )
+        planner = StructuredMember("planner", "Planned", changed_files=["src/auth/service.py"])
+        tester = StructuredMember("tester", "Tested", changed_files=["tests/auth/test_service.py"])
         coordinator.add_member(planner)
         coordinator.add_member(tester)
         coordinator.set_formation(TeamFormation.PARALLEL)
@@ -531,12 +515,10 @@ class TestErrorHandling:
         assert result["merge_risk_level"] == "low"
         assert result["worktree_plan"]["team_name"] == "feature_team"
         assert planner.seen_contexts[0]["isolation_mode"] == "worktree"
-        assert planner.seen_contexts[0]["workspace_root"].endswith(
-            "feature_team-planner"
+        assert planner.seen_contexts[0]["workspace_root"].endswith("feature_team-planner")
+        assert result["member_results"]["planner"].metadata["worktree_assignment"]["member_id"] == (
+            "planner"
         )
-        assert result["member_results"]["planner"].metadata["worktree_assignment"][
-            "member_id"
-        ] == ("planner")
         assert result["merge_analysis"]["member_changed_files"]["tester"] == [
             "tests/auth/test_service.py"
         ]
@@ -608,23 +590,15 @@ class TestErrorHandling:
 
         contracts = result["worker_return_contracts"]
 
-        assert (
-            contracts["planner"]["task_summary"]
-            == "Patched auth service error handling"
-        )
+        assert contracts["planner"]["task_summary"] == "Patched auth service error handling"
         assert contracts["planner"]["changed_files"] == ["src/auth/service.py"]
         assert contracts["planner"]["validation_run"]["status"] == "passed"
         assert contracts["planner"]["merge_risk"]["level"] == "low"
-        assert (
-            contracts["tester"]["task_summary"]
-            == "Validated the flow against auth tests."
-        )
+        assert contracts["tester"]["task_summary"] == "Validated the flow against auth tests."
         assert contracts["tester"]["validation_run"]["summary"] == "1 failed"
         assert contracts["tester"]["merge_risk"]["level"] == "medium"
         assert contracts["tester"]["merge_risk"]["reasons"] == ["out_of_scope_writes"]
-        assert contracts["tester"]["merge_risk"]["out_of_scope_writes"] == [
-            "src/auth/helpers.py"
-        ]
+        assert contracts["tester"]["merge_risk"]["out_of_scope_writes"] == ["src/auth/helpers.py"]
         review_contract = result["merge_review_contract"]
         assert review_contract["merge_ready"] is False
         assert review_contract["review_required"] is True
@@ -679,9 +653,7 @@ class TestErrorHandling:
             build_merge_orchestration=MagicMock(
                 return_value={"recommended_merge_order": ["m1"], "materialized": True}
             ),
-            cleanup=MagicMock(
-                return_value={"removed": ["/tmp/feature-m1"], "errors": []}
-            ),
+            cleanup=MagicMock(return_value={"removed": ["/tmp/feature-m1"], "errors": []}),
         )
         coordinator = UnifiedTeamCoordinator(
             enable_observability=False,
@@ -707,9 +679,7 @@ class TestErrorHandling:
         assert result["worktree_session"]["materialized"] is True
         assert result["merge_orchestration"]["materialized"] is True
         assert result["merge_review_contract"]["next_action"] == "merge"
-        assert result["member_results"]["m1"].metadata["changed_files"] == [
-            "src/auth/service.py"
-        ]
+        assert result["member_results"]["m1"].metadata["changed_files"] == ["src/auth/service.py"]
         assert result["worktree_cleanup"]["removed"] == ["/tmp/feature-m1"]
 
     @pytest.mark.asyncio
@@ -756,9 +726,7 @@ class TestErrorHandling:
             build_merge_orchestration=MagicMock(
                 return_value={"recommended_merge_order": ["m1"], "materialized": True}
             ),
-            cleanup=MagicMock(
-                return_value={"removed": ["/tmp/feature-m1"], "errors": []}
-            ),
+            cleanup=MagicMock(return_value={"removed": ["/tmp/feature-m1"], "errors": []}),
         )
         coordinator = UnifiedTeamCoordinator(
             enable_observability=False,
@@ -832,9 +800,7 @@ class TestErrorHandling:
         approval = follow_up["approval_contract"]
 
         assert "worktree_session" not in result
-        assert result["shared_context"]["workspace_isolation_diagnostics"] == [
-            diagnostic
-        ]
+        assert result["shared_context"]["workspace_isolation_diagnostics"] == [diagnostic]
         assert diagnostic["operation"] == "materialize"
         assert diagnostic["reason"] == "branch_exists"
         assert diagnostic["details"]["branch_name"] == "victor/team/tester-1"
@@ -894,9 +860,7 @@ class TestErrorHandling:
                     "merged_members": ["m1"],
                 }
             ),
-            cleanup=MagicMock(
-                return_value={"removed": ["/tmp/feature-m1"], "errors": []}
-            ),
+            cleanup=MagicMock(return_value={"removed": ["/tmp/feature-m1"], "errors": []}),
         )
         coordinator = UnifiedTeamCoordinator(
             enable_observability=False,
@@ -975,9 +939,7 @@ class TestErrorHandling:
                     "merged_members": ["m1"],
                 }
             ),
-            cleanup=MagicMock(
-                return_value={"removed": ["/tmp/feature-m1"], "errors": []}
-            ),
+            cleanup=MagicMock(return_value={"removed": ["/tmp/feature-m1"], "errors": []}),
         )
         coordinator = UnifiedTeamCoordinator(
             enable_observability=False,
@@ -1144,9 +1106,7 @@ class TestErrorHandling:
                     "merged_members": ["m1"],
                 }
             ),
-            cleanup=MagicMock(
-                return_value={"removed": ["/tmp/feature-m1"], "errors": []}
-            ),
+            cleanup=MagicMock(return_value={"removed": ["/tmp/feature-m1"], "errors": []}),
         )
         coordinator = UnifiedTeamCoordinator(
             enable_observability=False,
@@ -1292,9 +1252,7 @@ class TestErrorHandling:
                     "merged_members": ["m1"],
                 }
             ),
-            cleanup=MagicMock(
-                return_value={"removed": ["/tmp/feature-m1"], "errors": []}
-            ),
+            cleanup=MagicMock(return_value={"removed": ["/tmp/feature-m1"], "errors": []}),
         )
         coordinator = UnifiedTeamCoordinator(
             enable_observability=False,
@@ -1326,14 +1284,11 @@ class TestErrorHandling:
         assert approval["merge_executed"] is False
         assert approval["target_member_ids"] == ["m1"]
         assert (
-            approval["summary"]
-            == "Review merge risks before retrying preserved worktrees for: m1."
+            approval["summary"] == "Review merge risks before retrying preserved worktrees for: m1."
         )
         assert approval["resume_context"] == {
             "mode": "delegate",
-            "delegate_reentry_contract": result["delegate_follow_up_contract"][
-                "reentry_contract"
-            ],
+            "delegate_reentry_contract": result["delegate_follow_up_contract"]["reentry_contract"],
         }
         assert approval["task_briefs_by_member"] == {
             "m1": "Review the pending merge risk for m1 (low). Inspect: src/auth/service.py. Prior output: Done."
@@ -1405,9 +1360,7 @@ class TestErrorHandling:
                 return {
                     "materialized": True,
                     "dry_run": False,
-                    "assignments": [
-                        assignment.to_dict() for assignment in self.assignments
-                    ],
+                    "assignments": [assignment.to_dict() for assignment in self.assignments],
                 }
 
             def assignment_for(self, member_id: str):
@@ -1583,8 +1536,7 @@ class TestErrorHandling:
             }
         }
         assert (
-            follow_up["primary_step_request"]
-            == follow_up["step_requests"]["resume_delegate_retry"]
+            follow_up["primary_step_request"] == follow_up["step_requests"]["resume_delegate_retry"]
         )
         assert follow_up["step_execution_requests"] == {
             "resume_delegate_retry": {
@@ -1692,9 +1644,7 @@ class TestErrorHandling:
         assert tester.seen_contexts[0]["claimed_paths"] == ["tests/auth"]
         assert tester.seen_contexts[0]["readonly_paths"] == ["docs"]
         assert tester.seen_contexts[0]["materialized_worktree"] is True
-        assert (
-            tester.seen_contexts[0]["delegate_reentry_next_action"] == "fix_validation"
-        )
+        assert tester.seen_contexts[0]["delegate_reentry_next_action"] == "fix_validation"
         assert tester.seen_contexts[0]["follow_up_task_brief"] == (
             "Fix the failing validation run for tester. Re-run "
             "`python -m pytest tests/unit/auth/test_service.py`. "
@@ -1750,9 +1700,7 @@ class TestErrorHandling:
                 return {
                     "materialized": True,
                     "dry_run": False,
-                    "assignments": [
-                        assignment.to_dict() for assignment in self.assignments
-                    ],
+                    "assignments": [assignment.to_dict() for assignment in self.assignments],
                 }
 
             def assignment_for(self, member_id: str):
@@ -1826,9 +1774,7 @@ class TestErrorHandling:
             },
         )
 
-        retry_step = first["delegate_follow_up_contract"]["approval_contract"][
-            "next_steps"
-        ][0]
+        retry_step = first["delegate_follow_up_contract"]["approval_contract"]["next_steps"][0]
         fake_runtime.materialize.reset_mock()
         fake_runtime.collect_changed_files.reset_mock()
         planner.seen_contexts.clear()
@@ -1847,17 +1793,13 @@ class TestErrorHandling:
         assert planner.seen_contexts == []
         assert len(tester.seen_contexts) == 1
         assert tester.seen_contexts[0]["worktree_path"] == "/tmp/feature-tester"
-        assert (
-            tester.seen_contexts[0]["delegate_reentry_next_action"] == "fix_validation"
-        )
+        assert tester.seen_contexts[0]["delegate_reentry_next_action"] == "fix_validation"
         assert tester.seen_contexts[0]["follow_up_task_brief"] == (
             "Fix the failing validation run for tester. Re-run "
             "`python -m pytest tests/unit/auth/test_service.py`. "
             "Last result: 1 failed. Focus on: tests/auth/test_service.py."
         )
-        assert (
-            tester.seen_contexts[0]["delegate_selected_step"] == "resume_delegate_retry"
-        )
+        assert tester.seen_contexts[0]["delegate_selected_step"] == "resume_delegate_retry"
         assert tester.seen_contexts[0]["delegate_selected_instruction"] == (
             "Resume preserved worktrees to fix failing validation for: tester."
         )
@@ -1913,9 +1855,7 @@ class TestErrorHandling:
                 return {
                     "materialized": True,
                     "dry_run": False,
-                    "assignments": [
-                        assignment.to_dict() for assignment in self.assignments
-                    ],
+                    "assignments": [assignment.to_dict() for assignment in self.assignments],
                 }
 
             def assignment_for(self, member_id: str):
@@ -2006,12 +1946,8 @@ class TestErrorHandling:
         assert planner.seen_contexts == []
         assert len(tester.seen_contexts) == 1
         assert tester.seen_contexts[0]["worktree_path"] == "/tmp/feature-tester"
-        assert (
-            tester.seen_contexts[0]["delegate_reentry_next_action"] == "fix_validation"
-        )
-        assert (
-            tester.seen_contexts[0]["delegate_selected_step"] == "resume_delegate_retry"
-        )
+        assert tester.seen_contexts[0]["delegate_reentry_next_action"] == "fix_validation"
+        assert tester.seen_contexts[0]["delegate_selected_step"] == "resume_delegate_retry"
         assert set(second["member_results"]) == {"tester"}
 
     @pytest.mark.asyncio
@@ -2064,9 +2000,7 @@ class TestErrorHandling:
                 return {
                     "materialized": True,
                     "dry_run": False,
-                    "assignments": [
-                        assignment.to_dict() for assignment in self.assignments
-                    ],
+                    "assignments": [assignment.to_dict() for assignment in self.assignments],
                 }
 
             def assignment_for(self, member_id: str):
@@ -2140,9 +2074,7 @@ class TestErrorHandling:
             },
         )
 
-        execution_request = first["delegate_follow_up_contract"][
-            "primary_step_execution_request"
-        ]
+        execution_request = first["delegate_follow_up_contract"]["primary_step_execution_request"]
         fake_runtime.materialize.reset_mock()
         fake_runtime.collect_changed_files.reset_mock()
         planner.seen_contexts.clear()
@@ -2158,12 +2090,8 @@ class TestErrorHandling:
         assert planner.seen_contexts == []
         assert len(tester.seen_contexts) == 1
         assert tester.seen_contexts[0]["worktree_path"] == "/tmp/feature-tester"
-        assert (
-            tester.seen_contexts[0]["delegate_reentry_next_action"] == "fix_validation"
-        )
-        assert (
-            tester.seen_contexts[0]["delegate_selected_step"] == "resume_delegate_retry"
-        )
+        assert tester.seen_contexts[0]["delegate_reentry_next_action"] == "fix_validation"
+        assert tester.seen_contexts[0]["delegate_selected_step"] == "resume_delegate_retry"
         assert set(second["member_results"]) == {"tester"}
 
     @pytest.mark.asyncio
@@ -2216,9 +2144,7 @@ class TestErrorHandling:
                 return {
                     "materialized": True,
                     "dry_run": False,
-                    "assignments": [
-                        assignment.to_dict() for assignment in self.assignments
-                    ],
+                    "assignments": [assignment.to_dict() for assignment in self.assignments],
                 }
 
             def assignment_for(self, member_id: str):
@@ -2292,9 +2218,7 @@ class TestErrorHandling:
             },
         )
 
-        execution_request = first["delegate_follow_up_contract"][
-            "primary_step_execution_request"
-        ]
+        execution_request = first["delegate_follow_up_contract"]["primary_step_execution_request"]
         fake_runtime.materialize.reset_mock()
         fake_runtime.collect_changed_files.reset_mock()
         planner.seen_contexts.clear()
@@ -2307,12 +2231,8 @@ class TestErrorHandling:
         assert planner.seen_contexts == []
         assert len(tester.seen_contexts) == 1
         assert tester.seen_contexts[0]["worktree_path"] == "/tmp/feature-tester"
-        assert (
-            tester.seen_contexts[0]["delegate_reentry_next_action"] == "fix_validation"
-        )
-        assert (
-            tester.seen_contexts[0]["delegate_selected_step"] == "resume_delegate_retry"
-        )
+        assert tester.seen_contexts[0]["delegate_reentry_next_action"] == "fix_validation"
+        assert tester.seen_contexts[0]["delegate_selected_step"] == "resume_delegate_retry"
         assert set(second["member_results"]) == {"tester"}
 
     @pytest.mark.asyncio
@@ -2325,9 +2245,7 @@ class TestErrorHandling:
             await coordinator.execute_follow_up_request({"context": {}})
 
         with pytest.raises(ValueError, match="mapping context"):
-            await coordinator.execute_follow_up_request(
-                {"task": "Retry failed validation"}
-            )
+            await coordinator.execute_follow_up_request({"task": "Retry failed validation"})
 
     @pytest.mark.asyncio
     async def test_execute_follow_up_contract_executes_retry_from_follow_up_contract(
@@ -2379,9 +2297,7 @@ class TestErrorHandling:
                 return {
                     "materialized": True,
                     "dry_run": False,
-                    "assignments": [
-                        assignment.to_dict() for assignment in self.assignments
-                    ],
+                    "assignments": [assignment.to_dict() for assignment in self.assignments],
                 }
 
             def assignment_for(self, member_id: str):
@@ -2468,12 +2384,8 @@ class TestErrorHandling:
         assert planner.seen_contexts == []
         assert len(tester.seen_contexts) == 1
         assert tester.seen_contexts[0]["worktree_path"] == "/tmp/feature-tester"
-        assert (
-            tester.seen_contexts[0]["delegate_reentry_next_action"] == "fix_validation"
-        )
-        assert (
-            tester.seen_contexts[0]["delegate_selected_step"] == "resume_delegate_retry"
-        )
+        assert tester.seen_contexts[0]["delegate_reentry_next_action"] == "fix_validation"
+        assert tester.seen_contexts[0]["delegate_selected_step"] == "resume_delegate_retry"
         assert set(second["member_results"]) == {"tester"}
 
     @pytest.mark.asyncio
@@ -2526,9 +2438,7 @@ class TestErrorHandling:
                 return {
                     "materialized": True,
                     "dry_run": False,
-                    "assignments": [
-                        assignment.to_dict() for assignment in self.assignments
-                    ],
+                    "assignments": [assignment.to_dict() for assignment in self.assignments],
                 }
 
             def assignment_for(self, member_id: str):
@@ -2617,12 +2527,8 @@ class TestErrorHandling:
         assert planner.seen_contexts == []
         assert len(tester.seen_contexts) == 1
         assert tester.seen_contexts[0]["worktree_path"] == "/tmp/feature-tester"
-        assert (
-            tester.seen_contexts[0]["delegate_reentry_next_action"] == "fix_validation"
-        )
-        assert (
-            tester.seen_contexts[0]["delegate_selected_step"] == "resume_delegate_retry"
-        )
+        assert tester.seen_contexts[0]["delegate_reentry_next_action"] == "fix_validation"
+        assert tester.seen_contexts[0]["delegate_selected_step"] == "resume_delegate_retry"
         assert set(second["member_results"]) == {"tester"}
 
     @pytest.mark.asyncio
@@ -2673,9 +2579,7 @@ class TestErrorHandling:
                 return {
                     "materialized": True,
                     "dry_run": False,
-                    "assignments": [
-                        assignment.to_dict() for assignment in self.assignments
-                    ],
+                    "assignments": [assignment.to_dict() for assignment in self.assignments],
                 }
 
             def assignment_for(self, member_id: str):
@@ -2770,12 +2674,8 @@ class TestErrorHandling:
         assert planner.seen_contexts == []
         assert len(tester.seen_contexts) == 1
         assert tester.seen_contexts[0]["worktree_path"] == "/tmp/feature-tester"
-        assert (
-            tester.seen_contexts[0]["delegate_reentry_next_action"] == "fix_validation"
-        )
-        assert (
-            tester.seen_contexts[0]["delegate_selected_step"] == "resume_delegate_retry"
-        )
+        assert tester.seen_contexts[0]["delegate_reentry_next_action"] == "fix_validation"
+        assert tester.seen_contexts[0]["delegate_selected_step"] == "resume_delegate_retry"
         assert tester.seen_contexts[0]["delegate_selected_instruction"] == (
             "Resume preserved worktrees to fix failing validation for: tester."
         )
@@ -2802,9 +2702,7 @@ class TestErrorHandling:
                     },
                 }
             ),
-            cleanup=MagicMock(
-                return_value={"removed": ["/tmp/feature-m1"], "errors": []}
-            ),
+            cleanup=MagicMock(return_value={"removed": ["/tmp/feature-m1"], "errors": []}),
         )
         coordinator = UnifiedTeamCoordinator(
             enable_observability=False,
@@ -2934,12 +2832,9 @@ class TestErrorHandling:
         assert result["success"] is True
         assert result["merge_execution"]["status"] == "success"
         assert (
-            result["delegate_follow_up_contract"]["approval_contract"]["reason"]
-            == "merge_executed"
+            result["delegate_follow_up_contract"]["approval_contract"]["reason"] == "merge_executed"
         )
-        assert result["delegate_follow_up_contract"]["approval_contract"][
-            "next_steps"
-        ] == [
+        assert result["delegate_follow_up_contract"]["approval_contract"]["next_steps"] == [
             {
                 "step": "status_merged",
                 "step_id": "status_merged",
@@ -3079,9 +2974,7 @@ class TestErrorHandling:
                     },
                 }
             ),
-            cleanup=MagicMock(
-                return_value={"removed": ["/tmp/feature-m1"], "errors": []}
-            ),
+            cleanup=MagicMock(return_value={"removed": ["/tmp/feature-m1"], "errors": []}),
         )
         coordinator = UnifiedTeamCoordinator(
             enable_observability=False,
@@ -3101,9 +2994,7 @@ class TestErrorHandling:
             },
         )
 
-        merge_step = first["delegate_follow_up_contract"]["approval_contract"][
-            "next_steps"
-        ][0]
+        merge_step = first["delegate_follow_up_contract"]["approval_contract"]["next_steps"][0]
         fake_runtime.execute_merge_orchestration.reset_mock()
         fake_runtime.cleanup.reset_mock()
         member.seen_contexts.clear()
@@ -3122,8 +3013,7 @@ class TestErrorHandling:
         assert second["success"] is True
         assert second["merge_execution"]["status"] == "success"
         assert (
-            second["delegate_follow_up_contract"]["approval_contract"]["reason"]
-            == "merge_executed"
+            second["delegate_follow_up_contract"]["approval_contract"]["reason"] == "merge_executed"
         )
 
     @pytest.mark.asyncio
@@ -3254,9 +3144,7 @@ class TestErrorHandling:
                     },
                 }
             ),
-            cleanup=MagicMock(
-                return_value={"removed": ["/tmp/feature-m1"], "errors": []}
-            ),
+            cleanup=MagicMock(return_value={"removed": ["/tmp/feature-m1"], "errors": []}),
         )
         coordinator = UnifiedTeamCoordinator(
             enable_observability=False,
@@ -3293,8 +3181,7 @@ class TestErrorHandling:
         assert second["success"] is True
         assert second["merge_execution"]["status"] == "success"
         assert (
-            second["delegate_follow_up_contract"]["approval_contract"]["reason"]
-            == "merge_executed"
+            second["delegate_follow_up_contract"]["approval_contract"]["reason"] == "merge_executed"
         )
 
     @pytest.mark.asyncio
@@ -3425,9 +3312,7 @@ class TestErrorHandling:
                     },
                 }
             ),
-            cleanup=MagicMock(
-                return_value={"removed": ["/tmp/feature-m1"], "errors": []}
-            ),
+            cleanup=MagicMock(return_value={"removed": ["/tmp/feature-m1"], "errors": []}),
         )
         coordinator = UnifiedTeamCoordinator(
             enable_observability=False,
@@ -3447,9 +3332,7 @@ class TestErrorHandling:
             },
         )
 
-        execution_request = first["delegate_follow_up_contract"][
-            "primary_step_execution_request"
-        ]
+        execution_request = first["delegate_follow_up_contract"]["primary_step_execution_request"]
         fake_runtime.execute_merge_orchestration.reset_mock()
         fake_runtime.cleanup.reset_mock()
         member.seen_contexts.clear()
@@ -3465,8 +3348,7 @@ class TestErrorHandling:
         assert second["success"] is True
         assert second["merge_execution"]["status"] == "success"
         assert (
-            second["delegate_follow_up_contract"]["approval_contract"]["reason"]
-            == "merge_executed"
+            second["delegate_follow_up_contract"]["approval_contract"]["reason"] == "merge_executed"
         )
 
     @pytest.mark.asyncio
@@ -3597,9 +3479,7 @@ class TestErrorHandling:
                     },
                 }
             ),
-            cleanup=MagicMock(
-                return_value={"removed": ["/tmp/feature-m1"], "errors": []}
-            ),
+            cleanup=MagicMock(return_value={"removed": ["/tmp/feature-m1"], "errors": []}),
         )
         coordinator = UnifiedTeamCoordinator(
             enable_observability=False,
@@ -3619,9 +3499,7 @@ class TestErrorHandling:
             },
         )
 
-        execution_request = first["delegate_follow_up_contract"][
-            "primary_step_execution_request"
-        ]
+        execution_request = first["delegate_follow_up_contract"]["primary_step_execution_request"]
         fake_runtime.execute_merge_orchestration.reset_mock()
         fake_runtime.cleanup.reset_mock()
         member.seen_contexts.clear()
@@ -3634,8 +3512,7 @@ class TestErrorHandling:
         assert second["success"] is True
         assert second["merge_execution"]["status"] == "success"
         assert (
-            second["delegate_follow_up_contract"]["approval_contract"]["reason"]
-            == "merge_executed"
+            second["delegate_follow_up_contract"]["approval_contract"]["reason"] == "merge_executed"
         )
 
     @pytest.mark.asyncio
@@ -3766,9 +3643,7 @@ class TestErrorHandling:
                     },
                 }
             ),
-            cleanup=MagicMock(
-                return_value={"removed": ["/tmp/feature-m1"], "errors": []}
-            ),
+            cleanup=MagicMock(return_value={"removed": ["/tmp/feature-m1"], "errors": []}),
         )
         coordinator = UnifiedTeamCoordinator(
             enable_observability=False,
@@ -3801,8 +3676,7 @@ class TestErrorHandling:
         assert second["success"] is True
         assert second["merge_execution"]["status"] == "success"
         assert (
-            second["delegate_follow_up_contract"]["approval_contract"]["reason"]
-            == "merge_executed"
+            second["delegate_follow_up_contract"]["approval_contract"]["reason"] == "merge_executed"
         )
 
     @pytest.mark.asyncio
@@ -3931,9 +3805,7 @@ class TestErrorHandling:
                     },
                 }
             ),
-            cleanup=MagicMock(
-                return_value={"removed": ["/tmp/feature-m1"], "errors": []}
-            ),
+            cleanup=MagicMock(return_value={"removed": ["/tmp/feature-m1"], "errors": []}),
         )
         coordinator = UnifiedTeamCoordinator(
             enable_observability=False,
@@ -3954,9 +3826,7 @@ class TestErrorHandling:
         )
 
         follow_up_contract = first["delegate_follow_up_contract"]
-        merge_step_id = follow_up_contract["approval_contract"]["next_steps"][0][
-            "step_id"
-        ]
+        merge_step_id = follow_up_contract["approval_contract"]["next_steps"][0]["step_id"]
         fake_runtime.execute_merge_orchestration.reset_mock()
         fake_runtime.cleanup.reset_mock()
         member.seen_contexts.clear()
@@ -3976,8 +3846,7 @@ class TestErrorHandling:
         assert second["success"] is True
         assert second["merge_execution"]["status"] == "success"
         assert (
-            second["delegate_follow_up_contract"]["approval_contract"]["reason"]
-            == "merge_executed"
+            second["delegate_follow_up_contract"]["approval_contract"]["reason"] == "merge_executed"
         )
 
 
@@ -4067,9 +3936,7 @@ class TestFactoryFunction:
     def test_enable_observability(self):
         """Should accept enable_observability flag."""
         mock_orch = MagicMock()
-        coordinator = create_coordinator(
-            orchestrator=mock_orch, enable_observability=True
-        )
+        coordinator = create_coordinator(orchestrator=mock_orch, enable_observability=True)
         assert isinstance(coordinator, UnifiedTeamCoordinator)
 
     def test_enable_rl(self):
@@ -4182,9 +4049,7 @@ class TestStateGraphNodeIntegration:
         coordinator = UnifiedTeamCoordinator(enable_observability=False)
         coordinator.add_member(CapturingMember("m1"))
 
-        await coordinator(
-            {"task": "T", "query": "Q", "scope": "auth", "max_workers": 3}
-        )
+        await coordinator({"task": "T", "query": "Q", "scope": "auth", "max_workers": 3})
 
         assert captured_contexts, "member.execute_task was not invoked"
         ctx = captured_contexts[0]
@@ -4429,9 +4294,7 @@ class TestExecuteTeamConfig:
 
         coordinator = UnifiedTeamCoordinator(enable_observability=False)
 
-        async def _stub_execute_team_config(
-            config, members=None
-        ):  # pragma: no cover - thin stub
+        async def _stub_execute_team_config(config, members=None):  # pragma: no cover - thin stub
             recorded["called"] = True
             recorded["config_name"] = config.name
             recorded["formation"] = config.formation
@@ -4516,9 +4379,7 @@ class TestPydanticAndCopyOnWriteState:
         state = FlexibleState(task="run analysis")
         out = await coordinator(state)
 
-        assert isinstance(
-            out, FlexibleState
-        ), "Pydantic input must yield Pydantic output"
+        assert isinstance(out, FlexibleState), "Pydantic input must yield Pydantic output"
         assert getattr(out, "result", None) == "Done"
         assert getattr(out, "team_output", None) is not None
         assert out.task == "run analysis"  # original field preserved
@@ -4625,9 +4486,7 @@ class TestFormationStrategy:
         coordinator.add_member(MockTeamMember("m2"))
         coordinator.set_formation(TeamFormation.SEQUENTIAL)
         coordinator.with_state_graph_config(
-            StateGraphNodeConfig(
-                formation_strategy=lambda _state: TeamFormation.PARALLEL
-            )
+            StateGraphNodeConfig(formation_strategy=lambda _state: TeamFormation.PARALLEL)
         )
 
         out = await coordinator({"task": "x"})
@@ -4652,9 +4511,7 @@ class TestFormationStrategy:
         )
 
         # task_type="research" is a select_formation override → PARALLEL
-        out = await coordinator(
-            {"task": "x", "context": {"task_type": "research", "team_size": 2}}
-        )
+        out = await coordinator({"task": "x", "context": {"task_type": "research", "team_size": 2}})
 
         assert out["team_output"]["formation"] == "parallel"
 
@@ -4667,9 +4524,7 @@ class TestFormationStrategy:
 
         coordinator = UnifiedTeamCoordinator(enable_observability=False)
         coordinator.add_member(MockTeamMember("m1"))
-        coordinator.with_state_graph_config(
-            StateGraphNodeConfig(formation_strategy=async_strategy)
-        )
+        coordinator.with_state_graph_config(StateGraphNodeConfig(formation_strategy=async_strategy))
 
         with pytest.raises(TypeError, match="synchronously"):
             await coordinator({"task": "x"})
@@ -4689,9 +4544,7 @@ class TestFormationStrategy:
         )
 
         out = await coordinator(
-            CopyOnWriteState(
-                {"task": "x", "context": {"task_type": "research", "team_size": 2}}
-            )
+            CopyOnWriteState({"task": "x", "context": {"task_type": "research", "team_size": 2}})
         )
 
         assert out["team_output"]["formation"] == "parallel"

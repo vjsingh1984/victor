@@ -330,9 +330,7 @@ class TestToolExecutionTracking:
 
     def test_cost_tracking(self, collector):
         """Test cost tracking by tier."""
-        collector.record_tool_execution(
-            "expensive_tool", success=True, elapsed_ms=100.0
-        )
+        collector.record_tool_execution("expensive_tool", success=True, elapsed_ms=100.0)
         collector.record_tool_execution("medium_tool", success=True, elapsed_ms=100.0)
         collector.record_tool_execution("free_tool", success=True, elapsed_ms=100.0)
 
@@ -457,9 +455,7 @@ class TestConfigurationUpdates:
     @pytest.fixture
     def collector(self):
         """Create a MetricsCollector for testing."""
-        config = MetricsCollectorConfig(
-            model="initial-model", provider="initial-provider"
-        )
+        config = MetricsCollectorConfig(model="initial-model", provider="initial-provider")
         return MetricsCollector(config=config, usage_logger=MagicMock())
 
     def test_update_model_info(self, collector):

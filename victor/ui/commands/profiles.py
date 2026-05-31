@@ -66,12 +66,8 @@ def _get_profile_manager(config_dir: Optional[str]) -> ProfileManager:
 
 @profiles_app.command("list")
 def profile_list(
-    verbose: bool = typer.Option(
-        False, "--verbose", "-v", help="Show detailed profile settings"
-    ),
-    config_dir: Optional[str] = typer.Option(
-        None, "--config-dir", "-d", help="Config directory"
-    ),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Show detailed profile settings"),
+    config_dir: Optional[str] = typer.Option(None, "--config-dir", "-d", help="Config directory"),
 ) -> None:
     """List configured profiles from ~/.victor/profiles.yaml."""
     mgr = _get_profile_manager(config_dir)
@@ -124,9 +120,7 @@ def profile_list(
         )
 
     console.print(table)
-    console.print(
-        f"\n[dim]Total: {len(profiles)} configured profile(s). ★ = default[/]"
-    )
+    console.print(f"\n[dim]Total: {len(profiles)} configured profile(s). ★ = default[/]")
     console.print("[dim]Built-in templates: victor profiles templates[/]")
 
     if verbose:
@@ -135,9 +129,7 @@ def profile_list(
         for name, profile_data in sorted(profiles.items()):
             console.print(f"\n[cyan bold]{name}[/]")
             syntax = Syntax(
-                yaml.safe_dump(
-                    profile_data, default_flow_style=False, sort_keys=False
-                ).strip(),
+                yaml.safe_dump(profile_data, default_flow_style=False, sort_keys=False).strip(),
                 "yaml",
                 theme="monokai",
             )
@@ -146,9 +138,7 @@ def profile_list(
 
 @profiles_app.command("templates")
 def profile_templates(
-    verbose: bool = typer.Option(
-        False, "--verbose", "-v", help="Show detailed template settings"
-    ),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Show detailed template settings"),
 ) -> None:
     """List built-in profile templates that can be applied to profiles.yaml."""
     _list_profile_templates_impl(verbose=verbose)
@@ -190,9 +180,7 @@ def _list_profile_templates_impl(*, verbose: bool) -> None:
         console.print("─" * 60)
 
         for profile in sorted(all_profiles, key=lambda p: p.level.value):
-            console.print(
-                f"\n[cyan bold]{profile.display_name} ([dim]{profile.name}[/])[/]"
-            )
+            console.print(f"\n[cyan bold]{profile.display_name} ([dim]{profile.name}[/])[/]")
             console.print(f"[dim]{profile.description}[/]")
 
             settings_table = Table(show_header=False, box=None)
@@ -298,16 +286,10 @@ def profile_show(
 @profiles_app.command("apply")
 def profile_apply(
     name: str = typer.Argument(..., help="Profile name to apply"),
-    provider: Optional[str] = typer.Option(
-        None, "--provider", "-p", help="Override provider"
-    ),
+    provider: Optional[str] = typer.Option(None, "--provider", "-p", help="Override provider"),
     model: Optional[str] = typer.Option(None, "--model", "-m", help="Override model"),
-    config_dir: Optional[str] = typer.Option(
-        None, "--config-dir", "-d", help="Config directory"
-    ),
-    dry_run: bool = typer.Option(
-        False, "--dry-run", help="Show changes without applying"
-    ),
+    config_dir: Optional[str] = typer.Option(None, "--config-dir", "-d", help="Config directory"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without applying"),
 ) -> None:
     """Apply a profile to your configuration.
 
@@ -326,9 +308,7 @@ def profile_apply(
     config_path = _resolve_config_dir(config_dir)
 
     # Generate YAML content
-    yaml_content = generate_profile_yaml(
-        profile, provider_override=provider, model_override=model
-    )
+    yaml_content = generate_profile_yaml(profile, provider_override=provider, model_override=model)
 
     if dry_run:
         console.print(f"\n[bold]Dry Run: {profile.display_name} Profile[/]")
@@ -363,9 +343,7 @@ def profile_apply(
 
         # Show key settings
         table.add_row("Profile Level", profile.level.value.upper())
-        table.add_row(
-            "Provider", provider or profile.settings.get("default_provider", "ollama")
-        )
+        table.add_row("Provider", provider or profile.settings.get("default_provider", "ollama"))
         table.add_row("Model", model or profile.settings.get("default_model", "auto"))
         table.add_row("Max Tools", str(profile.settings.get("fallback_max_tools", 10)))
 
@@ -393,9 +371,7 @@ def profile_apply(
 
 @profiles_app.command("current")
 def profile_current(
-    config_dir: Optional[str] = typer.Option(
-        None, "--config-dir", "-d", help="Config directory"
-    ),
+    config_dir: Optional[str] = typer.Option(None, "--config-dir", "-d", help="Config directory"),
 ) -> None:
     """Show the current active profile."""
     mgr = _get_profile_manager(config_dir)
@@ -413,16 +389,12 @@ def profile_current(
     profile = get_profile(profile_name)
     if profile:
         console.print("\n[bold]Current Profile:[/]")
-        console.print(
-            f"  Name: [cyan]{profile.display_name}[/] ([dim]{profile.name}[/])"
-        )
+        console.print(f"  Name: [cyan]{profile.display_name}[/] ([dim]{profile.name}[/])")
         console.print(f"  Level: [yellow]{profile.level.value.upper()}[/]")
         console.print(f"  Description: {profile.description}")
         console.print(f"\n[dim]Config directory: {config_path}[/]")
     else:
-        console.print(
-            f"\n[dim]Current profile: {profile_name}[/] (custom configuration)"
-        )
+        console.print(f"\n[dim]Current profile: {profile_name}[/] (custom configuration)")
 
 
 @profiles_app.command("create")
@@ -430,28 +402,14 @@ def profile_create(
     name: str = typer.Argument(..., help="Profile name to create"),
     provider: str = typer.Option("ollama", "--provider", "-p", help="LLM provider"),
     model: str = typer.Option("llama2", "--model", "-m", help="Model name"),
-    account: Optional[str] = typer.Option(
-        None, "--account", "-a", help="Provider account name"
-    ),
-    auth_method: Optional[str] = typer.Option(
-        None, "--auth-method", help="Auth method"
-    ),
-    auth_source: Optional[str] = typer.Option(
-        None, "--auth-source", help="Auth source"
-    ),
-    temperature: Optional[float] = typer.Option(
-        None, "--temperature", "-t", help="Temperature"
-    ),
+    account: Optional[str] = typer.Option(None, "--account", "-a", help="Provider account name"),
+    auth_method: Optional[str] = typer.Option(None, "--auth-method", help="Auth method"),
+    auth_source: Optional[str] = typer.Option(None, "--auth-source", help="Auth source"),
+    temperature: Optional[float] = typer.Option(None, "--temperature", "-t", help="Temperature"),
     max_tokens: Optional[int] = typer.Option(None, "--max-tokens", help="Max tokens"),
-    description: Optional[str] = typer.Option(
-        None, "--description", "-d", help="Description"
-    ),
-    set_default: bool = typer.Option(
-        False, "--default", help="Set this profile as default"
-    ),
-    config_dir: Optional[str] = typer.Option(
-        None, "--config-dir", help="Config directory"
-    ),
+    description: Optional[str] = typer.Option(None, "--description", "-d", help="Description"),
+    set_default: bool = typer.Option(False, "--default", help="Set this profile as default"),
+    config_dir: Optional[str] = typer.Option(None, "--config-dir", help="Config directory"),
 ) -> None:
     """Create a new custom profile."""
     mgr = _get_profile_manager(config_dir)
@@ -498,20 +456,12 @@ def profile_create(
 @profiles_app.command("edit")
 def profile_edit(
     name: str = typer.Argument(..., help="Profile name to edit"),
-    provider: Optional[str] = typer.Option(
-        None, "--provider", "-p", help="LLM provider"
-    ),
+    provider: Optional[str] = typer.Option(None, "--provider", "-p", help="LLM provider"),
     model: Optional[str] = typer.Option(None, "--model", "-m", help="Model name"),
-    temperature: Optional[float] = typer.Option(
-        None, "--temperature", "-t", help="Temperature"
-    ),
+    temperature: Optional[float] = typer.Option(None, "--temperature", "-t", help="Temperature"),
     max_tokens: Optional[int] = typer.Option(None, "--max-tokens", help="Max tokens"),
-    description: Optional[str] = typer.Option(
-        None, "--description", "-d", help="Description"
-    ),
-    config_dir: Optional[str] = typer.Option(
-        None, "--config-dir", help="Config directory"
-    ),
+    description: Optional[str] = typer.Option(None, "--description", "-d", help="Description"),
+    config_dir: Optional[str] = typer.Option(None, "--config-dir", help="Config directory"),
 ) -> None:
     """Edit an existing custom profile."""
     mgr = _get_profile_manager(config_dir)
@@ -555,9 +505,7 @@ def profile_edit(
 def profile_delete(
     name: str = typer.Argument(..., help="Profile name to delete"),
     force: bool = typer.Option(False, "--force", "-f", help="Skip confirmation"),
-    config_dir: Optional[str] = typer.Option(
-        None, "--config-dir", help="Config directory"
-    ),
+    config_dir: Optional[str] = typer.Option(None, "--config-dir", help="Config directory"),
 ) -> None:
     """Delete a custom profile."""
     mgr = _get_profile_manager(config_dir)
@@ -590,9 +538,7 @@ def profile_delete(
 @profiles_app.command("set-default")
 def profile_set_default(
     name: str = typer.Argument(..., help="Profile name to set as default"),
-    config_dir: Optional[str] = typer.Option(
-        None, "--config-dir", help="Config directory"
-    ),
+    config_dir: Optional[str] = typer.Option(None, "--config-dir", help="Config directory"),
 ) -> None:
     """Set a profile as the default."""
     mgr = _get_profile_manager(config_dir)

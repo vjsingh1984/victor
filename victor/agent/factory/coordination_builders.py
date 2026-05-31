@@ -107,9 +107,7 @@ class CoordinationBuildersMixin:
                 RuntimeIntelligenceService,
             )
 
-            runtime_intelligence = RuntimeIntelligenceService.from_container(
-                self.container
-            )
+            runtime_intelligence = RuntimeIntelligenceService.from_container(self.container)
         except Exception as exc:
             logger.debug("Could not create runtime intelligence service: %s", exc)
             runtime_intelligence = None
@@ -260,15 +258,11 @@ class CoordinationBuildersMixin:
 
         provider_name = str(getattr(self.settings, "provider", "")).lower()
         local_providers = {"ollama", "lmstudio", "vllm", "llamacpp", "local"}
-        provider_type = (
-            "local" if any(p in provider_name for p in local_providers) else "cloud"
-        )
+        provider_type = "local" if any(p in provider_name for p in local_providers) else "cloud"
 
         compactor = create_context_compactor(
             controller=conversation_controller,
-            proactive_threshold=getattr(
-                self.settings, "context_proactive_threshold", 0.90
-            ),
+            proactive_threshold=getattr(self.settings, "context_proactive_threshold", 0.90),
             min_messages_after_compact=getattr(
                 self.settings, "context_min_messages_after_compact", 8
             ),
@@ -276,12 +270,8 @@ class CoordinationBuildersMixin:
             tool_result_max_lines=getattr(self.settings, "max_tool_output_lines", 200),
             truncation_strategy=truncation_strategy,
             preserve_code_blocks=True,
-            enable_proactive=getattr(
-                self.settings, "context_proactive_compaction", True
-            ),
-            enable_tool_truncation=getattr(
-                self.settings, "tool_result_truncation", True
-            ),
+            enable_proactive=getattr(self.settings, "context_proactive_compaction", True),
+            enable_tool_truncation=getattr(self.settings, "tool_result_truncation", True),
             pruning_learner=pruning_learner,
             provider_type=provider_type,
             runtime_intelligence=self._get_runtime_intelligence_service(),
@@ -304,9 +294,7 @@ class CoordinationBuildersMixin:
         """
         middleware_chain: Optional["MiddlewareChain"] = None
         code_correction_middleware: Optional[Any] = None
-        code_correction_enabled = getattr(
-            self.settings, "code_correction_enabled", True
-        )
+        code_correction_enabled = getattr(self.settings, "code_correction_enabled", True)
 
         try:
             from victor.agent.middleware_chain import MiddlewareChain
@@ -318,9 +306,7 @@ class CoordinationBuildersMixin:
             if extensions and extensions.middleware:
                 for middleware in extensions.middleware:
                     middleware_chain.add(middleware)
-                    logger.debug(
-                        f"Added middleware from vertical: {type(middleware).__name__}"
-                    )
+                    logger.debug(f"Added middleware from vertical: {type(middleware).__name__}")
 
                 for mw in extensions.middleware:
                     if "CodeCorrection" in type(mw).__name__:
@@ -348,9 +334,7 @@ class CoordinationBuildersMixin:
                                 max_iterations=code_correction_max_iterations,
                             )
                         )
-                        logger.debug(
-                            "Using fallback CodeCorrectionMiddleware (no vertical loaded)"
-                        )
+                        logger.debug("Using fallback CodeCorrectionMiddleware (no vertical loaded)")
                     except ImportError as e:
                         logger.warning(f"CodeCorrectionMiddleware unavailable: {e}")
         except ImportError as e:
@@ -465,9 +449,7 @@ class CoordinationBuildersMixin:
         with self.container.create_scope() as scope:
             reminder_manager = scope.get(ReminderManagerProtocol)
 
-        logger.debug(
-            f"ReminderManager created for {provider} with complexity {task_complexity}"
-        )
+        logger.debug(f"ReminderManager created for {provider} with complexity {task_complexity}")
         return reminder_manager
 
     def create_task_coordinator(self) -> "TaskCoordinatorProtocol":
@@ -528,9 +510,7 @@ class CoordinationBuildersMixin:
             selection_strategy=selection_strategy,
         )
 
-        logger.debug(
-            "Coordination advisor created with strategy=%s", selection_strategy
-        )
+        logger.debug("Coordination advisor created with strategy=%s", selection_strategy)
         return advisor
 
     def setup_subagent_orchestration(self) -> tuple[Optional[Any], bool]:
@@ -574,9 +554,7 @@ class CoordinationBuildersMixin:
 
         if observability and conversation_state:
             observability.wire_state_machine(conversation_state)
-            logger.debug(
-                "Observability integration wired with ConversationStateMachine"
-            )
+            logger.debug("Observability integration wired with ConversationStateMachine")
 
     # =========================================================================
     # Workflow Optimization Components
@@ -642,12 +620,8 @@ class CoordinationBuildersMixin:
         """
         from victor.agent.thinking_detector import create_thinking_detector
 
-        repetition_threshold = getattr(
-            self.settings, "thinking_repetition_threshold", 3
-        )
-        similarity_threshold = getattr(
-            self.settings, "thinking_similarity_threshold", 0.65
-        )
+        repetition_threshold = getattr(self.settings, "thinking_repetition_threshold", 3)
+        similarity_threshold = getattr(self.settings, "thinking_similarity_threshold", 0.65)
 
         detector = create_thinking_detector(
             repetition_threshold=repetition_threshold,
@@ -702,9 +676,7 @@ class CoordinationBuildersMixin:
         def _canonical_score_fn(messages, current_query=None):
             """Bridge provider Messages to canonical scorer."""
             conv_msgs = [ConversationMessage.from_provider_message(m) for m in messages]
-            scored = score_messages(
-                conv_msgs, current_query, weights=CONTROLLER_WEIGHTS
-            )
+            scored = score_messages(conv_msgs, current_query, weights=CONTROLLER_WEIGHTS)
             # Map back to original Message objects
             conv_to_orig = {id(cm): msg for cm, msg in zip(conv_msgs, messages)}
             return [(conv_to_orig[id(cm)], s) for cm, s in scored]

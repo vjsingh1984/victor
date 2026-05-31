@@ -419,12 +419,8 @@ class TestProfileResult:
     def test_creation_full(self):
         """Test full profile result creation."""
         func_stats = [
-            FunctionStats(
-                "func1", "mod", "mod.py", 10, cumulative_time=2.0, call_count=50
-            ),
-            FunctionStats(
-                "func2", "mod", "mod.py", 20, cumulative_time=1.0, call_count=100
-            ),
+            FunctionStats("func1", "mod", "mod.py", 10, cumulative_time=2.0, call_count=50),
+            FunctionStats("func2", "mod", "mod.py", 20, cumulative_time=1.0, call_count=100),
         ]
         result = ProfileResult(
             profiler_type=ProfilerType.CPU,

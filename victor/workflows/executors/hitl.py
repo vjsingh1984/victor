@@ -37,9 +37,7 @@ class HITLNodeExecutor:
     def __init__(self, context: Any = None):
         self._context = context
 
-    async def execute(
-        self, node: "HITLNode", state: "WorkflowState"
-    ) -> "WorkflowState":
+    async def execute(self, node: "HITLNode", state: "WorkflowState") -> "WorkflowState":
         """Record HITL completion metadata for resumed compiled workflows."""
         from victor.workflows.runtime_types import GraphNodeResult
 
@@ -57,9 +55,7 @@ class HITLNodeExecutor:
             and response.get("approved") is False
             and node.fallback.value == "abort"
         ):
-            error = (
-                f"HITL node '{node.id}' rejected: {response.get('reason', 'rejected')}"
-            )
+            error = f"HITL node '{node.id}' rejected: {response.get('reason', 'rejected')}"
             current_state["_error"] = error
             success = False
 

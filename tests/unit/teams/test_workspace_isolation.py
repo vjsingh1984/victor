@@ -62,9 +62,7 @@ def test_workspace_isolation_service_plans_and_materializes_delegate_context():
             return session
 
     runtime = Runtime()
-    service = WorkspaceIsolationService(
-        planner=planner, runtime=runtime, merge_analyzer=None
-    )
+    service = WorkspaceIsolationService(planner=planner, runtime=runtime, merge_analyzer=None)
 
     resolved_plan = service.plan(
         [SimpleNamespace(id="worker")],
@@ -82,9 +80,7 @@ def test_workspace_isolation_service_plans_and_materializes_delegate_context():
 
 
 def test_workspace_isolation_policy_resolves_delegate_defaults_and_overrides():
-    policy = WorkspaceIsolationPolicy.from_context(
-        {"mode": "delegate", "worktree_isolation": True}
-    )
+    policy = WorkspaceIsolationPolicy.from_context({"mode": "delegate", "worktree_isolation": True})
     explicit_policy = WorkspaceIsolationPolicy.from_context(
         {
             "mode": "delegate",
@@ -264,9 +260,7 @@ def test_workspace_isolation_service_preserves_cleanup_for_follow_up_contracts()
         {},
         result_dict={"delegate_follow_up_contract": {"preserve_worktrees": True}},
     )
-    summary = service.preserved_cleanup_summary(
-        session, reason="preserved_for_follow_up"
-    )
+    summary = service.preserved_cleanup_summary(session, reason="preserved_for_follow_up")
 
     assert should_cleanup is False
     assert summary == {
@@ -328,9 +322,7 @@ def test_workspace_isolation_service_builds_merge_review_contract_from_worker_re
         "summary": "unit failure",
         "command": "pytest tests/unit",
     } in contract["blocking_issues"]
-    assert any(
-        issue["type"] == "merge_risk_high" for issue in contract["blocking_issues"]
-    )
+    assert any(issue["type"] == "merge_risk_high" for issue in contract["blocking_issues"])
 
 
 def test_workspace_isolation_service_marks_low_risk_merge_ready():

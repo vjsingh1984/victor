@@ -72,8 +72,7 @@ def list_runtime_modes() -> list[dict[str, str]]:
         "explore": "Read-only codebase exploration and discovery.",
     }
     return [
-        {"name": mode, "description": descriptions.get(mode, "")}
-        for mode in CANONICAL_AGENT_MODES
+        {"name": mode, "description": descriptions.get(mode, "")} for mode in CANONICAL_AGENT_MODES
     ]
 
 

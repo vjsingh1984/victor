@@ -111,9 +111,7 @@ class GrepResult:
                     else:
                         lines.append(f"  {ctx_line}")
 
-            if i < len(self.matches) - 1 and (
-                match.context_before or match.context_after
-            ):
+            if i < len(self.matches) - 1 and (match.context_before or match.context_after):
                 lines.append("---")
 
         if len(self.matches) > max_matches:

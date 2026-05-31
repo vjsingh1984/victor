@@ -143,9 +143,7 @@ class TopologyDecision:
             "rationale": self.rationale,
             "score_breakdown": dict(self.score_breakdown),
             "grounding_requirements": self.grounding_requirements.to_dict(),
-            "fallback_action": (
-                self.fallback_action.value if self.fallback_action else None
-            ),
+            "fallback_action": (self.fallback_action.value if self.fallback_action else None),
             "telemetry_tags": dict(self.telemetry_tags),
             "provider": self.provider,
             "formation": self.formation,

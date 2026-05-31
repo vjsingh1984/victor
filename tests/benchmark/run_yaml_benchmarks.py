@@ -124,9 +124,7 @@ workflows:
             current, peak = tracemalloc.get_traced_memory()
             tracemalloc.stop()
 
-            node_count = (
-                len(workflow_def.workflows) if hasattr(workflow_def, "workflows") else 1
-            )
+            node_count = len(workflow_def.workflows) if hasattr(workflow_def, "workflows") else 1
 
             return {
                 "name": name,

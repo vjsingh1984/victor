@@ -146,9 +146,7 @@ class ModuleAnalyzer:
             )
         conn.commit()
 
-    def get_cached(
-        self, order_by: str = "hotspot_score", limit: int = 50
-    ) -> list[dict]:
+    def get_cached(self, order_by: str = "hotspot_score", limit: int = 50) -> list[dict]:
         """Get cached metrics from the database."""
         allowed_cols = {
             "hotspot_score",
@@ -218,14 +216,10 @@ class ModuleAnalyzer:
             return {}
         result: dict[str, list[dict]] = {}
         for node_id, ntype, name, fpath in rows:
-            result.setdefault(fpath, []).append(
-                {"node_id": node_id, "type": ntype, "name": name}
-            )
+            result.setdefault(fpath, []).append({"node_id": node_id, "type": ntype, "name": name})
         return result
 
-    def _compute_coupling(
-        self, module: str, adj_out: dict, adj_in: dict
-    ) -> tuple[int, int, float]:
+    def _compute_coupling(self, module: str, adj_out: dict, adj_in: dict) -> tuple[int, int, float]:
         """Compute afferent (Ca) and efferent (Ce) coupling + instability."""
         ca = len(adj_in.get(module, set()))
         ce = len(adj_out.get(module, set()))
@@ -238,9 +232,7 @@ class ModuleAnalyzer:
         nodes = module_to_nodes.get(module, [])
         if not nodes:
             return 0.0
-        type_nodes = [
-            n for n in nodes if n["type"] in ("class", "interface", "protocol")
-        ]
+        type_nodes = [n for n in nodes if n["type"] in ("class", "interface", "protocol")]
         if not type_nodes:
             return 0.0
         # Heuristic: classes with "Base", "Abstract", "Protocol", "Interface" in name
@@ -299,9 +291,7 @@ class ModuleAnalyzer:
 
         return scores
 
-    def _compute_betweenness(
-        self, modules: set[str], adj: dict[str, set[str]]
-    ) -> dict[str, float]:
+    def _compute_betweenness(self, modules: set[str], adj: dict[str, set[str]]) -> dict[str, float]:
         """Compute betweenness centrality (Brandes algorithm)."""
         if not modules:
             return {}
@@ -382,11 +372,7 @@ class ModuleAnalyzer:
                 timeout=5,
             )
             if result.returncode == 0:
-                return (
-                    len(result.stdout.strip().split("\n"))
-                    if result.stdout.strip()
-                    else 0
-                )
+                return len(result.stdout.strip().split("\n")) if result.stdout.strip() else 0
         except Exception:
             pass
         return 0

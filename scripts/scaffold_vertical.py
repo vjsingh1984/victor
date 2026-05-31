@@ -48,9 +48,7 @@ def scaffold(name: str, output_dir: Path) -> Path:
     """
     pkg_name = f"victor-{name}" if not name.startswith("victor-") else name
     mod_name = to_module_name(pkg_name)
-    class_name = to_class_name(
-        name.removeprefix("victor-") if name.startswith("victor-") else name
-    )
+    class_name = to_class_name(name.removeprefix("victor-") if name.startswith("victor-") else name)
     vertical_name = name.removeprefix("victor-") if name.startswith("victor-") else name
 
     pkg_dir = output_dir / pkg_name
@@ -307,12 +305,8 @@ def scaffold(name: str, output_dir: Path) -> Path:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Scaffold a new Victor vertical package"
-    )
-    parser.add_argument(
-        "name", help="Vertical name (e.g., 'my-vertical' or 'security')"
-    )
+    parser = argparse.ArgumentParser(description="Scaffold a new Victor vertical package")
+    parser.add_argument("name", help="Vertical name (e.g., 'my-vertical' or 'security')")
     parser.add_argument(
         "--output-dir",
         type=Path,

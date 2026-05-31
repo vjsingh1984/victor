@@ -100,14 +100,10 @@ T = TypeVar("T")
 class NullMetricsService:
     """No-op metrics service for when metrics are disabled."""
 
-    def record_metric(
-        self, name: str, value: float, tags: Optional[Dict[str, str]] = None
-    ) -> None:
+    def record_metric(self, name: str, value: float, tags: Optional[Dict[str, str]] = None) -> None:
         pass
 
-    def increment_counter(
-        self, name: str, tags: Optional[Dict[str, str]] = None
-    ) -> None:
+    def increment_counter(self, name: str, tags: Optional[Dict[str, str]] = None) -> None:
         pass
 
 
@@ -198,9 +194,7 @@ class SignatureStoreProtocol:
 
     def is_known_failure(self, tool_name: str, args: Dict[str, Any]) -> bool: ...
 
-    def record_failure(
-        self, tool_name: str, args: Dict[str, Any], error_message: str
-    ) -> None: ...
+    def record_failure(self, tool_name: str, args: Dict[str, Any], error_message: str) -> None: ...
 
 
 class UsageLoggerProtocol:
@@ -429,9 +423,7 @@ _BOOTSTRAP_PHASES = [
         optional=True,
     ),
     BootstrapPhase("workflow", _phase_workflow, depends_on=("settings",)),
-    BootstrapPhase(
-        "compiler_plugins", _phase_compiler_plugins, depends_on=("settings",)
-    ),
+    BootstrapPhase("compiler_plugins", _phase_compiler_plugins, depends_on=("settings",)),
     BootstrapPhase("extensions", _phase_extensions, depends_on=("events",)),
     BootstrapPhase(
         "vertical",
@@ -578,18 +570,10 @@ def _configure_extension_loader_runtime(settings: Settings) -> None:
 
     VerticalExtensionLoader.configure_extension_loader_pressure(
         warn_queue_threshold=_setting_int("extension_loader_warn_queue_threshold", 24),
-        error_queue_threshold=_setting_int(
-            "extension_loader_error_queue_threshold", 32
-        ),
-        warn_in_flight_threshold=_setting_int(
-            "extension_loader_warn_in_flight_threshold", 6
-        ),
-        error_in_flight_threshold=_setting_int(
-            "extension_loader_error_in_flight_threshold", 8
-        ),
-        cooldown_seconds=_setting_float(
-            "extension_loader_pressure_cooldown_seconds", 5.0
-        ),
+        error_queue_threshold=_setting_int("extension_loader_error_queue_threshold", 32),
+        warn_in_flight_threshold=_setting_int("extension_loader_warn_in_flight_threshold", 6),
+        error_in_flight_threshold=_setting_int("extension_loader_error_in_flight_threshold", 8),
+        cooldown_seconds=_setting_float("extension_loader_pressure_cooldown_seconds", 5.0),
         emit_events=_setting_bool("extension_loader_emit_pressure_events", False),
     )
 
@@ -611,9 +595,7 @@ def _configure_extension_loader_runtime(settings: Settings) -> None:
         stop_extension_loader_metrics_reporter(timeout=2.0)
 
 
-def _register_analytics_services(
-    container: ServiceContainer, settings: Settings
-) -> None:
+def _register_analytics_services(container: ServiceContainer, settings: Settings) -> None:
     """Register analytics and logging services."""
 
     # Metrics service
@@ -659,9 +641,7 @@ def _register_analytics_services(
     )
 
 
-def _register_embedding_services(
-    container: ServiceContainer, settings: Settings
-) -> None:
+def _register_embedding_services(container: ServiceContainer, settings: Settings) -> None:
     """Register embedding/ML services.
 
     Registers both the EmbeddingServiceProtocol (for protocol-based injection)
@@ -724,27 +704,15 @@ def bootstrap_capabilities() -> None:
     from victor.contrib.languages.registry import NullLanguageRegistry
     from victor.contrib.prompts.task_hints import NullTaskTypeHinter
 
-    registry.register(
-        TreeSitterParserProtocol, NullTreeSitterParser(), CapabilityStatus.STUB
-    )
-    registry.register(
-        TreeSitterExtractorProtocol, NullTreeSitterExtractor(), CapabilityStatus.STUB
-    )
-    registry.register(
-        TreeSitterAnalysisProtocol, NullTreeSitterAnalysis(), CapabilityStatus.STUB
-    )
+    registry.register(TreeSitterParserProtocol, NullTreeSitterParser(), CapabilityStatus.STUB)
+    registry.register(TreeSitterExtractorProtocol, NullTreeSitterExtractor(), CapabilityStatus.STUB)
+    registry.register(TreeSitterAnalysisProtocol, NullTreeSitterAnalysis(), CapabilityStatus.STUB)
     registry.register(
         CodebaseIndexFactoryProtocol, NullCodebaseIndexFactory(), CapabilityStatus.STUB
     )
-    registry.register(
-        SymbolStoreFactoryProtocol, NullSymbolStore(), CapabilityStatus.STUB
-    )
-    registry.register(
-        IgnorePatternsProtocol, BasicIgnorePatterns(), CapabilityStatus.STUB
-    )
-    registry.register(
-        LanguageRegistryProtocol, NullLanguageRegistry(), CapabilityStatus.STUB
-    )
+    registry.register(SymbolStoreFactoryProtocol, NullSymbolStore(), CapabilityStatus.STUB)
+    registry.register(IgnorePatternsProtocol, BasicIgnorePatterns(), CapabilityStatus.STUB)
+    registry.register(LanguageRegistryProtocol, NullLanguageRegistry(), CapabilityStatus.STUB)
     registry.register(TaskTypeHintProtocol, NullTaskTypeHinter(), CapabilityStatus.STUB)
 
     class _NullClassifierPhraseContributor:
@@ -920,9 +888,7 @@ def _auto_detect_enhanced_capabilities(registry: Any) -> None:
                 logger.debug(f"{label} auto-detection skipped: {e}")
 
 
-def _register_language_services(
-    container: ServiceContainer, settings: Settings
-) -> None:
+def _register_language_services(container: ServiceContainer, settings: Settings) -> None:
     """Register language plugin services (discovery, indexing).
 
     This ensures language plugins are discovered at startup, not mid-conversation.
@@ -943,9 +909,7 @@ def _register_language_services(
         except Exception as e:
             logger.warning(f"Failed to discover language plugins: {e}")
     else:
-        logger.debug(
-            "Language plugins not available - victor-coding package not installed"
-        )
+        logger.debug("Language plugins not available - victor-coding package not installed")
 
 
 def _register_signature_store(container: ServiceContainer, settings: Settings) -> None:
@@ -1021,18 +985,14 @@ class NullSignatureStore:
     def is_known_failure(self, tool_name: str, args: Dict[str, Any]) -> bool:
         return False
 
-    def record_failure(
-        self, tool_name: str, args: Dict[str, Any], error_message: str
-    ) -> None:
+    def record_failure(self, tool_name: str, args: Dict[str, Any], error_message: str) -> None:
         pass
 
     def clear_signature(self, tool_name: str, args: Dict[str, Any]) -> bool:
         return False
 
 
-def _register_orchestrator_services(
-    container: ServiceContainer, settings: Settings
-) -> None:
+def _register_orchestrator_services(container: ServiceContainer, settings: Settings) -> None:
     """Register orchestrator-related services.
 
     Part of Phase 10 DI Migration - registers services used by AgentOrchestrator.
@@ -1088,17 +1048,13 @@ def _register_agent_services(container: ServiceContainer, settings: Settings) ->
             )
             logger.debug("Bootstrapped canonical agent services")
         else:
-            logger.debug(
-                "Skipping canonical agent-service bootstrap (missing dependencies)"
-            )
+            logger.debug("Skipping canonical agent-service bootstrap (missing dependencies)")
     except Exception as e:
         # Don't fail bootstrap if canonical services can't be registered.
         logger.debug("Failed to bootstrap canonical agent services: %s", e)
 
 
-def _register_workflow_services(
-    container: ServiceContainer, settings: Settings
-) -> None:
+def _register_workflow_services(container: ServiceContainer, settings: Settings) -> None:
     """Register workflow-related services.
 
     Part of SOLID Refactoring - registers services used by the workflow system.
@@ -1162,9 +1118,7 @@ def _register_workflow_compiler_plugins(
         logger.warning(f"Failed to register workflow compiler plugins: {e}")
 
 
-def _resolve_vertical_name(
-    settings: Settings, requested_vertical: Optional[str]
-) -> Optional[str]:
+def _resolve_vertical_name(settings: Settings, requested_vertical: Optional[str]) -> Optional[str]:
     """Resolve which vertical name should be activated for this bootstrap.
 
     Returns:
@@ -1380,9 +1334,7 @@ def ensure_bootstrapped(
         _discover_plugin_capabilities(None)
         # Check if we need to switch verticals
         if vertical is not None:
-            _ensure_vertical_activated(
-                container, settings or container.get(Settings), vertical
-            )
+            _ensure_vertical_activated(container, settings or container.get(Settings), vertical)
         return container
 
     return bootstrap_container(settings, vertical=vertical)
@@ -1416,9 +1368,7 @@ def _ensure_vertical_activated(
 
         # If no vertical active or different vertical requested, (re)activate
         if current_vertical is None or current_vertical != vertical_name:
-            logger.info(
-                f"Switching vertical: {current_vertical or 'none'} -> {vertical_name}"
-            )
+            logger.info(f"Switching vertical: {current_vertical or 'none'} -> {vertical_name}")
             activation = activate_vertical_services(container, settings, vertical_name)
 
             # Update the extensions in container

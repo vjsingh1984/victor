@@ -134,8 +134,7 @@ class SubAgentConfig:
         agent_id = self.agent_id or generate_agent_id(self.role)
         return AgentRuntimeContext(
             agent_id=agent_id,
-            display_name=self.display_name
-            or build_display_name(self.role, task=self.task),
+            display_name=self.display_name or build_display_name(self.role, task=self.task),
             role=self.role.value,
             session_id=self.child_session_id or agent_id,
             parent_session_id=self.parent_session_id,
@@ -252,9 +251,7 @@ class SubAgent(IAgent):  # type: ignore[misc]
         if self.config.agent_id is None:
             self.config.agent_id = self._id
         if self.config.display_name is None:
-            self.config.display_name = build_display_name(
-                self.config.role, task=self.config.task
-            )
+            self.config.display_name = build_display_name(self.config.role, task=self.config.task)
 
         # Lazy init for backward compatibility
         if presentation is None:
@@ -375,9 +372,7 @@ class SubAgent(IAgent):  # type: ignore[misc]
                 f"   {gear_icon}  Setting disable_embeddings=True for {self.config.role.value} sub-agent"
             )
             if hasattr(orchestrator, "_session_state_manager"):
-                orchestrator._session_state_manager.execution_state.disable_embeddings = (
-                    True
-                )
+                orchestrator._session_state_manager.execution_state.disable_embeddings = True
 
         # Register only allowed tools
         self._configure_allowed_tools(orchestrator)
@@ -468,9 +463,7 @@ class SubAgent(IAgent):  # type: ignore[misc]
         for attempt in range(1, max_attempts + 1):
             try:
                 if attempt > 1:
-                    logger.debug(
-                        f"   {refresh_icon} Retry attempt {attempt}/{max_attempts}..."
-                    )
+                    logger.debug(f"   {refresh_icon} Retry attempt {attempt}/{max_attempts}...")
 
                 # Try to execute the chat
                 response = await self.orchestrator.chat(self.config.task)
@@ -522,9 +515,7 @@ class SubAgent(IAgent):  # type: ignore[misc]
                 raise
 
         # All retries exhausted
-        logger.error(
-            f"   {error_icon} All retry attempts exhausted for {self.config.role.value}"
-        )
+        logger.error(f"   {error_icon} All retry attempts exhausted for {self.config.role.value}")
         raise last_exception
 
     async def execute(self) -> SubAgentResult:
@@ -544,20 +535,14 @@ class SubAgent(IAgent):  # type: ignore[misc]
             if self.orchestrator is None:
                 self.orchestrator = self._create_constrained_orchestrator()
 
-            logger.info(
-                f"Executing {self.config.role.value} sub-agent: {self.config.task[:50]}..."
-            )
+            logger.info(f"Executing {self.config.role.value} sub-agent: {self.config.task[:50]}...")
 
             # Run the task with retry on rate limits
             response = await self._execute_with_retry()
             response_metadata = getattr(response, "metadata", None) or {}
-            execution_success = (
-                response_metadata.get("agentic_loop_success") is not False
-            )
+            execution_success = response_metadata.get("agentic_loop_success") is not False
             execution_error = (
-                response_metadata.get("agentic_loop_error")
-                if not execution_success
-                else None
+                response_metadata.get("agentic_loop_error") if not execution_success else None
             )
 
             # Extract metrics
@@ -589,11 +574,7 @@ class SubAgent(IAgent):  # type: ignore[misc]
                         metadata={
                             "tool_calls_used": tool_calls_used,
                             "agentic_loop_success": execution_success,
-                            **(
-                                {"agentic_loop_error": execution_error}
-                                if execution_error
-                                else {}
-                            ),
+                            **({"agentic_loop_error": execution_error} if execution_error else {}),
                         },
                     ),
                     **self._identity_metadata(),
@@ -703,9 +684,7 @@ class SubAgent(IAgent):  # type: ignore[misc]
         if self._owned_context_lifecycle is not None:
             return self._owned_context_lifecycle
         max_tokens = max(1, int(self.config.context_limit or 50000) // 4)
-        self._owned_context_lifecycle = ContextLifecycleService.with_defaults(
-            max_tokens=max_tokens
-        )
+        self._owned_context_lifecycle = ContextLifecycleService.with_defaults(max_tokens=max_tokens)
         return self._owned_context_lifecycle
 
     def _get_orchestrator_messages(self) -> List[Any]:
@@ -866,9 +845,7 @@ class SubAgent(IAgent):  # type: ignore[misc]
                 try:
                     context_size = len(str(self.orchestrator.get_messages()))
                 except Exception as e:
-                    logger.debug(
-                        "Failed to compute sub-agent stream context size: %s", e
-                    )
+                    logger.debug("Failed to compute sub-agent stream context size: %s", e)
 
             # Yield error chunk with is_final=True
             yield StreamChunk(

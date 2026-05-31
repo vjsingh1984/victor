@@ -91,22 +91,15 @@ class TestGlobalStateManager:
         """Test basic get/set operations across scopes."""
         global_manager = GlobalStateManager()
         global_manager.register_manager(StateScope.WORKFLOW, WorkflowStateManager())
-        global_manager.register_manager(
-            StateScope.CONVERSATION, ConversationStateManager()
-        )
+        global_manager.register_manager(StateScope.CONVERSATION, ConversationStateManager())
 
         # Set values in different scopes
         await global_manager.set("task_id", "task-123", scope=StateScope.WORKFLOW)
         await global_manager.set("stage", "gathering", scope=StateScope.CONVERSATION)
 
         # Get values from different scopes
-        assert (
-            await global_manager.get("task_id", scope=StateScope.WORKFLOW) == "task-123"
-        )
-        assert (
-            await global_manager.get("stage", scope=StateScope.CONVERSATION)
-            == "gathering"
-        )
+        assert await global_manager.get("task_id", scope=StateScope.WORKFLOW) == "task-123"
+        assert await global_manager.get("stage", scope=StateScope.CONVERSATION) == "gathering"
 
     @pytest.mark.asyncio
     async def test_get_with_default_scope(self):
@@ -151,9 +144,7 @@ class TestGlobalStateManager:
         await global_manager.set("coordinator", "agent-1", scope=StateScope.TEAM)
 
         # Get keys from workflow scope
-        workflow_keys = await global_manager.keys(
-            scope=StateScope.WORKFLOW, pattern="*"
-        )
+        workflow_keys = await global_manager.keys(scope=StateScope.WORKFLOW, pattern="*")
         assert set(workflow_keys) == {"task_id", "status"}
 
         # Get keys from team scope
@@ -164,9 +155,7 @@ class TestGlobalStateManager:
     async def test_get_all_method(self):
         """Test get_all() method across scopes."""
         global_manager = GlobalStateManager()
-        global_manager.register_manager(
-            StateScope.CONVERSATION, ConversationStateManager()
-        )
+        global_manager.register_manager(StateScope.CONVERSATION, ConversationStateManager())
 
         await global_manager.set("stage", "gathering", scope=StateScope.CONVERSATION)
         await global_manager.set("turn_count", 5, scope=StateScope.CONVERSATION)
@@ -180,9 +169,7 @@ class TestGlobalStateManager:
         global_manager = GlobalStateManager()
         global_manager.register_manager(StateScope.GLOBAL, GlobalStateManagerImpl())
 
-        await global_manager.update(
-            {"debug": True, "log_level": "INFO"}, scope=StateScope.GLOBAL
-        )
+        await global_manager.update({"debug": True, "log_level": "INFO"}, scope=StateScope.GLOBAL)
 
         assert await global_manager.get("debug", scope=StateScope.GLOBAL) is True
         assert await global_manager.get("log_level", scope=StateScope.GLOBAL) == "INFO"
@@ -194,9 +181,7 @@ class TestGlobalStateManager:
         global_manager.register_manager(StateScope.TEAM, TeamStateManager())
 
         await global_manager.set("coordinator", "agent-1", scope=StateScope.TEAM)
-        await global_manager.set(
-            "members", ["agent-1", "agent-2"], scope=StateScope.TEAM
-        )
+        await global_manager.set("members", ["agent-1", "agent-2"], scope=StateScope.TEAM)
 
         await global_manager.clear(scope=StateScope.TEAM)
 
@@ -207,9 +192,7 @@ class TestGlobalStateManager:
         """Test creating checkpoint across all scopes."""
         global_manager = GlobalStateManager()
         global_manager.register_manager(StateScope.WORKFLOW, WorkflowStateManager())
-        global_manager.register_manager(
-            StateScope.CONVERSATION, ConversationStateManager()
-        )
+        global_manager.register_manager(StateScope.CONVERSATION, ConversationStateManager())
         global_manager.register_manager(StateScope.TEAM, TeamStateManager())
         global_manager.register_manager(StateScope.GLOBAL, GlobalStateManagerImpl())
 
@@ -238,9 +221,7 @@ class TestGlobalStateManager:
         """Test restoring checkpoint across all scopes."""
         global_manager = GlobalStateManager()
         global_manager.register_manager(StateScope.WORKFLOW, WorkflowStateManager())
-        global_manager.register_manager(
-            StateScope.CONVERSATION, ConversationStateManager()
-        )
+        global_manager.register_manager(StateScope.CONVERSATION, ConversationStateManager())
 
         # Create checkpoint
         checkpoint = {
@@ -252,19 +233,10 @@ class TestGlobalStateManager:
         await global_manager.restore_checkpoint(checkpoint)
 
         # Verify restored state
-        assert (
-            await global_manager.get("task_id", scope=StateScope.WORKFLOW) == "task-123"
-        )
-        assert (
-            await global_manager.get("status", scope=StateScope.WORKFLOW) == "running"
-        )
-        assert (
-            await global_manager.get("stage", scope=StateScope.CONVERSATION)
-            == "processing"
-        )
-        assert (
-            await global_manager.get("turn_count", scope=StateScope.CONVERSATION) == 3
-        )
+        assert await global_manager.get("task_id", scope=StateScope.WORKFLOW) == "task-123"
+        assert await global_manager.get("status", scope=StateScope.WORKFLOW) == "running"
+        assert await global_manager.get("stage", scope=StateScope.CONVERSATION) == "processing"
+        assert await global_manager.get("turn_count", scope=StateScope.CONVERSATION) == 3
 
     @pytest.mark.asyncio
     async def test_restore_checkpoint_fails_on_unregistered_scope(self):
@@ -285,9 +257,7 @@ class TestGlobalStateManager:
         """Test getting state from all scopes."""
         global_manager = GlobalStateManager()
         global_manager.register_manager(StateScope.WORKFLOW, WorkflowStateManager())
-        global_manager.register_manager(
-            StateScope.CONVERSATION, ConversationStateManager()
-        )
+        global_manager.register_manager(StateScope.CONVERSATION, ConversationStateManager())
         global_manager.register_manager(StateScope.TEAM, TeamStateManager())
 
         # Set values in all scopes
@@ -306,9 +276,7 @@ class TestGlobalStateManager:
         """Test getting list of registered scopes."""
         global_manager = GlobalStateManager()
         global_manager.register_manager(StateScope.WORKFLOW, WorkflowStateManager())
-        global_manager.register_manager(
-            StateScope.CONVERSATION, ConversationStateManager()
-        )
+        global_manager.register_manager(StateScope.CONVERSATION, ConversationStateManager())
 
         scopes = global_manager.get_registered_scopes()
 
@@ -415,17 +383,13 @@ class TestFactoryFunctions:
         manager = get_global_manager()
 
         # Check manager types
-        assert isinstance(
-            manager.get_manager(StateScope.WORKFLOW), WorkflowStateManager
-        )
+        assert isinstance(manager.get_manager(StateScope.WORKFLOW), WorkflowStateManager)
         assert isinstance(
             manager.get_manager(StateScope.CONVERSATION),
             ConversationStateManager,
         )
         assert isinstance(manager.get_manager(StateScope.TEAM), TeamStateManager)
-        assert isinstance(
-            manager.get_manager(StateScope.GLOBAL), GlobalStateManagerImpl
-        )
+        assert isinstance(manager.get_manager(StateScope.GLOBAL), GlobalStateManagerImpl)
 
     def test_is_initialized(self):
         """Test is_initialized checks if manager was created."""
@@ -458,13 +422,11 @@ class TestFactoryFunctions:
         reset_global_manager()
 
         assert any(
-            record.levelno == logging.DEBUG
-            and "GlobalStateManager reset" in record.message
+            record.levelno == logging.DEBUG and "GlobalStateManager reset" in record.message
             for record in caplog.records
         )
         assert not any(
-            record.levelno == logging.INFO
-            and "GlobalStateManager reset" in record.message
+            record.levelno == logging.INFO and "GlobalStateManager reset" in record.message
             for record in caplog.records
         )
 

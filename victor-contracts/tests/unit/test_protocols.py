@@ -134,9 +134,7 @@ class TestVerticalBase:
             def get_workflow_spec(cls) -> dict[str, object]:
                 return {"stage_order": ["missing"]}
 
-        with pytest.raises(
-            VerticalConfigurationError, match="initial_stage|stage_order"
-        ):
+        with pytest.raises(VerticalConfigurationError, match="initial_stage|stage_order"):
             TestVertical.get_definition()
 
     def test_get_stages_default(self):
@@ -280,9 +278,7 @@ class TestCoreTypes:
 
         assert config.get_max_tier_for_tools(["read"]) == Tier.BASIC
         assert config.get_max_tier_for_tools(["read", "write"]) == Tier.STANDARD
-        assert (
-            config.get_max_tier_for_tools(["read", "write", "shell"]) == Tier.ADVANCED
-        )
+        assert config.get_max_tier_for_tools(["read", "write", "shell"]) == Tier.ADVANCED
 
     def test_tiered_tool_config_runtime_compatibility_fields(self):
         """TieredToolConfig should expose runtime-compatible tier aliases."""

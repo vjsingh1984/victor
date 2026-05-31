@@ -57,9 +57,7 @@ class PIIMatch:
     def __post_init__(self) -> None:
         if len(self.matched_text) > 8:
             visible = min(4, len(self.matched_text) // 4)
-            self.matched_text = (
-                f"{self.matched_text[:visible]}***{self.matched_text[-visible:]}"
-            )
+            self.matched_text = f"{self.matched_text[:visible]}***{self.matched_text[-visible:]}"
 
 
 PII_COLUMN_PATTERNS: Dict[PIIType, str] = {
@@ -172,12 +170,10 @@ class PIIScanner:
 
     def __init__(self) -> None:
         self._column_patterns: Dict[PIIType, Pattern[str]] = {
-            pii_type: re.compile(pattern)
-            for pii_type, pattern in PII_COLUMN_PATTERNS.items()
+            pii_type: re.compile(pattern) for pii_type, pattern in PII_COLUMN_PATTERNS.items()
         }
         self._content_patterns: Dict[PIIType, Pattern[str]] = {
-            pii_type: re.compile(pattern)
-            for pii_type, (pattern, _) in PII_CONTENT_PATTERNS.items()
+            pii_type: re.compile(pattern) for pii_type, (pattern, _) in PII_CONTENT_PATTERNS.items()
         }
 
     def detect_columns(self, columns: List[str]) -> List[Tuple[str, PIIType]]:

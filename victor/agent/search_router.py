@@ -283,9 +283,7 @@ def _graph_symbol_fragment(*, quoted_group: str, bare_group: str) -> str:
     )
 
 
-_GRAPH_SYMBOL_FRAGMENT = _graph_symbol_fragment(
-    quoted_group="quoted", bare_group="bare"
-)
+_GRAPH_SYMBOL_FRAGMENT = _graph_symbol_fragment(quoted_group="quoted", bare_group="bare")
 _GRAPH_SOURCE_SYMBOL_FRAGMENT = _graph_symbol_fragment(
     quoted_group="source_quoted",
     bare_group="source_bare",
@@ -510,9 +508,7 @@ class SearchRouter:
         self._graph_analytic_patterns: List[Tuple[re.Pattern, str, str]] = []
         self._graph_file_patterns: List[Tuple[re.Pattern, str, str]] = []
         self._graph_dependency_patterns: List[Tuple[re.Pattern, str, str]] = []
-        self._graph_dependency_traversal_patterns: List[Tuple[re.Pattern, str, str]] = (
-            []
-        )
+        self._graph_dependency_traversal_patterns: List[Tuple[re.Pattern, str, str]] = []
         self._graph_scoped_architecture_patterns: List[Tuple[re.Pattern, str]] = []
         self._graph_navigation_patterns: List[Tuple[re.Pattern, str, int, str]] = []
         self._graph_patterns: List[Tuple[re.Pattern, str, int, str]] = []
@@ -525,12 +521,8 @@ class SearchRouter:
         self._compile_graph_analytic_patterns(
             GRAPH_ARCHITECTURE_SIGNALS, self._graph_architecture_patterns
         )
-        self._compile_graph_analytic_patterns(
-            GRAPH_ANALYTIC_SIGNALS, self._graph_analytic_patterns
-        )
-        self._compile_graph_analytic_patterns(
-            GRAPH_FILE_SIGNALS, self._graph_file_patterns
-        )
+        self._compile_graph_analytic_patterns(GRAPH_ANALYTIC_SIGNALS, self._graph_analytic_patterns)
+        self._compile_graph_analytic_patterns(GRAPH_FILE_SIGNALS, self._graph_file_patterns)
         self._compile_graph_analytic_patterns(
             GRAPH_DEPENDENCY_SIGNALS, self._graph_dependency_patterns
         )
@@ -542,27 +534,19 @@ class SearchRouter:
             GRAPH_SCOPED_ARCHITECTURE_SIGNALS,
             self._graph_scoped_architecture_patterns,
         )
-        self._compile_graph_patterns(
-            GRAPH_NAVIGATION_SIGNALS, self._graph_navigation_patterns
-        )
+        self._compile_graph_patterns(GRAPH_NAVIGATION_SIGNALS, self._graph_navigation_patterns)
         self._compile_graph_patterns(GRAPH_TRAVERSAL_SIGNALS, self._graph_patterns)
 
         # Add custom signals
         if custom_signals:
             if "keyword" in custom_signals:
-                self._compile_patterns(
-                    custom_signals["keyword"], self._keyword_patterns
-                )
+                self._compile_patterns(custom_signals["keyword"], self._keyword_patterns)
             if "semantic" in custom_signals:
-                self._compile_patterns(
-                    custom_signals["semantic"], self._semantic_patterns
-                )
+                self._compile_patterns(custom_signals["semantic"], self._semantic_patterns)
             if "bug" in custom_signals:
                 self._compile_patterns(custom_signals["bug"], self._bug_patterns)
             if "localization" in custom_signals:
-                self._compile_patterns(
-                    custom_signals["localization"], self._localization_patterns
-                )
+                self._compile_patterns(custom_signals["localization"], self._localization_patterns)
             if "impact" in custom_signals:
                 self._compile_patterns(custom_signals["impact"], self._impact_patterns)
             if "graph_architecture" in custom_signals:
@@ -601,9 +585,7 @@ class SearchRouter:
                     self._graph_navigation_patterns,
                 )
             if "graph" in custom_signals:
-                self._compile_graph_patterns(
-                    custom_signals["graph"], self._graph_patterns
-                )
+                self._compile_graph_patterns(custom_signals["graph"], self._graph_patterns)
 
     def _compile_patterns(
         self,
@@ -705,9 +687,7 @@ class SearchRouter:
         if graph_dependency_route is not None:
             return graph_dependency_route
 
-        graph_dependency_traversal_route = self._route_graph_dependency_traversal_query(
-            query
-        )
+        graph_dependency_traversal_route = self._route_graph_dependency_traversal_query(query)
         if graph_dependency_traversal_route is not None:
             return graph_dependency_traversal_route
 
@@ -738,12 +718,8 @@ class SearchRouter:
             )
 
         # Score both search types
-        keyword_score, keyword_matches = self._score_patterns(
-            query, self._keyword_patterns
-        )
-        semantic_score, semantic_matches = self._score_patterns(
-            query, self._semantic_patterns
-        )
+        keyword_score, keyword_matches = self._score_patterns(query, self._keyword_patterns)
+        semantic_score, semantic_matches = self._score_patterns(query, self._semantic_patterns)
 
         # Normalize scores
         max_score = max(keyword_score + semantic_score, 1.0)
@@ -751,10 +727,7 @@ class SearchRouter:
         semantic_norm = semantic_score / max_score if max_score > 0 else 0
 
         # Determine route
-        if (
-            keyword_score >= self.hybrid_threshold
-            and semantic_score >= self.hybrid_threshold
-        ):
+        if keyword_score >= self.hybrid_threshold and semantic_score >= self.hybrid_threshold:
             # Both signals present - hybrid search
             return SearchRoute(
                 search_type=SearchType.HYBRID,
@@ -771,9 +744,7 @@ class SearchRouter:
                 transformed_query=None,
                 matched_patterns=keyword_matches,
             )
-        elif (
-            semantic_score > keyword_score and semantic_score >= self.semantic_threshold
-        ):
+        elif semantic_score > keyword_score and semantic_score >= self.semantic_threshold:
             return SearchRoute(
                 search_type=SearchType.SEMANTIC,
                 confidence=semantic_norm,
@@ -977,9 +948,7 @@ class SearchRouter:
 
         return None
 
-    def _route_graph_dependency_traversal_query(
-        self, query: str
-    ) -> Optional[SearchRoute]:
+    def _route_graph_dependency_traversal_query(self, query: str) -> Optional[SearchRoute]:
         """Return graph-tool routes for deep upstream/downstream dependency traversal."""
         for pattern, direction, name in self._graph_dependency_traversal_patterns:
             match = pattern.search(query)
@@ -1093,9 +1062,7 @@ class SearchRouter:
 
     def _route_change_impact_query(self, query: str) -> Optional[SearchRoute]:
         """Return a code_search impact-analysis route for blast-radius queries."""
-        impact_score, impact_matches = self._score_patterns(
-            query, self._impact_patterns
-        )
+        impact_score, impact_matches = self._score_patterns(query, self._impact_patterns)
         if impact_score < 0.8:
             return None
 
@@ -1162,9 +1129,7 @@ class SearchRouter:
 
         return normalized
 
-    def _extract_graph_symbol(
-        self, match: re.Match[str], prefix: str = ""
-    ) -> Optional[str]:
+    def _extract_graph_symbol(self, match: re.Match[str], prefix: str = "") -> Optional[str]:
         """Extract and normalize a graph symbol from a regex match."""
         groups = match.groupdict()
         return self._normalize_graph_symbol(

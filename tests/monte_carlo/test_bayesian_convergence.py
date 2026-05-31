@@ -89,9 +89,7 @@ class TestBeliefConvergence:
             # Simulate agent message (based on true outcome)
             import random
 
-            actual_outcome = (
-                "success" if random.random() < true_success_prob else "failure"
-            )
+            actual_outcome = "success" if random.random() < true_success_prob else "failure"
 
             # Agent predicts correctly 70% of the time
             if random.random() < 0.7:
@@ -178,9 +176,7 @@ class TestCalibration:
 
             # Should be in reasonable range (relaxed for Monte Carlo)
             # Just check that it's not completely wrong
-            assert (
-                0.4 < expected_reliability < 1.0
-            )  # Not too far from true reliability of 0.75
+            assert 0.4 < expected_reliability < 1.0  # Not too far from true reliability of 0.75
 
     def test_observation_model_calibration(self, tmp_path):
         """Test that observation model likelihoods are well-calibrated."""
@@ -217,12 +213,8 @@ class TestCalibration:
             )
 
         # Check calibration: likelihoods should reflect true probabilities
-        likelihood_affirm_success = observation_learner.get_likelihood(
-            "agent_a", "Yes", "success"
-        )
-        likelihood_deny_failure = observation_learner.get_likelihood(
-            "agent_a", "No", "failure"
-        )
+        likelihood_affirm_success = observation_learner.get_likelihood("agent_a", "Yes", "success")
+        likelihood_deny_failure = observation_learner.get_likelihood("agent_a", "No", "failure")
 
         # Should be in reasonable range
         assert 0.5 < likelihood_affirm_success < 1.0

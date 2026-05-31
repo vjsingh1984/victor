@@ -21,9 +21,7 @@ def __getattr__(name: str) -> Any:
     """Resolve runtime tool helpers lazily from the Victor host runtime."""
     module_name = _LAZY_IMPORTS.get(name)
     if module_name is None:
-        raise AttributeError(
-            f"module 'victor_contracts.tool_runtime' has no attribute {name!r}"
-        )
+        raise AttributeError(f"module 'victor_contracts.tool_runtime' has no attribute {name!r}")
 
     module = importlib.import_module(module_name)
     if name == "RuntimeToolSet":

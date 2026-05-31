@@ -189,11 +189,7 @@ class XAIProvider(HttpxOpenAICompatProvider):
     def context_window(self, model: Optional[str] = None) -> int:
         from victor.providers.context_windows import XAI, XAI_DEFAULT, lookup
 
-        target = (
-            self._clean_model_name(model)
-            if model
-            else getattr(self, "_current_model", None)
-        )
+        target = self._clean_model_name(model) if model else getattr(self, "_current_model", None)
         return lookup(XAI, target, XAI_DEFAULT)
 
     # ── xAI-specific helpers ──────────────────────────────────────────────────

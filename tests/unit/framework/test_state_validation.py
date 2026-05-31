@@ -200,9 +200,7 @@ class TestStateGraphValidation:
         from victor.framework.config import GraphConfig, ValidationConfig
 
         config = GraphConfig(
-            validation=ValidationConfig(
-                enabled=True, strict=True, validate_on_entry=True
-            )
+            validation=ValidationConfig(enabled=True, strict=True, validate_on_entry=True)
         )
 
         # Missing required field 'task'

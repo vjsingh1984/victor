@@ -155,9 +155,7 @@ def _truncate_output(text: str, max_bytes: int) -> Tuple[str, bool]:
     """
     if max_bytes <= 0 or len(text.encode("utf-8", errors="replace")) <= max_bytes:
         return text, False
-    truncated = text.encode("utf-8", errors="replace")[:max_bytes].decode(
-        "utf-8", errors="ignore"
-    )
+    truncated = text.encode("utf-8", errors="replace")[:max_bytes].decode("utf-8", errors="ignore")
     return truncated + "\n... [output truncated]", True
 
 
@@ -201,8 +199,7 @@ def _truncate_output_by_lines(
                 "utf-8", errors="ignore"
             )
             return (
-                truncated
-                + f"\n... [{stream_name} truncated: {text_bytes}→{max_bytes} bytes]",
+                truncated + f"\n... [{stream_name} truncated: {text_bytes}→{max_bytes} bytes]",
                 True,
                 text.count("\n") + 1,
             )
@@ -224,8 +221,7 @@ def _truncate_output_by_lines(
                 # Recount lines after byte truncation
                 new_line_count = truncated.count("\n") + 1
                 return (
-                    truncated
-                    + f"\n... [{stream_name} truncated: {text_bytes}→{max_bytes} bytes]",
+                    truncated + f"\n... [{stream_name} truncated: {text_bytes}→{max_bytes} bytes]",
                     True,
                     new_line_count,
                 )

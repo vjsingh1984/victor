@@ -325,8 +325,7 @@ class ProjectManifest:
         await manifest._infer_architecture()
 
         logger.info(
-            f"Built manifest: {len(manifest.files)} files, "
-            f"{len(manifest.modules)} modules"
+            f"Built manifest: {len(manifest.files)} files, " f"{len(manifest.modules)} modules"
         )
 
         return manifest
@@ -490,9 +489,7 @@ class ProjectManifest:
             self.metadata.package_manager = "pip"
 
             deps = project.get("dependencies", [])
-            self.metadata.dependencies = {
-                d.split(">=")[0].split("==")[0]: "" for d in deps
-            }
+            self.metadata.dependencies = {d.split(">=")[0].split("==")[0]: "" for d in deps}
 
             # Detect framework
             if "django" in self.metadata.dependencies:
@@ -557,9 +554,7 @@ class ProjectManifest:
                     self._analyze_js_file(content, file_info)
 
                 # Extract description from docstring/comments
-                file_info.description = self._extract_description(
-                    content, file_info.language
-                )
+                file_info.description = self._extract_description(content, file_info.language)
 
             except Exception as e:
                 logger.debug(f"Error analyzing {path}: {e}")
@@ -569,9 +564,7 @@ class ProjectManifest:
         import re
 
         # Find imports
-        import_pattern = re.compile(
-            r"^(?:from\s+([\w.]+)\s+)?import\s+([\w,\s]+)", re.MULTILINE
-        )
+        import_pattern = re.compile(r"^(?:from\s+([\w.]+)\s+)?import\s+([\w,\s]+)", re.MULTILINE)
         for match in import_pattern.finditer(content):
             module = match.group(1) or match.group(2).split(",")[0].strip()
             file_info.imports.append(module)
@@ -589,9 +582,7 @@ class ProjectManifest:
         import re
 
         # Find imports
-        import_pattern = re.compile(
-            r"import\s+.*?\s+from\s+['\"]([^'\"]+)['\"]", re.MULTILINE
-        )
+        import_pattern = re.compile(r"import\s+.*?\s+from\s+['\"]([^'\"]+)['\"]", re.MULTILINE)
         for match in import_pattern.finditer(content):
             file_info.imports.append(match.group(1))
 
@@ -870,9 +861,7 @@ class ProjectManifest:
                 for layer in self.architecture
                 if layer.modules
             ],
-            "entry_points": [
-                f.path for f in self.get_files_by_category(FileCategory.ENTRY_POINT)
-            ],
+            "entry_points": [f.path for f in self.get_files_by_category(FileCategory.ENTRY_POINT)],
             "dependencies": list(self.metadata.dependencies.keys())[:20],
         }
 
@@ -889,12 +878,10 @@ class ProjectManifest:
             "file_count": len(self.files),
             "module_count": len(self.modules),
             "categories": {
-                cat.value: len(self._file_index.get(cat.value, set()))
-                for cat in FileCategory
+                cat.value: len(self._file_index.get(cat.value, set())) for cat in FileCategory
             },
             "top_files": [
-                {"path": f.path, "importance": f.importance}
-                for f in self.get_important_files(10)
+                {"path": f.path, "importance": f.importance} for f in self.get_important_files(10)
             ],
         }
 

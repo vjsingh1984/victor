@@ -521,9 +521,7 @@ def _export_from_visualizer(
 
     # Try to get workflow info
     workflow = visualizer.workflow if hasattr(visualizer, "workflow") else None
-    workflow_meta = (
-        workflow.metadata if workflow and hasattr(workflow, "metadata") else {}
-    )
+    workflow_meta = workflow.metadata if workflow and hasattr(workflow, "metadata") else {}
 
     return GraphSchema(
         workflow_id=workflow_id or workflow_meta.get("id", "unknown"),
@@ -621,9 +619,7 @@ class WorkflowExecutionState:
             "completed_nodes": self.completed_nodes,
             "failed_nodes": self.failed_nodes,
             "skipped_nodes": self.skipped_nodes,
-            "node_execution_path": [
-                node.to_dict() for node in self.node_execution_path
-            ],
+            "node_execution_path": [node.to_dict() for node in self.node_execution_path],
             "total_duration_seconds": self.total_duration_seconds,
             "total_tool_calls": self.total_tool_calls,
             "total_tokens": self.total_tokens,

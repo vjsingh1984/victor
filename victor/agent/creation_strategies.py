@@ -111,9 +111,7 @@ def _vertical_name(vertical: Optional[Any]) -> Optional[str]:
     return getattr(vertical, "__name__", getattr(vertical, "name", str(vertical)))
 
 
-def _emit_session_start(
-    agent: "AgentOrchestrator", context: AgentCreationContext
-) -> None:
+def _emit_session_start(agent: "AgentOrchestrator", context: AgentCreationContext) -> None:
     """Emit session-start telemetry via the canonical observability surface."""
     observability = getattr(agent, "observability", None)
     if observability is None or not hasattr(observability, "on_session_start"):
@@ -127,17 +125,13 @@ def _emit_session_start(
     observability.on_session_start(event_metadata)
 
 
-def _apply_tracker_overrides(
-    agent: "AgentOrchestrator", context: AgentCreationContext
-) -> None:
+def _apply_tracker_overrides(agent: "AgentOrchestrator", context: AgentCreationContext) -> None:
     """Apply tracker-based runtime overrides to a created orchestrator."""
     if context.tool_budget is not None:
         agent.unified_tracker.set_tool_budget(context.tool_budget, user_override=True)
 
     if context.max_iterations is not None:
-        agent.unified_tracker.set_max_iterations(
-            context.max_iterations, user_override=True
-        )
+        agent.unified_tracker.set_max_iterations(context.max_iterations, user_override=True)
 
 
 def _apply_mode_override(context: AgentCreationContext) -> None:

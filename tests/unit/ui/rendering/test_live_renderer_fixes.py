@@ -284,9 +284,7 @@ class TestLiveDisplayRendererDebugLogging:
         with caplog.at_level("WARNING"):
             renderer.resume()
 
-        assert not any(
-            "no matching pause" in record.message for record in caplog.records
-        )
+        assert not any("no matching pause" in record.message for record in caplog.records)
 
 
 class TestLiveDisplayRendererNoDuplication:

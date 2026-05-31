@@ -116,9 +116,7 @@ class ExampleStatePassedCoordinator:
         stage = context.conversation_stage
 
         # Make decisions based on context
-        reasoning = (
-            f"Processing simple query (message #{message_count + 1}, stage={stage})"
-        )
+        reasoning = f"Processing simple query (message #{message_count + 1}, stage={stage})"
 
         # Create transition batch
         batch = TransitionBatch()
@@ -158,9 +156,7 @@ class ExampleStatePassedCoordinator:
             CoordinatorResult with potential tool execution transition
         """
         # Analyze message content (pure computation)
-        needs_file_info = (
-            "file" in user_message.lower() or "directory" in user_message.lower()
-        )
+        needs_file_info = "file" in user_message.lower() or "directory" in user_message.lower()
 
         if not needs_file_info:
             # No tool needed, just acknowledge
@@ -173,7 +169,9 @@ class ExampleStatePassedCoordinator:
 
         if has_observed_files:
             # We already have file information
-            reasoning = f"Using existing file info from {len(context.observed_files)} observed files"
+            reasoning = (
+                f"Using existing file info from {len(context.observed_files)} observed files"
+            )
 
             return CoordinatorResult(
                 transitions=TransitionBatch(),
@@ -223,14 +221,10 @@ class ExampleStatePassedCoordinator:
             "each",
         ]
 
-        is_complex = any(
-            indicator in user_message.lower() for indicator in complexity_indicators
-        )
+        is_complex = any(indicator in user_message.lower() for indicator in complexity_indicators)
 
         if not is_complex:
-            return CoordinatorResult.no_op(
-                reasoning="Query appears simple, no planning needed"
-            )
+            return CoordinatorResult.no_op(reasoning="Query appears simple, no planning needed")
 
         # Create a multi-step plan
         batch = TransitionBatch()

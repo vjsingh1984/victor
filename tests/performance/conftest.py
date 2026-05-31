@@ -21,8 +21,7 @@ def pytest_configure(config) -> None:
     )
     config.addinivalue_line(
         "markers",
-        "benchmark: marks tests as benchmark tests "
-        "(requires pytest-benchmark plugin)",
+        "benchmark: marks tests as benchmark tests " "(requires pytest-benchmark plugin)",
     )
     config.addinivalue_line(
         "markers", "slow: marks tests as slow-running (may be skipped in quick runs)"
@@ -120,9 +119,7 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config) -> None:
         terminalreporter.write_sep("=", red=True)
         terminalreporter.write_line("⚠️  PERFORMANCE REGRESSIONS DETECTED", red=True)
         for name, change_pct in regressions:
-            terminalreporter.write_line(
-                f"  {name}: +{change_pct:.1f}% slower", red=True
-            )
+            terminalreporter.write_line(f"  {name}: +{change_pct:.1f}% slower", red=True)
         terminalreporter.write_sep("=", red=True)
 
     # Report improvements
@@ -130,9 +127,7 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config) -> None:
         terminalreporter.write_sep("=", green=True)
         terminalreporter.write_line("✅ PERFORMANCE IMPROVEMENTS", green=True)
         for name, change_pct in improvements:
-            terminalreporter.write_line(
-                f"  {name}: {change_pct:.1f}% faster", green=True
-            )
+            terminalreporter.write_line(f"  {name}: {change_pct:.1f}% faster", green=True)
         terminalreporter.write_sep("=", green=True)
 
     # Summary

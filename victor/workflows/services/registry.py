@@ -102,9 +102,7 @@ class ServiceRegistry:
         self._providers[provider_type] = provider
         logger.debug(f"Registered provider: {provider_type}")
 
-    def get_provider(
-        self, provider_type: ServiceProviderType
-    ) -> Optional[ServiceProvider]:
+    def get_provider(self, provider_type: ServiceProviderType) -> Optional[ServiceProvider]:
         """Get provider by type."""
         return self._providers.get(provider_type)
 
@@ -213,9 +211,7 @@ class ServiceRegistry:
         # Get provider
         provider = self._providers.get(config.provider)
         if not provider:
-            raise ServiceError(
-                name, f"No provider registered for type: {config.provider}"
-            )
+            raise ServiceError(name, f"No provider registered for type: {config.provider}")
 
         entry.provider = provider
 
@@ -353,9 +349,7 @@ class ServiceRegistry:
         if len(result) != len(self._services):
             # Circular dependency
             remaining = set(self._services.keys()) - set(result)
-            raise ServiceDependencyError(
-                list(remaining)[0], "Circular dependency detected"
-            )
+            raise ServiceDependencyError(list(remaining)[0], "Circular dependency detected")
 
         return result
 
@@ -376,9 +370,7 @@ class ServiceRegistry:
                 "state": entry.handle.state.name if entry.handle else "PENDING",
                 "host": entry.handle.host if entry.handle else None,
                 "ports": entry.handle.ports if entry.handle else {},
-                "started_at": (
-                    entry.started_at.isoformat() if entry.started_at else None
-                ),
+                "started_at": (entry.started_at.isoformat() if entry.started_at else None),
                 "error": entry.error,
             }
             for name, entry in self._services.items()
@@ -561,9 +553,7 @@ class RestartPolicyEnforcer:
 
         try:
             # Increment restart count
-            self._restart_counts[service_name] = (
-                self._restart_counts.get(service_name, 0) + 1
-            )
+            self._restart_counts[service_name] = self._restart_counts.get(service_name, 0) + 1
 
             # Stop if still running
             if entry.handle and entry.handle.state == ServiceState.HEALTHY:

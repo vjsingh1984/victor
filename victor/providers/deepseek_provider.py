@@ -190,18 +190,14 @@ class DeepSeekProvider(HttpxOpenAICompatProvider):
             return None
         return tools
 
-    def _extract_response_metadata(
-        self, message: Dict[str, Any]
-    ) -> Optional[Dict[str, Any]]:
+    def _extract_response_metadata(self, message: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Capture reasoning_content from deepseek-reasoner non-streaming responses."""
         rc = message.get("reasoning_content")
         if rc:
             return {"reasoning_content": rc}
         return None
 
-    def _extract_stream_metadata(
-        self, delta: Dict[str, Any]
-    ) -> Optional[Dict[str, Any]]:
+    def _extract_stream_metadata(self, delta: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Capture per-chunk reasoning_content delta from deepseek-reasoner streaming."""
         rc = delta.get("reasoning_content")
         if rc:
@@ -298,9 +294,7 @@ class DeepSeekProvider(HttpxOpenAICompatProvider):
 
         dsml_calls = self._parse_dsml_tool_calls(response.content or "")
         if dsml_calls:
-            logger.debug(
-                "deepseek: recovered %d tool call(s) from DSML content", len(dsml_calls)
-            )
+            logger.debug("deepseek: recovered %d tool call(s) from DSML content", len(dsml_calls))
             return CompletionResponse(
                 content="",
                 role="assistant",

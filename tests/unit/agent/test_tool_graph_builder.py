@@ -241,9 +241,7 @@ class TestToolGraphBuilderPlanForGoals:
 
         assert result == []
 
-    def test_plan_for_goals_returns_tool_definitions(
-        self, mock_registry, mock_tool_graph
-    ):
+    def test_plan_for_goals_returns_tool_definitions(self, mock_registry, mock_tool_graph):
         """Test that plan_for_goals returns ToolDefinition objects."""
         builder = ToolGraphBuilder(registry=mock_registry, tool_graph=mock_tool_graph)
 
@@ -253,9 +251,7 @@ class TestToolGraphBuilderPlanForGoals:
         assert result[0].name == "code_search"
         assert result[1].name == "read_file"
 
-    def test_plan_for_goals_passes_available_inputs(
-        self, mock_registry, mock_tool_graph
-    ):
+    def test_plan_for_goals_passes_available_inputs(self, mock_registry, mock_tool_graph):
         """Test that plan_for_goals passes available inputs to graph."""
         builder = ToolGraphBuilder(registry=mock_registry, tool_graph=mock_tool_graph)
 
@@ -332,9 +328,7 @@ class TestToolGraphBuilderInferGoalsFromMessage:
 
         for msg in messages:
             goals = builder.infer_goals_from_message(msg)
-            assert (
-                "documentation" in goals
-            ), f"Expected 'documentation' in goals for: {msg}"
+            assert "documentation" in goals, f"Expected 'documentation' in goals for: {msg}"
 
     def test_infer_security_goals(self, builder):
         """Test inferring security goals from message."""
@@ -346,9 +340,7 @@ class TestToolGraphBuilderInferGoalsFromMessage:
 
         for msg in messages:
             goals = builder.infer_goals_from_message(msg)
-            assert (
-                "security_report" in goals
-            ), f"Expected 'security_report' in goals for: {msg}"
+            assert "security_report" in goals, f"Expected 'security_report' in goals for: {msg}"
 
     def test_infer_metrics_goals(self, builder):
         """Test inferring metrics goals from message."""
@@ -361,9 +353,7 @@ class TestToolGraphBuilderInferGoalsFromMessage:
 
         for msg in messages:
             goals = builder.infer_goals_from_message(msg)
-            assert (
-                "metrics_report" in goals
-            ), f"Expected 'metrics_report' in goals for: {msg}"
+            assert "metrics_report" in goals, f"Expected 'metrics_report' in goals for: {msg}"
 
     def test_infer_no_goals(self, builder):
         """Test that no goals are inferred for unrelated messages."""

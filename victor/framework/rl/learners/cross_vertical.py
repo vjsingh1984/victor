@@ -320,9 +320,7 @@ class CrossVerticalLearner(BaseLearner):
         Returns:
             Recommendation text
         """
-        quality_level = (
-            "high" if avg_quality > 0.7 else "moderate" if avg_quality > 0.5 else "low"
-        )
+        quality_level = "high" if avg_quality > 0.7 else "moderate" if avg_quality > 0.5 else "low"
 
         if recommended_mode:
             return (
@@ -391,8 +389,7 @@ class CrossVerticalLearner(BaseLearner):
         if matching_pattern:
             return RLRecommendation(
                 value=matching_pattern.avg_quality,
-                confidence=matching_pattern.confidence
-                * 0.8,  # Slightly reduce for transfer
+                confidence=matching_pattern.confidence * 0.8,  # Slightly reduce for transfer
                 reason=(
                     f"Cross-vertical pattern from {', '.join(matching_pattern.source_verticals)}: "
                     f"{matching_pattern.recommendation}"
@@ -551,9 +548,7 @@ class CrossVerticalLearner(BaseLearner):
         try:
             discovered = self.get_shared_patterns(min_confidence=min_confidence)
         except Exception as e:
-            logger.debug(
-                "cross_vertical: export_patterns — get_shared_patterns failed: %s", e
-            )
+            logger.debug("cross_vertical: export_patterns — get_shared_patterns failed: %s", e)
             discovered = []
 
         # Source 2: explicitly stored patterns in rl_pattern table (includes imports)
@@ -588,9 +583,7 @@ class CrossVerticalLearner(BaseLearner):
                     )
                 )
         except Exception as e:
-            logger.debug(
-                "cross_vertical: export_patterns — rl_pattern query failed: %s", e
-            )
+            logger.debug("cross_vertical: export_patterns — rl_pattern query failed: %s", e)
 
         # Merge, deduplicating by (task_type, pattern_name)
         seen: set = set()
@@ -644,9 +637,7 @@ class CrossVerticalLearner(BaseLearner):
             Number of patterns imported
         """
         if data.get("schema_version") != 1:
-            logger.warning(
-                "cross_vertical: unknown export schema version, skipping import"
-            )
+            logger.warning("cross_vertical: unknown export schema version, skipping import")
             return 0
 
         patterns = data.get("patterns", [])
@@ -659,7 +650,9 @@ class CrossVerticalLearner(BaseLearner):
 
         for p in patterns:
             try:
-                pattern_id = f"imported_{source_repo_id or 'ext'}_{p['task_type']}_{p['pattern_name']}"
+                pattern_id = (
+                    f"imported_{source_repo_id or 'ext'}_{p['task_type']}_{p['pattern_name']}"
+                )
                 decayed_confidence = p["confidence"] * confidence_decay
                 source_verticals = p.get("source_verticals", [])
 

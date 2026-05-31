@@ -62,9 +62,7 @@ class TestListProviders:
         assert result.exit_code == 0
         # Should mention features like Tool calling, Streaming
         output_lower = result.stdout.lower()
-        assert any(
-            x in output_lower for x in ["tool", "streaming", "features", "model"]
-        )
+        assert any(x in output_lower for x in ["tool", "streaming", "features", "model"])
 
     def test_list_providers_shows_help_message(self):
         """Test that help message for profiles is shown."""
@@ -103,10 +101,7 @@ class TestListProviders:
         result = runner.invoke(providers_app, [])
         assert result.exit_code == 0
         # Unknown providers should still be listed
-        assert (
-            "unknown_custom_provider" in result.stdout.lower()
-            or "Unknown" in result.stdout
-        )
+        assert "unknown_custom_provider" in result.stdout.lower() or "Unknown" in result.stdout
 
     @patch("victor.ui.commands.providers.ProviderRegistry")
     def test_list_providers_sorted_output(self, mock_registry):
@@ -222,9 +217,7 @@ class TestConsoleOutput:
 
     @patch("victor.ui.commands.providers._load_configured_provider_summary")
     @patch("victor.ui.commands.providers.ProviderRegistry")
-    def test_output_includes_configured_account_context(
-        self, mock_registry, mock_configured
-    ):
+    def test_output_includes_configured_account_context(self, mock_registry, mock_configured):
         """Provider list should connect catalog providers to configured accounts."""
         mock_registry.list_providers.return_value = ["openai"]
         mock_registry.get_aliases.return_value = {}

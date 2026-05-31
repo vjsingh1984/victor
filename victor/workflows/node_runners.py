@@ -120,9 +120,7 @@ class BaseNodeRunner(ABC):
             context["_current_node"] = node_id
 
             # Execute the node-specific logic
-            updated_context, output = await self._execute_impl(
-                node_id, node_config, context
-            )
+            updated_context, output = await self._execute_impl(node_id, node_config, context)
 
             duration = time.time() - start_time
 
@@ -559,9 +557,7 @@ class HITLNodeRunner(BaseNodeRunner):
         )
 
         # Execute HITL interaction
-        response = await self._hitl_executor.execute_hitl_node(
-            node, context.get("data", {})
-        )
+        response = await self._hitl_executor.execute_hitl_node(node, context.get("data", {}))
 
         # Update context with response
         output_key = node_config.get("output_key", f"{node_id}_response")

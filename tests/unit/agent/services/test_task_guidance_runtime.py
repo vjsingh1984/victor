@@ -18,9 +18,7 @@ def test_task_guidance_runtime_prepare_task_wires_reminder_manager_and_delegates
     result = runtime.prepare_task("plan this", "analysis")
 
     assert result == ("classification", 7)
-    task_coordinator.set_reminder_manager.assert_called_once_with(
-        runtime_host.reminder_manager
-    )
+    task_coordinator.set_reminder_manager.assert_called_once_with(runtime_host.reminder_manager)
     task_coordinator.prepare_task.assert_called_once_with(
         "plan this",
         "analysis",

@@ -39,9 +39,7 @@ def _make_runtime_host(**overrides):
 async def test_provider_management_runtime_switch_provider_syncs_host_state_and_callback():
     provider_service = MagicMock()
     provider_service.switch_provider = AsyncMock()
-    provider_service.get_current_provider = MagicMock(
-        return_value=MagicMock(name="provider")
-    )
+    provider_service.get_current_provider = MagicMock(return_value=MagicMock(name="provider"))
     provider_service.get_current_provider_info.return_value = _make_provider_info()
     host = _make_runtime_host(_provider_service=provider_service)
     runtime = ProviderManagementRuntime(OrchestratorProtocolAdapter(host))
@@ -61,9 +59,7 @@ async def test_provider_management_runtime_switch_provider_syncs_host_state_and_
 async def test_provider_management_runtime_switch_model_syncs_host_state():
     provider_service = MagicMock()
     provider_service.switch_model = AsyncMock()
-    provider_service.get_current_provider = MagicMock(
-        return_value=MagicMock(name="provider")
-    )
+    provider_service.get_current_provider = MagicMock(return_value=MagicMock(name="provider"))
     provider_service.get_current_provider_info.return_value = _make_provider_info(
         provider_name="anthropic",
         model_name="claude-3-7-sonnet",
@@ -118,9 +114,7 @@ def test_provider_management_runtime_get_current_provider_info_merges_rate_limit
         model_name="gpt-4.1",
     )
     provider_service.get_rate_limit_stats.return_value = {"rate_limits_hit": 7}
-    host = _make_runtime_host(
-        _provider_service=provider_service, tool_budget=21, tool_calls_used=4
-    )
+    host = _make_runtime_host(_provider_service=provider_service, tool_budget=21, tool_calls_used=4)
     runtime = ProviderManagementRuntime(OrchestratorProtocolAdapter(host))
 
     result = runtime.get_current_provider_info()
@@ -144,9 +138,7 @@ def test_provider_management_runtime_reports_tool_support_from_static_capabiliti
     runtime = ProviderManagementRuntime(OrchestratorProtocolAdapter(host))
 
     assert runtime.model_supports_tool_calls() is True
-    tool_capabilities.is_tool_call_supported.assert_called_once_with(
-        "openai", "gpt-4.1"
-    )
+    tool_capabilities.is_tool_call_supported.assert_called_once_with("openai", "gpt-4.1")
     assert host._tool_capability_warned is False
 
 

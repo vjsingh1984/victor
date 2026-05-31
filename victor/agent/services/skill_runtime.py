@@ -35,9 +35,7 @@ class SkillRuntime:
             if matches:
                 if len(matches) == 1:
                     skill, score = matches[0]
-                    logger.info(
-                        "Auto-selected skill: %s (score=%.2f)", skill.name, score
-                    )
+                    logger.info("Auto-selected skill: %s (score=%.2f)", skill.name, score)
                     self.inject_skill(skill)
                     runtime._last_skill_match_info = {
                         "auto_skill": skill.name,
@@ -48,14 +46,11 @@ class SkillRuntime:
                     return
 
                 names = [skill.name for skill, _ in matches]
-                logger.info(
-                    "Auto-selected %d skills: %s", len(matches), " → ".join(names)
-                )
+                logger.info("Auto-selected %d skills: %s", len(matches), " → ".join(names))
                 self.inject_skills(matches)
                 runtime._last_skill_match_info = {
                     "auto_skills": [
-                        {"name": skill.name, "score": round(score, 2)}
-                        for skill, score in matches
+                        {"name": skill.name, "score": round(score, 2)} for skill, score in matches
                     ],
                 }
                 if analytics:
@@ -136,9 +131,7 @@ class SkillRuntime:
 
         composed = (
             f"ACTIVE SKILLS ({len(skill_names)}): {' → '.join(skill_names)}\n"
-            f"Execute these skills in the listed order.\n\n"
-            + "\n".join(fragments)
-            + "\n"
+            f"Execute these skills in the listed order.\n\n" + "\n".join(fragments) + "\n"
         )
         runtime._active_skill_prompt = composed
 

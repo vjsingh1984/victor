@@ -123,9 +123,7 @@ class TestCleanupFunctions:
             # Verify filter was used
             mock_client.containers.list.assert_called_once_with(
                 all=True,
-                filters={
-                    "label": f"{SANDBOX_CONTAINER_LABEL}={SANDBOX_CONTAINER_VALUE}"
-                },
+                filters={"label": f"{SANDBOX_CONTAINER_LABEL}={SANDBOX_CONTAINER_VALUE}"},
             )
 
             # Verify both containers were removed
@@ -185,9 +183,7 @@ class TestContainerLabeling:
             # Verify labels were passed to container creation
             call_kwargs = mock_client.containers.run.call_args[1]
             assert "labels" in call_kwargs
-            assert call_kwargs["labels"] == {
-                SANDBOX_CONTAINER_LABEL: SANDBOX_CONTAINER_VALUE
-            }
+            assert call_kwargs["labels"] == {SANDBOX_CONTAINER_LABEL: SANDBOX_CONTAINER_VALUE}
 
 
 class TestSandboxResourceCleanup:

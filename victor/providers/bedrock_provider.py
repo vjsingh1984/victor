@@ -385,9 +385,7 @@ class BedrockProvider(BaseProvider):
             if msg.role == "system":
                 system_prompt = [{"text": msg.content}]
             elif msg.role == "user":
-                converse_messages.append(
-                    {"role": "user", "content": [{"text": msg.content}]}
-                )
+                converse_messages.append({"role": "user", "content": [{"text": msg.content}]})
             elif msg.role == "assistant":
                 content = []
                 if msg.content:
@@ -447,9 +445,7 @@ class BedrockProvider(BaseProvider):
 
         # Run synchronous boto3 call in thread pool
         loop = asyncio.get_event_loop()
-        response = await loop.run_in_executor(
-            None, lambda: client.converse(**request_params)
-        )
+        response = await loop.run_in_executor(None, lambda: client.converse(**request_params))
 
         return self._parse_converse_response(response, model)
 
@@ -478,9 +474,7 @@ class BedrockProvider(BaseProvider):
             client, messages, model, temperature, max_tokens, tools, **kwargs
         )
 
-    def _parse_converse_response(
-        self, response: Dict[str, Any], model: str
-    ) -> CompletionResponse:
+    def _parse_converse_response(self, response: Dict[str, Any], model: str) -> CompletionResponse:
         """Parse Bedrock Converse API response."""
         output = response.get("output", {})
         message = output.get("message", {})
@@ -551,9 +545,7 @@ class BedrockProvider(BaseProvider):
                 if msg.role == "system":
                     system_prompt = [{"text": msg.content}]
                 elif msg.role == "user":
-                    converse_messages.append(
-                        {"role": "user", "content": [{"text": msg.content}]}
-                    )
+                    converse_messages.append({"role": "user", "content": [{"text": msg.content}]})
                 elif msg.role == "assistant":
                     content = []
                     if msg.content:
@@ -614,9 +606,7 @@ class BedrockProvider(BaseProvider):
                             is_final=False,
                         )
                     elif "toolUse" in delta and current_tool_use:
-                        current_tool_use["arguments"] += delta["toolUse"].get(
-                            "input", ""
-                        )
+                        current_tool_use["arguments"] += delta["toolUse"].get("input", "")
 
                 elif "contentBlockStop" in event:
                     if current_tool_use and current_tool_use.get("name"):
@@ -638,12 +628,8 @@ class BedrockProvider(BaseProvider):
                 elif "messageStop" in event:
                     yield StreamChunk(
                         content="",
-                        tool_calls=(
-                            accumulated_tool_calls if accumulated_tool_calls else None
-                        ),
-                        stop_reason=event["messageStop"]
-                        .get("stopReason", "stop")
-                        .lower(),
+                        tool_calls=(accumulated_tool_calls if accumulated_tool_calls else None),
+                        stop_reason=event["messageStop"].get("stopReason", "stop").lower(),
                         is_final=True,
                     )
 
@@ -664,9 +650,7 @@ class BedrockProvider(BaseProvider):
             bedrock_client = session.client("bedrock", region_name=self._region)
 
             loop = asyncio.get_event_loop()
-            response = await loop.run_in_executor(
-                None, bedrock_client.list_foundation_models
-            )
+            response = await loop.run_in_executor(None, bedrock_client.list_foundation_models)
 
             return [
                 {
@@ -682,8 +666,7 @@ class BedrockProvider(BaseProvider):
         except Exception as e:
             self._provider_logger.logger.debug(f"Failed to list Bedrock models: {e}")
             return [
-                {"id": model_id, **model_info}
-                for model_id, model_info in BEDROCK_MODELS.items()
+                {"id": model_id, **model_info} for model_id, model_info in BEDROCK_MODELS.items()
             ]
 
     async def close(self) -> None:

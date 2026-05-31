@@ -228,9 +228,7 @@ class CooccurrenceTracker:
         self._history.append((task_key, list(tools), success, now))
         self._total_sequences += 1
 
-        logger.debug(
-            f"Recorded tool sequence: {tools} (task={task_type}, success={success})"
-        )
+        logger.debug(f"Recorded tool sequence: {tools} (task={task_type}, success={success})")
 
     def _record_pattern(
         self,
@@ -264,9 +262,7 @@ class CooccurrenceTracker:
         pattern_obj.last_seen = timestamp
 
         # Update success rate
-        new_success_count, new_total_count = self._pattern_success[task_key][
-            pattern_key
-        ]
+        new_success_count, new_total_count = self._pattern_success[task_key][pattern_key]
         pattern_obj.success_rate = (
             new_success_count / new_total_count if new_total_count > 0 else 0.5
         )
@@ -361,9 +357,7 @@ class CooccurrenceTracker:
         # Source 2: Direct co-occurrence from most recent tool (lower priority)
         if current_tools:
             last_tool = current_tools[-1]
-            cooccurrence_counts = self._cooccurrence_matrices[task_key].get(
-                last_tool, {}
-            )
+            cooccurrence_counts = self._cooccurrence_matrices[task_key].get(last_tool, {})
 
             if cooccurrence_counts:
                 total = sum(cooccurrence_counts.values())
@@ -389,9 +383,7 @@ class CooccurrenceTracker:
             normalized = {}
 
         # Sort and convert to ToolPrediction objects
-        sorted_predictions = sorted(
-            normalized.items(), key=lambda x: x[1], reverse=True
-        )[:top_k]
+        sorted_predictions = sorted(normalized.items(), key=lambda x: x[1], reverse=True)[:top_k]
 
         result = []
         for tool_name, probability in sorted_predictions:
@@ -563,9 +555,7 @@ class CooccurrenceTracker:
                         tool_b = tools[j]
                         matrix = self._cooccurrence_matrices[task_key][tool_a]
                         if tool_b in matrix:
-                            matrix[tool_b] = max(
-                                1, int(matrix[tool_b] * self.decay_factor)
-                            )
+                            matrix[tool_b] = max(1, int(matrix[tool_b] * self.decay_factor))
 
             logger.debug(f"Applied decay to {remove_count} old sequences")
 

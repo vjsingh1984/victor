@@ -158,9 +158,7 @@ class TestSemanticPrediction:
 
     def test_semantic_disabled_without_fn(self):
         """Test that semantic prediction is skipped without embedding_fn."""
-        config = ToolPredictorConfig(
-            enable_keyword_matching=False, enable_semantic_matching=True
-        )
+        config = ToolPredictorConfig(enable_keyword_matching=False, enable_semantic_matching=True)
         predictor = ToolPredictor(config=config)
 
         # No embedding function provided
@@ -512,9 +510,7 @@ class TestIntegration:
 
         # Feature: plan → design → implement
         for _ in range(5):
-            tracker.record_tool_sequence(
-                ["plan", "design", "implement"], "feature", True
-            )
+            tracker.record_tool_sequence(["plan", "design", "implement"], "feature", True)
 
         predictor = ToolPredictor(cooccurrence_tracker=tracker)
 

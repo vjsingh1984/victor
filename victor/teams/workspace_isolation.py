@@ -266,9 +266,7 @@ class WorkspaceIsolationService:
         try:
             return analyzer(member_results, worktree_plan=worktree_plan)
         except Exception as exc:
-            logger.debug(
-                "Workspace merge analysis failed; continuing without metadata: %s", exc
-            )
+            logger.debug("Workspace merge analysis failed; continuing without metadata: %s", exc)
             return None
 
     def inject_changed_files(
@@ -285,16 +283,13 @@ class WorkspaceIsolationService:
         for member_id, result in list(member_results.items()):
             metadata = dict(result.metadata or {})
             if any(
-                metadata.get(key)
-                for key in ("changed_files", "files_touched", "modified_files")
+                metadata.get(key) for key in ("changed_files", "files_touched", "modified_files")
             ):
                 continue
             try:
                 changed_files = list(collector(worktree_session, member_id))
             except Exception as exc:
-                logger.debug(
-                    "Failed to collect changed files for %s: %s", member_id, exc
-                )
+                logger.debug("Failed to collect changed files for %s: %s", member_id, exc)
                 continue
             if not changed_files:
                 continue
@@ -361,9 +356,7 @@ class WorkspaceIsolationService:
                 else {}
             )
             validation_status = self._coerce_optional_text(validation_run.get("status"))
-            normalized_status = (
-                validation_status.lower() if validation_status is not None else None
-            )
+            normalized_status = validation_status.lower() if validation_status is not None else None
             if normalized_status not in (
                 None,
                 "passed",
@@ -410,13 +403,10 @@ class WorkspaceIsolationService:
             or list(worker_return_contracts.keys())
         )
         merge_risk_level = self._coerce_optional_text(
-            orchestration_payload.get("merge_risk_level")
-            or merge_payload.get("risk_level")
+            orchestration_payload.get("merge_risk_level") or merge_payload.get("risk_level")
         )
         if "merge_execution_eligible" in orchestration_payload:
-            merge_execution_eligible = bool(
-                orchestration_payload.get("merge_execution_eligible")
-            )
+            merge_execution_eligible = bool(orchestration_payload.get("merge_execution_eligible"))
         else:
             merge_execution_eligible = merge_risk_level in (None, "low")
         merge_ready = bool(merge_execution_eligible and not blocking_issues)
@@ -529,9 +519,7 @@ class WorkspaceIsolationService:
         skipped: list[str] = []
         assignments = getattr(worktree_session, "assignments", [])
         for assignment in list(assignments or []):
-            path = self._coerce_optional_text(
-                getattr(assignment, "worktree_path", None)
-            )
+            path = self._coerce_optional_text(getattr(assignment, "worktree_path", None))
             if path is not None:
                 skipped.append(path)
         return {
@@ -541,9 +529,7 @@ class WorkspaceIsolationService:
             "reason": reason,
         }
 
-    def cleanup(
-        self, worktree_session: WorktreeMaterializationSession
-    ) -> Dict[str, Any]:
+    def cleanup(self, worktree_session: WorktreeMaterializationSession) -> Dict[str, Any]:
         cleaner = getattr(self._runtime, "cleanup", None)
         if not callable(cleaner):
             return {"removed": [], "skipped": [], "errors": []}
@@ -620,9 +606,7 @@ class WorkspaceMergeApprovalGate:
     ) -> MergeApprovalDecision:
         contract = dict(merge_review_contract)
         next_action = (contract.get("next_action") or "").lower()
-        blocking_issues: List[Dict[str, Any]] = list(
-            contract.get("blocking_issues") or []
-        )
+        blocking_issues: List[Dict[str, Any]] = list(contract.get("blocking_issues") or [])
 
         # Rule 1 — validation failures must be fixed first
         if next_action == "fix_validation":

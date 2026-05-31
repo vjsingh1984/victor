@@ -108,16 +108,9 @@ class TestUnifiedEntryPointRegistry:
 
             assert metrics.total_groups == 2
             assert registry.get_group(EXTENSION_PROTOCOLS_ENTRY_POINT_GROUP) is not None
-            assert (
-                registry.get_group(EXTENSION_CAPABILITIES_ENTRY_POINT_GROUP) is not None
-            )
-            assert (
-                PROTOCOL_ENTRY_POINT_GROUPS[0] == EXTENSION_PROTOCOLS_ENTRY_POINT_GROUP
-            )
-            assert (
-                CAPABILITY_ENTRY_POINT_GROUPS[0]
-                == EXTENSION_CAPABILITIES_ENTRY_POINT_GROUP
-            )
+            assert registry.get_group(EXTENSION_CAPABILITIES_ENTRY_POINT_GROUP) is not None
+            assert PROTOCOL_ENTRY_POINT_GROUPS[0] == EXTENSION_PROTOCOLS_ENTRY_POINT_GROUP
+            assert CAPABILITY_ENTRY_POINT_GROUPS[0] == EXTENSION_CAPABILITIES_ENTRY_POINT_GROUP
 
     def test_scan_all_empty(self):
         """Test scanning with no entry points."""
@@ -531,9 +524,7 @@ class TestConvenienceFunctions:
 
         with patch("victor.framework.entry_point_registry.entry_points") as mock_eps:
             mock_eps.return_value = [mock_ep]
-            with patch.object(
-                registry, "invalidate", wraps=registry.invalidate
-            ) as mock_invalidate:
+            with patch.object(registry, "invalidate", wraps=registry.invalidate) as mock_invalidate:
                 result = get_entry_point_values("victor.plugins", force=True)
 
         assert result == {"coding": "victor_coding.plugin:plugin"}
@@ -564,9 +555,7 @@ class TestPerformanceBenchmarks:
             mock_ep.value = f"test:Vertical{i}"
             mock_eps.append(mock_ep)
 
-        with patch(
-            "victor.framework.entry_point_registry.entry_points"
-        ) as mock_eps_func:
+        with patch("victor.framework.entry_point_registry.entry_points") as mock_eps_func:
             mock_eps_func.return_value = mock_eps
 
             registry = UnifiedEntryPointRegistry.get_instance()

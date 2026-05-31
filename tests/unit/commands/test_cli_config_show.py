@@ -28,9 +28,7 @@ def test_config_show_uses_global_victor_dir_by_default(tmp_path):
     """config show should resolve config files from centralized Victor paths."""
     config_dir = tmp_path / "custom-victor-config"
     config_dir.mkdir(exist_ok=True)
-    (config_dir / "profiles.yaml").write_text(
-        "profiles:\n  default:\n    provider: ollama\n"
-    )
+    (config_dir / "profiles.yaml").write_text("profiles:\n  default:\n    provider: ollama\n")
     (config_dir / "settings.yaml").write_text("log_level: INFO\n")
 
     mock_settings = SimpleNamespace(

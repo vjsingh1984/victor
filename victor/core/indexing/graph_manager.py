@@ -65,12 +65,12 @@ def classify_refresh_error(exc: Exception, *, failure_count: int = 1) -> Dict[st
         category = "transient_missing_file"
         retry_delay_seconds = 0.5
         operator_guidance = "Retry after the filesystem settles; this commonly happens during deletes or temp-file churn."
-    elif error_code in {errno.EMFILE, errno.ENFILE} or "Too many open files" in str(
-        exc
-    ):
+    elif error_code in {errno.EMFILE, errno.ENFILE} or "Too many open files" in str(exc):
         category = "resource_exhaustion"
         retry_delay_seconds = min(60.0, 5.0 * max(1, failure_count))
-        operator_guidance = "Reduce concurrent watcher/index activity or raise the open-file limit before retrying."
+        operator_guidance = (
+            "Reduce concurrent watcher/index activity or raise the open-file limit before retrying."
+        )
     elif isinstance(exc, TimeoutError):
         category = "lock_timeout"
         retry_delay_seconds = min(30.0, 2.0 * max(1, failure_count))
@@ -202,9 +202,7 @@ class GraphManager:
                 return result, True
 
             except Exception as e:
-                logger.error(
-                    f"[GraphManager] Failed to build graph for {cache_key}: {e}"
-                )
+                logger.error(f"[GraphManager] Failed to build graph for {cache_key}: {e}")
                 raise
 
     async def ensure_background_refresh(
@@ -242,9 +240,7 @@ class GraphManager:
             "pending": False,
             "on_refresh_complete": on_refresh_complete,
             "on_refresh_error": on_refresh_error,
-            "min_refresh_interval_seconds": max(
-                0.0, float(min_refresh_interval_seconds)
-            ),
+            "min_refresh_interval_seconds": max(0.0, float(min_refresh_interval_seconds)),
         }
 
         initial_stats = None
@@ -371,22 +367,16 @@ class GraphManager:
         if isinstance(failure, dict):
             next_retry_at = failure.get("next_retry_at")
             if isinstance(next_retry_at, (int, float)):
-                retry_delay_seconds = max(
-                    0.0, float(next_retry_at) - datetime.now().timestamp()
-                )
+                retry_delay_seconds = max(0.0, float(next_retry_at) - datetime.now().timestamp())
                 if retry_delay_seconds > 0:
-                    failure["suppressed_events"] = (
-                        int(failure.get("suppressed_events", 0)) + 1
-                    )
+                    failure["suppressed_events"] = int(failure.get("suppressed_events", 0)) + 1
 
         cooldown_delay_seconds = self._refresh_cooldown_delay(root_str, refresh_config)
         startup_delay_seconds = max(retry_delay_seconds, cooldown_delay_seconds)
 
         if startup_delay_seconds > 0:
             delay_reason = (
-                "retry_backoff"
-                if retry_delay_seconds >= cooldown_delay_seconds
-                else "cooldown"
+                "retry_backoff" if retry_delay_seconds >= cooldown_delay_seconds else "cooldown"
             )
             logger.debug(
                 "[GraphManager] Delaying background refresh for %s by %.2fs (%s)",
@@ -395,15 +385,11 @@ class GraphManager:
                 delay_reason,
             )
             self._refresh_tasks[root_str] = asyncio.create_task(
-                self._run_refresh_loop(
-                    root.resolve(), startup_delay_seconds=startup_delay_seconds
-                )
+                self._run_refresh_loop(root.resolve(), startup_delay_seconds=startup_delay_seconds)
             )
             return
 
-        self._refresh_tasks[root_str] = asyncio.create_task(
-            self._run_refresh_loop(root.resolve())
-        )
+        self._refresh_tasks[root_str] = asyncio.create_task(self._run_refresh_loop(root.resolve()))
 
     def _refresh_cooldown_delay(
         self,
@@ -423,18 +409,14 @@ class GraphManager:
         elapsed = datetime.now().timestamp() - float(last_completed)
         return max(0.0, min_interval - elapsed)
 
-    def _source_mtime_already_refreshed(
-        self, root_str: str, source_mtime: float
-    ) -> bool:
+    def _source_mtime_already_refreshed(self, root_str: str, source_mtime: float) -> bool:
         """Return True when the watched source tree has not advanced since last refresh."""
         last_source_mtime = self._last_refresh_source_mtime.get(root_str)
         if last_source_mtime is None:
             return False
         return float(last_source_mtime) >= float(source_mtime)
 
-    async def _run_refresh_loop(
-        self, root: Path, startup_delay_seconds: float = 0.0
-    ) -> None:
+    async def _run_refresh_loop(self, root: Path, startup_delay_seconds: float = 0.0) -> None:
         """Run one or more coalesced incremental refresh passes for a root."""
         root_str = str(root.resolve())
         current_task = asyncio.current_task()
@@ -458,9 +440,7 @@ class GraphManager:
                 if not refresh_config or not refresh_config.get("pending", False):
                     break
                 refresh_config["pending"] = False
-                cooldown_delay_seconds = self._refresh_cooldown_delay(
-                    root_str, refresh_config
-                )
+                cooldown_delay_seconds = self._refresh_cooldown_delay(root_str, refresh_config)
                 if cooldown_delay_seconds > 0:
                     await asyncio.sleep(cooldown_delay_seconds)
         except asyncio.CancelledError:
@@ -536,14 +516,10 @@ class GraphManager:
         stats = GraphIndexStats()
 
         if self._source_mtime_already_refreshed(root_str, repo_mtime):
-            stats.processing_time_seconds = (
-                datetime.now().timestamp() - refresh_started_at
-            )
+            stats.processing_time_seconds = datetime.now().timestamp() - refresh_started_at
             logger.debug("[GraphManager] Source tree already current for %s", root_str)
         else:
-            logger.info(
-                "[GraphManager] Starting incremental graph refresh for %s", root_str
-            )
+            logger.info("[GraphManager] Starting incremental graph refresh for %s", root_str)
             phase1_start = datetime.now().timestamp()
 
             lock_registry = IndexLockRegistry.get_instance()
@@ -668,9 +644,7 @@ class GraphManager:
             Dict with current statistics
         """
         total_graphs = len(self._graph_cache)
-        stale_graphs = sum(
-            1 for e in self._graph_cache.values() if e.get("stale", False)
-        )
+        stale_graphs = sum(1 for e in self._graph_cache.values() if e.get("stale", False))
         watched_roots = len(self._watcher_subscribed)
 
         return {
@@ -711,9 +685,7 @@ class GraphManager:
                     invalidated += 1
 
         if invalidated > 0:
-            logger.info(
-                f"[GraphManager] Invalidated {invalidated} graph(s) for {root_str}"
-            )
+            logger.info(f"[GraphManager] Invalidated {invalidated} graph(s) for {root_str}")
 
         return invalidated
 
@@ -735,9 +707,7 @@ class GraphManager:
                 logger.info(f"[GraphManager] Cleared all {cleared} graph(s)")
             else:
                 root_str = str(root.resolve())
-                keys_to_remove = [
-                    key for key in self._graph_cache if key.startswith(root_str)
-                ]
+                keys_to_remove = [key for key in self._graph_cache if key.startswith(root_str)]
 
                 for key in keys_to_remove:
                     del self._graph_cache[key]

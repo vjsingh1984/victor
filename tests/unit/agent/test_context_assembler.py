@@ -110,9 +110,7 @@ class TestAssembleOlderMessageSelection:
             return [(msg, 1.0 / (i + 1)) for i, msg in enumerate(messages)]
 
         ledger = SessionLedger()
-        assembler = TurnBoundaryContextAssembler(
-            session_ledger=ledger, score_fn=score_fn
-        )
+        assembler = TurnBoundaryContextAssembler(session_ledger=ledger, score_fn=score_fn)
         msgs = [_msg("system", "sys")]
         for i in range(10):
             msgs.append(_msg("user", f"q{i}"))

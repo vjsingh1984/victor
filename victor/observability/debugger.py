@@ -331,9 +331,7 @@ class AgentDebugger:
 
         # Filter by duration
         slow_calls = [
-            c
-            for c in all_calls
-            if c.duration_ms is not None and c.duration_ms > threshold_ms
+            c for c in all_calls if c.duration_ms is not None and c.duration_ms > threshold_ms
         ]
 
         # Sort by duration (slowest first) and limit

@@ -74,9 +74,7 @@ class ToolPlanner:
                 {
                     "goals": goals,
                     "planned_count": len(planned_tools),
-                    "tool_names": (
-                        [t.name for t in planned_tools] if planned_tools else []
-                    ),
+                    "tool_names": ([t.name for t in planned_tools] if planned_tools else []),
                     "category": "tool",
                 },
             )

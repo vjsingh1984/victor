@@ -97,9 +97,7 @@ async def test_exception_logging(caplog):
 
     caplog.set_level(logging.ERROR)
 
-    task = component.create_tracked_task(
-        component.failing_work("Test error"), name="failing"
-    )
+    task = component.create_tracked_task(component.failing_work("Test error"), name="failing")
 
     # Wait for task to fail
     with pytest.raises(ValueError):
@@ -186,13 +184,9 @@ async def test_mixed_success_and_failure():
     component = TestComponent()
 
     # Create mix of tasks
-    task1 = component.create_tracked_task(
-        component.do_work(1, delay=0.05), name="success1"
-    )
+    task1 = component.create_tracked_task(component.do_work(1, delay=0.05), name="success1")
     task2 = component.create_tracked_task(component.failing_work(), name="fail1")
-    task3 = component.create_tracked_task(
-        component.do_work(2, delay=0.05), name="success2"
-    )
+    task3 = component.create_tracked_task(component.do_work(2, delay=0.05), name="success2")
 
     assert component.active_task_count == 3
 
@@ -273,19 +267,11 @@ async def test_integration_with_multiple_components():
     component2 = TestComponent()
 
     # Create tasks in each
-    task1 = component1.create_tracked_task(
-        component1.do_work(1, delay=0.2), name="c1_task1"
-    )
-    task2 = component1.create_tracked_task(
-        component1.do_work(2, delay=0.2), name="c1_task2"
-    )
+    task1 = component1.create_tracked_task(component1.do_work(1, delay=0.2), name="c1_task1")
+    task2 = component1.create_tracked_task(component1.do_work(2, delay=0.2), name="c1_task2")
 
-    task3 = component2.create_tracked_task(
-        component2.do_work(10, delay=0.2), name="c2_task1"
-    )
-    task4 = component2.create_tracked_task(
-        component2.do_work(20, delay=0.2), name="c2_task2"
-    )
+    task3 = component2.create_tracked_task(component2.do_work(10, delay=0.2), name="c2_task1")
+    task4 = component2.create_tracked_task(component2.do_work(20, delay=0.2), name="c2_task2")
 
     # Verify isolation
     assert component1.active_task_count == 2

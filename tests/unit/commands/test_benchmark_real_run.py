@@ -26,9 +26,7 @@ class TestRunRealBenchmarkAsync:
         )
         benchmark_runner = MagicMock()
         real_runner = MagicMock()
-        real_runner.execute_real_run = AsyncMock(
-            return_value=(MagicMock(), MagicMock())
-        )
+        real_runner.execute_real_run = AsyncMock(return_value=(MagicMock(), MagicMock()))
 
         with patch(
             "victor.evaluation.real_run_runner.RealRunBenchmarkRunner",

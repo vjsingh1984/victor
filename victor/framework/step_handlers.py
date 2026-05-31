@@ -394,9 +394,7 @@ class BaseStepHandler(ABC):
             duration_ms=round(duration_ms, 2),
         )
 
-    def _get_step_details(
-        self, result: "IntegrationResult"
-    ) -> Optional[Dict[str, Any]]:
+    def _get_step_details(self, result: "IntegrationResult") -> Optional[Dict[str, Any]]:
         """Get step-specific details for status tracking.
 
         Override in subclasses to provide meaningful details about
@@ -508,9 +506,7 @@ class ToolStepHandler(BaseStepHandler):
             logger.debug("Tool name canonicalization not available")
             return tools
 
-    def _get_step_details(
-        self, result: "IntegrationResult"
-    ) -> Optional[Dict[str, Any]]:
+    def _get_step_details(self, result: "IntegrationResult") -> Optional[Dict[str, Any]]:
         """Return tool-specific details."""
         if result.tools_applied:
             return {"tools_count": len(result.tools_applied)}
@@ -608,9 +604,7 @@ class PromptStepHandler(BaseStepHandler):
             prompt_builder = getattr(orchestrator, "prompt_builder", None)
             if prompt_builder and hasattr(prompt_builder, "set_task_type_hints"):
                 prompt_builder.set_task_type_hints(merged_hints)
-                logger.debug(
-                    f"Applied {len(merged_hints)} task hints via prompt_builder"
-                )
+                logger.debug(f"Applied {len(merged_hints)} task hints via prompt_builder")
             else:
                 result.add_warning(
                     f"Could not apply {len(merged_hints)} task hints; "
@@ -624,9 +618,7 @@ class PromptStepHandler(BaseStepHandler):
                     continue
                 context.add_prompt_section(contribution.text)
                 if _check_capability(orchestrator, "prompt_section"):
-                    _invoke_capability(
-                        orchestrator, "prompt_section", contribution.text
-                    )
+                    _invoke_capability(orchestrator, "prompt_section", contribution.text)
                 elif _check_capability(orchestrator, "prompt_builder"):
                     prompt_builder = getattr(orchestrator, "prompt_builder", None)
                     if prompt_builder and hasattr(prompt_builder, "add_prompt_section"):
@@ -724,9 +716,7 @@ class SafetyStepHandler(BaseStepHandler):
             safety_checker = getattr(orchestrator, "safety_checker", None)
             if safety_checker and hasattr(safety_checker, "add_patterns"):
                 safety_checker.add_patterns(all_patterns)
-                logger.debug(
-                    f"Applied {len(all_patterns)} safety patterns via public method"
-                )
+                logger.debug(f"Applied {len(all_patterns)} safety patterns via public method")
             else:
                 result.add_warning(
                     f"Could not apply {len(all_patterns)} safety patterns; "
@@ -1329,8 +1319,7 @@ class FrameworkStepHandler(BaseStepHandler):
                 registration_version=registration_version,
             )
             result.add_info(
-                f"Registered {workflow_count} workflows: "
-                f"{', '.join(workflows.keys())}"
+                f"Registered {workflow_count} workflows: " f"{', '.join(workflows.keys())}"
             )
         except Exception as e:
             result.add_warning(f"Could not register workflows: {e}")
@@ -1349,9 +1338,7 @@ class FrameworkStepHandler(BaseStepHandler):
                         f"Registered {len(auto_workflows)} workflow triggers "
                         f"for {vertical.name}"
                     )
-                    result.add_info(
-                        f"Registered {len(auto_workflows)} workflow triggers"
-                    )
+                    result.add_info(f"Registered {len(auto_workflows)} workflow triggers")
         except Exception as e:
             result.add_warning(f"Could not register workflow triggers: {e}")
 
@@ -1406,9 +1393,7 @@ class FrameworkStepHandler(BaseStepHandler):
         # Wire active_learners restriction to RLCoordinator
         if hasattr(rl_config, "active_learners") and rl_config.active_learners:
             try:
-                registry_service = resolve_framework_integration_registry_service(
-                    orchestrator
-                )
+                registry_service = resolve_framework_integration_registry_service(orchestrator)
                 learner_names = [
                     learner.value if hasattr(learner, "value") else str(learner)
                     for learner in rl_config.active_learners
@@ -1513,35 +1498,27 @@ class FrameworkStepHandler(BaseStepHandler):
                 "Orchestrator lacks team_specs capability; specs stored in context only"
             )
 
-        result.add_info(
-            f"Registered {team_count} team specs: " f"{', '.join(team_specs.keys())}"
-        )
+        result.add_info(f"Registered {team_count} team specs: " f"{', '.join(team_specs.keys())}")
         # Log each team spec registration (matching workflow DEBUG logging pattern)
         for team_name in team_specs.keys():
             logger.debug(f"Registered team_spec: {team_name}")
 
         # Register with TeamSpecRegistry through framework integration registry service.
         try:
-            registry_service = resolve_framework_integration_registry_service(
-                orchestrator
-            )
+            registry_service = resolve_framework_integration_registry_service(orchestrator)
             registry_service.register_team_specs(
                 vertical.name,
                 team_specs,
                 replace=True,
                 registration_version=registration_version,
             )
-            logger.debug(
-                f"Registered {team_count} teams with global registry for {vertical.name}"
-            )
+            logger.debug(f"Registered {team_count} teams with global registry for {vertical.name}")
         except Exception as e:
             result.add_warning(f"Could not register with team registry: {e}")
 
         logger.debug(f"Applied {team_count} team specifications from vertical")
 
-    def _get_step_details(
-        self, result: "IntegrationResult"
-    ) -> Optional[Dict[str, Any]]:
+    def _get_step_details(self, result: "IntegrationResult") -> Optional[Dict[str, Any]]:
         """Return framework integration details."""
         details = {}
         if result.workflows_count > 0:
@@ -1584,9 +1561,7 @@ class FrameworkStepHandler(BaseStepHandler):
 
         # Register with ChainRegistry via framework integration registry service.
         try:
-            registry_service = resolve_framework_integration_registry_service(
-                orchestrator
-            )
+            registry_service = resolve_framework_integration_registry_service(orchestrator)
             registry_service.register_chains(
                 vertical.name,
                 chains,
@@ -1597,9 +1572,7 @@ class FrameworkStepHandler(BaseStepHandler):
                 full_name = f"{vertical.name}:{name}"
                 logger.debug(f"Registered chain: {full_name}")
 
-            result.add_info(
-                f"Registered {chain_count} chains: {', '.join(chains.keys())}"
-            )
+            result.add_info(f"Registered {chain_count} chains: {', '.join(chains.keys())}")
             logger.debug(f"Applied {chain_count} chains from vertical")
         except Exception as e:
             result.add_warning(f"Could not register chains: {e}")
@@ -1635,9 +1608,7 @@ class FrameworkStepHandler(BaseStepHandler):
 
         # Normalize and register personas through framework integration registry service.
         try:
-            registry_service = resolve_framework_integration_registry_service(
-                orchestrator
-            )
+            registry_service = resolve_framework_integration_registry_service(orchestrator)
             normalized_personas: Dict[str, Any] = {}
             for name, persona in personas.items():
                 # Convert to PersonaSpec if needed
@@ -1670,9 +1641,7 @@ class FrameworkStepHandler(BaseStepHandler):
                 replace=True,
                 registration_version=registration_version,
             )
-            result.add_info(
-                f"Registered {persona_count} personas: {', '.join(personas.keys())}"
-            )
+            result.add_info(f"Registered {persona_count} personas: {', '.join(personas.keys())}")
             logger.debug(f"Applied {persona_count} personas from vertical")
         except Exception as e:
             result.add_warning(f"Could not register personas: {e}")
@@ -1794,9 +1763,7 @@ class FrameworkStepHandler(BaseStepHandler):
             return
 
         try:
-            registry_service = resolve_framework_integration_registry_service(
-                orchestrator
-            )
+            registry_service = resolve_framework_integration_registry_service(orchestrator)
             registry_service.register_tool_graph(
                 vertical.name,
                 graph,
@@ -1839,9 +1806,7 @@ class FrameworkStepHandler(BaseStepHandler):
         handler_count = len(handlers)
 
         try:
-            registry_service = resolve_framework_integration_registry_service(
-                orchestrator
-            )
+            registry_service = resolve_framework_integration_registry_service(orchestrator)
             registry_service.register_handlers(
                 vertical.name,
                 handlers,
@@ -1851,9 +1816,7 @@ class FrameworkStepHandler(BaseStepHandler):
             for name in handlers.keys():
                 logger.debug(f"Registered handler: {vertical.name}:{name}")
 
-            result.add_info(
-                f"Registered {handler_count} handlers: {', '.join(handlers.keys())}"
-            )
+            result.add_info(f"Registered {handler_count} handlers: {', '.join(handlers.keys())}")
             logger.debug(f"Applied {handler_count} handlers from vertical")
         except Exception as e:
             result.add_warning(f"Could not register handlers: {e}")
@@ -1975,9 +1938,7 @@ class TieredConfigStepHandler(BaseStepHandler):
         tiered_config = get_tiered_config(vertical)
 
         if tiered_config is None:
-            logger.debug(
-                f"Vertical {vertical.name} does not provide tiered tool config"
-            )
+            logger.debug(f"Vertical {vertical.name} does not provide tiered tool config")
             return
 
         # Store in context
@@ -1985,12 +1946,8 @@ class TieredConfigStepHandler(BaseStepHandler):
 
         # Get tool counts for logging
         mandatory_count = len(tiered_config.mandatory) if tiered_config.mandatory else 0
-        core_count = (
-            len(tiered_config.vertical_core) if tiered_config.vertical_core else 0
-        )
-        pool_count = (
-            len(tiered_config.semantic_pool) if tiered_config.semantic_pool else 0
-        )
+        core_count = len(tiered_config.vertical_core) if tiered_config.vertical_core else 0
+        pool_count = len(tiered_config.semantic_pool) if tiered_config.semantic_pool else 0
 
         logger.debug(
             f"Applied tiered config: mandatory={mandatory_count}, "
@@ -2028,8 +1985,7 @@ class TieredConfigStepHandler(BaseStepHandler):
                 )
         else:
             result.add_warning(
-                "Orchestrator lacks tool_access_controller; "
-                "tiered config stored in context only"
+                "Orchestrator lacks tool_access_controller; " "tiered config stored in context only"
             )
 
 
@@ -2101,9 +2057,7 @@ class ExtensionHandler:
     """
 
     name: str
-    handler: Callable[
-        [Any, Any, Any, "MutableVerticalContextProtocol", "IntegrationResult"], None
-    ]
+    handler: Callable[[Any, Any, Any, "MutableVerticalContextProtocol", "IntegrationResult"], None]
     priority: int = 50
 
 
@@ -2176,13 +2130,9 @@ class ExtensionHandlerRegistry:
             ext_value = getattr(extensions, handler.name, None)
             if ext_value is not None:
                 try:
-                    handler.handler(
-                        orchestrator, ext_value, extensions, context, result
-                    )
+                    handler.handler(orchestrator, ext_value, extensions, context, result)
                 except Exception as e:
-                    result.add_warning(
-                        f"Extension handler '{handler.name}' failed: {e}"
-                    )
+                    result.add_warning(f"Extension handler '{handler.name}' failed: {e}")
                     logger.debug(f"Extension handler error: {e}", exc_info=True)
 
     @classmethod
@@ -2257,9 +2207,7 @@ class ExtensionsStepHandler(BaseStepHandler):
             context: "MutableVerticalContextProtocol",
             result: "IntegrationResult",
         ) -> None:
-            self._middleware_handler.apply_middleware(
-                orchestrator, middleware, context, result
-            )
+            self._middleware_handler.apply_middleware(orchestrator, middleware, context, result)
 
         def handle_safety(
             orchestrator: Any,
@@ -2279,9 +2227,7 @@ class ExtensionsStepHandler(BaseStepHandler):
             context: "MutableVerticalContextProtocol",
             result: "IntegrationResult",
         ) -> None:
-            self._prompt_handler.apply_contributors(
-                orchestrator, contributors, context, result
-            )
+            self._prompt_handler.apply_contributors(orchestrator, contributors, context, result)
 
         def handle_mode_config(
             orchestrator: Any,
@@ -2290,9 +2236,7 @@ class ExtensionsStepHandler(BaseStepHandler):
             context: "MutableVerticalContextProtocol",
             result: "IntegrationResult",
         ) -> None:
-            self._config_handler.apply_mode_config(
-                orchestrator, provider, context, result
-            )
+            self._config_handler.apply_mode_config(orchestrator, provider, context, result)
 
         def handle_tool_deps(
             orchestrator: Any,
@@ -2301,9 +2245,7 @@ class ExtensionsStepHandler(BaseStepHandler):
             context: "MutableVerticalContextProtocol",
             result: "IntegrationResult",
         ) -> None:
-            self._config_handler.apply_tool_dependencies(
-                orchestrator, provider, context, result
-            )
+            self._config_handler.apply_tool_dependencies(orchestrator, provider, context, result)
 
         def handle_enrichment(
             orchestrator: Any,
@@ -2364,9 +2306,7 @@ class ExtensionsStepHandler(BaseStepHandler):
                     activate_vertical_services,
                 )
 
-                activation = activate_vertical_services(
-                    container, settings, vertical_name
-                )
+                activation = activate_vertical_services(container, settings, vertical_name)
 
                 if activation.services_registered:
                     # Count registered services if method available
@@ -2386,16 +2326,10 @@ class ExtensionsStepHandler(BaseStepHandler):
                     )
                     logger.debug("Registered vertical services: %s total", total)
                 else:
-                    result.add_info(
-                        f"Vertical services already registered for '{vertical_name}'"
-                    )
-                    logger.debug(
-                        "Vertical services already registered for '%s'", vertical_name
-                    )
+                    result.add_info(f"Vertical services already registered for '{vertical_name}'")
+                    logger.debug("Vertical services already registered for '%s'", vertical_name)
             except ValueError as e:
-                result.add_warning(
-                    f"Failed to activate vertical '{vertical_name}': {e}"
-                )
+                result.add_warning(f"Failed to activate vertical '{vertical_name}': {e}")
                 logger.debug(
                     "Vertical activation error for '%s': %s",
                     vertical_name,
@@ -2430,9 +2364,7 @@ class ExtensionsStepHandler(BaseStepHandler):
             ExtensionHandler("enrichment_strategy", handle_enrichment, priority=60)
         )
         self._extension_registry.register(
-            ExtensionHandler(
-                "tool_selection_strategy", handle_tool_selection, priority=15
-            )
+            ExtensionHandler("tool_selection_strategy", handle_tool_selection, priority=15)
         )
 
     def _do_apply(
@@ -2455,9 +2387,7 @@ class ExtensionsStepHandler(BaseStepHandler):
         # OCP: Apply all registered extension handlers
         self._extension_registry.apply_all(orchestrator, extensions, context, result)
 
-    def _get_step_details(
-        self, result: "IntegrationResult"
-    ) -> Optional[Dict[str, Any]]:
+    def _get_step_details(self, result: "IntegrationResult") -> Optional[Dict[str, Any]]:
         """Return extension application details."""
         details = {}
         if result.middleware_count > 0:
@@ -2507,9 +2437,7 @@ class ExtensionsStepHandler(BaseStepHandler):
             elif hasattr(tool_selector, "register_strategy"):
                 vertical_name = context.vertical_name or "default"
                 tool_selector.register_strategy(vertical_name, strategy)
-                logger.debug(
-                    f"Registered tool selection strategy for vertical={vertical_name}"
-                )
+                logger.debug(f"Registered tool selection strategy for vertical={vertical_name}")
                 return
 
         # Log that strategy is stored in context only
@@ -2546,9 +2474,7 @@ class ExtensionsStepHandler(BaseStepHandler):
                 if service and hasattr(service, "register_strategy"):
                     vertical_name = context.vertical_name or "default"
                     service.register_strategy(vertical_name, strategy)
-                    logger.debug(
-                        f"Registered enrichment strategy for vertical={vertical_name}"
-                    )
+                    logger.debug(f"Registered enrichment strategy for vertical={vertical_name}")
                     return
             except Exception as e:
                 logger.debug(f"Failed to register enrichment strategy: {e}")

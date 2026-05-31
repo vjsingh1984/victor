@@ -46,9 +46,7 @@ class TestTieredRouting:
         mock_edge.decide_sync.return_value = _MockDecisionResult(result="tool_a")
         service._services["edge"] = mock_edge
 
-        result = service.decide_sync(
-            DecisionType.TOOL_SELECTION, {"message": "fix test"}
-        )
+        result = service.decide_sync(DecisionType.TOOL_SELECTION, {"message": "fix test"})
         mock_edge.decide_sync.assert_called_once()
         assert result.result == "tool_a"
 
@@ -100,9 +98,7 @@ class TestFallbackChain:
         service._services["edge"] = mock_edge
         service._failed_tiers.add("balanced")
 
-        result = service.decide_sync(
-            DecisionType.TASK_TYPE_CLASSIFICATION, {"message": "test"}
-        )
+        result = service.decide_sync(DecisionType.TASK_TYPE_CLASSIFICATION, {"message": "test"})
         mock_edge.decide_sync.assert_called_once()
         assert result.source == "edge_fallback"
 
@@ -150,11 +146,9 @@ class TestServiceCaching:
         config = DecisionServiceSettings()
         service = TieredDecisionService(config)
         mock_edge = MagicMock()
-        mock_edge.get_runtime_evaluation_feedback.return_value = (
-            RuntimeEvaluationFeedback(
-                completion_threshold=0.76,
-                enhanced_progress_threshold=0.61,
-            )
+        mock_edge.get_runtime_evaluation_feedback.return_value = RuntimeEvaluationFeedback(
+            completion_threshold=0.76,
+            enhanced_progress_threshold=0.61,
         )
         service._services["edge"] = mock_edge
 
@@ -269,9 +263,7 @@ class TestProviderAgnosticTiers:
 
         container = MagicMock()
         container.get_optional.side_effect = lambda service_type: (
-            provider_service
-            if service_type.__name__ == "ProviderServiceProtocol"
-            else None
+            provider_service if service_type.__name__ == "ProviderServiceProtocol" else None
         )
 
         with patch("victor.core.get_container", return_value=container):
@@ -296,9 +288,7 @@ class TestProviderAgnosticTiers:
 
         container = MagicMock()
         container.get_optional.side_effect = lambda service_type: (
-            provider_service
-            if service_type.__name__ == "ProviderServiceProtocol"
-            else None
+            provider_service if service_type.__name__ == "ProviderServiceProtocol" else None
         )
 
         with patch("victor.core.get_container", return_value=container):
@@ -375,9 +365,7 @@ class TestProviderAgnosticTiers:
         service = TieredDecisionService(config)
 
         # Mock provider detection to return test_provider
-        with patch.object(
-            service, "_detect_active_provider", return_value="test_provider"
-        ):
+        with patch.object(service, "_detect_active_provider", return_value="test_provider"):
             # Try to create edge tier - should fail gracefully
             result = service._create_service("edge")
             assert result is None

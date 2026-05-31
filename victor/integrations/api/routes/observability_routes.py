@@ -123,14 +123,10 @@ def get_export_service() -> ExportService:
 async def get_recent_events(
     limit: int = Query(100, ge=1, le=1000, description="Maximum events to return"),
     offset: int = Query(0, ge=0, description="Number of events to skip"),
-    event_types: Optional[str] = Query(
-        None, description="Comma-separated event types to filter"
-    ),
+    event_types: Optional[str] = Query(None, description="Comma-separated event types to filter"),
     session_id: Optional[str] = Query(None, description="Filter by session ID"),
     tool_name: Optional[str] = Query(None, description="Filter by tool name"),
-    severity: Optional[str] = Query(
-        None, description="Filter by severity (error, warning, info)"
-    ),
+    severity: Optional[str] = Query(None, description="Filter by severity (error, warning, info)"),
 ) -> EventsResponse:
     """Get recent events with pagination.
 
@@ -218,18 +214,14 @@ async def get_session_details(
     )
 
     # Calculate session metrics from events
-    tool_calls = sum(
-        1 for e in events if e.event_type and "tool" in e.event_type.lower()
-    )
+    tool_calls = sum(1 for e in events if e.event_type and "tool" in e.event_type.lower())
     errors = sum(1 for e in events if e.severity == "error")
 
     # Calculate duration
     if events:
         first_event = min(events, key=lambda e: e.timestamp)
         last_event = max(events, key=lambda e: e.timestamp)
-        duration_seconds = (
-            last_event.timestamp - first_event.timestamp
-        ).total_seconds()
+        duration_seconds = (last_event.timestamp - first_event.timestamp).total_seconds()
     else:
         duration_seconds = 0
 
@@ -353,9 +345,7 @@ async def list_traces(
                 "event_count": len(events),
                 "start_time": first_event.timestamp.isoformat(),
                 "end_time": last_event.timestamp.isoformat(),
-                "duration_seconds": (
-                    last_event.timestamp - first_event.timestamp
-                ).total_seconds(),
+                "duration_seconds": (last_event.timestamp - first_event.timestamp).total_seconds(),
                 "has_errors": any(e.severity == "error" for e in events),
             }
         )
@@ -396,9 +386,7 @@ async def get_trace_details(trace_id: str) -> dict:
     sorted_events = sorted(events, key=lambda e: e.timestamp)
 
     # Calculate trace statistics
-    tool_calls = [
-        e for e in sorted_events if e.event_type and "tool" in e.event_type.lower()
-    ]
+    tool_calls = [e for e in sorted_events if e.event_type and "tool" in e.event_type.lower()]
     errors = [e for e in sorted_events if e.severity == "error"]
 
     # Build span tree (simplified - just list events in order)

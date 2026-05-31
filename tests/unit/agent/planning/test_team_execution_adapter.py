@@ -194,10 +194,7 @@ async def test_adapter_member_executor_spawns_isolated_child_session_with_handof
     assert spawn_kwargs["agent_id"] == "team_plan_1_step_1_step_1_researcher"
     assert spawn_kwargs["team_id"] == team_id
     assert spawn_kwargs["parent_session_id"] == "session_root"
-    assert (
-        spawn_kwargs["child_session_id"]
-        == "session_root:team_plan_1_step_1:step_1_researcher"
-    )
+    assert spawn_kwargs["child_session_id"] == "session_root:team_plan_1_step_1:step_1_researcher"
     assert spawn_kwargs["plan_id"] == execution_plan.id
     assert spawn_kwargs["plan_step_id"] == "1"
     assert spawn_kwargs["allowed_tools"] == ["read", "ls", "grep"]
@@ -358,9 +355,7 @@ async def test_adapter_executes_compute_node_step_without_provider():
     subagents.spawn.assert_not_awaited()
 
     # Clean up registry so other tests are not affected.
-    PlanningTeamExecutionAdapter._COMPUTE_NODES.pop(
-        "rust_best_practices_checklist", None
-    )
+    PlanningTeamExecutionAdapter._COMPUTE_NODES.pop("rust_best_practices_checklist", None)
 
 
 @pytest.mark.asyncio
@@ -436,12 +431,9 @@ async def test_cross_crate_findings_step_uses_agent_when_not_explicit_compute(
     (crate_a / "src").mkdir(parents=True)
     (crate_b / "src").mkdir(parents=True)
     (rust).mkdir(exist_ok=True)
-    (rust / "Cargo.toml").write_text(
-        '[workspace]\nmembers = ["crates/protocol", "crates/state"]\n'
-    )
+    (rust / "Cargo.toml").write_text('[workspace]\nmembers = ["crates/protocol", "crates/state"]\n')
     (crate_a / "Cargo.toml").write_text(
-        '[package]\nname = "protocol"\nversion = "0.1.0"\n'
-        '[dependencies]\nserde = "1"\n'
+        '[package]\nname = "protocol"\nversion = "0.1.0"\n' '[dependencies]\nserde = "1"\n'
     )
     (crate_a / "src" / "lib.rs").write_text(
         "use std::sync::Arc;\npub struct Shared(pub Arc<String>);\n"
@@ -507,16 +499,12 @@ async def test_cross_crate_findings_step_uses_agent_when_not_explicit_compute(
 
 
 @pytest.mark.asyncio
-async def test_rust_crate_review_uses_agent_when_not_explicit_compute(
-    tmp_path, monkeypatch
-):
+async def test_rust_crate_review_uses_agent_when_not_explicit_compute(tmp_path, monkeypatch):
     """Deep Rust reviews should use a worker so file reads are visible in the graph."""
     crate = tmp_path / "rust" / "crates" / "python-bindings"
     src = crate / "src"
     src.mkdir(parents=True)
-    (crate / "Cargo.toml").write_text(
-        '[package]\nname = "victor_native"\nversion = "0.1.0"\n'
-    )
+    (crate / "Cargo.toml").write_text('[package]\nname = "victor_native"\nversion = "0.1.0"\n')
     (src / "lib.rs").write_text(
         "use std::sync::Arc;\n"
         "pub struct Matcher { inner: Arc<String> }\n"
@@ -670,15 +658,11 @@ async def test_compute_node_receives_plan_state():
             },
         )
 
-    PlanningTeamExecutionAdapter.register_compute_node(
-        "lang_checklist", _checklist_with_context
-    )
+    PlanningTeamExecutionAdapter.register_compute_node("lang_checklist", _checklist_with_context)
     parent = SimpleNamespace(active_session_id="session_root")
     subagents = MagicMock()
     subagents.spawn = AsyncMock()
-    adapter = PlanningTeamExecutionAdapter(
-        orchestrator=parent, sub_agent_orchestrator=subagents
-    )
+    adapter = PlanningTeamExecutionAdapter(orchestrator=parent, sub_agent_orchestrator=subagents)
 
     plan = ReadableTaskPlan(
         name="Checklist test",
@@ -774,9 +758,7 @@ def test_should_use_team_forces_team_for_advanced_execution_types():
             desc=f"Single {exec_type} step",
             steps=[{"id": "1", "type": "feature", "desc": "Step", "exec": exec_type}],
         )
-        assert (
-            adapter.should_use_team(plan) is True
-        ), f"Expected True for exec={exec_type!r}"
+        assert adapter.should_use_team(plan) is True, f"Expected True for exec={exec_type!r}"
 
     # Compact list format with 6th element
     plan_list = ReadableTaskPlan(
@@ -1349,9 +1331,7 @@ def test_conditional_node_non_empty_true():
 def test_conditional_node_non_empty_false_skips_true_branch():
     adapter = PlanningTeamExecutionAdapter(orchestrator=SimpleNamespace())
     # branches["true"] = loop step; when condition is False, skip "true" branch (loop)
-    step = _conditional_step(
-        "members", "non_empty", branches={"true": ["6a"], "false": ["6b"]}
-    )
+    step = _conditional_step("members", "non_empty", branches={"true": ["6a"], "false": ["6b"]})
     result = adapter._execute_conditional_node(step, {"members": []})
 
     assert result.metadata["condition_result"] is False
@@ -1374,9 +1354,7 @@ def test_conditional_node_multiple_condition():
     result = adapter._execute_conditional_node(step, plan_state)
 
     assert result.metadata["condition_result"] is True
-    assert result.metadata["skip_step_ids"] == [
-        "6b"
-    ]  # skip single-agent when multi-crate
+    assert result.metadata["skip_step_ids"] == ["6b"]  # skip single-agent when multi-crate
     assert plan_state["is_workspace"] is True
 
 
@@ -1384,9 +1362,7 @@ def test_conditional_node_single_item_multiple_false():
     adapter = PlanningTeamExecutionAdapter(orchestrator=SimpleNamespace())
     # branches["true"] = loop "6a"; branches["false"] = single-agent "6b"
     # single item → multiple=False → inactive="true" → skip ["6a"] (loop)
-    step = _conditional_step(
-        "crates", "multiple", branches={"true": ["6a"], "false": ["6b"]}
-    )
+    step = _conditional_step("crates", "multiple", branches={"true": ["6a"], "false": ["6b"]})
     result = adapter._execute_conditional_node(step, {"crates": ["only_one"]})
 
     assert result.metadata["condition_result"] is False
@@ -1626,9 +1602,7 @@ def test_conditional_node_falls_back_to_word_overlap_when_exact_key_missing():
         },
     )
     # plan_state uses a different key but with overlapping words
-    plan_state = {
-        "workspace_member_crates": ["crates/protocol", "crates/state", "crates/tools"]
-    }
+    plan_state = {"workspace_member_crates": ["crates/protocol", "crates/state", "crates/tools"]}
 
     result = adapter._execute_conditional_node(step, plan_state)
 
@@ -2336,9 +2310,7 @@ async def test_parallel_steps_dispatched_simultaneously():
         result = await svc._execute_plan_via_team_adapter(plan, mock_adapter)
 
     # 3 batches: [step 1], [steps 2+3 in parallel], [step 4]
-    assert (
-        len(gather_call_sizes) == 3
-    ), f"Expected 3 gather calls, got {gather_call_sizes}"
+    assert len(gather_call_sizes) == 3, f"Expected 3 gather calls, got {gather_call_sizes}"
     assert gather_call_sizes[0] == 1, "Batch 1: only step 1"
     assert (
         gather_call_sizes[1] == 2
@@ -2502,9 +2474,7 @@ def test_parse_step_list_removes_self_referential_dep():
     assert (
         "2" not in steps["2"].depends_on
     ), f"Self-dep '2' must be stripped from list step; got {steps['2'].depends_on}"
-    assert (
-        "1" in steps["2"].depends_on
-    ), f"Valid dep '1' must be kept; got {steps['2'].depends_on}"
+    assert "1" in steps["2"].depends_on, f"Valid dep '1' must be kept; got {steps['2'].depends_on}"
 
 
 def test_pass6_5_adds_missing_dep_on_condition_on_producer():
@@ -2630,9 +2600,7 @@ def test_task_description_knowledge_note_for_compute_step_with_produces():
         context={"produces": "best_practices_checklist"},
     )
     task = PlanningTeamExecutionAdapter._task_description_for_step(step, plan_state={})
-    assert (
-        "knowledge generation step" in task
-    ), f"Expected knowledge note, got: {task[:300]}"
+    assert "knowledge generation step" in task, f"Expected knowledge note, got: {task[:300]}"
     assert "no tool calls are required" in task.lower() or "no tools" in task.lower()
 
 
@@ -2946,9 +2914,7 @@ def test_pass7_preserves_phantom_dep_without_branch_variants():
     assert (
         "999" in steps["2"].depends_on
     ), f"Unresolvable phantom dep '999' must be preserved (not dropped); got {steps['2'].depends_on}"
-    assert (
-        "1" in steps["2"].depends_on
-    ), f"Valid dep '1' must be kept; got {steps['2'].depends_on}"
+    assert "1" in steps["2"].depends_on, f"Valid dep '1' must be kept; got {steps['2'].depends_on}"
 
 
 def test_pass7_preserves_real_deps_unchanged():
@@ -3311,9 +3277,7 @@ def test_task_description_appends_exit_criteria_for_tool_step():
     assert (
         "grep for Arc<T> in all crates" in task
     ), f"Exit criteria must appear in task; got: {task!r}"
-    assert (
-        "document lock ordering" in task
-    ), f"Exit criteria must appear in task; got: {task!r}"
+    assert "document lock ordering" in task, f"Exit criteria must appear in task; got: {task!r}"
     assert (
         "Verification criteria" in task
     ), f"Task must include a 'Verification criteria' header; got: {task!r}"
@@ -3357,9 +3321,7 @@ def test_task_description_exit_criteria_appended_after_context_and_format():
     # Exit criteria come after format
     format_pos = task.index("OUTPUT FORMAT")
     criteria_pos = task.index("Verification criteria")
-    assert (
-        criteria_pos > format_pos
-    ), "Verification criteria must appear after OUTPUT FORMAT"
+    assert criteria_pos > format_pos, "Verification criteria must appear after OUTPUT FORMAT"
 
 
 # ---------------------------------------------------------------------------

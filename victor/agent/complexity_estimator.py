@@ -191,9 +191,7 @@ REASONING: <one sentence>"""
             return estimate
 
         except Exception as e:
-            logger.warning(
-                f"[ComplexityEstimator] Edge model failed: {e}, using heuristic"
-            )
+            logger.warning(f"[ComplexityEstimator] Edge model failed: {e}, using heuristic")
             return self._heuristic_estimate(query, start_time)
 
     def _heuristic_estimate(self, query: str, start_time: float) -> ComplexityEstimate:
@@ -368,9 +366,7 @@ REASONING: <one sentence>"""
             Dict with estimation counts and cache statistics
         """
         cache_hit_rate = (
-            (self._cache_hits / self._estimate_count)
-            if self._estimate_count > 0
-            else 0.0
+            (self._cache_hits / self._estimate_count) if self._estimate_count > 0 else 0.0
         )
 
         return {

@@ -111,16 +111,11 @@ class PromptDocument:
 
     def estimate_length(self) -> int:
         """Estimate rendered character length."""
-        return sum(
-            len(block.get_formatted_content())
-            for block in self.iter_renderable_blocks()
-        )
+        return sum(len(block.get_formatted_content()) for block in self.iter_renderable_blocks())
 
     def render(self) -> str:
         """Render the full prompt document."""
-        rendered = [
-            block.get_formatted_content() for block in self.iter_renderable_blocks()
-        ]
+        rendered = [block.get_formatted_content() for block in self.iter_renderable_blocks()]
         return "\n\n".join(part for part in rendered if part)
 
 

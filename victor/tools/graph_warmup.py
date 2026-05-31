@@ -83,15 +83,11 @@ async def warmup_graph_tool(
         "settings": load_settings(),
     }
 
-    logger.info(
-        f"[warmup] Starting graph tool warm-up with {len(warmup_queries)} queries"
-    )
+    logger.info(f"[warmup] Starting graph tool warm-up with {len(warmup_queries)} queries")
 
     for i, query in enumerate(warmup_queries, 1):
         try:
-            logger.info(
-                f"[warmup] Query {i}/{len(warmup_queries)}: {query.get('mode', 'unknown')}"
-            )
+            logger.info(f"[warmup] Query {i}/{len(warmup_queries)}: {query.get('mode', 'unknown')}")
 
             # Execute graph query
             result = await graph(

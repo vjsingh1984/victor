@@ -10,25 +10,18 @@ from victor.agent.subagents import SubAgentRole
 
 def test_build_display_name_uses_task_subject_and_role():
     assert (
-        build_display_name(
-            SubAgentRole.REVIEWER, task="Review Rust Arc usage and performance"
-        )
+        build_display_name(SubAgentRole.REVIEWER, task="Review Rust Arc usage and performance")
         == "Rust Arc Reviewer"
     )
 
 
 def test_build_display_name_keeps_acronyms_readable():
-    assert (
-        build_display_name("researcher", task="Find API endpoints")
-        == "API Endpoints Researcher"
-    )
+    assert build_display_name("researcher", task="Find API endpoints") == "API Endpoints Researcher"
 
 
 def test_build_display_name_can_include_ordinal_for_disambiguation():
     assert (
-        build_display_name(
-            SubAgentRole.RESEARCHER, task="Analyze schema migration", ordinal=2
-        )
+        build_display_name(SubAgentRole.RESEARCHER, task="Analyze schema migration", ordinal=2)
         == "Schema Migration Researcher 2"
     )
 

@@ -157,9 +157,7 @@ class SharedToolRegistryAdapter:
             List of tool instances
         """
         tool_names = self._unified.list_tools(enabled_only=not airgapped_mode)
-        return [
-            self._unified.get(name) for name in tool_names if self._unified.get(name)
-        ]
+        return [self._unified.get(name) for name in tool_names if self._unified.get(name)]
 
 
 class ToolRegistryAdapter:
@@ -321,9 +319,7 @@ class ToolRegistryAdapter:
             List of tool instances
         """
         tool_names = self._unified.list_tools(enabled_only=only_enabled)
-        return [
-            self._unified.get(name) for name in tool_names if self._unified.get(name)
-        ]
+        return [self._unified.get(name) for name in tool_names if self._unified.get(name)]
 
     def get_tool_schemas(self, only_enabled: bool = True) -> List[Dict[str, Any]]:
         """Get JSON schemas for all tools.
@@ -359,9 +355,7 @@ def migrate_to_unified_registry() -> None:
     from victor.agent import shared_tool_registry
 
     shared_tool_registry.SharedToolRegistry = SharedToolRegistryAdapter
-    shared_tool_registry.SharedToolRegistry.get_instance = (
-        SharedToolRegistryAdapter.get_instance
-    )
+    shared_tool_registry.SharedToolRegistry.get_instance = SharedToolRegistryAdapter.get_instance
 
     # Note: ToolRegistry is typically instantiated per-session,
     # so we update it via __init__ instead

@@ -193,9 +193,7 @@ class TestTaskAnalyzer:
     def test_analyze_complex_query(self):
         """Test analyzing a complex query."""
         analyzer = TaskAnalyzer()
-        result = analyzer.analyze(
-            "Refactor the authentication system to use JWT tokens"
-        )
+        result = analyzer.analyze("Refactor the authentication system to use JWT tokens")
 
         assert isinstance(result, TaskAnalysis)
         # Complex tasks should have higher budget
@@ -237,15 +235,11 @@ class TestTaskAnalyzer:
         analyzer = TaskAnalyzer()
 
         # Explicit write request with file path
-        result = analyzer.check_write_authorization(
-            "Create and save a new file at hello.py"
-        )
+        result = analyzer.check_write_authorization("Create and save a new file at hello.py")
         assert isinstance(result, bool)
 
         # Display request - should not authorize writes
-        result2 = analyzer.check_write_authorization(
-            "Show me the contents of README.md"
-        )
+        result2 = analyzer.check_write_authorization("Show me the contents of README.md")
         assert isinstance(result2, bool)
 
     def test_unified_classifier_uses_runtime_intelligence_when_configured(self):
@@ -384,9 +378,7 @@ class TestTaskAnalyzer:
             "victor.agent.services.coordination_advisor_runtime.CoordinationAdvisorRuntime"
         ) as runtime_cls:
             runtime_cls.return_value.suggest_for_task.return_value = suggestion
-            result = analyzer.analyze_with_suggestions(
-                "Refactor this code", mode="build"
-            )
+            result = analyzer.analyze_with_suggestions("Refactor this code", mode="build")
 
         assert result.coordination_suggestion is suggestion
         assert analyzer._coordination_runtime is runtime_cls.return_value
@@ -409,9 +401,7 @@ class TestTaskAnalyzer:
             "victor.agent.services.coordination_advisor_runtime.CoordinationAdvisorRuntime"
         ) as runtime_cls:
             runtime_cls.return_value.suggest_for_task.return_value = suggestion
-            result = analyzer.analyze_with_suggestions(
-                "Refactor this code", mode="plan"
-            )
+            result = analyzer.analyze_with_suggestions("Refactor this code", mode="plan")
 
         assert result.coordination_suggestion is suggestion
         runtime_cls.return_value.suggest_for_task.assert_called_once_with(

@@ -135,8 +135,7 @@ class APIKeyNotFoundError(Exception):
             lines.append("  • Pass api_key parameter to provider constructor")
         else:
             lines.append(
-                f"  • Run: victor keys set {self.provider} --keyring "
-                "(for interactive CLI use)"
+                f"  • Run: victor keys set {self.provider} --keyring " "(for interactive CLI use)"
             )
             env_var = _get_provider_env_var(self.provider)
             if env_var:
@@ -194,25 +193,17 @@ def _sentinelpass_domain_from_victor_config(provider: str) -> Optional[str]:
             if account.provider == provider and account.auth.source == "sentinelpass":
                 return account.auth.value or provider
     except Exception as exc:
-        logger.debug(
-            "Could not inspect Victor accounts for SentinelPass source: %s", exc
-        )
+        logger.debug("Could not inspect Victor accounts for SentinelPass source: %s", exc)
     return None
 
 
 def _get_key_from_sentinelpass(provider: str, *, force: bool = False) -> Optional[str]:
     """Resolve an API key from SentinelPass through its daemon-mediated CLI."""
     configured_domain = _sentinelpass_domain_from_victor_config(provider)
-    if (
-        not force
-        and not configured_domain
-        and not _truthy_env("VICTOR_SENTINELPASS_ENABLED")
-    ):
+    if not force and not configured_domain and not _truthy_env("VICTOR_SENTINELPASS_ENABLED"):
         return None
 
-    sentinelpass_bin = os.environ.get("VICTOR_SENTINELPASS_BIN") or shutil.which(
-        "sentinelpass"
-    )
+    sentinelpass_bin = os.environ.get("VICTOR_SENTINELPASS_BIN") or shutil.which("sentinelpass")
     if not sentinelpass_bin:
         logger.debug("SentinelPass lookup enabled but `sentinelpass` was not found")
         return None
@@ -285,9 +276,7 @@ class UnifiedApiKeyResolver:
             non_interactive: Force non-interactive mode (None = auto-detect)
         """
         self.non_interactive = (
-            non_interactive
-            if non_interactive is not None
-            else self._detect_non_interactive()
+            non_interactive if non_interactive is not None else self._detect_non_interactive()
         )
         self._cache: Dict[str, APIKeyResult] = {}
 
@@ -425,9 +414,9 @@ class UnifiedApiKeyResolver:
                 )
 
         # Priority 3: SentinelPass local vault lookup (opt-in)
-        if _truthy_env(
-            "VICTOR_SENTINELPASS_ENABLED"
-        ) or _sentinelpass_domain_from_victor_config(provider):
+        if _truthy_env("VICTOR_SENTINELPASS_ENABLED") or _sentinelpass_domain_from_victor_config(
+            provider
+        ):
             sentinelpass_key = _get_key_from_sentinelpass(provider)
             sources.append(
                 KeySource(
@@ -435,9 +424,7 @@ class UnifiedApiKeyResolver:
                     description="SentinelPass local vault",
                     found=bool(sentinelpass_key),
                     value_preview=(
-                        self._preview_key(sentinelpass_key)
-                        if sentinelpass_key
-                        else None
+                        self._preview_key(sentinelpass_key) if sentinelpass_key else None
                     ),
                     interactive_required=_truthy_env("VICTOR_SENTINELPASS_BIOMETRIC"),
                 )
@@ -454,9 +441,7 @@ class UnifiedApiKeyResolver:
                 return self._cache_result(provider, result)
 
         # Priority 4: Keyring (skip in non-interactive mode)
-        check_keyring = (
-            check_keyring if check_keyring is not None else not self.non_interactive
-        )
+        check_keyring = check_keyring if check_keyring is not None else not self.non_interactive
 
         if check_keyring and is_keyring_available():
             from victor.config.api_keys import KEYRING_SERVICE

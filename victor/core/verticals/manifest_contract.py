@@ -229,9 +229,7 @@ def load_vertical_package_manifest_for_module(
         if getattr(class_spec, "provides_capabilities", None):
             provides.add(ExtensionType.CAPABILITIES)
 
-    dependencies = (
-        getattr(getattr(metadata, "dependencies", None), "verticals", []) or []
-    )
+    dependencies = getattr(getattr(metadata, "dependencies", None), "verticals", []) or []
     manifest = ExtensionManifest(
         name=str(metadata.name),
         version=str(metadata.version),
@@ -245,9 +243,7 @@ def load_vertical_package_manifest_for_module(
         # Let runtime defaults derive the namespace from the actual class provenance.
         plugin_namespace="",
     )
-    logger.debug(
-        "Loaded package manifest for module '%s' from %s", module_name, manifest_path
-    )
+    logger.debug("Loaded package manifest for module '%s' from %s", module_name, manifest_path)
     return manifest
 
 
@@ -273,9 +269,7 @@ def _iter_vertical_package_manifest_candidates(module_name: str) -> Iterable[Pat
     try:
         spec = importlib.util.find_spec(package_name)
     except (ImportError, ModuleNotFoundError, ValueError) as exc:
-        logger.debug(
-            "Unable to resolve package spec for module '%s': %s", module_name, exc
-        )
+        logger.debug("Unable to resolve package spec for module '%s': %s", module_name, exc)
         return ()
 
     if spec is None:
@@ -308,9 +302,7 @@ def _manifest_from_mapping(
     if "requires" in data:
         data["requires"] = _coerce_extension_types(data.get("requires"))
     if "extension_dependencies" in data:
-        data["extension_dependencies"] = _coerce_dependencies(
-            data["extension_dependencies"]
-        )
+        data["extension_dependencies"] = _coerce_dependencies(data["extension_dependencies"])
 
     try:
         manifest = ExtensionManifest(**data)
@@ -341,9 +333,7 @@ def _coerce_extension_types(values: Any) -> set[ExtensionType]:
             try:
                 normalized.add(ExtensionType(value))
             except ValueError:
-                logger.debug(
-                    "Ignoring unknown extension type '%s' in legacy manifest", value
-                )
+                logger.debug("Ignoring unknown extension type '%s' in legacy manifest", value)
     return normalized
 
 
@@ -415,9 +405,7 @@ def _synthesize_manifest(vertical_class: Type[Any]) -> ExtensionManifest:
     return manifest
 
 
-def _apply_manifest_defaults(
-    vertical_class: Type[Any], manifest: ExtensionManifest
-) -> None:
+def _apply_manifest_defaults(vertical_class: Type[Any], manifest: ExtensionManifest) -> None:
     """Fill required defaults on a manifest in-place."""
 
     if not manifest.name:

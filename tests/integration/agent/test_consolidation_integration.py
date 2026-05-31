@@ -251,10 +251,7 @@ class TestCoordinatorIntegration:
         facade = WorkflowFacade()
         assert hasattr(facade, "mode_workflow_team_coordinator") is False
         assert hasattr(AgentOrchestrator, "_mode_workflow_team_coordinator") is False
-        assert (
-            hasattr(OrchestratorFactory, "create_mode_workflow_team_coordinator")
-            is False
-        )
+        assert hasattr(OrchestratorFactory, "create_mode_workflow_team_coordinator") is False
 
         with pytest.raises(ImportError, match="mode_workflow_team_coordinator"):
             import victor.agent.mode_workflow_team_coordinator  # noqa: F401

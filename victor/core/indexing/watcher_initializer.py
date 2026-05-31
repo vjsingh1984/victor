@@ -79,9 +79,7 @@ async def initialize_file_watchers(
             )
 
     if initialized:
-        logger.info(
-            f"[FileWatcherInitializer] Initialized {len(initialized)} file watcher(s)"
-        )
+        logger.info(f"[FileWatcherInitializer] Initialized {len(initialized)} file watcher(s)")
 
 
 async def stop_file_watchers(
@@ -106,13 +104,9 @@ async def stop_file_watchers(
         try:
             stopped = await registry.stop_watcher(project_path)
             if stopped:
-                logger.info(
-                    f"[FileWatcherInitializer] Stopped watcher for {project_path}"
-                )
+                logger.info(f"[FileWatcherInitializer] Stopped watcher for {project_path}")
         except Exception as e:
-            logger.error(
-                f"[FileWatcherInitializer] Failed to stop watcher for {project_path}: {e}"
-            )
+            logger.error(f"[FileWatcherInitializer] Failed to stop watcher for {project_path}: {e}")
 
 
 def get_project_paths_from_context(exec_ctx: Optional[dict]) -> List[Path]:

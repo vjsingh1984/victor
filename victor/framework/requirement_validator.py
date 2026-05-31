@@ -104,9 +104,7 @@ class ValidationResult:
     critical_gaps: List[RequirementStatus] = field(default_factory=list)
     summary: str = ""
 
-    def get_satisfied_count(
-        self, priority: Optional[RequirementPriority] = None
-    ) -> int:
+    def get_satisfied_count(self, priority: Optional[RequirementPriority] = None) -> int:
         """Get count of satisfied requirements (optionally filtered by priority)."""
         if priority is None:
             return len(self.satisfied_requirements)
@@ -204,9 +202,7 @@ class RequirementValidator:
         satisfaction_score = self._calculate_satisfaction_score(requirement_statuses)
 
         # Determine if satisfied (all P0 met + overall threshold)
-        is_satisfied = (
-            len(critical_gaps) == 0 and satisfaction_score >= self.overall_threshold
-        )
+        is_satisfied = len(critical_gaps) == 0 and satisfaction_score >= self.overall_threshold
 
         # Generate summary
         summary = self._generate_summary(
@@ -242,22 +238,14 @@ class RequirementValidator:
         req_type = requirement.type.value.lower()
 
         if req_type == "functional":
-            return self._validate_functional_requirement(
-                requirement, action_result, context
-            )
+            return self._validate_functional_requirement(requirement, action_result, context)
         elif req_type == "constraint":
-            return self._validate_constraint_requirement(
-                requirement, action_result, context
-            )
+            return self._validate_constraint_requirement(requirement, action_result, context)
         elif req_type == "quality":
-            return self._validate_quality_requirement(
-                requirement, action_result, context
-            )
+            return self._validate_quality_requirement(requirement, action_result, context)
         else:
             # Generic validation for other types
-            return self._validate_generic_requirement(
-                requirement, action_result, context
-            )
+            return self._validate_generic_requirement(requirement, action_result, context)
 
     def _validate_functional_requirement(
         self,
@@ -292,8 +280,7 @@ class RequirementValidator:
 
         # Check for answers/explanations
         if any(
-            word in description_lower
-            for word in ["explain", "describe", "analyze", "summarize"]
+            word in description_lower for word in ["explain", "describe", "analyze", "summarize"]
         ):
             # Check if response has substantial content
             response = self._extract_response(action_result)
@@ -311,9 +298,7 @@ class RequirementValidator:
                 )
 
         # Check for fixes/changes
-        if any(
-            word in description_lower for word in ["fix", "change", "update", "modify"]
-        ):
+        if any(word in description_lower for word in ["fix", "change", "update", "modify"]):
             # Check if any tool was used (indicates action taken)
             tool_calls = self._extract_tool_calls(action_result)
             if tool_calls:
@@ -399,9 +384,7 @@ class RequirementValidator:
             "commented",
         ]
 
-        if response and any(
-            keyword in response.lower() for keyword in quality_keywords
-        ):
+        if response and any(keyword in response.lower() for keyword in quality_keywords):
             return RequirementStatus(
                 requirement=requirement,
                 is_satisfied=True,
@@ -447,9 +430,7 @@ class RequirementValidator:
             gap_description="Could not verify requirement was addressed",
         )
 
-    def _calculate_satisfaction_score(
-        self, requirement_statuses: List[RequirementStatus]
-    ) -> float:
+    def _calculate_satisfaction_score(self, requirement_statuses: List[RequirementStatus]) -> float:
         """Calculate priority-weighted satisfaction score.
 
         P0 requirements: 40% weight
@@ -500,9 +481,7 @@ class RequirementValidator:
                 f"{len(satisfied)}/{len(satisfied) + len(missing)} met)"
             )
         elif critical_gaps:
-            gap_desc = ", ".join(
-                [g.requirement.description[:50] for g in critical_gaps[:3]]
-            )
+            gap_desc = ", ".join([g.requirement.description[:50] for g in critical_gaps[:3]])
             return (
                 f"Critical requirements not met: {gap_desc}... "
                 f"(score: {score:.2f}, {len(satisfied)}/{len(satisfied) + len(missing)} met)"

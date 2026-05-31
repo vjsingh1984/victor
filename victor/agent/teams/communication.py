@@ -123,9 +123,7 @@ class AgentMessage:
             "priority": self.priority,
         }
 
-    def to_context_string(
-        self, presentation: Optional["PresentationProtocol"] = None
-    ) -> str:
+    def to_context_string(self, presentation: Optional["PresentationProtocol"] = None) -> str:
         """Format message for inclusion in agent context.
 
         Args:

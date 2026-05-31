@@ -39,9 +39,7 @@ def _load_vertical_attr(module_path: str, attr_name: str):
     try:
         return _resolve_vertical_attr(module_path, attr_name)
     except ImportError:
-        pytest.skip(
-            f"Vertical module or attribute unavailable: {module_path}:{attr_name}"
-        )
+        pytest.skip(f"Vertical module or attribute unavailable: {module_path}:{attr_name}")
 
 
 class TestResearchVerticalIndependence:
@@ -51,9 +49,7 @@ class TestResearchVerticalIndependence:
         """ResearchAssistant can be imported without coding module."""
         # Temporarily make coding module raise ImportError
         coding_modules = [
-            key
-            for key in sys.modules.keys()
-            if "victor_coding" in key or "victor.coding" in key
+            key for key in sys.modules.keys() if "victor_coding" in key or "victor.coding" in key
         ]
 
         # Store original modules
@@ -69,9 +65,7 @@ class TestResearchVerticalIndependence:
             if "victor.research" in sys.modules:
                 del sys.modules["victor.research"]
 
-            ResearchAssistant = _load_vertical_attr(
-                "victor.research", "ResearchAssistant"
-            )
+            ResearchAssistant = _load_vertical_attr("victor.research", "ResearchAssistant")
 
             # Should be able to access basic properties
             assert ResearchAssistant.name == "research"

@@ -431,10 +431,7 @@ class TestFrameworkExports:
             create_prompt_rollout_experiment_async as ExportedCreatePromptRolloutExperimentAsync,
         )
 
-        assert (
-            ExportedCreatePromptRolloutExperimentAsync
-            is create_prompt_rollout_experiment_async
-        )
+        assert ExportedCreatePromptRolloutExperimentAsync is create_prompt_rollout_experiment_async
 
     def test_analyze_prompt_rollout_experiment_exported(self):
         """Test rollout analysis helper is exported from framework."""
@@ -442,9 +439,7 @@ class TestFrameworkExports:
             analyze_prompt_rollout_experiment as ExportedAnalyzePromptRolloutExperiment,
         )
 
-        assert (
-            ExportedAnalyzePromptRolloutExperiment is analyze_prompt_rollout_experiment
-        )
+        assert ExportedAnalyzePromptRolloutExperiment is analyze_prompt_rollout_experiment
 
     def test_analyze_prompt_rollout_experiment_async_exported(self):
         """Test async rollout analysis helper is exported from framework."""
@@ -453,8 +448,7 @@ class TestFrameworkExports:
         )
 
         assert (
-            ExportedAnalyzePromptRolloutExperimentAsync
-            is analyze_prompt_rollout_experiment_async
+            ExportedAnalyzePromptRolloutExperimentAsync is analyze_prompt_rollout_experiment_async
         )
 
     def test_apply_prompt_rollout_recommendation_exported(self):
@@ -463,10 +457,7 @@ class TestFrameworkExports:
             apply_prompt_rollout_recommendation as ExportedApplyPromptRolloutRecommendation,
         )
 
-        assert (
-            ExportedApplyPromptRolloutRecommendation
-            is apply_prompt_rollout_recommendation
-        )
+        assert ExportedApplyPromptRolloutRecommendation is apply_prompt_rollout_recommendation
 
     def test_apply_prompt_rollout_recommendation_async_exported(self):
         """Test async rollout decision helper is exported from framework."""

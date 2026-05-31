@@ -69,9 +69,7 @@ def test_facades_expose_only_constructor_and_property_accessors() -> None:
 
     for relative_path, class_name in FACADE_SPECS:
         class_node = _load_class_node(relative_path, class_name)
-        allowed_private_helpers = ALLOWED_PRIVATE_HELPERS.get(
-            (relative_path, class_name), set()
-        )
+        allowed_private_helpers = ALLOWED_PRIVATE_HELPERS.get((relative_path, class_name), set())
         for node in class_node.body:
             if isinstance(node, ast.AsyncFunctionDef):
                 violations.append(

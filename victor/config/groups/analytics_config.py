@@ -56,7 +56,5 @@ class AnalyticsSettings(BaseModel):
         if v < 1:
             raise ValueError("streaming_metrics_history_size must be >= 1")
         if v > 10000:
-            raise ValueError(
-                "streaming_metrics_history_size must be <= 10000 (unreasonably large)"
-            )
+            raise ValueError("streaming_metrics_history_size must be <= 10000 (unreasonably large)")
         return v

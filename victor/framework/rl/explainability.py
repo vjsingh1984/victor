@@ -219,11 +219,7 @@ class RecommendationExplainer:
                 signals.append(
                     {
                         "source": "rl_q_learning",
-                        "value": (
-                            round(rec.value, 3)
-                            if isinstance(rec.value, float)
-                            else None
-                        ),
+                        "value": (round(rec.value, 3) if isinstance(rec.value, float) else None),
                         "weight": 0.9,
                         "description": rec.reason,
                     }
@@ -349,9 +345,7 @@ def get_recommendation_explainer(
     """
     from victor.core.feature_flags import FeatureFlag, get_feature_flag_manager
 
-    if not get_feature_flag_manager().is_enabled(
-        FeatureFlag.USE_LEARNING_FROM_EXECUTION
-    ):
+    if not get_feature_flag_manager().is_enabled(FeatureFlag.USE_LEARNING_FROM_EXECUTION):
         return None
 
     if coordinator is None:

@@ -121,10 +121,7 @@ def apply_cost_preference(
         CostTier.HIGH: 0.0,
     }
 
-    adjusted = [
-        (name, score + tier_boost.get(tier, 0.0), tier)
-        for name, score, tier in candidates
-    ]
+    adjusted = [(name, score + tier_boost.get(tier, 0.0), tier) for name, score, tier in candidates]
 
     return sorted(adjusted, key=lambda x: -x[1])
 

@@ -151,9 +151,7 @@ class QueryCache:
         logger.debug(f"Cache miss: {key}")
 
         value = compute_fn()
-        entry = CacheEntry(
-            value=value, ttl=ttl or self._default_ttl, tags=tags or set()
-        )
+        entry = CacheEntry(value=value, ttl=ttl or self._default_ttl, tags=tags or set())
         self._cache[key] = entry
 
         # Trigger cleanup if over threshold
@@ -220,9 +218,7 @@ class QueryCache:
     def _cleanup(self) -> None:
         """Clean up expired and least-recently-used entries."""
         # Remove expired entries
-        expired_keys = [
-            key for key, entry in self._cache.items() if not entry.is_valid()
-        ]
+        expired_keys = [key for key, entry in self._cache.items() if not entry.is_valid()]
         for key in expired_keys:
             del self._cache[key]
             self._stats["evictions"] += 1
@@ -237,8 +233,7 @@ class QueryCache:
                 self._stats["evictions"] += 1
 
         logger.debug(
-            f"Cache cleanup: {len(self._cache)} entries, "
-            f"{self._stats['evictions']} evictions"
+            f"Cache cleanup: {len(self._cache)} entries, " f"{self._stats['evictions']} evictions"
         )
 
     def get_stats(self) -> Dict[str, Any]:

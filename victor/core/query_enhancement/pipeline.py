@@ -141,9 +141,7 @@ class QueryEnhancementCache:
             del self._cache[key]
         return None
 
-    def set(
-        self, query: str, context: EnhancementContext, result: EnhancedQuery
-    ) -> None:
+    def set(self, query: str, context: EnhancementContext, result: EnhancedQuery) -> None:
         """Cache enhanced query result.
 
         Args:

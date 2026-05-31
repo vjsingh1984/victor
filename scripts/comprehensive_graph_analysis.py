@@ -76,9 +76,7 @@ def filter_victor_nodes(nodes: Dict, edges: List) -> Tuple[Dict, List]:
             if "/test" not in v["file"].lower() and "test_" not in v["file"].lower():
                 victor_nodes[k] = v
 
-    victor_edges = [
-        e for e in edges if e["src"] in victor_nodes and e["dst"] in victor_nodes
-    ]
+    victor_edges = [e for e in edges if e["src"] in victor_nodes and e["dst"] in victor_nodes]
 
     return victor_nodes, victor_edges
 
@@ -92,9 +90,7 @@ def build_networkx_graph(nodes: Dict, edges: List, directed: bool = True) -> nx.
 
     for edge in edges:
         if edge["src"] in nodes and edge["dst"] in nodes:
-            G.add_edge(
-                edge["src"], edge["dst"], edge_type=edge["type"], weight=edge["weight"]
-            )
+            G.add_edge(edge["src"], edge["dst"], edge_type=edge["type"], weight=edge["weight"])
 
     return G
 
@@ -155,9 +151,7 @@ def analyze_connected_components(G: nx.DiGraph) -> Dict:
             {
                 "component_id": i + 1,
                 "size": len(comp),
-                "top_modules": dict(
-                    sorted(modules.items(), key=lambda x: x[1], reverse=True)[:5]
-                ),
+                "top_modules": dict(sorted(modules.items(), key=lambda x: x[1], reverse=True)[:5]),
                 "node_types": dict(types),
             }
         )
@@ -227,9 +221,7 @@ def analyze_centrality(G: nx.DiGraph) -> Dict:
     print("  Computing betweenness centrality (sampled)...")
     try:
         betweenness = nx.betweenness_centrality(G, k=min(500, G.number_of_nodes()))
-        top_betweenness = sorted(betweenness.items(), key=lambda x: x[1], reverse=True)[
-            :30
-        ]
+        top_betweenness = sorted(betweenness.items(), key=lambda x: x[1], reverse=True)[:30]
         results["betweenness"] = [
             {
                 "node_id": n,
@@ -263,9 +255,7 @@ def analyze_dead_code(G: nx.DiGraph, nodes: Dict) -> Dict:
             if len(meaningful_in_edges) == 0:
                 # Check if it's a public API (doesn't start with _)
                 is_private = node["name"].startswith("_")
-                is_dunder = node["name"].startswith("__") and node["name"].endswith(
-                    "__"
-                )
+                is_dunder = node["name"].startswith("__") and node["name"].endswith("__")
 
                 dead_code_candidates.append(
                     {
@@ -293,14 +283,11 @@ def analyze_dead_code(G: nx.DiGraph, nodes: Dict) -> Dict:
     return {
         "total_candidates": len(dead_code_candidates),
         "by_severity": {
-            "medium": len(
-                [x for x in dead_code_candidates if x["severity"] == "medium"]
-            ),
+            "medium": len([x for x in dead_code_candidates if x["severity"] == "medium"]),
             "low": len([x for x in dead_code_candidates if x["severity"] == "low"]),
         },
         "by_module": {
-            m: len(v)
-            for m, v in sorted(by_module.items(), key=lambda x: len(x[1]), reverse=True)
+            m: len(v) for m, v in sorted(by_module.items(), key=lambda x: len(x[1]), reverse=True)
         },
         "candidates": dead_code_candidates[:100],  # Top 100 for report
     }
@@ -327,12 +314,8 @@ def analyze_code_coupling(G: nx.DiGraph, nodes: Dict) -> Dict:
     # Calculate coupling metrics
     coupling_analysis = []
     for mod in module_graph.nodes():
-        in_coupling = sum(
-            d["weight"] for _, _, d in module_graph.in_edges(mod, data=True)
-        )
-        out_coupling = sum(
-            d["weight"] for _, _, d in module_graph.out_edges(mod, data=True)
-        )
+        in_coupling = sum(d["weight"] for _, _, d in module_graph.in_edges(mod, data=True))
+        out_coupling = sum(d["weight"] for _, _, d in module_graph.out_edges(mod, data=True))
 
         coupling_analysis.append(
             {
@@ -354,9 +337,7 @@ def analyze_code_coupling(G: nx.DiGraph, nodes: Dict) -> Dict:
     tight_coupling = []
     for src, dst, data in module_graph.edges(data=True):
         if data["weight"] >= 20:  # Significant coupling
-            tight_coupling.append(
-                {"source": src, "target": dst, "edge_count": data["weight"]}
-            )
+            tight_coupling.append({"source": src, "target": dst, "edge_count": data["weight"]})
     tight_coupling.sort(key=lambda x: x["edge_count"], reverse=True)
 
     # Circular dependencies
@@ -469,9 +450,7 @@ def analyze_duplications(G: nx.DiGraph, nodes: Dict) -> Dict:
                 }
             )
 
-    similar_patterns.sort(
-        key=lambda x: (len(x["functions"]), x["pattern_size"]), reverse=True
-    )
+    similar_patterns.sort(key=lambda x: (len(x["functions"]), x["pattern_size"]), reverse=True)
 
     return {
         "name_duplicates": name_duplicates[:50],
@@ -491,12 +470,8 @@ def analyze_graph_metrics(G: nx.DiGraph) -> Dict:
         "nodes": G.number_of_nodes(),
         "edges": G.number_of_edges(),
         "density": round(nx.density(G), 6),
-        "avg_in_degree": round(
-            sum(d for _, d in G.in_degree()) / G.number_of_nodes(), 2
-        ),
-        "avg_out_degree": round(
-            sum(d for _, d in G.out_degree()) / G.number_of_nodes(), 2
-        ),
+        "avg_in_degree": round(sum(d for _, d in G.in_degree()) / G.number_of_nodes(), 2),
+        "avg_out_degree": round(sum(d for _, d in G.out_degree()) / G.number_of_nodes(), 2),
     }
 
     # Node type distribution
@@ -559,9 +534,7 @@ def generate_module_dependency_data(G: nx.DiGraph, nodes: Dict) -> Dict:
     return {
         "modules": [
             {"name": m, "size": len(n)}
-            for m, n in sorted(
-                module_nodes.items(), key=lambda x: len(x[1]), reverse=True
-            )
+            for m, n in sorted(module_nodes.items(), key=lambda x: len(x[1]), reverse=True)
         ],
         "dependencies": dependencies,
     }
@@ -670,9 +643,7 @@ def generate_summary_report(results: Dict):
         cc = results["connected_components"]
         f.write(f"- **Weakly Connected Components**: {cc['num_weak_components']}\n")
         f.write(f"- **Strongly Connected Components**: {cc['num_strong_components']}\n")
-        f.write(
-            f"- **Main Component Coverage**: {cc['largest_weak_component_ratio']*100:.1f}%\n\n"
-        )
+        f.write(f"- **Main Component Coverage**: {cc['largest_weak_component_ratio']*100:.1f}%\n\n")
 
         f.write("### Top Components\n\n")
         for comp in cc["component_details"][:5]:
@@ -699,34 +670,24 @@ def generate_summary_report(results: Dict):
             f.write(f"| {sev} | {count} |\n")
 
         f.write("\n### By Module\n\n")
-        f.write(
-            "| Module | Dead Code Candidates |\n|--------|----------------------|\n"
-        )
+        f.write("| Module | Dead Code Candidates |\n|--------|----------------------|\n")
         for mod, count in list(dc["by_module"].items())[:15]:
             f.write(f"| {mod} | {count} |\n")
 
         f.write("\n### Sample Dead Code Candidates (Medium Severity)\n\n")
         f.write("| Name | Type | File | Line |\n")
         f.write("|------|------|------|------|\n")
-        medium_candidates = [c for c in dc["candidates"] if c["severity"] == "medium"][
-            :30
-        ]
+        medium_candidates = [c for c in dc["candidates"] if c["severity"] == "medium"][:30]
         for c in medium_candidates:
-            short_file = (
-                "/".join(Path(c["file"]).parts[-3:]) if c["file"] else "unknown"
-            )
-            f.write(
-                f"| {c['name'][:30]} | {c['type']} | {short_file} | {c['line']} |\n"
-            )
+            short_file = "/".join(Path(c["file"]).parts[-3:]) if c["file"] else "unknown"
+            f.write(f"| {c['name'][:30]} | {c['type']} | {short_file} | {c['line']} |\n")
 
         # Coupling
         f.write("\n## Code Coupling Analysis\n\n")
         coupling = results["coupling"]
         f.write(f"- **Module Graph Density**: {coupling['module_graph_density']:.4f}\n")
         f.write(f"- **Total Modules**: {coupling['module_count']}\n")
-        f.write(
-            f"- **Circular Dependencies**: {len(coupling['circular_dependencies'])}\n\n"
-        )
+        f.write(f"- **Circular Dependencies**: {len(coupling['circular_dependencies'])}\n\n")
 
         f.write("### Module Coupling Metrics\n\n")
         f.write("| Module | Afferent | Efferent | Total | Instability |\n")
@@ -751,28 +712,20 @@ def generate_summary_report(results: Dict):
         f.write("\n## Duplication Analysis\n\n")
         dup = results["duplications"]
         f.write(f"- **Name Duplicates**: {dup['summary']['total_name_duplicates']}\n")
-        f.write(
-            f"- **Signature Duplicates**: {dup['summary']['total_signature_duplicates']}\n"
-        )
-        f.write(
-            f"- **Similar Call Patterns**: {dup['summary']['total_pattern_duplicates']}\n\n"
-        )
+        f.write(f"- **Signature Duplicates**: {dup['summary']['total_signature_duplicates']}\n")
+        f.write(f"- **Similar Call Patterns**: {dup['summary']['total_pattern_duplicates']}\n\n")
 
         f.write("### Name Duplicates (Potential Consolidation)\n\n")
         for d in dup["name_duplicates"][:20]:
             f.write(f"**{d['type']} `{d['name']}`** ({d['count']} occurrences)\n")
             for loc in d["locations"][:3]:
-                short_file = (
-                    "/".join(Path(loc["file"]).parts[-3:]) if loc["file"] else "unknown"
-                )
+                short_file = "/".join(Path(loc["file"]).parts[-3:]) if loc["file"] else "unknown"
                 f.write(f"  - {short_file}:{loc['line']}\n")
             f.write("\n")
 
         f.write("### Similar Call Patterns (Possible Abstraction Candidates)\n\n")
         for p in dup["similar_call_patterns"][:10]:
-            f.write(
-                f"**{len(p['functions'])} functions share {p['pattern_size']} calls**\n"
-            )
+            f.write(f"**{len(p['functions'])} functions share {p['pattern_size']} calls**\n")
             for func in p["functions"][:3]:
                 f.write(f"  - `{func['name']}` in {func['module']}\n")
             f.write(f"  - Shared calls: {', '.join(p['shared_calls'][:5])}\n\n")

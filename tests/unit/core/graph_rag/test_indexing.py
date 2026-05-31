@@ -308,18 +308,10 @@ async def test_graph_indexing_pipeline_excludes_root_level_coverage_temp_files(
 async def test_graph_indexing_pipeline_discovers_files_by_language_then_path(
     tmp_path: Path,
 ):
-    (tmp_path / "z_python.py").write_text(
-        "def zed():\n    return 1\n", encoding="utf-8"
-    )
-    (tmp_path / "a_typescript.ts").write_text(
-        "export const value = 1\n", encoding="utf-8"
-    )
-    (tmp_path / "b_python.py").write_text(
-        "def bee():\n    return 2\n", encoding="utf-8"
-    )
-    (tmp_path / "a_javascript.js").write_text(
-        "export const value = 1\n", encoding="utf-8"
-    )
+    (tmp_path / "z_python.py").write_text("def zed():\n    return 1\n", encoding="utf-8")
+    (tmp_path / "a_typescript.ts").write_text("export const value = 1\n", encoding="utf-8")
+    (tmp_path / "b_python.py").write_text("def bee():\n    return 2\n", encoding="utf-8")
+    (tmp_path / "a_javascript.js").write_text("export const value = 1\n", encoding="utf-8")
 
     graph_store = _RecordingGraphStore()
     config = GraphIndexConfig(
@@ -420,9 +412,7 @@ async def test_graph_indexing_pipeline_ignores_files_that_vanish_before_incremen
 
 
 @pytest.mark.asyncio
-async def test_run_indexing_with_lock_uses_project_index_lock(
-    monkeypatch, tmp_path: Path
-):
+async def test_run_indexing_with_lock_uses_project_index_lock(monkeypatch, tmp_path: Path):
     lock_events: list[str] = []
 
     class _FakePathLock:
@@ -577,9 +567,7 @@ async def test_resolve_cross_file_calls_skips_self_loops(monkeypatch, tmp_path: 
     )
 
     captured: list[GraphEdge] = []
-    monkeypatch.setattr(
-        graph_store, "upsert_edges", lambda edges: captured.extend(edges)
-    )
+    monkeypatch.setattr(graph_store, "upsert_edges", lambda edges: captured.extend(edges))
 
     emitted = await pipeline._resolve_cross_file_calls(tmp_path)
 
@@ -588,9 +576,7 @@ async def test_resolve_cross_file_calls_skips_self_loops(monkeypatch, tmp_path: 
 
 
 @pytest.mark.asyncio
-async def test_resolve_cross_file_calls_respects_fanout_cap(
-    monkeypatch, tmp_path: Path
-):
+async def test_resolve_cross_file_calls_respects_fanout_cap(monkeypatch, tmp_path: Path):
     graph_store = _RecordingGraphStore()
     config = GraphIndexConfig(
         root_path=tmp_path,
@@ -682,9 +668,7 @@ def test_tree_sitter_parser_cache_is_lru_one_per_language(monkeypatch, tmp_path:
 
 
 @pytest.mark.asyncio
-async def test_resolve_filters_by_impl_type_when_receiver_known(
-    monkeypatch, tmp_path: Path
-):
+async def test_resolve_filters_by_impl_type_when_receiver_known(monkeypatch, tmp_path: Path):
     graph_store = _RecordingGraphStore()
     config = GraphIndexConfig(
         root_path=tmp_path,
@@ -729,9 +713,7 @@ async def test_resolve_filters_by_impl_type_when_receiver_known(
 
 
 @pytest.mark.asyncio
-async def test_resolve_does_not_fall_back_when_receiver_type_unmatched(
-    monkeypatch, tmp_path: Path
-):
+async def test_resolve_does_not_fall_back_when_receiver_type_unmatched(monkeypatch, tmp_path: Path):
     """If the receiver type is set but no impl T::method matches, drop the call.
 
     The receiver type tells us the call targets a specific T::method. If T isn't
@@ -774,9 +756,7 @@ async def test_resolve_does_not_fall_back_when_receiver_type_unmatched(
 
 
 @pytest.mark.asyncio
-async def test_resolve_drops_method_calls_with_no_inferable_receiver(
-    monkeypatch, tmp_path: Path
-):
+async def test_resolve_drops_method_calls_with_no_inferable_receiver(monkeypatch, tmp_path: Path):
     """Method-syntax call (`x.method()`) with receiver_type=None must NOT fall
     back to name-only. Reasoning: the user wrote dot-dispatch, so they wanted
     a specific impl; if we couldn't infer the type, binding to user-defined
@@ -826,9 +806,7 @@ async def test_resolve_drops_method_calls_with_no_inferable_receiver(
 
 
 @pytest.mark.asyncio
-async def test_resolve_does_not_fanout_when_external_stdlib_receiver(
-    monkeypatch, tmp_path: Path
-):
+async def test_resolve_does_not_fanout_when_external_stdlib_receiver(monkeypatch, tmp_path: Path):
     """Regression: `vec.iter()` where vec: Vec (stdlib) must not fan out.
 
     Reproduces the inflation observed on proximaDB: one call site with
@@ -886,9 +864,7 @@ async def test_resolve_does_not_fanout_when_external_stdlib_receiver(
 
 
 @pytest.mark.asyncio
-async def test_resolve_receiver_typed_match_bypasses_fanout_cap(
-    monkeypatch, tmp_path: Path
-):
+async def test_resolve_receiver_typed_match_bypasses_fanout_cap(monkeypatch, tmp_path: Path):
     """A receiver-typed match is precise enough that fanout cap shouldn't apply.
 
     If 30 impls of Foo all define `method`, the receiver-typed lookup should still
@@ -943,9 +919,7 @@ async def test_resolve_receiver_typed_match_bypasses_fanout_cap(
 
 
 @pytest.mark.asyncio
-async def test_name_only_resolution_prefers_same_file_candidate(
-    monkeypatch, tmp_path: Path
-):
+async def test_name_only_resolution_prefers_same_file_candidate(monkeypatch, tmp_path: Path):
     """A plain function call inside file A binds only to the file-A candidate,
     not every same-leaf-name function elsewhere.
 
@@ -1030,9 +1004,7 @@ async def test_name_index_excludes_trait_impl_methods(monkeypatch, tmp_path: Pat
     await pipeline._resolve_cross_file_calls(tmp_path)
 
     # The leaf-name query (no "impl_type" alias) must filter trait impls.
-    leaf_queries = [
-        q for q in captured_queries if "FROM graph_node" in q and "impl_type" not in q
-    ]
+    leaf_queries = [q for q in captured_queries if "FROM graph_node" in q and "impl_type" not in q]
     assert leaf_queries, "expected at least one leaf-name SELECT against graph_node"
     leaf_query = leaf_queries[0]
     assert "NOT LIKE" in leaf_query, (
@@ -1045,9 +1017,7 @@ async def test_name_index_excludes_trait_impl_methods(monkeypatch, tmp_path: Pat
 
 
 @pytest.mark.asyncio
-async def test_name_only_falls_through_when_no_same_file_candidate(
-    monkeypatch, tmp_path: Path
-):
+async def test_name_only_falls_through_when_no_same_file_candidate(monkeypatch, tmp_path: Path):
     """If no candidate is in the caller's file, keep the original
     cross-file candidate set (subject to fanout cap). Conservative: we
     only restrict when same-file candidates exist."""
@@ -1127,9 +1097,7 @@ def _make_pipeline(tmp_path: Path) -> GraphIndexingPipeline:
     return GraphIndexingPipeline(_RecordingGraphStore(), config)
 
 
-def test_parse_file_sync_uses_enhanced_provider_when_available(
-    monkeypatch, tmp_path: Path
-) -> None:
+def test_parse_file_sync_uses_enhanced_provider_when_available(monkeypatch, tmp_path: Path) -> None:
     file_path = tmp_path / "a.py"
     file_path.write_text("def whatever(): pass\n", encoding="utf-8")
 
@@ -1150,9 +1118,7 @@ def test_parse_file_sync_uses_enhanced_provider_when_available(
 
     # Guarantee a failure if the hardcoded path runs instead of the provider.
     def _should_not_run(*args, **kwargs):  # pragma: no cover - guard
-        raise AssertionError(
-            "_extract_definitions should not run when provider succeeds"
-        )
+        raise AssertionError("_extract_definitions should not run when provider succeeds")
 
     monkeypatch.setattr(pipeline, "_extract_definitions", _should_not_run)
 
@@ -1173,9 +1139,7 @@ def test_parse_file_sync_uses_enhanced_provider_when_available(
     assert result.provider_fallback is False
 
 
-def test_parse_file_sync_falls_back_when_provider_raises(
-    monkeypatch, tmp_path: Path
-) -> None:
+def test_parse_file_sync_falls_back_when_provider_raises(monkeypatch, tmp_path: Path) -> None:
     file_path = tmp_path / "b.py"
     file_path.write_text("def whatever(): pass\n", encoding="utf-8")
 
@@ -1366,9 +1330,7 @@ async def test_resolve_cross_file_relationships_drops_self_loops(
     )
 
     captured: list[GraphEdge] = []
-    monkeypatch.setattr(
-        graph_store, "upsert_edges", lambda edges: captured.extend(edges)
-    )
+    monkeypatch.setattr(graph_store, "upsert_edges", lambda edges: captured.extend(edges))
 
     emitted = await pipeline._resolve_cross_file_relationships(tmp_path)
     assert emitted == 0
@@ -1434,10 +1396,7 @@ def test_resolve_module_to_path_prefers_module_over_package(tmp_path: Path) -> N
     )
     # Unknown module: stdlib / third-party / typo — must return None so the
     # resolver can count it as "external" and skip rather than crash.
-    assert (
-        pipeline._resolve_module_to_path("definitely.not.here", "python", tmp_path)
-        is None
-    )
+    assert pipeline._resolve_module_to_path("definitely.not.here", "python", tmp_path) is None
     # Non-Python languages return None today (documented limitation).
     assert pipeline._resolve_module_to_path("pkg.child", "typescript", tmp_path) is None
 
@@ -1517,9 +1476,7 @@ async def test_resolve_imports_emits_edges_between_module_nodes(
 
 
 @pytest.mark.asyncio
-async def test_resolve_imports_skips_stdlib_and_self(
-    monkeypatch, tmp_path: Path
-) -> None:
+async def test_resolve_imports_skips_stdlib_and_self(monkeypatch, tmp_path: Path) -> None:
     pipeline = _make_pipeline(tmp_path)
     src = tmp_path / "x.py"
     src.write_text("")
@@ -1547,9 +1504,7 @@ async def test_resolve_imports_skips_stdlib_and_self(
 
 
 @pytest.mark.asyncio
-async def test_resolve_imports_deduplicates_repeated_pairs(
-    monkeypatch, tmp_path: Path
-) -> None:
+async def test_resolve_imports_deduplicates_repeated_pairs(monkeypatch, tmp_path: Path) -> None:
     """The same ``import x`` appearing twice in one file should only emit
     one IMPORTS edge — graph_edge is keyed by (src, dst, type)."""
     pipeline = _make_pipeline(tmp_path)
@@ -1606,9 +1561,7 @@ async def test_resolve_imports_non_python_languages_are_skipped(
 
 
 @pytest.mark.asyncio
-async def test_resolve_imports_drops_dangling_targets(
-    monkeypatch, tmp_path: Path
-) -> None:
+async def test_resolve_imports_drops_dangling_targets(monkeypatch, tmp_path: Path) -> None:
     """A target file that exists on disk but wasn't indexed (excluded by
     pattern, parse-failed, etc.) must NOT produce an IMPORTS edge — the
     edge would point at a non-existent module node.
@@ -1649,13 +1602,9 @@ async def test_inject_module_node_links_top_level_symbols_via_parent_id(
     GraphNode, _ = _get_graph_types_for_test()
     top1 = GraphNode(node_id="t1", type="function", name="foo", file="x.py", line=1)
     top2 = GraphNode(node_id="t2", type="class", name="Bar", file="x.py", line=5)
-    nested = GraphNode(
-        node_id="n1", type="method", name="m", file="x.py", line=6, parent_id="t2"
-    )
+    nested = GraphNode(node_id="n1", type="method", name="m", file="x.py", line=6, parent_id="t2")
 
-    augmented = pipeline._inject_module_node(
-        [top1, top2, nested], Path("x.py"), "python"
-    )
+    augmented = pipeline._inject_module_node([top1, top2, nested], Path("x.py"), "python")
 
     assert augmented[0].type == "module"
     module_id = augmented[0].node_id
@@ -1694,9 +1643,7 @@ async def test_resolve_cross_file_relationships_unresolved_target_skipped(
     )
 
     captured: list[GraphEdge] = []
-    monkeypatch.setattr(
-        graph_store, "upsert_edges", lambda edges: captured.extend(edges)
-    )
+    monkeypatch.setattr(graph_store, "upsert_edges", lambda edges: captured.extend(edges))
 
     emitted = await pipeline._resolve_cross_file_relationships(tmp_path)
     assert emitted == 0
@@ -1742,9 +1689,7 @@ def test_provider_symbols_to_graph_nodes_resolves_parent_id_from_hints() -> None
     assert bar.type == "method"
 
 
-def test_provider_symbols_to_graph_nodes_does_not_promote_when_parent_not_class() -> (
-    None
-):
+def test_provider_symbols_to_graph_nodes_does_not_promote_when_parent_not_class() -> None:
     """A nested function inside another function must stay typed as
     ``function`` — promotion only fires for class-like parents.
     """
@@ -1854,9 +1799,7 @@ async def test_consume_yields_between_flushes(monkeypatch, tmp_path: Path) -> No
         )
     await queue.put(streaming._STREAM_DONE)
 
-    stats = await streaming._consume(
-        queue, total_files=3, done_offset=0, progress_callback=None
-    )
+    stats = await streaming._consume(queue, total_files=3, done_offset=0, progress_callback=None)
 
     # write_batch_size=1 -> flush runs per file. The 3rd flush happens on
     # the STREAM_DONE branch and intentionally does NOT yield (we're done),

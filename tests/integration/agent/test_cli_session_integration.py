@@ -33,9 +33,7 @@ def _load_vertical_attr(module_path: str, attr_name: str):
     """Resolve a vertical attribute and skip test when unavailable."""
     module, _resolved = import_module_with_fallback(module_path)
     if module is None or not hasattr(module, attr_name):
-        pytest.skip(
-            f"Vertical module or attribute unavailable: {module_path}:{attr_name}"
-        )
+        pytest.skip(f"Vertical module or attribute unavailable: {module_path}:{attr_name}")
     return getattr(module, attr_name)
 
 
@@ -66,9 +64,7 @@ class TestCLISessionInitialization:
         mock_factory = MagicMock()
         mock_factory.create = AsyncMock(return_value=mock_agent)
 
-        with patch(
-            "victor.framework.agent_factory.AgentFactory", return_value=mock_factory
-        ):
+        with patch("victor.framework.agent_factory.AgentFactory", return_value=mock_factory):
             agent = await handler.initialize(session_config)
 
         # Verify agent was created
@@ -103,9 +99,7 @@ class TestCLISessionInitialization:
     @pytest.mark.integration
     async def test_session_with_vertical_integration(self, session_config):
         """Test session with vertical integration."""
-        CodingAssistant = _load_vertical_attr(
-            "victor.coding.assistant", "CodingAssistant"
-        )
+        CodingAssistant = _load_vertical_attr("victor.coding.assistant", "CodingAssistant")
 
         session_config.vertical = "coding"
 
@@ -117,9 +111,7 @@ class TestCLISessionInitialization:
         mock_factory = MagicMock()
         mock_factory.create = AsyncMock(return_value=mock_agent)
 
-        with patch(
-            "victor.framework.agent_factory.AgentFactory", return_value=mock_factory
-        ):
+        with patch("victor.framework.agent_factory.AgentFactory", return_value=mock_factory):
             with patch("victor.core.verticals.get_vertical") as mock_get_vertical:
                 mock_get_vertical.return_value = CodingAssistant
 
@@ -198,9 +190,7 @@ class TestCLIMessageProcessing:
 
         # Process multiple messages concurrently
         messages = ["Hello", "World", "Test"]
-        tasks = [
-            handler.process_message(mock_agent, msg, stream=True) for msg in messages
-        ]
+        tasks = [handler.process_message(mock_agent, msg, stream=True) for msg in messages]
 
         responses = await asyncio.gather(*tasks)
 
@@ -241,9 +231,7 @@ class TestCLISessionLifecycle:
         mock_factory = MagicMock()
         mock_factory.create = AsyncMock(return_value=mock_agent)
 
-        with patch(
-            "victor.framework.agent_factory.AgentFactory", return_value=mock_factory
-        ):
+        with patch("victor.framework.agent_factory.AgentFactory", return_value=mock_factory):
             # Initialize
             agent = await handler.initialize(session_config)
             assert agent is mock_agent
@@ -278,9 +266,7 @@ class TestCLISessionLifecycle:
         mock_factory = MagicMock()
         mock_factory.create = AsyncMock(return_value=mock_agent)
 
-        with patch(
-            "victor.framework.agent_factory.AgentFactory", return_value=mock_factory
-        ):
+        with patch("victor.framework.agent_factory.AgentFactory", return_value=mock_factory):
             agent = await handler.initialize(session_config)
 
         metrics = SessionMetrics()
@@ -325,16 +311,12 @@ class TestOneShotIntegration:
         mock_factory = MagicMock()
         mock_factory.create = AsyncMock(return_value=mock_agent)
 
-        with patch(
-            "victor.framework.agent_factory.AgentFactory", return_value=mock_factory
-        ):
+        with patch("victor.framework.agent_factory.AgentFactory", return_value=mock_factory):
 
             async def mock_stream(msg):
                 yield MagicMock(content="One-shot response", type="content")
 
-            with patch.object(
-                handler, "process_message", return_value="One-shot response"
-            ):
+            with patch.object(handler, "process_message", return_value="One-shot response"):
                 metrics = await handler.execute(session_config, "Test message")
 
         assert metrics.success is True
@@ -347,9 +329,7 @@ class TestOneShotIntegration:
         mock_factory = MagicMock()
         mock_factory.create = AsyncMock(side_effect=Exception("Initialization failed"))
 
-        with patch(
-            "victor.framework.agent_factory.AgentFactory", return_value=mock_factory
-        ):
+        with patch("victor.framework.agent_factory.AgentFactory", return_value=mock_factory):
             with pytest.raises(Exception, match="Initialization failed"):
                 await handler.execute(session_config, "Test message")
 
@@ -380,12 +360,8 @@ class TestCLIModeSwitching:
         mock_factory = MagicMock()
         mock_factory.create = AsyncMock(return_value=mock_agent)
 
-        with patch(
-            "victor.framework.agent_factory.AgentFactory", return_value=mock_factory
-        ):
-            with patch(
-                "victor.agent.mode_controller.get_mode_controller"
-            ) as mock_get_controller:
+        with patch("victor.framework.agent_factory.AgentFactory", return_value=mock_factory):
+            with patch("victor.agent.mode_controller.get_mode_controller") as mock_get_controller:
                 mock_controller = MagicMock()
                 mock_get_controller.return_value = mock_controller
 
@@ -408,12 +384,8 @@ class TestCLIModeSwitching:
         mock_factory = MagicMock()
         mock_factory.create = AsyncMock(return_value=mock_agent)
 
-        with patch(
-            "victor.framework.agent_factory.AgentFactory", return_value=mock_factory
-        ):
-            with patch(
-                "victor.agent.mode_controller.get_mode_controller"
-            ) as mock_get_controller:
+        with patch("victor.framework.agent_factory.AgentFactory", return_value=mock_factory):
+            with patch("victor.agent.mode_controller.get_mode_controller") as mock_get_controller:
                 mock_controller = MagicMock()
                 # Simulate mode switch failure
                 mock_controller.switch_mode.side_effect = ValueError("Invalid mode")
@@ -452,9 +424,7 @@ class TestCLISessionPersistence:
         mock_factory = MagicMock()
         mock_factory.create = AsyncMock(return_value=mock_agent)
 
-        with patch(
-            "victor.framework.agent_factory.AgentFactory", return_value=mock_factory
-        ):
+        with patch("victor.framework.agent_factory.AgentFactory", return_value=mock_factory):
             agent = await handler.initialize(config)
 
         # Process some messages
@@ -500,9 +470,7 @@ class TestCLIErrorRecovery:
         mock_factory = MagicMock()
         mock_factory.create = AsyncMock(return_value=mock_agent)
 
-        with patch(
-            "victor.framework.agent_factory.AgentFactory", return_value=mock_factory
-        ):
+        with patch("victor.framework.agent_factory.AgentFactory", return_value=mock_factory):
             agent = await handler.initialize(config)
 
         # Simulate streaming failure
@@ -538,13 +506,9 @@ class TestCLIErrorRecovery:
         )
 
         mock_factory = MagicMock()
-        mock_factory.create = AsyncMock(
-            side_effect=RuntimeError("Provider unavailable")
-        )
+        mock_factory.create = AsyncMock(side_effect=RuntimeError("Provider unavailable"))
 
-        with patch(
-            "victor.framework.agent_factory.AgentFactory", return_value=mock_factory
-        ):
+        with patch("victor.framework.agent_factory.AgentFactory", return_value=mock_factory):
             # Should raise initialization error
             with pytest.raises(RuntimeError, match="Provider unavailable"):
                 await handler.initialize(config)

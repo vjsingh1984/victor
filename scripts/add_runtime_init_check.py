@@ -70,9 +70,7 @@ def add_runtime_check_function():
 
 '''
 
-    content = re.sub(
-        registry_totals_end_pattern, runtime_check_function, content, count=1
-    )
+    content = re.sub(registry_totals_end_pattern, runtime_check_function, content, count=1)
 
     with open("scripts/benchmark_startup_kpi.py", "w") as f:
         f.write(content)

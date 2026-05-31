@@ -124,9 +124,7 @@ class TestToolRegistryDeduplication:
         registry = ToolRegistry()
 
         # Register LangChain tool first (higher priority than MCP)
-        lc_tool = MockLangChainTool(
-            name="wikipedia", description="Wikipedia via LangChain"
-        )
+        lc_tool = MockLangChainTool(name="wikipedia", description="Wikipedia via LangChain")
         from victor.tools.langchain_adapter_tool import LangChainAdapterTool
 
         lc_adapter = LangChainAdapterTool(lc_tool)
@@ -284,9 +282,7 @@ class TestToolDeduplicatorIntegration:
         deduplicator = ToolDeduplicator(config)
 
         native_tool = MockNativeTool(name="special_tool", description="Special tool")
-        lc_tool = MockLangChainTool(
-            name="special_tool", description="Special tool via LangChain"
-        )
+        lc_tool = MockLangChainTool(name="special_tool", description="Special tool via LangChain")
 
         from victor.tools.langchain_adapter_tool import LangChainAdapterTool
 

@@ -163,9 +163,7 @@ class TestFilterTasks:
     def test_filter_by_max_tasks(self, sample_tasks):
         """Filter tasks by max_tasks limit."""
         runner = MockBenchmarkRunner()
-        config = EvaluationConfig(
-            benchmark=BenchmarkType.HUMAN_EVAL, model="test", max_tasks=2
-        )
+        config = EvaluationConfig(benchmark=BenchmarkType.HUMAN_EVAL, model="test", max_tasks=2)
 
         filtered = runner._filter_tasks(sample_tasks, config)
 
@@ -376,9 +374,7 @@ class TestEvaluationHarness:
         assert harness1 is harness2
 
     @pytest.mark.asyncio
-    async def test_run_evaluation_tolerates_unwritable_persistence_dirs(
-        self, tmp_path: Path
-    ):
+    async def test_run_evaluation_tolerates_unwritable_persistence_dirs(self, tmp_path: Path):
         """Evaluation should complete when checkpoint/result persistence is not writable."""
 
         class SingleTaskRunner(MockBenchmarkRunner):
@@ -479,9 +475,7 @@ class TestCheckpointPaths:
             prompt_section_name="GROUNDING_RULES",
         )
 
-        assert harness._get_checkpoint_path(first) != harness._get_checkpoint_path(
-            second
-        )
+        assert harness._get_checkpoint_path(first) != harness._get_checkpoint_path(second)
 
 
 class TestPromptCandidateEvaluationSuite:
@@ -576,9 +570,7 @@ class TestPromptCandidateEvaluationSuite:
         ]
         assert suite.to_dict()["best_label"] == "GROUNDING_RULES:anthropic:cand-123"
 
-    def test_prompt_candidate_evaluation_suite_from_dict_reconstructs_runs(
-        self, tmp_path
-    ):
+    def test_prompt_candidate_evaluation_suite_from_dict_reconstructs_runs(self, tmp_path):
         suite_payload = {
             "benchmark": "human_eval",
             "model": "test-model",
@@ -978,10 +970,7 @@ class TestBenchmarkToolUsageMetrics:
         assert loaded["summary"]["topology_feedback_coverage"] == 1.0
         assert loaded["tasks"][0]["code_search_calls"] == 2
         assert loaded["tasks"][0]["graph_calls"] == 1
-        assert (
-            loaded["tasks"][0]["metadata"]["topology_events"][0]["action"]
-            == "single_agent"
-        )
+        assert loaded["tasks"][0]["metadata"]["topology_events"][0]["action"] == "single_agent"
 
     def test_save_results_persists_task_report_efficiency_metrics(self, tmp_path):
         """Saved result JSON should keep task-report efficiency and ledger metadata."""
@@ -1030,25 +1019,19 @@ class TestBenchmarkToolUsageMetrics:
         assert loaded["summary"]["cost_usd_micros"] == 1500
         assert loaded["tasks"][0]["cached_tokens"] == 6
         assert loaded["tasks"][0]["metadata"]["task_report"]["task_id"] == "task-1"
-        assert loaded["tasks"][0]["metadata"][
-            "time_to_first_tool_call_seconds"
-        ] == pytest.approx(0.5)
-        assert loaded["tasks"][0]["metadata"][
-            "time_to_first_edit_seconds"
-        ] == pytest.approx(1.25)
+        assert loaded["tasks"][0]["metadata"]["time_to_first_tool_call_seconds"] == pytest.approx(
+            0.5
+        )
+        assert loaded["tasks"][0]["metadata"]["time_to_first_edit_seconds"] == pytest.approx(1.25)
         assert loaded["tasks"][0]["metadata"]["first_edit_tool_name"] == "edit"
         assert loaded["summary"]["accepted_patch_count"] == 1
         assert loaded["summary"]["tokens_to_merge_total"] == 25
         assert loaded["summary"]["avg_tokens_to_merge"] == pytest.approx(25.0)
         assert loaded["summary"]["cost_per_accepted_patch_usd"] == pytest.approx(0.0015)
-        assert loaded["summary"]["avg_time_to_first_edit_seconds"] == pytest.approx(
-            1.25
-        )
+        assert loaded["summary"]["avg_time_to_first_edit_seconds"] == pytest.approx(1.25)
         assert (
             "Intent:"
-            in loaded["tasks"][0]["metadata"]["task_report"]["metadata"][
-                "continuation_ledger"
-            ]
+            in loaded["tasks"][0]["metadata"]["task_report"]["metadata"]["continuation_ledger"]
         )
 
     def test_save_results_persists_planning_feedback_metrics(self, tmp_path):
@@ -1082,9 +1065,7 @@ class TestBenchmarkToolUsageMetrics:
         loaded = harness.load_results(saved_path)
 
         assert loaded["summary"]["planning_feedback_coverage"] == 1.0
-        assert loaded["summary"]["planning_policy_counts"] == {
-            "experiment_forced_slow_path": 1
-        }
+        assert loaded["summary"]["planning_policy_counts"] == {"experiment_forced_slow_path": 1}
 
     def test_save_results_persists_degradation_feedback_metrics(self, tmp_path):
         harness = EvaluationHarness(checkpoint_dir=tmp_path)
@@ -1123,10 +1104,7 @@ class TestBenchmarkToolUsageMetrics:
         assert loaded["summary"]["degradation_feedback_coverage"] == 1.0
         assert loaded["summary"]["recovered_task_count"] == 1
         assert loaded["summary"]["degradation_providers"] == {"ollama": 1}
-        assert (
-            loaded["tasks"][0]["metadata"]["degradation_events"][0]["provider"]
-            == "ollama"
-        )
+        assert loaded["tasks"][0]["metadata"]["degradation_events"][0]["provider"] == "ollama"
 
     def test_save_results_persists_team_feedback_metrics(self, tmp_path):
         """Saved benchmark summaries should include team/worktree telemetry aggregates."""
@@ -1186,10 +1164,7 @@ class TestBenchmarkToolUsageMetrics:
         assert loaded["summary"]["team_materialized_assignment_total"] == 2
         assert loaded["summary"]["team_worker_contract_task_count"] == 0
         assert loaded["summary"]["team_merge_review_contract_task_count"] == 0
-        assert (
-            loaded["tasks"][0]["metadata"]["worktree_plan"]["team_name"]
-            == "feature_team"
-        )
+        assert loaded["tasks"][0]["metadata"]["worktree_plan"]["team_name"] == "feature_team"
 
     def test_save_results_persists_failure_taxonomy(self, tmp_path):
         """Saved results should include normalized failure category fields."""
@@ -1369,10 +1344,7 @@ class TestBenchmarkToolUsageMetrics:
             == "benchmark_truth_feedback"
         )
         assert (
-            loaded["runtime_evaluation_feedback"]["metadata"][
-                "validated_evaluation_truth"
-            ]
-            is True
+            loaded["runtime_evaluation_feedback"]["metadata"]["validated_evaluation_truth"] is True
         )
         assert loaded["runtime_evaluation_feedback"]["metadata"]["scope"] == {
             "project": None,
@@ -1403,14 +1375,12 @@ class TestBenchmarkToolUsageMetrics:
 
         session_record = json.loads(session_feedback_files[0].read_text())
         assert (
-            session_record["runtime_evaluation_feedback"]["metadata"][
-                "truth_validation_mode"
-            ]
+            session_record["runtime_evaluation_feedback"]["metadata"]["truth_validation_mode"]
             == "deep_research_posthoc_validation"
         )
-        assert session_record["runtime_evaluation_feedback"]["metadata"]["scope"][
-            "vertical"
-        ] == ("research")
+        assert session_record["runtime_evaluation_feedback"]["metadata"]["scope"]["vertical"] == (
+            "research"
+        )
 
     def test_save_results_persists_browser_validated_session_feedback(self, tmp_path):
         """Browser-task results should emit validated session-truth artifacts."""
@@ -1442,33 +1412,26 @@ class TestBenchmarkToolUsageMetrics:
         )
 
         saved_path = harness._save_results(result)
-        feedback = load_runtime_evaluation_feedback(
-            tmp_path / "runtime_evaluation_feedback.json"
-        )
+        feedback = load_runtime_evaluation_feedback(tmp_path / "runtime_evaluation_feedback.json")
         session_feedback_files = sorted(tmp_path.glob("eval_session_guide_*.json"))
 
         assert saved_path.exists()
         assert feedback is not None
         assert len(session_feedback_files) == 1
         assert feedback.metadata["aggregated_artifact_count"] == 2
-        assert (
-            "validated_session_truth_feedback"
-            in feedback.metadata["validation_sources"]
-        )
+        assert "validated_session_truth_feedback" in feedback.metadata["validation_sources"]
 
         session_record = json.loads(session_feedback_files[0].read_text())
         assert (
-            session_record["runtime_evaluation_feedback"]["metadata"][
-                "truth_validation_mode"
-            ]
+            session_record["runtime_evaluation_feedback"]["metadata"]["truth_validation_mode"]
             == "browser_posthoc_validation"
         )
-        assert session_record["runtime_evaluation_feedback"]["metadata"]["scope"][
-            "benchmark"
-        ] == ("guide")
-        assert session_record["runtime_evaluation_feedback"]["metadata"]["scope"][
-            "vertical"
-        ] == ("browser")
+        assert session_record["runtime_evaluation_feedback"]["metadata"]["scope"]["benchmark"] == (
+            "guide"
+        )
+        assert session_record["runtime_evaluation_feedback"]["metadata"]["scope"]["vertical"] == (
+            "browser"
+        )
 
     def test_save_results_promotes_structured_experiment_memory(self, tmp_path):
         """Saved results should append a reusable structured experiment-memory record."""
@@ -1596,24 +1559,18 @@ class TestBenchmarkToolUsageMetrics:
             def build_artifact(self, context):
                 return ValidatedSessionTruthArtifact(
                     path=tmp_path / "eval_session_stub.json",
-                    record={
-                        "runtime_evaluation_feedback": {"metadata": {"source": "stub"}}
-                    },
+                    record={"runtime_evaluation_feedback": {"metadata": {"source": "stub"}}},
                 )
 
         harness = EvaluationHarness(
             checkpoint_dir=tmp_path,
-            validated_session_truth_emitters=ValidatedSessionTruthEmitterRegistry(
-                [StubEmitter()]
-            ),
+            validated_session_truth_emitters=ValidatedSessionTruthEmitterRegistry([StubEmitter()]),
         )
         harness._results_dir = tmp_path
         result = EvaluationResult(
             config=EvaluationConfig(benchmark=BenchmarkType.GUIDE, model="test"),
             task_results=[
-                TaskResult(
-                    task_id="guide-1", status=TaskStatus.PASSED, completion_score=1.0
-                )
+                TaskResult(task_id="guide-1", status=TaskStatus.PASSED, completion_score=1.0)
             ],
         )
 

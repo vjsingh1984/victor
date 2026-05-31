@@ -287,9 +287,7 @@ class TestPruningIntegration:
         reduction = (info.original_lines - info.pruned_lines) / info.original_lines
 
         # Target: 40-60% reduction
-        assert (
-            0.40 <= reduction <= 0.60
-        ), f"Reduction was {reduction:.2%}, expected 40-60%"
+        assert 0.40 <= reduction <= 0.60, f"Reduction was {reduction:.2%}, expected 40-60%"
 
     def test_edit_task_achieves_significant_reduction(self):
         """Test edit task achieves meaningful reduction."""

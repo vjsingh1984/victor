@@ -56,22 +56,14 @@ class TestRuntimeLazyInitialization:
                 orchestrator = agent.get_orchestrator()
 
                 # Access coordination runtime
-                coordination_runtime = getattr(
-                    orchestrator, "_coordination_runtime", None
-                )
-                assert (
-                    coordination_runtime is not None
-                ), "coordination_runtime should exist"
+                coordination_runtime = getattr(orchestrator, "_coordination_runtime", None)
+                assert coordination_runtime is not None, "coordination_runtime should exist"
 
                 # Check that components are NOT initialized (lazy)
-                recovery_coordinator = getattr(
-                    coordination_runtime, "recovery_coordinator", None
-                )
+                recovery_coordinator = getattr(coordination_runtime, "recovery_coordinator", None)
                 chunk_generator = getattr(coordination_runtime, "chunk_generator", None)
                 tool_planner = getattr(coordination_runtime, "tool_planner", None)
-                task_coordinator = getattr(
-                    coordination_runtime, "task_coordinator", None
-                )
+                task_coordinator = getattr(coordination_runtime, "task_coordinator", None)
                 coordination_advisor_runtime = getattr(
                     coordination_runtime, "coordination_advisor_runtime", None
                 )
@@ -114,12 +106,8 @@ class TestRuntimeLazyInitialization:
                 orchestrator = agent.get_orchestrator()
 
                 # Access interaction runtime
-                interaction_runtime = getattr(
-                    orchestrator, "_interaction_runtime", None
-                )
-                assert (
-                    interaction_runtime is not None
-                ), "interaction_runtime should exist"
+                interaction_runtime = getattr(orchestrator, "_interaction_runtime", None)
+                assert interaction_runtime is not None, "interaction_runtime should exist"
 
                 # Check that the primary runtime surface is service-first.
                 assert hasattr(interaction_runtime, "session_coordinator") is False
@@ -133,12 +121,8 @@ class TestRuntimeLazyInitialization:
                 assert hasattr(orchestrator, "_deprecated_chat_coordinator") is False
                 assert hasattr(orchestrator, "_deprecated_tool_coordinator") is False
 
-                orchestration_facade = getattr(
-                    orchestrator, "_orchestration_facade", None
-                )
-                assert (
-                    orchestration_facade is not None
-                ), "orchestration_facade should exist"
+                orchestration_facade = getattr(orchestrator, "_orchestration_facade", None)
+                assert orchestration_facade is not None, "orchestration_facade should exist"
                 assert (
                     orchestration_facade.initialized is False
                 ), "orchestration_facade should remain lazy after Agent.create()"
@@ -168,9 +152,7 @@ class TestRuntimeLazyInitialization:
                 assert resilience_runtime is not None, "resilience_runtime should exist"
 
                 recovery_handler = getattr(resilience_runtime, "recovery_handler", None)
-                recovery_integration = getattr(
-                    resilience_runtime, "recovery_integration", None
-                )
+                recovery_integration = getattr(resilience_runtime, "recovery_integration", None)
 
                 for component_name, component in [
                     ("recovery_handler", recovery_handler),
@@ -186,9 +168,7 @@ class TestRuntimeLazyInitialization:
                 await agent.close()
 
     @pytest.mark.asyncio
-    async def test_runtime_components_initialize_on_first_access(
-        self, mock_ollama_provider
-    ):
+    async def test_runtime_components_initialize_on_first_access(self, mock_ollama_provider):
         """Test that runtime components DO initialize when first accessed via get_instance()."""
         with (
             patch(
@@ -207,15 +187,11 @@ class TestRuntimeLazyInitialization:
                 orchestrator = agent.get_orchestrator()
 
                 # Access coordination runtime
-                coordination_runtime = getattr(
-                    orchestrator, "_coordination_runtime", None
-                )
+                coordination_runtime = getattr(orchestrator, "_coordination_runtime", None)
                 assert coordination_runtime is not None
 
                 # Get the LazyRuntimeProxy for recovery_coordinator
-                recovery_coordinator = getattr(
-                    coordination_runtime, "recovery_coordinator", None
-                )
+                recovery_coordinator = getattr(coordination_runtime, "recovery_coordinator", None)
                 assert recovery_coordinator is not None
 
                 # Verify it's NOT initialized initially
@@ -305,9 +281,7 @@ class TestRuntimeLazyInitialization:
                 await agent.close()
 
     @pytest.mark.asyncio
-    async def test_metrics_runtime_components_initialized_during_setup(
-        self, mock_ollama_provider
-    ):
+    async def test_metrics_runtime_components_initialized_during_setup(self, mock_ollama_provider):
         """Test that metrics_collector is initialized during orchestrator setup.
 
         The metrics_collector is eagerly initialized because create_lifecycle_manager()
@@ -337,9 +311,7 @@ class TestRuntimeLazyInitialization:
                 metrics_collector = getattr(metrics_runtime, "metrics_collector", None)
                 assert metrics_collector is not None, "metrics_collector should exist"
                 initialized = getattr(metrics_collector, "initialized", False)
-                assert (
-                    initialized
-                ), "metrics_collector should be initialized after Agent.create()"
+                assert initialized, "metrics_collector should be initialized after Agent.create()"
 
             finally:
                 await agent.close()
@@ -364,27 +336,15 @@ class TestRuntimeLazyInitialization:
                 orchestrator = agent.get_orchestrator()
 
                 # All runtimes should exist
-                assert hasattr(
-                    orchestrator, "_provider_runtime"
-                ), "provider_runtime missing"
-                assert hasattr(
-                    orchestrator, "_memory_runtime"
-                ), "memory_runtime missing"
-                assert hasattr(
-                    orchestrator, "_metrics_runtime"
-                ), "metrics_runtime missing"
-                assert hasattr(
-                    orchestrator, "_workflow_runtime"
-                ), "workflow_runtime missing"
+                assert hasattr(orchestrator, "_provider_runtime"), "provider_runtime missing"
+                assert hasattr(orchestrator, "_memory_runtime"), "memory_runtime missing"
+                assert hasattr(orchestrator, "_metrics_runtime"), "metrics_runtime missing"
+                assert hasattr(orchestrator, "_workflow_runtime"), "workflow_runtime missing"
                 assert hasattr(
                     orchestrator, "_coordination_runtime"
                 ), "coordination_runtime missing"
-                assert hasattr(
-                    orchestrator, "_interaction_runtime"
-                ), "interaction_runtime missing"
-                assert hasattr(
-                    orchestrator, "_resilience_runtime"
-                ), "resilience_runtime missing"
+                assert hasattr(orchestrator, "_interaction_runtime"), "interaction_runtime missing"
+                assert hasattr(orchestrator, "_resilience_runtime"), "resilience_runtime missing"
 
             finally:
                 await agent.close()

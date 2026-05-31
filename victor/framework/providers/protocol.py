@@ -159,15 +159,9 @@ class ProviderRegistry:
     """
 
     def __init__(self):
-        self._team_providers: List[TeamSpecProviderProtocol] = [
-            DefaultTeamSpecProvider()
-        ]
-        self._workflow_providers: List[WorkflowProviderProtocol] = [
-            DefaultWorkflowProvider()
-        ]
-        self._safety_providers: List[SafetyRulesProviderProtocol] = [
-            DefaultSafetyRulesProvider()
-        ]
+        self._team_providers: List[TeamSpecProviderProtocol] = [DefaultTeamSpecProvider()]
+        self._workflow_providers: List[WorkflowProviderProtocol] = [DefaultWorkflowProvider()]
+        self._safety_providers: List[SafetyRulesProviderProtocol] = [DefaultSafetyRulesProvider()]
 
         # Track vertical names for namespacing
         self._team_provider_names: Dict[str, str] = {}  # provider -> vertical_name
@@ -234,9 +228,7 @@ class ProviderRegistry:
             logger.debug(f"Entry points discovery failed: {e}")
 
     @staticmethod
-    def _iter_provider_entry_points(
-        metadata_module: Any, groups: tuple[str, ...]
-    ) -> list[Any]:
+    def _iter_provider_entry_points(metadata_module: Any, groups: tuple[str, ...]) -> list[Any]:
         """Return entry points from canonical groups with legacy fallback de-duplication."""
 
         discovered: list[Any] = []
@@ -246,9 +238,7 @@ class ProviderRegistry:
         for index, group in enumerate(groups):
             group_entry_points = list(metadata_module.entry_points(group=group))
             if index > 0 and group_entry_points and canonical_group is not None:
-                ProviderRegistry._warn_legacy_provider_group_usage(
-                    group, canonical_group
-                )
+                ProviderRegistry._warn_legacy_provider_group_usage(group, canonical_group)
             for entry_point in group_entry_points:
                 if entry_point.name in seen_names:
                     continue

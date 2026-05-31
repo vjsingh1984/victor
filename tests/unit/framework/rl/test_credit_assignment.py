@@ -389,8 +389,7 @@ class TestEpisodeLevelCreditAssigner:
         assigner = EpisodeLevelCreditAssigner(config)
 
         trajectory = [
-            ActionMetadata(agent_id="agent_1", action_id=f"action_{i}")
-            for i in range(10)
+            ActionMetadata(agent_id="agent_1", action_id=f"action_{i}") for i in range(10)
         ]
         rewards = [0.1] * 10
 
@@ -450,9 +449,7 @@ class TestHindsightCreditAssigner:
         """Should use normal credit assignment for successful trajectories."""
         assigner = HindsightCreditAssigner()
 
-        trajectory = [
-            ActionMetadata(agent_id="agent_1", action_id=f"a_{i}") for i in range(5)
-        ]
+        trajectory = [ActionMetadata(agent_id="agent_1", action_id=f"a_{i}") for i in range(5)]
         rewards = [0.1, 0.2, 0.3, 0.4, 0.5]  # Positive final reward
 
         signals = assigner.assign_credit(trajectory, rewards)
@@ -463,9 +460,7 @@ class TestHindsightCreditAssigner:
         """Should apply hindsight for failed trajectories."""
         assigner = HindsightCreditAssigner()
 
-        trajectory = [
-            ActionMetadata(agent_id="agent_1", action_id=f"a_{i}") for i in range(5)
-        ]
+        trajectory = [ActionMetadata(agent_id="agent_1", action_id=f"a_{i}") for i in range(5)]
         rewards = [0.1, 0.1, 0.1, 0.1, -1.0]  # Negative final reward
 
         signals = assigner.assign_credit(trajectory, rewards)
@@ -492,8 +487,7 @@ class TestMultiAgentCreditAssigner:
         assigner = MultiAgentCreditAssigner(config)
 
         trajectory = [
-            ActionMetadata(agent_id=f"agent_{i % 3}", action_id=f"a_{i}")
-            for i in range(12)
+            ActionMetadata(agent_id=f"agent_{i % 3}", action_id=f"a_{i}") for i in range(12)
         ]
         rewards = [0.5] * 12
 
@@ -517,12 +511,8 @@ class TestMultiAgentCreditAssigner:
 
         signals = assigner.assign_credit(trajectory, rewards)
 
-        agent_a_signals = [
-            s for s in signals if s.metadata and s.metadata.agent_id == "agent_A"
-        ]
-        agent_b_signals = [
-            s for s in signals if s.metadata and s.metadata.agent_id == "agent_B"
-        ]
+        agent_a_signals = [s for s in signals if s.metadata and s.metadata.agent_id == "agent_A"]
+        agent_b_signals = [s for s in signals if s.metadata and s.metadata.agent_id == "agent_B"]
 
         assert len(agent_a_signals) == 7
         assert len(agent_b_signals) == 3
@@ -570,9 +560,7 @@ class TestCreditAssignmentIntegration:
         config = CreditAssignmentConfig(methodology=CreditMethodology.GAE)
         integration = CreditAssignmentIntegration(default_config=config)
 
-        trajectory = [
-            ActionMetadata(agent_id="agent_1", action_id=f"a_{i}") for i in range(5)
-        ]
+        trajectory = [ActionMetadata(agent_id="agent_1", action_id=f"a_{i}") for i in range(5)]
         rewards = [0.1] * 5
 
         signals = integration.assign_credit(trajectory, rewards)
@@ -583,9 +571,7 @@ class TestCreditAssignmentIntegration:
         """Should retrieve credit for specific action."""
         integration = CreditAssignmentIntegration()
 
-        trajectory = [
-            ActionMetadata(agent_id="agent_1", action_id=f"a_{i}") for i in range(3)
-        ]
+        trajectory = [ActionMetadata(agent_id="agent_1", action_id=f"a_{i}") for i in range(3)]
         rewards = [0.1, 0.2, 0.3]
 
         signals = integration.assign_credit(trajectory, rewards)
@@ -611,9 +597,7 @@ class TestCreditAssignmentIntegration:
         """Should provide trajectory summary."""
         integration = CreditAssignmentIntegration()
 
-        trajectory = [
-            ActionMetadata(agent_id="agent_1", action_id=f"a_{i}") for i in range(5)
-        ]
+        trajectory = [ActionMetadata(agent_id="agent_1", action_id=f"a_{i}") for i in range(5)]
         rewards = [0.1] * 5
 
         integration.assign_credit(trajectory, rewards)
@@ -627,9 +611,7 @@ class TestCreditAssignmentIntegration:
         """Should reset all state."""
         integration = CreditAssignmentIntegration()
 
-        trajectory = [
-            ActionMetadata(agent_id="agent_1", action_id=f"a_{i}") for i in range(3)
-        ]
+        trajectory = [ActionMetadata(agent_id="agent_1", action_id=f"a_{i}") for i in range(3)]
         rewards = [0.1, 0.2, 0.3]
 
         integration.assign_credit(trajectory, rewards)
@@ -702,8 +684,7 @@ class TestUtilities:
     def test_compute_credit_metrics(self):
         """Should compute metrics from signals."""
         signals = [
-            CreditSignal(action_id=f"a_{i}", raw_reward=0.1, credit=float(i))
-            for i in range(1, 6)
+            CreditSignal(action_id=f"a_{i}", raw_reward=0.1, credit=float(i)) for i in range(1, 6)
         ]
 
         metrics = compute_credit_metrics(signals)
@@ -785,9 +766,7 @@ class TestCreditAssignmentScenarios:
         for i in range(20):
             agent = f"agent_{i % 3}"
             trajectory.append(
-                ActionMetadata(
-                    agent_id=agent, action_id=f"action_{i}", team_id="team_1"
-                )
+                ActionMetadata(agent_id=agent, action_id=f"action_{i}", team_id="team_1")
             )
 
         rewards = [1.0] * 20

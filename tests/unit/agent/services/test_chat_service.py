@@ -312,16 +312,12 @@ class TestChatServiceDictBasedContext(BaseChatServiceTest):
     @pytest.mark.asyncio
     async def test_chat_records_user_and_assistant_messages_in_dict_based_context(self):
         service = self._create_test_service()
-        response = CompletionResponse(
-            content="done", role="assistant", stop_reason="stop"
-        )
+        response = CompletionResponse(content="done", role="assistant", stop_reason="stop")
 
         class _TurnExecutor:
             async def execute_agentic_loop(self, user_message):
                 service._context.add_message({"role": "user", "content": user_message})
-                service._context.add_message(
-                    {"role": "assistant", "content": response.content}
-                )
+                service._context.add_message({"role": "assistant", "content": response.content})
                 return response
 
         service.bind_runtime_components(turn_executor=_TurnExecutor())
@@ -341,15 +337,11 @@ class TestChatServiceDictBasedContext(BaseChatServiceTest):
     @pytest.mark.asyncio
     async def test_chat_passes_runtime_context_overrides_to_bound_executor(self):
         service = self._create_test_service()
-        response = CompletionResponse(
-            content="done", role="assistant", stop_reason="stop"
-        )
+        response = CompletionResponse(content="done", role="assistant", stop_reason="stop")
         observed = {}
 
         class _TurnExecutor:
-            async def execute_agentic_loop(
-                self, user_message, runtime_context_overrides=None
-            ):
+            async def execute_agentic_loop(self, user_message, runtime_context_overrides=None):
                 observed["user_message"] = user_message
                 observed["runtime_context_overrides"] = runtime_context_overrides
                 return response
@@ -425,9 +417,7 @@ class TestChatServiceControllerBackedContext(BaseChatServiceTest):
         self,
     ):
         service, controller = self._create_controller_backed_service()
-        response = CompletionResponse(
-            content="done", role="assistant", stop_reason="stop"
-        )
+        response = CompletionResponse(content="done", role="assistant", stop_reason="stop")
 
         class _TurnExecutor:
             async def execute_agentic_loop(self, user_message):
@@ -484,9 +474,7 @@ class TestChatServiceControllerBackedContext(BaseChatServiceTest):
         from victor.tools.base import ToolResult
 
         tool_executor = mock.Mock()
-        tool_executor.execute = mock.AsyncMock(
-            return_value=ToolResult(success=True, output="ok")
-        )
+        tool_executor.execute = mock.AsyncMock(return_value=ToolResult(success=True, output="ok"))
         tool_service = ToolService(
             config=ToolServiceConfig(default_tool_budget=1, enable_caching=False),
             tool_selector=mock.Mock(),
@@ -532,9 +520,7 @@ class TestChatServiceControllerBackedContext(BaseChatServiceTest):
         from victor.tools.base import ToolResult
 
         tool_executor = mock.Mock()
-        tool_executor.execute = mock.AsyncMock(
-            return_value=ToolResult(success=True, output="ok")
-        )
+        tool_executor.execute = mock.AsyncMock(return_value=ToolResult(success=True, output="ok"))
         tool_service = ToolService(
             config=ToolServiceConfig(default_tool_budget=1, enable_caching=False),
             tool_selector=mock.Mock(),
@@ -597,16 +583,12 @@ class TestChatServicePlanningStreaming(BaseChatServiceTest):
 
         chunks = [
             chunk
-            async for chunk in service.stream_chat(
-                "continue addressing the findings in plan mode"
-            )
+            async for chunk in service.stream_chat("continue addressing the findings in plan mode")
         ]
 
         assert [chunk.content for chunk in chunks] == ["planned"]
         assert chunks[0].is_final is True
-        planning_handler.assert_awaited_once_with(
-            "continue addressing the findings in plan mode"
-        )
+        planning_handler.assert_awaited_once_with("continue addressing the findings in plan mode")
         assert stream_handler_called is False
 
     @pytest.mark.asyncio
@@ -704,9 +686,7 @@ class TestChatServiceTaskReporting(BaseChatServiceTest):
     @pytest.mark.asyncio
     async def test_chat_invokes_task_report_handlers_on_success(self):
         service = self._create_test_service()
-        response = CompletionResponse(
-            content="done", role="assistant", stop_reason="stop"
-        )
+        response = CompletionResponse(content="done", role="assistant", stop_reason="stop")
         started = []
         finished = []
 
@@ -719,17 +699,13 @@ class TestChatServiceTaskReporting(BaseChatServiceTest):
             task_report_start_handler=lambda user_message, **kwargs: started.append(
                 (user_message, kwargs)
             ),
-            task_report_finish_handler=lambda success, **kwargs: finished.append(
-                (success, kwargs)
-            ),
+            task_report_finish_handler=lambda success, **kwargs: finished.append((success, kwargs)),
         )
 
         result = await service.chat("hello")
 
         assert result is response
-        assert started == [
-            ("hello", {"stream": False, "metadata": {"use_planning": False}})
-        ]
+        assert started == [("hello", {"stream": False, "metadata": {"use_planning": False}})]
         assert finished[0][0] is True
         assert finished[0][1]["user_message"] == "hello"
         assert finished[0][1]["response"] is response
@@ -749,17 +725,13 @@ class TestChatServiceTaskReporting(BaseChatServiceTest):
             task_report_start_handler=lambda user_message, **kwargs: started.append(
                 (user_message, kwargs)
             ),
-            task_report_finish_handler=lambda success, **kwargs: finished.append(
-                (success, kwargs)
-            ),
+            task_report_finish_handler=lambda success, **kwargs: finished.append((success, kwargs)),
         )
 
         with pytest.raises(RuntimeError, match="boom"):
             await service.chat("explode")
 
-        assert started == [
-            ("explode", {"stream": False, "metadata": {"use_planning": False}})
-        ]
+        assert started == [("explode", {"stream": False, "metadata": {"use_planning": False}})]
         assert finished[0][0] is False
         assert str(finished[0][1]["error"]) == "boom"
 
@@ -779,9 +751,7 @@ class TestChatServiceTaskReporting(BaseChatServiceTest):
 
         service.bind_runtime_components(
             turn_executor=_TurnExecutor(),
-            task_report_finish_handler=lambda success, **kwargs: finished.append(
-                (success, kwargs)
-            ),
+            task_report_finish_handler=lambda success, **kwargs: finished.append((success, kwargs)),
         )
 
         result = await service.chat("inventory")
@@ -804,17 +774,13 @@ class TestChatServiceTaskReporting(BaseChatServiceTest):
             task_report_start_handler=lambda user_message, **kwargs: started.append(
                 (user_message, kwargs)
             ),
-            task_report_finish_handler=lambda success, **kwargs: finished.append(
-                (success, kwargs)
-            ),
+            task_report_finish_handler=lambda success, **kwargs: finished.append((success, kwargs)),
         )
 
         chunks = [chunk async for chunk in service.stream_chat("stream me")]
 
         assert [chunk.content for chunk in chunks] == ["done:stream me"]
-        assert started == [
-            ("stream me", {"stream": True, "metadata": {"use_planning": None}})
-        ]
+        assert started == [("stream me", {"stream": True, "metadata": {"use_planning": None}})]
         assert finished[0][0] is True
         assert finished[0][1]["stream"] is True
 
@@ -825,9 +791,7 @@ class TestChatServiceTurnScope(BaseChatServiceTest):
     @pytest.mark.asyncio
     async def test_chat_invokes_turn_scope_handlers_with_constraints(self):
         service = self._create_test_service()
-        response = CompletionResponse(
-            content="done", role="assistant", stop_reason="stop"
-        )
+        response = CompletionResponse(content="done", role="assistant", stop_reason="stop")
         events = []
 
         class _TurnExecutor:
@@ -1062,9 +1026,7 @@ class TestToolService:
         config = ToolServiceConfig()
         selector = mock.Mock()
         executor = mock.Mock()
-        executor.execute = mock.AsyncMock(
-            return_value=ToolResult(success=True, output="Success")
-        )
+        executor.execute = mock.AsyncMock(return_value=ToolResult(success=True, output="Success"))
         registrar = mock.Mock()
 
         service = ToolService(
@@ -1093,9 +1055,7 @@ class TestToolService:
         config = ToolServiceConfig(default_tool_budget=2)
         selector = mock.Mock()
         executor = mock.Mock()
-        executor.execute = mock.AsyncMock(
-            return_value=ToolResult(success=True, output="Success")
-        )
+        executor.execute = mock.AsyncMock(return_value=ToolResult(success=True, output="Success"))
         registrar = mock.Mock()
 
         service = ToolService(

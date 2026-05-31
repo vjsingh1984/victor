@@ -190,9 +190,7 @@ class OpenAIProvider(BaseProvider):
     def _provider_request_kwargs(cls, kwargs: Dict[str, Any]) -> Dict[str, Any]:
         """Return kwargs safe to forward to the OpenAI SDK request method."""
         return {
-            key: value
-            for key, value in kwargs.items()
-            if key not in cls._INTERNAL_REQUEST_KWARGS
+            key: value for key, value in kwargs.items() if key not in cls._INTERNAL_REQUEST_KWARGS
         }
 
     async def _ensure_valid_token(self) -> None:
@@ -228,9 +226,7 @@ class OpenAIProvider(BaseProvider):
         GPT-5.x still supports temperature and tools unlike O-series.
         """
         model_lower = model.lower()
-        return any(
-            model_lower.startswith(prefix) for prefix in ["o1", "o3", "gpt-5", "gpt5"]
-        )
+        return any(model_lower.startswith(prefix) for prefix in ["o1", "o3", "gpt-5", "gpt5"])
 
     @property
     def name(self) -> str:
@@ -441,9 +437,7 @@ class OpenAIProvider(BaseProvider):
         """Convert standard tools to OpenAI format."""
         return convert_tools_to_openai_format(tools)
 
-    def _parse_response(
-        self, response: ChatCompletion, model: str
-    ) -> CompletionResponse:
+    def _parse_response(self, response: ChatCompletion, model: str) -> CompletionResponse:
         """Parse OpenAI API response.
 
         Args:
@@ -484,9 +478,7 @@ class OpenAIProvider(BaseProvider):
             stop_reason=choice.finish_reason,
             usage=usage,
             model=model,
-            raw_response=(
-                response.model_dump() if hasattr(response, "model_dump") else None
-            ),
+            raw_response=(response.model_dump() if hasattr(response, "model_dump") else None),
         )
 
     def _parse_stream_chunk(
@@ -613,8 +605,7 @@ class OpenAIProvider(BaseProvider):
                 model_id = model.id
                 # Filter to chat-capable GPT models
                 if any(
-                    prefix in model_id
-                    for prefix in ["gpt-4", "gpt-3.5", "o1", "o3", "chatgpt"]
+                    prefix in model_id for prefix in ["gpt-4", "gpt-3.5", "o1", "o3", "chatgpt"]
                 ):
                     models.append(
                         {

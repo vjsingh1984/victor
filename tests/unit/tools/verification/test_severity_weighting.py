@@ -32,9 +32,7 @@ class TestSeverityWeighting:
         """Create a SeverityWeighting instance."""
         return SeverityWeighting()
 
-    def test_calculate_severity_score_security_issue(
-        self, weighting: SeverityWeighting
-    ):
+    def test_calculate_severity_score_security_issue(self, weighting: SeverityWeighting):
         """Test severity scoring for security issues."""
         issue = ClaimIssue(
             issue_type="security_vulnerability",
@@ -62,9 +60,7 @@ class TestSeverityWeighting:
         # Test issues should have lower severity
         assert score < 0.7
 
-    def test_calculate_severity_score_architectural_issue(
-        self, weighting: SeverityWeighting
-    ):
+    def test_calculate_severity_score_architectural_issue(self, weighting: SeverityWeighting):
         """Test severity scoring for architectural issues."""
         issue = ClaimIssue(
             issue_type="cross_layer_dependency",
@@ -118,9 +114,7 @@ class TestSeverityWeighting:
                 description="Security issue",
                 category=IssueCategory.SECURITY,
             ),
-            ClaimIssue(
-                issue_type="test", description="Test issue", file_path="tests/test.rs"
-            ),
+            ClaimIssue(issue_type="test", description="Test issue", file_path="tests/test.rs"),
         ]
 
         results = weighting.batch_score_issues(issues)
@@ -132,9 +126,7 @@ class TestSeverityWeighting:
     def test_get_severity_distribution(self, weighting: SeverityWeighting):
         """Test getting severity distribution."""
         issues = [
-            ClaimIssue(
-                issue_type="x", description="X", category=IssueCategory.SECURITY
-            ),
+            ClaimIssue(issue_type="x", description="X", category=IssueCategory.SECURITY),
             ClaimIssue(issue_type="y", description="Y", file_path="tests/test.rs"),
             ClaimIssue(issue_type="z", description="Z"),
         ]

@@ -94,9 +94,7 @@ async def test_run_workflow_mode_injects_delegate_follow_up_contract(tmp_path) -
     workflow_path.write_text("workflows: {}\n")
     contract = {
         "primary_step_id": "resume_delegate_retry",
-        "next_steps": [
-            {"step_id": "resume_delegate_retry", "step": "retry failed tests"}
-        ],
+        "next_steps": [{"step_id": "resume_delegate_retry", "step": "retry failed tests"}],
     }
     contract_path = tmp_path / "delegate-follow-up.json"
     contract_path.write_text(json.dumps(contract))

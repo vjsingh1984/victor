@@ -39,9 +39,7 @@ class TestSubprocessResourceLimits:
         assert limits.max_output_bytes == 10 * 1024 * 1024
 
     def test_from_env_invalid_value_keeps_default(self):
-        with patch.dict(
-            "os.environ", {"VICTOR_SUBPROCESS_MAX_MEMORY_MB": "not_a_number"}
-        ):
+        with patch.dict("os.environ", {"VICTOR_SUBPROCESS_MAX_MEMORY_MB": "not_a_number"}):
             limits = SubprocessResourceLimits.from_env()
         assert limits.max_memory_mb == 512
 
@@ -164,9 +162,7 @@ class TestRunCommandWithLimits:
         sentinel = lambda: None  # noqa: E731
 
         with patch("victor.tools.subprocess_executor.subprocess.run") as mock_run:
-            mock_run.return_value = type(
-                "R", (), {"returncode": 0, "stdout": "", "stderr": ""}
-            )()
+            mock_run.return_value = type("R", (), {"returncode": 0, "stdout": "", "stderr": ""})()
             run_command(["echo", "hi"], preexec_fn=sentinel, check_dangerous=False)
 
         _, kwargs = mock_run.call_args

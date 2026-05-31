@@ -64,15 +64,11 @@ class TestBackslideGuardWired:
         loop = AgenticLoop.__new__(AgenticLoop)
         loop._score_history = []
 
-        eval1 = EvaluationResult(
-            decision=EvaluationDecision.COMPLETE, score=0.8, reason=""
-        )
+        eval1 = EvaluationResult(decision=EvaluationDecision.COMPLETE, score=0.8, reason="")
         loop._apply_backslide_guard(eval1)
         assert len(loop._score_history) == 1
 
-        eval2 = EvaluationResult(
-            decision=EvaluationDecision.COMPLETE, score=0.85, reason=""
-        )
+        eval2 = EvaluationResult(decision=EvaluationDecision.COMPLETE, score=0.85, reason="")
         loop._apply_backslide_guard(eval2)
         assert len(loop._score_history) == 2
 

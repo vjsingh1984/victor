@@ -22,8 +22,7 @@ _RELATIVE_CLAUSE_THAT_PATTERN = re.compile(
     flags=re.IGNORECASE,
 )
 _FILE_PATH_PATTERN = re.compile(
-    r"(?:^|\s|[\"'\-`])((?:\.{0,2}/)?[\w./-]+/[\w.-]+\.[a-z]{1,10})"
-    r"(?:\s|[\"'`]|$|[,;:.\)]|\Z)",
+    r"(?:^|\s|[\"'\-`])((?:\.{0,2}/)?[\w./-]+/[\w.-]+\.[a-z]{1,10})" r"(?:\s|[\"'`]|$|[,;:.\)]|\Z)",
     flags=re.IGNORECASE,
 )
 _BARE_FILENAME_PATTERN = re.compile(
@@ -76,9 +75,7 @@ def is_ambiguous_write_followup_request(text: str) -> bool:
         return False
     if not _REMEDIATION_ACTION_PATTERN.search(text):
         return False
-    return has_ambiguous_target_reference(text) or bool(
-        _FOLLOW_UP_SCOPE_PATTERN.search(text)
-    )
+    return has_ambiguous_target_reference(text) or bool(_FOLLOW_UP_SCOPE_PATTERN.search(text))
 
 
 def content_has_explicit_target(text: str) -> bool:

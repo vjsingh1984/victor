@@ -31,9 +31,7 @@ class TestSessionLockedTools:
         all_tools = [MagicMock(name=f"tool_{i}") for i in range(10)]
         for i, tool in enumerate(all_tools):
             tool.name = f"tool_{i}"
-        orch.get_enabled_tools = MagicMock(
-            return_value={tool.name for tool in all_tools}
-        )
+        orch.get_enabled_tools = MagicMock(return_value={tool.name for tool in all_tools})
         orch.tools.list_tools = MagicMock(return_value=all_tools)
 
         # Import and call the method pattern

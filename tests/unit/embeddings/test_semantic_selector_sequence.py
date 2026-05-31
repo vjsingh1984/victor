@@ -35,9 +35,7 @@ class TestSequenceTrackingInit:
     def test_sequence_tracking_disabled(self):
         """Test that sequence tracking can be disabled."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            selector = SemanticToolSelector(
-                cache_dir=Path(tmpdir), sequence_tracking=False
-            )
+            selector = SemanticToolSelector(cache_dir=Path(tmpdir), sequence_tracking=False)
 
             assert selector._sequence_tracking is False
             assert selector._sequence_tracker is None
@@ -82,9 +80,7 @@ class TestRecordToolUsage:
     def test_record_tool_usage_disabled_tracking(self):
         """Test that recording works when sequence tracking is disabled."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            selector = SemanticToolSelector(
-                cache_dir=Path(tmpdir), sequence_tracking=False
-            )
+            selector = SemanticToolSelector(cache_dir=Path(tmpdir), sequence_tracking=False)
 
             # Should not raise even though tracker is None
             selector._record_tool_usage("read_file", "test query", success=True)
@@ -133,9 +129,7 @@ class TestGetSequenceBoost:
     def test_no_boost_when_disabled(self):
         """Test that no boost is applied when tracking is disabled."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            selector = SemanticToolSelector(
-                cache_dir=Path(tmpdir), sequence_tracking=False
-            )
+            selector = SemanticToolSelector(cache_dir=Path(tmpdir), sequence_tracking=False)
 
             boost = selector._get_sequence_boost("edit_files")
             assert boost == 0.0
@@ -173,9 +167,7 @@ class TestApplySequenceBoosts:
     def test_apply_sequence_boosts_when_disabled(self):
         """Test that no boosts are applied when tracking is disabled."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            selector = SemanticToolSelector(
-                cache_dir=Path(tmpdir), sequence_tracking=False
-            )
+            selector = SemanticToolSelector(cache_dir=Path(tmpdir), sequence_tracking=False)
 
             tool1 = MagicMock()
             tool1.name = "edit_files"
@@ -217,9 +209,7 @@ class TestGetNextToolSuggestions:
     def test_get_next_tool_suggestions_disabled(self):
         """Test getting suggestions when tracking is disabled."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            selector = SemanticToolSelector(
-                cache_dir=Path(tmpdir), sequence_tracking=False
-            )
+            selector = SemanticToolSelector(cache_dir=Path(tmpdir), sequence_tracking=False)
 
             suggestions = selector.get_next_tool_suggestions()
             assert suggestions == []
@@ -258,9 +248,7 @@ class TestGetCurrentWorkflow:
     def test_no_workflow_when_disabled(self):
         """Test that no workflow is detected when tracking is disabled."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            selector = SemanticToolSelector(
-                cache_dir=Path(tmpdir), sequence_tracking=False
-            )
+            selector = SemanticToolSelector(cache_dir=Path(tmpdir), sequence_tracking=False)
 
             workflow = selector.get_current_workflow()
             assert workflow is None
@@ -321,9 +309,7 @@ class TestClassificationToolStats:
     def test_stats_when_tracking_disabled(self):
         """Test stats when sequence tracking is disabled."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            selector = SemanticToolSelector(
-                cache_dir=Path(tmpdir), sequence_tracking=False
-            )
+            selector = SemanticToolSelector(cache_dir=Path(tmpdir), sequence_tracking=False)
 
             stats = selector.get_classification_tool_stats()
 

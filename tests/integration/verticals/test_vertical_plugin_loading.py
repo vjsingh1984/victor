@@ -159,9 +159,7 @@ def test_plugin_registry_registers_sdk_vertical_into_vertical_registry(monkeypat
     registry = PluginRegistry()
     monkeypatch.setattr(
         "victor.core.plugins.registry.get_entry_point_values",
-        lambda *args, **kwargs: {
-            "sdk_external": "victor_contracts_external.plugin:plugin"
-        },
+        lambda *args, **kwargs: {"sdk_external": "victor_contracts_external.plugin:plugin"},
     )
     monkeypatch.setattr(
         registry,
@@ -201,12 +199,8 @@ def test_vertical_loader_load_activates_sdk_vertical_through_adapter(monkeypatch
 
     activated = []
     monkeypatch.setattr(loader, "_negotiate_manifest", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(
-        loader, "_validate_dependencies", lambda *_args, **_kwargs: None
-    )
-    monkeypatch.setattr(
-        loader, "_activate", lambda vertical: activated.append(vertical)
-    )
+    monkeypatch.setattr(loader, "_validate_dependencies", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(loader, "_activate", lambda vertical: activated.append(vertical))
 
     resolved = loader.load("sdk_external")
 

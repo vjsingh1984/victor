@@ -79,9 +79,7 @@ class ResilienceFacade:
         self._context_manager = context_manager
         self._rl_coordinator = rl_coordinator
         self._code_manager = code_manager
-        self._background_tasks = (
-            background_tasks if background_tasks is not None else set()
-        )
+        self._background_tasks = background_tasks if background_tasks is not None else set()
         self._cancel_event = cancel_event
         self._is_streaming = is_streaming
         self._runtime_state_host = runtime_state_host
@@ -172,9 +170,7 @@ class ResilienceFacade:
     def cancel_event(self) -> Optional[asyncio.Event]:
         """Cancellation event for streaming."""
         if self._runtime_state_host is not None:
-            return getattr(
-                self._runtime_state_host, "_cancel_event", self._cancel_event
-            )
+            return getattr(self._runtime_state_host, "_cancel_event", self._cancel_event)
         return self._cancel_event
 
     @cancel_event.setter
@@ -188,9 +184,7 @@ class ResilienceFacade:
     def is_streaming(self) -> bool:
         """Whether currently streaming."""
         if self._runtime_state_host is not None:
-            return getattr(
-                self._runtime_state_host, "_is_streaming", self._is_streaming
-            )
+            return getattr(self._runtime_state_host, "_is_streaming", self._is_streaming)
         return self._is_streaming
 
     @is_streaming.setter

@@ -825,9 +825,7 @@ class TestLLMRefinement:
 
         with (
             patch("victor.core.feature_flags.get_feature_flag_manager") as mock_ffm,
-            patch(
-                "victor.core.get_container", side_effect=RuntimeError("no container")
-            ),
+            patch("victor.core.get_container", side_effect=RuntimeError("no container")),
         ):
             mock_ffm.return_value.is_enabled.return_value = True
             result = await loop._refine_with_llm(heuristic, MagicMock(), {})
@@ -861,15 +859,11 @@ class TestLLMRefinement:
         ):
             mock_ffm.return_value.is_enabled.return_value = True
 
-            result = await loop._refine_with_llm(
-                heuristic, MagicMock(content="hmm"), {}
-            )
+            result = await loop._refine_with_llm(heuristic, MagicMock(content="hmm"), {})
 
         assert result.decision == EvaluationDecision.RETRY
         assert "stuck" in result.reason
-        mock_svc.escalate_tier.assert_awaited_once_with(
-            DecisionType.TASK_COMPLETION, "stuck_phase"
-        )
+        mock_svc.escalate_tier.assert_awaited_once_with(DecisionType.TASK_COMPLETION, "stuck_phase")
 
     async def test_high_confidence_awaits_async_tier_deescalation(self):
         """LLM refinement should await async tier de-escalation hooks."""
@@ -898,9 +892,7 @@ class TestLLMRefinement:
             patch("victor.core.get_container", return_value=mock_container),
         ):
             mock_ffm.return_value.is_enabled.return_value = True
-            result = await loop._refine_with_llm(
-                heuristic, MagicMock(content="done"), {}
-            )
+            result = await loop._refine_with_llm(heuristic, MagicMock(content="done"), {})
 
         assert result.decision == EvaluationDecision.COMPLETE
         mock_svc.deescalate_tier.assert_awaited_once_with(

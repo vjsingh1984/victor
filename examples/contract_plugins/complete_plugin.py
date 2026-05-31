@@ -283,9 +283,7 @@ class CompletePlugin(VictorPlugin):
         self._activated = True
         self._activation_count += 1
 
-        print(
-            f"\n[{self.name}] Activated (async, activation #{self._activation_count})"
-        )
+        print(f"\n[{self.name}] Activated (async, activation #{self._activation_count})")
         print(f"  [{self.name}] Async resources initialized")
 
     async def on_deactivate_async(self) -> None:

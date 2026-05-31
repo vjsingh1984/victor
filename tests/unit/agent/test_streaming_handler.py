@@ -248,9 +248,7 @@ class TestProcessToolResults:
 
         assert len(chunks) >= 1
         # Find the tool result chunk
-        tool_result_chunks = [
-            c for c in chunks if c.metadata and "tool_result" in c.metadata
-        ]
+        tool_result_chunks = [c for c in chunks if c.metadata and "tool_result" in c.metadata]
         assert len(tool_result_chunks) == 1
         assert tool_result_chunks[0].metadata["tool_result"]["success"] is True
 
@@ -266,14 +264,10 @@ class TestProcessToolResults:
 
         chunks = handler.process_tool_results(execution, basic_context)
 
-        tool_result_chunks = [
-            c for c in chunks if c.metadata and "tool_result" in c.metadata
-        ]
+        tool_result_chunks = [c for c in chunks if c.metadata and "tool_result" in c.metadata]
         assert len(tool_result_chunks) == 1
         assert tool_result_chunks[0].metadata["tool_result"]["success"] is False
-        assert (
-            tool_result_chunks[0].metadata["tool_result"]["error"] == "file not found"
-        )
+        assert tool_result_chunks[0].metadata["tool_result"]["error"] == "file not found"
 
     def test_no_thinking_status_chunk(self, handler, basic_context):
         """process_tool_results does not emit a separate Thinking status chunk.
@@ -306,13 +300,9 @@ class TestProcessToolResults:
 
         chunks = handler.process_tool_results(execution, basic_context)
 
-        tool_result_chunks = [
-            c for c in chunks if c.metadata and "tool_result" in c.metadata
-        ]
+        tool_result_chunks = [c for c in chunks if c.metadata and "tool_result" in c.metadata]
         assert len(tool_result_chunks) == 1
-        assert tool_result_chunks[0].metadata["tool_result"][
-            "follow_up_suggestions"
-        ] == [
+        assert tool_result_chunks[0].metadata["tool_result"]["follow_up_suggestions"] == [
             {
                 "command": 'graph(mode="trace", node="main", depth=3)',
                 "description": "Trace execution starting from main.",
@@ -391,9 +381,7 @@ class TestCheckNaturalCompletion:
             total_accumulated_chars=1000,
             substantial_content_threshold=500,
         )
-        result = handler.check_natural_completion(
-            ctx, has_tool_calls=True, content_length=0
-        )
+        result = handler.check_natural_completion(ctx, has_tool_calls=True, content_length=0)
         assert result is None
 
     def test_returns_none_without_substantial_content(self, handler):
@@ -403,9 +391,7 @@ class TestCheckNaturalCompletion:
             total_accumulated_chars=100,
             substantial_content_threshold=500,
         )
-        result = handler.check_natural_completion(
-            ctx, has_tool_calls=False, content_length=0
-        )
+        result = handler.check_natural_completion(ctx, has_tool_calls=False, content_length=0)
         assert result is None
 
     def test_returns_break_with_substantial_content(self, handler):
@@ -419,9 +405,7 @@ class TestCheckNaturalCompletion:
             total_accumulated_chars=600,
             substantial_content_threshold=500,
         )
-        result = handler.check_natural_completion(
-            ctx, has_tool_calls=False, content_length=0
-        )
+        result = handler.check_natural_completion(ctx, has_tool_calls=False, content_length=0)
         # Signal-based completion: handler returns None, TaskCompletionDetector decides
         assert result is None
 
@@ -780,14 +764,8 @@ class TestResearchLoopDetection:
 
     def test_is_research_loop_true(self, handler):
         """Detects research loop correctly."""
-        assert (
-            handler.is_research_loop("loop_detected", "research pattern detected")
-            is True
-        )
-        assert (
-            handler.is_research_loop("loop_detected", "Research loop: web_search")
-            is True
-        )
+        assert handler.is_research_loop("loop_detected", "research pattern detected") is True
+        assert handler.is_research_loop("loop_detected", "Research loop: web_search") is True
         assert handler.is_research_loop("loop_detected", "RESEARCH pattern") is True
 
     def test_is_research_loop_false_wrong_reason(self, handler):
@@ -798,9 +776,7 @@ class TestResearchLoopDetection:
 
     def test_is_research_loop_false_no_research(self, handler):
         """Not a research loop without research in hint."""
-        assert (
-            handler.is_research_loop("loop_detected", "tool budget exceeded") is False
-        )
+        assert handler.is_research_loop("loop_detected", "tool budget exceeded") is False
         assert handler.is_research_loop("loop_detected", "max iterations") is False
         assert handler.is_research_loop("loop_detected", "") is False
 
@@ -820,9 +796,7 @@ class TestForceCompletionMessages:
     def test_get_force_completion_chunks_exploration_limit(self, handler):
         """Non-research generates exploration limit message."""
         ctx = StreamingChatContext(user_message="test")
-        chunk, message = handler.get_force_completion_chunks(
-            ctx, is_research_loop=False
-        )
+        chunk, message = handler.get_force_completion_chunks(ctx, is_research_loop=False)
 
         assert "exploration limit" in chunk.content
         assert "FINAL COMPREHENSIVE ANSWER" in message
@@ -843,9 +817,7 @@ class TestForceCompletionMessages:
             user_message="test",
             force_completion=True,
         )
-        result = handler.handle_force_completion(
-            ctx, "loop_detected", "research loop detected"
-        )
+        result = handler.handle_force_completion(ctx, "loop_detected", "research loop detected")
 
         assert result is not None
         assert len(result.chunks) == 1
@@ -856,17 +828,13 @@ class TestForceCompletionMessages:
         assert call_args[0][0] == "user"
         assert "SYNTHESIZE" in call_args[0][1]
 
-    def test_handle_force_completion_exploration_limit(
-        self, handler, mock_message_adder
-    ):
+    def test_handle_force_completion_exploration_limit(self, handler, mock_message_adder):
         """Handles exploration limit force completion."""
         ctx = StreamingChatContext(
             user_message="test",
             force_completion=True,
         )
-        result = handler.handle_force_completion(
-            ctx, "max_iterations", "too many iterations"
-        )
+        result = handler.handle_force_completion(ctx, "max_iterations", "too many iterations")
 
         assert result is not None
         assert len(result.chunks) == 1
@@ -893,10 +861,7 @@ class TestRecoveryPrompts:
 
         assert len(prompts) == 3
         # First prompt should be about continuing exploration
-        assert (
-            "discovery tools" in prompts[0][0].lower()
-            or "tool call" in prompts[0][0].lower()
-        )
+        assert "discovery tools" in prompts[0][0].lower() or "tool call" in prompts[0][0].lower()
         # Temperatures should increase
         assert prompts[1][1] > prompts[0][1]
         assert prompts[2][1] > prompts[1][1]
@@ -913,9 +878,7 @@ class TestRecoveryPrompts:
 
         assert len(prompts) == 3
         # Should be summary prompts since budget exhausted
-        assert (
-            "summarize" in prompts[0][0].lower() or "findings" in prompts[0][0].lower()
-        )
+        assert "summarize" in prompts[0][0].lower() or "findings" in prompts[0][0].lower()
 
     def test_get_recovery_prompts_thinking_mode(self, handler):
         """Thinking mode returns simpler prompts with lower temps."""
@@ -961,10 +924,7 @@ class TestRecoveryPrompts:
 
         assert len(prompts) == 3
         # Should be task continuation prompts
-        assert (
-            "discovery tools" in prompts[0][0].lower()
-            or "tool call" in prompts[0][0].lower()
-        )
+        assert "discovery tools" in prompts[0][0].lower() or "tool call" in prompts[0][0].lower()
 
     def test_get_recovery_prompts_standard_task(self, handler):
         """Standard task returns summary prompts."""
@@ -979,9 +939,7 @@ class TestRecoveryPrompts:
 
         assert len(prompts) == 3
         # Should be summary prompts
-        assert (
-            "summarize" in prompts[0][0].lower() or "findings" in prompts[0][0].lower()
-        )
+        assert "summarize" in prompts[0][0].lower() or "findings" in prompts[0][0].lower()
 
 
 class TestShouldUseToolsForRecovery:
@@ -1313,9 +1271,7 @@ class TestGenerateFilePreviewChunk:
     def test_long_content_truncated(self, handler):
         """Long content is truncated with line count."""
         content = "\n".join([f"line{i}" for i in range(20)])
-        chunk = handler.generate_file_preview_chunk(
-            content, "/test.py", preview_lines=8
-        )
+        chunk = handler.generate_file_preview_chunk(content, "/test.py", preview_lines=8)
 
         assert chunk is not None
         assert "... (12 more lines)" in chunk.metadata["file_preview"]
@@ -1788,9 +1744,7 @@ class TestGenerateContentChunk:
 class TestCheckForceAction:
     """Tests for check_force_action method."""
 
-    def test_triggers_force_completion_when_checker_returns_true(
-        self, handler, basic_context
-    ):
+    def test_triggers_force_completion_when_checker_returns_true(self, handler, basic_context):
         """Sets force_completion when force checker returns True."""
         assert basic_context.force_completion is False
 

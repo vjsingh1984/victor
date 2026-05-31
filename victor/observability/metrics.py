@@ -541,9 +541,7 @@ class MetricsRegistry:
             return f"{name}{{{label_str}}}"
         return name
 
-    def get(
-        self, name: str, labels: Optional[Dict[str, str]] = None
-    ) -> Optional[Metric]:
+    def get(self, name: str, labels: Optional[Dict[str, str]] = None) -> Optional[Metric]:
         """Get metric by name.
 
         Args:
@@ -731,15 +729,9 @@ class MetricsCollector:
 
     def _on_lifecycle_event(self, event: Any) -> None:
         """Handle lifecycle events."""
-        if (
-            event.topic.endswith("session.start")
-            or event.topic == "lifecycle.session.start"
-        ):
+        if event.topic.endswith("session.start") or event.topic == "lifecycle.session.start":
             self.active_sessions.increment()
-        elif (
-            event.topic.endswith("session.end")
-            or event.topic == "lifecycle.session.end"
-        ):
+        elif event.topic.endswith("session.end") or event.topic == "lifecycle.session.end":
             self.active_sessions.decrement()
             # Check for duration in milliseconds or seconds
             duration_ms = event.data.get("duration_ms", 0)
@@ -763,9 +755,7 @@ class MetricsCollector:
             "tool_calls": self.tool_calls.value,
             "tool_errors": self.tool_errors.value,
             "tool_error_rate": (
-                self.tool_errors.value / self.tool_calls.value
-                if self.tool_calls.value > 0
-                else 0
+                self.tool_errors.value / self.tool_calls.value if self.tool_calls.value > 0 else 0
             ),
             "model_requests": self.model_requests.value,
             "model_tokens": self.model_tokens.value,

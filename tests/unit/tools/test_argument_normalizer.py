@@ -108,9 +108,7 @@ class TestNormalizeParameterAliases:
 
     def test_multiple_aliases(self):
         """Test multiple aliases applied."""
-        config = {
-            "parameter_aliases": {"read": {"line_start": "offset", "line_end": "limit"}}
-        }
+        config = {"parameter_aliases": {"read": {"line_start": "offset", "line_end": "limit"}}}
         normalizer = ArgumentNormalizer(config=config)
         args = {"path": "test.py", "line_start": 10, "line_end": 50}
         result, was_aliased = normalizer.normalize_parameter_aliases(args, "read")
@@ -263,11 +261,7 @@ class TestNormalizeArgumentsAST:
     def test_edit_value_envelope_with_raw_newline_json_string(self):
         """Canonical edit should recover wrapped JSON strings with raw newlines."""
         normalizer = ArgumentNormalizer()
-        args = {
-            "value": (
-                '{"ops":[{"type":"create","path":"test.txt","content":"line1\nline2"}]}'
-            )
-        }
+        args = {"value": ('{"ops":[{"type":"create","path":"test.txt","content":"line1\nline2"}]}')}
         result, strategy = normalizer.normalize_arguments(args, "edit")
         assert strategy == NormalizationStrategy.DIRECT
         assert isinstance(result["ops"], list)
@@ -292,8 +286,7 @@ class TestNormalizeArgumentsAST:
         normalizer = ArgumentNormalizer()
         args = {
             "value": (
-                '{"file_path":"victor/framework/graph_protocols.py",'
-                '"text":"line1\\nline2"}'
+                '{"file_path":"victor/framework/graph_protocols.py",' '"text":"line1\\nline2"}'
             )
         }
         result, strategy = normalizer.normalize_arguments(args, "write")
@@ -605,9 +598,7 @@ class TestIntegration:
     def test_ollama_python_syntax(self):
         """Test Ollama-style Python syntax is handled."""
         normalizer = ArgumentNormalizer(provider_name="ollama")
-        args = {
-            "operations": "[{'type': 'modify', 'path': 'test.sh', 'content': 'echo hello'}]"
-        }
+        args = {"operations": "[{'type': 'modify', 'path': 'test.sh', 'content': 'echo hello'}]"}
         result, strategy = normalizer.normalize_arguments(args, "edit_files")
 
         # Should successfully normalize
@@ -620,11 +611,7 @@ class TestIntegration:
 
     def test_gpt_oss_aliases(self):
         """Test gpt-oss style parameter aliases are handled."""
-        config = {
-            "parameter_aliases": {
-                "read": {"line_start": "offset", "line_end": "_line_end"}
-            }
-        }
+        config = {"parameter_aliases": {"read": {"line_start": "offset", "line_end": "_line_end"}}}
         normalizer = ArgumentNormalizer(provider_name="ollama", config=config)
         args = {"path": "test.py", "line_start": 10, "line_end": 50}
 
@@ -646,10 +633,7 @@ class TestIntegration:
 
         stats = normalizer.get_stats()
         assert stats["total_calls"] == 2
-        assert (
-            stats["normalizations"]["direct"] >= 1
-            or stats["normalizations"]["python_ast"] >= 1
-        )
+        assert stats["normalizations"]["direct"] >= 1 or stats["normalizations"]["python_ast"] >= 1
 
 
 class TestNativeFallback:
@@ -1368,15 +1352,13 @@ embedded newlines and "quotes" that aren't escaped.
         # Real-world failure: shell heredoc writing markdown with mermaid,
         # apostrophes, embedded "quotes", literal newlines, and triple backticks.
         malformed_cmd = (
-            'cat > docs/BLUEPRINT.md << \'EOF\'\n'
+            "cat > docs/BLUEPRINT.md << 'EOF'\n"
             "# Blueprint\n\n"
-            "Victor's documentation says \"use the framework\" not \"call internals\".\n"
+            'Victor\'s documentation says "use the framework" not "call internals".\n'
             "```mermaid\n"
             'flowchart TB\n    A["Agent"]\n    A --> B["Provider"]\n'
             "```\n\n"
-            "Section 1: it's all about flexibility\n"
-            + "More content line.\n" * 200
-            + "Done."
+            "Section 1: it's all about flexibility\n" + "More content line.\n" * 200 + "Done."
             "\nEOF"
         )
         # The provider wraps this in {"value": stringified-JSON-of-cmd}
@@ -1407,9 +1389,7 @@ embedded newlines and "quotes" that aren't escaped.
             'See `victor.framework.client.VictorClient` — "the canonical entry point".\n'
             "```python\n"
             'agent = await VictorClient.create(provider="anthropic")\n'
-            "```\n\n"
-            + "Filler.\n" * 300
-            + "END_MARKER"
+            "```\n\n" + "Filler.\n" * 300 + "END_MARKER"
         )
         wrapped = '{"path": "docs/test.md", "content": "' + content + '"}'
         args = {"value": wrapped}
@@ -1417,9 +1397,9 @@ embedded newlines and "quotes" that aren't escaped.
         result, _strategy = normalizer.normalize_arguments(args, "write")
 
         assert result.get("path") == "docs/test.md"
-        assert "END_MARKER" in result.get("content", ""), (
-            f"Content truncated; got {len(result.get('content', ''))} chars"
-        )
+        assert "END_MARKER" in result.get(
+            "content", ""
+        ), f"Content truncated; got {len(result.get('content', ''))} chars"
 
     def test_regex_fallback_preserves_apostrophes_in_content(self):
         """Regression test: regex fallback must NOT truncate content at the
@@ -1438,9 +1418,7 @@ embedded newlines and "quotes" that aren't escaped.
             "# Victor Blueprint\n\n"
             "Victor's documentation covers don't, let's, and it's.\n"
             "Section A: who's who in the codebase\n"
-            "Section B: what's new in 0.7\n"
-            + "Filler line.\n" * 500
-            + "End of document marker"
+            "Section B: what's new in 0.7\n" + "Filler line.\n" * 500 + "End of document marker"
         )
         # Malformed JSON: literal newlines inside the string value
         # (json.loads would reject this; AST also fails on multiline strings).
@@ -1459,9 +1437,7 @@ embedded newlines and "quotes" that aren't escaped.
             f"Content was truncated to {len(recovered)} chars; "
             f"end marker missing. Last 120 chars: ...{recovered[-120:]!r}"
         )
-        assert (
-            len(recovered) > 500
-        ), f"Content unexpectedly short ({len(recovered)} chars)"
+        assert len(recovered) > 500, f"Content unexpectedly short ({len(recovered)} chars)"
 
 
 if __name__ == "__main__":

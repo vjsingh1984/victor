@@ -60,9 +60,7 @@ class ProviderManagerProtocol(Protocol):
         """Initialize the tool adapter for current provider/model."""
         ...
 
-    async def switch_provider(
-        self, provider_name: str, model: Optional[str] = None
-    ) -> bool:
+    async def switch_provider(self, provider_name: str, model: Optional[str] = None) -> bool:
         """Switch to a different provider/model.
 
         Args:

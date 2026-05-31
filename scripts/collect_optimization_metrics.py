@@ -53,9 +53,7 @@ class OptimizationMetricsCollector:
         logger.info("Collecting optimization metrics...")
 
         # Component 1: Tool Output Pruner
-        self.metrics["components"][
-            "tool_output_pruner"
-        ] = self._collect_pruner_metrics()
+        self.metrics["components"]["tool_output_pruner"] = self._collect_pruner_metrics()
 
         # Component 2: Planning Gate
         self.metrics["components"]["planning_gate"] = self._collect_gate_metrics()
@@ -64,19 +62,13 @@ class OptimizationMetricsCollector:
         self.metrics["components"]["paradigm_router"] = self._collect_router_metrics()
 
         # Component 4: Complexity Estimator
-        self.metrics["components"][
-            "complexity_estimator"
-        ] = self._collect_estimator_metrics()
+        self.metrics["components"]["complexity_estimator"] = self._collect_estimator_metrics()
 
         # Component 5: Task Classifier
-        self.metrics["components"][
-            "task_classifier"
-        ] = self._collect_classifier_metrics()
+        self.metrics["components"]["task_classifier"] = self._collect_classifier_metrics()
 
         # Component 6: Threshold Optimizer
-        self.metrics["components"][
-            "threshold_optimizer"
-        ] = self._collect_optimizer_metrics()
+        self.metrics["components"]["threshold_optimizer"] = self._collect_optimizer_metrics()
 
         # Component 7: Enhanced Prompts (static)
         self.metrics["components"]["enhanced_prompts"] = self._collect_prompt_metrics()
@@ -84,9 +76,7 @@ class OptimizationMetricsCollector:
         # Calculate aggregate metrics
         self.metrics["aggregates"] = self._calculate_aggregates()
 
-        logger.info(
-            f"Collected metrics from {len(self.metrics['components'])} components"
-        )
+        logger.info(f"Collected metrics from {len(self.metrics['components'])} components")
 
         return self.metrics
 
@@ -287,13 +277,9 @@ class OptimizationMetricsCollector:
 
             # Show key metrics for each component
             if name == "planning_gate":
-                print(
-                    f"    Fast-path rate: {component.get('fast_path_percentage', 0):.1f}%"
-                )
+                print(f"    Fast-path rate: {component.get('fast_path_percentage', 0):.1f}%")
             elif name == "paradigm_router":
-                print(
-                    f"    Small model usage: {component.get('small_model_usage', 0):.1f}%"
-                )
+                print(f"    Small model usage: {component.get('small_model_usage', 0):.1f}%")
             elif name == "complexity_estimator":
                 print(f"    Cache hit rate: {component.get('cache_hit_rate', 0):.1f}%")
             elif name == "task_classifier":
@@ -308,9 +294,7 @@ class OptimizationMetricsCollector:
         )
         print(f"  Fast-path rate: {aggregates.get('fast_path_percentage', 0):.1f}%")
         print(f"  Small model usage: {aggregates.get('small_model_usage', 0):.1f}%")
-        print(
-            f"  Estimated cost reduction: {aggregates.get('estimated_cost_reduction', 0):.1f}%"
-        )
+        print(f"  Estimated cost reduction: {aggregates.get('estimated_cost_reduction', 0):.1f}%")
         print("")
 
         print("=" * 80)

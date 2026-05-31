@@ -454,9 +454,9 @@ class RunnableBranch(Runnable[Input, Output]):
             *branches: Tuples of (condition, runnable) evaluated in order
             default: Runnable to use if no conditions match
         """
-        self._branches: List[
-            Tuple[Callable[[Input], bool], Runnable[Input, Output]]
-        ] = list(branches)
+        self._branches: List[Tuple[Callable[[Input], bool], Runnable[Input, Output]]] = list(
+            branches
+        )
         self._default = default
 
         if not self._branches and not self._default:
@@ -499,7 +499,9 @@ class RunnableBranch(Runnable[Input, Output]):
         raise ValueError("No branch matched and no default provided")
 
     def __repr__(self) -> str:
-        return f"RunnableBranch({len(self._branches)} branches, default={self._default is not None})"
+        return (
+            f"RunnableBranch({len(self._branches)} branches, default={self._default is not None})"
+        )
 
 
 class RunnableLambda(Runnable[Input, Output]):

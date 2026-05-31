@@ -12,7 +12,9 @@ from victor.providers.base import Message
 @pytest.fixture
 def mock_provider():
     provider = MagicMock()
-    provider.chat.return_value = "User asked about JWT auth. Read auth/middleware.py. Plan: add validate_token()."
+    provider.chat.return_value = (
+        "User asked about JWT auth. Read auth/middleware.py. Plan: add validate_token()."
+    )
     return provider
 
 
@@ -57,9 +59,7 @@ def sample_messages():
 
 
 class TestLLMCompactionSummarizer:
-    def test_summarize_calls_provider_chat(
-        self, summarizer, mock_provider, sample_messages
-    ):
+    def test_summarize_calls_provider_chat(self, summarizer, mock_provider, sample_messages):
         result = summarizer.summarize(sample_messages)
         mock_provider.chat.assert_called_once()
         call_kwargs = mock_provider.chat.call_args
@@ -79,9 +79,7 @@ class TestLLMCompactionSummarizer:
         assert "auth.py" in prompt
         assert "factory pattern" in prompt
 
-    def test_fallback_on_provider_error(
-        self, summarizer, mock_provider, fallback, sample_messages
-    ):
+    def test_fallback_on_provider_error(self, summarizer, mock_provider, fallback, sample_messages):
         mock_provider.chat.side_effect = RuntimeError("API error")
         result = summarizer.summarize(sample_messages)
         assert result == "[Fallback summary]"

@@ -74,9 +74,7 @@ class StreamingChatContext:
     complexity_tool_budget: Optional[int] = None
     is_analysis_task: bool = False
     is_action_task: bool = False
-    is_complex_task: bool = (
-        False  # GAP-16: Track COMPLEX complexity for lenient progress checking
-    )
+    is_complex_task: bool = False  # GAP-16: Track COMPLEX complexity for lenient progress checking
     needs_execution: bool = False
     is_qa_task: bool = False  # Pure Q&A task — skip tools entirely
     coarse_task_type: str = "default"
@@ -339,9 +337,7 @@ class StreamingChatContext:
         if remaining <= 0 or self.tool_budget <= 0:
             return False
 
-        dynamic_remaining = min(
-            max(1, self.tool_budget // 5), max(1, warning_remaining)
-        )
+        dynamic_remaining = min(max(1, self.tool_budget // 5), max(1, warning_remaining))
         over_absolute_threshold = self.tool_calls_used >= max(1, warning_threshold)
         over_ratio_threshold = (self.tool_calls_used / self.tool_budget) >= warning_pct
         low_remaining = remaining <= dynamic_remaining
@@ -383,12 +379,8 @@ class StreamingChatContext:
 
         # Check unique resources accessed
         # GAP-16: Include is_complex_task for lenient threshold calculation
-        requires_lenient = (
-            self.is_analysis_task or self.is_action_task or self.is_complex_task
-        )
-        threshold = (
-            self.tool_calls_used // 4 if requires_lenient else self.tool_calls_used // 2
-        )
+        requires_lenient = self.is_analysis_task or self.is_action_task or self.is_complex_task
+        threshold = self.tool_calls_used // 4 if requires_lenient else self.tool_calls_used // 2
         return len(self.unique_resources) >= threshold
 
     def update_quality_score(self, score: float) -> None:
@@ -440,9 +432,7 @@ class StreamingChatContext:
             if value in (None, "", [], {}, set()):
                 continue
             if isinstance(value, (list, tuple, set)):
-                event[key] = [
-                    self._normalize_ledger_text(item, limit=80) for item in value
-                ][:6]
+                event[key] = [self._normalize_ledger_text(item, limit=80) for item in value][:6]
             else:
                 event[key] = self._normalize_ledger_text(value, limit=120)
 
@@ -498,9 +488,7 @@ class StreamingChatContext:
         if self.plan_steps:
             lines.append("Plan: " + "; ".join(self.plan_steps[:max_plan_steps]))
         if self.resume_summary:
-            lines.append(
-                "Resume: " + self._normalize_ledger_text(self.resume_summary, limit=180)
-            )
+            lines.append("Resume: " + self._normalize_ledger_text(self.resume_summary, limit=180))
         if self.resume_recent_tools:
             lines.append("Recent tools: " + ", ".join(self.resume_recent_tools[:4]))
         if self.resume_recent_resources:

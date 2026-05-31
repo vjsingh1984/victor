@@ -104,9 +104,7 @@ class PipelineStep:
             "artifacts": self.artifacts,
             "cache_paths": self.cache_paths,
             "estimated_duration": (
-                self.estimated_duration.total_seconds()
-                if self.estimated_duration
-                else None
+                self.estimated_duration.total_seconds() if self.estimated_duration else None
             ),
         }
 
@@ -147,9 +145,7 @@ class PipelineConfig:
     platform: PipelinePlatform
     file_path: Path
     name: str | None = None
-    triggers: list[str] = field(
-        default_factory=list
-    )  # push, pull_request, schedule, etc.
+    triggers: list[str] = field(default_factory=list)  # push, pull_request, schedule, etc.
     branches: list[str] = field(default_factory=list)
     steps: list[PipelineStep] = field(default_factory=list)
     global_environment: dict[str, str] = field(default_factory=dict)
@@ -325,9 +321,7 @@ class PipelineAnalysisResult:
             "recent_runs": [r.to_dict() for r in self.recent_runs],
             "coverage_trend": [c.to_dict() for c in self.coverage_trend],
             "success_rate": self.success_rate,
-            "avg_duration": (
-                self.avg_duration.total_seconds() if self.avg_duration else None
-            ),
+            "avg_duration": (self.avg_duration.total_seconds() if self.avg_duration else None),
             "recommendations": self.recommendations,
             "analyzed_at": self.analyzed_at.isoformat(),
         }
@@ -435,8 +429,7 @@ class CoverageAnalyzerProtocol(ABC):
         return {
             "line_coverage_delta": current.line_coverage - baseline.line_coverage,
             "branch_coverage_delta": current.branch_coverage - baseline.branch_coverage,
-            "function_coverage_delta": current.function_coverage
-            - baseline.function_coverage,
+            "function_coverage_delta": current.function_coverage - baseline.function_coverage,
             "new_uncovered_files": [
                 f for f in current.uncovered_files if f not in baseline.uncovered_files
             ],

@@ -223,9 +223,7 @@ class TestConfidenceCalculation:
         conf_with = self.integration._calculate_confidence(
             intent=ActionIntent.AMBIGUOUS,
             complexity=TaskComplexity.SIMPLE,
-            requirements=[
-                Requirement(type=RequirementType.FUNCTIONAL, description="x")
-            ],
+            requirements=[Requirement(type=RequirementType.FUNCTIONAL, description="x")],
             similar_experiences=[],
         )
         # Adding requirements should change the confidence (3 signals vs 2)
@@ -233,9 +231,7 @@ class TestConfidenceCalculation:
 
     def test_similar_experiences_affect_confidence(self):
         exps = [
-            SimilarExperience(
-                task_id="1", description="test", similarity_score=0.8, outcome=True
-            )
+            SimilarExperience(task_id="1", description="test", similarity_score=0.8, outcome=True)
         ]
         conf = self.integration._calculate_confidence(
             intent=ActionIntent.AMBIGUOUS,
@@ -248,16 +244,12 @@ class TestConfidenceCalculation:
 
     def test_max_confidence_capped_at_1(self):
         exps = [
-            SimilarExperience(
-                task_id="1", description="test", similarity_score=1.0, outcome=True
-            )
+            SimilarExperience(task_id="1", description="test", similarity_score=1.0, outcome=True)
         ]
         conf = self.integration._calculate_confidence(
             intent=ActionIntent.WRITE_ALLOWED,
             complexity=TaskComplexity.COMPLEX,
-            requirements=[
-                Requirement(type=RequirementType.FUNCTIONAL, description="x")
-            ],
+            requirements=[Requirement(type=RequirementType.FUNCTIONAL, description="x")],
             similar_experiences=exps,
             intent_confidence=0.95,
         )
@@ -288,9 +280,7 @@ class TestPerceive:
             memory_coordinator=None,
             enable_similarity_search=False,
         )
-        result = await integration.perceive(
-            "The code must handle errors and should be fast"
-        )
+        result = await integration.perceive("The code must handle errors and should be fast")
         assert len(result.requirements) >= 1
 
     async def test_perceive_without_requirements(self):
@@ -353,9 +343,7 @@ class TestPerceive:
         result = await integration.perceive("Fix it and add tests.")
 
         assert result.needs_clarification is True
-        assert (
-            result.clarification_reason == "target artifact or scope is underspecified"
-        )
+        assert result.clarification_reason == "target artifact or scope is underspecified"
         assert result.clarification_prompt is not None
         assert "Which file, component, or bug" in result.clarification_prompt
 
@@ -623,13 +611,9 @@ class TestCalibratedConfidence:
         conf_rich = self.integration._calculate_confidence(
             intent=ActionIntent.WRITE_ALLOWED,
             complexity=TaskComplexity.MEDIUM,
-            requirements=[
-                Requirement(type=RequirementType.FUNCTIONAL, description="x")
-            ],
+            requirements=[Requirement(type=RequirementType.FUNCTIONAL, description="x")],
             similar_experiences=[
-                SimilarExperience(
-                    task_id="1", description="t", similarity_score=0.9, outcome=True
-                )
+                SimilarExperience(task_id="1", description="t", similarity_score=0.9, outcome=True)
             ],
         )
         # Both should be reasonable (geometric mean makes this non-trivial)

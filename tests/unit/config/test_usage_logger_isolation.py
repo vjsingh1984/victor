@@ -34,9 +34,7 @@ class TestUsageLoggerIsolation:
     def test_test_mode_environment_variable_set(self):
         """Verify that TEST_MODE is set during test execution."""
         # This fixture is session-scoped and should be set
-        assert (
-            os.getenv("TEST_MODE") == "1"
-        ), "TEST_MODE should be set by conftest fixture"
+        assert os.getenv("TEST_MODE") == "1", "TEST_MODE should be set by conftest fixture"
 
     def test_global_logs_dir_exists(self):
         """Verify that global logs directory exists but test mode redirects away."""

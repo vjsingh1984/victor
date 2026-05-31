@@ -232,9 +232,7 @@ class CoordinationSuggestion:
     @property
     def should_spawn_team(self) -> bool:
         """Check if team should be auto-spawned."""
-        return (
-            self.action == TeamSuggestionAction.AUTO_SPAWN and self.has_team_suggestion
-        )
+        return self.action == TeamSuggestionAction.AUTO_SPAWN and self.has_team_suggestion
 
     @property
     def should_suggest_team(self) -> bool:

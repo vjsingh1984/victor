@@ -137,9 +137,7 @@ class AnalysisToolFactory(ToolFactory):
             ExpensiveAnalysisTool instance
         """
         self._call_count += 1
-        print(
-            f"  [AnalysisToolFactory] Creating tool instance (call #{self._call_count})..."
-        )
+        print(f"  [AnalysisToolFactory] Creating tool instance (call #{self._call_count})...")
 
         return ExpensiveAnalysisTool(
             model_path=self._model_path,

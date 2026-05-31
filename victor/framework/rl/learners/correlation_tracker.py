@@ -238,9 +238,7 @@ class CorrelationTracker:
         else:
             return 0.0  # No correlation data, assume independent
 
-    def get_correlation_matrix(
-        self, agent_ids: List[str]
-    ) -> Dict[str, Dict[str, float]]:
+    def get_correlation_matrix(self, agent_ids: List[str]) -> Dict[str, Dict[str, float]]:
         """Get correlation matrix for a set of agents.
 
         Args:
@@ -283,9 +281,7 @@ class CorrelationTracker:
             return 0.0
 
         # Sum of weights
-        weight_sum = sum(
-            reliability_weights.get(agent_id, 1.0) for agent_id in agent_ids
-        )
+        weight_sum = sum(reliability_weights.get(agent_id, 1.0) for agent_id in agent_ids)
 
         if weight_sum == 0:
             return 0.0
@@ -409,9 +405,7 @@ class CorrelationTracker:
 
         return dict(stats)
 
-    def get_highly_correlated_pairs(
-        self, threshold: float = 0.7
-    ) -> List[Tuple[str, str, float]]:
+    def get_highly_correlated_pairs(self, threshold: float = 0.7) -> List[Tuple[str, str, float]]:
         """Get pairs of agents with high correlation.
 
         Args:

@@ -103,9 +103,7 @@ class EvaluationResult:
     @property
     def should_continue(self) -> bool:
         """Check if execution should continue."""
-        return (
-            self.decision == EvaluationDecision.CONTINUE or self.decision == "continue"
-        )
+        return self.decision == EvaluationDecision.CONTINUE or self.decision == "continue"
 
     @property
     def should_retry(self) -> bool:
@@ -115,9 +113,7 @@ class EvaluationResult:
     @property
     def should_complete(self) -> bool:
         """Check if task is complete."""
-        return (
-            self.decision == EvaluationDecision.COMPLETE or self.decision == "complete"
-        )
+        return self.decision == EvaluationDecision.COMPLETE or self.decision == "complete"
 
     @property
     def should_fail(self) -> bool:
@@ -126,9 +122,7 @@ class EvaluationResult:
 
 
 # Type alias for evaluator functions
-Evaluator = Callable[
-    [Dict[str, Any]], Union[EvaluationResult, Awaitable[EvaluationResult]]
-]
+Evaluator = Callable[[Dict[str, Any]], Union[EvaluationResult, Awaitable[EvaluationResult]]]
 """Evaluator function signature.
 
 Takes current state dict, returns EvaluationResult.

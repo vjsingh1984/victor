@@ -236,9 +236,7 @@ class ExecutionConfig:
         if self.timeout is not None and self.timeout < 0.1:
             raise ValueError(f"timeout must be >= 0.1, got {self.timeout}")
         if self.recursion_limit < 1:
-            raise ValueError(
-                f"recursion_limit must be >= 1, got {self.recursion_limit}"
-            )
+            raise ValueError(f"recursion_limit must be >= 1, got {self.recursion_limit}")
 
 
 @dataclass

@@ -40,9 +40,9 @@ def test_persist_validated_session_truth_artifacts_writes_all_and_refreshes_once
 
     assert saved_paths == [artifact.path for artifact in artifacts]
     assert (
-        json.loads(artifacts[0].path.read_text())["runtime_evaluation_feedback"][
-            "metadata"
-        ]["source"]
+        json.loads(artifacts[0].path.read_text())["runtime_evaluation_feedback"]["metadata"][
+            "source"
+        ]
         == "test"
     )
     assert artifacts[1].path.exists()

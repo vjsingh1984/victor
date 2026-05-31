@@ -42,9 +42,7 @@ async def create_orchestrator_from_settings(
         available = list(profiles.keys())
         import difflib
 
-        suggestions = difflib.get_close_matches(
-            profile_name, available, n=3, cutoff=0.4
-        )
+        suggestions = difflib.get_close_matches(profile_name, available, n=3, cutoff=0.4)
 
         error_msg = f"Profile not found: '{profile_name}'"
         if suggestions:
@@ -52,13 +50,13 @@ async def create_orchestrator_from_settings(
         if available:
             error_msg += f"\n  Available profiles: {', '.join(sorted(available))}"
         else:
-            error_msg += "\n  No profiles configured. Run 'victor init' or create ~/.victor/profiles.yaml"
+            error_msg += (
+                "\n  No profiles configured. Run 'victor init' or create ~/.victor/profiles.yaml"
+            )
         raise ValueError(error_msg)
 
     # Get provider-level settings
-    profile_extras = (
-        profile.__pydantic_extra__ if hasattr(profile, "__pydantic_extra__") else {}
-    )
+    profile_extras = profile.__pydantic_extra__ if hasattr(profile, "__pydantic_extra__") else {}
     provider_settings = settings.get_provider_settings(profile.provider, profile_extras)
 
     if profile_extras:

@@ -252,10 +252,7 @@ class TestDirectorySummaries:
                 assert result == {}
 
                 # Should log warning with context
-                assert any(
-                    "Failed to get directory summaries" in msg
-                    for msg in caplog.messages
-                )
+                assert any("Failed to get directory summaries" in msg for msg in caplog.messages)
                 assert any("Test error" in msg for msg in caplog.messages)
 
     @pytest.mark.asyncio
@@ -289,9 +286,7 @@ class TestDirectorySummaries:
                 mock_get_db.return_value = mock_db
 
                 # Call with 3 directories
-                result = await _get_directory_summaries(
-                    Path(tmpdir), ["dir1", "dir2", "dir3"]
-                )
+                result = await _get_directory_summaries(Path(tmpdir), ["dir1", "dir2", "dir3"])
 
                 # Should return partial results (not empty dict)
                 # Note: The actual implementation returns empty on any exception

@@ -348,9 +348,7 @@ async def demo_plugin_usage():
     context: Dict[str, Any] = {}
 
     # Execute weather tool
-    weather_result = await registry.execute(
-        "get_weather", context, city="London", units="celsius"
-    )
+    weather_result = await registry.execute("get_weather", context, city="London", units="celsius")
     print("\nWeather for London:")
     print(f"  Success: {weather_result.success}")
     if weather_result.success:

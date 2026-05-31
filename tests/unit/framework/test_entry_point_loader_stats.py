@@ -64,9 +64,7 @@ def test_stats_track_tool_dependency_fallback_resolution(
 
 @patch("victor.core.tool_dependency_loader.create_vertical_tool_dependency_provider")
 @patch("victor.framework.entry_point_loader._cached_entry_points")
-def test_stats_track_tool_dependency_none_returns(
-    mock_cached_eps, mock_create_vertical_provider
-):
+def test_stats_track_tool_dependency_none_returns(mock_cached_eps, mock_create_vertical_provider):
     """Empty fallback providers should increment none-return counters."""
     mock_cached_eps.return_value = ()
     mock_create_vertical_provider.return_value = EmptyToolDependencyProvider("coding")

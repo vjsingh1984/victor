@@ -107,9 +107,7 @@ class TestSkillRegistrySearch:
         from victor.framework.skills import SkillRegistry
 
         registry = SkillRegistry()
-        registry.register(
-            _make_skill("debug_test_failure", description="Debug a failing test")
-        )
+        registry.register(_make_skill("debug_test_failure", description="Debug a failing test"))
         registry.register(_make_skill("deploy_service", description="Deploy a service"))
         results = registry.search(query="debug")
         assert len(results) == 1
@@ -119,12 +117,8 @@ class TestSkillRegistrySearch:
         from victor.framework.skills import SkillRegistry
 
         registry = SkillRegistry()
-        registry.register(
-            _make_skill("debug", category="coding", description="Debug code")
-        )
-        registry.register(
-            _make_skill("debug_infra", category="devops", description="Debug infra")
-        )
+        registry.register(_make_skill("debug", category="coding", description="Debug code"))
+        registry.register(_make_skill("debug_infra", category="devops", description="Debug infra"))
         results = registry.search(query="debug", category="coding")
         assert len(results) == 1
         assert results[0].name == "debug"
@@ -133,9 +127,7 @@ class TestSkillRegistrySearch:
         from victor.framework.skills import SkillRegistry
 
         registry = SkillRegistry()
-        registry.register(
-            _make_skill("refactor", tags=frozenset({"code-quality", "cleanup"}))
-        )
+        registry.register(_make_skill("refactor", tags=frozenset({"code-quality", "cleanup"})))
         registry.register(_make_skill("deploy"))
         results = registry.search(query="cleanup")
         assert len(results) == 1

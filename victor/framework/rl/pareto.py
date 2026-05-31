@@ -104,9 +104,7 @@ class ParetoFrontier:
                 return True
 
         # Check dominance — reject if dominated by everyone
-        if self._candidates and all(
-            self._dominates(c, entry) for c in self._candidates
-        ):
+        if self._candidates and all(self._dominates(c, entry) for c in self._candidates):
             return False
 
         self._candidates.append(entry)
@@ -127,9 +125,7 @@ class ParetoFrontier:
         self._recompute_coverage()
         return True
 
-    def update_instance_score(
-        self, text_hash: str, instance_id: str, score: float
-    ) -> None:
+    def update_instance_score(self, text_hash: str, instance_id: str, score: float) -> None:
         """Update a candidate's score on a specific evaluation instance."""
         self._instances.add(instance_id)
         for candidate in self._candidates:
@@ -229,9 +225,7 @@ class ParetoFrontier:
                 merged_hash = hashlib.md5(merged_text.encode()).hexdigest()[:12]
                 # Inherit average scores from parents
                 merged_scores: Dict[str, float] = {}
-                all_instances = set(a.instance_scores.keys()) | set(
-                    b.instance_scores.keys()
-                )
+                all_instances = set(a.instance_scores.keys()) | set(b.instance_scores.keys())
                 for inst in all_instances:
                     sa = a.instance_scores.get(inst, 0)
                     sb = b.instance_scores.get(inst, 0)

@@ -74,9 +74,7 @@ class TestUILayerArchitecturalBoundaries:
                                         {
                                             "file": str(
                                                 file_path.relative_to(
-                                                    Path(
-                                                        __file__
-                                                    ).parent.parent.parent.parent
+                                                    Path(__file__).parent.parent.parent.parent
                                                 )
                                             ),
                                             "line": node.lineno,
@@ -87,17 +85,12 @@ class TestUILayerArchitecturalBoundaries:
                     # Check for direct imports
                     if isinstance(node, ast.Import):
                         for alias in node.names:
-                            if (
-                                "orchestrator" in alias.name
-                                and "AgentOrchestrator" in alias.name
-                            ):
+                            if "orchestrator" in alias.name and "AgentOrchestrator" in alias.name:
                                 violations.append(
                                     {
                                         "file": str(
                                             file_path.relative_to(
-                                                Path(
-                                                    __file__
-                                                ).parent.parent.parent.parent
+                                                Path(__file__).parent.parent.parent.parent
                                             )
                                         ),
                                         "line": node.lineno,
@@ -113,9 +106,7 @@ class TestUILayerArchitecturalBoundaries:
                 "UI layer must NOT import AgentOrchestrator directly.\n"
                 "Use VictorClient or Agent facade instead.\n\n"
                 "Violations:\n"
-                + "\n".join(
-                    f"  - {v['file']}:{v['line']}: {v['import']}" for v in violations
-                )
+                + "\n".join(f"  - {v['file']}:{v['line']}: {v['import']}" for v in violations)
             )
 
     def test_ui_layer_must_not_import_framework_shim(self, ui_layer_files):
@@ -147,8 +138,7 @@ class TestUILayerArchitecturalBoundaries:
             pytest.fail(
                 "UI layer must NOT import FrameworkShim (deprecated).\n"
                 "Use VictorClient or Agent.create() instead.\n\n"
-                "Violations:\n"
-                + "\n".join(f"  - {v['file']}: {v['import']}" for v in violations)
+                "Violations:\n" + "\n".join(f"  - {v['file']}: {v['import']}" for v in violations)
             )
 
     def test_ui_layer_must_not_call_private_victor_client_methods(self, ui_layer_files):
@@ -182,9 +172,7 @@ class TestUILayerArchitecturalBoundaries:
                 "UI layer must NOT call private VictorClient methods.\n"
                 "Use VictorClient.initialize() or other public surfaces instead.\n\n"
                 "Violations:\n"
-                + "\n".join(
-                    f"  - {v['file']}:{v['line']}: {v['content']}" for v in violations
-                )
+                + "\n".join(f"  - {v['file']}:{v['line']}: {v['content']}" for v in violations)
             )
 
 
@@ -207,9 +195,7 @@ class TestVictorClientArchitecturalBoundaries:
         param = params["config"]
         if param.annotation and "SessionConfig" not in str(param.annotation):
             # Allow generic annotations
-            if not any(
-                x in str(param.annotation) for x in ["Any", "object", "SessionConfig"]
-            ):
+            if not any(x in str(param.annotation) for x in ["Any", "object", "SessionConfig"]):
                 pytest.fail(
                     f"VictorClient.__init__ 'config' parameter should accept SessionConfig, "
                     f"but has annotation: {param.annotation}"
@@ -352,10 +338,7 @@ class TestServiceLayerArchitecturalBoundaries:
                 module = __import__(module_name, fromlist=[""])
                 # Check if the service class exists
                 service_class_name = (
-                    module_name.split(".")[-1]
-                    .replace("_service", "")
-                    .title()
-                    .replace("_", "")
+                    module_name.split(".")[-1].replace("_service", "").title().replace("_", "")
                     + "Service"
                 )
                 if not hasattr(module, service_class_name):
@@ -435,8 +418,7 @@ class TestRegressionGuards:
             pytest.fail(
                 "UI layer must NOT instantiate AgentFactory directly.\n"
                 "Use VictorClient or Agent.create() instead.\n\n"
-                "Violations:\n"
-                + "\n".join(f"  - {v['file']}: {v['pattern']}" for v in violations)
+                "Violations:\n" + "\n".join(f"  - {v['file']}: {v['pattern']}" for v in violations)
             )
 
     def test_no_settings_mutation_in_ui_layer(self, ui_layer_files):

@@ -95,9 +95,7 @@ class TestProviderPayloadLimiter:
         limiter = ProviderPayloadLimiter(provider_name="groq")
         messages = [
             MockMessage(role="user", content="Test"),
-            MockMessage(
-                role="tool", content="Tool result content" * 100, tool_call_id="tc_1"
-            ),
+            MockMessage(role="tool", content="Tool result content" * 100, tool_call_id="tc_1"),
         ]
 
         estimate = limiter.estimate_size(messages, None)
@@ -208,9 +206,7 @@ class TestProviderPayloadLimiter:
             safety_margin=1.0,
             enable_dictionary_compression=True,
         )
-        repeated_tool_result = "\n".join(
-            f"line {i}: repeated payload content" for i in range(220)
-        )
+        repeated_tool_result = "\n".join(f"line {i}: repeated payload content" for i in range(220))
         messages = [
             MockMessage(role="user", content="Analyze the duplicated tool outputs"),
             MockMessage(role="tool", content=repeated_tool_result, tool_call_id="tc_1"),
@@ -300,20 +296,14 @@ class TestProviderPayloadLimiter:
         assert result.truncated is True
         # With 20 tools, reduce_tools should cut to 10, which may still exceed
         # so it may also truncate messages. Check that some action was taken.
-        assert (
-            result.tools_removed > 0
-            or result.messages_removed > 0
-            or result.bytes_saved > 0
-        )
+        assert result.tools_removed > 0 or result.messages_removed > 0 or result.bytes_saved > 0
 
     def test_fail_strategy(self):
         """Test FAIL strategy returns error without truncation."""
         limiter = ProviderPayloadLimiter(provider_name="test", max_payload_bytes=100)
         messages = [MockMessage(role="user", content="x" * 500)]
 
-        result = limiter.truncate_if_needed(
-            messages, None, strategy=TruncationStrategy.FAIL
-        )
+        result = limiter.truncate_if_needed(messages, None, strategy=TruncationStrategy.FAIL)
 
         assert result.truncated is False
         assert result.warning is not None

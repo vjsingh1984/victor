@@ -166,8 +166,7 @@ def create_edge_decision_service(
             # Verify model is available for Ollama
             if not _check_model_available(config.base_url, config.model):
                 logger.warning(
-                    "Edge model '%s' not available in Ollama. "
-                    "Pull it with: ollama pull %s",
+                    "Edge model '%s' not available in Ollama. " "Pull it with: ollama pull %s",
                     config.model,
                     config.model,
                 )
@@ -364,9 +363,7 @@ class EdgeLLMVerificationResult:
     original_confidence: float  # Original confidence score
     verified_result: Any  # Verified/corrected result from edge LLM
     verification_confidence: float  # Confidence of the verification
-    verification_passed: (
-        bool  # Whether verification passed (confidence ≥ high threshold)
-    )
+    verification_passed: bool  # Whether verification passed (confidence ≥ high threshold)
     latency_ms: float  # Verification latency in milliseconds
     tokens_used: int  # Tokens used for verification
 

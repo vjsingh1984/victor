@@ -113,9 +113,7 @@ class TestPriority4Migration:
             )
             indexes = {row[0] for row in cursor.fetchall()}
 
-            assert (
-                "idx_rl_outcome_session" in indexes
-            ), "session index should be created"
+            assert "idx_rl_outcome_session" in indexes, "session index should be created"
             assert "idx_rl_outcome_repo" in indexes, "repo index should be created"
 
             conn.close()
@@ -473,8 +471,6 @@ class TestPriority4Performance:
             elapsed_ms = (time.time() - start) * 1000
 
             assert len(rows) == 10, "Should find 10 outcomes"
-            assert (
-                elapsed_ms < 100
-            ), f"Query with index should be fast, took {elapsed_ms:.1f}ms"
+            assert elapsed_ms < 100, f"Query with index should be fast, took {elapsed_ms:.1f}ms"
 
             conn.close()

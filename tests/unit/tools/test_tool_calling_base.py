@@ -227,18 +227,14 @@ class TestBaseToolCallingAdapterGetSystemPromptHints:
 
     def test_native_no_hints(self):
         """Test native tool calls with no strict prompting returns empty."""
-        caps = ToolCallingCapabilities(
-            native_tool_calls=True, requires_strict_prompting=False
-        )
+        caps = ToolCallingCapabilities(native_tool_calls=True, requires_strict_prompting=False)
         adapter = ConcreteToolCallingAdapter(capabilities=caps)
         hints = adapter.get_system_prompt_hints()
         assert hints == ""
 
     def test_strict_prompting_hints(self):
         """Test strict prompting adds hints (covers lines 205-208)."""
-        caps = ToolCallingCapabilities(
-            native_tool_calls=False, requires_strict_prompting=True
-        )
+        caps = ToolCallingCapabilities(native_tool_calls=False, requires_strict_prompting=True)
         adapter = ConcreteToolCallingAdapter(capabilities=caps)
         hints = adapter.get_system_prompt_hints()
         assert "ONE AT A TIME" in hints

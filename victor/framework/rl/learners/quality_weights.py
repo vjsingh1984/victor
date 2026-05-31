@@ -139,9 +139,7 @@ class QualityWeightLearner(BaseLearner):
 
     def _ensure_tables(self) -> None:
         """Migrate legacy per-learner tables to unified RL tables."""
-        RLTableMigrator(self.db).run_if_needed(
-            self.name, RLTableMigrator.migrate_quality_weights
-        )
+        RLTableMigrator(self.db).run_if_needed(self.name, RLTableMigrator.migrate_quality_weights)
 
     def _load_state(self) -> None:
         """Load state from database."""
@@ -163,9 +161,7 @@ class QualityWeightLearner(BaseLearner):
 
                 if task_type not in self._weights:
                     self._weights[task_type] = dict(self.DEFAULT_WEIGHTS)
-                    self._velocities[task_type] = dict.fromkeys(
-                        QualityDimension.ALL, 0.0
-                    )
+                    self._velocities[task_type] = dict.fromkeys(QualityDimension.ALL, 0.0)
                     self._sample_counts[task_type] = 0
 
                 if key.startswith("weight:"):
@@ -202,9 +198,7 @@ class QualityWeightLearner(BaseLearner):
         overall_success = outcome.metadata.get("overall_success", outcome.quality_score)
 
         if not dimension_scores:
-            logger.debug(
-                "RL: quality_weights outcome missing dimension_scores, skipping"
-            )
+            logger.debug("RL: quality_weights outcome missing dimension_scores, skipping")
             return
 
         # Ensure task type exists
@@ -283,9 +277,7 @@ class QualityWeightLearner(BaseLearner):
                 gradient = error * dimension_scores[dim]
 
                 # Momentum update
-                velocities[dim] = (
-                    self.momentum * velocities[dim] + self.learning_rate * gradient
-                )
+                velocities[dim] = self.momentum * velocities[dim] + self.learning_rate * gradient
 
                 # Weight update (gradient descent)
                 new_weight = weights[dim] - velocities[dim]
@@ -522,8 +514,7 @@ class QualityWeightLearner(BaseLearner):
             mean_success = sum(successes) / n
 
             numerator = sum(
-                (d - mean_dim) * (s - mean_success)
-                for d, s in zip(dim_scores, successes)
+                (d - mean_dim) * (s - mean_success) for d, s in zip(dim_scores, successes)
             )
 
             var_dim = sum((d - mean_dim) ** 2 for d in dim_scores)

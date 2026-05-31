@@ -286,10 +286,7 @@ def has_explicit_readonly_shell_request(message: Optional[str]) -> bool:
     if not message:
         return False
     lowered = message.lower()
-    return any(
-        re.search(pattern, lowered, re.IGNORECASE)
-        for pattern, _ in READONLY_SHELL_SIGNALS
-    )
+    return any(re.search(pattern, lowered, re.IGNORECASE) for pattern, _ in READONLY_SHELL_SIGNALS)
 
 
 def split_continuation_request(message: Optional[str]) -> tuple[bool, str]:
@@ -353,9 +350,8 @@ def is_tool_blocked_for_intent(
     if intent is None:
         return False
     canonical_tool_name = normalize_tool_name_for_policy(tool_name)
-    if (
-        canonical_tool_name == ToolNames.SHELL
-        and should_allow_shell_for_read_only_intent(intent, user_message)
+    if canonical_tool_name == ToolNames.SHELL and should_allow_shell_for_read_only_intent(
+        intent, user_message
     ):
         return False
     return canonical_tool_name in get_intent_blocked_tools(intent)
@@ -720,9 +716,7 @@ class IntentDetector:
         self,
         custom_display_signals: Optional[List[Tuple[str, float, str]]] = None,
         custom_write_signals: Optional[List[Tuple[str, float, str]]] = None,
-        custom_detectors: Optional[
-            List[Callable[[str], Optional[IntentClassification]]]
-        ] = None,
+        custom_detectors: Optional[List[Callable[[str], Optional[IntentClassification]]]] = None,
         default_intent: ActionIntent = ActionIntent.AMBIGUOUS,
     ):
         """Initialize the intent detector.
@@ -798,9 +792,7 @@ class IntentDetector:
         display_score, display_matched = self._score_patterns(
             scoring_message, self._display_patterns
         )
-        write_score, write_matched = self._score_patterns(
-            scoring_message, self._write_patterns
-        )
+        write_score, write_matched = self._score_patterns(scoring_message, self._write_patterns)
         read_only_score, read_only_matched = self._score_patterns(
             scoring_message, self._read_only_patterns
         )

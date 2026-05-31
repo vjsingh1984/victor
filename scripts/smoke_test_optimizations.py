@@ -346,9 +346,7 @@ class OptimizationSmokeTest:
 
 def main():
     """Main entry point."""
-    parser = argparse.ArgumentParser(
-        description="Smoke test for arXiv optimization components"
-    )
+    parser = argparse.ArgumentParser(description="Smoke test for arXiv optimization components")
     parser.add_argument(
         "--verbose",
         action="store_true",

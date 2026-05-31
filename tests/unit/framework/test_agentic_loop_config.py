@@ -56,9 +56,7 @@ class TestAgenticLoopConfigDataclass:
     def test_config_from_dict_ignores_unknown_keys(self):
         from victor.framework.agentic_loop import AgenticLoopConfig
 
-        cfg = AgenticLoopConfig.from_dict(
-            {"unknown_key": "value", "enable_planning_gate": False}
-        )
+        cfg = AgenticLoopConfig.from_dict({"unknown_key": "value", "enable_planning_gate": False})
         assert cfg.enable_planning_gate is False
         # No KeyError from the unknown key
         assert cfg.disable_enhanced_completion is False  # default preserved

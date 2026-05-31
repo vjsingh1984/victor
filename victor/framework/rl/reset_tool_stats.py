@@ -84,14 +84,10 @@ def reset_tool_stats(tool_name: str, confirm: bool = False) -> bool:
             )
 
         # Delete from rl_tool_q
-        q_deleted = db.execute(
-            "DELETE FROM rl_tool_q WHERE tool_name = ?", (tool_name,)
-        ).rowcount
+        q_deleted = db.execute("DELETE FROM rl_tool_q WHERE tool_name = ?", (tool_name,)).rowcount
 
         if q_deleted > 0:
-            logger.info(
-                f"[reset_tool_stats] Cleared rl_tool_q record for '{tool_name}'"
-            )
+            logger.info(f"[reset_tool_stats] Cleared rl_tool_q record for '{tool_name}'")
 
         # Delete from rl_cache_tool
         cache_deleted = db.execute(
@@ -99,9 +95,7 @@ def reset_tool_stats(tool_name: str, confirm: bool = False) -> bool:
         ).rowcount
 
         if cache_deleted > 0:
-            logger.info(
-                f"[reset_tool_stats] Cleared rl_cache_tool record for '{tool_name}'"
-            )
+            logger.info(f"[reset_tool_stats] Cleared rl_cache_tool record for '{tool_name}'")
 
         # Delete from rl_tool_task
         task_deleted = db.execute(
@@ -113,9 +107,7 @@ def reset_tool_stats(tool_name: str, confirm: bool = False) -> bool:
                 f"[reset_tool_stats] Cleared {task_deleted} rl_tool_task records for '{tool_name}'"
             )
 
-        logger.info(
-            f"[reset_tool_stats] Tool '{tool_name}' statistics reset successfully"
-        )
+        logger.info(f"[reset_tool_stats] Tool '{tool_name}' statistics reset successfully")
         return True
 
     except Exception as e:
@@ -123,9 +115,7 @@ def reset_tool_stats(tool_name: str, confirm: bool = False) -> bool:
         return False
 
 
-def reset_multiple_tools(
-    tool_names: List[str], confirm: bool = False
-) -> dict[str, bool]:
+def reset_multiple_tools(tool_names: List[str], confirm: bool = False) -> dict[str, bool]:
     """Reset RL statistics for multiple tools.
 
     Args:
@@ -176,12 +166,8 @@ def get_tool_stats_summary(tool_name: str) -> Optional[dict]:
             "selection_count": q_row[1] if q_row else 0,
             "success_count": q_row[2] if q_row else 0,
             "outcome_count": outcome_stats[0] if outcome_stats else 0,
-            "avg_success": (
-                outcome_stats[1] if outcome_stats and outcome_stats[1] else None
-            ),
-            "avg_quality": (
-                outcome_stats[2] if outcome_stats and outcome_stats[2] else None
-            ),
+            "avg_success": (outcome_stats[1] if outcome_stats and outcome_stats[1] else None),
+            "avg_quality": (outcome_stats[2] if outcome_stats and outcome_stats[2] else None),
         }
 
         if result["selection_count"] > 0:
@@ -192,9 +178,7 @@ def get_tool_stats_summary(tool_name: str) -> Optional[dict]:
         return result
 
     except Exception as e:
-        logger.error(
-            f"[get_tool_stats_summary] Failed to get stats for '{tool_name}': {e}"
-        )
+        logger.error(f"[get_tool_stats_summary] Failed to get stats for '{tool_name}': {e}")
         return None
 
 

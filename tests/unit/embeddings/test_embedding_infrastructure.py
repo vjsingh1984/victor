@@ -108,9 +108,7 @@ class TestEmbeddingServiceEmbeddings:
 
     def test_embed_text_sync_returns_numpy_array(self, mock_model):
         """Test that embed_text_sync returns numpy array."""
-        with patch(
-            "sentence_transformers.SentenceTransformer", return_value=mock_model
-        ):
+        with patch("sentence_transformers.SentenceTransformer", return_value=mock_model):
             service = EmbeddingService.get_instance()
             result = service.embed_text_sync("Hello world")
 
@@ -122,9 +120,7 @@ class TestEmbeddingServiceEmbeddings:
         """Test that embed_batch_sync returns 2D array."""
         mock_model.encode.return_value = np.random.randn(3, 384).astype(np.float32)
 
-        with patch(
-            "sentence_transformers.SentenceTransformer", return_value=mock_model
-        ):
+        with patch("sentence_transformers.SentenceTransformer", return_value=mock_model):
             service = EmbeddingService.get_instance()
             result = service.embed_batch_sync(["Hello", "World", "Test"])
 
@@ -134,9 +130,7 @@ class TestEmbeddingServiceEmbeddings:
 
     def test_embed_batch_sync_empty_list_returns_empty_array(self, mock_model):
         """Test that empty list returns empty array."""
-        with patch(
-            "sentence_transformers.SentenceTransformer", return_value=mock_model
-        ):
+        with patch("sentence_transformers.SentenceTransformer", return_value=mock_model):
             service = EmbeddingService.get_instance()
             result = service.embed_batch_sync([])
 
@@ -146,9 +140,7 @@ class TestEmbeddingServiceEmbeddings:
     @pytest.mark.asyncio
     async def test_embed_text_async(self, mock_model):
         """Test async embed_text method."""
-        with patch(
-            "sentence_transformers.SentenceTransformer", return_value=mock_model
-        ):
+        with patch("sentence_transformers.SentenceTransformer", return_value=mock_model):
             service = EmbeddingService.get_instance()
             result = await service.embed_text("Hello world")
 
@@ -157,9 +149,7 @@ class TestEmbeddingServiceEmbeddings:
 
     def test_dimension_property(self, mock_model):
         """Test dimension property returns correct value."""
-        with patch(
-            "sentence_transformers.SentenceTransformer", return_value=mock_model
-        ):
+        with patch("sentence_transformers.SentenceTransformer", return_value=mock_model):
             service = EmbeddingService.get_instance()
             assert service.dimension == 384
 
@@ -411,15 +401,10 @@ class TestIntentClassifier:
                 base = np.random.randn(384).astype(np.float32)
 
                 # Add semantic signal based on content
-                if any(
-                    kw in text_lower for kw in ["let me", "i'll", "next", "going to"]
-                ):
+                if any(kw in text_lower for kw in ["let me", "i'll", "next", "going to"]):
                     # Continuation-like
                     signal = np.array([1.0] * 192 + [0.0] * 192, dtype=np.float32)
-                elif any(
-                    kw in text_lower
-                    for kw in ["summary", "here are", "conclusion", "##"]
-                ):
+                elif any(kw in text_lower for kw in ["summary", "here are", "conclusion", "##"]):
                     # Completion-like
                     signal = np.array([0.0] * 192 + [1.0] * 192, dtype=np.float32)
                 else:
@@ -468,16 +453,12 @@ class TestIntentClassifier:
         )
         classifier.initialize_sync()
 
-        result = classifier.classify_intent_sync(
-            "## 1. Summary of findings\nHere are the results"
-        )
+        result = classifier.classify_intent_sync("## 1. Summary of findings\nHere are the results")
 
         assert result.intent == IntentType.COMPLETION
         assert result.confidence > 0.5
 
-    def test_completion_marker_heuristic_uses_rare_victor_marker(
-        self, mock_embedding_service
-    ):
+    def test_completion_marker_heuristic_uses_rare_victor_marker(self, mock_embedding_service):
         """Explicit rare completion markers should force completion intent."""
         classifier = IntentClassifier(
             cache_dir=Path(self.temp_dir),
@@ -489,9 +470,7 @@ class TestIntentClassifier:
 
         assert result.intent == IntentType.COMPLETION
 
-    def test_legacy_done_marker_no_longer_forces_completion(
-        self, mock_embedding_service
-    ):
+    def test_legacy_done_marker_no_longer_forces_completion(self, mock_embedding_service):
         """Generic DONE markers should not trigger the completion heuristic."""
         classifier = IntentClassifier(
             cache_dir=Path(self.temp_dir),

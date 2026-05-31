@@ -118,9 +118,7 @@ class TestGenerateSkillAwarePlanPrompt:
             "refactor": _make_skill("refactor", description="Refactor code"),
         }
 
-        prompt = build_skill_aware_plan_prompt(
-            "Fix the auth bug and clean up the code", skills
-        )
+        prompt = build_skill_aware_plan_prompt("Fix the auth bug and clean up the code", skills)
 
         assert "debug" in prompt
         assert "refactor" in prompt

@@ -197,11 +197,7 @@ class GraphAwareEmbedder:
                 import numpy as np
 
                 embedding = await service.embed_text(text, use_cache=True)
-                return (
-                    embedding.tolist()
-                    if isinstance(embedding, np.ndarray)
-                    else list(embedding)
-                )
+                return embedding.tolist() if isinstance(embedding, np.ndarray) else list(embedding)
             except Exception as e:
                 logger.warning(f"EmbeddingService encoding failed: {e}")
 

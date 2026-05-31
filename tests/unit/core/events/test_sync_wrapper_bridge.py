@@ -20,12 +20,8 @@ class TestSyncEventWrapperBridge:
                 "get_running_loop",
                 side_effect=RuntimeError,
             ),
-            patch.object(
-                sync_wrapper_module, "run_sync", return_value=True
-            ) as mock_run_sync,
-            patch.object(
-                sync_wrapper_module, "run_sync_in_thread"
-            ) as mock_run_sync_in_thread,
+            patch.object(sync_wrapper_module, "run_sync", return_value=True) as mock_run_sync,
+            patch.object(sync_wrapper_module, "run_sync_in_thread") as mock_run_sync_in_thread,
         ):
             result = wrapper.publish(event)
 
@@ -42,9 +38,7 @@ class TestSyncEventWrapperBridge:
         event = MessagingEvent(topic="tool.end", data={"tool": "read_file"})
 
         with (
-            patch.object(
-                sync_wrapper_module.asyncio, "get_running_loop", return_value=object()
-            ),
+            patch.object(sync_wrapper_module.asyncio, "get_running_loop", return_value=object()),
             patch.object(sync_wrapper_module, "run_sync") as mock_run_sync,
             patch.object(
                 sync_wrapper_module, "run_sync_in_thread", return_value=True
@@ -65,9 +59,7 @@ class TestSyncEventWrapperBridge:
         wrapper = sync_wrapper_module.SyncEventWrapper(backend)
         handler = Mock()
 
-        with patch.object(
-            sync_wrapper_module, "run_sync", return_value=handle
-        ) as mock_run_sync:
+        with patch.object(sync_wrapper_module, "run_sync", return_value=handle) as mock_run_sync:
             result = wrapper.subscribe("tool.*", handler)
 
         backend.subscribe.assert_called_once()

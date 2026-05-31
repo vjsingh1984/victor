@@ -43,9 +43,7 @@ def test_service_persists_evaluation_result_via_registry_and_persistence_helper(
             captured["context"] = context
             return ValidatedSessionTruthArtifact(
                 path=tmp_path / "eval_session_guide_stub.json",
-                record={
-                    "runtime_evaluation_feedback": {"metadata": {"source": "stub"}}
-                },
+                record={"runtime_evaluation_feedback": {"metadata": {"source": "stub"}}},
             )
 
     def fake_persist(artifacts, *, refresh_dir, refresh_when_empty=False):
@@ -58,9 +56,7 @@ def test_service_persists_evaluation_result_via_registry_and_persistence_helper(
         "victor.evaluation.validated_session_truth_service.persist_validated_session_truth_artifacts",
         fake_persist,
     )
-    service = ValidatedSessionTruthService(
-        ValidatedSessionTruthEmitterRegistry([StubEmitter()])
-    )
+    service = ValidatedSessionTruthService(ValidatedSessionTruthEmitterRegistry([StubEmitter()]))
     result = EvaluationResult(
         config=EvaluationConfig(benchmark=BenchmarkType.GUIDE, model="test"),
         task_results=[
@@ -83,10 +79,7 @@ def test_service_persists_evaluation_result_via_registry_and_persistence_helper(
     assert saved_paths == [tmp_path / "eval_session_guide_stub.json"]
     assert captured["context"].benchmark == BenchmarkType.GUIDE
     assert captured["context"].task_id == "guide-1"
-    assert (
-        captured["context"].source_result_path
-        == tmp_path / "eval_guide_20260425_010101.json"
-    )
+    assert captured["context"].source_result_path == tmp_path / "eval_guide_20260425_010101.json"
     assert captured["refresh_dir"] == tmp_path
     assert captured["refresh_when_empty"] is True
 
@@ -104,9 +97,7 @@ def test_service_persists_validation_result_via_registry_and_persistence_helper(
             captured["context"] = context
             return ValidatedSessionTruthArtifact(
                 path=tmp_path / "eval_session_swe_stub.json",
-                record={
-                    "runtime_evaluation_feedback": {"metadata": {"source": "stub"}}
-                },
+                record={"runtime_evaluation_feedback": {"metadata": {"source": "stub"}}},
             )
 
     def fake_persist(artifacts, *, refresh_dir, refresh_when_empty=False):
@@ -119,9 +110,7 @@ def test_service_persists_validation_result_via_registry_and_persistence_helper(
         "victor.evaluation.validated_session_truth_service.persist_validated_session_truth_artifacts",
         fake_persist,
     )
-    service = ValidatedSessionTruthService(
-        ValidatedSessionTruthEmitterRegistry([StubEmitter()])
-    )
+    service = ValidatedSessionTruthService(ValidatedSessionTruthEmitterRegistry([StubEmitter()]))
 
     validation_result = BaselineValidationResult(
         instance_id="django__123",
@@ -133,9 +122,7 @@ def test_service_persists_validation_result_via_registry_and_persistence_helper(
             pass_to_pass=["test_keep_green"],
             status=BaselineStatus.VALID,
         ),
-        post_change_results=TestRunResults(
-            total=2, passed=1, failed=1, duration_seconds=2.0
-        ),
+        post_change_results=TestRunResults(total=2, passed=1, failed=1, duration_seconds=2.0),
         fail_to_pass_fixed=["test_fix_a"],
         pass_to_pass_broken=[],
         success=False,
@@ -202,9 +189,7 @@ def test_service_creates_results_dir_before_persisting(tmp_path, monkeypatch):
         def build_artifact(self, context):
             return ValidatedSessionTruthArtifact(
                 path=context.results_dir / "eval_session_stub.json",
-                record={
-                    "runtime_evaluation_feedback": {"metadata": {"source": "stub"}}
-                },
+                record={"runtime_evaluation_feedback": {"metadata": {"source": "stub"}}},
             )
 
     def fake_persist(artifacts, *, refresh_dir, refresh_when_empty=False):
@@ -215,16 +200,12 @@ def test_service_creates_results_dir_before_persisting(tmp_path, monkeypatch):
         "victor.evaluation.validated_session_truth_service.persist_validated_session_truth_artifacts",
         fake_persist,
     )
-    service = ValidatedSessionTruthService(
-        ValidatedSessionTruthEmitterRegistry([StubEmitter()])
-    )
+    service = ValidatedSessionTruthService(ValidatedSessionTruthEmitterRegistry([StubEmitter()]))
     results_dir = tmp_path / "missing" / "evaluations"
     result = EvaluationResult(
         config=EvaluationConfig(benchmark=BenchmarkType.GUIDE, model="test"),
         task_results=[
-            TaskResult(
-                task_id="guide-1", status=TaskStatus.PASSED, completion_score=1.0
-            )
+            TaskResult(task_id="guide-1", status=TaskStatus.PASSED, completion_score=1.0)
         ],
     )
 
@@ -252,12 +233,8 @@ def test_service_skips_task_when_emitter_raises_for_evaluation_result(tmp_path):
     result = EvaluationResult(
         config=EvaluationConfig(benchmark=BenchmarkType.GUIDE, model="test"),
         task_results=[
-            TaskResult(
-                task_id="guide-1", status=TaskStatus.PASSED, completion_score=1.0
-            ),
-            TaskResult(
-                task_id="guide-2", status=TaskStatus.FAILED, completion_score=0.2
-            ),
+            TaskResult(task_id="guide-1", status=TaskStatus.PASSED, completion_score=1.0),
+            TaskResult(task_id="guide-2", status=TaskStatus.FAILED, completion_score=0.2),
         ],
     )
 
@@ -279,9 +256,7 @@ def test_service_returns_none_when_validation_persistence_raises(tmp_path, monke
         def build_artifact(self, context):
             return ValidatedSessionTruthArtifact(
                 path=tmp_path / "eval_session_stub.json",
-                record={
-                    "runtime_evaluation_feedback": {"metadata": {"source": "stub"}}
-                },
+                record={"runtime_evaluation_feedback": {"metadata": {"source": "stub"}}},
             )
 
     def fake_persist(artifacts, *, refresh_dir, refresh_when_empty=False):
@@ -291,9 +266,7 @@ def test_service_returns_none_when_validation_persistence_raises(tmp_path, monke
         "victor.evaluation.validated_session_truth_service.persist_validated_session_truth_artifacts",
         fake_persist,
     )
-    service = ValidatedSessionTruthService(
-        ValidatedSessionTruthEmitterRegistry([StubEmitter()])
-    )
+    service = ValidatedSessionTruthService(ValidatedSessionTruthEmitterRegistry([StubEmitter()]))
 
     saved_path = service.persist_validation_result(
         benchmark=BenchmarkType.SWE_BENCH,

@@ -295,9 +295,7 @@ class WorkflowServiceProvider:
         from victor.workflows.executors.factory import NodeExecutorFactory
 
         factory = NodeExecutorFactory(container=self.container)
-        logger.debug(
-            "Created node executor factory with built-in executor registrations"
-        )
+        logger.debug("Created node executor factory with built-in executor registrations")
 
         return factory
 
@@ -319,9 +317,7 @@ class WorkflowServiceProvider:
 
         # Auto-discover and register handlers from all verticals
         # This will be called after vertical initialization
-        logger.debug(
-            "Created ComputeHandlerRegistry (handlers will be registered by verticals)"
-        )
+        logger.debug("Created ComputeHandlerRegistry (handlers will be registered by verticals)")
 
         return registry
 

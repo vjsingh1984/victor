@@ -336,13 +336,9 @@ class TestRegistryAdapterSyncBridge:
         mock_async = MagicMock(return_value=coro)
 
         with (
-            patch.object(
-                adapters_module.asyncio, "get_running_loop", side_effect=RuntimeError
-            ),
+            patch.object(adapters_module.asyncio, "get_running_loop", side_effect=RuntimeError),
             patch.object(adapter._unified, "register", mock_async),
-            patch.object(
-                adapters_module, "run_sync", return_value=None
-            ) as mock_run_sync,
+            patch.object(adapters_module, "run_sync", return_value=None) as mock_run_sync,
         ):
             adapter.register(tool)
 
@@ -372,13 +368,9 @@ class TestRegistryAdapterSyncBridge:
         mock_async = MagicMock(return_value=coro)
 
         with (
-            patch.object(
-                adapters_module.asyncio, "get_running_loop", side_effect=RuntimeError
-            ),
+            patch.object(adapters_module.asyncio, "get_running_loop", side_effect=RuntimeError),
             patch.object(adapter._unified, helper_name, mock_async),
-            patch.object(
-                adapters_module, "run_sync", return_value=result
-            ) as mock_run_sync,
+            patch.object(adapters_module, "run_sync", return_value=result) as mock_run_sync,
         ):
             call_result = getattr(adapter, method_name)(arg)
 
@@ -403,9 +395,7 @@ class TestUnifiedRegistrySyncBridge:
                 "victor.tools.unified.registry.asyncio.get_running_loop",
                 side_effect=RuntimeError,
             ),
-            patch(
-                "victor.tools.unified.registry.run_sync", return_value=None
-            ) as mock_run_sync,
+            patch("victor.tools.unified.registry.run_sync", return_value=None) as mock_run_sync,
         ):
             UnifiedToolRegistry.reset_instance()
 
@@ -425,9 +415,7 @@ class TestUnifiedRegistrySyncBridge:
                 "victor.tools.unified.registry.asyncio.get_running_loop",
                 return_value=object(),
             ),
-            patch(
-                "victor.tools.unified.registry.asyncio.create_task"
-            ) as mock_create_task,
+            patch("victor.tools.unified.registry.asyncio.create_task") as mock_create_task,
             patch("victor.tools.unified.registry.run_sync") as mock_run_sync,
         ):
             UnifiedToolRegistry.reset_instance()

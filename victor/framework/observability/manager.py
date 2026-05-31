@@ -211,9 +211,7 @@ class ObservabilityManager:
         logger.info("ObservabilityManager initialized")
 
     @classmethod
-    def get_instance(
-        cls, config: Optional[ObservabilityConfig] = None
-    ) -> ObservabilityManager:
+    def get_instance(cls, config: Optional[ObservabilityConfig] = None) -> ObservabilityManager:
         """Get the singleton observability manager instance.
 
         Args:
@@ -255,9 +253,7 @@ class ObservabilityManager:
         with self._sources_lock:
             self._sources.add(source)
 
-        logger.info(
-            f"Registered metrics source: {source.source_id} ({source.source_type})"
-        )
+        logger.info(f"Registered metrics source: {source.source_id} ({source.source_type})")
 
     def unregister_source(self, source: MetricSource) -> None:
         """Unregister a metrics source.
@@ -305,9 +301,7 @@ class ObservabilityManager:
                 snapshot = source.get_metrics()
                 collection.add_snapshot(snapshot)
             except Exception as e:
-                logger.warning(
-                    f"Failed to collect metrics from {source.source_id}: {e}"
-                )
+                logger.warning(f"Failed to collect metrics from {source.source_id}: {e}")
                 with self._stats_lock:
                     self._collection_errors += 1
 
@@ -408,9 +402,7 @@ class ObservabilityManager:
         # Count sources by type
         type_counts: Dict[str, int] = {}
         for snapshot in collection.snapshots:
-            type_counts[snapshot.source_type] = (
-                type_counts.get(snapshot.source_type, 0) + 1
-            )
+            type_counts[snapshot.source_type] = type_counts.get(snapshot.source_type, 0) + 1
         dashboard_data.sources_by_type = type_counts
         dashboard_data.total_sources = len(collection.snapshots)
 
@@ -421,14 +413,10 @@ class ObservabilityManager:
         dashboard_data.tool_metrics = self._aggregate_tool_metrics(collection)
 
         # Aggregate coordinator metrics
-        dashboard_data.coordinator_metrics = self._aggregate_coordinator_metrics(
-            collection
-        )
+        dashboard_data.coordinator_metrics = self._aggregate_coordinator_metrics(collection)
 
         # Aggregate capability metrics
-        dashboard_data.capability_metrics = self._aggregate_capability_metrics(
-            collection
-        )
+        dashboard_data.capability_metrics = self._aggregate_capability_metrics(collection)
 
         # Aggregate vertical metrics
         dashboard_data.vertical_metrics = self._aggregate_vertical_metrics(collection)
@@ -517,9 +505,9 @@ class ObservabilityManager:
 
         # Calculate success rate
         if result["total_calls"] > 0:
-            result["success_rate"] = (
-                result["total_calls"] - result["total_errors"]
-            ) / result["total_calls"]
+            result["success_rate"] = (result["total_calls"] - result["total_errors"]) / result[
+                "total_calls"
+            ]
 
         # Calculate average latency
         if latency_count > 0:
@@ -527,9 +515,7 @@ class ObservabilityManager:
 
         return result
 
-    def _aggregate_coordinator_metrics(
-        self, collection: MetricsCollection
-    ) -> Dict[str, Any]:
+    def _aggregate_coordinator_metrics(self, collection: MetricsCollection) -> Dict[str, Any]:
         """Aggregate coordinator metrics.
 
         Args:
@@ -568,9 +554,7 @@ class ObservabilityManager:
 
         return result
 
-    def _aggregate_capability_metrics(
-        self, collection: MetricsCollection
-    ) -> Dict[str, Any]:
+    def _aggregate_capability_metrics(self, collection: MetricsCollection) -> Dict[str, Any]:
         """Aggregate capability metrics.
 
         Args:
@@ -601,9 +585,7 @@ class ObservabilityManager:
 
         return result
 
-    def _aggregate_vertical_metrics(
-        self, collection: MetricsCollection
-    ) -> Dict[str, Any]:
+    def _aggregate_vertical_metrics(self, collection: MetricsCollection) -> Dict[str, Any]:
         """Aggregate vertical metrics.
 
         Args:
@@ -762,17 +744,13 @@ class ObservabilityManager:
                 if source_id is not None:
                     snapshot = collection.get_by_source_id(source_id)
                     if snapshot:
-                        filtered_collection = MetricsCollection(
-                            timestamp=collection.timestamp
-                        )
+                        filtered_collection = MetricsCollection(timestamp=collection.timestamp)
                         filtered_collection.add_snapshot(snapshot)
                         result.append(filtered_collection)
                 elif source_type is not None:
                     snapshots = collection.get_by_source_type(source_type)
                     if snapshots:
-                        filtered_collection = MetricsCollection(
-                            timestamp=collection.timestamp
-                        )
+                        filtered_collection = MetricsCollection(timestamp=collection.timestamp)
                         for snapshot in snapshots:
                             filtered_collection.add_snapshot(snapshot)
                         result.append(filtered_collection)

@@ -48,9 +48,7 @@ class AgentRuntimeContext:
     ) -> "AgentRuntimeContext":
         """Create a child runtime context with its own session scope."""
         resolved_team_id = team_id or self.team_id or "team"
-        child_session_id = (
-            session_id or f"{self.session_id}:{resolved_team_id}:{member_id}"
-        )
+        child_session_id = session_id or f"{self.session_id}:{resolved_team_id}:{member_id}"
         return AgentRuntimeContext(
             agent_id=agent_id,
             display_name=display_name,

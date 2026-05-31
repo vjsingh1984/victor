@@ -130,10 +130,7 @@ class TestFormatToolOutput:
 
         # With production guards, invalid input returns plain text
         assert result.summary is not None  # Should have a summary
-        assert (
-            "invalid" in result.summary.lower()
-            or "invalid" in str(result.content).lower()
-        )
+        assert "invalid" in result.summary.lower() or "invalid" in str(result.content).lower()
 
     def test_format_with_formatter_error(self):
         """Test that formatter errors are handled gracefully."""

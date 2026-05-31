@@ -74,19 +74,13 @@ def test_execution_checkpoint_importable_from_framework_namespace() -> None:
 
     assert framework.ExecutionCheckpoint is ExecutionCheckpoint
     assert framework.ApprovalState is ApprovalState
+    assert framework.execution_checkpoint_trace_metadata is execution_checkpoint_trace_metadata
     assert (
-        framework.execution_checkpoint_trace_metadata
-        is execution_checkpoint_trace_metadata
-    )
-    assert (
-        framework.normalize_execution_checkpoint_context
-        is normalize_execution_checkpoint_context
+        framework.normalize_execution_checkpoint_context is normalize_execution_checkpoint_context
     )
 
 
-def test_execution_checkpoint_trace_metadata_accepts_envelope_and_serialized_forms() -> (
-    None
-):
+def test_execution_checkpoint_trace_metadata_accepts_envelope_and_serialized_forms() -> None:
     checkpoint = ExecutionCheckpoint.create(
         session_id="session-1",
         graph_checkpoint_id="graph-1",
@@ -137,10 +131,5 @@ def test_normalize_execution_checkpoint_context_can_bind_graph_checkpoint_id() -
         graph_checkpoint_id="graph-checkpoint-1",
     )
 
-    assert (
-        context["execution_checkpoint"]["graph_checkpoint_id"] == "graph-checkpoint-1"
-    )
-    assert (
-        context["execution_checkpoint_metadata"]["graph_checkpoint_id"]
-        == "graph-checkpoint-1"
-    )
+    assert context["execution_checkpoint"]["graph_checkpoint_id"] == "graph-checkpoint-1"
+    assert context["execution_checkpoint_metadata"]["graph_checkpoint_id"] == "graph-checkpoint-1"

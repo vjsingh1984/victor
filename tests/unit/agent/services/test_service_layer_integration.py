@@ -120,9 +120,7 @@ class TestBootstrapServiceCreation:
         ]:
             svc = container.get_optional(proto)
             if svc is not None:
-                assert hasattr(
-                    svc, "is_healthy"
-                ), f"{proto.__name__} service missing is_healthy()"
+                assert hasattr(svc, "is_healthy"), f"{proto.__name__} service missing is_healthy()"
 
 
 class TestExecutionContextServiceAccess:

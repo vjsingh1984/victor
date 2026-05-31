@@ -61,16 +61,11 @@ def build_self_cls_usage_counts() -> Counter:
                 prev_prev = None
                 for tok in tokenize.tokenize(handle.readline):
                     if tok.type == tokenize.NAME:
-                        if (
-                            prev_prev
-                            and prev
-                            and prev.type == tokenize.OP
-                            and prev.string == "."
-                        ):
-                            if (
-                                prev_prev.type == tokenize.NAME
-                                and prev_prev.string in {"self", "cls"}
-                            ):
+                        if prev_prev and prev and prev.type == tokenize.OP and prev.string == ".":
+                            if prev_prev.type == tokenize.NAME and prev_prev.string in {
+                                "self",
+                                "cls",
+                            }:
                                 counts[tok.string] += 1
                         prev_prev = prev
                         prev = tok
@@ -95,18 +90,14 @@ def nested_function_lines(path: Path) -> set[int]:
             self.stack: list[ast.AST] = []
 
         def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
-            if self.stack and isinstance(
-                self.stack[-1], (ast.FunctionDef, ast.AsyncFunctionDef)
-            ):
+            if self.stack and isinstance(self.stack[-1], (ast.FunctionDef, ast.AsyncFunctionDef)):
                 nested.add(node.lineno)
             self.stack.append(node)
             self.generic_visit(node)
             self.stack.pop()
 
         def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
-            if self.stack and isinstance(
-                self.stack[-1], (ast.FunctionDef, ast.AsyncFunctionDef)
-            ):
+            if self.stack and isinstance(self.stack[-1], (ast.FunctionDef, ast.AsyncFunctionDef)):
                 nested.add(node.lineno)
             self.stack.append(node)
             self.generic_visit(node)
@@ -213,9 +204,7 @@ def main() -> int:
         "prune_shortlist_count": len(prune_shortlist),
         "prune_shortlist_top": prune_shortlist[:20],
     }
-    (REPORT_DIR / "07_dead_code_triage_summary.json").write_text(
-        json.dumps(summary, indent=2)
-    )
+    (REPORT_DIR / "07_dead_code_triage_summary.json").write_text(json.dumps(summary, indent=2))
 
     print("Dead code triage written:")
     print(f"- {REPORT_DIR / '06_dead_code_false_positives.json'}")

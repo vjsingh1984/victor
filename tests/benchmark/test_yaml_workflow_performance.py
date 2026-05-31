@@ -84,9 +84,7 @@ class YAMLWorkflowBenchmark:
             _, peak = tracemalloc.get_traced_memory()
             tracemalloc.stop()
 
-            node_count = (
-                len(workflow_def.workflows) if hasattr(workflow_def, "workflows") else 1
-            )
+            node_count = len(workflow_def.workflows) if hasattr(workflow_def, "workflows") else 1
 
             return BenchmarkResult(
                 name="compilation",
@@ -309,9 +307,7 @@ class TestYAMLWorkflowScaling:
                 f"Nodes: {count:3d} | Time: {result.time_ms:6.2f}ms | Memory: {result.memory_peak_mb:5.2f}MB"
             )
 
-            assert (
-                result.success
-            ), f"Compilation failed for {count} nodes: {result.error}"
+            assert result.success, f"Compilation failed for {count} nodes: {result.error}"
 
         # Check that time scales roughly linearly (allowing for overhead)
         # Each 2x nodes should take < 2.5x time (allowing for constant overhead)

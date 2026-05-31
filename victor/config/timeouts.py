@@ -175,9 +175,7 @@ class TimeoutConfig:
             DOCKER_BUILD=get_int("DOCKER_BUILD", cls.DOCKER_BUILD),
             GIT_DEFAULT=get_int("GIT_DEFAULT", cls.GIT_DEFAULT),
             MCP_RESPONSE=get_float("MCP_RESPONSE", cls.MCP_RESPONSE),
-            MCP_PROCESS_TERMINATE=get_float(
-                "MCP_PROCESS_TERMINATE", cls.MCP_PROCESS_TERMINATE
-            ),
+            MCP_PROCESS_TERMINATE=get_float("MCP_PROCESS_TERMINATE", cls.MCP_PROCESS_TERMINATE),
             MCP_PROCESS_KILL=get_float("MCP_PROCESS_KILL", cls.MCP_PROCESS_KILL),
             MCP_SERVER_IDLE=get_float("MCP_SERVER_IDLE", cls.MCP_SERVER_IDLE),
             CIRCUIT_BREAKER_RECOVERY=get_float(
@@ -185,9 +183,7 @@ class TimeoutConfig:
             ),
             INDEX_BUILD_MAX=get_float("INDEX_BUILD_MAX", cls.INDEX_BUILD_MAX),
             INDEX_PROBE=get_float("INDEX_PROBE", cls.INDEX_PROBE),
-            SYMBOL_EMBEDDING_BATCH=get_float(
-                "SYMBOL_EMBEDDING_BATCH", cls.SYMBOL_EMBEDDING_BATCH
-            ),
+            SYMBOL_EMBEDDING_BATCH=get_float("SYMBOL_EMBEDDING_BATCH", cls.SYMBOL_EMBEDDING_BATCH),
         )
 
 

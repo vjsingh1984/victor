@@ -340,9 +340,7 @@ class TreeSitterStructuralCodeChunker:
         cursor = node.start_byte
         for child in children:
             if child.start_byte > cursor:
-                segments.append(
-                    self._make_span(cursor, child.start_byte, parse_context)
-                )
+                segments.append(self._make_span(cursor, child.start_byte, parse_context))
             segments.extend(self._chunk_node(child, parse_context, is_root=False))
             cursor = max(cursor, child.end_byte)
         if cursor < node.end_byte:
@@ -370,22 +368,16 @@ class TreeSitterStructuralCodeChunker:
             text = parse_context.slice(span.start_byte, span.end_byte)
             if not text.strip():
                 if current is not None:
-                    current = self._make_span(
-                        current.start_byte, span.end_byte, parse_context
-                    )
+                    current = self._make_span(current.start_byte, span.end_byte, parse_context)
                 continue
 
             if current is None:
                 current = span
                 continue
 
-            projected = self._make_span(
-                current.start_byte, span.end_byte, parse_context
-            )
+            projected = self._make_span(current.start_byte, span.end_byte, parse_context)
             if (
-                self._span_word_count(
-                    projected.start_byte, projected.end_byte, parse_context
-                )
+                self._span_word_count(projected.start_byte, projected.end_byte, parse_context)
                 <= self._chunk_size
             ):
                 current = projected
@@ -403,10 +395,7 @@ class TreeSitterStructuralCodeChunker:
         span: _ByteSpan,
         parse_context: TreeSitterParseContext,
     ) -> list[_ByteSpan]:
-        if (
-            self._span_word_count(span.start_byte, span.end_byte, parse_context)
-            <= self._chunk_size
-        ):
+        if self._span_word_count(span.start_byte, span.end_byte, parse_context) <= self._chunk_size:
             return [span]
         return self._split_large_span(span.start_byte, span.end_byte, parse_context)
 
@@ -457,15 +446,11 @@ class TreeSitterStructuralCodeChunker:
     ) -> int:
         return _count_words(parse_context.slice(start_byte, end_byte))
 
-    def _line_start_byte(
-        self, line_number: int, parse_context: TreeSitterParseContext
-    ) -> int:
+    def _line_start_byte(self, line_number: int, parse_context: TreeSitterParseContext) -> int:
         index = max(min(line_number - 1, len(parse_context.line_start_offsets) - 1), 0)
         return parse_context.line_start_offsets[index]
 
-    def _line_end_byte(
-        self, line_number: int, parse_context: TreeSitterParseContext
-    ) -> int:
+    def _line_end_byte(self, line_number: int, parse_context: TreeSitterParseContext) -> int:
         next_index = line_number
         if next_index < len(parse_context.line_start_offsets):
             return parse_context.line_start_offsets[next_index]

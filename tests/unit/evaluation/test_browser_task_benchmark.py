@@ -89,9 +89,7 @@ class TestBrowserTaskBenchmarkRunner:
 
         runner = BrowserTaskBenchmarkRunner(BenchmarkType.GUIDE, dataset)
         task = (
-            await runner.load_tasks(
-                EvaluationConfig(benchmark=BenchmarkType.GUIDE, model="test")
-            )
+            await runner.load_tasks(EvaluationConfig(benchmark=BenchmarkType.GUIDE, model="test"))
         )[0]
 
         output = json.dumps(
@@ -164,9 +162,7 @@ class TestBrowserTaskBenchmarkRunner:
         assert diagnosis.subtype == "forbidden_action"
 
     @pytest.mark.asyncio
-    async def test_run_task_scores_partial_completion_when_action_missing(
-        self, tmp_path
-    ):
+    async def test_run_task_scores_partial_completion_when_action_missing(self, tmp_path):
         """Missing required actions should produce partial completion scoring."""
         dataset = tmp_path / "claw.json"
         dataset.write_text(

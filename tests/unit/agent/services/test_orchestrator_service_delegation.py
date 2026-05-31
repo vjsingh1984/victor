@@ -67,9 +67,7 @@ class TestServiceProtocolImports:
             "get_rate_limit_stats",
             "is_healthy",
         }
-        actual = {
-            name for name in dir(ProviderServiceProtocol) if not name.startswith("_")
-        }
+        actual = {name for name in dir(ProviderServiceProtocol) if not name.startswith("_")}
         assert required.issubset(actual), f"Missing: {required - actual}"
 
     def test_tool_service_protocol_has_required_methods(self):
@@ -122,9 +120,7 @@ class TestServiceProtocolImports:
             "check_force_action",
             "is_healthy",
         }
-        actual = {
-            name for name in dir(RecoveryServiceProtocol) if not name.startswith("_")
-        }
+        actual = {name for name in dir(RecoveryServiceProtocol) if not name.startswith("_")}
         assert required.issubset(actual), f"Missing: {required - actual}"
 
     def test_context_service_protocol_has_required_methods(self):
@@ -138,9 +134,7 @@ class TestServiceProtocolImports:
             "get_messages",
             "is_healthy",
         }
-        actual = {
-            name for name in dir(ContextServiceProtocol) if not name.startswith("_")
-        }
+        actual = {name for name in dir(ContextServiceProtocol) if not name.startswith("_")}
         assert required.issubset(actual), f"Missing: {required - actual}"
 
 
@@ -241,9 +235,7 @@ class TestAdapterProtocolConformance:
             return_value=[{"name": "read", "success": True}]
         )
         orchestrator._handle_tool_calls = AsyncMock(
-            side_effect=AssertionError(
-                "legacy _handle_tool_calls bridge should not be used"
-            )
+            side_effect=AssertionError("legacy _handle_tool_calls bridge should not be used")
         )
 
         adapter = OrchestratorProtocolAdapter(orchestrator)
@@ -287,9 +279,7 @@ class TestAdapterProtocolConformance:
 
         stream_chunk = StreamChunk(content="stream", is_final=True)
         context_limit_helper = MagicMock()
-        context_limit_helper.handle_limits = AsyncMock(
-            return_value=(True, stream_chunk)
-        )
+        context_limit_helper.handle_limits = AsyncMock(return_value=(True, stream_chunk))
         orchestrator = MagicMock()
 
         async def _stream_chat(user_message: str, **kwargs):
@@ -298,9 +288,7 @@ class TestAdapterProtocolConformance:
             yield stream_chunk
 
         orchestrator.stream_chat = _stream_chat
-        orchestrator._get_context_limit_runtime = MagicMock(
-            return_value=context_limit_helper
-        )
+        orchestrator._get_context_limit_runtime = MagicMock(return_value=context_limit_helper)
 
         adapter = OrchestratorProtocolAdapter(orchestrator)
         chunks = [chunk async for chunk in adapter.stream_chat("hello", mode="compat")]
@@ -335,21 +323,15 @@ class TestAdapterProtocolConformance:
         context_limit_helper = MagicMock()
         context_limit_helper.handle_limits = AsyncMock(return_value=(False, None))
         orchestrator = MagicMock()
-        orchestrator._get_planning_chat_runtime = MagicMock(
-            return_value=planning_helper
-        )
-        orchestrator._get_context_limit_runtime = MagicMock(
-            return_value=context_limit_helper
-        )
+        orchestrator._get_planning_chat_runtime = MagicMock(return_value=planning_helper)
+        orchestrator._get_context_limit_runtime = MagicMock(return_value=context_limit_helper)
 
         adapter = OrchestratorProtocolAdapter(orchestrator)
         assert isinstance(adapter, ChatRuntimeHelperAccessProtocol)
         assert adapter._get_planning_chat_runtime() is planning_helper
         assert adapter._get_context_limit_runtime() is context_limit_helper
         planning_response = await planning_helper.run("plan this")
-        handled, chunk = await context_limit_helper.handle_limits(
-            "plan this", 5, 1000, 1, 0.8
-        )
+        handled, chunk = await context_limit_helper.handle_limits("plan this", 5, 1000, 1, 0.8)
 
         assert planning_response is response
         assert handled is False
@@ -384,9 +366,7 @@ class TestAdapterProtocolConformance:
             adapter._get_context_limit_runtime()
 
         assert "_run_planning_chat_runtime" not in type(adapter).__dict__
-        assert (
-            "_handle_context_and_iteration_limits_runtime" not in type(adapter).__dict__
-        )
+        assert "_handle_context_and_iteration_limits_runtime" not in type(adapter).__dict__
 
     def test_orchestrator_protocol_adapter_exposes_planning_runtime_surface(self):
         from victor.agent.services.orchestrator_protocol_adapter import (
@@ -427,25 +407,17 @@ class TestAdapterProtocolConformance:
         planning_helper = MagicMock()
         planning_helper.run = AsyncMock(return_value=response)
         context_limit_helper = MagicMock()
-        context_limit_helper.handle_limits = AsyncMock(
-            return_value=(True, stream_chunk)
-        )
+        context_limit_helper.handle_limits = AsyncMock(return_value=(True, stream_chunk))
 
         orchestrator = MagicMock()
         orchestrator._chat_service = None
-        orchestrator._get_planning_chat_runtime = MagicMock(
-            return_value=planning_helper
-        )
-        orchestrator._get_context_limit_runtime = MagicMock(
-            return_value=context_limit_helper
-        )
+        orchestrator._get_planning_chat_runtime = MagicMock(return_value=planning_helper)
+        orchestrator._get_context_limit_runtime = MagicMock(return_value=context_limit_helper)
         orchestrator._run_planning_chat_runtime = AsyncMock(
             side_effect=AssertionError("legacy planning wrapper should not be used")
         )
         orchestrator._handle_context_and_iteration_limits_runtime = AsyncMock(
-            side_effect=AssertionError(
-                "legacy context-limit wrapper should not be used"
-            )
+            side_effect=AssertionError("legacy context-limit wrapper should not be used")
         )
 
         adapter = OrchestratorProtocolAdapter(orchestrator)
@@ -513,9 +485,7 @@ class TestAdapterProtocolConformance:
         orchestrator._metrics_coordinator.get_last_tool_strategy_event.return_value = {
             "tool_tokens": 144
         }
-        orchestrator._metrics_coordinator.finish_task_report.return_value = {
-            "task_id": "t-1"
-        }
+        orchestrator._metrics_coordinator.finish_task_report.return_value = {"task_id": "t-1"}
         orchestrator._context_service = MagicMock()
         orchestrator._context_service.get_performance_metrics.return_value = {}
         orchestrator._current_stream_context = SimpleNamespace(
@@ -546,19 +516,14 @@ class TestAdapterProtocolConformance:
             user_message="Fix the parser regression",
         )
 
-        finish_kwargs = (
-            orchestrator._metrics_coordinator.finish_task_report.call_args.kwargs
-        )
+        finish_kwargs = orchestrator._metrics_coordinator.finish_task_report.call_args.kwargs
         metadata = finish_kwargs["metadata"]
         assert metadata["task_intent"] == "Fix the failing parser regression"
         assert metadata["plan_steps"] == [
             "Inspect failing tests",
             "Patch parser callsite",
         ]
-        assert (
-            metadata["resume_summary"]
-            == "Need to verify parser patch with targeted tests"
-        )
+        assert metadata["resume_summary"] == "Need to verify parser patch with targeted tests"
         assert metadata["degraded_resume_state"] is True
         assert metadata["continuation_ledger"].startswith("Intent:")
 
@@ -684,9 +649,7 @@ class TestChatServiceBootstrapLaziness:
         assert kwargs["turn_setup_handler"].__self__ is obj
         assert callable(kwargs["turn_teardown_handler"])
         assert kwargs["turn_teardown_handler"].__self__ is obj
-        obj._factory.create_streaming_chat_adapter.assert_called_once_with(
-            obj._protocol_adapter
-        )
+        obj._factory.create_streaming_chat_adapter.assert_called_once_with(obj._protocol_adapter)
         assert obj._deprecated_chat_coordinator.initialized is False
         assert trap_chat.touched is False
 
@@ -756,9 +719,7 @@ class TestChatServiceBootstrapLaziness:
 
             def __getattr__(self, name):
                 self.touched = True
-                raise AssertionError(
-                    f"chat coordinator should remain lazy during runtime: {name}"
-                )
+                raise AssertionError(f"chat coordinator should remain lazy during runtime: {name}")
 
         trap_chat = TrapChatCoordinator()
 
@@ -774,14 +735,10 @@ class TestChatServiceBootstrapLaziness:
         with (
             patch.object(AgentOrchestrator, "_register_coordinators_for_services"),
             patch.object(AgentOrchestrator, "_bootstrap_service_layer"),
-            patch(
-                "victor.agent.services.planning_runtime.PlanningRuntimeService"
-            ) as planning_cls,
+            patch("victor.agent.services.planning_runtime.PlanningRuntimeService") as planning_cls,
         ):
             planning_instance = MagicMock()
-            planning_instance.chat_with_planning = AsyncMock(
-                return_value=planning_response
-            )
+            planning_instance.chat_with_planning = AsyncMock(return_value=planning_response)
             planning_cls.return_value = planning_instance
 
             obj._initialize_services()
@@ -803,9 +760,7 @@ class TestChatServiceBootstrapLaziness:
         obj.conversation.ensure_system_prompt.assert_called_once()
         obj.add_message.assert_any_call("user", "plan this", metadata=ANY)
         obj.add_message.assert_any_call("assistant", "planned", metadata=ANY)
-        obj._factory.create_streaming_chat_adapter.assert_called_once_with(
-            obj._protocol_adapter
-        )
+        obj._factory.create_streaming_chat_adapter.assert_called_once_with(obj._protocol_adapter)
         assert obj._deprecated_chat_coordinator.initialized is False
         assert trap_chat.touched is False
 
@@ -813,10 +768,7 @@ class TestChatServiceBootstrapLaziness:
         from victor.agent.orchestrator import AgentOrchestrator
 
         assert "_run_planning_chat_runtime" not in AgentOrchestrator.__dict__
-        assert (
-            "_handle_context_and_iteration_limits_runtime"
-            not in AgentOrchestrator.__dict__
-        )
+        assert "_handle_context_and_iteration_limits_runtime" not in AgentOrchestrator.__dict__
 
     def test_get_planning_chat_runtime_prefers_cached_helper_and_orchestrator_host(
         self,
@@ -910,9 +862,7 @@ class TestChatServiceBootstrapLaziness:
         obj._provider_management_runtime = helper
         callback = MagicMock()
 
-        result = await AgentOrchestrator.switch_provider(
-            obj, "openai", "gpt-4.1", callback
-        )
+        result = await AgentOrchestrator.switch_provider(obj, "openai", "gpt-4.1", callback)
 
         assert result is True
         helper.switch_provider.assert_awaited_once_with("openai", "gpt-4.1", callback)
@@ -1033,21 +983,15 @@ class TestChatServiceBootstrapLaziness:
 
         obj = object.__new__(AgentOrchestrator)
         helper = MagicMock()
-        helper.apply_recovery_action.return_value = StreamChunk(
-            content="Recovered", is_final=True
-        )
+        helper.apply_recovery_action.return_value = StreamChunk(content="Recovered", is_final=True)
         obj._recovery_runtime = helper
         stream_ctx = MagicMock(name="stream_ctx")
         recovery_action = MagicMock(name="recovery_action")
 
-        result = AgentOrchestrator._apply_recovery_action(
-            obj, recovery_action, stream_ctx
-        )
+        result = AgentOrchestrator._apply_recovery_action(obj, recovery_action, stream_ctx)
 
         assert result.content == "Recovered"
-        helper.apply_recovery_action.assert_called_once_with(
-            recovery_action, stream_ctx
-        )
+        helper.apply_recovery_action.assert_called_once_with(recovery_action, stream_ctx)
 
     @pytest.mark.asyncio
     async def test_execute_tool_calls_delegates_to_helper(self):
@@ -1055,9 +999,7 @@ class TestChatServiceBootstrapLaziness:
 
         obj = object.__new__(AgentOrchestrator)
         helper = MagicMock()
-        helper.execute_tool_calls = AsyncMock(
-            return_value=[{"name": "read", "success": True}]
-        )
+        helper.execute_tool_calls = AsyncMock(return_value=[{"name": "read", "success": True}])
         obj._tool_execution_runtime = helper
 
         result = await AgentOrchestrator.execute_tool_calls(
@@ -1066,9 +1008,7 @@ class TestChatServiceBootstrapLaziness:
         )
 
         assert result == [{"name": "read", "success": True}]
-        helper.execute_tool_calls.assert_awaited_once_with(
-            [{"name": "read", "arguments": {}}]
-        )
+        helper.execute_tool_calls.assert_awaited_once_with([{"name": "read", "arguments": {}}])
 
     def test_sync_session_service_runtime_state_delegates_to_helper(self):
         from victor.agent.orchestrator import AgentOrchestrator
@@ -1344,9 +1284,7 @@ class TestChatServiceBootstrapLaziness:
         obj._check_context_overflow = MagicMock(return_value=False)
         obj._record_runtime_intelligence_outcome = MagicMock()
 
-        direct_response = CompletionResponse(
-            content="already recorded", role="assistant"
-        )
+        direct_response = CompletionResponse(content="already recorded", role="assistant")
 
         async def _direct_chat(user_message: str) -> CompletionResponse:
             obj.add_message("user", user_message)
@@ -1371,14 +1309,10 @@ class TestChatServiceBootstrapLaziness:
         with (
             patch.object(AgentOrchestrator, "_register_coordinators_for_services"),
             patch.object(AgentOrchestrator, "_bootstrap_service_layer"),
-            patch(
-                "victor.agent.services.planning_runtime.PlanningRuntimeService"
-            ) as planning_cls,
+            patch("victor.agent.services.planning_runtime.PlanningRuntimeService") as planning_cls,
         ):
             planning_instance = MagicMock()
-            planning_instance.chat_with_planning = AsyncMock(
-                side_effect=_direct_chat_with_planning
-            )
+            planning_instance.chat_with_planning = AsyncMock(side_effect=_direct_chat_with_planning)
             planning_cls.return_value = planning_instance
 
             obj._initialize_services()
@@ -1487,14 +1421,10 @@ class TestChatServiceBootstrapLaziness:
 
             kwargs = chat_service.bind_runtime_components.call_args.kwargs
             stream_chat_handler = kwargs["stream_chat_handler"]
-            chunks = [
-                c async for c in stream_chat_handler("hello", _preserve_iteration=True)
-            ]
+            chunks = [c async for c in stream_chat_handler("hello", _preserve_iteration=True)]
 
         assert chunks == [stream_chunk]
-        obj._factory.create_streaming_chat_adapter.assert_called_once_with(
-            obj._protocol_adapter
-        )
+        obj._factory.create_streaming_chat_adapter.assert_called_once_with(obj._protocol_adapter)
         assert obj._deprecated_chat_coordinator.initialized is False
         assert trap_chat.touched is False
 
@@ -1513,12 +1443,7 @@ class TestChatServiceBootstrapLaziness:
 
         obj._chat_service = SimpleNamespace(stream_chat=_stream_chat)
 
-        chunks = [
-            c
-            async for c in obj.stream_chat(
-                "hello", mode="compat", constraints=constraints
-            )
-        ]
+        chunks = [c async for c in obj.stream_chat("hello", mode="compat", constraints=constraints)]
 
         assert chunks == [chunk]
 
@@ -1755,13 +1680,9 @@ class TestChatServiceBootstrapLaziness:
         helper = MagicMock()
         obj._prompt_builder_runtime = helper
 
-        AgentOrchestrator.update_system_prompt_for_query(
-            obj, query_classification="coding"
-        )
+        AgentOrchestrator.update_system_prompt_for_query(obj, query_classification="coding")
 
-        helper.update_system_prompt_for_query.assert_called_once_with(
-            query_classification="coding"
-        )
+        helper.update_system_prompt_for_query.assert_called_once_with(query_classification="coding")
 
     def test_refresh_system_prompt_delegates_to_helper(self):
         from victor.agent.orchestrator import AgentOrchestrator
@@ -1873,9 +1794,7 @@ class TestChatServiceBootstrapLaziness:
         from victor.agent.orchestrator import AgentOrchestrator
 
         obj = object.__new__(AgentOrchestrator)
-        obj._chat_service = SimpleNamespace(
-            chat=AsyncMock(side_effect=RuntimeError("chat failed"))
-        )
+        obj._chat_service = SimpleNamespace(chat=AsyncMock(side_effect=RuntimeError("chat failed")))
 
         with pytest.raises(RuntimeError, match="chat failed"):
             await obj.chat("hello")

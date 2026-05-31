@@ -197,9 +197,7 @@ class MiddlewareChain:
         aggregated_metadata: Dict[str, Any] = {}
         if self._vertical_context:
             aggregated_metadata["vertical_name"] = self._vertical_context.vertical_name
-            aggregated_metadata["vertical_mode"] = getattr(
-                self._vertical_context, "mode", None
-            )
+            aggregated_metadata["vertical_mode"] = getattr(self._vertical_context, "mode", None)
 
         for middleware in applicable:
             try:

@@ -26,9 +26,7 @@ VALIDATED_RUNTIME_FEEDBACK_SOURCES = {
 }
 AGGREGATED_RUNTIME_FEEDBACK_SOURCE = "validated_evaluation_truth_aggregate"
 SESSION_TOPOLOGY_RUNTIME_FEEDBACK_SOURCE = "session_topology_runtime_feedback"
-AGGREGATED_SESSION_TOPOLOGY_RUNTIME_FEEDBACK_SOURCE = (
-    "session_topology_runtime_feedback_aggregate"
-)
+AGGREGATED_SESSION_TOPOLOGY_RUNTIME_FEEDBACK_SOURCE = "session_topology_runtime_feedback_aggregate"
 FRESHNESS_HALF_LIFE_DAYS = 14.0
 SESSION_TOPOLOGY_FRESHNESS_HALF_LIFE_DAYS = 5.0
 VALIDATED_RUNTIME_FEEDBACK_SOURCE_TRUST = {
@@ -227,19 +225,12 @@ def get_runtime_evaluation_feedback_path(base_dir: Optional[Path] = None) -> Pat
 
         return get_victor_dir() / "evaluations" / RUNTIME_EVALUATION_FEEDBACK_FILENAME
     except ImportError:
-        return (
-            Path.home()
-            / ".victor"
-            / "evaluations"
-            / RUNTIME_EVALUATION_FEEDBACK_FILENAME
-        )
+        return Path.home() / ".victor" / "evaluations" / RUNTIME_EVALUATION_FEEDBACK_FILENAME
 
 
 def _resolve_feedback_base_dir(target: Optional[Path]) -> Path:
     """Resolve the directory used for scoped runtime-feedback artifacts."""
-    target_path = (
-        Path(target) if target is not None else get_runtime_evaluation_feedback_path()
-    )
+    target_path = Path(target) if target is not None else get_runtime_evaluation_feedback_path()
     feedback_dir = _resolve_feedback_directory(target_path)
     if feedback_dir is not None:
         return feedback_dir
@@ -284,9 +275,7 @@ def _extract_task_entries(
     result_or_payload: Any,
 ) -> tuple[list[dict[str, Any]], dict[str, Any], dict[str, Any]]:
     """Normalize evaluation result objects and saved payloads into plain records."""
-    if hasattr(result_or_payload, "task_results") and hasattr(
-        result_or_payload, "get_metrics"
-    ):
+    if hasattr(result_or_payload, "task_results") and hasattr(result_or_payload, "get_metrics"):
         tasks: list[dict[str, Any]] = []
         for task in result_or_payload.task_results:
             assessment = task.get_confidence_assessment()
@@ -353,13 +342,9 @@ def derive_runtime_evaluation_feedback(
     threshold -= min(0.15, underconfidence_rate * 0.20)
 
     if passed_confidences:
-        threshold = min(
-            threshold, (sum(passed_confidences) / len(passed_confidences)) - 0.05
-        )
+        threshold = min(threshold, (sum(passed_confidences) / len(passed_confidences)) - 0.05)
     if failed_confidences:
-        threshold = max(
-            threshold, (sum(failed_confidences) / len(failed_confidences)) + 0.05
-        )
+        threshold = max(threshold, (sum(failed_confidences) / len(failed_confidences)) + 0.05)
     if truth_alignment_rate < 0.75:
         threshold += min(0.08, (0.75 - truth_alignment_rate) * 0.20)
     threshold = _clamp(threshold, 0.55, 0.92)
@@ -367,15 +352,13 @@ def derive_runtime_evaluation_feedback(
     progress_threshold = _clamp(threshold - 0.15, 0.35, threshold)
     if underconfidence_rate > overconfidence_rate:
         progress_threshold = _clamp(
-            progress_threshold
-            - min(0.05, (underconfidence_rate - overconfidence_rate) * 0.10),
+            progress_threshold - min(0.05, (underconfidence_rate - overconfidence_rate) * 0.10),
             0.35,
             threshold,
         )
     elif overconfidence_rate > underconfidence_rate:
         progress_threshold = _clamp(
-            progress_threshold
-            + min(0.05, (overconfidence_rate - underconfidence_rate) * 0.10),
+            progress_threshold + min(0.05, (overconfidence_rate - underconfidence_rate) * 0.10),
             0.35,
             threshold,
         )
@@ -403,11 +386,9 @@ def derive_runtime_evaluation_feedback(
         and topology_selection_policy_optimization_counts
         and topology_selection_policy_optimization_reward_totals
     ):
-        avg_topology_optimization_reward_by_selection_policy = (
-            _average_mapping_from_totals(
-                topology_selection_policy_optimization_counts,
-                topology_selection_policy_optimization_reward_totals,
-            )
+        avg_topology_optimization_reward_by_selection_policy = _average_mapping_from_totals(
+            topology_selection_policy_optimization_counts,
+            topology_selection_policy_optimization_reward_totals,
         )
     topology_selection_policy_feasible_counts = dict(
         summary.get("topology_selection_policy_feasible_counts") or {}
@@ -441,8 +422,7 @@ def derive_runtime_evaluation_feedback(
             "provider": config.get("provider"),
             "model": config.get("model"),
             "prompt_candidate_hash": config.get("prompt_candidate_hash"),
-            "section_name": config.get("section_name")
-            or config.get("prompt_section_name"),
+            "section_name": config.get("section_name") or config.get("prompt_section_name"),
             "scope": RuntimeEvaluationFeedbackScope(
                 benchmark=_coerce_optional_text(config.get("benchmark")),
                 provider=_coerce_optional_text(config.get("provider")),
@@ -456,18 +436,14 @@ def derive_runtime_evaluation_feedback(
             "topology_feedback_coverage": round(
                 float(summary.get("topology_feedback_coverage", 0.0) or 0.0), 4
             ),
-            "avg_topology_reward": round(
-                float(summary.get("avg_topology_reward", 0.0) or 0.0), 4
-            ),
+            "avg_topology_reward": round(float(summary.get("avg_topology_reward", 0.0) or 0.0), 4),
             "avg_topology_confidence": round(
                 float(summary.get("avg_topology_confidence", 0.0) or 0.0), 4
             ),
             "degradation_feedback_coverage": round(
                 float(summary.get("degradation_feedback_coverage", 0.0) or 0.0), 4
             ),
-            "degradation_event_count": int(
-                summary.get("degradation_event_count", 0) or 0
-            ),
+            "degradation_event_count": int(summary.get("degradation_event_count", 0) or 0),
             "degraded_task_count": int(summary.get("degraded_task_count", 0) or 0),
             "recovered_task_count": int(summary.get("recovered_task_count", 0) or 0),
             "degradation_recovery_rate": round(
@@ -479,9 +455,7 @@ def derive_runtime_evaluation_feedback(
                 4,
             ),
             "avg_degradation_time_to_recover_seconds": round(
-                float(
-                    summary.get("avg_degradation_time_to_recover_seconds", 0.0) or 0.0
-                ),
+                float(summary.get("avg_degradation_time_to_recover_seconds", 0.0) or 0.0),
                 4,
             ),
             "avg_degradation_cost_variance": round(
@@ -489,9 +463,7 @@ def derive_runtime_evaluation_feedback(
                 4,
             ),
             "avg_degradation_recovery_time_variance": round(
-                float(
-                    summary.get("avg_degradation_recovery_time_variance", 0.0) or 0.0
-                ),
+                float(summary.get("avg_degradation_recovery_time_variance", 0.0) or 0.0),
                 4,
             ),
             "avg_degradation_intervention_count": round(
@@ -547,18 +519,12 @@ def derive_runtime_evaluation_feedback(
             ),
             "degradation_sources": dict(summary.get("degradation_sources") or {}),
             "degradation_kinds": dict(summary.get("degradation_kinds") or {}),
-            "degradation_failure_types": dict(
-                summary.get("degradation_failure_types") or {}
-            ),
+            "degradation_failure_types": dict(summary.get("degradation_failure_types") or {}),
             "degradation_providers": dict(summary.get("degradation_providers") or {}),
             "degradation_reasons": dict(summary.get("degradation_reasons") or {}),
             "topology_actions": dict(summary.get("topology_actions") or {}),
-            "topology_execution_modes": dict(
-                summary.get("topology_execution_modes") or {}
-            ),
-            "topology_selection_policies": dict(
-                summary.get("topology_selection_policies") or {}
-            ),
+            "topology_execution_modes": dict(summary.get("topology_execution_modes") or {}),
+            "topology_selection_policies": dict(summary.get("topology_selection_policies") or {}),
             "topology_selection_policy_reward_totals": dict(
                 summary.get("topology_selection_policy_reward_totals") or {}
             ),
@@ -569,10 +535,7 @@ def derive_runtime_evaluation_feedback(
                 summary.get("topology_learned_override_reward_delta")
             ),
             "optimization_feasible_tasks": int(
-                summary.get(
-                    "optimization_feasible_tasks", summary.get("feasible_tasks", 0)
-                )
-                or 0
+                summary.get("optimization_feasible_tasks", summary.get("feasible_tasks", 0)) or 0
             ),
             "optimization_infeasible_tasks": int(
                 summary.get(
@@ -593,10 +556,7 @@ def derive_runtime_evaluation_feedback(
             ),
             "avg_optimization_reward": round(
                 float(
-                    summary.get(
-                        "avg_optimization_reward", summary.get("avg_reward", 0.0)
-                    )
-                    or 0.0
+                    summary.get("avg_optimization_reward", summary.get("avg_reward", 0.0)) or 0.0
                 ),
                 4,
             ),
@@ -621,8 +581,7 @@ def derive_runtime_evaluation_feedback(
                 4,
             ),
             "optimization_gate_failures": dict(
-                summary.get("optimization_gate_failures", summary.get("gate_failures"))
-                or {}
+                summary.get("optimization_gate_failures", summary.get("gate_failures")) or {}
             ),
             "topology_selection_policy_optimization_counts": (
                 topology_selection_policy_optimization_counts
@@ -640,54 +599,34 @@ def derive_runtime_evaluation_feedback(
                 topology_selection_policy_feasibility_rates
             ),
             "topology_learned_override_optimization_reward_delta": (
-                _coerce_float(
-                    summary.get("topology_learned_override_optimization_reward_delta")
-                )
+                _coerce_float(summary.get("topology_learned_override_optimization_reward_delta"))
                 or _selection_policy_reward_delta(
                     avg_topology_optimization_reward_by_selection_policy
                 )
             ),
             "topology_learned_override_feasibility_delta": (
-                _coerce_float(
-                    summary.get("topology_learned_override_feasibility_delta")
-                )
-                or _selection_policy_reward_delta(
-                    topology_selection_policy_feasibility_rates
-                )
+                _coerce_float(summary.get("topology_learned_override_feasibility_delta"))
+                or _selection_policy_reward_delta(topology_selection_policy_feasibility_rates)
             ),
-            "tasks_with_team_feedback": int(
-                summary.get("tasks_with_team_feedback", 0) or 0
-            ),
+            "tasks_with_team_feedback": int(summary.get("tasks_with_team_feedback", 0) or 0),
             "team_feedback_coverage": round(
                 float(summary.get("team_feedback_coverage", 0.0) or 0.0),
                 4,
             ),
             "team_formations": dict(summary.get("team_formations") or {}),
             "team_merge_risk_levels": dict(summary.get("team_merge_risk_levels") or {}),
-            "team_worktree_plan_count": int(
-                summary.get("team_worktree_plan_count", 0) or 0
-            ),
+            "team_worktree_plan_count": int(summary.get("team_worktree_plan_count", 0) or 0),
             "team_worktree_materialized_count": int(
                 summary.get("team_worktree_materialized_count", 0) or 0
             ),
-            "team_worktree_dry_run_count": int(
-                summary.get("team_worktree_dry_run_count", 0) or 0
-            ),
-            "team_low_risk_task_count": int(
-                summary.get("team_low_risk_task_count", 0) or 0
-            ),
-            "team_medium_risk_task_count": int(
-                summary.get("team_medium_risk_task_count", 0) or 0
-            ),
-            "team_high_risk_task_count": int(
-                summary.get("team_high_risk_task_count", 0) or 0
-            ),
+            "team_worktree_dry_run_count": int(summary.get("team_worktree_dry_run_count", 0) or 0),
+            "team_low_risk_task_count": int(summary.get("team_low_risk_task_count", 0) or 0),
+            "team_medium_risk_task_count": int(summary.get("team_medium_risk_task_count", 0) or 0),
+            "team_high_risk_task_count": int(summary.get("team_high_risk_task_count", 0) or 0),
             "team_merge_conflict_task_count": int(
                 summary.get("team_merge_conflict_task_count", 0) or 0
             ),
-            "team_merge_conflict_count": int(
-                summary.get("team_merge_conflict_count", 0) or 0
-            ),
+            "team_merge_conflict_count": int(summary.get("team_merge_conflict_count", 0) or 0),
             "team_merge_overlap_task_count": int(
                 summary.get("team_merge_overlap_task_count", 0) or 0
             ),
@@ -703,15 +642,11 @@ def derive_runtime_evaluation_feedback(
             "team_readonly_violation_count": int(
                 summary.get("team_readonly_violation_count", 0) or 0
             ),
-            "team_cleanup_task_count": int(
-                summary.get("team_cleanup_task_count", 0) or 0
-            ),
+            "team_cleanup_task_count": int(summary.get("team_cleanup_task_count", 0) or 0),
             "team_cleanup_error_task_count": int(
                 summary.get("team_cleanup_error_task_count", 0) or 0
             ),
-            "team_cleanup_error_count": int(
-                summary.get("team_cleanup_error_count", 0) or 0
-            ),
+            "team_cleanup_error_count": int(summary.get("team_cleanup_error_count", 0) or 0),
             "avg_team_assignments": round(
                 float(summary.get("avg_team_assignments", 0.0) or 0.0), 4
             ),
@@ -730,9 +665,7 @@ def derive_runtime_evaluation_feedback(
             "team_materialized_assignment_total": int(
                 summary.get("team_materialized_assignment_total", 0) or 0
             ),
-            "team_worktree_scope_metrics": dict(
-                summary.get("team_worktree_scope_metrics") or {}
-            ),
+            "team_worktree_scope_metrics": dict(summary.get("team_worktree_scope_metrics") or {}),
         },
     )
 
@@ -755,16 +688,12 @@ def runtime_evaluation_feedback_scope_from_context(
             or context.get("repo")
             or context.get("workspace_name")
         ),
-        provider=_coerce_optional_text(
-            context.get("provider") or context.get("provider_name")
-        ),
+        provider=_coerce_optional_text(context.get("provider") or context.get("provider_name")),
         model=_coerce_optional_text(context.get("model") or context.get("model_name")),
         task_type=_coerce_optional_text(context.get("task_type")),
         benchmark=_coerce_optional_text(context.get("benchmark")),
         vertical=_coerce_optional_text(context.get("vertical")),
-        workflow=_coerce_optional_text(
-            context.get("workflow") or context.get("workflow_name")
-        ),
+        workflow=_coerce_optional_text(context.get("workflow") or context.get("workflow_name")),
         tags=tuple(str(tag) for tag in (context.get("tags") or ()) if str(tag).strip()),
     )
 
@@ -797,9 +726,7 @@ def build_runtime_evaluation_feedback_payload(
     if metadata.get("model") is None:
         metadata["model"] = scope.model
     resolved_saved_at = (
-        saved_at
-        or _parse_timestamp(metadata.get("saved_at"))
-        or datetime.now(timezone.utc)
+        saved_at or _parse_timestamp(metadata.get("saved_at")) or datetime.now(timezone.utc)
     )
     metadata["saved_at"] = _format_timestamp(resolved_saved_at)
     if source_result_path is not None:
@@ -939,17 +866,12 @@ def build_swe_bench_validated_session_feedback_payload(
     metadata_payload = dict(metadata or {})
     provider = _coerce_optional_text(metadata_payload.get("provider"))
     model = _coerce_optional_text(metadata_payload.get("model"))
-    prompt_candidate_hash = _coerce_optional_text(
-        metadata_payload.get("prompt_candidate_hash")
-    )
+    prompt_candidate_hash = _coerce_optional_text(metadata_payload.get("prompt_candidate_hash"))
     section_name = _coerce_optional_text(
-        metadata_payload.get("section_name")
-        or metadata_payload.get("prompt_section_name")
+        metadata_payload.get("section_name") or metadata_payload.get("prompt_section_name")
     )
 
-    baseline_status = str(
-        getattr(getattr(baseline, "status", None), "value", "") or ""
-    ).lower()
+    baseline_status = str(getattr(getattr(baseline, "status", None), "value", "") or "").lower()
     fail_to_pass = list(getattr(baseline, "fail_to_pass", []) or [])
     pass_to_pass = list(getattr(baseline, "pass_to_pass", []) or [])
     total_fail_to_pass = len(fail_to_pass)
@@ -975,27 +897,17 @@ def build_swe_bench_validated_session_feedback_payload(
         )
     )
     overall_score = (
-        float(
-            getattr(score, "overall_score", getattr(validation_result, "score", 0.0))
-            or 0.0
-        )
+        float(getattr(score, "overall_score", getattr(validation_result, "score", 0.0)) or 0.0)
         if score is not None
         else float(getattr(validation_result, "score", 0.0) or 0.0)
     )
-    resolved = bool(
-        getattr(score, "resolved", getattr(validation_result, "success", False))
-    )
-    partial = bool(
-        getattr(score, "partial", getattr(validation_result, "partial_success", False))
-    )
+    resolved = bool(getattr(score, "resolved", getattr(validation_result, "success", False)))
+    partial = bool(getattr(score, "partial", getattr(validation_result, "partial_success", False)))
     unresolved_gap = _clamp(1.0 - overall_score, 0.0, 1.0)
     regression_rate = len(broken_tests) / max(1, total_pass_to_pass)
 
     completion_threshold = _clamp(
-        0.72
-        + (unresolved_gap * 0.16)
-        + (regression_rate * 0.12)
-        - (0.05 if resolved else 0.0),
+        0.72 + (unresolved_gap * 0.16) + (regression_rate * 0.12) - (0.05 if resolved else 0.0),
         0.58,
         0.92,
     )
@@ -1009,9 +921,7 @@ def build_swe_bench_validated_session_feedback_payload(
         0.65,
         0.95,
     )
-    truth_alignment_rate = _clamp(
-        0.55 + (overall_score * 0.4) - (regression_rate * 0.1), 0.4, 0.99
-    )
+    truth_alignment_rate = _clamp(0.55 + (overall_score * 0.4) - (regression_rate * 0.1), 0.4, 0.99)
 
     post_change_results = getattr(validation_result, "post_change_results", None)
     payload_metadata = dict(metadata_payload)
@@ -1028,17 +938,13 @@ def build_swe_bench_validated_session_feedback_payload(
             "task_count": total_validated_tests,
             "validation_summary": {
                 "success": bool(getattr(validation_result, "success", False)),
-                "partial_success": bool(
-                    getattr(validation_result, "partial_success", False)
-                ),
+                "partial_success": bool(getattr(validation_result, "partial_success", False)),
                 "fail_to_pass_total": total_fail_to_pass,
                 "fail_to_pass_fixed": len(fixed_tests),
                 "pass_to_pass_total": total_pass_to_pass,
                 "pass_to_pass_broken": len(broken_tests),
                 "post_change_total": int(getattr(post_change_results, "total", 0) or 0),
-                "post_change_passed": int(
-                    getattr(post_change_results, "passed", 0) or 0
-                ),
+                "post_change_passed": int(getattr(post_change_results, "passed", 0) or 0),
             },
             "score_summary": {
                 "resolved": resolved,
@@ -1148,9 +1054,7 @@ def _build_coverage_validated_session_feedback_payload(
 ) -> Optional[dict[str, Any]]:
     """Build validated session-truth payloads for coverage-based evaluators."""
     failure_details = _extract_mapping(evaluation_result, "failure_details")
-    completion_score = _coerce_float(
-        _extract_value(evaluation_result, "completion_score")
-    )
+    completion_score = _coerce_float(_extract_value(evaluation_result, "completion_score"))
     primary_coverage = _coerce_float(failure_details.get(primary_coverage_key))
     secondary_coverage = _coerce_float(failure_details.get(secondary_coverage_key))
 
@@ -1169,8 +1073,7 @@ def _build_coverage_validated_session_feedback_payload(
     combined_completion = (
         completion_score
         if completion_score is not None and completion_score > 0.0
-        else (primary_coverage * primary_weight)
-        + (secondary_coverage * secondary_weight)
+        else (primary_coverage * primary_weight) + (secondary_coverage * secondary_weight)
     )
     combined_completion = _clamp(combined_completion, 0.0, 1.0)
     primary_gap = _clamp(1.0 - primary_coverage, 0.0, 1.0)
@@ -1191,9 +1094,7 @@ def _build_coverage_validated_session_feedback_payload(
         0.92,
     )
     progress_threshold = _clamp(
-        completion_threshold
-        - 0.17
-        - (0.03 if not passed and combined_completion < 0.6 else 0.0),
+        completion_threshold - 0.17 - (0.03 if not passed and combined_completion < 0.6 else 0.0),
         0.35,
         completion_threshold,
     )
@@ -1234,8 +1135,7 @@ def _build_coverage_validated_session_feedback_payload(
     if not isinstance(dataset_metadata, Mapping):
         dataset_metadata = {}
     benchmark = (
-        _coerce_optional_text(_extract_value(evaluation_result, "benchmark"))
-        or benchmark_default
+        _coerce_optional_text(_extract_value(evaluation_result, "benchmark")) or benchmark_default
     )
     provider = _coerce_optional_text(_extract_value(evaluation_result, "provider"))
     model = _coerce_optional_text(_extract_value(evaluation_result, "model"))
@@ -1546,11 +1446,7 @@ def _feedback_weight(
     minimum_weight = 0.005 if is_live_topology_feedback else 0.05
     return max(
         minimum_weight,
-        recency_weight
-        * truth_alignment
-        * coverage_weight
-        * trust_weight
-        * scope_weight,
+        recency_weight * truth_alignment * coverage_weight * trust_weight * scope_weight,
     )
 
 
@@ -1695,8 +1591,7 @@ def _merge_selection_policy_scope_bucket(
         if reward_total <= 0.0:
             continue
         bucket["policy_optimization_reward_totals"][policy_name] = round(
-            bucket["policy_optimization_reward_totals"].get(policy_name, 0.0)
-            + reward_total,
+            bucket["policy_optimization_reward_totals"].get(policy_name, 0.0) + reward_total,
             4,
         )
     for policy, count_value in policy_feasible_counts.items():
@@ -1727,9 +1622,7 @@ def _build_selection_policy_scope_metrics(
 
     for metadata in metadata_list:
         explicit_bucket_keys: set[tuple[str, str]] = set()
-        explicit_scope_metrics = (
-            metadata.get("topology_selection_policy_scope_metrics") or {}
-        )
+        explicit_scope_metrics = metadata.get("topology_selection_policy_scope_metrics") or {}
         if isinstance(explicit_scope_metrics, Mapping):
             for dimension, entries in explicit_scope_metrics.items():
                 if dimension not in scope_metrics or not isinstance(entries, Mapping):
@@ -1744,18 +1637,14 @@ def _build_selection_policy_scope_metrics(
                         dimension=dimension,
                         label=normalized_label,
                         policy_counts=dict(bucket.get("policy_counts") or {}),
-                        policy_reward_totals=dict(
-                            bucket.get("policy_reward_totals") or {}
-                        ),
+                        policy_reward_totals=dict(bucket.get("policy_reward_totals") or {}),
                         policy_optimization_counts=dict(
                             bucket.get("policy_optimization_counts") or {}
                         ),
                         policy_optimization_reward_totals=dict(
                             bucket.get("policy_optimization_reward_totals") or {}
                         ),
-                        policy_feasible_counts=dict(
-                            bucket.get("policy_feasible_counts") or {}
-                        ),
+                        policy_feasible_counts=dict(bucket.get("policy_feasible_counts") or {}),
                     )
 
         selection_policy_counts = metadata.get("topology_selection_policies") or {}
@@ -1811,9 +1700,7 @@ def _build_selection_policy_scope_metrics(
         for label, bucket in entries.items():
             policy_counts = dict(bucket.get("policy_counts") or {})
             policy_reward_totals = dict(bucket.get("policy_reward_totals") or {})
-            policy_optimization_counts = dict(
-                bucket.get("policy_optimization_counts") or {}
-            )
+            policy_optimization_counts = dict(bucket.get("policy_optimization_counts") or {})
             policy_optimization_reward_totals = dict(
                 bucket.get("policy_optimization_reward_totals") or {}
             )
@@ -1825,9 +1712,7 @@ def _build_selection_policy_scope_metrics(
             bucket["policy_counts"] = policy_counts
             bucket["policy_reward_totals"] = policy_reward_totals
             bucket["policy_optimization_counts"] = policy_optimization_counts
-            bucket["policy_optimization_reward_totals"] = (
-                policy_optimization_reward_totals
-            )
+            bucket["policy_optimization_reward_totals"] = policy_optimization_reward_totals
             bucket["policy_feasible_counts"] = policy_feasible_counts
             bucket["avg_reward_by_policy"] = avg_reward_by_policy
             bucket["learned_override_reward_delta"] = _selection_policy_reward_delta(
@@ -1839,20 +1724,17 @@ def _build_selection_policy_scope_metrics(
             )
             bucket["feasibility_rate_by_policy"] = {
                 policy: round(
-                    float(policy_feasible_counts.get(policy, 0.0))
-                    / max(1.0, float(count_value)),
+                    float(policy_feasible_counts.get(policy, 0.0)) / max(1.0, float(count_value)),
                     4,
                 )
                 for policy, count_value in policy_optimization_counts.items()
                 if float(count_value) > 0.0
             }
-            bucket["learned_override_optimization_reward_delta"] = (
-                _selection_policy_reward_delta(
-                    bucket["avg_optimization_reward_by_policy"]
-                )
+            bucket["learned_override_optimization_reward_delta"] = _selection_policy_reward_delta(
+                bucket["avg_optimization_reward_by_policy"]
             )
-            bucket["learned_override_feasibility_delta"] = (
-                _selection_policy_reward_delta(bucket["feasibility_rate_by_policy"])
+            bucket["learned_override_feasibility_delta"] = _selection_policy_reward_delta(
+                bucket["feasibility_rate_by_policy"]
             )
     return scope_metrics
 
@@ -1934,8 +1816,7 @@ def _merge_team_worktree_scope_bucket(
     )
     bucket["_coverage_weight"] = round(bucket["_coverage_weight"] + count_weight, 4)
     bucket["team_feedback_coverage"] = round(
-        bucket["team_feedback_coverage"]
-        + (_coerce_non_negative(coverage) * count_weight),
+        bucket["team_feedback_coverage"] + (_coerce_non_negative(coverage) * count_weight),
         4,
     )
     for field_name, field_value in (
@@ -2017,38 +1898,20 @@ def _build_team_worktree_scope_metrics(
                         task_count=bucket.get("tasks_with_team_feedback"),
                         coverage=bucket.get("team_feedback_coverage"),
                         worktree_plan_count=bucket.get("team_worktree_plan_count"),
-                        worktree_materialized_count=bucket.get(
-                            "team_worktree_materialized_count"
-                        ),
-                        worktree_dry_run_count=bucket.get(
-                            "team_worktree_dry_run_count"
-                        ),
+                        worktree_materialized_count=bucket.get("team_worktree_materialized_count"),
+                        worktree_dry_run_count=bucket.get("team_worktree_dry_run_count"),
                         cleanup_task_count=bucket.get("team_cleanup_task_count"),
-                        cleanup_error_task_count=bucket.get(
-                            "team_cleanup_error_task_count"
-                        ),
-                        merge_conflict_task_count=bucket.get(
-                            "team_merge_conflict_task_count"
-                        ),
+                        cleanup_error_task_count=bucket.get("team_cleanup_error_task_count"),
+                        merge_conflict_task_count=bucket.get("team_merge_conflict_task_count"),
                         low_risk_task_count=bucket.get("team_low_risk_task_count"),
-                        medium_risk_task_count=bucket.get(
-                            "team_medium_risk_task_count"
-                        ),
+                        medium_risk_task_count=bucket.get("team_medium_risk_task_count"),
                         high_risk_task_count=bucket.get("team_high_risk_task_count"),
                         avg_team_assignments=bucket.get("avg_team_assignments"),
                         avg_team_scoped_members=bucket.get("avg_team_scoped_members"),
-                        avg_team_members_with_changes=bucket.get(
-                            "avg_team_members_with_changes"
-                        ),
-                        avg_team_changed_file_count=bucket.get(
-                            "avg_team_changed_file_count"
-                        ),
-                        formation_distribution=dict(
-                            bucket.get("team_formations") or {}
-                        ),
-                        merge_risk_distribution=dict(
-                            bucket.get("team_merge_risk_levels") or {}
-                        ),
+                        avg_team_members_with_changes=bucket.get("avg_team_members_with_changes"),
+                        avg_team_changed_file_count=bucket.get("avg_team_changed_file_count"),
+                        formation_distribution=dict(bucket.get("team_formations") or {}),
+                        merge_risk_distribution=dict(bucket.get("team_merge_risk_levels") or {}),
                     )
 
         if not any(
@@ -2074,28 +1937,20 @@ def _build_team_worktree_scope_metrics(
                 task_count=metadata.get("tasks_with_team_feedback"),
                 coverage=metadata.get("team_feedback_coverage"),
                 worktree_plan_count=metadata.get("team_worktree_plan_count"),
-                worktree_materialized_count=metadata.get(
-                    "team_worktree_materialized_count"
-                ),
+                worktree_materialized_count=metadata.get("team_worktree_materialized_count"),
                 worktree_dry_run_count=metadata.get("team_worktree_dry_run_count"),
                 cleanup_task_count=metadata.get("team_cleanup_task_count"),
                 cleanup_error_task_count=metadata.get("team_cleanup_error_task_count"),
-                merge_conflict_task_count=metadata.get(
-                    "team_merge_conflict_task_count"
-                ),
+                merge_conflict_task_count=metadata.get("team_merge_conflict_task_count"),
                 low_risk_task_count=metadata.get("team_low_risk_task_count"),
                 medium_risk_task_count=metadata.get("team_medium_risk_task_count"),
                 high_risk_task_count=metadata.get("team_high_risk_task_count"),
                 avg_team_assignments=metadata.get("avg_team_assignments"),
                 avg_team_scoped_members=metadata.get("avg_team_scoped_members"),
-                avg_team_members_with_changes=metadata.get(
-                    "avg_team_members_with_changes"
-                ),
+                avg_team_members_with_changes=metadata.get("avg_team_members_with_changes"),
                 avg_team_changed_file_count=metadata.get("avg_team_changed_file_count"),
                 formation_distribution=dict(metadata.get("team_formations") or {}),
-                merge_risk_distribution=dict(
-                    metadata.get("team_merge_risk_levels") or {}
-                ),
+                merge_risk_distribution=dict(metadata.get("team_merge_risk_levels") or {}),
             )
 
     finalized: dict[str, dict[str, dict[str, Any]]] = {
@@ -2105,9 +1960,7 @@ def _build_team_worktree_scope_metrics(
     }
     for dimension, entries in scope_metrics.items():
         for label, bucket in entries.items():
-            coverage_weight = max(
-                float(bucket.get("_coverage_weight", 0.0) or 0.0), 1e-9
-            )
+            coverage_weight = max(float(bucket.get("_coverage_weight", 0.0) or 0.0), 1e-9)
             avg_weight = max(float(bucket.get("_avg_weight", 0.0) or 0.0), 1e-9)
             finalized[dimension][label] = {
                 "tasks_with_team_feedback": round(
@@ -2115,8 +1968,7 @@ def _build_team_worktree_scope_metrics(
                     4,
                 ),
                 "team_feedback_coverage": round(
-                    float(bucket.get("team_feedback_coverage", 0.0) or 0.0)
-                    / coverage_weight,
+                    float(bucket.get("team_feedback_coverage", 0.0) or 0.0) / coverage_weight,
                     4,
                 ),
                 "team_worktree_plan_count": round(
@@ -2156,19 +2008,15 @@ def _build_team_worktree_scope_metrics(
                     4,
                 ),
                 "avg_team_assignments": round(
-                    float(bucket.get("_avg_team_assignments_total", 0.0) or 0.0)
-                    / avg_weight,
+                    float(bucket.get("_avg_team_assignments_total", 0.0) or 0.0) / avg_weight,
                     4,
                 ),
                 "avg_team_scoped_members": round(
-                    float(bucket.get("_avg_team_scoped_members_total", 0.0) or 0.0)
-                    / avg_weight,
+                    float(bucket.get("_avg_team_scoped_members_total", 0.0) or 0.0) / avg_weight,
                     4,
                 ),
                 "avg_team_members_with_changes": round(
-                    float(
-                        bucket.get("_avg_team_members_with_changes_total", 0.0) or 0.0
-                    )
+                    float(bucket.get("_avg_team_members_with_changes_total", 0.0) or 0.0)
                     / avg_weight,
                     4,
                 ),
@@ -2178,9 +2026,7 @@ def _build_team_worktree_scope_metrics(
                     4,
                 ),
                 "team_formations": dict(bucket.get("team_formations") or {}),
-                "team_merge_risk_levels": dict(
-                    bucket.get("team_merge_risk_levels") or {}
-                ),
+                "team_merge_risk_levels": dict(bucket.get("team_merge_risk_levels") or {}),
             }
     return finalized
 
@@ -2217,9 +2063,7 @@ def _topology_conflict_score(
         (provider_agreement, 0.20),
         (formation_agreement, 0.15),
     ]
-    usable = [
-        (value, weight) for value, weight in weighted_agreements if value is not None
-    ]
+    usable = [(value, weight) for value, weight in weighted_agreements if value is not None]
     if not usable:
         return None
     weighted_consensus = sum(value * weight for value, weight in usable) / sum(
@@ -2293,14 +2137,10 @@ def _aggregate_feedback_payloads(
                     count = float(value)
                 except (TypeError, ValueError):
                     continue
-                aggregated[label] = round(
-                    aggregated.get(label, 0.0) + (count * weight), 4
-                )
+                aggregated[label] = round(aggregated.get(label, 0.0) + (count * weight), 4)
         return aggregated
 
-    metadata_list = [
-        dict(payload.get("metadata") or {}) for payload in validated_payloads
-    ]
+    metadata_list = [dict(payload.get("metadata") or {}) for payload in validated_payloads]
     selection_policy_counts = weighted_distribution("topology_selection_policies")
     selection_policy_reward_totals = weighted_distribution(
         "topology_selection_policy_reward_totals"
@@ -2325,8 +2165,7 @@ def _aggregate_feedback_payloads(
     )
     selection_policy_feasibility_rates = {
         policy: round(
-            float(selection_policy_feasible_counts.get(policy, 0.0))
-            / max(1.0, float(count_value)),
+            float(selection_policy_feasible_counts.get(policy, 0.0)) / max(1.0, float(count_value)),
             4,
         )
         for policy, count_value in selection_policy_optimization_counts.items()
@@ -2346,27 +2185,21 @@ def _aggregate_feedback_payloads(
     ]
     freshest_payload = max(
         validated_payloads,
-        key=lambda payload: _parse_timestamp(
-            dict(payload.get("metadata") or {}).get("saved_at")
-        )
+        key=lambda payload: _parse_timestamp(dict(payload.get("metadata") or {}).get("saved_at"))
         or datetime.min.replace(tzinfo=timezone.utc),
     )
     freshest_metadata = dict(freshest_payload.get("metadata") or {})
     benchmarks = [metadata.get("benchmark") for metadata in metadata_list]
     models = [metadata.get("model") for metadata in metadata_list]
     datasets = [metadata.get("dataset_metadata") for metadata in metadata_list]
-    task_counts = [
-        int(metadata.get("task_count", 0) or 0) for metadata in metadata_list
-    ]
+    task_counts = [int(metadata.get("task_count", 0) or 0) for metadata in metadata_list]
     freshest_saved_at = max(resolved_saved_at_values, default=None)
     oldest_saved_at = min(resolved_saved_at_values, default=None)
 
     return RuntimeEvaluationFeedback(
         completion_threshold=weighted_average("completion_threshold"),
         enhanced_progress_threshold=weighted_average("enhanced_progress_threshold"),
-        minimum_supported_evidence_score=weighted_average(
-            "minimum_supported_evidence_score"
-        ),
+        minimum_supported_evidence_score=weighted_average("minimum_supported_evidence_score"),
         metadata={
             "source": AGGREGATED_RUNTIME_FEEDBACK_SOURCE,
             "validated_evaluation_truth": True,
@@ -2381,9 +2214,7 @@ def _aggregate_feedback_payloads(
                     if metadata.get("source") is not None
                 }
             ),
-            "benchmark": _select_metadata(
-                benchmarks, fallback=freshest_metadata.get("benchmark")
-            ),
+            "benchmark": _select_metadata(benchmarks, fallback=freshest_metadata.get("benchmark")),
             "model": _select_metadata(models, fallback=freshest_metadata.get("model")),
             "dataset_metadata": _select_metadata(
                 datasets,
@@ -2402,24 +2233,16 @@ def _aggregate_feedback_payloads(
                 / max(sum(weights), 1e-9),
                 4,
             ),
-            "topology_feedback_coverage": weighted_metadata_average(
-                "topology_feedback_coverage"
-            ),
+            "topology_feedback_coverage": weighted_metadata_average("topology_feedback_coverage"),
             "avg_topology_reward": weighted_metadata_average("avg_topology_reward"),
-            "avg_topology_confidence": weighted_metadata_average(
-                "avg_topology_confidence"
-            ),
+            "avg_topology_confidence": weighted_metadata_average("avg_topology_confidence"),
             "degradation_feedback_coverage": weighted_metadata_average(
                 "degradation_feedback_coverage"
             ),
-            "degradation_event_count": weighted_metadata_average(
-                "degradation_event_count"
-            ),
+            "degradation_event_count": weighted_metadata_average("degradation_event_count"),
             "degraded_task_count": weighted_metadata_average("degraded_task_count"),
             "recovered_task_count": weighted_metadata_average("recovered_task_count"),
-            "degradation_recovery_rate": weighted_metadata_average(
-                "degradation_recovery_rate"
-            ),
+            "degradation_recovery_rate": weighted_metadata_average("degradation_recovery_rate"),
             "avg_degradation_adaptation_cost": weighted_metadata_average(
                 "avg_degradation_adaptation_cost"
             ),
@@ -2435,12 +2258,8 @@ def _aggregate_feedback_payloads(
             "avg_degradation_intervention_count": weighted_metadata_average(
                 "avg_degradation_intervention_count"
             ),
-            "avg_degradation_confidence": weighted_metadata_average(
-                "avg_degradation_confidence"
-            ),
-            "avg_degradation_drift_score": weighted_metadata_average(
-                "avg_degradation_drift_score"
-            ),
+            "avg_degradation_confidence": weighted_metadata_average("avg_degradation_confidence"),
+            "avg_degradation_drift_score": weighted_metadata_average("avg_degradation_drift_score"),
             "content_degradation_task_count": weighted_metadata_average(
                 "content_degradation_task_count"
             ),
@@ -2454,9 +2273,7 @@ def _aggregate_feedback_payloads(
                 "persistent_degradation_task_count"
             ),
             "drift_task_count": weighted_metadata_average("drift_task_count"),
-            "degradation_drift_rate": weighted_metadata_average(
-                "degradation_drift_rate"
-            ),
+            "degradation_drift_rate": weighted_metadata_average("degradation_drift_rate"),
             "degradation_intervention_task_count": weighted_metadata_average(
                 "degradation_intervention_task_count"
             ),
@@ -2466,34 +2283,22 @@ def _aggregate_feedback_payloads(
             "high_adaptation_cost_task_count": weighted_metadata_average(
                 "high_adaptation_cost_task_count"
             ),
-            "degradation_high_cost_rate": weighted_metadata_average(
-                "degradation_high_cost_rate"
-            ),
-            "degradation_confidence_rate": weighted_metadata_average(
-                "degradation_confidence_rate"
-            ),
-            "degradation_stability_score": weighted_metadata_average(
-                "degradation_stability_score"
-            ),
+            "degradation_high_cost_rate": weighted_metadata_average("degradation_high_cost_rate"),
+            "degradation_confidence_rate": weighted_metadata_average("degradation_confidence_rate"),
+            "degradation_stability_score": weighted_metadata_average("degradation_stability_score"),
             "degradation_sources": weighted_distribution("degradation_sources"),
             "degradation_kinds": weighted_distribution("degradation_kinds"),
-            "degradation_failure_types": weighted_distribution(
-                "degradation_failure_types"
-            ),
+            "degradation_failure_types": weighted_distribution("degradation_failure_types"),
             "degradation_providers": weighted_distribution("degradation_providers"),
             "degradation_reasons": weighted_distribution("degradation_reasons"),
-            "optimization_feasible_tasks": weighted_metadata_average(
-                "optimization_feasible_tasks"
-            ),
+            "optimization_feasible_tasks": weighted_metadata_average("optimization_feasible_tasks"),
             "optimization_infeasible_tasks": weighted_metadata_average(
                 "optimization_infeasible_tasks"
             ),
             "optimization_feasibility_rate": weighted_metadata_average(
                 "optimization_feasibility_rate"
             ),
-            "avg_optimization_reward": weighted_metadata_average(
-                "avg_optimization_reward"
-            ),
+            "avg_optimization_reward": weighted_metadata_average("avg_optimization_reward"),
             "avg_feasible_optimization_reward": weighted_metadata_average(
                 "avg_feasible_optimization_reward"
             ),
@@ -2505,9 +2310,7 @@ def _aggregate_feedback_payloads(
             "topology_final_actions": weighted_distribution("topology_final_actions"),
             "topology_kinds": weighted_distribution("topology_kinds"),
             "topology_final_kinds": weighted_distribution("topology_final_kinds"),
-            "topology_execution_modes": weighted_distribution(
-                "topology_execution_modes"
-            ),
+            "topology_execution_modes": weighted_distribution("topology_execution_modes"),
             "topology_providers": weighted_distribution("topology_providers"),
             "topology_formations": weighted_distribution("topology_formations"),
             "topology_selection_policies": selection_policy_counts,
@@ -2516,9 +2319,7 @@ def _aggregate_feedback_payloads(
             "topology_learned_override_reward_delta": _selection_policy_reward_delta(
                 avg_reward_by_selection_policy
             ),
-            "topology_selection_policy_optimization_counts": (
-                selection_policy_optimization_counts
-            ),
+            "topology_selection_policy_optimization_counts": (selection_policy_optimization_counts),
             "topology_selection_policy_optimization_reward_totals": (
                 selection_policy_optimization_reward_totals
             ),
@@ -2528,9 +2329,7 @@ def _aggregate_feedback_payloads(
             "topology_selection_policy_feasible_counts": selection_policy_feasible_counts,
             "topology_selection_policy_feasibility_rates": selection_policy_feasibility_rates,
             "topology_learned_override_optimization_reward_delta": (
-                _selection_policy_reward_delta(
-                    avg_optimization_reward_by_selection_policy
-                )
+                _selection_policy_reward_delta(avg_optimization_reward_by_selection_policy)
             ),
             "topology_learned_override_feasibility_delta": _selection_policy_reward_delta(
                 selection_policy_feasibility_rates
@@ -2543,9 +2342,7 @@ def _aggregate_feedback_payloads(
                 if not selected_scope.is_empty()
                 else "recency_reliability_weighted"
             ),
-            "scope_target": (
-                None if selected_scope.is_empty() else selected_scope.to_dict()
-            ),
+            "scope_target": (None if selected_scope.is_empty() else selected_scope.to_dict()),
             "best_scope_match_score": round(max(scope_scores, default=1.0), 4),
             "freshest_saved_at": _format_timestamp(freshest_saved_at),
             "oldest_saved_at": _format_timestamp(oldest_saved_at),
@@ -2608,9 +2405,7 @@ def _aggregate_topology_feedback_metadata(
         _feedback_weight(payload, reference_time, target_scope=selected_scope)
         for payload in topology_payloads
     ]
-    metadata_list = [
-        dict(payload.get("metadata") or {}) for payload in topology_payloads
-    ]
+    metadata_list = [dict(payload.get("metadata") or {}) for payload in topology_payloads]
 
     def weighted_metadata_average(field_name: str) -> Optional[float]:
         weighted_pairs = [
@@ -2638,9 +2433,7 @@ def _aggregate_topology_feedback_metadata(
                     count = float(value)
                 except (TypeError, ValueError):
                     continue
-                aggregated[label] = round(
-                    aggregated.get(label, 0.0) + (count * weight), 4
-                )
+                aggregated[label] = round(aggregated.get(label, 0.0) + (count * weight), 4)
         return aggregated
 
     action_distribution = weighted_distribution("topology_actions")
@@ -2674,8 +2467,7 @@ def _aggregate_topology_feedback_metadata(
     )
     selection_policy_feasibility_rates = {
         policy: round(
-            float(selection_policy_feasible_counts.get(policy, 0.0))
-            / max(1.0, float(count_value)),
+            float(selection_policy_feasible_counts.get(policy, 0.0)) / max(1.0, float(count_value)),
             4,
         )
         for policy, count_value in selection_policy_optimization_counts.items()
@@ -2689,9 +2481,7 @@ def _aggregate_topology_feedback_metadata(
         metadata_list,
         weights,
     )
-    action_agreement = _distribution_agreement(
-        final_action_distribution or action_distribution
-    )
+    action_agreement = _distribution_agreement(final_action_distribution or action_distribution)
     topology_agreement = _distribution_agreement(
         final_topology_distribution or topology_distribution
     )
@@ -2730,41 +2520,29 @@ def _aggregate_topology_feedback_metadata(
     return {
         "source": AGGREGATED_SESSION_TOPOLOGY_RUNTIME_FEEDBACK_SOURCE,
         "topology_feedback_sources": list(dict.fromkeys(sources)),
-        "topology_feedback_coverage": weighted_metadata_average(
-            "topology_feedback_coverage"
-        ),
+        "topology_feedback_coverage": weighted_metadata_average("topology_feedback_coverage"),
         "avg_topology_reward": weighted_metadata_average("avg_topology_reward"),
         "avg_topology_confidence": weighted_metadata_average("avg_topology_confidence"),
-        "degradation_feedback_coverage": weighted_metadata_average(
-            "degradation_feedback_coverage"
-        ),
+        "degradation_feedback_coverage": weighted_metadata_average("degradation_feedback_coverage"),
         "degradation_event_count": weighted_metadata_average("degradation_event_count"),
         "degraded_task_count": weighted_metadata_average("degraded_task_count"),
         "recovered_task_count": weighted_metadata_average("recovered_task_count"),
-        "degradation_recovery_rate": weighted_metadata_average(
-            "degradation_recovery_rate"
-        ),
+        "degradation_recovery_rate": weighted_metadata_average("degradation_recovery_rate"),
         "avg_degradation_adaptation_cost": weighted_metadata_average(
             "avg_degradation_adaptation_cost"
         ),
         "avg_degradation_time_to_recover_seconds": weighted_metadata_average(
             "avg_degradation_time_to_recover_seconds"
         ),
-        "avg_degradation_cost_variance": weighted_metadata_average(
-            "avg_degradation_cost_variance"
-        ),
+        "avg_degradation_cost_variance": weighted_metadata_average("avg_degradation_cost_variance"),
         "avg_degradation_recovery_time_variance": weighted_metadata_average(
             "avg_degradation_recovery_time_variance"
         ),
         "avg_degradation_intervention_count": weighted_metadata_average(
             "avg_degradation_intervention_count"
         ),
-        "avg_degradation_confidence": weighted_metadata_average(
-            "avg_degradation_confidence"
-        ),
-        "avg_degradation_drift_score": weighted_metadata_average(
-            "avg_degradation_drift_score"
-        ),
+        "avg_degradation_confidence": weighted_metadata_average("avg_degradation_confidence"),
+        "avg_degradation_drift_score": weighted_metadata_average("avg_degradation_drift_score"),
         "content_degradation_task_count": weighted_metadata_average(
             "content_degradation_task_count"
         ),
@@ -2782,99 +2560,57 @@ def _aggregate_topology_feedback_metadata(
         "degradation_intervention_task_count": weighted_metadata_average(
             "degradation_intervention_task_count"
         ),
-        "degradation_intervention_rate": weighted_metadata_average(
-            "degradation_intervention_rate"
-        ),
+        "degradation_intervention_rate": weighted_metadata_average("degradation_intervention_rate"),
         "high_adaptation_cost_task_count": weighted_metadata_average(
             "high_adaptation_cost_task_count"
         ),
-        "degradation_high_cost_rate": weighted_metadata_average(
-            "degradation_high_cost_rate"
-        ),
-        "degradation_confidence_rate": weighted_metadata_average(
-            "degradation_confidence_rate"
-        ),
-        "degradation_stability_score": weighted_metadata_average(
-            "degradation_stability_score"
-        ),
+        "degradation_high_cost_rate": weighted_metadata_average("degradation_high_cost_rate"),
+        "degradation_confidence_rate": weighted_metadata_average("degradation_confidence_rate"),
+        "degradation_stability_score": weighted_metadata_average("degradation_stability_score"),
         "degradation_sources": weighted_distribution("degradation_sources"),
         "degradation_kinds": weighted_distribution("degradation_kinds"),
         "degradation_failure_types": weighted_distribution("degradation_failure_types"),
         "degradation_providers": weighted_distribution("degradation_providers"),
         "degradation_reasons": weighted_distribution("degradation_reasons"),
-        "tasks_with_team_feedback": weighted_metadata_average(
-            "tasks_with_team_feedback"
-        ),
+        "tasks_with_team_feedback": weighted_metadata_average("tasks_with_team_feedback"),
         "team_feedback_coverage": weighted_metadata_average("team_feedback_coverage"),
         "team_formations": weighted_distribution("team_formations"),
         "team_merge_risk_levels": weighted_distribution("team_merge_risk_levels"),
-        "team_worktree_plan_count": weighted_metadata_average(
-            "team_worktree_plan_count"
-        ),
+        "team_worktree_plan_count": weighted_metadata_average("team_worktree_plan_count"),
         "team_worktree_materialized_count": weighted_metadata_average(
             "team_worktree_materialized_count"
         ),
-        "team_worktree_dry_run_count": weighted_metadata_average(
-            "team_worktree_dry_run_count"
-        ),
-        "team_low_risk_task_count": weighted_metadata_average(
-            "team_low_risk_task_count"
-        ),
-        "team_medium_risk_task_count": weighted_metadata_average(
-            "team_medium_risk_task_count"
-        ),
-        "team_high_risk_task_count": weighted_metadata_average(
-            "team_high_risk_task_count"
-        ),
+        "team_worktree_dry_run_count": weighted_metadata_average("team_worktree_dry_run_count"),
+        "team_low_risk_task_count": weighted_metadata_average("team_low_risk_task_count"),
+        "team_medium_risk_task_count": weighted_metadata_average("team_medium_risk_task_count"),
+        "team_high_risk_task_count": weighted_metadata_average("team_high_risk_task_count"),
         "team_merge_conflict_task_count": weighted_metadata_average(
             "team_merge_conflict_task_count"
         ),
-        "team_merge_conflict_count": weighted_metadata_average(
-            "team_merge_conflict_count"
-        ),
-        "team_merge_overlap_task_count": weighted_metadata_average(
-            "team_merge_overlap_task_count"
-        ),
+        "team_merge_conflict_count": weighted_metadata_average("team_merge_conflict_count"),
+        "team_merge_overlap_task_count": weighted_metadata_average("team_merge_overlap_task_count"),
         "team_out_of_scope_write_task_count": weighted_metadata_average(
             "team_out_of_scope_write_task_count"
         ),
-        "team_out_of_scope_write_count": weighted_metadata_average(
-            "team_out_of_scope_write_count"
-        ),
+        "team_out_of_scope_write_count": weighted_metadata_average("team_out_of_scope_write_count"),
         "team_readonly_violation_task_count": weighted_metadata_average(
             "team_readonly_violation_task_count"
         ),
-        "team_readonly_violation_count": weighted_metadata_average(
-            "team_readonly_violation_count"
-        ),
+        "team_readonly_violation_count": weighted_metadata_average("team_readonly_violation_count"),
         "team_cleanup_task_count": weighted_metadata_average("team_cleanup_task_count"),
-        "team_cleanup_error_task_count": weighted_metadata_average(
-            "team_cleanup_error_task_count"
-        ),
-        "team_cleanup_error_count": weighted_metadata_average(
-            "team_cleanup_error_count"
-        ),
+        "team_cleanup_error_task_count": weighted_metadata_average("team_cleanup_error_task_count"),
+        "team_cleanup_error_count": weighted_metadata_average("team_cleanup_error_count"),
         "avg_team_assignments": weighted_metadata_average("avg_team_assignments"),
         "avg_team_scoped_members": weighted_metadata_average("avg_team_scoped_members"),
-        "avg_team_members_with_changes": weighted_metadata_average(
-            "avg_team_members_with_changes"
-        ),
-        "avg_team_changed_file_count": weighted_metadata_average(
-            "avg_team_changed_file_count"
-        ),
+        "avg_team_members_with_changes": weighted_metadata_average("avg_team_members_with_changes"),
+        "avg_team_changed_file_count": weighted_metadata_average("avg_team_changed_file_count"),
         "team_materialized_assignment_total": weighted_metadata_average(
             "team_materialized_assignment_total"
         ),
         "team_worktree_scope_metrics": team_worktree_scope_metrics,
-        "optimization_feasible_tasks": weighted_metadata_average(
-            "optimization_feasible_tasks"
-        ),
-        "optimization_infeasible_tasks": weighted_metadata_average(
-            "optimization_infeasible_tasks"
-        ),
-        "optimization_feasibility_rate": weighted_metadata_average(
-            "optimization_feasibility_rate"
-        ),
+        "optimization_feasible_tasks": weighted_metadata_average("optimization_feasible_tasks"),
+        "optimization_infeasible_tasks": weighted_metadata_average("optimization_infeasible_tasks"),
+        "optimization_feasibility_rate": weighted_metadata_average("optimization_feasibility_rate"),
         "avg_optimization_reward": weighted_metadata_average("avg_optimization_reward"),
         "avg_feasible_optimization_reward": weighted_metadata_average(
             "avg_feasible_optimization_reward"
@@ -2929,9 +2665,7 @@ def _aggregate_topology_feedback_metadata(
             if not selected_scope.is_empty()
             else "recency_reliability_weighted"
         ),
-        "topology_scope_target": (
-            None if selected_scope.is_empty() else selected_scope.to_dict()
-        ),
+        "topology_scope_target": (None if selected_scope.is_empty() else selected_scope.to_dict()),
         "topology_best_scope_match_score": round(max(scope_scores, default=1.0), 4),
         "topology_freshest_saved_at": _format_timestamp(freshest_saved_at),
         "topology_oldest_saved_at": _format_timestamp(oldest_saved_at),
@@ -2971,9 +2705,7 @@ def save_runtime_evaluation_feedback(
     source_result_path: Optional[Path] = None,
 ) -> Path:
     """Persist runtime calibration feedback to the canonical evaluation-feedback file."""
-    target_path = (
-        Path(path) if path is not None else get_runtime_evaluation_feedback_path()
-    )
+    target_path = Path(path) if path is not None else get_runtime_evaluation_feedback_path()
     target_path.parent.mkdir(parents=True, exist_ok=True)
     payload = build_runtime_evaluation_feedback_payload(
         feedback,
@@ -3015,15 +2747,12 @@ def load_runtime_evaluation_feedback(
     scope: Optional[Any] = None,
 ) -> Optional[RuntimeEvaluationFeedback]:
     """Load persisted runtime calibration feedback when available."""
-    target_path = (
-        Path(path) if path is not None else get_runtime_evaluation_feedback_path()
-    )
+    target_path = Path(path) if path is not None else get_runtime_evaluation_feedback_path()
     feedback_dir = _resolve_feedback_directory(target_path)
     if feedback_dir is not None:
         payloads = _load_feedback_payloads_from_directory(feedback_dir)
         topology_metadata = _aggregate_topology_feedback_metadata(
-            payloads
-            + _load_session_topology_feedback_payloads_from_directory(feedback_dir),
+            payloads + _load_session_topology_feedback_payloads_from_directory(feedback_dir),
             scope=scope,
         )
         aggregate = _aggregate_feedback_payloads(

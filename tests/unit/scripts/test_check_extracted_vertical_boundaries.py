@@ -62,10 +62,8 @@ def test_discover_default_paths_only_returns_existing_repos(tmp_path: Path) -> N
     (tmp_path / "victor-rag").mkdir()
     (tmp_path / "victor-invest").mkdir()
 
-    discovered = (
-        check_extracted_vertical_boundaries.discover_default_extracted_repo_paths(
-            repo_root=core_repo
-        )
+    discovered = check_extracted_vertical_boundaries.discover_default_extracted_repo_paths(
+        repo_root=core_repo
     )
 
     assert discovered == [
@@ -81,9 +79,7 @@ def test_main_returns_zero_when_no_default_repos_exist(tmp_path: Path) -> None:
     core_repo.mkdir()
     output = io.StringIO()
 
-    exit_code = check_extracted_vertical_boundaries.main(
-        [], repo_root=core_repo, stdout=output
-    )
+    exit_code = check_extracted_vertical_boundaries.main([], repo_root=core_repo, stdout=output)
 
     assert exit_code == 0
     assert "No extracted vertical repositories found" in output.getvalue()

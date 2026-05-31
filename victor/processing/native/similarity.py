@@ -59,9 +59,7 @@ def cosine_similarity(a: List[float], b: List[float]) -> float:
 
 
 @dispatch_with_observability("batch_cosine_similarity")
-def batch_cosine_similarity(
-    query: List[float], corpus: List[List[float]]
-) -> List[float]:
+def batch_cosine_similarity(query: List[float], corpus: List[List[float]]) -> List[float]:
     """Compute cosine similarity between a query vector and multiple corpus vectors.
 
     Uses NumPy+BLAS for batch operations (benchmark shows ~6x faster than Rust
@@ -96,9 +94,7 @@ def batch_cosine_similarity(
 
     # Normalize
     query_norm = query_arr / (np.linalg.norm(query_arr) + 1e-9)
-    corpus_norms = corpus_arr / (
-        np.linalg.norm(corpus_arr, axis=1, keepdims=True) + 1e-9
-    )
+    corpus_norms = corpus_arr / (np.linalg.norm(corpus_arr, axis=1, keepdims=True) + 1e-9)
 
     # Compute similarities
     similarities = np.dot(corpus_norms, query_norm)

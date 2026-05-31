@@ -111,9 +111,7 @@ def test_classify_error_unwraps_retry_exhausted_rate_limit() -> None:
     response = httpx.Response(429, request=request, text="Too many requests")
     wrapped = RetryExhaustedError(
         3,
-        httpx.HTTPStatusError(
-            "429 Too Many Requests", request=request, response=response
-        ),
+        httpx.HTTPStatusError("429 Too Many Requests", request=request, response=response),
     )
 
     result = provider.classify_error(wrapped)
@@ -138,9 +136,7 @@ def test_classify_error_sanitizes_html_auth_response() -> None:
         request=request,
         text="<html><body><svg>large login page</svg></body></html>",
     )
-    error = httpx.HTTPStatusError(
-        "401 Unauthorized", request=request, response=response
-    )
+    error = httpx.HTTPStatusError("401 Unauthorized", request=request, response=response)
 
     result = provider.classify_error(error)
 
@@ -150,9 +146,7 @@ def test_classify_error_sanitizes_html_auth_response() -> None:
 
 
 @pytest.mark.asyncio
-async def test_execute_with_circuit_breaker_suppresses_follow_on_rate_limited_calls() -> (
-    None
-):
+async def test_execute_with_circuit_breaker_suppresses_follow_on_rate_limited_calls() -> None:
     provider = _RetryingDummyProvider()
     request = httpx.Request("POST", "https://example.com/chat/completions")
     response = httpx.Response(429, request=request, text="Too many requests")
@@ -161,9 +155,7 @@ async def test_execute_with_circuit_breaker_suppresses_follow_on_rate_limited_ca
     async def always_rate_limited() -> None:
         nonlocal attempts
         attempts += 1
-        raise httpx.HTTPStatusError(
-            "429 Too Many Requests", request=request, response=response
-        )
+        raise httpx.HTTPStatusError("429 Too Many Requests", request=request, response=response)
 
     with pytest.raises(ProviderRateLimitError) as first_error:
         await provider._execute_with_circuit_breaker(always_rate_limited)

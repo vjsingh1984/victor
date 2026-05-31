@@ -48,9 +48,7 @@ COORDINATOR_FILES = [
 
 # Pattern: hasattr(something, "_private") or getattr(something, "_private"...)
 # This catches both `hasattr(orch, "_foo")` and `getattr(self._orchestrator, "_foo", ...)`
-_PRIVATE_ATTR_PATTERN = re.compile(
-    r"""(?:hasattr|getattr)\s*\(\s*[^,]+,\s*['"](_[a-z_]+)['"]\s*"""
-)
+_PRIVATE_ATTR_PATTERN = re.compile(r"""(?:hasattr|getattr)\s*\(\s*[^,]+,\s*['"](_[a-z_]+)['"]\s*""")
 
 # Attributes that are legitimate private-attribute access patterns:
 # - _cumulative_token_usage: internal state dict accessed via known pattern

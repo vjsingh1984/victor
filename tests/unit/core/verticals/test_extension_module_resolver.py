@@ -32,9 +32,7 @@ class TestExtensionModuleResolver:
         assert self.resolver.is_available("victor.core.verticals") is True
 
     def test_auto_generate_class_name(self):
-        name = self.resolver.auto_generate_class_name(
-            "CodingAssistant", "safety_extension"
-        )
+        name = self.resolver.auto_generate_class_name("CodingAssistant", "safety_extension")
         assert name == "CodingSafetyExtension"
 
     def test_auto_generate_class_name_no_assistant_suffix(self):

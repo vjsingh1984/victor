@@ -185,12 +185,8 @@ def _create_correct_schema(cursor: sqlite3.Cursor):
     """)
 
     # Indexes
-    cursor.execute(
-        "CREATE INDEX idx_messages_session_time ON messages(session_id, timestamp)"
-    )
-    cursor.execute(
-        "CREATE INDEX idx_messages_priority ON messages(session_id, priority DESC)"
-    )
+    cursor.execute("CREATE INDEX idx_messages_session_time ON messages(session_id, timestamp)")
+    cursor.execute("CREATE INDEX idx_messages_priority ON messages(session_id, priority DESC)")
     cursor.execute(
         "CREATE INDEX idx_summaries_session ON context_summaries(session_id, created_at DESC)"
     )

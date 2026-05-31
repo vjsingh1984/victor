@@ -94,9 +94,7 @@ def sample_sequences():
 
 
 @pytest.fixture
-def full_config(
-    sample_dependencies, sample_transitions, sample_clusters, sample_sequences
-):
+def full_config(sample_dependencies, sample_transitions, sample_clusters, sample_sequences):
     """Full configuration object for testing."""
     return ToolDependencyConfig(
         dependencies=sample_dependencies,
@@ -116,9 +114,7 @@ def provider_with_config(full_config):
 
 
 @pytest.fixture
-def provider_with_args(
-    sample_dependencies, sample_transitions, sample_clusters, sample_sequences
-):
+def provider_with_args(sample_dependencies, sample_transitions, sample_clusters, sample_sequences):
     """Provider initialized with individual arguments."""
     return BaseToolDependencyProvider(
         dependencies=sample_dependencies,
@@ -223,14 +219,10 @@ class TestBaseToolDependencyProviderInit:
         assert provider._config.transitions == {}
         assert provider._config.default_sequence == ["read", "edit"]
 
-    def test_config_takes_precedence_over_individual_args(
-        self, full_config, sample_dependencies
-    ):
+    def test_config_takes_precedence_over_individual_args(self, full_config, sample_dependencies):
         """When config is provided, individual args should be ignored."""
         # Create a different set of dependencies
-        other_deps = [
-            ToolDependency(tool_name="other", depends_on=set(), enables=set())
-        ]
+        other_deps = [ToolDependency(tool_name="other", depends_on=set(), enables=set())]
 
         provider = BaseToolDependencyProvider(
             config=full_config,
@@ -832,9 +824,7 @@ class TestSubclassing:
             def __init__(self):
                 super().__init__(
                     dependencies=[
-                        ToolDependency(
-                            "deploy", depends_on={"build"}, enables={"monitor"}
-                        )
+                        ToolDependency("deploy", depends_on={"build"}, enables={"monitor"})
                     ],
                     required_tools={"build", "deploy"},
                 )
@@ -875,9 +865,7 @@ class TestIntegrationScenarios:
         for from_tool in file_ops:
             for to_tool in file_ops:
                 if from_tool != to_tool:
-                    weight = provider_with_config.get_transition_weight(
-                        from_tool, to_tool
-                    )
+                    weight = provider_with_config.get_transition_weight(from_tool, to_tool)
                     if weight > 0.3:  # Not just default
                         valid_transitions += 1
 

@@ -101,17 +101,13 @@ class TestAdaptiveCompactionThresholdExtraKeywords:
         assert threshold._extra_domain_keywords == {}
 
     def test_set_extra_domain_keywords_replaces_mapping(self):
-        threshold = AdaptiveCompactionThreshold(
-            extra_domain_keywords={"swift": ["swift"]}
-        )
+        threshold = AdaptiveCompactionThreshold(extra_domain_keywords={"swift": ["swift"]})
         threshold.set_extra_domain_keywords({"kotlin": ["kotlin", "gradle"]})
         assert "kotlin" in threshold._extra_domain_keywords
         assert "swift" not in threshold._extra_domain_keywords
 
     def test_set_extra_domain_keywords_with_empty_clears_mapping(self):
-        threshold = AdaptiveCompactionThreshold(
-            extra_domain_keywords={"swift": ["swift"]}
-        )
+        threshold = AdaptiveCompactionThreshold(extra_domain_keywords={"swift": ["swift"]})
         threshold.set_extra_domain_keywords({})
         assert threshold._extra_domain_keywords == {}
 
@@ -168,11 +164,7 @@ class TestContextCompactorCapabilityWiring:
         mock_registry.get.return_value = provider
 
         # Patch at the source module since CapabilityRegistry is a deferred import.
-        with (
-            patch(
-                "victor.core.capability_registry.CapabilityRegistry"
-            ) as mock_registry_cls,
-        ):
+        with (patch("victor.core.capability_registry.CapabilityRegistry") as mock_registry_cls,):
             mock_registry_cls.get_instance.return_value = mock_registry
             compactor.set_adaptive_threshold(threshold)
 
@@ -190,9 +182,7 @@ class TestContextCompactorCapabilityWiring:
         mock_registry = MagicMock()
         mock_registry.get.return_value = None  # no provider registered
 
-        with patch(
-            "victor.core.capability_registry.CapabilityRegistry"
-        ) as mock_registry_cls:
+        with patch("victor.core.capability_registry.CapabilityRegistry") as mock_registry_cls:
             mock_registry_cls.get_instance.return_value = mock_registry
             compactor.set_adaptive_threshold(threshold)
 
@@ -206,12 +196,8 @@ class TestContextCompactorCapabilityWiring:
         threshold = AdaptiveCompactionThreshold()
         compactor = ContextCompactor()
 
-        with patch(
-            "victor.core.capability_registry.CapabilityRegistry"
-        ) as mock_registry_cls:
-            mock_registry_cls.get_instance.side_effect = RuntimeError(
-                "registry unavailable"
-            )
+        with patch("victor.core.capability_registry.CapabilityRegistry") as mock_registry_cls:
+            mock_registry_cls.get_instance.side_effect = RuntimeError("registry unavailable")
             # Should complete without raising
             compactor.set_adaptive_threshold(threshold)
 

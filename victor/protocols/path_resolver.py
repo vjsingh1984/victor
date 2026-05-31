@@ -97,7 +97,9 @@ class PathResolution:
     def __str__(self) -> str:
         """Human-readable representation."""
         if self.was_normalized:
-            return f"'{self.original_path}' -> '{self.resolved_path}' ({self.normalization_applied})"
+            return (
+                f"'{self.original_path}' -> '{self.resolved_path}' ({self.normalization_applied})"
+            )
         return str(self.resolved_path)
 
 
@@ -204,9 +206,7 @@ def strip_human_root_prefix(path: str, cwd: Path) -> Tuple[Optional[str], str]:
     if not path or path.startswith("/") or path.startswith("~"):
         return None, ""
 
-    match = re.match(
-        r"^(?P<prefix>root|repo|repository|project)(?:\s+|/)(?P<rest>.+)$", path
-    )
+    match = re.match(r"^(?P<prefix>root|repo|repository|project)(?:\s+|/)(?P<rest>.+)$", path)
     if not match:
         return None, ""
 
@@ -544,9 +544,7 @@ class PathResolver(IPathResolver):
                         # Build combined description
                         full_description = description
                         if root != self.cwd:
-                            full_description = (
-                                f"{description}, resolved_from:{root.name}"
-                            )
+                            full_description = f"{description}, resolved_from:{root.name}"
 
                         result = PathResolution(
                             original_path=path,
@@ -666,8 +664,7 @@ class PathResolver(IPathResolver):
         exact_relative_matches = [
             candidate
             for candidate in full_paths
-            if Path(candidate.rstrip("/")).name == filename
-            and candidate.rstrip("/") != path
+            if Path(candidate.rstrip("/")).name == filename and candidate.rstrip("/") != path
         ]
         suggestions.extend(exact_relative_matches[:limit])
 

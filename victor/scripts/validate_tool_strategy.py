@@ -288,9 +288,7 @@ def validate_context_constraints(provider_name: str, model: str) -> Dict[str, An
         typical_full_tokens = 6 * 125  # 750
         typical_compact_tokens = 10 * 70  # 700
         typical_stub_tokens = 20 * 32  # 640
-        typical_total = (
-            typical_full_tokens + typical_compact_tokens + typical_stub_tokens
-        )  # 2090
+        typical_total = typical_full_tokens + typical_compact_tokens + typical_stub_tokens  # 2090
 
         if typical_total <= max_tool_tokens:
             results["tests"].append(
@@ -371,14 +369,10 @@ def print_summary(all_results: Dict[str, Any]):
         print("  2. Enable feature flag: VICTOR_TOOL_STRATEGY_V2=true")
         print("  3. Test with real workloads")
     else:
-        print(
-            f"\n❌ {failed} test(s) failed. Please fix before enabling tool_strategy_v2."
-        )
+        print(f"\n❌ {failed} test(s) failed. Please fix before enabling tool_strategy_v2.")
         print("\nTroubleshooting:")
         print("  - Check provider implementations have context_window() method")
-        print(
-            "  - Verify tool_tiers.yaml has been generated (run analyze_tool_usage.py)"
-        )
+        print("  - Verify tool_tiers.yaml has been generated (run analyze_tool_usage.py)")
         print("  - Review schema token cost estimates")
 
 
@@ -413,9 +407,7 @@ async def main():
     all_results["context_window"] = validate_context_window(args.provider, args.model)
     all_results["tool_tiers"] = validate_tool_tier_assignments()
     all_results["schema_costs"] = validate_schema_token_costs()
-    all_results["context_constraints"] = validate_context_constraints(
-        args.provider, args.model
-    )
+    all_results["context_constraints"] = validate_context_constraints(args.provider, args.model)
 
     # Print summary
     print_summary(all_results)

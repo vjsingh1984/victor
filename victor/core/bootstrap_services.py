@@ -53,9 +53,7 @@ def _get_feature_flag_manager_optional() -> Any:
     try:
         from victor.core.feature_flags import get_feature_flag_manager
     except ImportError:
-        logger.debug(
-            "Feature flags not available; skipping optional decision-service bootstrap"
-        )
+        logger.debug("Feature flags not available; skipping optional decision-service bootstrap")
         return None
     return get_feature_flag_manager()
 
@@ -181,9 +179,7 @@ def bootstrap_new_services(
             # Try tiered service first (routes different DecisionTypes to different tiers)
             decision_service = _create_tiered_decision_service()
             if decision_service is not None:
-                logger.info(
-                    "Bootstrapped TieredDecisionService (edge/balanced/performance)"
-                )
+                logger.info("Bootstrapped TieredDecisionService (edge/balanced/performance)")
             else:
                 # Fall back to single edge model
                 decision_service = _create_edge_decision_service()
@@ -522,11 +518,7 @@ def _create_llm_decision_service(container: ServiceContainer) -> Optional[Any]:
             return None
 
         # Get model name from provider if available
-        model = (
-            getattr(provider, "model", None)
-            or getattr(provider, "model_name", None)
-            or ""
-        )
+        model = getattr(provider, "model", None) or getattr(provider, "model_name", None) or ""
 
         config = LLMDecisionServiceConfig(
             confidence_threshold=0.7,

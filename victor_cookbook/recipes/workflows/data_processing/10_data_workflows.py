@@ -393,9 +393,7 @@ edges:
 
     try:
         agent = Agent.create(vertical="dataanalysis")
-        result = await agent.run_workflow(
-            workflow_path, input={"base_data_path": base_data_path}
-        )
+        result = await agent.run_workflow(workflow_path, input={"base_data_path": base_data_path})
         return result.content
     finally:
         os.unlink(workflow_path)
@@ -510,9 +508,7 @@ edges:
         os.unlink(workflow_path)
 
 
-async def data_merging_workflow(
-    primary_path: str, secondary_paths: list[str], merge_strategy: str
-):
+async def data_merging_workflow(primary_path: str, secondary_paths: list[str], merge_strategy: str):
     """Merge multiple datasets together."""
     import tempfile
     import os

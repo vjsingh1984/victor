@@ -44,9 +44,7 @@ class TestTaskReminderTemplates:
 
     def test_get_reminder_with_context(self):
         """Reminder with context should include context in template."""
-        reminder = get_reminder_for_task(
-            "analysis", context={"files": "file1.py, file2.py"}
-        )
+        reminder = get_reminder_for_task("analysis", context={"files": "file1.py, file2.py"})
         assert (
             "file1.py" in reminder or "{files}" not in reminder
         )  # Either filled or has placeholder
@@ -55,9 +53,7 @@ class TestTaskReminderTemplates:
         """Reminders should be concise (< 200 chars)."""
         for task_type in ["analysis", "implementation", "debugging", "coding"]:
             reminder = get_reminder_for_task(task_type)
-            assert (
-                len(reminder) < 200
-            ), f"{task_type} reminder too long: {len(reminder)} chars"
+            assert len(reminder) < 200, f"{task_type} reminder too long: {len(reminder)} chars"
 
     def test_all_reminders_use_user_role(self):
         """All reminders should suggest user role injection (OpenDev finding)."""

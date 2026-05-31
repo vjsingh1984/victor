@@ -24,9 +24,7 @@ async def test_acquire_lock_releases_file_lock_after_context(tmp_path, monkeypat
         self._lock_fd = 1
         return True
 
-    monkeypatch.setattr(
-        "victor.core.indexing.index_lock.FileLock.acquire", _fake_acquire
-    )
+    monkeypatch.setattr("victor.core.indexing.index_lock.FileLock.acquire", _fake_acquire)
 
     def _fake_release(self):
         if self._lock_fd is None:
@@ -34,9 +32,7 @@ async def test_acquire_lock_releases_file_lock_after_context(tmp_path, monkeypat
         release_calls.append(self.lock_file)
         self._lock_fd = None
 
-    monkeypatch.setattr(
-        "victor.core.indexing.index_lock.FileLock.release", _fake_release
-    )
+    monkeypatch.setattr("victor.core.indexing.index_lock.FileLock.release", _fake_release)
 
     path_lock = await registry.acquire_lock(root)
     async with path_lock:
@@ -62,16 +58,12 @@ async def test_acquire_lock_marks_usage_on_context_exit(tmp_path, monkeypatch):
         self._lock_fd = 1
         return True
 
-    monkeypatch.setattr(
-        "victor.core.indexing.index_lock.FileLock.acquire", _fake_acquire_noop
-    )
+    monkeypatch.setattr("victor.core.indexing.index_lock.FileLock.acquire", _fake_acquire_noop)
 
     def _noop_release(self):
         self._lock_fd = None
 
-    monkeypatch.setattr(
-        "victor.core.indexing.index_lock.FileLock.release", _noop_release
-    )
+    monkeypatch.setattr("victor.core.indexing.index_lock.FileLock.release", _noop_release)
 
     path_lock = await registry.acquire_lock(root)
     async with path_lock:
@@ -91,15 +83,11 @@ def test_file_lock_closes_fd_between_retry_attempts(tmp_path, monkeypatch):
         "victor.core.indexing.index_lock.os.open",
         lambda *args, **kwargs: next(opened_fds),
     )
-    monkeypatch.setattr(
-        "victor.core.indexing.index_lock.os.write", lambda *args, **kwargs: None
-    )
+    monkeypatch.setattr("victor.core.indexing.index_lock.os.write", lambda *args, **kwargs: None)
     monkeypatch.setattr(
         "victor.core.indexing.index_lock.os.close", lambda fd: closed_fds.append(fd)
     )
-    monkeypatch.setattr(
-        "victor.core.indexing.index_lock.time.sleep", lambda _seconds: None
-    )
+    monkeypatch.setattr("victor.core.indexing.index_lock.time.sleep", lambda _seconds: None)
 
     def _fake_flock(fd, operation):
         if fd == 101:

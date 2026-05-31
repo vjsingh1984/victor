@@ -54,9 +54,7 @@ def _normalize_event(event: Any) -> Optional[dict[str, Any]]:
         return None
 
     constraint_tags = [
-        str(tag).strip()
-        for tag in list(event.get("constraint_tags") or [])
-        if str(tag).strip()
+        str(tag).strip() for tag in list(event.get("constraint_tags") or []) if str(tag).strip()
     ]
     return {
         "selection_policy": selection_policy,
@@ -66,9 +64,7 @@ def _normalize_event(event: Any) -> Optional[dict[str, Any]]:
         "task_type": _coerce_optional_text(event.get("task_type")),
         "skip_reason": _coerce_optional_text(event.get("skip_reason")),
         "force_reason": _coerce_optional_text(event.get("force_reason")),
-        "forced_by_runtime_feedback": bool(
-            event.get("forced_by_runtime_feedback", False)
-        ),
+        "forced_by_runtime_feedback": bool(event.get("forced_by_runtime_feedback", False)),
         "constraint_tags": constraint_tags,
         "experiment_support": _coerce_float(event.get("experiment_support")) or 0.0,
     }
@@ -137,21 +133,13 @@ def summarize_planning_feedback(value: Any) -> Optional[dict[str, Any]]:
     selection_policies = Counter(
         event["selection_policy"] for event in events if event.get("selection_policy")
     )
-    force_reasons = Counter(
-        event["force_reason"] for event in events if event.get("force_reason")
-    )
+    force_reasons = Counter(event["force_reason"] for event in events if event.get("force_reason"))
     constraint_counts = Counter(
         tag for event in events for tag in list(event.get("constraint_tags") or [])
     )
-    used_llm_count = sum(
-        1 for event in events if event.get("used_llm_planning") is True
-    )
-    fast_path_count = sum(
-        1 for event in events if event.get("used_llm_planning") is False
-    )
-    avg_support = sum(event.get("experiment_support", 0.0) for event in events) / len(
-        events
-    )
+    used_llm_count = sum(1 for event in events if event.get("used_llm_planning") is True)
+    fast_path_count = sum(1 for event in events if event.get("used_llm_planning") is False)
+    avg_support = sum(event.get("experiment_support", 0.0) for event in events) / len(events)
 
     return {
         "event_count": len(events),
@@ -162,8 +150,7 @@ def summarize_planning_feedback(value: Any) -> Optional[dict[str, Any]]:
         "forced_by_runtime_feedback": any(
             bool(event.get("forced_by_runtime_feedback")) for event in events
         ),
-        "force_reason": last_event.get("force_reason")
-        or first_event.get("force_reason"),
+        "force_reason": last_event.get("force_reason") or first_event.get("force_reason"),
         "avg_experiment_support": round(avg_support, 4),
         "used_llm_count": used_llm_count,
         "fast_path_count": fast_path_count,
@@ -181,9 +168,7 @@ def aggregate_planning_feedback(
     total_tasks: Optional[int] = None,
 ) -> dict[str, Any]:
     """Aggregate planning summaries across benchmark task results."""
-    summaries = [
-        summary for value in values if (summary := summarize_planning_feedback(value))
-    ]
+    summaries = [summary for value in values if (summary := summarize_planning_feedback(value))]
     if not summaries:
         return {
             "tasks_with_planning_feedback": 0,
@@ -204,9 +189,7 @@ def aggregate_planning_feedback(
 
     task_count = total_tasks if total_tasks is not None else len(summaries)
     selected_policies = Counter(
-        summary["selected_policy"]
-        for summary in summaries
-        if summary.get("selected_policy")
+        summary["selected_policy"] for summary in summaries if summary.get("selected_policy")
     )
     final_policies = Counter(
         summary["final_policy"] for summary in summaries if summary.get("final_policy")
@@ -227,14 +210,11 @@ def aggregate_planning_feedback(
         if not final_policy:
             continue
         policy_completion_totals[final_policy] = round(
-            policy_completion_totals.get(final_policy, 0.0)
-            + float(summary["completion_score"]),
+            policy_completion_totals.get(final_policy, 0.0) + float(summary["completion_score"]),
             4,
         )
         if str(summary.get("status") or "").lower() in _SUCCESS_STATUSES:
-            policy_pass_counts[final_policy] = (
-                policy_pass_counts.get(final_policy, 0) + 1
-            )
+            policy_pass_counts[final_policy] = policy_pass_counts.get(final_policy, 0) + 1
 
     avg_completion_by_policy = {
         policy: round(policy_completion_totals[policy] / max(1, count), 4)
@@ -282,8 +262,7 @@ def aggregate_planning_feedback(
         "planning_policy_pass_rates": dict(pass_rates_by_policy),
         "planning_forced_slow_path_completion_delta": forced_delta,
         "avg_planning_experiment_support": round(
-            sum(summary["avg_experiment_support"] for summary in summaries)
-            / len(summaries),
+            sum(summary["avg_experiment_support"] for summary in summaries) / len(summaries),
             4,
         ),
     }

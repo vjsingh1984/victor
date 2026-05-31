@@ -58,14 +58,8 @@ class TestBaseProvider:
     def test_default_returns_default_constant(self):
         # BaseProvider has abstract methods (chat/stream/close) so we exercise
         # context_window via the unbound function form.
-        assert (
-            BaseProvider.context_window(object(), None)
-            == BaseProvider.DEFAULT_CONTEXT_WINDOW
-        )
-        assert (
-            BaseProvider.context_window(object(), "any")
-            == BaseProvider.DEFAULT_CONTEXT_WINDOW
-        )
+        assert BaseProvider.context_window(object(), None) == BaseProvider.DEFAULT_CONTEXT_WINDOW
+        assert BaseProvider.context_window(object(), "any") == BaseProvider.DEFAULT_CONTEXT_WINDOW
 
     def test_default_is_8192(self):
         assert BaseProvider.DEFAULT_CONTEXT_WINDOW == 8192
@@ -190,9 +184,7 @@ class TestBaseProvider:
         ),
     ],
 )
-def test_provider_context_window(
-    module_name, class_name, known_model, known_cw, unknown_default
-):
+def test_provider_context_window(module_name, class_name, known_model, known_cw, unknown_default):
     """Each provider returns a positive int for known and unknown models."""
     import importlib
 
@@ -208,10 +200,7 @@ def test_provider_context_window(
     ), f"{class_name}.context_window({known_model!r}) should be {known_cw}"
 
     # Unknown model returns provider default
-    assert (
-        cls.context_window(instance, "totally-unknown-model-xyz-9999")
-        == unknown_default
-    )
+    assert cls.context_window(instance, "totally-unknown-model-xyz-9999") == unknown_default
 
     # None/empty also returns default
     assert cls.context_window(instance, None) == unknown_default

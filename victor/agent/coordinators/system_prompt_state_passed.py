@@ -61,9 +61,7 @@ class SystemPromptStatePassedCoordinator:
         history = self._extract_history(context)
 
         # Classify with context (pure read operation)
-        classification = self._task_analyzer.classify_task_with_context(
-            user_message, history
-        )
+        classification = self._task_analyzer.classify_task_with_context(user_message, history)
 
         if not classification:
             return CoordinatorResult.no_op(reasoning="No classification result")

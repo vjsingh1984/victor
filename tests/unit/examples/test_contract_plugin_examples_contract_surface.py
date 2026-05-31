@@ -18,12 +18,8 @@ def test_contract_plugin_examples_import_contract_namespace() -> None:
     for path in PYTHON_EXAMPLES:
         source = path.read_text(encoding="utf-8")
 
-        assert (
-            "victor_contracts" in source
-        ), f"{path.name} should import contract symbols"
-        assert (
-            "victor_sdk" not in source
-        ), f"{path.name} should not import legacy SDK symbols"
+        assert "victor_contracts" in source, f"{path.name} should import contract symbols"
+        assert "victor_sdk" not in source, f"{path.name} should not import legacy SDK symbols"
 
 
 def test_contract_plugin_readme_documents_contract_namespace() -> None:
@@ -36,7 +32,5 @@ def test_contract_plugin_readme_documents_contract_namespace() -> None:
     ]
 
     missing = sorted(snippet for snippet in required_snippets if snippet not in readme)
-    assert (
-        not missing
-    ), f"Contract plugin README is missing contract snippets: {missing}"
+    assert not missing, f"Contract plugin README is missing contract snippets: {missing}"
     assert "victor_sdk" not in readme

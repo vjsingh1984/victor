@@ -77,9 +77,7 @@ class EdgeLLMVerificationResult:
     original_confidence: float  # Original confidence score
     verified_result: Any  # Verified/corrected result from edge LLM
     verification_confidence: float  # Confidence of the verification
-    verification_passed: (
-        bool  # Whether verification passed (confidence ≥ high threshold)
-    )
+    verification_passed: bool  # Whether verification passed (confidence ≥ high threshold)
     latency_ms: float  # Verification latency in milliseconds
     tokens_used: int  # Tokens used for verification
 
@@ -335,9 +333,7 @@ class TieredDecisionService:
                 )
 
         # All tiers exhausted — return heuristic
-        logger.debug(
-            "Decision %s: all tiers unavailable, using heuristic", decision_type.value
-        )
+        logger.debug("Decision %s: all tiers unavailable, using heuristic", decision_type.value)
         return DecisionResult(
             decision_type=decision_type,
             result=heuristic_result,
@@ -375,9 +371,7 @@ class TieredDecisionService:
                 max_tokens=getattr(self._config, tier).max_tokens,
             )
 
-            logger.debug(
-                f"Using override for tier '{tier}': {override_provider}/{override_model}"
-            )
+            logger.debug(f"Using override for tier '{tier}': {override_provider}/{override_model}")
         else:
             spec = getattr(self._config, tier, None)
 
@@ -407,9 +401,7 @@ class TieredDecisionService:
                     provider = "ollama"
                     model = "qwen2.5-coder:1.5b"
                 else:
-                    logger.warning(
-                        f"Could not detect active provider for tier '{tier}'"
-                    )
+                    logger.warning(f"Could not detect active provider for tier '{tier}'")
                     self._failed_tiers.add(tier)
                     return None
             else:
@@ -471,9 +463,7 @@ class TieredDecisionService:
                 max_tokens_override=spec.max_tokens,
             )
 
-            service = LLMDecisionService(
-                provider=provider_instance, model=model, config=svc_config
-            )
+            service = LLMDecisionService(provider=provider_instance, model=model, config=svc_config)
             self._services[tier] = service
             logger.info(
                 "Created %s decision service: %s/%s (timeout=%dms)",
@@ -724,9 +714,7 @@ class TieredDecisionService:
                 else confidence
             )
             final_source = (
-                "edge_verification"
-                if verification.verification_passed
-                else base_result.source
+                "edge_verification" if verification.verification_passed else base_result.source
             )
 
             return TieredClassificationResult(
@@ -792,9 +780,7 @@ class TieredDecisionService:
         edge_service = self._get_service("edge")
         if edge_service is None:
             # Edge unavailable - conservatively reject
-            logger.debug(
-                "Edge tier unavailable for verification, conservatively rejecting"
-            )
+            logger.debug("Edge tier unavailable for verification, conservatively rejecting")
             return EdgeLLMVerificationResult(
                 original_result=original_result.result,
                 original_confidence=original_result.confidence,

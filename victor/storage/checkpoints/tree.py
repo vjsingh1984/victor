@@ -448,9 +448,7 @@ class CheckpointTree:
             child = self._nodes.get(child_id)
             if child:
                 descendants.append(child)
-                queue.extend(
-                    (grandchild_id, depth + 1) for grandchild_id in child.children_ids
-                )
+                queue.extend((grandchild_id, depth + 1) for grandchild_id in child.children_ids)
 
         return descendants
 
@@ -469,9 +467,7 @@ class CheckpointTree:
             List of nodes forming the path, or empty if no path exists
         """
         # Get ancestors of both
-        from_ancestors = set(
-            n.checkpoint_id for n in self.get_ancestors(from_checkpoint)
-        )
+        from_ancestors = set(n.checkpoint_id for n in self.get_ancestors(from_checkpoint))
         from_ancestors.add(from_checkpoint)
 
         to_ancestors = set(n.checkpoint_id for n in self.get_ancestors(to_checkpoint))
@@ -583,9 +579,7 @@ class CheckpointTree:
                 }
                 for cid, n in self._nodes.items()
             },
-            "branches": {
-                name: branch.to_dict() for name, branch in self._branches.items()
-            },
+            "branches": {name: branch.to_dict() for name, branch in self._branches.items()},
         }
 
     def to_ascii(self, max_depth: Optional[int] = None) -> str:
@@ -678,9 +672,7 @@ class BranchManager:
         self.default_branch_name = default_branch_name
 
         # In-memory branch storage (should be persisted in production)
-        self._branches: Dict[str, Dict[str, BranchMetadata]] = (
-            {}
-        )  # session_id -> {name: branch}
+        self._branches: Dict[str, Dict[str, BranchMetadata]] = {}  # session_id -> {name: branch}
         self._current_branch: Dict[str, str] = {}  # session_id -> branch_name
 
     async def create_branch(
@@ -710,9 +702,7 @@ class BranchManager:
 
         # Check for duplicate name
         if name in self._branches[session_id]:
-            raise CheckpointError(
-                f"Branch '{name}' already exists in session {session_id}"
-            )
+            raise CheckpointError(f"Branch '{name}' already exists in session {session_id}")
 
         # Get base checkpoint
         if from_checkpoint is None:
@@ -726,9 +716,7 @@ class BranchManager:
                 if checkpoints:
                     from_checkpoint = checkpoints[0].checkpoint_id
                 else:
-                    raise CheckpointError(
-                        f"No checkpoints found for session {session_id}"
-                    )
+                    raise CheckpointError(f"No checkpoints found for session {session_id}")
 
         # Create branch
         branch = BranchMetadata.create(
@@ -741,9 +729,7 @@ class BranchManager:
 
         self._branches[session_id][name] = branch
 
-        logger.info(
-            f"Created branch '{name}' from checkpoint {from_checkpoint[:12]}..."
-        )
+        logger.info(f"Created branch '{name}' from checkpoint {from_checkpoint[:12]}...")
 
         return branch
 
@@ -768,9 +754,7 @@ class BranchManager:
             raise CheckpointError(f"No branches found for session {session_id}")
 
         if branch_name not in self._branches[session_id]:
-            raise CheckpointError(
-                f"Branch '{branch_name}' not found in session {session_id}"
-            )
+            raise CheckpointError(f"Branch '{branch_name}' not found in session {session_id}")
 
         self._current_branch[session_id] = branch_name
         branch = self._branches[session_id][branch_name]
@@ -868,10 +852,7 @@ class BranchManager:
 
         # Fast-forward if linear history
         if strategy == MergeStrategy.FAST_FORWARD:
-            if (
-                common_ancestor
-                and common_ancestor.checkpoint_id == target.head_checkpoint_id
-            ):
+            if common_ancestor and common_ancestor.checkpoint_id == target.head_checkpoint_id:
                 # Target is ancestor of source - fast-forward
                 target.head_checkpoint_id = source.head_checkpoint_id
                 target.updated_at = datetime.now(timezone.utc)
@@ -882,9 +863,7 @@ class BranchManager:
                     strategy_used=MergeStrategy.FAST_FORWARD,
                     changes_merged={
                         "checkpoints": len(
-                            tree.get_path(
-                                target.head_checkpoint_id, source.head_checkpoint_id
-                            )
+                            tree.get_path(target.head_checkpoint_id, source.head_checkpoint_id)
                         )
                     },
                 )
@@ -913,9 +892,7 @@ class BranchManager:
                 )
 
             # Load all three states
-            base_data = await self.backend.load_checkpoint(
-                common_ancestor.checkpoint_id
-            )
+            base_data = await self.backend.load_checkpoint(common_ancestor.checkpoint_id)
             source_data = await self.backend.load_checkpoint(source.head_checkpoint_id)
             target_data = await self.backend.load_checkpoint(target.head_checkpoint_id)
 
@@ -1138,9 +1115,7 @@ class BranchManager:
             Populated CheckpointTree
         """
         branches = self._branches.get(session_id, {})
-        return await CheckpointTree.build_from_session(
-            self.backend, session_id, branches
-        )
+        return await CheckpointTree.build_from_session(self.backend, session_id, branches)
 
     async def replay_from(
         self,
@@ -1225,10 +1200,7 @@ class BranchManager:
         Returns:
             Default branch metadata
         """
-        if (
-            session_id in self._branches
-            and self.default_branch_name in self._branches[session_id]
-        ):
+        if session_id in self._branches and self.default_branch_name in self._branches[session_id]:
             return self._branches[session_id][self.default_branch_name]
 
         # Check for existing checkpoints
@@ -1267,9 +1239,7 @@ class BranchStorageProtocol(Protocol):
         """Load a branch by ID."""
         ...
 
-    async def load_branch_by_name(
-        self, session_id: str, name: str
-    ) -> Optional[BranchMetadata]:
+    async def load_branch_by_name(self, session_id: str, name: str) -> Optional[BranchMetadata]:
         """Load a branch by session and name."""
         ...
 

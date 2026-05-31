@@ -270,9 +270,7 @@ async def test_delete_file_removes_embeddings_from_vector_store(graph_store, cap
     mock_provider = AsyncMock()
     mock_provider.delete_by_file.return_value = 1
 
-    with patch(
-        "victor.storage.vector_stores.registry.EmbeddingRegistry"
-    ) as mock_registry:
+    with patch("victor.storage.vector_stores.registry.EmbeddingRegistry") as mock_registry:
         mock_registry.create.return_value = mock_provider
         await graph_store.delete_by_file("test.py")
 
@@ -302,13 +300,9 @@ async def test_vector_store_unavailable_doesnt_block_graph_deletion(graph_store)
 
     # Mock vector store to raise exception
     mock_provider = AsyncMock()
-    mock_provider.delete_by_file.side_effect = Exception(
-        "Vector store connection failed"
-    )
+    mock_provider.delete_by_file.side_effect = Exception("Vector store connection failed")
 
-    with patch(
-        "victor.storage.vector_stores.registry.EmbeddingRegistry"
-    ) as mock_registry:
+    with patch("victor.storage.vector_stores.registry.EmbeddingRegistry") as mock_registry:
         mock_registry.create.return_value = mock_provider
         # Should not raise exception
         await graph_store.delete_by_file("test.py")
@@ -429,9 +423,7 @@ def test_incremental_indexer_delete_file_data(indexer):
     assert result["embeddings"] >= 0
 
     # Verify other.py data remains
-    cursor = conn.execute(
-        "SELECT COUNT(*) FROM graph_node WHERE file = ?", ("other.py",)
-    )
+    cursor = conn.execute("SELECT COUNT(*) FROM graph_node WHERE file = ?", ("other.py",))
     assert cursor.fetchone()[0] == 1
 
     cursor = conn.execute("SELECT COUNT(*) FROM graph_edge")

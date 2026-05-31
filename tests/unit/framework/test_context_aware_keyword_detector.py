@@ -75,9 +75,7 @@ class TestContextAwareKeywordDetector:
         """Test detection of code generation completion."""
         detector = ContextAwareKeywordDetector()
 
-        response = (
-            "Here is the implementation of the authentication system in the code above."
-        )
+        response = "Here is the implementation of the authentication system in the code above."
 
         signal = detector.detect_completion(
             response=response, task_type=TaskType.CODE_GENERATION, requirements=None
@@ -112,10 +110,7 @@ class TestContextAwareKeywordDetector:
         )
 
         assert signal.has_completion_indicator is True
-        assert (
-            "fix" in signal.evidence[0].lower()
-            or "resolved" in signal.evidence[0].lower()
-        )
+        assert "fix" in signal.evidence[0].lower() or "resolved" in signal.evidence[0].lower()
 
     def test_detect_search_completion(self):
         """Test detection of search task completion."""
@@ -208,14 +203,10 @@ The function above handles authentication.
         detector = ContextAwareKeywordDetector()
 
         requirements = [
-            MockRequirement(
-                type="functional", description="Implement authentication system"
-            )
+            MockRequirement(type="functional", description="Implement authentication system")
         ]
 
-        response = (
-            "I've implemented the authentication system with secure password hashing."
-        )
+        response = "I've implemented the authentication system with secure password hashing."
 
         signal = detector.detect_completion(
             response=response,
@@ -278,8 +269,7 @@ The function above handles authentication.
 
         assert signal.has_completion_indicator is True
         assert any(
-            "deliverable" in str(indicator).lower()
-            or "explicit" in str(indicator).lower()
+            "deliverable" in str(indicator).lower() or "explicit" in str(indicator).lower()
             for indicator in signal.indicator_types
         )
 
@@ -356,9 +346,7 @@ The code above resolves the issue. In conclusion, the system is now working.
         """Test when response doesn't address requirements."""
         detector = ContextAwareKeywordDetector()
 
-        requirements = [
-            MockRequirement(type="functional", description="Add authentication system")
-        ]
+        requirements = [MockRequirement(type="functional", description="Add authentication system")]
 
         # Response that doesn't mention the requirement
         response = "I've created a simple file for testing."
