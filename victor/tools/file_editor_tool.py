@@ -19,7 +19,7 @@ rollback capability to the agent.
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 from pathlib import Path
 
 # =============================================================================
@@ -619,9 +619,7 @@ async def edit(
                 # Check if old_str exists in content
                 occurrences = current_content.count(old_str)
                 if occurrences == 0:
-                    old_str_preview = (
-                        old_str[:80] + "..." if len(old_str) > 80 else old_str
-                    )
+                    old_str_preview = old_str[:80] + "..." if len(old_str) > 80 else old_str
                     old_str_first_line = old_str.split("\n")[0][:60]
 
                     # Try to find similar content to help debug
@@ -644,9 +642,8 @@ async def edit(
                                     f"{start + j + 1}: {file_lines[start + j]}"
                                     for j in range(end - start)
                                 ]
-                                context_str = (
-                                    "\n\nActual file content around match:\n"
-                                    + "\n".join(numbered)
+                                context_str = "\n\nActual file content around match:\n" + "\n".join(
+                                    numbered
                                 )
                                 break
                     elif old_str.rstrip() in current_content:

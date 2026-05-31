@@ -620,7 +620,6 @@ def _validate_readonly_command(cmd: str) -> tuple[bool, str]:
             "ls",
             "info",
             "why",
-            "why",
             "version",
             "help",
             "cache",
@@ -663,12 +662,7 @@ def _validate_readonly_command(cmd: str) -> tuple[bool, str]:
 
     # black: allow --check, --diff, --version
     if base_cmd == "black":
-        if (
-            "--check" in cmd
-            or "--diff" in cmd
-            or "--version" in cmd
-            or "version" in cmd
-        ):
+        if "--check" in cmd or "--diff" in cmd or "--version" in cmd or "version" in cmd:
             return True, ""
         return False, "black (write operation)"
 
@@ -677,13 +671,7 @@ def _validate_readonly_command(cmd: str) -> tuple[bool, str]:
         # Check for dangerous flags like -i (interactive) or -u
         if "-m pytest" in cmd:
             return True, ""
-        if (
-            "-c" in cmd
-            or "--version" in cmd
-            or "-V" in cmd
-            or "-h" in cmd
-            or "--help" in cmd
-        ):
+        if "-c" in cmd or "--version" in cmd or "-V" in cmd or "-h" in cmd or "--help" in cmd:
             return True, ""
         # If it's just 'python script.py', it depends on the script, but we allow it
         # as python is in the readonly set. We could be stricter here.
@@ -760,7 +748,6 @@ def _strip_shell_comments(cmd: str) -> str:
     - Preserves comments in quoted strings: echo "# not a comment"
     - Preserves escaped hashes: echo \# not a comment
     """
-    lines = []
     i = 0
     in_quote = None  # None, '"', or "'"
     in_escape = False
@@ -846,7 +833,7 @@ def _strip_shell_comments(cmd: str) -> str:
     result = "\n".join(result_lines)
 
     if result != cmd:
-        logger.debug(f"Shell optimizer: stripped comments from command")
+        logger.debug("Shell optimizer: stripped comments from command")
 
     return result
 
@@ -859,9 +846,7 @@ def _optimize_grep_to_rg(cmd: str) -> str:
     because it respects .gitignore, uses memory-mapped I/O, and parallelizes.
     Basic grep flags (-n, -i, -l, -c, -w, -e) are compatible with rg.
     """
-    if not re.match(r"^grep\s+.*-[rR]", cmd) and not re.match(
-        r"^grep\s+-[a-zA-Z]*[rR]", cmd
-    ):
+    if not re.match(r"^grep\s+.*-[rR]", cmd) and not re.match(r"^grep\s+-[a-zA-Z]*[rR]", cmd):
         return cmd
 
     if not shutil.which("rg"):
@@ -1132,9 +1117,7 @@ async def shell(
                 }
             except Exception as cache_error:
                 # If caching fails, fall through to normal execution
-                logger.warning(
-                    f"Cache lookup failed, executing directly: {cache_error}"
-                )
+                logger.warning(f"Cache lookup failed, executing directly: {cache_error}")
 
         # Create subprocess
         process = await asyncio.create_subprocess_shell(
@@ -1198,9 +1181,7 @@ async def shell(
 
                 if is_file_cache_enabled():
                     clear_file_content_cache(reset_stats=False)
-                    logger.debug(
-                        "Cleared file content cache after non-readonly shell command"
-                    )
+                    logger.debug("Cleared file content cache after non-readonly shell command")
             except (ImportError, Exception):
                 pass
 
@@ -1232,17 +1213,13 @@ async def shell(
                 # Truncate stderr if too long, keeping first and last parts
                 stderr_preview = stderr_str.strip()
                 if len(stderr_preview) > 500:
-                    stderr_preview = (
-                        stderr_preview[:250] + "\n...\n" + stderr_preview[-250:]
-                    )
+                    stderr_preview = stderr_preview[:250] + "\n...\n" + stderr_preview[-250:]
                 error_parts.append(f"stderr: {stderr_preview}")
             elif stdout_str.strip():
                 # Some commands output errors to stdout
                 stdout_preview = stdout_str.strip()
                 if len(stdout_preview) > 300:
-                    stdout_preview = (
-                        stdout_preview[:150] + "..." + stdout_preview[-150:]
-                    )
+                    stdout_preview = stdout_preview[:150] + "..." + stdout_preview[-150:]
                 error_parts.append(f"output: {stdout_preview}")
             result["error"] = "\n".join(error_parts)
 

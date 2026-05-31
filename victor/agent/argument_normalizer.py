@@ -11,7 +11,7 @@ import ast
 import json
 import logging
 from enum import Enum
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from pydantic import BaseModel, Field
 from victor.tools.core_tool_aliases import canonicalize_core_tool_name
@@ -45,9 +45,7 @@ class ToolStats(BaseModel):
     model_config = {"validate_assignment": True}
 
     calls: int = Field(default=0, ge=0, description="Number of times tool was called")
-    normalizations: int = Field(
-        default=0, ge=0, description="Number of arguments normalized"
-    )
+    normalizations: int = Field(default=0, ge=0, description="Number of arguments normalized")
 
     # Dict-like interface for backward compatibility
     def __getitem__(self, key: str) -> Any:
@@ -144,9 +142,7 @@ class ArgumentNormalizer:
         }
     )
 
-    def __init__(
-        self, provider_name: str = "unknown", config: Optional[Dict[str, Any]] = None
-    ):
+    def __init__(self, provider_name: str = "unknown", config: Optional[Dict[str, Any]] = None):
         """
         Initialize argument normalizer.
 
@@ -376,11 +372,7 @@ class ArgumentNormalizer:
                 for key, val in all_matches:
                     # Unescape common escape sequences (JSON-style)
                     val = val.replace("\\n", "\n").replace("\\t", "\t")
-                    val = (
-                        val.replace('\\"', '"')
-                        .replace("\\'", "'")
-                        .replace("\\\\", "\\")
-                    )
+                    val = val.replace('\\"', '"').replace("\\'", "'").replace("\\\\", "\\")
                     # Last-write-wins if same key appears in both quote styles
                     result[key] = val
 
@@ -411,9 +403,9 @@ class ArgumentNormalizer:
                                 tolerant[key] = extracted
                         # Use tolerant result if it recovered MORE content than regex
                         for field in big_value_fields:
-                            if isinstance(tolerant.get(field), str) and len(
-                                tolerant[field]
-                            ) > len(result.get(field, "")):
+                            if isinstance(tolerant.get(field), str) and len(tolerant[field]) > len(
+                                result.get(field, "")
+                            ):
                                 result.update(tolerant)
                                 logger.info(
                                     "Tolerant extractor upgraded result: "
@@ -426,12 +418,10 @@ class ArgumentNormalizer:
 
                 # If we found at least one key-value pair and it looks like a tool call
                 if result and any(
-                    k in result
-                    for k in ["cmd", "path", "content", "query", "file_path"]
+                    k in result for k in ["cmd", "path", "content", "query", "file_path"]
                 ):
                     logger.debug(
-                        "Extracted parameters via regex fallback: %s "
-                        "(content_len=%s)",
+                        "Extracted parameters via regex fallback: %s " "(content_len=%s)",
                         list(result.keys()),
                         (
                             len(result.get("content", ""))
@@ -461,17 +451,32 @@ class ArgumentNormalizer:
     # (followed by another `"<known_key>":`) and content quotes (no such pattern follows).
     _KNOWN_TOOL_PARAMS = frozenset(
         {
-            "path", "content", "cmd", "query", "ops", "type",
-            "old_str", "new_str", "new_path", "pattern", "operations",
-            "file_path", "filename", "command", "directory", "dir",
-            "text", "data", "desc", "message", "args",
+            "path",
+            "content",
+            "cmd",
+            "query",
+            "ops",
+            "type",
+            "old_str",
+            "new_str",
+            "new_path",
+            "pattern",
+            "operations",
+            "file_path",
+            "filename",
+            "command",
+            "directory",
+            "dir",
+            "text",
+            "data",
+            "desc",
+            "message",
+            "args",
         }
     )
 
     @staticmethod
-    def _extract_string_value_tolerant(
-        text: str, key: str
-    ) -> Optional[str]:
+    def _extract_string_value_tolerant(text: str, key: str) -> Optional[str]:
         """Extract a JSON string value tolerantly.
 
         Designed for LLM-generated tool args where content (markdown,
@@ -500,7 +505,7 @@ class ArgumentNormalizer:
         import re
 
         key_re = re.compile(
-            r'(?P<q>["\'])' + re.escape(key) + r'(?P=q)\s*:\s*',
+            r'(?P<q>["\'])' + re.escape(key) + r"(?P=q)\s*:\s*",
             re.MULTILINE,
         )
         m = key_re.search(text)
@@ -518,9 +523,7 @@ class ArgumentNormalizer:
         i = start
         n = len(text)
         # Precompile pattern for "is next a known-key reference"
-        next_key_re = re.compile(
-            r'\s*["\'](?P<k>\w+)["\']\s*:'
-        )
+        next_key_re = re.compile(r'\s*["\'](?P<k>\w+)["\']\s*:')
 
         end = -1
         while i < n:
@@ -613,9 +616,7 @@ class ArgumentNormalizer:
                     if colon_pos > 0:
                         # Skip whitespace and find the quote
                         rest = value[colon_pos + 1 :]
-                        quote_match = re.search(
-                            r'(["\'])([^\1]*?)\1\s*\}\s*$', rest, re.DOTALL
-                        )
+                        quote_match = re.search(r'(["\'])([^\1]*?)\1\s*\}\s*$', rest, re.DOTALL)
                         if quote_match:
                             content = quote_match.group(2)
                             return {"path": path, "content": content}
@@ -683,13 +684,9 @@ class ArgumentNormalizer:
 
         try:
             # Try to find cmd parameter with various quote styles
-            cmd_match = re.search(
-                r'"cmd"\s*:\s*"((?:[^"\\]|\\.)*)"', payload, re.DOTALL
-            )
+            cmd_match = re.search(r'"cmd"\s*:\s*"((?:[^"\\]|\\.)*)"', payload, re.DOTALL)
             if not cmd_match:
-                cmd_match = re.search(
-                    r"'cmd'\s*:\s*'((?:[^'\\]|\\.)*)'", payload, re.DOTALL
-                )
+                cmd_match = re.search(r"'cmd'\s*:\s*'((?:[^'\\]|\\.)*)'", payload, re.DOTALL)
 
             if cmd_match:
                 cmd = cmd_match.group(1)
@@ -710,16 +707,12 @@ class ArgumentNormalizer:
                 start = payload.find(heredoc_match.group(0))
                 if start >= 0:
                     # Find the end of the heredoc (closing delimiter)
-                    cmd_text = payload[
-                        start : start + len(heredoc_match.group(0)) + 2000
-                    ]
+                    cmd_text = payload[start : start + len(heredoc_match.group(0)) + 2000]
                     end_marker = payload.find(
                         "\n" + heredoc_match.group(2), len(heredoc_match.group(0))
                     )
                     if end_marker > 0:
-                        cmd_text = payload[
-                            start : end_marker + len(heredoc_match.group(2)) + 1
-                        ]
+                        cmd_text = payload[start : end_marker + len(heredoc_match.group(2)) + 1]
                         return {"cmd": cmd_text}
 
         except Exception as exc:
@@ -813,11 +806,7 @@ class ArgumentNormalizer:
                         "[%s] Failed to parse value envelope string for tool '%s': %s",
                         self.provider_name,
                         canonical_tool_name,
-                        (
-                            payload[:100]
-                            if isinstance(payload, str)
-                            else str(payload)[:100]
-                        ),
+                        (payload[:100] if isinstance(payload, str) else str(payload)[:100]),
                     )
 
                 # Tolerant state-machine extraction — works for any tool's
@@ -853,13 +842,11 @@ class ArgumentNormalizer:
                         tolerant_extract[param] = extracted
 
                 # Did we recover the required param for this tool?
-                required_set = set(
-                    required_for_tool.get(canonical_tool_name, [])
-                )
+                required_set = set(required_for_tool.get(canonical_tool_name, []))
                 if required_set and required_set.issubset(tolerant_extract.keys()):
-                    content_field = tolerant_extract.get(
-                        "content"
-                    ) or tolerant_extract.get("cmd", "")
+                    content_field = tolerant_extract.get("content") or tolerant_extract.get(
+                        "cmd", ""
+                    )
                     logger.info(
                         "[%s] Tolerant extraction recovered %s payload for "
                         "tool '%s' (content_len=%d, params=%s)",
@@ -897,9 +884,7 @@ class ArgumentNormalizer:
                 return arguments
 
         if isinstance(payload, dict):
-            aliased_payload = self._apply_tool_aliases_without_stats(
-                payload, canonical_tool_name
-            )
+            aliased_payload = self._apply_tool_aliases_without_stats(payload, canonical_tool_name)
 
             envelope_param_map = {
                 "write": {"path", "content"},
@@ -1026,9 +1011,7 @@ class ArgumentNormalizer:
                         f"[{self.provider_name}] {tool_name}: Normalized version is_valid={is_valid}"
                     )
                     if is_valid:
-                        self.stats.normalizations[
-                            NormalizationStrategy.PYTHON_AST.value
-                        ] += 1
+                        self.stats.normalizations[NormalizationStrategy.PYTHON_AST.value] += 1
                         self.stats.by_tool[tool_name].normalizations += 1
                         logger.info(
                             f"[{self.provider_name}] Preemptively normalized {tool_name} arguments via AST"
@@ -1041,14 +1024,10 @@ class ArgumentNormalizer:
                 )
 
         # Layer 1: Check if already valid (fast path - most cases after preemptive normalization)
-        logger.debug(
-            f"[{self.provider_name}] {tool_name}: Layer 1 - Checking if already valid"
-        )
+        logger.debug(f"[{self.provider_name}] {tool_name}: Layer 1 - Checking if already valid")
         try:
             is_valid = self._is_valid_json_dict(arguments)
-            logger.debug(
-                f"[{self.provider_name}] {tool_name}: Layer 1 - is_valid={is_valid}"
-            )
+            logger.debug(f"[{self.provider_name}] {tool_name}: Layer 1 - is_valid={is_valid}")
             if is_valid:
                 self.stats.normalizations[NormalizationStrategy.DIRECT.value] += 1
                 return arguments, NormalizationStrategy.DIRECT
@@ -1066,9 +1045,7 @@ class ArgumentNormalizer:
             try:
                 normalized = self._normalize_via_ast(arguments, tool_name)
                 if self._is_valid_json_dict(normalized):
-                    self.stats.normalizations[
-                        NormalizationStrategy.PYTHON_AST.value
-                    ] += 1
+                    self.stats.normalizations[NormalizationStrategy.PYTHON_AST.value] += 1
                     logger.info(
                         f"[{self.provider_name}] Normalized {tool_name} arguments via AST conversion"
                     )
@@ -1081,9 +1058,7 @@ class ArgumentNormalizer:
             normalized = self._normalize_via_regex(arguments, tool_name)
             if self._is_valid_json_dict(normalized):
                 self.stats.normalizations[NormalizationStrategy.REGEX_QUOTES.value] += 1
-                logger.info(
-                    f"[{self.provider_name}] Normalized {tool_name} arguments via regex"
-                )
+                logger.info(f"[{self.provider_name}] Normalized {tool_name} arguments via regex")
                 return normalized, NormalizationStrategy.REGEX_QUOTES
         except Exception as e:
             logger.debug(f"Regex normalization failed for {tool_name}: {e}")
@@ -1092,9 +1067,7 @@ class ArgumentNormalizer:
         try:
             normalized = self._normalize_via_manual_repair(arguments, tool_name)
             if self._is_valid_json_dict(normalized):
-                self.stats.normalizations[
-                    NormalizationStrategy.MANUAL_REPAIR.value
-                ] += 1
+                self.stats.normalizations[NormalizationStrategy.MANUAL_REPAIR.value] += 1
                 logger.info(
                     f"[{self.provider_name}] Normalized {tool_name} arguments via manual repair"
                 )
@@ -1165,9 +1138,7 @@ class ArgumentNormalizer:
             logger.debug("_is_valid_json_dict: Exception in validation: %s", e)
             return False
 
-    def _normalize_via_ast(
-        self, arguments: Dict[str, Any], tool_name: str = ""
-    ) -> Dict[str, Any]:
+    def _normalize_via_ast(self, arguments: Dict[str, Any], tool_name: str = "") -> Dict[str, Any]:
         """
         Convert Python syntax to JSON via AST.
 
@@ -1224,9 +1195,7 @@ class ArgumentNormalizer:
                                     logger.warning(
                                         f"Parameter {key} contains non-serializable value: {e}"
                                     )
-                                    normalized[key] = json.dumps(
-                                        python_obj, default=str
-                                    )
+                                    normalized[key] = json.dumps(python_obj, default=str)
                         else:
                             # Primitive value - keep as-is
                             normalized[key] = value
@@ -1400,9 +1369,7 @@ class ArgumentNormalizer:
                 pass
         return arguments
 
-    def _coerce_primitive_types(
-        self, arguments: Dict[str, Any], tool_name: str
-    ) -> Dict[str, Any]:
+    def _coerce_primitive_types(self, arguments: Dict[str, Any], tool_name: str) -> Dict[str, Any]:
         """
         Coerce string values to primitive types (int, float, bool) when appropriate.
 
@@ -1530,8 +1497,7 @@ class ArgumentNormalizer:
             Dictionary with normalization metrics
         """
         success_rate = (
-            (self.stats.total_calls - self.stats.failures)
-            / max(self.stats.total_calls, 1)
+            (self.stats.total_calls - self.stats.failures) / max(self.stats.total_calls, 1)
         ) * 100
 
         return {
