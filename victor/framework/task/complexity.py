@@ -51,6 +51,10 @@ from victor.classification import (
     get_pattern_matcher,
 )
 
+# Per-turn tool budgets are sourced from the framework-wide budget policy so the
+# complexity-derived budgets cannot drift away from BUDGET_LIMITS again.
+from victor.config.orchestrator_constants import BUDGET_LIMITS
+
 logger = logging.getLogger(__name__)
 
 
@@ -248,48 +252,58 @@ class ComplexityBudget:
         )
 
 
-# Single source of truth for all budget-related configs
+# Single source of truth for all budget-related configs.
+#
+# Tool budgets are derived from BUDGET_LIMITS (victor.config.orchestrator_constants)
+# so that the per-turn budget enforced by the chat/streaming path stays aligned with
+# the framework-wide budget policy. Previously these values were hardcoded small
+# numbers (MEDIUM=15, ANALYSIS=60) that had drifted away from BUDGET_LIMITS
+# (medium=50, analysis=500). A real multi-file analysis task classified as MEDIUM
+# would then exhaust its 15-call budget after a handful of `ls`/`read` calls and stop
+# before producing anything. The framework's design intent (documented on
+# BUDGET_LIMITS) is generous exploration bounded by task-completion detection, not by
+# tiny hard caps — so budgets are sourced from BUDGET_LIMITS to prevent re-drift.
 COMPLEXITY_BUDGETS: Dict[TaskComplexity, ComplexityBudget] = {
     TaskComplexity.SIMPLE: ComplexityBudget(
-        tool_budget=10,
-        max_turns=5,
-        max_continuation_requests=3,
-        timeout_seconds=60,
+        tool_budget=BUDGET_LIMITS.simple_task,  # 20
+        max_turns=10,
+        max_continuation_requests=4,
+        timeout_seconds=120,
         per_tool_timeout_seconds=15,
     ),
     TaskComplexity.MEDIUM: ComplexityBudget(
-        tool_budget=15,
-        max_turns=10,
-        max_continuation_requests=5,
-        timeout_seconds=120,
-        per_tool_timeout_seconds=30,
-    ),
-    TaskComplexity.COMPLEX: ComplexityBudget(
-        tool_budget=25,
+        tool_budget=BUDGET_LIMITS.medium_task,  # 50
         max_turns=20,
         max_continuation_requests=10,
         timeout_seconds=300,
-        per_tool_timeout_seconds=60,
+        per_tool_timeout_seconds=30,
     ),
-    TaskComplexity.GENERATION: ComplexityBudget(
-        tool_budget=10,
-        max_turns=5,
-        max_continuation_requests=3,
-        timeout_seconds=60,
-        per_tool_timeout_seconds=15,
-    ),
-    TaskComplexity.ACTION: ComplexityBudget(
-        tool_budget=50,
-        max_turns=30,
-        max_continuation_requests=15,
+    TaskComplexity.COMPLEX: ComplexityBudget(
+        tool_budget=BUDGET_LIMITS.complex_task,  # 100
+        max_turns=40,
+        max_continuation_requests=20,
         timeout_seconds=600,
         per_tool_timeout_seconds=60,
     ),
-    TaskComplexity.ANALYSIS: ComplexityBudget(
-        tool_budget=60,
-        max_turns=40,
-        max_continuation_requests=20,
+    TaskComplexity.GENERATION: ComplexityBudget(
+        tool_budget=BUDGET_LIMITS.simple_task,  # 20
+        max_turns=10,
+        max_continuation_requests=4,
+        timeout_seconds=120,
+        per_tool_timeout_seconds=15,
+    ),
+    TaskComplexity.ACTION: ComplexityBudget(
+        tool_budget=BUDGET_LIMITS.action_task,  # 200
+        max_turns=60,
+        max_continuation_requests=30,
         timeout_seconds=900,
+        per_tool_timeout_seconds=60,
+    ),
+    TaskComplexity.ANALYSIS: ComplexityBudget(
+        tool_budget=BUDGET_LIMITS.analysis_task,  # 500
+        max_turns=80,
+        max_continuation_requests=40,
+        timeout_seconds=1200,
         per_tool_timeout_seconds=60,
     ),
 }

@@ -72,6 +72,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from victor.config.orchestrator_constants import BUDGET_LIMITS
 from victor.core.schema import Tables
 
 logger = logging.getLogger(__name__)
@@ -515,18 +516,24 @@ class AdaptiveModeController:
         AgentMode.COMPLETE: [],
     }
 
-    # Default tool budgets by task type
+    # Default tool budgets by task type.
+    #
+    # Aligned with BUDGET_LIMITS / COMPLEXITY_BUDGETS so the RL-recommended budget
+    # path cannot collapse a real task to a handful of calls. These are the *defaults*
+    # consulted by get_optimal_tool_budget() before any learned override; previously
+    # they were tiny vestigial values (analyze=8, analysis_deep=15) that contradicted
+    # the framework-wide generous-exploration policy and could prematurely stop tasks.
     DEFAULT_TOOL_BUDGETS = {
-        "code_generation": 3,
-        "create_simple": 2,
-        "create": 5,
-        "edit": 5,
-        "search": 6,
-        "action": 10,
-        "analysis_deep": 15,
-        "analyze": 8,
-        "design": 20,
-        "general": 8,
+        "code_generation": BUDGET_LIMITS.simple_task,  # 20
+        "create_simple": BUDGET_LIMITS.simple_task,  # 20
+        "create": BUDGET_LIMITS.medium_task,  # 50
+        "edit": BUDGET_LIMITS.medium_task,  # 50
+        "search": BUDGET_LIMITS.medium_task,  # 50
+        "action": BUDGET_LIMITS.action_task,  # 200
+        "analysis_deep": BUDGET_LIMITS.analysis_task,  # 500
+        "analyze": BUDGET_LIMITS.complex_task,  # 100
+        "design": BUDGET_LIMITS.complex_task,  # 100
+        "general": BUDGET_LIMITS.medium_task,  # 50
     }
 
     # Provider-aware iteration thresholds for loop detection
