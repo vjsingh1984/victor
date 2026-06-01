@@ -690,8 +690,13 @@ class TestFulfillmentConfigWeights:
                 config=default_config,
             )
 
-            # Config with higher file_exists_weight
-            high_weight_config = FulfillmentConfig(file_exists_weight=0.9)
+            # Config with higher file_exists_weight (code-gen weights must sum to 1.0)
+            high_weight_config = FulfillmentConfig(
+                file_exists_weight=0.9,
+                syntax_valid_weight=0.04,
+                non_empty_weight=0.03,
+                pattern_weight=0.03,
+            )
             result_high = await strategy.check(
                 criteria={"file_path": path},
                 context={},
@@ -725,7 +730,12 @@ class TestFulfillmentConfigWeights:
 
                 return FulfillmentResult(status=FulfillmentStatus.FULFILLED, score=1.0)
 
-        config = FulfillmentConfig(file_exists_weight=0.42)
+        config = FulfillmentConfig(
+            file_exists_weight=0.42,
+            syntax_valid_weight=0.28,
+            non_empty_weight=0.15,
+            pattern_weight=0.15,
+        )
         detector = FulfillmentDetector(config=config)
         detector.register_strategy(TaskType.CODE_GENERATION, RecordingStrategy())
 

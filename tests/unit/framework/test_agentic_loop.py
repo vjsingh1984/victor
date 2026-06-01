@@ -1565,7 +1565,12 @@ class TestEvaluate:
         assert result.metadata["source"] == "enhanced"
         assert state["low_confidence_retries"] == 2
         assert state["_successful_tool_evidence"] is True
-        assert state["_force_synthesis_next"] is True
+        # `_force_synthesis_next` is intentionally NOT set here: forcing synthesis
+        # after every successful tool batch made the next turn answer the recovery
+        # prompt with tool-call pseudocode instead of a deliverable (see
+        # AgenticLoop._evaluate). The `_successful_tool_evidence` signal alone lets
+        # the loop synthesize at termination if no written answer was produced.
+        assert "_force_synthesis_next" not in state
 
     async def test_evaluate_does_not_treat_ls_only_as_successful_tool_progress(self):
         loop = AgenticLoop(
@@ -1606,9 +1611,19 @@ class TestEvaluate:
             orchestrator=MagicMock(),
             enable_fulfillment_check=False,
         )
+        # A real forced synthesis is accepted only when it looks like an actual
+        # deliverable: markdown structure plus substantive length. Short narration
+        # ("Now let me read X") is rejected so the model gets another turn.
         turn = TurnResult(
             response=CompletionResponse(
-                content="Cargo.toml defines the workspace members.",
+                content=(
+                    "# Workspace Overview\n\n"
+                    "Cargo.toml defines the workspace members and shared "
+                    "dependencies. The workspace groups the protocol, state, "
+                    "tools, edge-runtime, and python-bindings crates so they "
+                    "build together with a single lockfile and consistent "
+                    "dependency versions across the entire project tree."
+                ),
                 role="assistant",
                 metadata={"agentic_loop_synthesis": True},
             ),
