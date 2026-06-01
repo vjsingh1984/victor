@@ -811,7 +811,7 @@ class TurnExecutor:
         # Long instruction sets (synthesis prompts, init.md generation, etc.)
         # frequently mention "manifest" or "package layout" in passing while
         # actually asking for a written deliverable. The fast-path is only
-        # appropriate for short, focused plan steps like "review the Cargo.toml
+        # appropriate for short, focused plan steps like "review the build
         # manifest", not multi-paragraph instructions. If the prompt asks to
         # *produce* content (write/generate/synthesize/return markdown) or is
         # simply too long to be a single read step, fall through to the real

@@ -1788,6 +1788,7 @@ class ReadableTaskPlan(BaseModel):
 }
 
 ─── STEP TYPES (canonical names + common aliases) ────────────────────────────
+Canonical types: research, planning, feature, bugfix, refactor, test, review, deploy, analyze, doc
 • research    — investigate, analyze, review, doc, documentation, explore, inspect
 • planning    — plan, design, architect, strategy, conceptual
 • feature     — create, implement, new, add, write, generate, scaffold

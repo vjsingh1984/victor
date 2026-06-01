@@ -330,9 +330,16 @@ class TaskTypeRegistry:
         # Check vertical-specific first
         if vertical:
             vertical = vertical.lower()
-            if vertical in self._vertical_overrides:
-                if canonical in self._vertical_overrides[vertical]:
-                    return self._vertical_overrides[vertical][canonical]
+            overrides = self._vertical_overrides.get(vertical)
+            if overrides:
+                # Honor the exact registered name as well as the canonical form.
+                # Vertical overrides registered under an alias (e.g. "refactor",
+                # an alias of "edit") would otherwise be invisible because the
+                # lookup canonicalizes "refactor" -> "edit" before matching.
+                if task_type in overrides:
+                    return overrides[task_type]
+                if canonical in overrides:
+                    return overrides[canonical]
 
         # Fall back to core types
         return self._core_types.get(canonical)
@@ -510,6 +517,31 @@ class TaskTypeRegistry:
             <StepType.IMPLEMENTATION: 'implementation'>
         """
         from victor.agent.planning.base import StepType
+
+        # The ReadableTaskPlan vocabulary maps directly to planning step types and
+        # takes precedence over alias resolution, which is tuned for tool-budget
+        # categories and would otherwise collapse distinct planning steps (e.g.
+        # "review" -> "analyze" -> RESEARCH, or drop "planning"/"deploy"/"doc").
+        direct_step_map = {
+            "research": StepType.RESEARCH,
+            "planning": StepType.PLANNING,
+            "feature": StepType.IMPLEMENTATION,
+            "implementation": StepType.IMPLEMENTATION,
+            "bugfix": StepType.IMPLEMENTATION,
+            "refactor": StepType.IMPLEMENTATION,
+            "test": StepType.TESTING,
+            "testing": StepType.TESTING,
+            "review": StepType.REVIEW,
+            "deploy": StepType.DEPLOYMENT,
+            "deployment": StepType.DEPLOYMENT,
+            "analyze": StepType.RESEARCH,
+            "analysis": StepType.RESEARCH,
+            "doc": StepType.RESEARCH,
+            "documentation": StepType.RESEARCH,
+        }
+        direct = direct_step_map.get(task_type.lower().strip())
+        if direct is not None:
+            return direct
 
         # Resolve alias to canonical name
         canonical_name = self.resolve_alias(task_type)
