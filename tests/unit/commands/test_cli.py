@@ -916,7 +916,8 @@ class TestChatReplRendering:
             patch.object(
                 chat_module,
                 "_create_cli_prompt_session",
-                return_value=FakePromptSession(),
+                # _create_cli_prompt_session now returns (session, renderer_holder).
+                return_value=(FakePromptSession(), {"ref": None}),
             ),
             patch.object(chat_module.console, "print") as mock_print,
             patch(
@@ -974,7 +975,8 @@ class TestChatReplRendering:
                 patch.object(
                     chat_module,
                     "_create_cli_prompt_session",
-                    return_value=FakePromptSession(),
+                    # _create_cli_prompt_session now returns (session, renderer_holder).
+                    return_value=(FakePromptSession(), {"ref": None}),
                 ),
                 patch.object(chat_module.console, "print") as mock_print,
                 patch.object(

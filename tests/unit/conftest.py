@@ -33,7 +33,35 @@ import victor.agent.presentation  # noqa: F401 — populates sys.modules early
 import victor.agent.safety  # noqa: F401 — populates sys.modules early
 import victor.agent.background_agent  # noqa: F401 — populates sys.modules early
 
+# Ensure the real victor.framework.agent SUBMODULE is importable for patching.
+import victor.framework.agent  # noqa: E402,F401 — registers the submodule in sys.modules
+
 _UNIT_TEST_REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
+@pytest.fixture(autouse=True)
+def _stable_framework_agent_submodule():
+    """Pin ``victor.framework.agent`` (package attribute) to its real submodule.
+
+    ``victor.framework`` exposes BOTH a submodule ``agent`` (which defines class
+    ``Agent``) AND, via ``__getattr__``, a decorator alias ``agent`` that gets
+    cached into the package ``__dict__`` on first access. Once any test triggers
+    that alias, ``getattr(victor.framework, "agent")`` returns the decorator
+    function for the rest of the session, so unrelated tests that
+    ``patch("victor.framework.agent.Agent")`` fail with
+    "'victor.framework.agent' is not a package" (observed: test_decorators,
+    test_init_synthesizer fallback, test_cli — all order-dependent).
+
+    Re-pinning the package attribute to the submodule before each test makes the
+    patch target resolve deterministically. The ``@agent`` decorator is always
+    imported from ``victor.framework.decorators``, so this does not affect it.
+    """
+    submodule = sys.modules.get("victor.framework.agent")
+    if submodule is not None and getattr(submodule, "__name__", "") == "victor.framework.agent":
+        import victor.framework as _framework_pkg
+
+        _framework_pkg.__dict__["agent"] = submodule
+    yield
 
 
 def _safe_current_working_directory() -> Path:
