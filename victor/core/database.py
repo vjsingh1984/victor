@@ -441,6 +441,36 @@ class DatabaseConsolidator:
             target_conn.close()
 
 
+def _find_existing_project_dir(start: Path) -> Optional[Path]:
+    """Walk up from ``start`` to the nearest ancestor holding ``.victor/project.db``.
+
+    A project owns a single ``.victor/project.db`` at its root. Resolving a
+    subdirectory (e.g. ``src/network``) must therefore reuse the repository's
+    project database rather than fabricate a fresh empty one under the subdir.
+
+    Only an *existing* ``project.db`` is matched, so a brand-new project still
+    initializes in place. The search is bounded at the git repository root: it
+    never ascends past a directory that contains ``.git`` without first finding
+    a project database there.
+
+    Args:
+        start: Directory to begin the upward search from (already resolved).
+
+    Returns:
+        The ``.victor`` directory of the owning project, or ``None`` if no
+        existing project database is found within the bound.
+    """
+    for ancestor in (start, *start.parents):
+        victor_dir = ancestor / ".victor"
+        if (victor_dir / "project.db").exists():
+            return victor_dir
+        # Stop at the repository boundary: a subdir of a not-yet-indexed repo
+        # should initialize at the repo root via the caller, not somewhere above.
+        if (ancestor / ".git").exists():
+            break
+    return None
+
+
 def _normalize_project_database_paths(
     project_path: Optional[Path],
 ) -> tuple[Path, Path, Path]:
@@ -457,7 +487,11 @@ def _normalize_project_database_paths(
         project_dir = resolved
         db_path = project_dir / "project.db"
     else:
-        project_dir = resolved / ".victor"
+        # Prefer an existing project DB in an ancestor so subdirectory lookups
+        # resolve to the repository's single project.db instead of creating an
+        # empty DB (and stray ``.victor/`` dir) under the subdirectory.
+        existing = _find_existing_project_dir(resolved)
+        project_dir = existing if existing is not None else resolved / ".victor"
         db_path = project_dir / "project.db"
 
     project_root = project_dir.parent
@@ -1807,6 +1841,24 @@ def get_project_database(project_path: Optional[Path] = None) -> ProjectDatabase
     return _project_databases[project_key]
 
 
+def resolve_project_db_root(project_path: Optional[Path] = None) -> Path:
+    """Resolve the canonical project root that owns the project database.
+
+    Walks up from ``project_path`` (or cwd) to the repository's ``.victor``
+    project, so callers operating on a subdirectory get the single project-level
+    database root rather than the literal subpath. Falls back to the resolved
+    path itself when no existing project database is found (fresh project).
+
+    Args:
+        project_path: A path inside the project (file or directory). Defaults to cwd.
+
+    Returns:
+        The directory that holds (or will hold) ``.victor/project.db``.
+    """
+    project_root, _project_dir, _db_path = _normalize_project_database_paths(project_path)
+    return project_root
+
+
 def reset_database() -> None:
     """Reset the global database instance (for testing)."""
     global _database
@@ -1845,6 +1897,7 @@ __all__ = [
     "ProjectDatabaseManager",
     "get_database",
     "get_project_database",
+    "resolve_project_db_root",
     "reset_database",
     "reset_project_database",
     "reset_all_databases",
