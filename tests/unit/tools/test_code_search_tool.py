@@ -1951,13 +1951,14 @@ async def test_literal_search_filename_only_timeout_returns_friendly_error(
             filename_only=True,
         )
 
-    assert result == {
-        "success": False,
-        "error": "Filename search timed out after 15s",
-        "results": [],
-        "count": 0,
-        "mode": "filename",
-    }
+    # The filename-search timeout is env-overridable (default 45s) and the error
+    # message names the override knob for very large trees.
+    assert result["success"] is False
+    assert result["results"] == []
+    assert result["count"] == 0
+    assert result["mode"] == "filename"
+    assert result["error"].startswith("Filename search timed out after 45s")
+    assert "VICTOR_TIMEOUT_FILENAME_SEARCH" in result["error"]
 
 
 @pytest.mark.asyncio
