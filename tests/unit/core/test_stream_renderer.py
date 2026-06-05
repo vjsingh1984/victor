@@ -61,22 +61,31 @@ class TestFormatterRenderer:
         renderer.resume()
         mock_formatter.start_streaming.assert_called_once()
 
-    def test_on_tool_start_pauses_and_resumes(self, renderer, mock_formatter):
-        """Test on_tool_start() pauses, shows status, and resumes."""
+    def test_on_tool_start_records_and_delegates(self, renderer, mock_formatter):
+        """on_tool_start records tool info and delegates to formatter.tool_start.
+
+        It deliberately does NOT emit a separate "running" status line (the result
+        line covers it) — see FormatterRenderer.on_tool_start.
+        """
         renderer.on_tool_start("read", {"path": "/test.py"})
 
-        # Should pause, call tool_start, status, then resume
         mock_formatter.tool_start.assert_called_once_with("read", {"path": "/test.py"})
-        mock_formatter.status.assert_called_once()
-        assert "read" in mock_formatter.status.call_args[0][0]
-        mock_formatter.start_streaming.assert_called_once()
+        mock_formatter.status.assert_not_called()
+        assert renderer._last_tool_start == {
+            "name": "read",
+            "arguments": {"path": "/test.py"},
+        }
 
-    def test_on_tool_start_formats_display_name_in_status(self, renderer, mock_formatter):
-        """Tool start status uses lower-camel display formatting only for UI text."""
+    def test_on_tool_start_delegates_raw_name_without_status(self, renderer, mock_formatter):
+        """on_tool_start forwards the raw tool name and emits no status line.
+
+        Display-name formatting (e.g. codeSearch) is the formatter's concern, not
+        the renderer's.
+        """
         renderer.on_tool_start("code_search", {"query": "foo"})
 
         mock_formatter.tool_start.assert_called_once_with("code_search", {"query": "foo"})
-        mock_formatter.status.assert_called_once_with("🔧 Running codeSearch...")
+        mock_formatter.status.assert_not_called()
 
     def test_on_tool_result_success(self, renderer, mock_formatter):
         """Test on_tool_result() for successful tool execution."""
@@ -186,8 +195,8 @@ class TestFormatterRenderer:
         diff = "-old line\n+new line\n context"
         renderer.on_edit_preview("/test.py", diff)
 
-        # Should print path header and 3 diff lines
-        assert mock_console.print.call_count == 4
+        # render_edit_preview renders the whole diff as one consolidated panel.
+        assert mock_console.print.call_count == 1
         mock_formatter.start_streaming.assert_called_once()
 
     def test_on_content_accumulates(self, renderer, mock_formatter):
@@ -326,20 +335,23 @@ class TestLiveDisplayRenderer:
         assert mock_live.start.call_count == 2
 
     @patch("victor.ui.rendering.live_renderer.Live")
-    def test_on_tool_start_prints_running_feedback(self, mock_live_class, renderer, mock_console):
-        """Test on_tool_start() stores state and prints immediate running feedback."""
+    def test_on_tool_start_prints_starting_hint_for_slow_tools(
+        self, mock_live_class, renderer, mock_console
+    ):
+        """on_tool_start stores state, shows the Tool Execution section, and prints
+        a "starting…" hint for slow tools (fast tools stay silent until result)."""
         mock_live = MagicMock()
         mock_live_class.return_value = mock_live
 
         renderer.start()
-        renderer.on_tool_start("read", {"path": "/test.py"})
+        renderer.on_tool_start("code_search", {"query": "foo"})
 
         assert renderer._pending_tool is not None
-        assert renderer._pending_tool["name"] == "read"
-        assert renderer._pending_tool["arguments"] == {"path": "/test.py"}
+        assert renderer._pending_tool["name"] == "code_search"
+        assert renderer._pending_tool["arguments"] == {"query": "foo"}
         printed_calls = [str(call_args) for call_args in mock_console.print.call_args_list]
         assert any("Tool Execution" in call_str for call_str in printed_calls)
-        assert any("read" in call_str and "running" in call_str for call_str in printed_calls)
+        assert any("starting" in call_str for call_str in printed_calls)
 
     @patch("victor.ui.rendering.live_renderer.Live")
     def test_on_tool_result_success_prints_checkmark(self, mock_live_class, renderer, mock_console):
