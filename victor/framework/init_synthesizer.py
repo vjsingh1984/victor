@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import logging
+import os
 from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
@@ -22,12 +23,60 @@ logger = logging.getLogger(__name__)
 
 INIT_PROVIDER_TIMEOUT_SECONDS = 120
 INIT_PROVIDER_MAX_RETRIES = 0
+
+# Local providers run inference on the box; a large (~20K-char) synthesis prompt
+# to a big local model (e.g. a 31B) needs a generous budget or it times out and
+# silently drops to the template. Cloud providers respond faster.
+_LOCAL_INIT_PROVIDERS = frozenset(
+    {"ollama", "lmstudio", "llamacpp", "llama_cpp", "llama-cpp", "mlx", "vllm"}
+)
+
+
+def _init_provider_timeout(provider_name: str, configured: Optional[float] = None) -> int:
+    """Resolve the init-synthesis request timeout in seconds.
+
+    Honors ``VICTOR_INIT_SYNTH_TIMEOUT`` as an explicit override. Otherwise local
+    providers get a larger budget than cloud providers, and any timeout already
+    configured for the provider is never reduced.
+    """
+    override = os.environ.get("VICTOR_INIT_SYNTH_TIMEOUT")
+    if override:
+        try:
+            return max(1, int(float(override)))
+        except ValueError:
+            logger.debug("[init] Ignoring invalid VICTOR_INIT_SYNTH_TIMEOUT=%r", override)
+
+    base = 600 if (provider_name or "").lower() in _LOCAL_INIT_PROVIDERS else 300
+    if configured is not None:
+        try:
+            return max(int(float(configured)), base)
+        except (TypeError, ValueError):
+            return base
+    return base
+
+
+def _classify_init_failure(error: Exception) -> str:
+    """Return a short, log-friendly category for an init-synthesis failure.
+
+    Distinguishes timeout vs connection vs empty-output vs other so the template
+    fallback is explainable rather than a generic warning.
+    """
+    message = str(error).lower()
+    if "timed out" in message or "timeout" in message:
+        return "timeout"
+    if "connection" in message or "unavailable" in message or isinstance(error, OSError):
+        return "connection"
+    if "empty" in message:
+        return "empty_output"
+    if "rate" in message and "limit" in message:
+        return "rate_limit"
+    return type(error).__name__
+
+
 _ZAI_PROVIDER_ALIASES = frozenset(
     {"zai", "zhipu", "zhipuai", "zai-coding", "zai-coding-plan", "glm-coding"}
 )
-_ZAI_CODING_PROVIDER_ALIASES = frozenset(
-    {"zai-coding", "zai-coding-plan", "glm-coding"}
-)
+_ZAI_CODING_PROVIDER_ALIASES = frozenset({"zai-coding", "zai-coding-plan", "glm-coding"})
 
 
 @dataclass(frozen=True)
@@ -213,6 +262,248 @@ def _trim_to_first_markdown_heading(content: str) -> Optional[str]:
             elif stripped.startswith("##"):
                 return "".join(lines[idx:])
     return None
+
+
+# Signal phrases that indicate the model appended a self-reflective
+# postamble about tool availability instead of just returning the doc.
+# Matched case-insensitively against the trailing prose block only —
+# never against content inside the document body.
+_META_COMMENTARY_SIGNALS = (
+    "no write",
+    "no edit",
+    "no file-write",
+    "write tool",
+    "edit tool",
+    "write/edit",
+    "file-write",
+    "registered toolset",
+    "registered tool set",
+    "tool access",
+    "tool with file-write",
+    "tool with write",
+    "cannot be persisted",
+    "cannot be saved",
+    "cannot write to",
+    "lack the ability",
+    "lack write",
+    "i don't have",
+    "i do not have",
+    "i was unable",
+    "needs to be saved",
+    "save this output",
+    "save the file",
+    "save this file",
+    "ready to be written",
+)
+
+
+# Signal phrases that indicate the model emitted a chat-style recap
+# INSTEAD of the actual init.md document (typically because the agentic
+# loop ran extra iterations after the deliverable was already produced
+# in an earlier turn).
+_LEADING_META_COMMENTARY_SIGNALS = (
+    "already generated",
+    "already wrote",
+    "already written",
+    "already created",
+    "previous turn",
+    "earlier turn",
+    "task is complete",
+    "task complete",
+    "i have generated",
+    "i've generated",
+    "i have created",
+    "i've created",
+    "i have written",
+    "i've written",
+    "verified through tool calls",
+    "all claims verified",
+    "claims verified",
+    "here is the init",
+    "here's the init",
+    "below is the init",
+    "writing the init.md",
+    "let me write",
+    "i'll write",
+    "i will write",
+    "i'll generate",
+    "i will generate",
+    "now i'll",
+    "now i will",
+    "generated `.victor/init.md`",
+    "generated .victor/init.md",
+)
+
+
+def _is_numbered_list_item(stripped: str) -> bool:
+    """Return True if ``stripped`` starts with ``N. `` / ``NN. `` / ``NNN. ``."""
+    dot_idx = stripped.find(". ")
+    if dot_idx < 1 or dot_idx > 3:
+        return False
+    return stripped[:dot_idx].isdigit()
+
+
+def _strip_leading_meta_commentary(content: str) -> str:
+    """Trim a leading self-reflective preamble before the document body.
+
+    Observed leak (2026-05-28): the agentic synthesis loop ran extra
+    iterations after the model had already produced the real init.md in
+    an earlier turn. The final assistant message — which is what gets
+    persisted — was a chat-style recap like::
+
+        The init.md document was already generated and output in my
+        previous turn. The task is complete.
+
+        Generated `.victor/init.md` with all claims verified through
+        tool calls:
+
+        1. **Cargo.toml** — verified version `0.2.0`, ...
+        2. **Makefile** — verified all build/test/benchmark commands
+        ...
+
+    Because the recap has no markdown headings,
+    ``_trim_to_first_markdown_heading`` can't find a trim point and the
+    recap gets persisted as the saved file.
+
+    Strategy: walk forward over leading paragraphs (separated by blank
+    lines). Drop a paragraph if it is plain prose AND contains any
+    leading-meta signal phrase. After dropping >=1 prose paragraph,
+    also drop a directly-following numbered list where every item
+    matches a "verification" pattern. Stops at the first markdown
+    heading or non-meta content paragraph.
+
+    Conservative on purpose: only trims LEADING content, never anything
+    after real document structure has started.
+    """
+    if not content:
+        return content
+    lines = content.splitlines()
+    trimmed_any = False
+    while True:
+        # Drop leading blank lines.
+        while lines and not lines[0].strip():
+            lines.pop(0)
+        if not lines:
+            break
+        # If we hit a markdown heading, the document body has started.
+        first_stripped = lines[0].lstrip()
+        if first_stripped.startswith("#"):
+            break
+        # Find the end of the first paragraph (next blank line, or EOF).
+        para_end = len(lines)
+        for idx in range(len(lines)):
+            if not lines[idx].strip():
+                para_end = idx
+                break
+        paragraph_lines = lines[:para_end]
+        non_blank_lines = [ln for ln in paragraph_lines if ln.strip()]
+        if not non_blank_lines:
+            break
+        # Case 1: a numbered list (e.g. "1. **Cargo.toml** — verified ...").
+        # Only treated as recap when we've already stripped a prose
+        # paragraph above it AND every item looks like a verification
+        # entry. Otherwise it's real content (numbered list of facts).
+        if all(_is_numbered_list_item(ln.lstrip()) for ln in non_blank_lines):
+            if trimmed_any and all(
+                ("verified" in ln.lower() or " — " in ln or " - " in ln) for ln in non_blank_lines
+            ):
+                del lines[:para_end]
+                trimmed_any = True
+                continue
+            break
+        # Case 2: plain prose paragraph. Reject if any line has markdown
+        # structure (heading, list, table, blockquote, code fence).
+        if any(
+            ln.lstrip().startswith(("#", "- ", "* ", "+ ", "> ", "| ", "```"))
+            for ln in paragraph_lines
+        ):
+            break
+        lowered = "\n".join(paragraph_lines).lower()
+        if not any(sig in lowered for sig in _LEADING_META_COMMENTARY_SIGNALS):
+            break
+        del lines[:para_end]
+        trimmed_any = True
+    result = "\n".join(lines)
+    if trimmed_any and content.endswith("\n") and not result.endswith("\n"):
+        result += "\n"
+    return result
+
+
+def _strip_trailing_meta_commentary(content: str) -> str:
+    """Trim a trailing self-reflective paragraph about tool availability.
+
+    Observed leak (2026-05-27): the synthesis agent emitted the full
+    init.md, then appended a paragraph like "No write/edit tool
+    available in the registered toolset — the file content above is
+    ready to be written..." which got persisted verbatim into the saved
+    file because nothing in the cleanup chain looks at the tail.
+
+    Strategy: walk from the end of the document backward over blank
+    lines and a single trailing paragraph. If that paragraph is plain
+    prose (no markdown structure markers — no leading ``#``, ``-``,
+    ``*``, ``|``, ``>``, ``    `` code indent, no fence) and contains
+    any of the meta-commentary signal phrases, trim it plus its
+    leading separator blank lines. Repeat for stacked paragraphs.
+
+    Conservative on purpose: only trims trailing PROSE, never lines
+    that look like document content. A user-written ``## Tool
+    Availability`` section with prose underneath stays intact because
+    the trim stops at the preceding heading.
+    """
+    if not content:
+        return content
+    lines = content.splitlines()
+    trimmed_any = False
+    while True:
+        # Drop trailing blanks
+        while lines and not lines[-1].strip():
+            lines.pop()
+        if not lines:
+            break
+        # Find the start of the trailing paragraph (back to a blank
+        # line or to a markdown-structure line — whichever comes first).
+        para_start = len(lines)
+        for idx in range(len(lines) - 1, -1, -1):
+            line = lines[idx]
+            stripped = line.lstrip()
+            if not stripped:
+                para_start = idx + 1
+                break
+            # Hit a markdown structure line — paragraph starts after it.
+            if (
+                stripped.startswith("#")
+                or stripped.startswith("- ")
+                or stripped.startswith("* ")
+                or stripped.startswith("+ ")
+                or stripped.startswith("> ")
+                or stripped.startswith("| ")
+                or stripped.startswith("|-")
+                or stripped.startswith("```")
+                or (len(line) >= 4 and line[:4] == "    ")
+                or (stripped[:2].isdigit() and ". " in stripped[:5])
+            ):
+                para_start = idx + 1
+                break
+            para_start = idx
+        if para_start >= len(lines):
+            # No trailing prose paragraph found.
+            break
+        paragraph = "\n".join(lines[para_start:])
+        # Don't trim if the paragraph itself contains markdown structure.
+        if any(
+            ln.lstrip().startswith(("#", "- ", "* ", "+ ", "> ", "| ", "```"))
+            for ln in lines[para_start:]
+        ):
+            break
+        lowered = paragraph.lower()
+        if not any(sig in lowered for sig in _META_COMMENTARY_SIGNALS):
+            break
+        del lines[para_start:]
+        trimmed_any = True
+    result = "\n".join(lines)
+    if trimmed_any and content.endswith("\n"):
+        result += "\n"
+    return result
 
 
 def _format_graph_context_for_prompt(graph_context: dict) -> str:
@@ -413,6 +704,14 @@ content starting with ``# init.md``. Do NOT produce narrative text like
 blocks — narration without an actual function call is treated as a
 finished answer by the runtime and the document never gets written.
 
+How persistence works: your final assistant message IS the saved
+``.victor/init.md`` file. The runtime captures that message verbatim
+and writes it to disk for you. Write/edit/shell tools are
+intentionally disabled for this task. Do NOT attempt to call them, and
+do NOT add a postamble explaining what tools were or weren't available
+— any prose appended after the last markdown section gets written into
+the file as visible junk.
+
 Rules:
 1. The "Measured Project Scale" section below is ground truth. Quote
    those numbers verbatim. If your draft references a count not listed
@@ -421,7 +720,11 @@ Rules:
    only.
 3. Target 100-180 lines. Use Markdown tables for structured data.
 4. Return ONLY the init.md markdown content (start with ``# init.md``),
-   no preamble, no postamble, no commentary.
+   no preamble, no postamble, no commentary. Do NOT wrap the document
+   in a ``` ```markdown ... ``` ``` fence. Do NOT add a closing note
+   about tool availability, file-saving, or what you would have done
+   differently — the last line of your response must be the last line
+   of the document.
 
 ---
 
@@ -594,9 +897,7 @@ class InitSynthesizer:
         if agent:
             return await self._run_with_orchestrator(agent, prompt)
         else:
-            return await self._run_with_fresh_agent(
-                prompt, resolved_provider, resolved_model
-            )
+            return await self._run_with_fresh_agent(prompt, resolved_provider, resolved_model)
 
     async def synthesize_with_tools(
         self,
@@ -717,18 +1018,62 @@ class InitSynthesizer:
                 _trimmed = _trim_to_first_markdown_heading(content)
                 if _trimmed is not None:
                     content = _trimmed
-                return self._clean(content)
+                # Strip a chat-style leading recap that has no markdown
+                # heading at all (so the previous step couldn't help).
+                # Observed when the agentic loop runs extra iterations
+                # after the deliverable was already produced — the model
+                # responds "the init.md was already generated... " in
+                # the final turn and that recap gets persisted.
+                _pre_trim = _strip_leading_meta_commentary(content)
+                if _pre_trim != content:
+                    logger.info(
+                        "[init] trimmed leading meta-commentary from "
+                        "agentic synthesis output (%d -> %d chars)",
+                        len(content),
+                        len(_pre_trim),
+                    )
+                    content = _pre_trim
+                # Strip any trailing self-reflective paragraph the model
+                # may have appended about tool availability / inability
+                # to save the file. Observed leak: agent emitted full
+                # init.md then a "No write/edit tool available …" coda
+                # that got persisted verbatim into the saved doc.
+                _post_trim = _strip_trailing_meta_commentary(content)
+                if _post_trim != content:
+                    logger.info(
+                        "[init] trimmed trailing meta-commentary from "
+                        "agentic synthesis output (%d -> %d chars)",
+                        len(content),
+                        len(_post_trim),
+                    )
+                    content = _post_trim
+                cleaned = self._clean(content)
+                # Sanity check: if the cleaned output has no markdown
+                # headings, the model didn't produce a real document
+                # (typically a recap-only final turn). Returning the
+                # recap would persist chat junk into ``.victor/init.md``
+                # (and worse, init.py then appends synthetic sections
+                # like "## Architecture Patterns" AFTER the junk, making
+                # it look almost-real). Treat as failed synthesis so the
+                # caller falls back to base content.
+                if cleaned and not self._has_document_structure(cleaned):
+                    logger.warning(
+                        "[init] agentic synthesis produced no markdown "
+                        "structure (chars=%d, lines=%d); treating as "
+                        "failed synthesis. First 200 chars: %r",
+                        len(cleaned),
+                        cleaned.count("\n") + 1,
+                        cleaned[:200],
+                    )
+                    return ""
+                return cleaned
             except Exception as e:
                 logger.warning("Init synthesis with tools failed: %s", e)
                 return ""
         else:
-            return await self._run_agent_with_tools(
-                prompt, provider, model, vertical="coding"
-            )
+            return await self._run_agent_with_tools(prompt, provider, model, vertical="coding")
 
-    async def _run_with_orchestrator(
-        self, agent: "AgentOrchestrator", prompt: str
-    ) -> str:
+    async def _run_with_orchestrator(self, agent: "AgentOrchestrator", prompt: str) -> str:
         """Run synthesis using an existing orchestrator or framework Agent.
 
         Handles two agent types:
@@ -776,9 +1121,7 @@ class InitSynthesizer:
             # 3. Last resort: fall back to agent.chat() for slash command contexts where
             #    the orchestrator's provider attribute may not be directly accessible.
             if inspect.iscoroutinefunction(getattr(agent, "chat", None)):
-                logger.debug(
-                    "[init] No direct provider found, falling back to agent.chat()"
-                )
+                logger.debug("[init] No direct provider found, falling back to agent.chat()")
                 response = await agent.chat(prompt)
                 content = response.content if response else ""
                 return self._clean(content)
@@ -865,9 +1208,7 @@ class InitSynthesizer:
 
         settings = load_settings()
         provider_settings = getattr(settings, "provider", None)
-        profiles = (
-            settings.load_profiles() if hasattr(settings, "load_profiles") else {}
-        )
+        profiles = settings.load_profiles() if hasattr(settings, "load_profiles") else {}
 
         resolved_provider: Optional[str] = None
         resolved_model = model
@@ -882,9 +1223,7 @@ class InitSynthesizer:
                 resolved_model = getattr(requested_profile, "model", None)
 
         if resolved_provider is None:
-            default_profile = (
-                profiles.get("default") if isinstance(profiles, dict) else None
-            )
+            default_profile = profiles.get("default") if isinstance(profiles, dict) else None
             profile_provider = getattr(default_profile, "provider", None)
             profile_model = getattr(default_profile, "model", None)
             resolved_provider = (
@@ -909,9 +1248,7 @@ class InitSynthesizer:
         provider_key_lower = provider_key.lower()
         requested_key = str(requested_provider or provider_key).lower()
 
-        canonical_provider = (
-            "zai" if provider_key_lower in _ZAI_PROVIDER_ALIASES else provider_key
-        )
+        canonical_provider = "zai" if provider_key_lower in _ZAI_PROVIDER_ALIASES else provider_key
         provider_init_model = resolved_model
         if canonical_provider == "zai":
             if (
@@ -941,18 +1278,16 @@ class InitSynthesizer:
         ``Settings.get_provider_settings(...)`` instead of reconstructing just
         provider/model manually.
         """
-        effective_provider = (
-            getattr(profile, "provider", None) or requested_profile_name
-        )
+        effective_provider = getattr(profile, "provider", None) or requested_profile_name
         request_model = model_override or getattr(profile, "model", None)
         temperature = float(getattr(profile, "temperature", 0.7) or 0.7)
         max_tokens = int(getattr(profile, "max_tokens", 4096) or 4096)
         profile_extras = dict(getattr(profile, "__pydantic_extra__", {}) or {})
 
-        provider_kwargs = dict(
-            settings.get_provider_settings(effective_provider, profile_extras)
+        provider_kwargs = dict(settings.get_provider_settings(effective_provider, profile_extras))
+        provider_kwargs["timeout"] = _init_provider_timeout(
+            str(effective_provider), provider_kwargs.get("timeout")
         )
-        provider_kwargs.setdefault("timeout", INIT_PROVIDER_TIMEOUT_SECONDS)
         provider_kwargs["max_retries"] = INIT_PROVIDER_MAX_RETRIES
 
         return InitProviderBootstrap(
@@ -978,9 +1313,7 @@ class InitSynthesizer:
         from victor.config.settings import load_settings
 
         settings = load_settings()
-        profiles = (
-            settings.load_profiles() if hasattr(settings, "load_profiles") else {}
-        )
+        profiles = settings.load_profiles() if hasattr(settings, "load_profiles") else {}
 
         requested_profile = None
         requested_profile_name: Optional[str] = None
@@ -989,9 +1322,7 @@ class InitSynthesizer:
             requested_profile_name = provider if requested_profile is not None else None
         elif provider is None and isinstance(profiles, dict):
             requested_profile = profiles.get("default")
-            requested_profile_name = (
-                "default" if requested_profile is not None else None
-            )
+            requested_profile_name = "default" if requested_profile is not None else None
 
         if requested_profile is not None and requested_profile_name is not None:
             return InitSynthesizer._build_profile_bootstrap(
@@ -1011,17 +1342,16 @@ class InitSynthesizer:
         profile_overrides: dict[str, Any] = {}
         if canonical_provider == "zai" and (
             requested_key in _ZAI_CODING_PROVIDER_ALIASES
-            or (
-                provider_init_model is not None
-                and provider_init_model.endswith(":coding")
-            )
+            or (provider_init_model is not None and provider_init_model.endswith(":coding"))
         ):
             profile_overrides["coding_plan"] = True
 
         provider_kwargs = dict(
             settings.get_provider_settings(canonical_provider, profile_overrides)
         )
-        provider_kwargs.setdefault("timeout", INIT_PROVIDER_TIMEOUT_SECONDS)
+        provider_kwargs["timeout"] = _init_provider_timeout(
+            str(canonical_provider), provider_kwargs.get("timeout")
+        )
         provider_kwargs["max_retries"] = INIT_PROVIDER_MAX_RETRIES
         if provider_init_model is not None and (
             provider_init_model != resolved_model or ":" in provider_init_model
@@ -1042,11 +1372,9 @@ class InitSynthesizer:
         model: Optional[str],
     ) -> tuple[str, Optional[str]]:
         """Resolve canonical provider/model using profile-aware init routing rules."""
-        resolved_provider, resolved_model, _ = (
-            InitSynthesizer._resolve_provider_request(
-                provider,
-                model,
-            )
+        resolved_provider, resolved_model, _ = InitSynthesizer._resolve_provider_request(
+            provider,
+            model,
         )
         return resolved_provider, resolved_model
 
@@ -1064,13 +1392,9 @@ class InitSynthesizer:
 
         settings = load_settings()
         provider_settings = getattr(settings, "provider", None)
-        profiles = (
-            settings.load_profiles() if hasattr(settings, "load_profiles") else {}
-        )
+        profiles = settings.load_profiles() if hasattr(settings, "load_profiles") else {}
 
-        default_profile = (
-            profiles.get("default") if isinstance(profiles, dict) else None
-        )
+        default_profile = profiles.get("default") if isinstance(profiles, dict) else None
         if getattr(default_profile, "provider", None) == "ollama":
             return "ollama", getattr(default_profile, "model", None)
 
@@ -1102,23 +1426,40 @@ class InitSynthesizer:
         failed_model: Optional[str],
         error: Exception,
     ) -> Optional[str]:
-        """Retry init synthesis with local Ollama once after remote rate limiting."""
-        from victor.core.errors import ProviderRateLimitError
+        """Retry init synthesis with a local model once after a recoverable remote failure.
 
-        if not isinstance(error, ProviderRateLimitError):
+        Triggers on rate limiting, timeouts, and connection errors — a slow or
+        throttled *cloud* provider can fall back to local Ollama. A local provider
+        that itself times out resolves to no fallback (the excluded provider is
+        the only local one), so the caller degrades to the template instead.
+        """
+        from victor.core.errors import ProviderError, ProviderRateLimitError
+
+        try:
+            from victor.core.errors import ProviderTimeoutError
+        except Exception:  # pragma: no cover - defensive import
+            ProviderTimeoutError = ()  # type: ignore[assignment, misc]
+
+        recoverable = isinstance(error, (ProviderRateLimitError, ProviderTimeoutError))
+        # Bare connection/timeout errors surface as ProviderError or OSError.
+        if not recoverable and isinstance(error, (ProviderError, OSError, TimeoutError)):
+            message = str(error).lower()
+            recoverable = any(
+                token in message for token in ("timed out", "timeout", "connection", "unavailable")
+            )
+        if not recoverable:
             return None
 
-        fallback = self._resolve_local_fallback_selection(
-            exclude_provider=failed_provider
-        )
+        fallback = self._resolve_local_fallback_selection(exclude_provider=failed_provider)
         if fallback is None:
             return None
 
         fallback_provider, fallback_model = fallback
         logger.warning(
-            "[init] Provider %s/%s exhausted; retrying synthesis with local fallback %s/%s",
+            "[init] Provider %s/%s failed (%s); retrying synthesis with local fallback %s/%s",
             failed_provider,
             failed_model,
+            type(error).__name__,
             fallback_provider,
             fallback_model,
         )
@@ -1149,9 +1490,7 @@ class InitSynthesizer:
 
         from victor.providers.base import Message
 
-        provider_name = getattr(
-            provider_instance, "name", type(provider_instance).__name__
-        )
+        provider_name = getattr(provider_instance, "name", type(provider_instance).__name__)
         resolved_provider = provider_name
         resolved_model = model
         if provider_name == "ollama":
@@ -1237,9 +1576,7 @@ class InitSynthesizer:
                 **bootstrap.provider_init_kwargs,
             )
             if not provider_instance:
-                raise RuntimeError(
-                    f"Could not create provider {bootstrap.provider_name}"
-                )
+                raise RuntimeError(f"Could not create provider {bootstrap.provider_name}")
 
             model = await self._preflight_provider(
                 bootstrap.provider_name,
@@ -1269,9 +1606,7 @@ class InitSynthesizer:
             if model is not None:
                 chat_kwargs["model"] = model
             try:
-                response = await provider_instance.chat(
-                    messages=messages, **chat_kwargs
-                )
+                response = await provider_instance.chat(messages=messages, **chat_kwargs)
             except Exception as exc:
                 if allow_local_fallback:
                     fallback_result = await self._maybe_retry_with_local_fallback(
@@ -1355,7 +1690,11 @@ class InitSynthesizer:
 
             return result
         except Exception as e:
-            logger.warning("Init synthesis via provider failed: %s", e)
+            logger.warning(
+                "Init synthesis via provider failed [%s]: %s — falling back to template",
+                _classify_init_failure(e),
+                e,
+            )
             raise
         finally:
             if provider_instance is not None:
@@ -1390,15 +1729,73 @@ class InitSynthesizer:
             return ""
 
     @staticmethod
+    def _has_document_structure(content: str) -> bool:
+        """True if content contains at least one markdown heading.
+
+        Used as a sanity check after cleanup — synthesis output that
+        survived the trim helpers but has no headings at all is almost
+        certainly a chat-style recap, not a real init.md document.
+        """
+        for line in content.splitlines():
+            stripped = line.lstrip()
+            if stripped.startswith("#"):
+                # Require ``# `` / ``## `` etc. — at least one space
+                # after the leading hashes to count as a heading.
+                hashes = 0
+                while hashes < len(stripped) and stripped[hashes] == "#":
+                    hashes += 1
+                if hashes < len(stripped) and stripped[hashes] in (" ", "\t"):
+                    return True
+        return False
+
+    @staticmethod
     def _clean(content: str) -> str:
-        """Clean LLM output — strip code fences, validate markdown."""
+        """Clean LLM output — strip code fences and meta-commentary.
+
+        Four things get trimmed here, in order:
+
+        1. A wrapping ``` ```markdown … ``` ``` fence (model occasionally
+           wraps the whole doc in a single fenced block).
+        2. A leading chat-style recap before the first heading (see
+           ``_strip_leading_meta_commentary``).
+        3. A trailing self-reflective paragraph about tool availability
+           or inability to save the file (see
+           ``_strip_trailing_meta_commentary``).
+        4. An orphan trailing ``` ``` ``` line on its own — happens when
+           the preamble trim earlier in the pipeline ate the opening
+           fence but the closing fence survived because the model
+           appended postamble text after it.
+        """
         content = content.strip()
         if content.startswith("```"):
             lines = content.split("\n")
             lines = lines[1:] if lines[0].startswith("```") else lines
             lines = lines[:-1] if lines and lines[-1].strip() == "```" else lines
-            content = "\n".join(lines)
-        return content
+            content = "\n".join(lines).strip()
+        # Leading meta-commentary trim catches recap-only outputs that
+        # the earlier first-heading trim couldn't (because the recap
+        # contains no headings to anchor on). Runs before the trailing
+        # trim so signal-phrase detection doesn't accidentally fire on
+        # body text below.
+        content = _strip_leading_meta_commentary(content)
+        # Order matters: trim meta-commentary BEFORE stripping orphan
+        # trailing fences, because the meta paragraph often sits AFTER
+        # the orphan fence. Stripping the fence first wouldn't help
+        # since the paragraph below it survives, and stripping meta
+        # first exposes the orphan fence so the next step can drop it.
+        content = _strip_trailing_meta_commentary(content)
+        # Even if the opening fence was already trimmed (e.g. by the
+        # preamble-trim path that jumps to the first ``# `` heading),
+        # the closing fence may still be sitting on a line by itself
+        # in the tail. Drop trailing blanks + fences, alternating, so
+        # we handle ``...\n```\n\n``` patterns too.
+        lines = content.splitlines()
+        while lines and (
+            not lines[-1].strip() or lines[-1].strip() in ("```", "```markdown", "```md")
+        ):
+            lines.pop()
+        content = "\n".join(lines)
+        return content.strip()
 
     async def _pre_synthesis_discovery(
         self, agent: Optional["AgentOrchestrator"] = None
@@ -1429,9 +1826,7 @@ class InitSynthesizer:
                 if coupling_result["success"] and coupling_result["result"]["results"]:
                     discovery_lines.append("### Highly Coupled Modules (Fan-in)")
                     for row in coupling_result["result"]["results"]:
-                        discovery_lines.append(
-                            f"- {row['dst']} ({row['count']} importers)"
-                        )
+                        discovery_lines.append(f"- {row['dst']} ({row['count']} importers)")
                     discovery_lines.append("")
             except Exception:
                 pass
@@ -1451,9 +1846,7 @@ class InitSynthesizer:
                 if size_result["success"] and size_result["result"]["results"]:
                     discovery_lines.append("### Module Implementation Depth")
                     for row in size_result["result"]["results"]:
-                        discovery_lines.append(
-                            f"- {row['file']} ({row['count']} symbols)"
-                        )
+                        discovery_lines.append(f"- {row['file']} ({row['count']} symbols)")
                     discovery_lines.append("")
             except Exception:
                 pass
@@ -1471,9 +1864,7 @@ class InitSynthesizer:
                         semantic_result["success"]
                         and semantic_result["result"]["potential_relationships"]
                     ):
-                        discovery_lines.append(
-                            f"### Semantic Relationships for '{top_hub}'"
-                        )
+                        discovery_lines.append(f"### Semantic Relationships for '{top_hub}'")
                         for rel in semantic_result["result"]["potential_relationships"]:
                             discovery_lines.append(
                                 f"- {rel['name']} ({rel['file']}) - score: {rel['similarity']}"
@@ -1521,9 +1912,7 @@ class InitSynthesizer:
             length_score = 0.3
 
         # Combined quality score
-        quality_score = (
-            section_score * 0.6 + length_score * 0.2 + (0.2 if result else 0.0)
-        )
+        quality_score = section_score * 0.6 + length_score * 0.2 + (0.2 if result else 0.0)
 
         usage.log_event(
             "init_quality",
@@ -1598,9 +1987,7 @@ class InitSynthesizer:
                     if len(text) > 1500:
                         trimmed += "\n... (truncated)"
                     enrichments.append(f"## README (first 1500 chars)\n\n{trimmed}")
-                    logger.info(
-                        "[init] Enriched with %s (%d chars)", name, len(trimmed)
-                    )
+                    logger.info("[init] Enriched with %s (%d chars)", name, len(trimmed))
                     break
                 except Exception:
                     pass
@@ -1649,12 +2036,8 @@ class InitSynthesizer:
                     trimmed = text[:1500]
                     if len(text) > 1500:
                         trimmed += "\n... (truncated)"
-                    enrichments.append(
-                        f"## Build Manifest ({name})\n\n```\n{trimmed}\n```"
-                    )
-                    logger.info(
-                        "[init] Enriched with %s (%d chars)", name, len(trimmed)
-                    )
+                    enrichments.append(f"## Build Manifest ({name})\n\n```\n{trimmed}\n```")
+                    logger.info("[init] Enriched with %s (%d chars)", name, len(trimmed))
                     break
                 except Exception:
                     pass
@@ -1672,9 +2055,7 @@ class InitSynthesizer:
                 try:
                     snippet = reader(path)
                     if snippet:
-                        enrichments.append(
-                            f"## Task Runner ({name})\n\n```\n{snippet}\n```"
-                        )
+                        enrichments.append(f"## Task Runner ({name})\n\n```\n{snippet}\n```")
                         logger.info("[init] Enriched with %s", name)
                     break
                 except Exception:
@@ -1750,8 +2131,7 @@ class InitSynthesizer:
             )
             if rec and rec.confidence > 0.6 and not rec.is_baseline:
                 logger.info(
-                    "Using GEPA-evolved init rules "
-                    "(gen=%s, confidence=%.2f, %d chars)",
+                    "Using GEPA-evolved init rules " "(gen=%s, confidence=%.2f, %d chars)",
                     rec.reason,
                     rec.confidence,
                     len(rec.value),
