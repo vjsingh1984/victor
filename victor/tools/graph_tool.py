@@ -471,6 +471,30 @@ def _normalize_relpath(file_path: str) -> str:
     return file_path.replace("\\", "/").strip()
 
 
+# Directory-module index filenames whose parent dir names the module
+# (e.g. ``src/network/mod.rs`` -> module ``src/network``).
+_MODULE_INDEX_STEMS = ("/mod", "/__init__", "/index")
+
+
+def _module_path_stem(file_path: str) -> str:
+    """Return a file path with its extension and directory-module suffix removed.
+
+    Used to match Python/dotted-style module references (``src.network``) against
+    real file nodes regardless of language extension:
+      ``src/network/multi_server.rs`` -> ``src/network/multi_server``
+      ``src/network/mod.rs``          -> ``src/network``
+      ``src/lib.rs``                  -> ``src/lib``
+    """
+    normalized = _normalize_relpath(file_path)
+    suffix = Path(normalized).suffix
+    if suffix:
+        normalized = normalized[: -len(suffix)]
+    for tail in _MODULE_INDEX_STEMS:
+        if normalized.endswith(tail):
+            return normalized[: -len(tail)]
+    return normalized
+
+
 def _project_graph_watch_daemon_active(root_path: Path) -> bool:
     """Return True when a project-scoped graph-watch daemon is alive."""
     pid_file = get_project_paths(root_path).project_victor_dir / "graph-watch.pid"
@@ -766,16 +790,22 @@ def _build_graph_error_follow_up_suggestions(
         )
 
     if search_seed:
+        # Dotted module references (``src.network.multi_server``) rarely match
+        # path-based file nodes; seed the search with a path-style variant so the
+        # follow-up actually resolves on non-Python repos.
+        search_query = search_seed
+        if "." in search_seed and "/" not in search_seed and ":" not in search_seed:
+            search_query = search_seed.replace(".", "/")
         suggestions.append(
             _build_follow_up_suggestion(
                 "graph",
                 {
                     "mode": "search",
-                    "query": search_seed,
+                    "query": search_query,
                     "path": path,
                     "top_k": effective_top_k,
                 },
-                f'Search the graph index for matches to "{search_seed}".',
+                f'Search the graph index for matches to "{search_query}".',
             )
         )
     elif not suggestions:
@@ -971,6 +1001,9 @@ class GraphAnalyzer:
                     candidates.append(node.node_id)
 
         if not candidates:
+            candidates.extend(self._resolve_dotted_reference(normalized, lowered=lowered))
+
+        if not candidates:
             return None
 
         def _score(node_id: str) -> tuple[int, int, str]:
@@ -1020,6 +1053,35 @@ class GraphAnalyzer:
         else:
             matches.sort()
         return matches
+
+    def _resolve_dotted_reference(self, normalized: str, *, lowered: str) -> List[str]:
+        """Resolve Python/dotted module references against path-based file nodes.
+
+        Models frequently address files with dotted module syntax
+        (``src.network.multi_server``) even in non-Python repos where the graph
+        stores path-based file nodes (``src/network/multi_server.rs``). Convert
+        the dotted reference to a slashed stem and match file nodes
+        language-agnostically; fall back to the last segment as a symbol name.
+        """
+        if "." not in normalized or "/" in normalized or ":" in normalized:
+            return []
+
+        slashed = _normalize_relpath(normalized.replace(".", "/"))
+        if not slashed:
+            return []
+
+        candidates: List[str] = []
+        for file_path, node_ids in self._file_index.items():
+            stem = _module_path_stem(file_path)
+            if stem == slashed or stem.endswith("/" + slashed):
+                candidates.extend(node_ids)
+
+        if not candidates:
+            last_segment = normalized.rsplit(".", 1)[-1].strip().lower()
+            if last_segment and last_segment != lowered:
+                candidates.extend(self._name_index.get(last_segment, ()))
+
+        return candidates
 
     def search(
         self,
@@ -2094,21 +2156,32 @@ def _build_degree_centrality_from_project_store(
     # Build separate filters for node and edge clauses
     node_where_clauses = []
     edge_where_clauses = []
-    params = []
+    edge_params: List[str] = []
+    node_params: List[str] = []
 
     if node_types:
         placeholders = ",".join("?" for _ in node_types)
         node_where_clauses.append(f"n.type IN ({placeholders})")
-        params.extend(node_types)
+        node_params.extend(node_types)
+
+    scope = _project_relative_scope(root_path)
+    if scope:
+        node_where_clauses.append("n.file LIKE ?")
+        node_params.append(f"{scope}/%")
 
     if edge_types:
         placeholders = ",".join("?" for _ in edge_types)
         edge_where_clauses.append(f"e.type IN ({placeholders})")
-        params.extend(edge_types)
+        edge_params.extend(edge_types)
 
     # Build WHERE clauses for different contexts
     edge_where_sql = f"WHERE {' AND '.join(edge_where_clauses)}" if edge_where_clauses else ""
     node_where_sql = f"WHERE {' AND '.join(node_where_clauses)}" if node_where_clauses else ""
+
+    # Bind parameters in the exact order placeholders appear in the query below:
+    # the edge filter is interpolated twice (outgoing + incoming subqueries), so
+    # its params must be supplied twice, then the outer node filter, then LIMIT.
+    params: List[Any] = [*edge_params, *edge_params, *node_params]
 
     # Compute degree centrality using SQL aggregation
     # Count both outgoing (src) and incoming (dst) edges
@@ -2176,6 +2249,28 @@ def _build_degree_centrality_from_project_store(
     }
 
 
+def _project_relative_scope(root_path: Path) -> Optional[str]:
+    """Return the POSIX subpath of ``root_path`` within its project, or None.
+
+    Broad graph modes query the single project-level database (whole repo). When
+    the caller scopes a request to a subdirectory (e.g. ``src/network``), this
+    returns ``"src/network"`` so the SQL can be filtered to that subtree via a
+    ``n.file LIKE scope || '/%'`` predicate. Returns ``None`` when the request is
+    at (or above) the project root, i.e. genuinely repo-wide.
+    """
+    from victor.core.database import resolve_project_db_root
+
+    project_root = resolve_project_db_root(root_path)
+    try:
+        rel = Path(root_path).resolve().relative_to(project_root)
+    except ValueError:
+        return None
+    rel_str = rel.as_posix()
+    if rel_str in ("", "."):
+        return None
+    return rel_str
+
+
 def _build_cheap_overview_from_project_store(
     root_path: Path,
     *,
@@ -2185,6 +2280,8 @@ def _build_cheap_overview_from_project_store(
 
     This avoids materializing very large graphs and never triggers semantic
     index rebuilds. It is intentionally degree-based rather than full PageRank.
+    When ``root_path`` is a subdirectory of the project, results are scoped to
+    that subtree via ``n.file`` prefix matching.
     """
     from victor.core.database import get_project_database
 
@@ -2192,31 +2289,42 @@ def _build_cheap_overview_from_project_store(
     _ensure_project_graph_tables(project_db)
 
     limit = max(1, min(int(top_k or 10), 25))
+    scope = _project_relative_scope(root_path)
+    scope_like = f"{scope}/%" if scope else None
+    scope_sql = " AND n.file LIKE ?" if scope_like else ""
     symbol_types = tuple(sorted(_SYMBOL_TYPES))
     placeholders = ",".join("?" for _ in symbol_types)
+    symbol_params: List[Any] = [*symbol_types]
+    if scope_like:
+        symbol_params.append(scope_like)
+    symbol_params.append(limit)
     symbol_rows = project_db.query(
         f"""
         SELECT n.node_id, n.name, n.type, n.file, COUNT(e.src) AS degree
         FROM graph_node n
         LEFT JOIN graph_edge e ON e.src = n.node_id OR e.dst = n.node_id
-        WHERE n.type IN ({placeholders})
+        WHERE n.type IN ({placeholders}){scope_sql}
         GROUP BY n.node_id, n.name, n.type, n.file
         ORDER BY degree DESC, n.file ASC, n.name ASC
         LIMIT ?
         """,
-        (*symbol_types, limit),
+        tuple(symbol_params),
     )
+    module_params: List[Any] = []
+    if scope_like:
+        module_params.append(scope_like)
+    module_params.append(limit)
     module_rows = project_db.query(
-        """
+        f"""
         SELECT n.file AS module_path, COUNT(e.src) AS degree
         FROM graph_node n
         LEFT JOIN graph_edge e ON e.src = n.node_id OR e.dst = n.node_id
-        WHERE n.file IS NOT NULL AND n.file != ''
+        WHERE n.file IS NOT NULL AND n.file != ''{scope_sql}
         GROUP BY n.file
         ORDER BY degree DESC, n.file ASC
         LIMIT ?
         """,
-        (limit,),
+        tuple(module_params),
     )
     modules = [
         {

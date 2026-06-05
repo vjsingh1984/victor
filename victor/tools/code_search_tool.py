@@ -9,7 +9,7 @@ import warnings
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Tuple
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set, Tuple
 
 from victor.core.indexing.graph_enrichment import ensure_project_graph_enriched
 from victor.framework.enrichment.file_patterns import CODE_PATTERNS
@@ -586,6 +586,55 @@ async def _background_index_rebuild(index: Any, rebuild_timeout: float = 120.0) 
         return False
 
 
+def _filename_search_timeout() -> float:
+    """Timeout (seconds) for the filename ``find`` subprocess (env-overridable).
+
+    Walking a large source tree with ``find`` is O(files); the previous hardcoded
+    15s fired on big repos. Override via ``VICTOR_TIMEOUT_FILENAME_SEARCH``.
+    """
+    return float(
+        os.environ.get(
+            "VICTOR_TIMEOUT_FILENAME_SEARCH",
+            os.environ.get("VICTOR_FILENAME_SEARCH_TIMEOUT", "45.0"),
+        )
+    )
+
+
+# Single-flight registry for background index rebuilds, keyed by project root.
+# Without this, every stale code_search call spawns a fresh fire-and-forget
+# rebuild; concurrent rebuilds on a large repo thrash the same embeddings store
+# and cascade into repeated probe timeouts.
+_INFLIGHT_INDEX_REBUILDS: Dict[str, "asyncio.Task[Any]"] = {}
+
+
+def _spawn_index_rebuild_once(
+    root_key: str, coro_factory: Callable[[], Any]
+) -> "asyncio.Task[Any]":
+    """Spawn a background rebuild for ``root_key`` unless one is already running.
+
+    Returns the in-flight task (existing or newly created). ``coro_factory`` is
+    only invoked when a new task is actually spawned, so no orphan coroutine is
+    created when a rebuild is deduplicated.
+    """
+    existing = _INFLIGHT_INDEX_REBUILDS.get(root_key)
+    if existing is not None and not existing.done():
+        logger.info(
+            "[code_search] Index rebuild already in-flight for %s; skipping duplicate",
+            root_key,
+        )
+        return existing
+
+    task = asyncio.create_task(coro_factory())
+    _INFLIGHT_INDEX_REBUILDS[root_key] = task
+
+    def _clear(done_task: "asyncio.Task[Any]", key: str = root_key) -> None:
+        if _INFLIGHT_INDEX_REBUILDS.get(key) is done_task:
+            _INFLIGHT_INDEX_REBUILDS.pop(key, None)
+
+    task.add_done_callback(_clear)
+    return task
+
+
 def _get_index_cache(exec_ctx: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Get the index cache, preferring DI-injected cache if available.
 
@@ -777,12 +826,16 @@ def _extract_exception_cause(exc: Exception) -> str:
 def _calculate_index_build_timeout(root_path: Path) -> float:
     """Calculate dynamic timeout for index building based on codebase size.
 
-    Uses a heuristic based on the number of Python files and total directory size
-    to estimate embedding time. Formula:
+    Counts indexable source files across all supported languages (not just
+    Python) as a proxy for embedding time. Formula:
     - Base timeout: 60 seconds
-    - +5 seconds per Python file (max 300s for files)
+    - +5 seconds per source file (max 300s for files)
     - +1 second per 1000 estimated symbols (max 300s for symbols)
     - Cap at 600 seconds (10 minutes) for very large codebases
+
+    Counting only ``.py`` files (the previous behavior) gave large Rust/Go/TS
+    repositories the 60s base timeout, which always fired before the index
+    finished and triggered repeated background rebuilds.
 
     Args:
         root_path: Path to the codebase root
@@ -801,48 +854,31 @@ def _calculate_index_build_timeout(root_path: Path) -> float:
     )
 
     try:
-        # Count Python files as a proxy for codebase size
-        py_file_count = 0
+        # Count indexable source files (all supported languages) as a size proxy.
+        source_file_count = 0
         total_size_bytes = 0
+        source_extensions = tuple(DEFAULT_CODE_EXTENSIONS)
+        # ``.victor`` can hold large caches (e.g. swe_bench_cache); ``env`` is a
+        # common virtualenv dir. Exclude both alongside the shared EXCLUDE_DIRS.
+        excluded_dirs = set(EXCLUDE_DIRS) | {".victor", "env"}
 
         for root, dirs, files in os.walk(root_path):
             # Skip excluded directories
-            dirs[:] = [
-                d
-                for d in dirs
-                if d
-                not in {
-                    ".git",
-                    "__pycache__",
-                    ".venv",
-                    "venv",
-                    "env",
-                    "node_modules",
-                    ".victor",
-                    "build",
-                    "dist",
-                    ".eggs",
-                    "*.egg-info",
-                    ".tox",
-                    ".mypy_cache",
-                    ".pytest_cache",
-                }
-            ]
+            dirs[:] = [d for d in dirs if d not in excluded_dirs]
 
             for file in files:
-                if file.endswith(".py"):
-                    py_file_count += 1
+                if file.endswith(source_extensions):
+                    source_file_count += 1
                     try:
                         total_size_bytes += os.path.getsize(os.path.join(root, file))
                     except (OSError, IOError):
                         pass
 
-        # Estimate symbols: roughly 100 symbols per 1000 lines of code
-        # Average 50 lines per file = 20 symbols per file
-        estimated_symbols = py_file_count * 20
+        # Estimate symbols: roughly 20 symbols per file on average.
+        estimated_symbols = source_file_count * 20
 
         # Calculate timeout
-        file_timeout = min(py_file_count * 5.0, 300.0)  # Max 5 minutes from files
+        file_timeout = min(source_file_count * 5.0, 300.0)  # Max 5 minutes from files
         symbol_timeout = min(estimated_symbols / 1000.0 * 10.0, 300.0)  # Max 5 minutes from symbols
         size_timeout = min(total_size_bytes / (1024 * 1024) * 30.0, 200.0)  # Max 200s from size
 
@@ -852,7 +888,7 @@ def _calculate_index_build_timeout(root_path: Path) -> float:
         logger.debug(
             "[code_search] Timeout calculation for %s: %d files, %d MB, ~%d symbols → %.1fs timeout",
             root_path,
-            py_file_count,
+            source_file_count,
             total_size_bytes // (1024 * 1024),
             estimated_symbols,
             final_timeout,
@@ -2456,8 +2492,9 @@ async def _get_or_build_index(
                                 exc,
                             )
 
-                # Spawn background task
-                asyncio.create_task(_rebuildInBackground())
+                # Spawn background task (single-flight per root to avoid concurrent
+                # rebuilds thrashing the same embeddings store).
+                _spawn_index_rebuild_once(str(root), _rebuildInBackground)
 
                 # Cache stale index for immediate use
                 index_cache[str(root)] = {
@@ -2674,7 +2711,10 @@ async def _literal_search(
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
                 )
-                stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=15)
+                filename_timeout = _filename_search_timeout()
+                stdout, stderr = await asyncio.wait_for(
+                    proc.communicate(), timeout=filename_timeout
+                )
                 find_result = type(
                     "obj",
                     (object,),
@@ -2719,11 +2759,14 @@ async def _literal_search(
                         "mode": "filename",
                     }
             except asyncio.TimeoutError:
-                logger.debug("Filename search timed out after 15s")
+                logger.debug("Filename search timed out after %.0fs", filename_timeout)
                 if filename_only:
                     return {
                         "success": False,
-                        "error": "Filename search timed out after 15s",
+                        "error": (
+                            f"Filename search timed out after {filename_timeout:.0f}s "
+                            "(raise VICTOR_TIMEOUT_FILENAME_SEARCH for very large trees)"
+                        ),
                         "results": [],
                         "count": 0,
                         "mode": "filename",

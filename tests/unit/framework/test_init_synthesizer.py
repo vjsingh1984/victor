@@ -17,7 +17,47 @@ from victor.framework.init_synthesizer import (
     SYNTHESIS_RULES,
     SYNTHESIS_PROMPT,
     _build_synthesis_prompt,
+    _classify_init_failure,
+    _init_provider_timeout,
 )
+
+
+class TestInitProviderTimeout:
+    """Adaptive init-synthesis timeout resolution."""
+
+    def test_local_provider_gets_large_budget(self):
+        assert _init_provider_timeout("ollama") == 600
+
+    def test_cloud_provider_gets_default(self):
+        assert _init_provider_timeout("zai") == 300
+
+    def test_never_reduces_configured_timeout(self):
+        assert _init_provider_timeout("zai", configured=900) == 900
+        assert _init_provider_timeout("ollama", configured=120) == 600
+
+    def test_env_override_wins(self, monkeypatch):
+        monkeypatch.setenv("VICTOR_INIT_SYNTH_TIMEOUT", "42")
+        assert _init_provider_timeout("ollama", configured=900) == 42
+
+    def test_invalid_env_override_ignored(self, monkeypatch):
+        monkeypatch.setenv("VICTOR_INIT_SYNTH_TIMEOUT", "not-a-number")
+        assert _init_provider_timeout("zai") == 300
+
+
+class TestClassifyInitFailure:
+    """Failure categorization for actionable template-fallback logging."""
+
+    def test_timeout(self):
+        assert _classify_init_failure(Exception("Request timed out after 300s")) == "timeout"
+
+    def test_connection(self):
+        assert _classify_init_failure(OSError("connection refused")) == "connection"
+
+    def test_empty_output(self):
+        assert _classify_init_failure(Exception("returned empty content")) == "empty_output"
+
+    def test_other(self):
+        assert _classify_init_failure(ValueError("weird")) == "ValueError"
 
 
 @pytest.fixture(autouse=True)
@@ -223,7 +263,9 @@ class TestInitSynthesizer:
 
         assert result == "# init"
         assert mock_provider.chat.call_args.kwargs["model"] == "profile-default"
-        mock_create.assert_called_once_with("ollama", timeout=120, max_retries=0)
+        # Local providers (ollama) get a generous init-synthesis timeout so a
+        # large local model isn't cut off mid-generation; retries stay at 0.
+        mock_create.assert_called_once_with("ollama", timeout=600, max_retries=0)
 
     def test_resolve_provider_selection_prefers_default_profile(self):
         """Init synthesis should honor the default profile before provider defaults."""
