@@ -1361,6 +1361,11 @@ class ChatStreamHelperMixin:
                         now = time.monotonic()
                         wait_overrun_seconds = max(0.0, now - wait_started_at - heartbeat_interval)
                         if wait_overrun_seconds > loop_stall_grace:
+                            # The heartbeat wait overran by more than the grace
+                            # window: the local asyncio event loop was blocked
+                            # (host-side GC/CPU), not the provider. Attribute it to
+                            # the host and reset the timer so a responsive provider
+                            # (including cloud) is not penalized for local blocking.
                             self._record_provider_status_event(
                                 stream_ctx,
                                 "local_runtime_stall",
@@ -1369,8 +1374,9 @@ class ChatStreamHelperMixin:
                                 model=getattr(orch, "model", None),
                             )
                             logger.warning(
-                                "[provider-stream] Local runtime was unavailable for %.1fs "
-                                "while waiting on provider; resetting provider stall timer",
+                                "[provider-stream] Local event loop blocked for %.1fs "
+                                "(host-side GC/CPU, not the provider); not charging it "
+                                "against the provider stall timer",
                                 wait_overrun_seconds,
                             )
                             waiting_since = now
