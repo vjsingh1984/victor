@@ -74,17 +74,14 @@ jobs:
         with:
           pattern: durations-*
           path: parts
-          merge-multiple: true
       - name: Merge into .test_durations
         run: |
-          python - <<'PY'
-          import json, glob
-          merged = {}
-          for f in sorted(glob.glob("parts/durations-*.json")):
-              merged.update(json.load(open(f)))
-          json.dump(merged, open(".test_durations", "w"), indent=2, sort_keys=True)
-          print(f"merged {len(glob.glob('parts/durations-*.json'))} shards -> {len(merged)} test durations")
-          PY
+          python -c "import json, glob; \
+          files = sorted(glob.glob('parts/**/*.json', recursive=True)); \
+          merged = {}; [merged.update(json.load(open(f))) for f in files]; \
+          json.dump(merged, open('.test_durations', 'w'), indent=2, sort_keys=True); \
+          print(f'merged {len(files)} shard files -> {len(merged)} test durations')"
+          test -s .test_durations
       - name: Upload merged durations
         uses: actions/upload-artifact@v4
         with:
