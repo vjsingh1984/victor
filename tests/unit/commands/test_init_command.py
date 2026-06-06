@@ -131,8 +131,11 @@ def test_init_ccg_reports_project_graph_stats_without_name_error(tmp_path, monke
     fake_graph_store.stats.assert_awaited_once()
 
     rendered = output.getvalue()
-    assert "CCG index updated" in rendered
-    assert "12 total nodes, 34 total edges in database" in rendered
+    # The index-updated branch reports "Graph index updated" + a "N nodes, M
+    # edges in database" line (the legacy "CCG index updated" / "N total nodes"
+    # wording was deliberately retired — see init.py).
+    assert "Graph index updated" in rendered
+    assert "12 nodes, 34 edges in database" in rendered
     assert "CCG indexing skipped" not in rendered
 
 
