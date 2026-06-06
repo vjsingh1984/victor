@@ -331,8 +331,13 @@ class TestLogToolCall:
         assert debug_logger.stats.tool_calls_made == 2
 
     def test_truncates_long_args(self, debug_logger):
-        """Test long args are truncated."""
-        long_value = "a" * 100
+        """Long args are truncated to a size-prefixed head…tail preview.
+
+        ``_format_value`` renders ``(N chars): <first 60>...<last 30>`` for long
+        values, which only shortens inputs well above ~106 chars; use a clearly
+        long value so truncation is actually exercised.
+        """
+        long_value = "a" * 1000
         with patch.object(debug_logger.logger, "info") as mock_info:
             debug_logger.log_tool_call("test", {"long": long_value}, 1)
             call_str = mock_info.call_args[0][0]

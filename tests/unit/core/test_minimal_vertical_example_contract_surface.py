@@ -39,9 +39,10 @@ def test_minimal_vertical_example_uses_contract_import_namespace() -> None:
 
     assert "from victor_contracts import PluginContext, VictorPlugin" in init_source
     assert "from victor_contracts.verticals.protocols.base import VerticalBase" in init_source
-    assert "from victor_contracts.verticals.protocols import ToolProvider, SafetyProvider" in (
-        init_source
-    )
+    # __init__ imports both protocols from the canonical namespace; tolerate
+    # single-line or parenthesized multi-line import formatting.
+    assert "from victor_contracts.verticals.protocols import" in init_source
+    assert "ToolProvider" in init_source and "SafetyProvider" in init_source
     assert "from victor_contracts.verticals.protocols import ToolProvider, SafetyProvider" in (
         protocols_source
     )

@@ -131,8 +131,11 @@ def test_init_ccg_reports_project_graph_stats_without_name_error(tmp_path, monke
     fake_graph_store.stats.assert_awaited_once()
 
     rendered = output.getvalue()
-    assert "CCG index updated" in rendered
-    assert "12 total nodes, 34 total edges in database" in rendered
+    # The index-updated branch reports "Graph index updated" + a "N nodes, M
+    # edges in database" line (the legacy "CCG index updated" / "N total nodes"
+    # wording was deliberately retired — see init.py).
+    assert "Graph index updated" in rendered
+    assert "12 nodes, 34 edges in database" in rendered
     assert "CCG indexing skipped" not in rendered
 
 
@@ -287,7 +290,9 @@ async def test_create_init_agent_uses_lightweight_profile_provider():
         "zai",
         base_url="https://api.z.ai/api/coding/paas/v4/",
         coding_plan=True,
-        timeout=120,
+        # Cloud providers get the 300s init-synthesis budget (_init_provider_timeout);
+        # local providers get 600s. The old flat 120s constant was retired.
+        timeout=300,
         max_retries=0,
     )
 

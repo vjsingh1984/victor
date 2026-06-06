@@ -2900,9 +2900,12 @@ class ToolPipeline:
                 )
             else:
                 # Check if agent explicitly provided offset/limit in the original call
-                # (not just defaults from argument normalization)
-                explicit_offset = "offset" in raw_args
-                explicit_limit = "limit" in raw_args
+                # (not just defaults from argument normalization). ``raw_args`` may be
+                # None when a tool call arrives without an arguments object; treat that
+                # as "no explicit offset/limit" rather than crashing.
+                raw_args_map = raw_args if isinstance(raw_args, dict) else {}
+                explicit_offset = "offset" in raw_args_map
+                explicit_limit = "limit" in raw_args_map
                 follow_up_rewrite = (
                     self._select_follow_up_code_read_rewrite(
                         str(file_path),
