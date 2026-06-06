@@ -22,9 +22,10 @@ These utilities help reduce code duplication across provider implementations.
 
 import json
 import logging
+import re
 import uuid
 from contextvars import ContextVar
-from typing import Any, Dict, List, Mapping, Optional
+from typing import Any, Dict, List, Mapping, Optional, Tuple
 
 import httpx
 
@@ -628,3 +629,119 @@ def accumulate_tool_call_delta(
             accumulated[idx]["name"] = func["name"]
         if "arguments" in func:
             accumulated[idx]["arguments"] += func["arguments"]
+
+
+def extract_thinking_content(response: str) -> Tuple[str, str]:
+    """Extract ``<think>...</think>`` reasoning blocks from a response.
+
+    Shared across OpenAI-compatible local providers (vLLM, llama.cpp, LM Studio,
+    …) that may surface a model's chain-of-thought inline. Returns the thinking
+    text and the response with the think blocks stripped.
+
+    Args:
+        response: Raw response text.
+
+    Returns:
+        Tuple of ``(thinking_content, main_content)``.
+    """
+    if not response:
+        return ("", "")
+
+    think_pattern = r"<think>(.*?)</think>"
+    matches = re.findall(think_pattern, response, re.DOTALL | re.IGNORECASE)
+    thinking = "\n".join(matches) if matches else ""
+    content = re.sub(think_pattern, "", response, flags=re.DOTALL | re.IGNORECASE).strip()
+    return (thinking, content)
+
+
+def extract_tool_calls_from_content(content: str) -> Tuple[List[Dict[str, Any]], str]:
+    """Extract tool calls embedded as JSON text when the server didn't parse them.
+
+    Shared fallback for OpenAI-compatible local providers (e.g. vLLM not started
+    with ``--enable-auto-tool-choice``). Recognizes three shapes:
+    ``` ```json {...}``` ```, ``<TOOL_OUTPUT>{...}</TOOL_OUTPUT>``, and a bare
+    inline ``{"name": ..., "arguments": {...}}``. Planning-style JSON (which also
+    has ``name`` but different structure) is rejected via keyword heuristics.
+
+    Args:
+        content: Response content that may contain tool calls.
+
+    Returns:
+        Tuple of ``(parsed_tool_calls, remaining_content)``.
+    """
+    tool_calls: List[Dict[str, Any]] = []
+    remaining = content
+
+    # Planning keywords to avoid false positives
+    planning_keywords = {"complexity", "steps", "desc", "duration"}
+
+    # Pattern 1: JSON code block with tool call
+    json_block_pattern = r"```json\s*\n?\s*(\{[^`]*\"name\"\s*:\s*\"[^\"]+\"[^`]*\})\s*\n?```"
+    matches = re.findall(json_block_pattern, content, re.DOTALL)
+    for match in matches:
+        try:
+            data = json.loads(match)
+            if "name" in data:
+                arguments = data.get("arguments", {})
+                if isinstance(arguments, dict) and not any(
+                    key in arguments for key in planning_keywords
+                ):
+                    tool_calls.append(
+                        {
+                            "id": f"fallback_{len(tool_calls)}",
+                            "name": data.get("name", ""),
+                            "arguments": arguments,
+                        }
+                    )
+                    remaining = remaining.replace(f"```json\n{match}\n```", "").strip()
+                    remaining = remaining.replace(f"```json{match}```", "").strip()
+        except json.JSONDecodeError:
+            pass
+
+    # Pattern 2: <TOOL_OUTPUT> tags
+    tool_output_pattern = r"<TOOL_OUTPUT>\s*(\{.*?\})\s*</TOOL_OUTPUT>"
+    matches = re.findall(tool_output_pattern, content, re.DOTALL)
+    for match in matches:
+        try:
+            data = json.loads(match)
+            if "name" in data:
+                arguments = data.get("arguments", {})
+                if isinstance(arguments, dict) and not any(
+                    key in arguments for key in planning_keywords
+                ):
+                    tool_calls.append(
+                        {
+                            "id": f"fallback_{len(tool_calls)}",
+                            "name": data.get("name", ""),
+                            "arguments": arguments,
+                        }
+                    )
+                    remaining = re.sub(
+                        r"<TOOL_OUTPUT>\s*" + re.escape(match) + r"\s*</TOOL_OUTPUT>",
+                        "",
+                        remaining,
+                    )
+        except json.JSONDecodeError:
+            pass
+
+    # Pattern 3: Inline JSON (for simple cases)
+    if not tool_calls and content.strip().startswith("{") and "name" in content:
+        try:
+            data = json.loads(content.strip())
+            if "name" in data:
+                arguments = data.get("arguments", {})
+                if isinstance(arguments, dict) and not any(
+                    key in arguments for key in planning_keywords
+                ):
+                    tool_calls.append(
+                        {
+                            "id": "fallback_0",
+                            "name": data.get("name", ""),
+                            "arguments": arguments,
+                        }
+                    )
+                    remaining = ""
+        except json.JSONDecodeError:
+            pass
+
+    return tool_calls, remaining.strip()

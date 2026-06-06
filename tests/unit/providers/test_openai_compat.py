@@ -447,3 +447,91 @@ class TestFixOrphanedToolMessages:
         assert "tool_calls" in result[1]
         assert result[2]["role"] == "tool"
         assert result[2]["tool_call_id"] == "call_123"
+
+
+# Consolidated from per-provider duplicates (vLLM/llama.cpp) — the extraction
+# helpers now live in victor.providers.openai_compat.
+from victor.providers.openai_compat import (  # noqa: E402
+    extract_thinking_content,
+    extract_tool_calls_from_content,
+)
+
+
+class TestExtractThinkingContent:
+    """Tests for extract_thinking_content function."""
+
+    def test_extract_thinking(self):
+        """Test extracting thinking content."""
+        response = "<think>Let me think about this...</think>Here is my answer."
+        thinking, content = extract_thinking_content(response)
+        assert thinking == "Let me think about this..."
+        assert content == "Here is my answer."
+
+    def test_extract_multiple_thinking_blocks(self):
+        """Test extracting multiple thinking blocks."""
+        response = "<think>First thought</think>Text<think>Second thought</think>More text"
+        thinking, content = extract_thinking_content(response)
+        assert "First thought" in thinking
+        assert "Second thought" in thinking
+        assert "Text" in content
+        assert "More text" in content
+
+    def test_no_thinking_tags(self):
+        """Test content without thinking tags."""
+        response = "Just a normal response"
+        thinking, content = extract_thinking_content(response)
+        assert thinking == ""
+        assert content == "Just a normal response"
+
+    def test_case_insensitive(self):
+        """Test case-insensitive tag matching."""
+        response = "<THINK>Thinking</THINK>Answer"
+        thinking, content = extract_thinking_content(response)
+        assert thinking == "Thinking"
+        assert content == "Answer"
+
+
+class TestExtractToolCallsFromContent:
+    """Tests for extract_tool_calls_from_content function."""
+
+    def test_extract_json_block(self):
+        """Test extracting tool call from JSON code block."""
+        content = '```json\n{"name": "read_file", "arguments": {"path": "test.py"}}\n```'
+        tool_calls, remaining = extract_tool_calls_from_content(content)
+        assert len(tool_calls) == 1
+        assert tool_calls[0]["name"] == "read_file"
+        assert tool_calls[0]["arguments"]["path"] == "test.py"
+
+    def test_extract_tool_output_tags(self):
+        """Test extracting tool call from TOOL_OUTPUT tags."""
+        content = '<TOOL_OUTPUT>{"name": "search", "arguments": {"query": "test"}}</TOOL_OUTPUT>'
+        tool_calls, remaining = extract_tool_calls_from_content(content)
+        assert len(tool_calls) == 1
+        assert tool_calls[0]["name"] == "search"
+
+    def test_extract_inline_json(self):
+        """Test extracting inline JSON tool call."""
+        content = '{"name": "list_files", "arguments": {"directory": "."}}'
+        tool_calls, remaining = extract_tool_calls_from_content(content)
+        assert len(tool_calls) == 1
+        assert tool_calls[0]["name"] == "list_files"
+        assert remaining == ""
+
+    def test_no_tool_calls(self):
+        """Test content without tool calls."""
+        content = "This is just regular text without any tool calls."
+        tool_calls, remaining = extract_tool_calls_from_content(content)
+        assert len(tool_calls) == 0
+        assert remaining == content
+
+    def test_invalid_json(self):
+        """Test handling of invalid JSON."""
+        content = "```json\n{invalid json here}\n```"
+        tool_calls, remaining = extract_tool_calls_from_content(content)
+        assert len(tool_calls) == 0
+
+    def test_json_without_name(self):
+        """Test JSON that doesn't have name field."""
+        content = '{"type": "object", "value": 42}'
+        tool_calls, remaining = extract_tool_calls_from_content(content)
+        assert len(tool_calls) == 0
