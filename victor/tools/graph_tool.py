@@ -2828,14 +2828,21 @@ async def _graph_impl(
             )
             root_path = project_root
 
-    # Subscribe to file watcher for automatic cache invalidation (only once per root)
+    # Subscribe to file watcher for automatic cache invalidation (only once per root).
+    # The watcher + incremental refresh operate on the *project* graph DB, so they
+    # must run against the canonical project root — not a scoped subpath like
+    # ``src/network``. Passing the subpath here indexes a stray subdirectory DB
+    # (and litters a ``.victor/`` dir) instead of refreshing the repo's project.db.
+    from victor.core.database import resolve_project_db_root
     from victor.core.indexing.graph_manager import GraphManager
 
-    # Subscribe GraphManager to file watcher for this root
-    if not reindex and not _project_graph_watch_daemon_active(root_path):
+    refresh_root = resolve_project_db_root(root_path)
+
+    # Subscribe GraphManager to file watcher for the project root
+    if not reindex and not _project_graph_watch_daemon_active(refresh_root):
         try:
             manager = GraphManager.get_instance()
-            await manager.ensure_background_refresh(root_path, exec_ctx=_exec_ctx)
+            await manager.ensure_background_refresh(refresh_root, exec_ctx=_exec_ctx)
         except Exception as e:
             # Non-fatal: log warning but continue
             logger.warning(f"[graph] Failed to subscribe to file watcher: {e}")
