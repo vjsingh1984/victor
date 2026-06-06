@@ -22,8 +22,6 @@ from victor.providers.vllm_provider import (
     VLLMProvider,
     _model_supports_tools,
     _model_uses_thinking_tags,
-    _extract_thinking_content,
-    _extract_tool_calls_from_content,
     TOOL_CAPABLE_MODELS,
     THINKING_TAG_MODELS,
     DEFAULT_VLLM_URLS,
@@ -136,86 +134,6 @@ class TestModelUsesThinkingTags:
         """Test regular models don't use thinking tags."""
         assert _model_uses_thinking_tags("llama-3.1-8b") is False
         assert _model_uses_thinking_tags("gpt-4") is False
-
-
-class TestExtractThinkingContent:
-    """Tests for _extract_thinking_content function."""
-
-    def test_extract_thinking(self):
-        """Test extracting thinking content."""
-        response = "<think>Let me think about this...</think>Here is my answer."
-        thinking, content = _extract_thinking_content(response)
-        assert thinking == "Let me think about this..."
-        assert content == "Here is my answer."
-
-    def test_extract_multiple_thinking_blocks(self):
-        """Test extracting multiple thinking blocks."""
-        response = "<think>First thought</think>Text<think>Second thought</think>More text"
-        thinking, content = _extract_thinking_content(response)
-        assert "First thought" in thinking
-        assert "Second thought" in thinking
-        assert "Text" in content
-        assert "More text" in content
-
-    def test_no_thinking_tags(self):
-        """Test content without thinking tags."""
-        response = "Just a normal response"
-        thinking, content = _extract_thinking_content(response)
-        assert thinking == ""
-        assert content == "Just a normal response"
-
-    def test_case_insensitive(self):
-        """Test case-insensitive tag matching."""
-        response = "<THINK>Thinking</THINK>Answer"
-        thinking, content = _extract_thinking_content(response)
-        assert thinking == "Thinking"
-        assert content == "Answer"
-
-
-class TestExtractToolCallsFromContent:
-    """Tests for _extract_tool_calls_from_content function."""
-
-    def test_extract_json_block(self):
-        """Test extracting tool call from JSON code block."""
-        content = '```json\n{"name": "read_file", "arguments": {"path": "test.py"}}\n```'
-        tool_calls, remaining = _extract_tool_calls_from_content(content)
-        assert len(tool_calls) == 1
-        assert tool_calls[0]["name"] == "read_file"
-        assert tool_calls[0]["arguments"]["path"] == "test.py"
-
-    def test_extract_tool_output_tags(self):
-        """Test extracting tool call from TOOL_OUTPUT tags."""
-        content = '<TOOL_OUTPUT>{"name": "search", "arguments": {"query": "test"}}</TOOL_OUTPUT>'
-        tool_calls, remaining = _extract_tool_calls_from_content(content)
-        assert len(tool_calls) == 1
-        assert tool_calls[0]["name"] == "search"
-
-    def test_extract_inline_json(self):
-        """Test extracting inline JSON tool call."""
-        content = '{"name": "list_files", "arguments": {"directory": "."}}'
-        tool_calls, remaining = _extract_tool_calls_from_content(content)
-        assert len(tool_calls) == 1
-        assert tool_calls[0]["name"] == "list_files"
-        assert remaining == ""
-
-    def test_no_tool_calls(self):
-        """Test content without tool calls."""
-        content = "This is just regular text without any tool calls."
-        tool_calls, remaining = _extract_tool_calls_from_content(content)
-        assert len(tool_calls) == 0
-        assert remaining == content
-
-    def test_invalid_json(self):
-        """Test handling of invalid JSON."""
-        content = "```json\n{invalid json here}\n```"
-        tool_calls, remaining = _extract_tool_calls_from_content(content)
-        assert len(tool_calls) == 0
-
-    def test_json_without_name(self):
-        """Test JSON that doesn't have name field."""
-        content = '{"type": "object", "value": 42}'
-        tool_calls, remaining = _extract_tool_calls_from_content(content)
-        assert len(tool_calls) == 0
 
 
 # =============================================================================

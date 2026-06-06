@@ -36,6 +36,9 @@ from typing import Any, AsyncIterator, Dict, List, Optional, Tuple, Union
 
 import httpx
 
+from victor.providers.openai_compat import (
+    extract_thinking_content as _extract_thinking_content,
+)
 from victor.providers.base import (
     BaseProvider,
     CompletionResponse,
@@ -83,28 +86,6 @@ def _model_supports_tools(model: str) -> bool:
     """Check if a model supports native tool calling."""
     model_lower = model.lower()
     return any(pattern in model_lower for pattern in TOOL_CAPABLE_MODELS)
-
-
-def _extract_thinking_content(response: str) -> Tuple[str, str]:
-    """Extract <think>...</think> tags from response.
-
-    Args:
-        response: Raw response text
-
-    Returns:
-        Tuple of (thinking_content, main_content)
-    """
-    if not response:
-        return ("", "")
-
-    # Match <think>...</think> tags (case insensitive, multiline)
-    think_pattern = r"<think>(.*?)</think>"
-    matches = re.findall(think_pattern, response, re.DOTALL | re.IGNORECASE)
-
-    thinking = "\n".join(matches) if matches else ""
-    content = re.sub(think_pattern, "", response, flags=re.DOTALL | re.IGNORECASE).strip()
-
-    return (thinking, content)
 
 
 class LMStudioProvider(BaseProvider):
