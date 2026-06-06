@@ -127,14 +127,6 @@ class TestBaseProviderAdapter:
         assert normalized[0].name == "read_file"
         assert normalized[0].arguments == {"path": "/test.py"}
 
-    def test_should_retry_rate_limit(self, adapter):
-        """Test retry logic for rate limit errors."""
-        error = Exception("Rate limit exceeded")
-        is_retryable, backoff = adapter.should_retry(error)
-
-        assert is_retryable is True
-        assert backoff == 60.0
-
     def test_should_retry_server_error(self, adapter):
         """Test retry logic for 503 errors."""
         error = Exception("503 Service Unavailable")

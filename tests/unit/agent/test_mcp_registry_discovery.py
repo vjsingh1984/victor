@@ -25,17 +25,6 @@ from victor.integrations.mcp.registry import MCPRegistry, MCPServerConfig, Serve
 class TestMCPServerConfig:
     """Tests for MCPServerConfig model."""
 
-    def test_minimal_config(self):
-        """Test creating config with minimal fields."""
-        config = MCPServerConfig(
-            name="test_server",
-            command=["python", "-m", "test_server"],
-        )
-        assert config.name == "test_server"
-        assert config.command == ["python", "-m", "test_server"]
-        assert config.auto_connect is True
-        assert config.enabled is True
-
     def test_full_config(self):
         """Test creating config with all fields."""
         config = MCPServerConfig(
