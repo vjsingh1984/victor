@@ -70,10 +70,16 @@ async def test_embedding_preloading_reduces_latency():
         )
         orchestrator_with_preload.tools.register(dummy_tool)
 
-        # Start the preload and wait for it to finish
+        # Start the preload and wait for it to finish.
         orchestrator_with_preload.start_embedding_preload()
-        # Give the event loop time to run the task
-        await asyncio.sleep(load_delay + 0.1)
+        # Await the actual preload task(s) deterministically rather than racing a
+        # fixed sleep — under CI scheduling jitter the background task may not
+        # complete within a fixed margin, causing select_semantic() to re-init
+        # and a spurious "called twice" failure.
+        for _task_attr in ("_embedding_preload_task", "_runtime_preload_task"):
+            _preload_task = getattr(orchestrator_with_preload, _task_attr, None)
+            if _preload_task is not None:
+                await _preload_task
 
         # select_semantic should NOT re-initialize (preload already did it)
         await orchestrator_with_preload.tool_selector.select_semantic("test message")
