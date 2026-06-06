@@ -2274,8 +2274,12 @@ class TestFailedPathRedirects:
 class TestIntentBasedToolFilter:
     """Tests for Issue 4: intent-based tool filtering in _select_tools_for_turn."""
 
-    def test_read_only_intent_filters_write_tools(self):
-        """READ_ONLY intent should remove write/generation tools from the tool list."""
+    def test_read_only_intent_uses_permissive_tool_policy(self):
+        """READ_ONLY uses a permissive (empty) block-set.
+
+        Tools are no longer removed from the list by intent; safety is enforced
+        via the prompt guard instead (see INTENT_BLOCKED_TOOLS [PERMISSIVE]).
+        """
         from victor.agent.action_authorizer import INTENT_BLOCKED_TOOLS, ActionIntent
         from victor.tools.tool_names import get_canonical_name
 
@@ -2287,14 +2291,9 @@ class TestIntentBasedToolFilter:
             {"name": "execute_bash"},
         ]
         blocked = INTENT_BLOCKED_TOOLS[ActionIntent.READ_ONLY]
+        assert blocked == frozenset()  # permissive: nothing hard-blocked
         filtered = [t for t in tools if get_canonical_name(t.get("name", "")) not in blocked]
-
-        names = {t["name"] for t in filtered}
-        assert "write_file" not in names
-        assert "edit_files" not in names
-        assert "execute_bash" not in names
-        assert "read" in names
-        assert "code_search" in names
+        assert filtered == tools  # no tools removed
 
     def test_write_allowed_intent_no_filtering(self):
         """WRITE_ALLOWED intent should not filter any tools."""
@@ -2307,17 +2306,16 @@ class TestIntentBasedToolFilter:
 
         assert len(filtered) == len(tools)
 
-    def test_display_only_intent_filters_write_tools(self):
-        """DISPLAY_ONLY intent should remove write tools."""
+    def test_display_only_intent_uses_permissive_tool_policy(self):
+        """DISPLAY_ONLY uses a permissive (empty) block-set; safety via prompt guard."""
         from victor.agent.action_authorizer import INTENT_BLOCKED_TOOLS, ActionIntent
         from victor.tools.tool_names import get_canonical_name
 
         tools = [{"name": "write_file"}, {"name": "read"}, {"name": "ls"}]
         blocked = INTENT_BLOCKED_TOOLS[ActionIntent.DISPLAY_ONLY]
+        assert blocked == frozenset()  # permissive: nothing hard-blocked
         filtered = [t for t in tools if get_canonical_name(t.get("name", "")) not in blocked]
-
-        assert {"name": "write_file"} not in filtered
-        assert {"name": "read"} in filtered
+        assert filtered == tools  # no tools removed
 
     def test_invalid_intent_string_does_not_crash(self):
         """An unrecognised intent string should not raise, just skip filtering."""
