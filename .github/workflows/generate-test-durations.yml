@@ -87,4 +87,6 @@ jobs:
         with:
           name: test-durations
           path: .test_durations
+          # .test_durations is a dotfile; upload-artifact@v4 skips hidden files by default.
+          include-hidden-files: true
           if-no-files-found: error
