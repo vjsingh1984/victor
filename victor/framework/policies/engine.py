@@ -78,6 +78,8 @@ class PolicyEngine:
         args_modified = False
         current_result: Any = event.result
         result_modified = False
+        current_content: Any = event.content
+        content_modified = False
 
         ask_reasons: List[str] = []
         ask_policy = ""
@@ -88,7 +90,12 @@ class PolicyEngine:
             if not policy.applies_to(event.tool_name):
                 continue
 
-            sub_event = replace(event, arguments=current_args, result=current_result)
+            sub_event = replace(
+                event,
+                arguments=current_args,
+                result=current_result,
+                content=current_content,
+            )
             try:
                 verdict = await policy.evaluate(sub_event)
             except Exception:  # pragma: no cover - defensive
@@ -107,6 +114,9 @@ class PolicyEngine:
             if verdict.modified_result is not UNSET:
                 current_result = verdict.modified_result
                 result_modified = True
+            if verdict.modified_content is not UNSET:
+                current_content = verdict.modified_content
+                content_modified = True
 
             if verdict.is_ask:
                 ask_reasons.append(verdict.reason)
@@ -115,6 +125,7 @@ class PolicyEngine:
 
         final_args: Optional[Dict[str, Any]] = current_args if args_modified else None
         final_result: Any = current_result if result_modified else UNSET
+        final_content: Any = current_content if content_modified else UNSET
 
         if ask_reasons:
             combined = PolicyVerdict(
@@ -123,6 +134,7 @@ class PolicyEngine:
                 policy_name=ask_policy,
                 modified_arguments=final_args,
                 modified_result=final_result,
+                modified_content=final_content,
             )
             self._emit_decision(event, combined)
             return combined
@@ -131,6 +143,7 @@ class PolicyEngine:
             action=PolicyAction.ALLOW,
             modified_arguments=final_args,
             modified_result=final_result,
+            modified_content=final_content,
         )
 
     def _emit_decision(self, event: PolicyEvent, verdict: PolicyVerdict) -> None:

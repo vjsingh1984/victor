@@ -25,12 +25,16 @@ builtins:
 from __future__ import annotations
 
 import logging
-from typing import Iterable, List, Optional, Set
+import re
+from typing import Iterable, List, Optional, Pattern, Set
 
 from victor.framework.policies.base import Policy
 from victor.framework.policies.types import Phase, PolicyEvent, PolicyVerdict
 
 logger = logging.getLogger(__name__)
+
+# Message phases (gated at the turn boundary, not tool-scoped).
+_MESSAGE_PHASES: Set[Phase] = {Phase.REQUEST, Phase.RESPONSE}
 
 
 class CostBudgetPolicy(Policy):
@@ -226,10 +230,101 @@ class MaxToolCallsPolicy(Policy):
         return PolicyVerdict.allow()
 
 
+def _compile_patterns(patterns: Optional[Iterable[str]]) -> List[Pattern[str]]:
+    """Compile regex patterns, skipping (with a warning) any that don't compile."""
+    compiled: List[Pattern[str]] = []
+    for raw in patterns or []:
+        try:
+            compiled.append(re.compile(raw))
+        except re.error as exc:  # pragma: no cover - defensive: bad config
+            logger.warning("Skipping invalid policy regex %r: %s", raw, exc)
+    return compiled
+
+
+class RedactContentPolicy(Policy):
+    """Redact regex matches from message text (REQUEST and/or RESPONSE).
+
+    Replaces every match of any configured pattern with ``placeholder`` and
+    ALLOWs the (modified) message. Useful for stripping secrets/PII from the
+    user message before it reaches the LLM, or from the assistant output before
+    it is shown/stored. ALLOW-with-redaction never blocks the turn.
+    """
+
+    name = "redact_content"
+
+    def __init__(
+        self,
+        patterns: Optional[Iterable[str]] = None,
+        *,
+        placeholder: str = "[REDACTED]",
+        phases: Optional[Iterable[Phase]] = None,
+    ) -> None:
+        """Initialize with redaction patterns and the phases to apply them in."""
+        self._patterns = _compile_patterns(patterns)
+        self._placeholder = placeholder
+        self._phases: Set[Phase] = set(phases) if phases is not None else set(_MESSAGE_PHASES)
+
+    def phases(self) -> Set[Phase]:
+        """Apply in the configured message phases (default REQUEST + RESPONSE)."""
+        return self._phases
+
+    async def evaluate(self, event: PolicyEvent) -> PolicyVerdict:
+        """Redact matches; ALLOW unchanged when nothing matches."""
+        text = event.content
+        if not text or not self._patterns:
+            return PolicyVerdict.allow()
+        redacted = text
+        for pattern in self._patterns:
+            redacted = pattern.sub(self._placeholder, redacted)
+        if redacted == text:
+            return PolicyVerdict.allow()
+        return PolicyVerdict.allow(policy_name=self.name, modified_content=redacted)
+
+
+class BlockPatternPolicy(Policy):
+    """DENY a message whose text matches any configured pattern.
+
+    A hard content gate for message phases — e.g. block prompt-injection markers
+    in the user message (REQUEST) or forbidden content in the assistant output
+    (RESPONSE). Matching is a regex ``search`` (anywhere in the text).
+    """
+
+    name = "block_pattern"
+
+    def __init__(
+        self,
+        patterns: Optional[Iterable[str]] = None,
+        *,
+        phases: Optional[Iterable[Phase]] = None,
+        reason: Optional[str] = None,
+    ) -> None:
+        """Initialize with block patterns and the phases to enforce them in."""
+        self._patterns = _compile_patterns(patterns)
+        self._phases: Set[Phase] = set(phases) if phases is not None else {Phase.REQUEST}
+        self._reason = reason
+
+    def phases(self) -> Set[Phase]:
+        """Enforce in the configured message phases (default REQUEST only)."""
+        return self._phases
+
+    async def evaluate(self, event: PolicyEvent) -> PolicyVerdict:
+        """DENY when the text matches any pattern; ALLOW otherwise."""
+        text = event.content or ""
+        for pattern in self._patterns:
+            if pattern.search(text):
+                return PolicyVerdict.deny(
+                    self._reason or "Message blocked by content policy.",
+                    policy_name=self.name,
+                )
+        return PolicyVerdict.allow()
+
+
 __all__ = [
     "CostBudgetPolicy",
     "AskOnToolsPolicy",
     "DenyToolsPolicy",
     "AllowToolsPolicy",
     "MaxToolCallsPolicy",
+    "RedactContentPolicy",
+    "BlockPatternPolicy",
 ]

@@ -53,6 +53,61 @@ logger = logging.getLogger(__name__)
 ContextProvider = Callable[[], PolicyContext]
 
 
+async def resolve_policy_ask(
+    approval_handler: Optional[Any],
+    *,
+    ask_fallback: str,
+    ask_timeout_seconds: int,
+    title: str,
+    description: str,
+    context: Dict[str, Any],
+) -> bool:
+    """Resolve an ASK verdict to a boolean approval decision.
+
+    Shared by :class:`PolicyEngineMiddleware` (tool gating) and
+    :class:`~victor.framework.policies.gate.MessagePolicyGate` (message gating)
+    so both honour the same HITL lifecycle and fail-safe fallback.
+
+    Args:
+        approval_handler: Async HITL ``ApprovalHandler`` or None. When None, the
+            decision falls back to ``ask_fallback``.
+        ask_fallback: ``"allow"`` or ``"deny"`` (fail safe) — outcome when no
+            handler is configured or the handler errors.
+        ask_timeout_seconds: Timeout passed to the approval request.
+        title: Short approval title (e.g. ``"Approve tool: run_command"``).
+        description: Longer human-readable reason.
+        context: Structured context attached to the approval request.
+
+    Returns:
+        True to proceed, False to block.
+    """
+    if approval_handler is None:
+        logger.warning(
+            "Policy requested approval (%s) but no approval handler is "
+            "configured; applying ask_fallback=%s",
+            title,
+            ask_fallback,
+        )
+        return ask_fallback == "allow"
+
+    # Reuse the existing HITL machinery for the request lifecycle.
+    from victor.framework.hitl import HITLController
+
+    controller = HITLController(approval_handler=approval_handler)
+    request = controller.request_approval(
+        title=title,
+        description=description,
+        context=context,
+        timeout_seconds=ask_timeout_seconds,
+    )
+    try:
+        resolved = await controller.process_approval(request.id)
+    except Exception:  # pragma: no cover - defensive
+        logger.exception("Approval handler failed for '%s'; failing safe", title)
+        return ask_fallback == "allow"
+    return resolved.is_approved
+
+
 class PolicyEngineMiddleware(MiddlewareProtocol):
     """Bridges :class:`PolicyEngine` verdicts onto the middleware protocol."""
 
@@ -161,32 +216,14 @@ class PolicyEngineMiddleware(MiddlewareProtocol):
 
     async def _resolve_ask(self, tool_name: str, verdict: PolicyVerdict) -> bool:
         """Resolve an ASK verdict to a boolean approval decision."""
-        if self._approval_handler is None:
-            logger.warning(
-                "Policy '%s' requested approval for tool '%s' but no approval "
-                "handler is configured; applying ask_fallback=%s",
-                verdict.policy_name,
-                tool_name,
-                self._ask_fallback,
-            )
-            return self._ask_fallback == "allow"
-
-        # Reuse the existing HITL machinery for the request lifecycle.
-        from victor.framework.hitl import HITLController
-
-        controller = HITLController(approval_handler=self._approval_handler)
-        request = controller.request_approval(
+        return await resolve_policy_ask(
+            self._approval_handler,
+            ask_fallback=self._ask_fallback,
+            ask_timeout_seconds=self._ask_timeout_seconds,
             title=f"Approve tool: {tool_name}",
             description=verdict.reason or f"Policy requests approval to run '{tool_name}'.",
             context={"tool_name": tool_name, "policy": verdict.policy_name},
-            timeout_seconds=self._ask_timeout_seconds,
         )
-        try:
-            resolved = await controller.process_approval(request.id)
-        except Exception:  # pragma: no cover - defensive
-            logger.exception("Approval handler failed for tool '%s'; failing safe", tool_name)
-            return self._ask_fallback == "allow"
-        return resolved.is_approved
 
     @staticmethod
     def _block_message(tool_name: str, verdict: PolicyVerdict, *, asked: bool) -> str:
@@ -197,4 +234,4 @@ class PolicyEngineMiddleware(MiddlewareProtocol):
         return f"{prefix}{policy} for '{tool_name}'{reason}"
 
 
-__all__ = ["PolicyEngineMiddleware", "ContextProvider"]
+__all__ = ["PolicyEngineMiddleware", "ContextProvider", "resolve_policy_ask"]

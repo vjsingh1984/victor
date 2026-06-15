@@ -79,6 +79,141 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def build_policy_emitter(container: Any) -> Optional[Callable[[str, Dict[str, Any]], None]]:
+    """Build a sync emitter forwarding policy DENY/ASK to the event bus.
+
+    The PolicyEngine calls the emitter synchronously from within an async
+    context; ObservabilityBus.emit is async, so we schedule it on the running
+    loop (best-effort, audit-only). Returns None if the bus is unavailable.
+
+    Shared by tool-policy and message-policy wiring.
+    """
+    try:
+        from victor.core.events.backends import ObservabilityBus
+
+        bus = container.get_optional(ObservabilityBus)
+    except Exception:  # pragma: no cover - defensive
+        bus = None
+    if bus is None:
+        return None
+
+    # Retain references so fire-and-forget audit tasks aren't GC'd mid-flight.
+    pending: set = set()
+
+    def _emit(topic: str, payload: Dict[str, Any]) -> None:
+        import asyncio
+
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return  # no running loop; skip audit emit
+        task = loop.create_task(bus.emit(topic, payload, source="policy_engine"))
+        pending.add(task)
+        task.add_done_callback(pending.discard)
+
+    return _emit
+
+
+def resolve_policy_approval_handler(governance: Any) -> Optional[Any]:
+    """Resolve an approval handler for ASK verdicts (tool or message phases).
+
+    Wires the built-in console handler only when
+    ``governance.interactive_approval`` is set AND stdin is an interactive TTY.
+    Otherwise returns None and ASK resolves via ``ask_fallback``.
+    """
+    if not getattr(governance, "interactive_approval", False):
+        return None
+    try:
+        import sys
+
+        if not sys.stdin or not sys.stdin.isatty():
+            logger.debug("interactive_approval set but stdin is not a TTY; skipping handler")
+            return None
+        from victor.framework.policies import console_approval_handler
+
+        return console_approval_handler
+    except Exception:  # pragma: no cover - defensive
+        return None
+
+
+def build_message_policy_gate(settings: Any, container: Any, model: Optional[str]) -> Optional[Any]:
+    """Build the governance message gate (REQUEST/RESPONSE phases), or None.
+
+    No-op unless the USE_POLICY_ENGINE feature flag and
+    ``settings.governance.enabled`` are both set AND at least one message-phase
+    policy is configured (redaction or block patterns). Mirrors
+    ``CoordinationBuildersMixin._maybe_add_policy_engine`` for the tool path but
+    returns a :class:`~victor.framework.policies.gate.MessagePolicyGate` for the
+    turn boundary to consume.
+    """
+    try:
+        from victor.core.feature_flags import FeatureFlag, is_feature_enabled
+
+        if not is_feature_enabled(FeatureFlag.USE_POLICY_ENGINE):
+            return None
+
+        governance = getattr(settings, "governance", None)
+        if governance is None or not getattr(governance, "enabled", False):
+            return None
+
+        from victor.framework.policies import (
+            BlockPatternPolicy,
+            MessagePolicyGate,
+            Phase,
+            PolicyContext,
+            PolicyEngine,
+            RedactContentPolicy,
+        )
+
+        policies: list = []
+        if getattr(governance, "redact_patterns", None):
+            policies.append(
+                RedactContentPolicy(
+                    governance.redact_patterns,
+                    placeholder=getattr(governance, "redact_placeholder", "[REDACTED]"),
+                )
+            )
+        if getattr(governance, "block_request_patterns", None):
+            policies.append(
+                BlockPatternPolicy(
+                    governance.block_request_patterns,
+                    phases={Phase.REQUEST},
+                    reason="Your message was blocked by a content policy.",
+                )
+            )
+        if getattr(governance, "block_response_patterns", None):
+            policies.append(
+                BlockPatternPolicy(
+                    governance.block_response_patterns,
+                    phases={Phase.RESPONSE},
+                    reason="The response was withheld by a content policy.",
+                )
+            )
+
+        if not policies:
+            return None
+
+        def _context_provider() -> "PolicyContext":
+            return PolicyContext(model=model)
+
+        engine = PolicyEngine(policies, event_emitter=build_policy_emitter(container))
+        gate = MessagePolicyGate(
+            engine,
+            context_provider=_context_provider,
+            approval_handler=resolve_policy_approval_handler(governance),
+            ask_fallback=getattr(governance, "ask_fallback", "deny"),
+        )
+        logger.info(
+            "Message policy gate enabled with %d policy(ies): %s",
+            len(policies),
+            ", ".join(p.name for p in policies),
+        )
+        return gate
+    except Exception as e:  # pragma: no cover - never break runtime init
+        logger.warning("Message policy gate wiring skipped: %s", e)
+        return None
+
+
 class CoordinationBuildersMixin:
     """Mixin providing coordination-related factory methods.
 
@@ -436,58 +571,12 @@ class CoordinationBuildersMixin:
             logger.warning(f"Policy engine wiring skipped: {e}")
 
     def _build_policy_emitter(self) -> Optional[Callable[[str, Dict[str, Any]], None]]:
-        """Build a sync emitter that forwards policy DENY/ASK to the event bus.
-
-        The PolicyEngine calls the emitter synchronously from within an async
-        context; ObservabilityBus.emit is async, so we schedule it on the
-        running loop (best-effort, audit-only). Returns None if the bus is
-        unavailable.
-        """
-        try:
-            from victor.core.events.backends import ObservabilityBus
-
-            bus = self.container.get_optional(ObservabilityBus)
-        except Exception:  # pragma: no cover - defensive
-            bus = None
-        if bus is None:
-            return None
-
-        # Retain references so fire-and-forget audit tasks aren't GC'd mid-flight.
-        pending: set = set()
-
-        def _emit(topic: str, payload: Dict[str, Any]) -> None:
-            import asyncio
-
-            try:
-                loop = asyncio.get_running_loop()
-            except RuntimeError:
-                return  # no running loop; skip audit emit
-            task = loop.create_task(bus.emit(topic, payload, source="policy_engine"))
-            pending.add(task)
-            task.add_done_callback(pending.discard)
-
-        return _emit
+        """Build a sync emitter that forwards policy DENY/ASK to the event bus."""
+        return build_policy_emitter(self.container)
 
     def _resolve_policy_approval_handler(self, governance: Any) -> Optional[Any]:
-        """Resolve an approval handler for ASK verdicts.
-
-        Wires the built-in console handler only when
-        ``governance.interactive_approval`` is set AND stdin is an interactive
-        TTY. Otherwise returns None and ASK resolves via ``ask_fallback``.
-        """
-        if not getattr(governance, "interactive_approval", False):
-            return None
-        try:
-            import sys
-
-            if not sys.stdin or not sys.stdin.isatty():
-                logger.debug("interactive_approval set but stdin is not a TTY; skipping handler")
-                return None
-            from victor.framework.policies import console_approval_handler
-
-            return console_approval_handler
-        except Exception:  # pragma: no cover - defensive
-            return None
+        """Resolve an approval handler for ASK verdicts."""
+        return resolve_policy_approval_handler(governance)
 
     def create_safety_checker(self) -> "SafetyCheckerProtocol":
         """Create safety checker with vertical safety patterns.

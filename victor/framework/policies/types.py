@@ -39,11 +39,15 @@ UNSET: Any = object()
 class Phase(str, Enum):
     """Lifecycle points where policies may intercept agent actions.
 
-    Only the tool phases are wired into the live pipeline today. The enum is
-    intentionally extensible (REQUEST/RESPONSE/LLM phases can be added later
-    without changing the engine contract).
+    Tool phases gate individual tool calls (wired via the middleware chain);
+    message phases gate the user message before the LLM call (REQUEST) and the
+    assistant's final output after it (RESPONSE), wired at the turn boundary.
+    The enum stays extensible (further LLM/streaming phases can be added without
+    changing the engine contract).
     """
 
+    REQUEST = "request"
+    RESPONSE = "response"
     TOOL_CALL = "tool_call"
     TOOL_RESULT = "tool_result"
 
@@ -77,11 +81,16 @@ class PolicyEvent:
     """The unit a policy evaluates.
 
     Attributes:
-        phase: Lifecycle point (TOOL_CALL before execution, TOOL_RESULT after).
-        tool_name: Name of the tool being called.
+        phase: Lifecycle point (TOOL_CALL before execution, TOOL_RESULT after,
+            REQUEST before the LLM call, RESPONSE after it).
+        tool_name: Name of the tool being called. Empty for message phases
+            (REQUEST/RESPONSE), which are not tool-scoped.
         arguments: Tool arguments (the engine threads modifications between
             policies, so a policy sees prior policies' modifications).
         result: Tool result (only meaningful on TOOL_RESULT).
+        content: Message text being gated (the user message on REQUEST, the
+            assistant output on RESPONSE). The engine threads modifications
+            between policies, mirroring ``arguments``/``result``.
         success: Whether the tool execution succeeded (TOOL_RESULT only).
         context: Session snapshot (cost, model, labels, usage).
     """
@@ -90,6 +99,7 @@ class PolicyEvent:
     tool_name: str
     arguments: Dict[str, Any] = field(default_factory=dict)
     result: Any = None
+    content: Optional[str] = None
     success: bool = True
     context: PolicyContext = field(default_factory=PolicyContext)
 
@@ -108,6 +118,8 @@ class PolicyVerdict:
         modified_arguments: Replacement tool arguments, or None to leave as-is.
         modified_result: Replacement tool result, or :data:`UNSET` to leave
             as-is (TOOL_RESULT redaction).
+        modified_content: Replacement message text, or :data:`UNSET` to leave
+            as-is (REQUEST/RESPONSE redaction).
     """
 
     action: PolicyAction
@@ -115,6 +127,7 @@ class PolicyVerdict:
     policy_name: str = ""
     modified_arguments: Optional[Dict[str, Any]] = None
     modified_result: Any = UNSET
+    modified_content: Any = UNSET
 
     @classmethod
     def allow(
@@ -123,13 +136,15 @@ class PolicyVerdict:
         policy_name: str = "",
         modified_arguments: Optional[Dict[str, Any]] = None,
         modified_result: Any = UNSET,
+        modified_content: Any = UNSET,
     ) -> "PolicyVerdict":
-        """Allow the action (optionally modifying arguments or result)."""
+        """Allow the action (optionally modifying arguments, result, or content)."""
         return cls(
             action=PolicyAction.ALLOW,
             policy_name=policy_name,
             modified_arguments=modified_arguments,
             modified_result=modified_result,
+            modified_content=modified_content,
         )
 
     @classmethod

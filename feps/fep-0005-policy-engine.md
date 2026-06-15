@@ -52,21 +52,24 @@ assembled into one declarative layer.
 
 - A small, composable policy abstraction with ALLOW/DENY/ASK verdicts.
 - Phase-based interception at `TOOL_CALL` (gate/modify args) and `TOOL_RESULT`
-  (redact/transform output).
+  (redact/transform output), plus message phases `REQUEST` (gate/redact the user
+  message before the LLM call) and `RESPONSE` (gate/redact the assistant output).
 - Three-level ordering (session → agent → server) with strict-first
   short-circuit on DENY.
 - ASK resolved through the existing `HITLController`, with a fail-safe fallback
   when no approval handler is wired.
-- Builtins: `CostBudgetPolicy`, `AskOnToolsPolicy`, `MaxToolCallsPolicy`.
+- Builtins: `CostBudgetPolicy`, `AskOnToolsPolicy`, `MaxToolCallsPolicy`,
+  `DenyToolsPolicy`, `AllowToolsPolicy` (tool phases); `RedactContentPolicy`,
+  `BlockPatternPolicy` (message phases).
 - Zero behavior change when disabled; opt-in via feature flag + setting.
 - No new parallel abstraction layer; reuse `MiddlewareChain`, `HITLController`,
   and `ConversationStore` cost accounting.
 
 ### Non-Goals
 
-- REQUEST / LLM_REQUEST / RESPONSE phases (the `Phase` enum is left extensible;
-  only tool phases are wired now).
-- Streaming-path integration (`StreamingChatPipeline` has its own loop).
+- Streaming-path integration (`StreamingChatPipeline` has its own loop) — the
+  tool path and the non-streaming turn path (REQUEST/RESPONSE) are covered;
+  streaming is a separate follow-up.
 - Server-wide admin policy distribution/persistence and an interactive CLI
   approval UI (the approval handler is pluggable; default is fail-safe deny).
 - Sandboxing and the Executor-seam refactor (separate future FEPs).
@@ -118,13 +121,37 @@ modifications thread between policies.
   inside* the async `before_tool_call`. If no approval handler is configured,
   the ASK resolves via `ask_fallback` (`"deny"` default = fail safe).
 
+#### Message-phase gate (`gate.py`)
+- The middleware chain is tool-only, so message phases use a thin
+  `MessagePolicyGate` adapter wired at the turn boundary
+  (`TurnExecutor.execute_agentic_loop`), not via `MiddlewareChain`.
+- `gate_request(text)` runs the `REQUEST` phase on the user message *before* it
+  enters history or reaches the LLM; `gate_response(text)` runs the `RESPONSE`
+  phase on the assistant's final output. Both return a `GateResult`
+  (`allowed`, `content`, `reason`, `blocked_by`).
+- A DENY short-circuits the turn: REQUEST-DENY returns a refusal
+  `CompletionResponse` with no LLM call and nothing stored; RESPONSE-DENY
+  replaces the output content and clears tool calls.
+- Redaction substitutes the modified text (REQUEST: the redacted message is what
+  gets stored/sent; RESPONSE: the redacted output is returned). ASK reuses the
+  shared `resolve_policy_ask` helper (same HITL lifecycle and fail-safe as the
+  tool path). `PolicyEvent` gained a `content` field and `PolicyVerdict` a
+  `modified_content` field, both threaded by the engine like `arguments`/`result`.
+- Built lazily by `build_message_policy_gate(settings, container, model)` and
+  injected into `TurnExecutor` — `None` (zero behavior change) unless the flag +
+  `governance.enabled` are set AND at least one message-phase policy is
+  configured (`redact_patterns`, `block_request_patterns`,
+  `block_response_patterns`).
+
 ### API Changes
 
 New public package `victor.framework.policies` exporting `PolicyEngine`,
-`PolicyEngineMiddleware`, `Policy`, `Phase`, `PolicyAction`, `PolicyContext`,
-`PolicyEvent`, `PolicyVerdict`, and the three builtins. New public method
+`PolicyEngineMiddleware`, `MessagePolicyGate`, `GateResult`, `Policy`, `Phase`,
+`PolicyAction`, `PolicyContext`, `PolicyEvent`, `PolicyVerdict`, the builtins,
+and `resolve_policy_ask`. New public method
 `ConversationController.get_session_cost_usd()` (read-only, returns live
-session cost; 0.0 when unavailable).
+session cost; 0.0 when unavailable). `TurnExecutor.__init__` gains an optional
+`message_policy_gate` parameter (default `None`).
 
 ### Configuration Changes
 
@@ -137,8 +164,16 @@ governance:
   cost_ask_thresholds_usd: []           # soft checkpoints -> one-time ASK
   expensive_models: ["opus", "fable", "gpt-5.5"]
   ask_on_tools: []                      # tools requiring approval
+  deny_tools: []                        # tools hard-blocked (DENY)
+  allow_tools: []                       # allowlist (non-empty -> others DENY)
   max_tool_calls_per_session: 0         # 0 = off
   ask_fallback: "deny"                  # "deny" (fail safe) | "allow"
+  interactive_approval: false           # wire console ASK handler (TTY only)
+  # Message phases (REQUEST/RESPONSE):
+  redact_patterns: []                   # regex redacted from message + output
+  redact_placeholder: "[REDACTED]"
+  block_request_patterns: []            # regex -> DENY the user message
+  block_response_patterns: []           # regex -> DENY the assistant output
 ```
 
 New feature flag `USE_POLICY_ENGINE` (`VICTOR_USE_POLICY_ENGINE=true`), opt-in,
@@ -200,13 +235,18 @@ tests.
 ### Phase 3: Rollout (in progress)
 Done: observability emit of DENY/ASK to the event bus; reusable console
 approval handler (`console_approval_handler` / `make_console_approval_handler`)
-wired via the opt-in `governance.interactive_approval` setting (TTY-gated).
-Remaining: docs; optional REQUEST/RESPONSE phases; streaming-path integration;
+wired via the opt-in `governance.interactive_approval` setting (TTY-gated);
+`DenyToolsPolicy` / `AllowToolsPolicy` tool builtins; **REQUEST/RESPONSE message
+phases** (`MessagePolicyGate` at the turn boundary, `RedactContentPolicy` /
+`BlockPatternPolicy` builtins, `build_message_policy_gate` wiring).
+Remaining: streaming-path integration (`StreamingChatPipeline`);
 container-registered approval handler for non-TTY surfaces (API/TUI).
 
 ### Testing Strategy
-36 unit tests covering engine composition, middleware DENY/ASK/fallback, result
-redaction, and the three builtins. Integration smoke test through the real
+Unit tests covering engine composition (incl. `content` threading), middleware
+DENY/ASK/fallback, result/content redaction, all tool + message builtins, the
+message gate (allow/redact/deny/ask), and TurnExecutor gating integration.
+Integration smoke test through the real
 `MiddlewareChain` confirms flag/setting gating and tool-call blocking.
 
 ### Rollout Plan

@@ -1328,3 +1328,133 @@ class TestSummarizeDeterministicToolResults:
 # ---------------------------------------------------------------------------
 # Regression: deterministic trigger conditions for Rust manifest discovery
 # ---------------------------------------------------------------------------
+
+
+# ---------------------------------------------------------------------------
+# Governance message gate (REQUEST/RESPONSE phases)
+# ---------------------------------------------------------------------------
+
+
+class _FakeGate:
+    """Records calls and returns canned GateResults for request/response."""
+
+    def __init__(self, request_result=None, response_result=None):
+        from victor.framework.policies import GateResult
+
+        self._request = request_result or GateResult(allowed=True, content="")
+        self._response = response_result or GateResult(allowed=True, content="")
+        self.request_calls = []
+        self.response_calls = []
+
+    async def gate_request(self, text):
+        from victor.framework.policies import GateResult
+
+        self.request_calls.append(text)
+        if self._request.content == "" and self._request.allowed:
+            # "passthrough" sentinel: echo the input unchanged
+            return GateResult(allowed=True, content=text)
+        return self._request
+
+    async def gate_response(self, text):
+        from victor.framework.policies import GateResult
+
+        self.response_calls.append(text)
+        if self._response.content == "" and self._response.allowed:
+            return GateResult(allowed=True, content=text)
+        return self._response
+
+
+def _make_gated_executor(gate):
+    chat_context = MagicMock()
+    chat_context.add_message = MagicMock()
+    chat_context.conversation = MagicMock()
+    chat_context._orchestrator = None
+    return TurnExecutor(
+        chat_context=chat_context,
+        tool_context=MagicMock(),
+        provider_context=MagicMock(),
+        execution_provider=MagicMock(),
+        message_policy_gate=gate,
+    )
+
+
+async def test_request_deny_short_circuits_without_llm_or_history():
+    from victor.framework.policies import GateResult
+
+    gate = _FakeGate(
+        request_result=GateResult(allowed=False, content="", reason="blocked by policy")
+    )
+    executor = _make_gated_executor(gate)
+    executor._execute_via_agentic_loop = AsyncMock()
+
+    result = await executor.execute_agentic_loop("dangerous message")
+
+    assert isinstance(result, CompletionResponse)
+    assert result.content == "blocked by policy"
+    executor._execute_via_agentic_loop.assert_not_called()
+    executor._chat_context.add_message.assert_not_called()
+    assert gate.request_calls == ["dangerous message"]
+
+
+async def test_request_redaction_substitutes_user_message():
+    from victor.framework.policies import GateResult
+
+    gate = _FakeGate(request_result=GateResult(allowed=True, content="my key is [REDACTED]"))
+    executor = _make_gated_executor(gate)
+    executor._execute_via_agentic_loop = AsyncMock(
+        return_value=CompletionResponse(content="done", role="assistant")
+    )
+
+    await executor.execute_agentic_loop("my key is sk-123")
+
+    # The redacted text is what gets stored and passed downstream.
+    args, kwargs = executor._chat_context.add_message.call_args
+    assert args[0] == "user"
+    assert args[1] == "my key is [REDACTED]"
+    executor._execute_via_agentic_loop.assert_awaited_once()
+    assert executor._execute_via_agentic_loop.await_args.args[0] == "my key is [REDACTED]"
+
+
+async def test_response_redaction_modifies_final_response():
+    from victor.framework.policies import GateResult
+
+    gate = _FakeGate(
+        response_result=GateResult(allowed=True, content="sanitized output"),
+    )
+    executor = _make_gated_executor(gate)
+    executor._execute_via_agentic_loop = AsyncMock(
+        return_value=CompletionResponse(content="raw secret output", role="assistant")
+    )
+
+    result = await executor.execute_agentic_loop("hello")
+
+    assert result.content == "sanitized output"
+    assert gate.response_calls == ["raw secret output"]
+
+
+async def test_response_deny_replaces_content_and_clears_tool_calls():
+    from victor.framework.policies import GateResult
+
+    gate = _FakeGate(
+        response_result=GateResult(allowed=False, content="", reason="withheld"),
+    )
+    executor = _make_gated_executor(gate)
+    executor._execute_via_agentic_loop = AsyncMock(
+        return_value=CompletionResponse(content="leak", role="assistant", tool_calls=[{"id": "1"}])
+    )
+
+    result = await executor.execute_agentic_loop("hello")
+
+    assert result.content == "withheld"
+    assert result.tool_calls is None
+
+
+async def test_no_gate_is_zero_behavior_change():
+    executor = _make_executor()  # message_policy_gate defaults to None
+    assert executor._message_policy_gate is None
+    sentinel = CompletionResponse(content="ok", role="assistant")
+    executor._execute_via_agentic_loop = AsyncMock(return_value=sentinel)
+
+    result = await executor.execute_agentic_loop("hello")
+
+    assert result is sentinel

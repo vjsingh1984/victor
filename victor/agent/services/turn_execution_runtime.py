@@ -169,6 +169,7 @@ class TurnExecutor:
         provider_context: "ProviderContextProtocol",
         execution_provider: Any,  # ExecutionProvider protocol
         exploration_coordinator: Optional[Any] = None,
+        message_policy_gate: Optional[Any] = None,
     ) -> None:
         """Initialize the TurnExecutor.
 
@@ -183,12 +184,17 @@ class TurnExecutor:
                 orchestrator facade and falls back to the direct
                 ExplorationCoordinator helper only when no orchestrator-backed
                 state-passed surface is available.
+            message_policy_gate: Optional governance
+                :class:`~victor.framework.policies.gate.MessagePolicyGate` that
+                gates the REQUEST (user message pre-LLM) and RESPONSE (assistant
+                output) phases. None disables message-phase governance (default).
         """
         self._chat_context = chat_context
         self._tool_context = tool_context
         self._provider_context = provider_context
         self._execution_provider = execution_provider
         self._exploration_coordinator = exploration_coordinator
+        self._message_policy_gate = message_policy_gate
         self._exploration_done = False  # Instance-level: fires once per conversation
         self._last_tool_follow_up_guidance_signature: Optional[tuple[str, ...]] = None
 
@@ -434,6 +440,19 @@ class TurnExecutor:
         Returns:
             CompletionResponse with complete response
         """
+        # Governance REQUEST phase: gate/redact the user message before it
+        # enters history or reaches the LLM. A block short-circuits the turn
+        # (no LLM call, nothing stored); a redaction substitutes the text.
+        if self._message_policy_gate is not None:
+            gate_result = await self._message_policy_gate.gate_request(user_message)
+            if not gate_result.allowed:
+                return CompletionResponse(
+                    content=gate_result.reason or "Your message was blocked by policy.",
+                    role="assistant",
+                    tool_calls=None,
+                )
+            user_message = gate_result.content
+
         # Ensure system prompt is included once at start of conversation
         self._chat_context.conversation.ensure_system_prompt()
         self._chat_context._system_added = True
@@ -452,7 +471,7 @@ class TurnExecutor:
         agentic_loop_state = self._snapshot_agentic_loop_state()
 
         try:
-            return await self._execute_via_agentic_loop(
+            response = await self._execute_via_agentic_loop(
                 user_message,
                 max_iterations,
                 runtime_context_overrides=runtime_context_overrides,
@@ -460,6 +479,26 @@ class TurnExecutor:
         except Exception:
             self._restore_agentic_loop_state(agentic_loop_state)
             raise
+
+        # Governance RESPONSE phase: gate/redact the assistant's final output.
+        if self._message_policy_gate is not None and response is not None:
+            response = await self._gate_final_response(response)
+        return response
+
+    async def _gate_final_response(self, response: CompletionResponse) -> CompletionResponse:
+        """Apply the RESPONSE-phase policy gate to a final assistant response."""
+        original = response.content or ""
+        gate_result = await self._message_policy_gate.gate_response(original)
+        if not gate_result.allowed:
+            return response.model_copy(
+                update={
+                    "content": gate_result.reason or "The response was withheld by policy.",
+                    "tool_calls": None,
+                }
+            )
+        if gate_result.content != original:
+            return response.model_copy(update={"content": gate_result.content})
+        return response
 
     async def prepare_runtime_topology(
         self,

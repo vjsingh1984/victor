@@ -51,6 +51,19 @@ class GovernanceSettings(BaseModel):
     max_tool_calls_per_session: int = 0
 
     # ==========================================================================
+    # Message phases (REQUEST: user message pre-LLM; RESPONSE: assistant output)
+    # ==========================================================================
+    # Regex patterns redacted from BOTH the user message and the assistant
+    # output (matches replaced with redact_placeholder). Empty disables.
+    redact_patterns: List[str] = Field(default_factory=list)
+    # Replacement text for redacted matches.
+    redact_placeholder: str = "[REDACTED]"
+    # Regex patterns that hard-block (DENY) the user message before the LLM call.
+    block_request_patterns: List[str] = Field(default_factory=list)
+    # Regex patterns that hard-block (DENY) the assistant's final output.
+    block_response_patterns: List[str] = Field(default_factory=list)
+
+    # ==========================================================================
     # Approval fallback
     # ==========================================================================
     # Outcome of an ASK verdict when no approval handler is wired:
