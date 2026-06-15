@@ -436,11 +436,25 @@ class TestTeamFormationEnum:
         assert TeamFormation.CONSENSUS is not None
         assert TeamFormation.CONSENSUS.value == "consensus"
 
-    def test_all_formations_count(self):
-        """TeamFormation should have exactly 5 formations."""
+    def test_formation_reflection_exists(self):
+        """TeamFormation should have REFLECTION value."""
         from victor.framework.agent_protocols import TeamFormation
 
-        expected = {"sequential", "parallel", "hierarchical", "pipeline", "consensus"}
+        assert TeamFormation.REFLECTION is not None
+        assert TeamFormation.REFLECTION.value == "reflection"
+
+    def test_all_formations_count(self):
+        """TeamFormation should have exactly 6 formations."""
+        from victor.framework.agent_protocols import TeamFormation
+
+        expected = {
+            "sequential",
+            "parallel",
+            "hierarchical",
+            "pipeline",
+            "consensus",
+            "reflection",
+        }
         actual = {f.value for f in TeamFormation}
         assert actual == expected
 
