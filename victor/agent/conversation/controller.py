@@ -201,6 +201,26 @@ class ConversationController:
         self._last_actual_prompt_tokens: Optional[int] = None
         self._observed_chars_per_token: float = float(self.config.chars_per_token_estimate)
 
+    def get_session_cost_usd(self) -> float:
+        """Return the live cumulative cost (USD) for the active session.
+
+        Reads actual API-returned token costs from the conversation store.
+        Returns 0.0 when no store/session is bound or pricing is unavailable,
+        so callers (e.g. the governance cost-budget policy) degrade gracefully.
+        """
+        if not self._conversation_store or not self._session_id:
+            return 0.0
+        try:
+            stats = self._conversation_store.get_session_token_stats(self._session_id)
+        except Exception:  # pragma: no cover - defensive: cost must not break flow
+            return 0.0
+        if not stats:
+            return 0.0
+        try:
+            return float(stats.get("cost_usd", 0.0) or 0.0)
+        except (TypeError, ValueError):  # pragma: no cover - defensive
+            return 0.0
+
     @property
     def messages(self) -> List[Message]:
         return self._history.messages

@@ -1,0 +1,105 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Approval handlers for resolving policy ASK verdicts.
+
+An approval handler is the standard HITL ``ApprovalHandler`` callable
+(``victor.framework.hitl``): ``async (ApprovalRequest) -> (status, response,
+responder)``. The :class:`~victor.framework.policies.middleware.
+PolicyEngineMiddleware` uses one to turn an ASK verdict into an approve/reject
+decision.
+
+This module provides an interactive console handler for CLI sessions. Library
+and server callers should supply their own handler (e.g. one that elicits over
+a websocket) rather than the console one.
+"""
+
+from __future__ import annotations
+
+import logging
+from typing import Awaitable, Callable, Optional, Tuple
+
+from victor.framework.hitl import ApprovalRequest, ApprovalStatus
+
+logger = logging.getLogger(__name__)
+
+# (approved: bool) decision function, injectable for testing.
+ConfirmFn = Callable[[str], bool]
+
+_ApprovalResult = Tuple[ApprovalStatus, Optional[str], Optional[str]]
+ApprovalHandlerFn = Callable[[ApprovalRequest], Awaitable[_ApprovalResult]]
+
+
+def _default_confirm(prompt: str) -> bool:
+    """Prompt the user on the console, returning True if approved.
+
+    Uses Rich's ``Confirm`` when available, falling back to ``input()``.
+    Defaults to ``False`` (reject) on any error or non-interactive input — a
+    governance prompt should fail safe.
+    """
+    try:
+        from rich.prompt import Confirm
+
+        return bool(Confirm.ask(prompt, default=False))
+    except Exception:
+        pass
+    try:
+        answer = input(f"{prompt} [y/N] ").strip().lower()
+        return answer in {"y", "yes"}
+    except (EOFError, KeyboardInterrupt, Exception):  # pragma: no cover - defensive
+        return False
+
+
+def make_console_approval_handler(confirm_fn: Optional[ConfirmFn] = None) -> ApprovalHandlerFn:
+    """Build an interactive console approval handler.
+
+    Args:
+        confirm_fn: Optional ``(prompt) -> bool`` used to ask the user. Defaults
+            to a Rich/``input()``-based prompt. Injectable for testing.
+
+    Returns:
+        An async ``ApprovalHandler`` suitable for HITLController / the policy
+        middleware.
+
+    Note:
+        The confirm call is synchronous and blocks until the user answers; that
+        is intentional — nothing should proceed while awaiting approval.
+    """
+    confirm = confirm_fn or _default_confirm
+
+    async def handler(request: ApprovalRequest) -> _ApprovalResult:
+        prompt = request.title
+        if request.description:
+            prompt = f"{request.title} — {request.description}"
+        try:
+            approved = confirm(prompt)
+        except Exception:  # pragma: no cover - defensive: fail safe on prompt error
+            logger.debug("Console approval prompt failed; rejecting", exc_info=True)
+            approved = False
+        status = ApprovalStatus.APPROVED if approved else ApprovalStatus.REJECTED
+        return status, "console decision", "console_user"
+
+    return handler
+
+
+#: Default interactive console approval handler.
+console_approval_handler: ApprovalHandlerFn = make_console_approval_handler()
+
+
+__all__ = [
+    "ConfirmFn",
+    "ApprovalHandlerFn",
+    "make_console_approval_handler",
+    "console_approval_handler",
+]

@@ -340,7 +340,154 @@ class CoordinationBuildersMixin:
         except ImportError as e:
             logger.warning(f"Middleware chain unavailable: {e}")
 
+        # Governance policy engine (opt-in: USE_POLICY_ENGINE + governance.enabled).
+        # Assembled from existing primitives — adds a single CRITICAL-priority
+        # middleware that gates tool calls with ALLOW/DENY/ASK verdicts.
+        if middleware_chain is not None:
+            self._maybe_add_policy_engine(middleware_chain)
+
         return middleware_chain, code_correction_middleware
+
+    def _maybe_add_policy_engine(self, middleware_chain: "MiddlewareChain") -> None:
+        """Conditionally add the governance PolicyEngineMiddleware to the chain.
+
+        No-op unless the USE_POLICY_ENGINE feature flag and
+        ``settings.governance.enabled`` are both set. Builtin policies are
+        constructed from ``settings.governance``; the cost context is resolved
+        lazily from the ConversationController (live token cost) and the
+        configured model.
+        """
+        try:
+            from victor.core.feature_flags import FeatureFlag, is_feature_enabled
+
+            if not is_feature_enabled(FeatureFlag.USE_POLICY_ENGINE):
+                return
+
+            governance = getattr(self.settings, "governance", None)
+            if governance is None or not getattr(governance, "enabled", False):
+                return
+
+            from victor.framework.policies import (
+                AllowToolsPolicy,
+                AskOnToolsPolicy,
+                CostBudgetPolicy,
+                DenyToolsPolicy,
+                MaxToolCallsPolicy,
+                PolicyContext,
+                PolicyEngine,
+                PolicyEngineMiddleware,
+            )
+
+            policies: list = []
+            if getattr(governance, "cost_budget_usd", 0.0) or getattr(
+                governance, "cost_ask_thresholds_usd", None
+            ):
+                policies.append(
+                    CostBudgetPolicy(
+                        max_cost_usd=(governance.cost_budget_usd or None),
+                        ask_thresholds_usd=governance.cost_ask_thresholds_usd,
+                        expensive_models=governance.expensive_models,
+                    )
+                )
+            # Hard tool gates first: a DENY must win over an ASK for the same tool
+            # (the engine short-circuits on the first DENY).
+            if getattr(governance, "deny_tools", None):
+                policies.append(DenyToolsPolicy(governance.deny_tools))
+            if getattr(governance, "allow_tools", None):
+                policies.append(AllowToolsPolicy(governance.allow_tools))
+            if getattr(governance, "ask_on_tools", None):
+                policies.append(AskOnToolsPolicy(governance.ask_on_tools))
+            if getattr(governance, "max_tool_calls_per_session", 0):
+                policies.append(MaxToolCallsPolicy(limit=governance.max_tool_calls_per_session))
+
+            if not policies:
+                logger.debug("Policy engine enabled but no policies configured; skipping")
+                return
+
+            model = getattr(self, "model", None)
+
+            def _context_provider() -> PolicyContext:
+                """Resolve a live session snapshot for policy evaluation."""
+                cost = 0.0
+                try:
+                    from victor.agent.conversation.controller import ConversationController
+
+                    controller = self.container.get_optional(ConversationController)
+                    if controller is not None:
+                        cost = controller.get_session_cost_usd()
+                except Exception:  # pragma: no cover - defensive
+                    cost = 0.0
+                return PolicyContext(cost_usd=cost, model=model)
+
+            engine = PolicyEngine(policies, event_emitter=self._build_policy_emitter())
+            middleware = PolicyEngineMiddleware(
+                engine,
+                context_provider=_context_provider,
+                approval_handler=self._resolve_policy_approval_handler(governance),
+                ask_fallback=getattr(governance, "ask_fallback", "deny"),
+            )
+            middleware_chain.add(middleware)
+            logger.info(
+                "Policy engine enabled with %d policy(ies): %s",
+                len(policies),
+                ", ".join(p.name for p in policies),
+            )
+        except Exception as e:  # pragma: no cover - never break orchestrator init
+            logger.warning(f"Policy engine wiring skipped: {e}")
+
+    def _build_policy_emitter(self) -> Optional[Callable[[str, Dict[str, Any]], None]]:
+        """Build a sync emitter that forwards policy DENY/ASK to the event bus.
+
+        The PolicyEngine calls the emitter synchronously from within an async
+        context; ObservabilityBus.emit is async, so we schedule it on the
+        running loop (best-effort, audit-only). Returns None if the bus is
+        unavailable.
+        """
+        try:
+            from victor.core.events.backends import ObservabilityBus
+
+            bus = self.container.get_optional(ObservabilityBus)
+        except Exception:  # pragma: no cover - defensive
+            bus = None
+        if bus is None:
+            return None
+
+        # Retain references so fire-and-forget audit tasks aren't GC'd mid-flight.
+        pending: set = set()
+
+        def _emit(topic: str, payload: Dict[str, Any]) -> None:
+            import asyncio
+
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                return  # no running loop; skip audit emit
+            task = loop.create_task(bus.emit(topic, payload, source="policy_engine"))
+            pending.add(task)
+            task.add_done_callback(pending.discard)
+
+        return _emit
+
+    def _resolve_policy_approval_handler(self, governance: Any) -> Optional[Any]:
+        """Resolve an approval handler for ASK verdicts.
+
+        Wires the built-in console handler only when
+        ``governance.interactive_approval`` is set AND stdin is an interactive
+        TTY. Otherwise returns None and ASK resolves via ``ask_fallback``.
+        """
+        if not getattr(governance, "interactive_approval", False):
+            return None
+        try:
+            import sys
+
+            if not sys.stdin or not sys.stdin.isatty():
+                logger.debug("interactive_approval set but stdin is not a TTY; skipping handler")
+                return None
+            from victor.framework.policies import console_approval_handler
+
+            return console_approval_handler
+        except Exception:  # pragma: no cover - defensive
+            return None
 
     def create_safety_checker(self) -> "SafetyCheckerProtocol":
         """Create safety checker with vertical safety patterns.

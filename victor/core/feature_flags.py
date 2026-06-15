@@ -169,6 +169,13 @@ class FeatureFlag(Enum):
     # Default: False (opt-in, enable with VICTOR_USE_TIERED_CLASSIFICATION=true)
     USE_TIERED_CLASSIFICATION = "use_tiered_classification"
 
+    # Phase 18 - Governance Policy Engine (ALLOW/DENY/ASK over tool execution)
+    # Gates wiring of PolicyEngineMiddleware into the tool pipeline (see
+    # victor/framework/policies/ and settings.governance). Enabling requires
+    # both this flag and settings.governance.enabled=True.
+    # Default: False (opt-in, enable with VICTOR_USE_POLICY_ENGINE=true)
+    USE_POLICY_ENGINE = "use_policy_engine"
+
     def get_env_var_name(self) -> str:
         """Get the environment variable name for this flag.
 
@@ -206,6 +213,8 @@ class FeatureFlag(Enum):
             FeatureFlag.USE_STAGE_TRANSITION_COORDINATOR,
             # Phase 17: Tiered Classification (opt-in, off by default)
             FeatureFlag.USE_TIERED_CLASSIFICATION,
+            # Phase 18: Governance Policy Engine (opt-in, off by default)
+            FeatureFlag.USE_POLICY_ENGINE,
         }
 
     def get_default_enabled(self, fallback: bool) -> bool:

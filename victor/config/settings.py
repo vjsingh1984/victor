@@ -527,6 +527,7 @@ from victor.config.groups import (
     EmbeddingSettings,
     ToolSelectionSettings,
     FuzzyMatchingSettings,
+    GovernanceSettings,
 )
 
 # Old config imports (to be migrated to groups)
@@ -632,6 +633,7 @@ _NESTED_GROUPS = {
     "embedding": EmbeddingSettings,
     "tool_selection": ToolSelectionSettings,
     "fuzzy_matching": FuzzyMatchingSettings,
+    "governance": GovernanceSettings,
 }
 
 
@@ -1134,6 +1136,7 @@ class Settings(BaseSettings):
     embedding: Optional[EmbeddingSettings] = Field(default=None, exclude=True, repr=False)
     tool_selection: Optional[ToolSelectionSettings] = Field(default=None, exclude=True, repr=False)
     fuzzy_matching: Optional[FuzzyMatchingSettings] = Field(default=None, exclude=True, repr=False)
+    governance: Optional[GovernanceSettings] = Field(default=None, exclude=True, repr=False)
 
     tool_settings: Optional[ToolSettings] = Field(
         default_factory=ToolSettings, exclude=True, repr=False
