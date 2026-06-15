@@ -13,6 +13,29 @@ from victor.agent.semantic_response_cache import (
 class TestSemanticResponseCache:
     """Test semantic response cache functionality."""
 
+    @pytest.fixture(autouse=True)
+    def _deterministic_embeddings(self, monkeypatch):
+        """Make the cache hermetic by replacing the real embedding model.
+
+        ``SemanticResponseCache._embed`` lazily loads a real
+        ``SentenceTransformer("BAAI/bge-small-en-v1.5")`` — a network/HuggingFace
+        model download. On CI that download is intermittently slow/unavailable;
+        when it fails, ``set()`` silently skips storing the entry, which made the
+        storage/stats/eviction assertions fail non-deterministically. These tests
+        only need identical text -> identical vector (a hit) and different text ->
+        a near-orthogonal vector (a miss), not real semantics, so a deterministic
+        offline embedding removes the flakiness without changing behavior.
+        """
+        import hashlib
+
+        def _fake_embed(_self, text: str) -> np.ndarray:
+            seed = int.from_bytes(hashlib.sha256(text.encode("utf-8")).digest()[:4], "little")
+            vec = np.random.RandomState(seed).randn(384).astype(np.float32)
+            norm = np.linalg.norm(vec)
+            return vec / norm if norm else vec
+
+        monkeypatch.setattr(SemanticResponseCache, "_embed", _fake_embed)
+
     def test_initialization(self):
         """Test cache initialization with defaults."""
         cache = SemanticResponseCache()
