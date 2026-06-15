@@ -36,7 +36,10 @@ import subprocess
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Tuple, Union
+
+if TYPE_CHECKING:
+    from victor.tools.sandbox import SandboxBackend
 
 logger = logging.getLogger(__name__)
 
@@ -335,6 +338,46 @@ def check_pip_available() -> bool:
 # =============================================================================
 
 
+def _resolve_default_sandbox() -> "SandboxBackend":
+    """Resolve the sandbox backend from global settings (fail-open to none).
+
+    Reads ``settings.sandbox`` (off by default). Any failure degrades to no
+    sandbox so subprocess execution is never broken by sandbox resolution.
+    """
+    from victor.tools.sandbox import NoneSandbox, resolve_sandbox_backend
+
+    try:
+        from victor.config.settings import get_settings
+
+        sandbox_settings = getattr(get_settings(), "sandbox", None)
+        return resolve_sandbox_backend(sandbox_settings)
+    except Exception:  # pragma: no cover - defensive: never break execution
+        return NoneSandbox()
+
+
+def _apply_sandbox(
+    sandbox: "Optional[SandboxBackend]",
+    args: Union[str, List[str]],
+    shell: bool,
+    working_dir: Optional[Union[str, Path]],
+) -> Tuple[Union[str, List[str]], bool]:
+    """Wrap ``args`` with the sandbox launcher if one is active.
+
+    Returns ``(exec_args, exec_shell)``. When no sandbox is active the inputs
+    are returned unchanged (zero behavior change with sandboxing disabled).
+    A wrapped command always runs as an argv list with ``shell=False``.
+    """
+    backend = sandbox if sandbox is not None else _resolve_default_sandbox()
+    if backend.type_name == "none":
+        return args, shell
+
+    cwd_path = Path(working_dir) if working_dir else None
+    if shell or isinstance(args, str):
+        cmd_str = args if isinstance(args, str) else " ".join(args)
+        return backend.wrap_argv(["/bin/sh", "-c", cmd_str], cwd_path), False
+    return backend.wrap_argv(list(args), cwd_path), False
+
+
 def run_command(
     args: Union[str, List[str]],
     working_dir: Optional[Union[str, Path]] = None,
@@ -344,6 +387,7 @@ def run_command(
     shell: bool = False,
     preexec_fn: Optional[Callable[[], None]] = None,
     max_output_bytes: int = 0,
+    sandbox: "Optional[SandboxBackend]" = None,
 ) -> CommandResult:
     """Execute a command synchronously and return structured result.
 
@@ -356,6 +400,8 @@ def run_command(
         shell: Whether to use shell execution (default: False).
         preexec_fn: Callable invoked in the child process before exec (POSIX only).
         max_output_bytes: Truncate stdout/stderr beyond this many bytes (0 = no limit).
+        sandbox: Optional sandbox backend. When None, resolved from settings
+            (off by default). A non-none backend wraps the command argv.
 
     Returns:
         CommandResult with execution details.
@@ -394,15 +440,18 @@ def run_command(
                 working_dir=str(working_dir),
             )
 
+    # Apply OS sandbox if active (no-op when disabled; default off).
+    exec_args, exec_shell = _apply_sandbox(sandbox, args, shell, working_dir)
+
     try:
         result = subprocess.run(
-            args,
+            exec_args,
             capture_output=True,
             text=True,
             timeout=timeout,
             cwd=working_dir,
             env=env,
-            shell=shell,  # nosec B602
+            shell=exec_shell,  # nosec B602
             preexec_fn=preexec_fn,  # nosec B603
         )
 
@@ -501,6 +550,7 @@ async def run_command_async(
     env: Optional[Dict[str, str]] = None,
     preexec_fn: Optional[Callable[[], None]] = None,
     max_output_bytes: int = 0,
+    sandbox: "Optional[SandboxBackend]" = None,
 ) -> CommandResult:
     """Execute a shell command asynchronously and return structured result.
 
@@ -512,6 +562,9 @@ async def run_command_async(
         env: Environment variables to set.
         preexec_fn: Callable invoked in the child process before exec (POSIX only).
         max_output_bytes: Truncate stdout/stderr beyond this many bytes (0 = no limit).
+        sandbox: Optional sandbox backend. When None, resolved from settings
+            (off by default). A non-none backend wraps the command argv and
+            runs it via exec instead of the shell.
 
     Returns:
         CommandResult with execution details.
@@ -548,16 +601,31 @@ async def run_command_async(
                 working_dir=str(working_dir),
             )
 
+    # Apply OS sandbox if active (no-op when disabled; default off).
+    backend = sandbox if sandbox is not None else _resolve_default_sandbox()
+
     try:
-        logger.debug("Executing command via shell: %.200s", command)
-        process = await asyncio.create_subprocess_shell(
-            command,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            cwd=cwd,
-            env=env,
-            preexec_fn=preexec_fn,
-        )
+        if backend.type_name != "none":
+            wrapped = backend.wrap_argv(["/bin/sh", "-c", command], cwd)
+            logger.debug("Executing command via %s sandbox: %.200s", backend.type_name, command)
+            process = await asyncio.create_subprocess_exec(
+                *wrapped,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                cwd=cwd,
+                env=env,
+                preexec_fn=preexec_fn,
+            )
+        else:
+            logger.debug("Executing command via shell: %.200s", command)
+            process = await asyncio.create_subprocess_shell(
+                command,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                cwd=cwd,
+                env=env,
+                preexec_fn=preexec_fn,
+            )
 
         try:
             stdout, stderr = await asyncio.wait_for(

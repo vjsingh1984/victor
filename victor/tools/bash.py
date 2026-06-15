@@ -23,6 +23,7 @@ import platform
 import re
 import shlex
 import shutil
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
 
 logger = logging.getLogger(__name__)
@@ -1119,13 +1120,25 @@ async def shell(
                 # If caching fails, fall through to normal execution
                 logger.warning(f"Cache lookup failed, executing directly: {cache_error}")
 
-        # Create subprocess
-        process = await asyncio.create_subprocess_shell(
-            cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            cwd=cwd,
-        )
+        # Create subprocess (apply OS sandbox if active; default off = no change).
+        from victor.tools.subprocess_executor import _resolve_default_sandbox
+
+        _sandbox = _resolve_default_sandbox()
+        if _sandbox.type_name != "none":
+            _wrapped = _sandbox.wrap_argv(["/bin/sh", "-c", cmd], Path(cwd) if cwd else None)
+            process = await asyncio.create_subprocess_exec(
+                *_wrapped,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                cwd=cwd,
+            )
+        else:
+            process = await asyncio.create_subprocess_shell(
+                cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                cwd=cwd,
+            )
 
         # Wait for completion with timeout
         try:
