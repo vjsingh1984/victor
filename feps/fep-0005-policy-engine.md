@@ -21,11 +21,18 @@ Add a declarative **governance policy engine** to Victor that intercepts agent
 tool execution at defined lifecycle phases and returns one of three verdicts —
 **ALLOW / DENY / ASK** — composing an ordered list of policies (session →
 agent → server, strictest-first). The engine is assembled entirely from
-existing framework primitives (the `MiddlewareChain` tool seam, the
-`HITLController` approval flow, and live token/cost accounting), exposed to the
-tool pipeline as a single `CRITICAL`-priority middleware. Ships with three
-builtins: cost budget, tool-approval gate, and per-session tool-call cap.
-Disabled by default behind the `USE_POLICY_ENGINE` feature flag.
+existing framework primitives (the `MiddlewareChain` tool seam, the turn
+boundary, the `HITLController` approval flow, and live token/cost accounting),
+exposed to the tool pipeline as a single `CRITICAL`-priority middleware and to
+the turn path as a `MessagePolicyGate`. The engine spans both tool phases
+(`TOOL_CALL` / `TOOL_RESULT`) and message phases (`REQUEST` gates/redacts the
+user message before the LLM call; `RESPONSE` gates/redacts the assistant
+output), on both the non-streaming and streaming paths. It ships with tool
+builtins (cost budget, ask/deny/allow tool gates, per-session call cap) and
+message builtins (regex redaction, content block). Everything is disabled by
+default behind the `USE_POLICY_ENGINE` feature flag plus `governance.enabled`,
+is fail-safe (an absent approval handler resolves ASK to DENY), and adds no new
+parallel abstraction layer.
 
 This is a cross-learning from **Omnigent** (a meta-harness over Claude Code,
 Codex, and Pi), whose standout, directly-transplantable feature is exactly such
@@ -190,16 +197,21 @@ and `victor.agent.conversation` cost accounting.
 ## Benefits
 
 ### For Framework Users
-Spend caps, "ask before risky tools," and runaway-call guards — declaratively,
-without writing middleware.
+Spend caps, "ask before risky tools," runaway-call guards, secret/PII redaction
+from prompts and outputs, and content blocks — all declaratively, without
+writing middleware. Governance applies uniformly across the non-streaming and
+streaming chat paths, so behavior does not depend on which surface a user runs.
 
 ### For Vertical Developers
-A first-class extension point: ship domain policies as `Policy` subclasses
-instead of bespoke middleware.
+A first-class extension point: ship domain policies as small `Policy` subclasses
+(tool or message phase) instead of bespoke middleware, and supply a
+container-registered approval handler to drive ASK on non-TTY surfaces (HTTP
+API, TUI, websocket) without reimplementing the elicitation lifecycle.
 
 ### For the Ecosystem
-Closes a documented competitive gap (governance/production maturity) and gives
-a foundation for future REQUEST/RESPONSE-phase policies and admin distribution.
+Closes a documented competitive gap (governance / production maturity) and gives
+a foundation for future phases (per-step governance of external-harness
+executors, FEP-0006) and server-wide admin policy distribution.
 
 ## Drawbacks and Alternatives
 
@@ -257,6 +269,37 @@ Integration smoke test through the real
 
 ### Rollout Plan
 Opt-in flag, off by default; no behavior change until explicitly enabled.
+
+## Migration Path
+
+No migration is required: the policy engine is purely additive and opt-in. With
+`USE_POLICY_ENGINE` unset (the default) or `governance.enabled = false`, no
+middleware or message gate is wired and behavior is byte-for-byte unchanged —
+existing agents, tools, and chat surfaces are unaffected.
+
+### Adopting governance
+
+To enable, set the feature flag and configure at least one policy:
+
+```bash
+export VICTOR_USE_POLICY_ENGINE=true
+```
+
+```yaml
+governance:
+  enabled: true
+  cost_budget_usd: 5.0
+  ask_on_tools: ["run_command"]
+  redact_patterns: ["sk-[A-Za-z0-9]+"]   # message-phase redaction
+```
+
+No code changes are needed for the builtins. Custom policies are added by
+subclassing `Policy`; non-TTY surfaces opt into interactive ASK by registering a
+`PolicyApprovalHandler` in the DI container. There is no deprecation: this FEP
+introduces new capability and removes nothing.
+
+### Deprecation Timeline
+None — no existing API is changed or removed.
 
 ## Compatibility
 

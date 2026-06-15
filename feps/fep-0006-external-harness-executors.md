@@ -259,17 +259,21 @@ policy.
 ## Benefits
 
 ### For Framework Users
-- Delegate whole tasks to best-in-class external agents from inside Victor.
+- Delegate whole tasks to best-in-class external agents from inside Victor,
+  without leaving the Victor session or losing its session/observability context.
 - Cross-harness review/benchmark flows (implement with one agent, review with
-  Victor) — composes with heterogeneous teams.
+  Victor) — composes directly with the heterogeneous-teams work, so an external
+  agent can be a team member alongside native providers.
 
 ### For Vertical Developers
 - A documented executor seam to add domain-specific external agents without
-  faking a provider.
+  faking a single-round-trip provider, with one isolated adapter per harness so
+  format drift is contained.
 
 ### For the Ecosystem
 - Closes Victor's biggest gap vs. meta-harnesses (Omnigent's core superpower):
-  orchestrating *other agents*, not just models.
+  orchestrating *other agents*, not just models — while keeping the governance
+  and sandbox story honest about what black-box vs. streamed-step can enforce.
 
 ## Drawbacks and Alternatives
 
