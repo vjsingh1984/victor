@@ -106,6 +106,29 @@ jobs:
         run: |
           python -c "import victor, victor_contracts.cli, lancedb, pytest_asyncio, scipy; print(victor.__file__)"
 
+      - name: Pre-cache embedding model
+        run: |
+          # EmbeddingService / SemanticResponseCache lazily load
+          # BAAI/bge-small-en-v1.5 the first time a test exercises them. A failed
+          # in-test HuggingFace download then surfaces as a NON-deterministic test
+          # failure (e.g. semantic cache / weighted-similarity / prompt-corpus
+          # tests). Pre-fetch the model here with retries so it is cached on disk
+          # before the suite runs. Best-effort: never fail the job on a model
+          # download issue (tests degrade as before, no worse).
+          cat > /tmp/precache_model.py <<'PY'
+          from sentence_transformers import SentenceTransformer
+
+          SentenceTransformer("BAAI/bge-small-en-v1.5")
+          print("embedding model cached")
+          PY
+          for attempt in 1 2 3; do
+            if python /tmp/precache_model.py; then
+              break
+            fi
+            echo "Embedding model pre-cache attempt ${attempt} failed; retrying..."
+            sleep 5
+          done || true
+
       - name: Run tests (sharded)
         run: |
           # Coverage only on 3.11 shard 1 (where Codecov upload happens)
