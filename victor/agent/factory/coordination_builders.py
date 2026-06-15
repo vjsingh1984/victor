@@ -114,13 +114,29 @@ def build_policy_emitter(container: Any) -> Optional[Callable[[str, Dict[str, An
     return _emit
 
 
-def resolve_policy_approval_handler(governance: Any) -> Optional[Any]:
+def resolve_policy_approval_handler(governance: Any, container: Any = None) -> Optional[Any]:
     """Resolve an approval handler for ASK verdicts (tool or message phases).
 
-    Wires the built-in console handler only when
-    ``governance.interactive_approval`` is set AND stdin is an interactive TTY.
-    Otherwise returns None and ASK resolves via ``ask_fallback``.
+    Resolution order:
+      1. A ``PolicyApprovalHandler`` registered in the DI container — used on any
+         surface (HTTP API, TUI, websocket), taking precedence so non-TTY
+         surfaces can supply their own elicitation.
+      2. The built-in console handler, only when ``governance.interactive_approval``
+         is set AND stdin is an interactive TTY.
+      3. None — ASK then resolves via ``ask_fallback`` (default fail-safe deny).
     """
+    # 1. Container-registered handler (works on non-TTY surfaces).
+    if container is not None:
+        try:
+            from victor.framework.policies import PolicyApprovalHandler
+
+            holder = container.get_optional(PolicyApprovalHandler)
+            if holder is not None and getattr(holder, "handler", None) is not None:
+                return holder.handler
+        except Exception:  # pragma: no cover - defensive
+            pass
+
+    # 2. TTY console handler (opt-in).
     if not getattr(governance, "interactive_approval", False):
         return None
     try:
@@ -200,7 +216,7 @@ def build_message_policy_gate(settings: Any, container: Any, model: Optional[str
         gate = MessagePolicyGate(
             engine,
             context_provider=_context_provider,
-            approval_handler=resolve_policy_approval_handler(governance),
+            approval_handler=resolve_policy_approval_handler(governance, container),
             ask_fallback=getattr(governance, "ask_fallback", "deny"),
         )
         logger.info(
@@ -576,7 +592,7 @@ class CoordinationBuildersMixin:
 
     def _resolve_policy_approval_handler(self, governance: Any) -> Optional[Any]:
         """Resolve an approval handler for ASK verdicts."""
-        return resolve_policy_approval_handler(governance)
+        return resolve_policy_approval_handler(governance, self.container)
 
     def create_safety_checker(self) -> "SafetyCheckerProtocol":
         """Create safety checker with vertical safety patterns.

@@ -174,6 +174,36 @@ def test_approval_handler_wired_when_interactive_tty(monkeypatch):
     assert callable(handler)
 
 
+def test_container_registered_handler_used_on_non_tty():
+    # A container-registered PolicyApprovalHandler resolves even when
+    # interactive_approval is off and there is no TTY (API/TUI surfaces).
+    from victor.framework.policies import PolicyApprovalHandler
+
+    async def my_handler(_request):
+        return None
+
+    s = _governed_settings(interactive_approval=False)
+    container = _FakeContainer({PolicyApprovalHandler: PolicyApprovalHandler(my_handler)})
+    host = _Host(s, container=container)
+    assert host._resolve_policy_approval_handler(s.governance) is my_handler
+
+
+def test_container_handler_takes_precedence_over_console(monkeypatch):
+    import sys
+
+    from victor.framework.policies import PolicyApprovalHandler
+
+    async def my_handler(_request):
+        return None
+
+    s = _governed_settings(interactive_approval=True)
+    container = _FakeContainer({PolicyApprovalHandler: PolicyApprovalHandler(my_handler)})
+    host = _Host(s, container=container)
+    monkeypatch.setattr(sys.stdin, "isatty", lambda: True, raising=False)
+    # Even with interactive TTY available, the registered handler wins.
+    assert host._resolve_policy_approval_handler(s.governance) is my_handler
+
+
 # ---------------------------------------------------------------------------
 # Message policy gate builder (REQUEST/RESPONSE phases)
 # ---------------------------------------------------------------------------

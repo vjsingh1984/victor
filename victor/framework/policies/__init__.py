@@ -47,6 +47,7 @@ from victor.framework.policies.engine import EventEmitter, PolicyEngine
 from victor.framework.policies.gate import GateResult, MessagePolicyGate
 from victor.framework.policies.handlers import (
     ApprovalHandlerFn,
+    PolicyApprovalHandler,
     console_approval_handler,
     make_console_approval_handler,
 )
@@ -87,6 +88,7 @@ __all__ = [
     # Approval handlers
     "console_approval_handler",
     "make_console_approval_handler",
+    "PolicyApprovalHandler",
     "ApprovalHandlerFn",
     "resolve_policy_ask",
     # Aliases

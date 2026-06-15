@@ -97,9 +97,29 @@ def make_console_approval_handler(confirm_fn: Optional[ConfirmFn] = None) -> App
 console_approval_handler: ApprovalHandlerFn = make_console_approval_handler()
 
 
+class PolicyApprovalHandler:
+    """Container-registerable holder for a policy ASK approval handler.
+
+    The console handler is TTY-only. Non-interactive surfaces (HTTP API, TUI,
+    websocket) that want ASK verdicts resolved interactively register one of
+    these in the DI container::
+
+        from victor.framework.policies import PolicyApprovalHandler
+        container.register(PolicyApprovalHandler, PolicyApprovalHandler(my_handler))
+
+    The policy wiring then resolves it (taking precedence over the TTY console
+    handler) so ASK works on any surface that supplies its own elicitation.
+    """
+
+    def __init__(self, handler: ApprovalHandlerFn) -> None:
+        """Wrap an async ``ApprovalHandler`` callable."""
+        self.handler = handler
+
+
 __all__ = [
     "ConfirmFn",
     "ApprovalHandlerFn",
     "make_console_approval_handler",
     "console_approval_handler",
+    "PolicyApprovalHandler",
 ]
