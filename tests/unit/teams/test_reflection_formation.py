@@ -210,3 +210,78 @@ async def test_create_reflection_team_warns_same_vendor(_stub_coordinator, caplo
             critic=TeamMemberSpec(role="reviewer", goal="r", provider="openai"),
         )
     assert any("share provider" in r.message for r in caplog.records)
+
+
+# -- satisfaction judging (verdict-preferred, keyword fallback) --------------
+
+
+def test_verdict_satisfied_wins_over_keyword_absence():
+    f = ReflectionFormation()
+    # Explicit verdict, no positive keywords at all.
+    assert f._is_satisfied("Looks fine overall.\nVERDICT: SATISFIED") is True
+
+
+def test_verdict_needs_work_overrides_positive_keywords():
+    f = ReflectionFormation()
+    # Contains "good" but the critic's verdict is NEEDS_WORK -> not satisfied.
+    assert f._is_satisfied("This is good in places.\nVERDICT: NEEDS_WORK") is False
+
+
+def test_verdict_tolerates_markdown_formatting():
+    f = ReflectionFormation()
+    assert f._is_satisfied("**VERDICT:** SATISFIED") is True
+    assert f._is_satisfied("verdict - needs_work") is False
+
+
+def test_keyword_fallback_when_no_verdict():
+    f = ReflectionFormation()
+    assert f._is_satisfied("this looks good to me") is True
+
+
+def test_keyword_fallback_respects_negation():
+    f = ReflectionFormation()
+    # "not good" / "not acceptable" must NOT read as satisfaction.
+    assert f._is_satisfied("this is not good yet") is False
+    assert f._is_satisfied("the result is not acceptable") is False
+
+
+def test_empty_feedback_not_satisfied():
+    assert ReflectionFormation()._is_satisfied("") is False
+    assert ReflectionFormation()._is_satisfied(None) is False
+
+
+# -- richer critique prompt (includes original task + verdict request) -------
+
+
+async def test_critique_prompt_includes_original_task_and_verdict_request():
+    captured = {}
+
+    class _RecordingCritic(_FakeMember):
+        async def execute(self, prompt, context=None):  # context-agent shim API
+            captured["prompt"] = prompt
+            return "VERDICT: SATISFIED"
+
+    class _Gen(_FakeMember):
+        async def execute(self, prompt, context=None):
+            self.calls += 1
+            return "the solution"
+
+    gen = _Gen("g", "generator")
+    crit = _RecordingCritic("c", "critic")
+    ctx = TeamContext(
+        team_id="t",
+        formation="reflection",
+        shared_state={"generator": gen, "critic": crit},
+    )
+    task = AgentMessage(
+        sender_id="t", content="Implement feature X correctly", message_type=MessageType.TASK
+    )
+
+    results = await ReflectionFormation(max_iterations=3).execute([], ctx, task)
+
+    # Original task surfaced to the critic, and a verdict line was requested.
+    assert "Implement feature X correctly" in captured["prompt"]
+    assert "VERDICT" in captured["prompt"]
+    # SATISFIED verdict -> early termination after one round.
+    assert gen.calls == 1
+    assert results[0].metadata["satisfied"] is True

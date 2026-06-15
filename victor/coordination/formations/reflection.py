@@ -47,12 +47,19 @@ Usage:
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any, Dict, List, Optional
 
 from victor.coordination.formations.base import BaseFormationStrategy, TeamContext
 from victor.teams.types import AgentMessage, MemberResult
 
 logger = logging.getLogger(__name__)
+
+# Explicit verdict line the critic is asked to emit so satisfaction is judged by
+# the critic LLM rather than inferred from incidental positive words.
+_VERDICT_RE = re.compile(r"verdict\W+(satisfied|needs[ _]work)", re.IGNORECASE)
+# Negations immediately preceding a satisfaction keyword (keyword fallback only).
+_NEGATION_RE = re.compile(r"\b(not|no|never|isn't|aren't|wasn't|n't)\b\W*$", re.IGNORECASE)
 
 
 class ReflectionFormation(BaseFormationStrategy):
@@ -154,6 +161,11 @@ class ReflectionFormation(BaseFormationStrategy):
         result = None
         feedback = None
 
+        # Preserve the original task so every critique judges fitness against
+        # what was actually asked (not just the candidate solution in isolation),
+        # and so refinement rounds keep the goal in view.
+        original_task = task.content
+
         # Per-run iteration bound: a team may override via context
         # ("reflection_max_iterations") so the shared formation instance stays
         # stateless and concurrency-safe. Falls back to the instance default.
@@ -180,10 +192,8 @@ class ReflectionFormation(BaseFormationStrategy):
                     )
                 ]
 
-            # Critique the solution
-            critique_prompt = (
-                f"Critique this solution:\n\n{result}\n\nProvide feedback for improvement."
-            )
+            # Critique the solution against the original task.
+            critique_prompt = self._build_critique_prompt(original_task, result)
             try:
                 critique_response = await critic.execute(
                     critique_prompt, context=context.shared_state
@@ -193,7 +203,7 @@ class ReflectionFormation(BaseFormationStrategy):
                 logger.warning(f"Critic failed in iteration {iteration + 1}: {e}")
                 feedback = f"Critique unavailable: {str(e)}"
 
-            # Check if satisfied
+            # Check if satisfied (critic verdict preferred; keyword fallback)
             if self._is_satisfied(feedback):
                 logger.info(f"Critic satisfied after {iteration + 1} iterations")
                 break
@@ -203,7 +213,7 @@ class ReflectionFormation(BaseFormationStrategy):
 
             task = AgentMessage(
                 sender_id="reflection_formation",
-                content=f"Refine this solution based on feedback:\n\n{result}\n\nFeedback: {feedback}",
+                content=self._build_refine_prompt(original_task, result, feedback),
                 message_type=MessageType.TASK,
             )
 
@@ -267,25 +277,78 @@ class ReflectionFormation(BaseFormationStrategy):
         """Reflection reads its 'generator' and 'critic' agents from context."""
         return True
 
+    @staticmethod
+    def _build_critique_prompt(original_task: str, result: Any) -> str:
+        """Build a critique prompt that judges the solution against the task.
+
+        Includes the original task so the critic assesses fitness-for-purpose,
+        and requests an explicit verdict line so satisfaction can be judged by
+        the critic rather than inferred from incidental positive words.
+        """
+        return (
+            "You are reviewing a candidate solution against the original task.\n\n"
+            f"ORIGINAL TASK:\n{original_task}\n\n"
+            f"CANDIDATE SOLUTION:\n{result}\n\n"
+            "Assess whether the solution fully and correctly satisfies the "
+            "original task. Give specific, actionable feedback on anything that "
+            "is missing, incorrect, or could be improved.\n"
+            "End your reply with a final line exactly of the form "
+            "'VERDICT: SATISFIED' if no further work is needed, or "
+            "'VERDICT: NEEDS_WORK' otherwise."
+        )
+
+    @staticmethod
+    def _build_refine_prompt(original_task: str, result: Any, feedback: Optional[str]) -> str:
+        """Build a refinement prompt that keeps the original task in view."""
+        return (
+            "Refine your solution to better satisfy the original task.\n\n"
+            f"ORIGINAL TASK:\n{original_task}\n\n"
+            f"CURRENT SOLUTION:\n{result}\n\n"
+            f"REVIEWER FEEDBACK:\n{feedback}\n\n"
+            "Produce an improved solution that addresses the feedback while "
+            "fully satisfying the original task."
+        )
+
     def _is_satisfied(self, feedback: Optional[str]) -> bool:
-        """Check if critic feedback indicates satisfaction.
+        """Check whether critic feedback indicates satisfaction.
+
+        Prefers the critic's explicit ``VERDICT: SATISFIED`` / ``NEEDS_WORK``
+        line (LLM-judged). Falls back to satisfaction-keyword matching only when
+        no verdict line is present, with a guard so a negated keyword (e.g.
+        "not good") does not count as satisfaction.
 
         Args:
             feedback: Critic's feedback text
 
         Returns:
-            True if feedback contains satisfaction keywords
+            True if the critic is satisfied.
         """
         if not feedback:
             return False
 
-        feedback_lower = feedback.lower()
+        verdict = self._parse_verdict(feedback)
+        if verdict is not None:
+            return verdict
 
-        # Check for satisfaction keywords
+        return self._keyword_satisfied(feedback)
+
+    @staticmethod
+    def _parse_verdict(feedback: str) -> Optional[bool]:
+        """Return True/False from an explicit VERDICT line, or None if absent."""
+        match = _VERDICT_RE.search(feedback)
+        if not match:
+            return None
+        return match.group(1).lower().startswith("satisfied")
+
+    def _keyword_satisfied(self, feedback: str) -> bool:
+        """Heuristic fallback: a non-negated satisfaction keyword is present."""
+        text = feedback.lower()
         for keyword in self.satisfaction_keywords:
-            if keyword in feedback_lower:
+            for hit in re.finditer(r"\b" + re.escape(keyword.lower()) + r"\b", text):
+                preceding = text[max(0, hit.start() - 12) : hit.start()]
+                if _NEGATION_RE.search(preceding):
+                    continue
                 return True
-
         return False
 
 
