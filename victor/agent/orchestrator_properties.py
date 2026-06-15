@@ -199,21 +199,17 @@ def _turn_executor(self: "AgentOrchestrator") -> Any:
     """Get the execution coordinator for agentic loop (lazy init)."""
     if self._turn_executor is None:
         from victor.agent.services.turn_execution_runtime import TurnExecutor
-        from victor.agent.factory.coordination_builders import build_message_policy_gate
 
-        # Governance message gate (REQUEST/RESPONSE phases). None unless the
-        # policy engine is enabled with message-phase policies configured —
+        # Governance message gate (REQUEST/RESPONSE phases) is built once at
+        # component assembly and shared with the streaming executor. None unless
+        # the policy engine is enabled with message-phase policies configured —
         # zero behaviour change otherwise.
-        message_policy_gate = build_message_policy_gate(
-            self.settings, self.container, getattr(self, "model", None)
-        )
-
         self._turn_executor = TurnExecutor(
             chat_context=self.protocol_adapter,
             tool_context=self.protocol_adapter,
             provider_context=self.protocol_adapter,
             execution_provider=self.protocol_adapter,
-            message_policy_gate=message_policy_gate,
+            message_policy_gate=getattr(self, "_message_policy_gate", None),
         )
     return self._turn_executor
 

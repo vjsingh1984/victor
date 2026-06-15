@@ -235,7 +235,24 @@ class StreamingChatExecutor:
 
         return "", None
 
-    def _build_terminal_delivery_chunk(
+    async def _govern_final_response(self, orch: Any, text: str) -> tuple[str, bool]:
+        """RESPONSE-phase gate for the streaming path's final assistant output.
+
+        Returns ``(text_to_use, blocked)``. When no message policy gate is
+        configured the text is returned unchanged. Streaming cannot un-send
+        tokens that were already emitted incrementally, so this governs the
+        persisted history copy and the final delivered chunk (the documented
+        limitation of message governance on the streaming path).
+        """
+        gate = getattr(orch, "_message_policy_gate", None)
+        if gate is None or not text:
+            return text, False
+        result = await gate.gate_response(text)
+        if not result.allowed:
+            return result.reason or "The response was withheld by policy.", True
+        return result.content, False
+
+    async def _build_terminal_delivery_chunk(
         self,
         orch: Any,
         stream_ctx: Any,
@@ -252,6 +269,9 @@ class StreamingChatExecutor:
         )
 
         if terminal_content:
+            # RESPONSE-phase governance on the terminal (final) assistant output.
+            terminal_content, _blocked = await self._govern_final_response(orch, terminal_content)
+
             from victor.agent.conversation.types import (
                 MESSAGE_SOURCE_METADATA_KEY,
                 MessageSource,
@@ -789,6 +809,21 @@ class StreamingChatExecutor:
         orch = runtime_owner._orchestrator
         recovery = getattr(orch, "_recovery_service", None) or orch._recovery_coordinator
         create_recovery_context = orch.create_recovery_context
+
+        # Governance REQUEST phase: gate/redact the user message before any state
+        # is set up or the LLM is called. A block short-circuits the stream with
+        # a single refusal chunk; a redaction substitutes the message text used
+        # downstream (and stored in history).
+        _gate = getattr(orch, "_message_policy_gate", None)
+        if _gate is not None:
+            _req = await _gate.gate_request(user_message)
+            if not _req.allowed:
+                yield orch._chunk_generator.generate_content_chunk(
+                    _req.reason or "Your message was blocked by policy.",
+                    is_final=True,
+                )
+                return
+            user_message = _req.content
 
         self._reset_streaming_turn_state(orch)
 
@@ -1374,19 +1409,24 @@ class StreamingChatExecutor:
                         MessageSource,
                     )
 
+                    # RESPONSE-phase governance only on the final emit; intermediate
+                    # content turns continue the loop and must not be blocked.
+                    _is_final_emit = forced_task_completion and not tool_calls
+                    if _is_final_emit:
+                        sanitized, _ = await self._govern_final_response(orch, sanitized)
                     orch.add_message(
                         "assistant",
                         sanitized,
                         tool_calls=tool_calls,
-                        persist_synchronously=forced_task_completion and not tool_calls,
+                        persist_synchronously=_is_final_emit,
                         metadata={MESSAGE_SOURCE_METADATA_KEY: MessageSource.AGENT_RESPONSE.value},
                     )
                     assistant_content_yielded = True
                     yield orch._chunk_generator.generate_content_chunk(
                         sanitized,
-                        is_final=forced_task_completion and not tool_calls,
+                        is_final=_is_final_emit,
                     )
-                    if forced_task_completion and not tool_calls:
+                    if _is_final_emit:
                         return
                 else:
                     plain_text = orch.sanitizer.strip_markup(
@@ -1402,11 +1442,14 @@ class StreamingChatExecutor:
                             MessageSource,
                         )
 
+                        _is_final_emit = forced_task_completion and not tool_calls
+                        if _is_final_emit:
+                            plain_text, _ = await self._govern_final_response(orch, plain_text)
                         orch.add_message(
                             "assistant",
                             plain_text,
                             tool_calls=tool_calls,
-                            persist_synchronously=forced_task_completion and not tool_calls,
+                            persist_synchronously=_is_final_emit,
                             metadata={
                                 MESSAGE_SOURCE_METADATA_KEY: MessageSource.AGENT_RESPONSE.value
                             },
@@ -1414,12 +1457,12 @@ class StreamingChatExecutor:
                         assistant_content_yielded = True
                         yield orch._chunk_generator.generate_content_chunk(
                             plain_text,
-                            is_final=forced_task_completion and not tool_calls,
+                            is_final=_is_final_emit,
                         )
-                        if forced_task_completion and not tool_calls:
+                        if _is_final_emit:
                             return
                     elif forced_task_completion and not tool_calls:
-                        yield self._build_terminal_delivery_chunk(
+                        yield await self._build_terminal_delivery_chunk(
                             orch,
                             stream_ctx,
                             full_content=full_content,
@@ -1715,7 +1758,7 @@ class StreamingChatExecutor:
                             and not assistant_content_yielded
                             and not continuation_visible
                         ):
-                            yield self._build_terminal_delivery_chunk(
+                            yield await self._build_terminal_delivery_chunk(
                                 orch,
                                 stream_ctx,
                                 full_content=full_content,

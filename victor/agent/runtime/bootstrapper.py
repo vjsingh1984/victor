@@ -310,6 +310,10 @@ class AgentRuntimeBootstrapper:
         orchestrator._coordination_advisor_runtime = None
         orchestrator._turn_executor = None
         orchestrator._protocol_adapter = None
+        # Governance message gate (REQUEST/RESPONSE). Built once at component
+        # assembly when the policy engine is enabled; shared by the non-streaming
+        # TurnExecutor and the streaming executor. None disables (default).
+        orchestrator._message_policy_gate = None
 
         # Interaction runtime boundary
         orchestrator._initialize_interaction_runtime()

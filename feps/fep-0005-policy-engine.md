@@ -67,12 +67,10 @@ assembled into one declarative layer.
 
 ### Non-Goals
 
-- Streaming-path integration (`StreamingChatPipeline` has its own loop) — the
-  tool path and the non-streaming turn path (REQUEST/RESPONSE) are covered;
-  streaming is a separate follow-up.
-- Server-wide admin policy distribution/persistence and an interactive CLI
-  approval UI (the approval handler is pluggable; default is fail-safe deny).
-- Sandboxing and the Executor-seam refactor (separate future FEPs).
+- Server-wide admin policy distribution/persistence and a container-registered
+  approval handler for non-TTY surfaces (API/TUI) — the approval handler is
+  pluggable; default is fail-safe deny.
+- Sandboxing and the external-harness Executor-seam refactor (separate FEPs).
 
 ## Proposed Change
 
@@ -123,8 +121,12 @@ modifications thread between policies.
 
 #### Message-phase gate (`gate.py`)
 - The middleware chain is tool-only, so message phases use a thin
-  `MessagePolicyGate` adapter wired at the turn boundary
-  (`TurnExecutor.execute_agentic_loop`), not via `MiddlewareChain`.
+  `MessagePolicyGate` adapter wired at the turn boundary — both the
+  non-streaming `TurnExecutor.execute_agentic_loop` and the streaming
+  `StreamingChatExecutor` — not via `MiddlewareChain`. The gate is built once at
+  component assembly (`orchestrator._message_policy_gate`) and shared by both
+  paths. (Tool phases already share the non-streaming `ToolPipeline`, so they
+  govern streaming with no extra wiring.)
 - `gate_request(text)` runs the `REQUEST` phase on the user message *before* it
   enters history or reaches the LLM; `gate_response(text)` runs the `RESPONSE`
   phase on the assistant's final output. Both return a `GateResult`
@@ -238,9 +240,13 @@ approval handler (`console_approval_handler` / `make_console_approval_handler`)
 wired via the opt-in `governance.interactive_approval` setting (TTY-gated);
 `DenyToolsPolicy` / `AllowToolsPolicy` tool builtins; **REQUEST/RESPONSE message
 phases** (`MessagePolicyGate` at the turn boundary, `RedactContentPolicy` /
-`BlockPatternPolicy` builtins, `build_message_policy_gate` wiring).
-Remaining: streaming-path integration (`StreamingChatPipeline`);
-container-registered approval handler for non-TTY surfaces (API/TUI).
+`BlockPatternPolicy` builtins, `build_message_policy_gate` wiring); **streaming
+governance** — tool phases already share the non-streaming `ToolPipeline`, and
+the message gate is now wired into `StreamingChatExecutor` (REQUEST gated before
+the stream; RESPONSE gated on the final assistant output — the persisted copy
+and authoritative final chunk; live-streamed tokens can't be un-sent).
+Remaining: container-registered approval handler for non-TTY surfaces (API/TUI);
+team-streaming terminal output; admin policy distribution.
 
 ### Testing Strategy
 Unit tests covering engine composition (incl. `content` threading), middleware

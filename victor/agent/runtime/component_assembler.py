@@ -66,6 +66,15 @@ class ComponentAssembler:
         orchestrator._middleware_chain, orchestrator._code_correction_middleware = (
             factory.create_middleware_chain()
         )
+        # Governance message gate (REQUEST/RESPONSE phases). Built once here and
+        # shared by both the non-streaming TurnExecutor and the streaming
+        # executor so message governance covers both paths. None unless the
+        # policy engine is enabled with message-phase policies configured.
+        from victor.agent.factory.coordination_builders import build_message_policy_gate
+
+        orchestrator._message_policy_gate = build_message_policy_gate(
+            factory.settings, factory.container, getattr(factory, "model", None)
+        )
         orchestrator._safety_checker = factory.create_safety_checker()
         orchestrator._auto_committer = factory.create_auto_committer()
 
