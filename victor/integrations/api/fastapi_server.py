@@ -382,6 +382,42 @@ class _LegacyOrchestratorClientAdapter:
 # =============================================================================
 
 
+def collect_route_paths(app: Any) -> set[str]:
+    """Collect all concrete route paths from a FastAPI/Starlette app.
+
+    Robust across Starlette versions. Newer Starlette stores lazily-included
+    routers as ``_IncludedRouter`` wrapper objects in ``app.routes`` (resolved
+    at request time) instead of eagerly flattening their sub-routes; a naive
+    ``{route.path for route in app.routes}`` then misses every included path
+    (and capability detection silently reports nothing). This recurses into
+    included routers / mounts so it works on both old (flat) and new (lazy)
+    Starlette.
+    """
+    paths: set[str] = set()
+    seen: set[int] = set()
+
+    def _walk(routes: Any) -> None:
+        for route in routes or []:
+            if id(route) in seen:
+                continue
+            seen.add(id(route))
+            path = getattr(route, "path", None)
+            if isinstance(path, str) and path:
+                paths.add(path)
+            # Newer Starlette wraps included routers; the real router (with the
+            # concrete sub-routes) is exposed as ``original_router``.
+            included = getattr(route, "original_router", None)
+            sub = getattr(included, "routes", None) if included is not None else None
+            if sub is None:
+                # Mounts / sub-apps expose nested routes directly.
+                sub = getattr(route, "routes", None)
+            if sub:
+                _walk(sub)
+
+    _walk(getattr(app, "routes", None))
+    return paths
+
+
 class VictorFastAPIServer:
     """FastAPI-based HTTP API Server for Victor."""
 
@@ -575,7 +611,7 @@ class VictorFastAPIServer:
 
     def _detect_capabilities(self) -> List[str]:
         """Detect capabilities from currently mounted API routes."""
-        route_paths = {getattr(route, "path", "") for route in self.app.routes}
+        route_paths = collect_route_paths(self.app)
         capabilities: set[str] = set()
 
         if "/chat" in route_paths:

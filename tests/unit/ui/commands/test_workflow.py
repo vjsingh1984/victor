@@ -25,11 +25,23 @@ def test_load_registered_handlers_supports_host_injected_registrar(monkeypatch) 
 
     fake_module.register_handlers = register_handlers
 
-    def fake_import_module(name: str):
-        assert name == "victor.fake.handlers"
-        return fake_module
+    import importlib
 
-    monkeypatch.setattr("importlib.import_module", fake_import_module)
+    real_import_module = importlib.import_module
+
+    def fake_import_module(name: str, *args, **kwargs):
+        # Only stub the vertical handler module; delegate everything else to the
+        # real importer. pytest's own monkeypatch.setattr(<dotted string>) calls
+        # importlib.import_module internally to resolve the target, so a fake
+        # that hard-asserts the name breaks unrelated resolution (e.g. it
+        # resolves "victor" first) — non-deterministically, depending on what is
+        # already cached in sys.modules.
+        if name == "victor.fake.handlers":
+            return fake_module
+        return real_import_module(name, *args, **kwargs)
+
+    # Patch the registry targets BEFORE swapping import_module so their dotted
+    # resolution uses the real importer, then install the fake importer.
     monkeypatch.setattr(
         "victor.workflows.compute_registry.register_compute_handler",
         lambda name, handler: captured.append((name, handler)),
@@ -38,6 +50,7 @@ def test_load_registered_handlers_supports_host_injected_registrar(monkeypatch) 
         "victor.workflows.compute_registry.list_compute_handlers",
         lambda: ["alpha"],
     )
+    monkeypatch.setattr("importlib.import_module", fake_import_module)
 
     handlers = _load_registered_handlers("fake")
 
