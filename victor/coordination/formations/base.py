@@ -242,6 +242,20 @@ class BaseFormationStrategy(ABC):
         """
         return False
 
+    def consumes_context_agents(self) -> bool:
+        """Whether this formation reads role-named agents from the context.
+
+        Most formations operate on the ``agents`` list passed to ``execute()``.
+        A few (e.g. reflection) instead pull named role agents — "generator",
+        "critic" — out of ``context`` (see :meth:`get_required_roles`). When this
+        returns True, the coordinator binds members to those roles and injects
+        them into the context before execution.
+
+        Returns:
+            True if ``execute()`` reads agents from context by role name.
+        """
+        return False
+
     async def prepare_context(
         self,
         context: "TeamContext",

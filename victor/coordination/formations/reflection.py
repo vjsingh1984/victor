@@ -154,9 +154,14 @@ class ReflectionFormation(BaseFormationStrategy):
         result = None
         feedback = None
 
+        # Per-run iteration bound: a team may override via context
+        # ("reflection_max_iterations") so the shared formation instance stays
+        # stateless and concurrency-safe. Falls back to the instance default.
+        max_iterations = context.get("reflection_max_iterations") or self.max_iterations
+
         # Reflection loop
-        for iteration in range(self.max_iterations):
-            logger.info(f"Reflection iteration {iteration + 1}/{self.max_iterations}")
+        for iteration in range(max_iterations):
+            logger.info(f"Reflection iteration {iteration + 1}/{max_iterations}")
 
             # Generate solution
             try:
@@ -256,6 +261,10 @@ class ReflectionFormation(BaseFormationStrategy):
         Returns:
             True (supports early termination)
         """
+        return True
+
+    def consumes_context_agents(self) -> bool:
+        """Reflection reads its 'generator' and 'critic' agents from context."""
         return True
 
     def _is_satisfied(self, feedback: Optional[str]) -> bool:

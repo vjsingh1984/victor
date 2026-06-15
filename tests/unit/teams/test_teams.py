@@ -49,9 +49,10 @@ class TestTeamFormation:
         assert TeamFormation.CONSENSUS.value == "consensus"
 
     def test_formations_are_iterable(self):
-        """All formations can be iterated (5 formations including CONSENSUS)."""
+        """All formations can be iterated (6: incl. CONSENSUS and REFLECTION)."""
         formations = list(TeamFormation)
-        assert len(formations) == 5
+        assert len(formations) == 6
+        assert TeamFormation.REFLECTION in formations
 
 
 class TestMemberStatus:

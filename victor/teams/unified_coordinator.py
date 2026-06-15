@@ -41,7 +41,18 @@ import logging
 import time
 from contextvars import ContextVar
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Mapping, Optional, Sequence
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    List,
+    Mapping,
+    Optional,
+    Protocol,
+    Sequence,
+    runtime_checkable,
+)
 
 from victor.coordination.formations.base import BaseFormationStrategy, TeamContext
 from victor.coordination.formations import (
@@ -50,6 +61,7 @@ from victor.coordination.formations import (
     HierarchicalFormation,
     PipelineFormation,
     ConsensusFormation,
+    ReflectionFormation,
 )
 from victor.teams.mixins.observability import ObservabilityMixin
 from victor.teams.mixins.rl import RLMixin
@@ -122,6 +134,54 @@ class _CoordinatorExecutionState:
 # =============================================================================
 # Team Member Adapter
 # =============================================================================
+
+
+@runtime_checkable
+class ContextAgent(Protocol):
+    """A role-named agent that context-driven formations invoke directly.
+
+    Reflection-style formations pull "generator"/"critic" agents out of the
+    team context and call ``execute(prompt, context)`` on them, using the
+    returned string as the produced/critiqued text. This is a narrower contract
+    than ``ITeamMember`` — implement it to supply a custom role agent.
+    """
+
+    async def execute(self, prompt: str, context: Optional[Dict[str, Any]] = None) -> str:
+        """Produce (or critique) text for ``prompt`` and return it as a string."""
+        ...
+
+
+class _MemberContextAgent:
+    """Adapts an ``ITeamMember`` to the :class:`ContextAgent` contract.
+
+    Bridges the interface mismatch between the coordinator's members
+    (``execute_task(str, dict) -> Any``) and what context-driven formations
+    expect (``execute(str, context) -> str``), normalizing str/mapping output.
+    """
+
+    def __init__(self, member: "ITeamMember") -> None:
+        self._member = member
+        self.id = getattr(member, "id", "context_agent")
+
+    async def execute(self, prompt: str, context: Optional[Dict[str, Any]] = None) -> str:
+        raw = await self._member.execute_task(prompt, context or {})
+        if isinstance(raw, Mapping):
+            value = raw.get("output") or raw.get("final_output") or raw.get("content") or ""
+            return str(value)
+        return "" if raw is None else str(raw)
+
+
+def _member_formation_role(member: Any) -> Optional[str]:
+    """Read a member's declared formation_role, looking through adapters.
+
+    Members may be raw ``ITeamMember`` adapters wrapping a ``TeamMember`` dataclass
+    (the dataclass carries ``formation_role``), so check both levels.
+    """
+    role = getattr(member, "formation_role", None)
+    if role is None:
+        inner = getattr(member, "member", None)
+        role = getattr(inner, "formation_role", None)
+    return role
 
 
 class _TeamMemberAdapter:
@@ -363,6 +423,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
             TeamFormation.HIERARCHICAL: HierarchicalFormation(),
             TeamFormation.PIPELINE: PipelineFormation(),
             TeamFormation.CONSENSUS: ConsensusFormation(),
+            TeamFormation.REFLECTION: ReflectionFormation(),
         }
 
         # StateGraph node config (used when the coordinator is invoked as a
@@ -709,6 +770,13 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
             _TeamMemberAdapter(m, effective_context, member_context_overrides.get(m.id))
             for m in execution_members
         ]
+
+        # Context-driven formations (e.g. reflection) read role-named agents
+        # ("generator"/"critic") from context rather than the agents list. Bind
+        # them generically — no-op for the other formations.
+        context_agents = self._populate_context_agents(strategy, execution_members)
+        if context_agents:
+            shared_state_with_manager.update(context_agents)
 
         # Create TeamContext
         if max_workers is not None:
@@ -2823,6 +2891,42 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         finally:
             self._execution_state.reset(token)
 
+    def _populate_context_agents(
+        self, strategy: "BaseFormationStrategy", members: List["ITeamMember"]
+    ) -> Dict[str, "ContextAgent"]:
+        """Bind members to the role-named agents a context-driven formation needs.
+
+        Returns ``{}`` unless ``strategy.consumes_context_agents()`` is True.
+        Each role from ``strategy.get_required_roles()`` is bound to the member
+        whose ``formation_role`` matches, falling back to positional order.
+        Returns fewer entries than required roles when members are short — the
+        formation's own validation then reports the shortfall.
+        """
+        if not strategy.consumes_context_agents():
+            return {}
+        roles = strategy.get_required_roles() or []
+        if not roles:
+            return {}
+
+        agents: Dict[str, "ContextAgent"] = {}
+        remaining = list(members)
+
+        # First pass: explicit binding by declared formation_role.
+        for role in roles:
+            for idx, member in enumerate(remaining):
+                if _member_formation_role(member) == role:
+                    agents[role] = _MemberContextAgent(member)
+                    remaining.pop(idx)
+                    break
+
+        # Second pass: positional fallback for any unbound role.
+        for role in roles:
+            if role in agents or not remaining:
+                continue
+            agents[role] = _MemberContextAgent(remaining.pop(0))
+
+        return agents
+
     def _adapt_team_members(self, members: List[Any]) -> List["ITeamMember"]:
         """Adapt ``TeamMember`` dataclasses to ``ITeamMember`` adapters.
 
@@ -2852,6 +2956,9 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
                     task=task,
                     tool_budget=team_member.tool_budget,
                     allowed_tools=team_member.allowed_tools,
+                    provider=getattr(team_member, "provider", None),
+                    model=getattr(team_member, "model", None),
+                    temperature=getattr(team_member, "temperature", None),
                 )
                 return {
                     "success": getattr(spawn_result, "success", False),

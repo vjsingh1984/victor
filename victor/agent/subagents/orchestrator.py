@@ -317,6 +317,9 @@ class SubAgentOrchestrator:
         parent_session_id: Optional[str] = None,
         child_session_id: Optional[str] = None,
         result_summary_max_chars: Optional[int] = None,
+        provider: Optional[str] = None,
+        model: Optional[str] = None,
+        temperature: Optional[float] = None,
     ) -> SubAgentResult:
         """Spawn a sub-agent to execute a task.
 
@@ -333,6 +336,11 @@ class SubAgentOrchestrator:
             timeout_seconds: Maximum execution time
             disable_embeddings: Disable codebase embeddings (workflow service mode)
             constraints: Optional task constraints for write policy activation
+            provider: Optional provider name override for heterogeneous teams
+                (e.g. "openai", "anthropic"). None inherits the parent provider.
+            model: Optional model override paired with ``provider``.
+            temperature: Optional per-member sampling temperature override
+                (None inherits the parent's temperature).
 
         Returns:
             SubAgentResult with execution outcome
@@ -378,6 +386,16 @@ class SubAgentOrchestrator:
             model_name = getattr(self.parent, "model", None)
             effective_context = get_context_for_role(role, provider_name, model_name)
 
+        # Heterogeneous execution: resolve a per-member provider override when
+        # requested (cross-vendor teams). Fail-open — inherit the parent provider
+        # on any resolution error so a misconfigured override never blocks the run.
+        provider_override = None
+        model_override = None
+        if provider:
+            provider_override = await self._resolve_override_provider(provider, model)
+            if provider_override is not None:
+                model_override = model
+
         # Create configuration
         config = SubAgentConfig(
             role=role,
@@ -397,6 +415,9 @@ class SubAgentOrchestrator:
             parent_session_id=parent_session_id,
             child_session_id=child_session_id,
             result_summary_max_chars=result_summary_max_chars,
+            provider_override=provider_override,
+            model_override=model_override,
+            temperature_override=temperature,
         )
 
         # Create and execute sub-agent
@@ -434,6 +455,43 @@ class SubAgentOrchestrator:
                 activator = get_constraint_activator()
                 activator.deactivate_constraints()
                 logger.debug(f"SubAgent constraints deactivated for role: {role.value}")
+
+    async def _resolve_override_provider(
+        self, provider: str, model: Optional[str]
+    ) -> Optional[Any]:
+        """Resolve a provider instance for a per-member override (fail-open).
+
+        Builds a managed provider for ``provider``/``model`` via the shared
+        factory, resolving the API key the same way the main provider does.
+        Returns None on any failure so the caller inherits the parent provider
+        rather than blocking the run.
+
+        Args:
+            provider: Provider name (e.g. "openai", "anthropic").
+            model: Optional model id; falls back to the provider's default.
+
+        Returns:
+            A provider instance, or None to inherit the parent provider.
+        """
+        try:
+            from victor.config.api_keys import get_api_key
+            from victor.providers.factory import ManagedProviderFactory
+
+            effective_model = model or getattr(self.parent, "model", None) or ""
+            api_key = get_api_key(provider)
+            return await ManagedProviderFactory.create(
+                provider_name=provider,
+                model=effective_model,
+                api_key=api_key,
+            )
+        except Exception as exc:
+            logger.warning(
+                "Per-member provider override '%s' could not be resolved (%s); "
+                "inheriting parent provider.",
+                provider,
+                exc,
+            )
+            return None
 
     @staticmethod
     def _attach_identity_metadata(result: SubAgentResult, config: SubAgentConfig) -> None:

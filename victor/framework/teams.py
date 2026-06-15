@@ -49,6 +49,7 @@ Example:
 from __future__ import annotations
 
 import asyncio
+import logging
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -76,6 +77,8 @@ from victor.teams import (
     TeamFormation,
     TeamResult,
 )
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from victor.core.shared_types import SubAgentRole
@@ -303,6 +306,16 @@ class TeamMemberSpec:
     cache: bool = True
     verbose: bool = False
     max_iterations: Optional[int] = None
+    # Heterogeneous execution: per-member provider/model/temperature override.
+    # When unset, the member inherits the team orchestrator's settings. Enables
+    # cross-vendor teams (e.g. writer on one vendor, reviewer on another) and
+    # per-role sampling (e.g. writer hot, reviewer at temperature 0).
+    provider: Optional[str] = None
+    model: Optional[str] = None
+    temperature: Optional[float] = None
+    # Formation role for context-driven formations (e.g. "generator"/"critic"
+    # for REFLECTION). None = positional binding.
+    formation_role: Optional[str] = None
 
     def to_team_member(self, index: int = 0) -> TeamMember:
         """Convert to internal TeamMember.
@@ -354,6 +367,10 @@ class TeamMemberSpec:
             cache=self.cache,
             verbose=self.verbose,
             max_iterations=self.max_iterations,
+            provider=self.provider,
+            model=self.model,
+            temperature=self.temperature,
+            formation_role=self.formation_role,
         )
 
         # Auto-attach memory coordinator if memory is enabled
@@ -541,6 +558,125 @@ class AgentTeam:
             name=name,
             goal=goal,
             members=members,
+            **kwargs,
+        )
+
+    @classmethod
+    async def create_review_team(
+        cls,
+        orchestrator: "AgentOrchestrator",
+        name: str,
+        goal: str,
+        *,
+        writer: TeamMemberSpec,
+        reviewer: TeamMemberSpec,
+        reviser: Optional[TeamMemberSpec] = None,
+        **kwargs: Any,
+    ) -> "AgentTeam":
+        """Create a cross-vendor review team (writer -> reviewer [-> reviser]).
+
+        A thin preset over :meth:`create` using ``TeamFormation.PIPELINE`` so
+        each member's output feeds the next. The point is heterogeneity: give
+        ``writer`` and ``reviewer`` different providers (e.g. writer on OpenAI,
+        reviewer on Anthropic) so one vendor reviews another's work — the
+        Omnigent "Polly" pattern. Emits a warning (does not fail) when the
+        writer and reviewer share a provider, since that defeats cross-vendor
+        review.
+
+        Args:
+            orchestrator: AgentOrchestrator for spawning members.
+            name: Team name.
+            goal: Overall objective.
+            writer: Member that produces the work (set ``provider``/``model``).
+            reviewer: Member that reviews it (set a *different* ``provider``).
+            reviser: Optional member that applies the review feedback.
+            **kwargs: Forwarded to :meth:`create` (formation is fixed PIPELINE).
+
+        Returns:
+            Configured AgentTeam in PIPELINE formation.
+        """
+        if (
+            writer.provider
+            and reviewer.provider
+            and writer.provider.lower() == reviewer.provider.lower()
+        ):
+            logger.warning(
+                "Review team '%s': writer and reviewer share provider '%s'; "
+                "cross-vendor review is more effective with different vendors.",
+                name,
+                writer.provider,
+            )
+
+        members = [writer, reviewer] + ([reviser] if reviser is not None else [])
+        kwargs.pop("formation", None)
+        return await cls.create(
+            orchestrator=orchestrator,
+            name=name,
+            goal=goal,
+            members=members,
+            formation=TeamFormation.PIPELINE,
+            **kwargs,
+        )
+
+    @classmethod
+    async def create_reflection_team(
+        cls,
+        orchestrator: "AgentOrchestrator",
+        name: str,
+        goal: str,
+        *,
+        generator: TeamMemberSpec,
+        critic: TeamMemberSpec,
+        rounds: int = 3,
+        **kwargs: Any,
+    ) -> "AgentTeam":
+        """Create an iterative reflection team (generate → critique → refine).
+
+        Uses ``TeamFormation.REFLECTION``: the ``generator`` produces a solution,
+        the ``critic`` critiques it, and the generator refines — looping up to
+        ``rounds`` times or until the critic is satisfied. Give the two members
+        different providers for cross-vendor critique (e.g. generator on OpenAI,
+        critic on Anthropic) — the iterative complement to
+        :meth:`create_review_team`'s single pass.
+
+        Args:
+            orchestrator: AgentOrchestrator for spawning members.
+            name: Team name.
+            goal: Overall objective.
+            generator: Member that produces/refines the solution.
+            critic: Member that critiques it (use a *different* provider).
+            rounds: Maximum reflection iterations (early-exits on satisfaction).
+            **kwargs: Forwarded to :meth:`create` (formation is fixed REFLECTION).
+
+        Returns:
+            Configured AgentTeam in REFLECTION formation.
+        """
+        if (
+            generator.provider
+            and critic.provider
+            and generator.provider.lower() == critic.provider.lower()
+        ):
+            logger.warning(
+                "Reflection team '%s': generator and critic share provider '%s'; "
+                "cross-vendor critique is more effective with different vendors.",
+                name,
+                generator.provider,
+            )
+
+        # Bind roles explicitly so context-agent binding never depends on order.
+        generator.formation_role = "generator"
+        critic.formation_role = "critic"
+
+        kwargs.pop("formation", None)
+        shared_context = dict(kwargs.pop("shared_context", None) or {})
+        shared_context.setdefault("reflection_max_iterations", rounds)
+        return await cls.create(
+            orchestrator=orchestrator,
+            name=name,
+            goal=goal,
+            members=[generator, critic],
+            formation=TeamFormation.REFLECTION,
+            shared_context=shared_context,
             **kwargs,
         )
 

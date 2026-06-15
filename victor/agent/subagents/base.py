@@ -126,6 +126,11 @@ class SubAgentConfig:
     parent_session_id: Optional[str] = None
     child_session_id: Optional[str] = None
     result_summary_max_chars: Optional[int] = None
+    # Heterogeneous execution: a pre-resolved provider instance, model, and
+    # temperature to use instead of inheriting the parent's. None = inherit.
+    provider_override: Optional[Any] = None
+    model_override: Optional[str] = None
+    temperature_override: Optional[float] = None
 
     def to_runtime_context(self) -> "AgentRuntimeContext":
         """Build the common per-agent runtime context from this config."""
@@ -344,14 +349,31 @@ class SubAgent(IAgent):  # type: ignore[misc]
         settings.tool_budget = self.config.tool_budget
         settings.max_context_chars = self.config.context_limit
 
-        # Create new orchestrator instance with same provider
+        # Heterogeneous execution: use a per-member provider override when one
+        # was resolved (cross-vendor teams); otherwise inherit the parent's
+        # provider/model so behavior is unchanged for members without overrides.
+        provider = self.config.provider_override or self._context.provider
+        model = self.config.model_override or self._context.model
+        if self.config.provider_override is not None:
+            provider_name = getattr(
+                self.config.provider_override, "provider_name", self._context.provider_name
+            )
+        else:
+            provider_name = self._context.provider_name
+        temperature = (
+            self.config.temperature_override
+            if self.config.temperature_override is not None
+            else self._context.temperature
+        )
+
+        # Create new orchestrator instance.
         # Use the actual provider object (not just the name) for proper initialization
         orchestrator = AgentOrchestrator(
             settings=settings,
-            provider=self._context.provider,
-            model=self._context.model,
-            temperature=self._context.temperature,
-            provider_name=self._context.provider_name,
+            provider=provider,
+            model=model,
+            temperature=temperature,
+            provider_name=provider_name,
             system_prompt_override=self._get_role_prompt(),
             # Note: We'll share the parent's DI container for now
             # In production, we might want isolated scoped containers
