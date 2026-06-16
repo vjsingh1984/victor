@@ -250,16 +250,15 @@ class TestModeTransitionLearner:
 
     def test_get_recommendation_exploration(self, learner: ModeTransitionLearner) -> None:
         """Test get_recommendation can explore with high epsilon."""
-        import random
-
         state_key = "explore:analysis:low:low:fair:fair"
 
         _record_transition_outcome(learner, state_key=state_key, action_key="plan:0")
         _record_transition_outcome(learner, state_key=state_key, action_key="build:0")
 
-        # Force exploration
+        # Force exploration (epsilon=1.0 always explores; control the learner's
+        # injectable RNG rather than the stdlib global).
         learner.epsilon = 1.0
-        with patch.object(random, "random", return_value=0.5):
+        with patch.object(learner._rng, "random", return_value=0.5):
             rec = learner.get_recommendation(state_key, "", "analysis")
 
         assert rec is not None

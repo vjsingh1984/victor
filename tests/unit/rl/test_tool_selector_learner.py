@@ -274,14 +274,13 @@ class TestToolSelectorLearner:
 
     def test_should_explore(self, learner: ToolSelectorLearner) -> None:
         """Test exploration probability."""
-        # With ε=0.1, should explore ~10% of the time
-        import random
-
-        # Mock random to test both paths
-        with patch.object(random, "random", return_value=0.05):
+        # With ε=0.1, should explore ~10% of the time. Control the learner's
+        # injectable RNG (self._rng) directly rather than patching the stdlib
+        # global random module.
+        with patch.object(learner._rng, "random", return_value=0.05):
             assert learner.should_explore() is True  # 0.05 < 0.1
 
-        with patch.object(random, "random", return_value=0.15):
+        with patch.object(learner._rng, "random", return_value=0.15):
             assert learner.should_explore() is False  # 0.15 > 0.1
 
     def test_blended_q_value(self, learner: ToolSelectorLearner) -> None:
