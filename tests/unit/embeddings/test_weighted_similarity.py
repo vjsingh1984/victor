@@ -25,8 +25,19 @@ class TestWeightedCosineSimilarity:
 
     @pytest.fixture
     def embedding_service(self):
-        """Get embedding service instance."""
-        return EmbeddingService.get_instance()
+        """Get the embedding service; skip if its model cannot be loaded.
+
+        These tests exercise real cosine-similarity behavior and need the
+        sentence-transformers model. If it can't be fetched (offline + not
+        pre-cached, or a transient HF outage), skip rather than fail with an
+        OSError — the test can't run meaningfully without the model.
+        """
+        service = EmbeddingService.get_instance()
+        try:
+            service.embed_text_sync("warmup")
+        except Exception as exc:  # pragma: no cover - network/offline dependent
+            pytest.skip(f"embedding model unavailable: {exc}")
+        return service
 
     @pytest.fixture
     def sample_embeddings(self):

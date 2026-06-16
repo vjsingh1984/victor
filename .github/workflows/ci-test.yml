@@ -121,24 +121,26 @@ jobs:
           SentenceTransformer("BAAI/bge-small-en-v1.5")
           print("embedding model cached")
           PY
-          for attempt in 1 2 3; do
+          for attempt in 1 2 3 4 5; do
             if python /tmp/precache_model.py; then
+              # Only go offline for the test run when the model is actually
+              # cached. Offline + uncached would turn a transient HF outage into
+              # a HARD failure (OSError) instead of degrading to the baseline.
+              echo "HF_HUB_OFFLINE=1" >> "$GITHUB_ENV"
+              echo "TRANSFORMERS_OFFLINE=1" >> "$GITHUB_ENV"
               break
             fi
             echo "Embedding model pre-cache attempt ${attempt} failed; retrying..."
-            sleep 5
+            sleep $((attempt * 5))
           done || true
 
       - name: Run tests (sharded)
-        env:
-          # The embedding model is pre-cached in the previous step. Force
-          # huggingface_hub / transformers offline during the test run so cached
-          # model loads do NOT issue a network metadata (HEAD) request — those
-          # get '429 Too Many Requests' under 12 parallel shards and surfaced as
-          # non-deterministic embedding-test failures. All non-default models in
-          # the test suite are mocked, so offline is safe.
-          HF_HUB_OFFLINE: "1"
-          TRANSFORMERS_OFFLINE: "1"
+        # HF_HUB_OFFLINE / TRANSFORMERS_OFFLINE are exported by the pre-cache step
+        # ONLY when the model was successfully cached. When cached, offline loads
+        # skip the network metadata (HEAD) request that returns '429 Too Many
+        # Requests' under 12 parallel shards (a non-deterministic embedding-test
+        # failure source). When the pre-cache misses, offline is NOT set and the
+        # tests fall back to the online baseline (never a hard offline error).
         run: |
           # Coverage only on 3.11 shard 1 (where Codecov upload happens)
           if [ "${{ matrix.python-version }}" = "3.11" ] && [ "${{ matrix.shard }}" = "1" ]; then
