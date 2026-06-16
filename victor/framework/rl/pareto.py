@@ -66,6 +66,12 @@ class ParetoFrontier:
         self._max_candidates = max_candidates
         # All known instance IDs
         self._instances: set = set()
+        # Injectable, reproducible RNG (honours VICTOR_RL_SEED) instead of the
+        # global random module, so Pareto sampling is deterministic when seeded
+        # and never couples to other components' global RNG state.
+        from victor.framework.rl.base import resolve_rl_rng_seed
+
+        self._rng = random.Random(resolve_rl_rng_seed("pareto_frontier"))
 
     @property
     def size(self) -> int:
@@ -181,10 +187,10 @@ class ParetoFrontier:
         weights = [max(c.coverage_count, 1) for c in self._candidates]
         total = sum(weights)
         if total == 0:
-            return random.choice(self._candidates)
+            return self._rng.choice(self._candidates)
 
         # Weighted random selection
-        r = random.uniform(0, total)
+        r = self._rng.uniform(0, total)
         cumulative = 0.0
         for candidate, w in zip(self._candidates, weights):
             cumulative += w
@@ -216,7 +222,7 @@ class ParetoFrontier:
         if len(self._candidates) < 2:
             return None
 
-        a, b = random.sample(self._candidates, 2)
+        a, b = self._rng.sample(self._candidates, 2)
         try:
             merged_text = gepa_service.merge(a.text, b.text, section_name=section_name)
             if merged_text and merged_text != a.text and merged_text != b.text:

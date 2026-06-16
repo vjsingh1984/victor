@@ -245,8 +245,11 @@ class EmbeddingService:
                 "all-MiniLM-L6-v2=80MB/384-dim/fastest"
             )
 
+            import random as _random
+
             last_err: Optional[Exception] = None
-            for attempt in range(4):
+            max_attempts = 4
+            for attempt in range(max_attempts):
                 try:
                     load_start = time.perf_counter()
                     logger.info(
@@ -269,20 +272,53 @@ class EmbeddingService:
                         f"device={self._model.device}, load_time={load_time:.2f}s"
                     )
                     return
-                except Exception as e:  # transient: HF 429 / network / disk
+                except Exception as e:
                     last_err = e
-                    if attempt < 3:
-                        time.sleep(2 ** (attempt + 1))  # 2s, 4s, 8s
+                    # Only retry TRANSIENT failures (rate limit / network). A
+                    # permanent error (offline + uncached, model-not-found) won't
+                    # recover, so degrade immediately instead of wasting backoff.
+                    if attempt >= max_attempts - 1 or not self._is_transient_load_error(e):
+                        break
+                    # Exponential backoff with jitter: jitter de-synchronizes the
+                    # parallel shards whose lock-step retries cause the 429s.
+                    delay = (2 ** (attempt + 1)) * (0.75 + 0.5 * _random.random())
+                    time.sleep(delay)
 
-            # All attempts failed — degrade gracefully (leave _model unset so
-            # embed_*_sync return zero vectors). Recoverable: a later call retries.
+            # Attempts exhausted or a permanent error — degrade gracefully
+            # (leave _model unset so embed_*_sync return zero vectors).
+            # Recoverable: a later call retries the load.
             logger.warning(
-                "[EmbeddingService] Model %s failed to load after retries (%s); "
-                "embeddings degrade to zero vectors. Pre-cache the model or set "
-                "HF_TOKEN to raise HuggingFace rate limits.",
+                "[EmbeddingService] Model %s failed to load (%s); embeddings "
+                "degrade to zero vectors. Pre-cache the model or set HF_TOKEN to "
+                "raise HuggingFace rate limits.",
                 self.model_name,
                 last_err,
             )
+
+    @staticmethod
+    def _is_transient_load_error(exc: Exception) -> bool:
+        """Whether a model-load error is worth retrying.
+
+        Transient (retry): rate limits (HTTP 429), server errors (5xx),
+        connection/timeout errors. Permanent (degrade now): offline-without-cache,
+        model-not-found (HTTP 404 / 4xx), missing files — retrying can't help.
+        """
+        message = str(exc).lower()
+        permanent_markers = (
+            "offline",
+            "couldn't find",
+            "could not find",
+            "no such file",
+            "not a valid model identifier",
+            "repository not found",
+        )
+        if any(marker in message for marker in permanent_markers):
+            return False
+        status = getattr(getattr(exc, "response", None), "status_code", None)
+        if isinstance(status, int):
+            return status == 429 or 500 <= status < 600
+        # No HTTP status (connection reset, timeout, DNS, etc.) — treat as transient.
+        return True
 
     @property
     def dimension(self) -> int:
@@ -382,8 +418,10 @@ class EmbeddingService:
 
         self._ensure_model_loaded()
         if self._model is None:
-            # Model unavailable (load failed after retries) — degrade gracefully.
-            return np.zeros(self.dimension, dtype=np.float32)
+            # Model unavailable (load failed) — degrade gracefully. Use the
+            # cached/default dimension directly; `self.dimension` would re-run
+            # the (just-failed) load and waste another round of retries.
+            return np.zeros(self._dimension or 384, dtype=np.float32)
 
         try:
             start_time = time.perf_counter()
@@ -475,8 +513,9 @@ class EmbeddingService:
 
         self._ensure_model_loaded()
         if self._model is None:
-            # Model unavailable (load failed after retries) — degrade gracefully.
-            return np.zeros((len(texts), self.dimension), dtype=np.float32)
+            # Model unavailable (load failed) — degrade gracefully without
+            # re-triggering the just-failed load via the `dimension` property.
+            return np.zeros((len(texts), self._dimension or 384), dtype=np.float32)
 
         try:
             start_time = time.perf_counter()

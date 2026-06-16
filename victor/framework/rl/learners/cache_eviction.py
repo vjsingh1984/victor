@@ -391,8 +391,8 @@ class CacheEvictionLearner(BaseLearner):
         # Epsilon-greedy selection
         import random
 
-        if random.random() < self.epsilon:
-            action = random.choice(self.ACTIONS)
+        if self._rng.random() < self.epsilon:
+            action = self._rng.choice(self.ACTIONS)
             return RLRecommendation(
                 value=action,
                 confidence=0.3,

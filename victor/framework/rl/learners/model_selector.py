@@ -389,8 +389,8 @@ class ModelSelectorLearner(BaseLearner):
     ) -> Tuple[str, str]:
         """Select using epsilon-greedy strategy."""
         # Exploration
-        if random.random() < self.epsilon:
-            selected = random.choice(providers)
+        if self._rng.random() < self.epsilon:
+            selected = self._rng.choice(providers)
             reason = f"Exploration (ε={self.epsilon:.2f})"
             return selected, reason
 
@@ -410,7 +410,7 @@ class ModelSelectorLearner(BaseLearner):
     def _select_ucb(self, providers: List[str], task_type: Optional[str] = None) -> Tuple[str, str]:
         """Select using Upper Confidence Bound (UCB) strategy."""
         if self._total_selections == 0:
-            return random.choice(providers), "No history, random selection"
+            return self._rng.choice(providers), "No history, random selection"
 
         log_total = math.log(self._total_selections + 1)
         ucb_scores = {}

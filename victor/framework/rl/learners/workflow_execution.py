@@ -153,8 +153,8 @@ class WorkflowExecutionLearner(BaseLearner):
         import random
 
         # ε-greedy: explore with probability epsilon
-        if random.random() < self._epsilon:
-            return random.choice(available_workflows)
+        if self._rng.random() < self._epsilon:
+            return self._rng.choice(available_workflows)
 
         # Exploit: get workflow with highest Q-value
         cursor = self.db.cursor()

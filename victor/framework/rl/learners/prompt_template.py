@@ -124,10 +124,13 @@ class BetaDistribution:
 
     alpha: float = 1.0  # Prior
     beta: float = 1.0  # Prior
+    # Independent per-instance RNG (decoupled from the global random module so
+    # concurrent candidates sample independently and tests don't share state).
+    _rng: random.Random = field(default_factory=random.Random, repr=False, compare=False)
 
     def sample(self) -> float:
         """Sample from the beta distribution."""
-        return random.betavariate(self.alpha, self.beta)
+        return self._rng.betavariate(self.alpha, self.beta)
 
     def mean(self) -> float:
         """Get the mean of the distribution."""
@@ -551,7 +554,7 @@ class PromptTemplateLearner(BaseLearner):
         sample_count = self._sample_counts.get(context_key, 0)
 
         # Check for pure exploration
-        if random.random() < self.exploration_rate:
+        if self._rng.random() < self.exploration_rate:
             template = self._random_template()
             confidence = 0.3
             reason = "Exploration: random template"
@@ -610,10 +613,10 @@ class PromptTemplateLearner(BaseLearner):
 
     def _random_template(self) -> PromptTemplate:
         """Generate a random template for exploration."""
-        style = random.choice(self.ALL_STYLES)
+        style = self._rng.choice(self.ALL_STYLES)
         # Random subset of elements (0-4)
-        num_elements = random.randint(0, 4)
-        elements = random.sample(self.ALL_ELEMENTS, k=num_elements)
+        num_elements = self._rng.randint(0, 4)
+        elements = self._rng.sample(self.ALL_ELEMENTS, k=num_elements)
         return PromptTemplate(style=style, elements=elements)
 
     def _compute_confidence(self, posterior: BetaDistribution, sample_count: int) -> float:

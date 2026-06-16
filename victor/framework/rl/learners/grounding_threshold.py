@@ -421,7 +421,7 @@ class GroundingThresholdLearner(BaseLearner):
         total_samples = 0
         for threshold, (alpha, beta) in self._beta_params[context_key].items():
             # Sample from Beta(alpha, beta)
-            sample = random.betavariate(alpha, beta)
+            sample = self._rng.betavariate(alpha, beta)
             samples[threshold] = sample
             total_samples += int(alpha + beta - 2 * self.PRIOR_ALPHA)
 

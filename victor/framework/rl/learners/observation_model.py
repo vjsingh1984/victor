@@ -262,7 +262,7 @@ class ObservationModelLearner(BaseLearner):
         # For small sample counts we temper the draw back toward the posterior
         # mean so one noisy sample does not overwhelm sparse but consistent
         # evidence during orchestration decisions.
-        sampled_likelihood = random.betavariate(alpha, beta)
+        sampled_likelihood = self._rng.betavariate(alpha, beta)
         sample_count = int(params["sample_count"])
         if sample_count <= 0:
             likelihood = sampled_likelihood

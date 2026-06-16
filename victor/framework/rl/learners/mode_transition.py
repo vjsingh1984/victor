@@ -387,9 +387,9 @@ class ModeTransitionLearner(BaseLearner):
         # Epsilon-greedy: explore or exploit
         import random
 
-        if random.random() < self.epsilon:
+        if self._rng.random() < self.epsilon:
             # Exploration: random action
-            action = random.choice(list(actions.keys()))
+            action = self._rng.choice(list(actions.keys()))
             _q_value = actions[action]  # noqa: F841
             return RLRecommendation(
                 value=action,

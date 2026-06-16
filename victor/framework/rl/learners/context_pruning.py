@@ -263,7 +263,7 @@ class ContextPruningLearner(BaseLearner):
             beta = self.PRIOR_BETA + stats["visits"] - stats["successes"]
 
             # Sample from Beta distribution
-            sample = random.betavariate(alpha, max(1, beta))
+            sample = self._rng.betavariate(alpha, max(1, beta))
 
             # Weight by Q-value if we have enough samples
             if stats["visits"] >= self.MIN_SAMPLES_FOR_CONFIDENCE:

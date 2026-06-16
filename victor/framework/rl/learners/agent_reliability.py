@@ -175,7 +175,7 @@ class AgentReliabilityLearner(BaseLearner):
         # upweighted above 1.0, which is operationally the opposite of what the
         # accumulated evidence says.
         posterior_mean = alpha / (alpha + beta)
-        sampled_reliability = random.betavariate(alpha, beta)
+        sampled_reliability = self._rng.betavariate(alpha, beta)
         if posterior_mean < 0.5:
             expected_reliability = min(sampled_reliability, 0.5 - 1e-12)
         elif posterior_mean > 0.5:

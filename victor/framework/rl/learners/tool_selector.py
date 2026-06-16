@@ -373,7 +373,7 @@ class ToolSelectorLearner(BaseLearner):
         """
         import random
 
-        return random.random() < self.epsilon
+        return self._rng.random() < self.epsilon
 
     def _get_blended_q_value(self, tool_name: str, task_type: str) -> float:
         """Get blended Q-value (70% task-specific + 30% global).

@@ -352,6 +352,9 @@ class PromptCandidate:
     is_on_frontier: bool = True
     char_length: int = 0
     requires_benchmark: bool = False
+    # Independent per-instance RNG (decoupled from the global random module so
+    # candidates sample independently and tests don't share global RNG state).
+    _rng: random.Random = field(default_factory=random.Random, repr=False, compare=False)
 
     def sample(self) -> float:
         """Thompson Sampling: draw from Beta distribution with staleness decay.
@@ -364,7 +367,7 @@ class PromptCandidate:
         # Decay posteriors toward prior (1,1) — increases uncertainty
         eff_alpha = 1.0 + (self.alpha - 1.0) * decay
         eff_beta = 1.0 + (self.beta_val - 1.0) * decay
-        return random.betavariate(max(eff_alpha, 0.01), max(eff_beta, 0.01))
+        return self._rng.betavariate(max(eff_alpha, 0.01), max(eff_beta, 0.01))
 
     def update(self, success: bool) -> None:
         """Update Beta posteriors."""

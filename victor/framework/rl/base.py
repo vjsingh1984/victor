@@ -16,6 +16,8 @@
 
 import json
 import logging
+import os
+import random
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -26,6 +28,24 @@ if TYPE_CHECKING:
     from victor.protocols.provider_adapter import IProviderAdapter
 
 logger = logging.getLogger(__name__)
+
+
+def resolve_rl_rng_seed(name: str) -> Optional[int]:
+    """Resolve a deterministic RNG seed from ``VICTOR_RL_SEED`` (None = entropy).
+
+    Shared by all RL stochastic components so they draw from an injectable,
+    reproducible source instead of the global ``random`` module. The component
+    ``name`` is mixed in so each gets a distinct but reproducible stream from
+    the same base seed. Returns None (system entropy) when the env var is unset.
+    """
+    raw = os.environ.get("VICTOR_RL_SEED")
+    if raw is None or raw == "":
+        return None
+    try:
+        base = int(raw)
+    except ValueError:
+        base = hash(raw)
+    return (base ^ (hash(name) & 0xFFFFFFFF)) & 0x7FFFFFFF
 
 
 @dataclass
@@ -168,8 +188,19 @@ class BaseLearner(ABC):
         self.learning_rate = learning_rate
         self.provider_adapter = provider_adapter
 
+        # Per-learner stochastic source. Learners must draw from ``self._rng``
+        # (NOT the global ``random`` module) so RL decisions are reproducible and
+        # testable without monkeypatching stdlib. Unseeded by default (system
+        # entropy = prior behavior); set ``VICTOR_RL_SEED`` for a deterministic,
+        # per-learner-distinct stream, or call ``seed_rng()`` in tests.
+        self._rng: random.Random = random.Random(resolve_rl_rng_seed(name))
+
         # Ensure tables exist
         self._ensure_tables()
+
+    def seed_rng(self, seed: int) -> None:
+        """Seed this learner's RNG for deterministic draws (tests/reproducibility)."""
+        self._rng.seed(seed)
 
     @abstractmethod
     def _ensure_tables(self) -> None:
