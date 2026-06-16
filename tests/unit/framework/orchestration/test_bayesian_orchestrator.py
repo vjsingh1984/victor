@@ -277,23 +277,24 @@ class TestBayesianUpdates:
             initial_belief={"success": 0.5, "failure": 0.5},
         )
 
-        # get_reliability_weight uses Thompson sampling (np.random.beta), so the
-        # belief shift is random. Locally pytest-randomly reseeds numpy per test
-        # (deterministic), but CI has no pytest-randomly — leaving the sample
-        # dependent on accumulated global RNG state, which occasionally drew a
-        # high weight and pushed success above the threshold (non-deterministic
-        # CI failure). Seed numpy so the sampled weight is reproducible.
-        import numpy as np
-
-        np.random.seed(0)
+        # get_reliability_weight uses Thompson sampling via random.betavariate
+        # (Python's random module, NOT numpy). It is non-deterministic, and CI
+        # has no pytest-randomly to reseed it, so the sampled weight occasionally
+        # pushed success above the 0.75 threshold (flaky CI failure). Pin the
+        # sample to the Beta posterior mean so the weighting is deterministic —
+        # this exercises the intended "low reliability -> smaller belief shift"
+        # behavior without any RNG dependence.
+        import random
+        from unittest.mock import patch
 
         # Update with unreliable agent
-        updated_belief = service.update_belief_with_message(
-            belief_id=belief.belief_id,
-            agent_id="agent_a",
-            message="This will work",
-            confidence=0.9,
-        )
+        with patch.object(random, "betavariate", lambda alpha, beta: alpha / (alpha + beta)):
+            updated_belief = service.update_belief_with_message(
+                belief_id=belief.belief_id,
+                agent_id="agent_a",
+                message="This will work",
+                confidence=0.9,
+            )
 
         # Belief should shift less due to low reliability
         # (compared to a reliable agent)
