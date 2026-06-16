@@ -207,67 +207,82 @@ class EmbeddingService:
         logger.debug("[EmbeddingService] Shutdown signaled, new operations will be skipped")
 
     def _ensure_model_loaded(self) -> None:
-        """Ensure the model is loaded (lazy loading)."""
-        if self._model is None:
-            with self._model_lock:
-                if self._model is None:
-                    try:
-                        import warnings
-                        import logging
-                        import sys
-                        from contextlib import redirect_stderr
-                        from io import StringIO
-                        from sentence_transformers import SentenceTransformer
+        """Ensure the model is loaded (lazy loading).
 
-                        # Suppress all warnings from transformers/sentence_transformers during model loading
-                        # The BERT LOAD REPORT is printed directly by transformers library
-                        warnings.filterwarnings("ignore")
+        Resilient to transient model-fetch failures (e.g. HuggingFace ``429 Too
+        Many Requests`` under load): retries with backoff, and on persistent
+        failure leaves ``_model`` unset so callers degrade to zero-vector
+        embeddings rather than crashing. Embeddings are an optimization — an
+        unavailable model backend must not bring down an agent turn.
+        """
+        if self._model is not None:
+            return
+        with self._model_lock:
+            if self._model is not None:
+                return
 
-                        # Also suppress transformers library logging
-                        logging.getLogger("transformers").setLevel(logging.ERROR)
-                        logging.getLogger("sentence_transformers").setLevel(logging.ERROR)
+            import warnings
+            import logging
+            from contextlib import redirect_stderr
+            from io import StringIO
 
-                        load_start = time.perf_counter()
-                        logger.info(
-                            f"[EmbeddingService] Loading model: {self.model_name} "
-                            f"(device={self.device or 'auto'})"
+            try:
+                from sentence_transformers import SentenceTransformer
+            except ImportError as e:
+                raise ImportError(
+                    "sentence-transformers not installed. "
+                    "Install with: pip install sentence-transformers"
+                ) from e
+
+            # Suppress noisy warnings/logging during model loading.
+            warnings.filterwarnings("ignore")
+            logging.getLogger("transformers").setLevel(logging.ERROR)
+            logging.getLogger("sentence_transformers").setLevel(logging.ERROR)
+            logger.debug(
+                "[EmbeddingService] Model specs: "
+                "BAAI/bge-small-en-v1.5=130MB/384-dim/MTEB-62.2, "
+                "thenlper/gte-small=67MB/384-dim, "
+                "all-MiniLM-L6-v2=80MB/384-dim/fastest"
+            )
+
+            last_err: Optional[Exception] = None
+            for attempt in range(4):
+                try:
+                    load_start = time.perf_counter()
+                    logger.info(
+                        f"[EmbeddingService] Loading model: {self.model_name} "
+                        f"(device={self.device or 'auto'}, attempt={attempt + 1})"
+                    )
+                    # Suppress stderr to hide the BERT LOAD REPORT (C++ library).
+                    stderr_capture = StringIO()
+                    with redirect_stderr(stderr_capture):
+                        self._model = SentenceTransformer(
+                            self.model_name,
+                            device=self.device,
                         )
-                        logger.debug(
-                            "[EmbeddingService] Model specs: "
-                            "BAAI/bge-small-en-v1.5=130MB/384-dim/MTEB-62.2, "
-                            "thenlper/gte-small=67MB/384-dim, "
-                            "all-MiniLM-L6-v2=80MB/384-dim/fastest"
-                        )
+                    self._dimension = self._model.get_sentence_embedding_dimension()
+                    self._initialized = True
+                    load_time = time.perf_counter() - load_start
+                    logger.info(
+                        f"[EmbeddingService] Model loaded successfully: "
+                        f"model={self.model_name}, dimension={self._dimension}, "
+                        f"device={self._model.device}, load_time={load_time:.2f}s"
+                    )
+                    return
+                except Exception as e:  # transient: HF 429 / network / disk
+                    last_err = e
+                    if attempt < 3:
+                        time.sleep(2 ** (attempt + 1))  # 2s, 4s, 8s
 
-                        # Suppress stderr to hide BERT LOAD REPORT (printed directly by C++ library)
-                        stderr_capture = StringIO()
-                        with redirect_stderr(stderr_capture):
-                            self._model = SentenceTransformer(
-                                self.model_name,
-                                device=self.device,
-                            )
-
-                        # Get embedding dimension from model
-                        self._dimension = self._model.get_sentence_embedding_dimension()
-                        self._initialized = True
-                        load_time = time.perf_counter() - load_start
-
-                        logger.info(
-                            f"[EmbeddingService] Model loaded successfully: "
-                            f"model={self.model_name}, "
-                            f"dimension={self._dimension}, "
-                            f"device={self._model.device}, "
-                            f"load_time={load_time:.2f}s"
-                        )
-                        logger.debug(
-                            "[EmbeddingService] Singleton instance ready. "
-                            "Memory footprint ~130MB for bge-small-en-v1.5"
-                        )
-                    except ImportError as e:
-                        raise ImportError(
-                            "sentence-transformers not installed. "
-                            "Install with: pip install sentence-transformers"
-                        ) from e
+            # All attempts failed — degrade gracefully (leave _model unset so
+            # embed_*_sync return zero vectors). Recoverable: a later call retries.
+            logger.warning(
+                "[EmbeddingService] Model %s failed to load after retries (%s); "
+                "embeddings degrade to zero vectors. Pre-cache the model or set "
+                "HF_TOKEN to raise HuggingFace rate limits.",
+                self.model_name,
+                last_err,
+            )
 
     @property
     def dimension(self) -> int:
@@ -366,6 +381,9 @@ class EmbeddingService:
             self._cache_misses += 1
 
         self._ensure_model_loaded()
+        if self._model is None:
+            # Model unavailable (load failed after retries) — degrade gracefully.
+            return np.zeros(self.dimension, dtype=np.float32)
 
         try:
             start_time = time.perf_counter()
@@ -456,6 +474,9 @@ class EmbeddingService:
             return np.empty((0, self.dimension), dtype=np.float32)
 
         self._ensure_model_loaded()
+        if self._model is None:
+            # Model unavailable (load failed after retries) — degrade gracefully.
+            return np.zeros((len(texts), self.dimension), dtype=np.float32)
 
         try:
             start_time = time.perf_counter()

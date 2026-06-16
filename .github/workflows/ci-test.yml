@@ -107,6 +107,11 @@ jobs:
           python -c "import victor, victor_contracts.cli, lancedb, pytest_asyncio, scipy; print(victor.__file__)"
 
       - name: Pre-cache embedding model
+        env:
+          # Authenticated HF requests get a much higher rate limit, which avoids
+          # the '429 Too Many Requests' that 12 parallel shards trigger on the
+          # unauthenticated endpoint. No-op when the secret is unset.
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
           # EmbeddingService / SemanticResponseCache lazily load
           # BAAI/bge-small-en-v1.5 the first time a test exercises them. A failed
@@ -140,7 +145,11 @@ jobs:
         # skip the network metadata (HEAD) request that returns '429 Too Many
         # Requests' under 12 parallel shards (a non-deterministic embedding-test
         # failure source). When the pre-cache misses, offline is NOT set and the
-        # tests fall back to the online baseline (never a hard offline error).
+        # tests fall back to the online baseline (never a hard offline error) —
+        # HF_TOKEN (if set) keeps those online loads under the rate limit, and
+        # EmbeddingService retries + degrades gracefully as a final backstop.
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
           # Coverage only on 3.11 shard 1 (where Codecov upload happens)
           if [ "${{ matrix.python-version }}" = "3.11" ] && [ "${{ matrix.shard }}" = "1" ]; then
