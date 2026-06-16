@@ -393,15 +393,24 @@ class TestInitSynthesizerToolsFallback:
     @pytest.mark.asyncio
     async def test_tools_fallback_with_agent(self):
         """Fallback uses agent.chat() with tools prompt."""
-        mock_agent = AsyncMock()
-        mock_agent.chat.return_value = MagicMock(content="# Fallback init.md")
+        # Use a real ``async def chat`` rather than AsyncMock: on Python
+        # 3.10/3.11 ``inspect.iscoroutinefunction(AsyncMock())`` returns False
+        # (AsyncMock coroutine detection was only fixed in 3.12), so
+        # synthesize_with_tools took its "agent exposes no async chat/run"
+        # branch and returned "" — a version-dependent CI failure. A real
+        # coroutine function is detected consistently on all versions.
+        captured = {}
+
+        class _FakeAgent:
+            async def chat(self, prompt, **kwargs):
+                captured["prompt"] = prompt
+                return MagicMock(content="# Fallback init.md")
 
         synthesizer = InitSynthesizer()
-        result = await synthesizer.synthesize_with_tools(agent=mock_agent)
+        result = await synthesizer.synthesize_with_tools(agent=_FakeAgent())
 
         assert result == "# Fallback init.md"
-        prompt = mock_agent.chat.call_args[0][0]
-        assert "overview" in prompt.lower() or "analyze" in prompt.lower()
+        assert "overview" in captured["prompt"].lower() or "analyze" in captured["prompt"].lower()
 
     @pytest.mark.asyncio
     async def test_tools_fallback_without_agent(self):

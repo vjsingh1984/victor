@@ -130,6 +130,15 @@ jobs:
           done || true
 
       - name: Run tests (sharded)
+        env:
+          # The embedding model is pre-cached in the previous step. Force
+          # huggingface_hub / transformers offline during the test run so cached
+          # model loads do NOT issue a network metadata (HEAD) request — those
+          # get '429 Too Many Requests' under 12 parallel shards and surfaced as
+          # non-deterministic embedding-test failures. All non-default models in
+          # the test suite are mocked, so offline is safe.
+          HF_HUB_OFFLINE: "1"
+          TRANSFORMERS_OFFLINE: "1"
         run: |
           # Coverage only on 3.11 shard 1 (where Codecov upload happens)
           if [ "${{ matrix.python-version }}" = "3.11" ] && [ "${{ matrix.shard }}" = "1" ]; then

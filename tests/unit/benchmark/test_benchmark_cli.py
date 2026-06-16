@@ -2012,8 +2012,13 @@ class TestBenchmarkCompare:
         )
 
         assert result.exit_code == 0
-        assert "Included Victor publication root:" in result.stdout
-        assert "published_fixtures" in result.stdout
+        # Rich wraps console output to the terminal width, which on CI (narrow,
+        # ~80 cols) splits the long publication-root path across lines (e.g.
+        # "published_fixture\ns"). Normalize whitespace so these substring checks
+        # are console-width independent.
+        normalized = " ".join(result.stdout.split())
+        assert "Included Victor publication root:" in normalized
+        assert "published_fixtures" in normalized.replace(" ", "")
         saved = json.loads(output.read_text())
         victor_entries = [row for row in saved["results"] if row["framework"] == "victor"]
         assert len(victor_entries) == 3
