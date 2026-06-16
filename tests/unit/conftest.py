@@ -141,6 +141,12 @@ def reset_embedding_singleton():
     The singleton pattern means first caller wins model choice. Without
     this fixture, test ordering can cause stale embeddings from a different
     model to be returned.
+
+    Also resets the classifier singletons (intent/task/question) which CACHE a
+    reference to the EmbeddingService. Without resetting them, a classifier kept
+    a reference to a service that the EmbeddingService reset had discarded — a
+    source of non-deterministic embedding failures on CI when several embedding
+    tests run in the same shard process.
     """
     yield
     # Only import and reset if the module was loaded (avoid importing heavy deps)
@@ -151,6 +157,21 @@ def reset_embedding_singleton():
 
         if EmbeddingService._instance is not None:
             EmbeddingService.reset_instance()
+
+    # Reset classifier singletons that cache the embedding service.
+    for mod_name, cls_name in (
+        ("victor.storage.embeddings.intent_classifier", "IntentClassifier"),
+        ("victor.storage.embeddings.task_classifier", "TaskTypeClassifier"),
+        ("victor.storage.embeddings.question_classifier", "QuestionTypeClassifier"),
+    ):
+        module = sys.modules.get(mod_name)
+        if module is None:
+            continue
+        cls = getattr(module, cls_name, None)
+        if cls is not None and getattr(cls, "_instance", None) is not None:
+            reset = getattr(cls, "reset_instance", None)
+            if callable(reset):
+                reset()
 
 
 @pytest.fixture(autouse=True)

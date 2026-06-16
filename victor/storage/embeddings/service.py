@@ -182,10 +182,16 @@ class EmbeddingService:
 
     @classmethod
     def reset_instance(cls) -> None:
-        """Reset the singleton instance (mainly for testing)."""
+        """Reset the singleton instance (mainly for testing).
+
+        Note: the discarded instance is intentionally NOT marked ``_shutdown``.
+        Components (e.g. the intent/task/question classifiers) may still hold a
+        reference to it; a shut-down instance returns zero vectors, which leaks
+        as non-deterministic embedding failures into later tests. Dropping the
+        model lets any lingering reference lazily reload and keep working.
+        """
         with cls._lock:
             if cls._instance is not None:
-                cls._instance._shutdown = True
                 cls._instance._model = None
                 cls._instance = None
                 logger.info("Reset EmbeddingService singleton")
