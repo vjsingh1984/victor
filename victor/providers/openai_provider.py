@@ -228,6 +228,12 @@ class OpenAIProvider(BaseProvider):
         model_lower = model.lower()
         return any(model_lower.startswith(prefix) for prefix in ["o1", "o3", "gpt-5", "gpt5"])
 
+    def supports_reasoning_effort(self, model: Optional[str] = None) -> bool:
+        """OpenAI reasoning models (o-series, GPT-5.x) accept ``reasoning_effort``."""
+        if not model:
+            return False
+        return self._uses_max_completion_tokens(model)
+
     @property
     def name(self) -> str:
         """Provider name."""
@@ -332,6 +338,14 @@ class OpenAIProvider(BaseProvider):
                         request_params["tools"] = self._convert_tools(tools)
                         request_params["tool_choice"] = "auto"
 
+                # reasoning_effort is only valid for reasoning models — drop a
+                # stray per-member value before it reaches a model that rejects
+                # it (defence-in-depth; the runtime is already capability-gated).
+                if "reasoning_effort" in request_params and not self.supports_reasoning_effort(
+                    model
+                ):
+                    request_params.pop("reasoning_effort", None)
+
                 # Make API call with circuit breaker protection
                 response: ChatCompletion = await self._execute_with_circuit_breaker(
                     self.client.chat.completions.create, **request_params
@@ -415,6 +429,10 @@ class OpenAIProvider(BaseProvider):
                 if tools:
                     request_params["tools"] = self._convert_tools(tools)
                     request_params["tool_choice"] = "auto"
+
+            # reasoning_effort is only valid for reasoning models (see chat()).
+            if "reasoning_effort" in request_params and not self.supports_reasoning_effort(model):
+                request_params.pop("reasoning_effort", None)
 
             # Accumulate tool calls across streaming deltas to avoid emitting partial JSON
             tool_call_accumulator: Dict[str, Dict[str, Any]] = {}

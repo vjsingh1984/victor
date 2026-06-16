@@ -447,6 +447,26 @@ class BaseProvider(ABC):
         """
         return False
 
+    def supports_reasoning_effort(self, model: Optional[str] = None) -> bool:
+        """Check if a model accepts the ``reasoning_effort`` request parameter.
+
+        ``reasoning_effort`` (``"low"`` / ``"medium"`` / ``"high"``) controls how
+        much a reasoning model deliberates before answering. It is only valid for
+        reasoning models on providers that expose it (e.g. OpenAI o-series /
+        GPT-5); sending it to a model that doesn't support it is an API error.
+
+        The framework consults this before forwarding a per-member
+        ``reasoning_effort`` so the parameter is never sent to a model that would
+        reject it. Default is False — providers/models opt in by overriding.
+
+        Args:
+            model: Model identifier to check (provider may key support on it).
+
+        Returns:
+            True if ``reasoning_effort`` may be forwarded for ``model``.
+        """
+        return False
+
     DEFAULT_CONTEXT_WINDOW: int = 8_192
     """Conservative default context window when model is unknown.
 

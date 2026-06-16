@@ -2959,6 +2959,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
                     provider=getattr(team_member, "provider", None),
                     model=getattr(team_member, "model", None),
                     temperature=getattr(team_member, "temperature", None),
+                    reasoning_effort=getattr(team_member, "reasoning_effort", None),
                 )
                 return {
                     "success": getattr(spawn_result, "success", False),

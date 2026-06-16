@@ -131,6 +131,7 @@ class SubAgentConfig:
     provider_override: Optional[Any] = None
     model_override: Optional[str] = None
     temperature_override: Optional[float] = None
+    reasoning_effort_override: Optional[str] = None
 
     def to_runtime_context(self) -> "AgentRuntimeContext":
         """Build the common per-agent runtime context from this config."""
@@ -365,6 +366,12 @@ class SubAgent(IAgent):  # type: ignore[misc]
             if self.config.temperature_override is not None
             else self._context.temperature
         )
+        # Per-member reasoning_effort override; inherit the parent's when unset.
+        reasoning_effort = (
+            self.config.reasoning_effort_override
+            if self.config.reasoning_effort_override is not None
+            else getattr(self._context, "reasoning_effort", None)
+        )
 
         # Create new orchestrator instance.
         # Use the actual provider object (not just the name) for proper initialization
@@ -375,6 +382,7 @@ class SubAgent(IAgent):  # type: ignore[misc]
             temperature=temperature,
             provider_name=provider_name,
             system_prompt_override=self._get_role_prompt(),
+            reasoning_effort=reasoning_effort,
             # Note: We'll share the parent's DI container for now
             # In production, we might want isolated scoped containers
         )

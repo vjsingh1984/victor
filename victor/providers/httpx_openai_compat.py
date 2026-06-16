@@ -265,6 +265,13 @@ class HttpxOpenAICompatProvider(BaseProvider):
             if key not in {"api_key"} and value is not None and key not in payload:
                 payload[key] = value
 
+        # reasoning_effort is only valid for reasoning models. The kwarg
+        # passthrough above forwards it for any OpenAI-compatible endpoint that
+        # accepts it (subclasses opt in via supports_reasoning_effort); strip it
+        # otherwise so it never reaches a model/endpoint that would reject it.
+        if "reasoning_effort" in payload and not self.supports_reasoning_effort(model):
+            payload.pop("reasoning_effort", None)
+
         # Log detailed message structure for debugging tool pairing issues
         tool_messages = [
             (i, m) for i, m in enumerate(formatted) if m.get("role") in ("tool", "assistant")

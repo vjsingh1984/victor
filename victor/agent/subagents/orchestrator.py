@@ -320,6 +320,7 @@ class SubAgentOrchestrator:
         provider: Optional[str] = None,
         model: Optional[str] = None,
         temperature: Optional[float] = None,
+        reasoning_effort: Optional[str] = None,
     ) -> SubAgentResult:
         """Spawn a sub-agent to execute a task.
 
@@ -341,6 +342,9 @@ class SubAgentOrchestrator:
             model: Optional model override paired with ``provider``.
             temperature: Optional per-member sampling temperature override
                 (None inherits the parent's temperature).
+            reasoning_effort: Optional per-member reasoning effort ("low"/
+                "medium"/"high") for reasoning-capable models (None inherits/omits;
+                forwarded only to providers/models that support it).
 
         Returns:
             SubAgentResult with execution outcome
@@ -418,6 +422,7 @@ class SubAgentOrchestrator:
             provider_override=provider_override,
             model_override=model_override,
             temperature_override=temperature,
+            reasoning_effort_override=reasoning_effort,
         )
 
         # Create and execute sub-agent

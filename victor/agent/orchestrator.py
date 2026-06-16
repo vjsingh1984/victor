@@ -876,6 +876,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         provider_name: Optional[str] = None,
         profile_name: Optional[str] = None,
         system_prompt_override: Optional[str] = None,
+        reasoning_effort: Optional[str] = None,
     ):
         """Initialize orchestrator.
 
@@ -891,6 +892,10 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
             provider_name: Optional provider label from profile (e.g., lmstudio, vllm) to disambiguate OpenAI-compatible providers
             profile_name: Optional profile name (e.g., "groq-fast", "claude-sonnet") for session tracking
             system_prompt_override: Optional complete system prompt for isolated child runtimes
+            reasoning_effort: Optional reasoning effort ("low"/"medium"/"high") for
+                reasoning-capable models. None inherits/omits. Forwarded to the
+                provider only when it reports support (see
+                ``BaseProvider.supports_reasoning_effort``); ignored otherwise.
         """
         # Store profile name for session tracking
         self._profile_name = profile_name
@@ -917,6 +922,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
 
         self.settings = settings
         self.temperature = temperature
+        self.reasoning_effort = reasoning_effort
         self.max_tokens = max_tokens
         self.console = console or Console()
         self.tool_selection = tool_selection or {}

@@ -94,7 +94,9 @@ async def test_resolve_override_provider_fail_open(monkeypatch, caplog):
 # -- spawn() threads the override into SubAgentConfig ----------------------
 
 
-async def _spawn_capturing_config(monkeypatch, *, provider, model, resolved, temperature=None):
+async def _spawn_capturing_config(
+    monkeypatch, *, provider, model, resolved, temperature=None, reasoning_effort=None
+):
     """Run spawn() with SubAgent + resolution stubbed; return the captured config."""
     captured = {}
 
@@ -124,7 +126,12 @@ async def _spawn_capturing_config(monkeypatch, *, provider, model, resolved, tem
     monkeypatch.setattr(so, "_resolve_override_provider", _fake_resolve)
 
     await so.spawn(
-        SubAgentRole.REVIEWER, "task", provider=provider, model=model, temperature=temperature
+        SubAgentRole.REVIEWER,
+        "task",
+        provider=provider,
+        model=model,
+        temperature=temperature,
+        reasoning_effort=reasoning_effort,
     )
     return captured["config"]
 
@@ -355,3 +362,123 @@ def test_constrained_orchestrator_uses_temperature_override(monkeypatch):
 
     # temperature_override=0.0 must win over the parent's 0.7 (not be treated as falsy).
     assert captured["temperature"] == 0.0
+
+
+# -- reasoning_effort threads the same chain as temperature -----------------
+
+
+def test_spec_passes_reasoning_effort_to_member():
+    member = TeamMemberSpec(
+        role="reviewer", goal="review", reasoning_effort="high"
+    ).to_team_member()
+    assert member.reasoning_effort == "high"
+
+
+def test_spec_defaults_reasoning_effort_none():
+    member = TeamMemberSpec(role="executor", goal="write").to_team_member()
+    assert member.reasoning_effort is None
+
+
+async def test_spawn_threads_reasoning_effort_override(monkeypatch):
+    config = await _spawn_capturing_config(
+        monkeypatch, provider=None, model=None, resolved=None, reasoning_effort="high"
+    )
+    assert config.reasoning_effort_override == "high"
+
+
+async def test_spawn_no_reasoning_effort_override_by_default(monkeypatch):
+    config = await _spawn_capturing_config(monkeypatch, provider=None, model=None, resolved=None)
+    assert config.reasoning_effort_override is None
+
+
+async def test_make_executor_forwards_reasoning_effort(monkeypatch):
+    recorded = {}
+
+    async def _recording_spawn(self, role, task, **kwargs):
+        recorded.update(kwargs)
+        return types.SimpleNamespace(
+            success=True, summary="done", error=None, tool_calls_used=0, duration_seconds=0.1
+        )
+
+    monkeypatch.setattr(SubAgentOrchestrator, "spawn", _recording_spawn)
+
+    coord = UnifiedTeamCoordinator(types.SimpleNamespace(), lightweight_mode=True)
+    member = TeamMemberSpec(
+        role="reviewer", goal="review", reasoning_effort="high"
+    ).to_team_member()
+
+    adapters = coord._adapt_team_members([member])
+    await adapters[0].execute_task("review this", {})
+
+    assert recorded.get("reasoning_effort") == "high"
+
+
+def _make_constrained(monkeypatch, *, config, context_reasoning=None):
+    """Build a SubAgent with a fake AgentOrchestrator; return captured init kwargs."""
+    from victor.agent.subagents.base import SubAgent
+
+    captured = {}
+
+    class _FakeRegistry:
+        def clear(self):
+            pass
+
+        def register(self, tool):
+            pass
+
+        def get(self, name):
+            return None
+
+    class _FakeOrchestrator:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+            self.tool_registry = _FakeRegistry()
+            self._vertical_context = None
+
+    import victor.agent.orchestrator as orch_module
+
+    monkeypatch.setattr(orch_module, "AgentOrchestrator", _FakeOrchestrator)
+
+    sa = SubAgent.__new__(SubAgent)
+    sa.config = config
+    sa._context = types.SimpleNamespace(
+        settings=types.SimpleNamespace(tool_budget=1, max_context_chars=1),
+        provider=object(),
+        model="parent-model",
+        temperature=0.7,
+        reasoning_effort=context_reasoning,
+        provider_name="anthropic",
+        vertical_context=None,
+        tool_registry=_FakeRegistry(),
+    )
+    sa._create_constrained_orchestrator()
+    return captured
+
+
+def test_constrained_orchestrator_uses_reasoning_effort_override(monkeypatch):
+    config = SubAgentConfig(
+        role=SubAgentRole.REVIEWER,
+        task="t",
+        allowed_tools=[],
+        tool_budget=5,
+        context_limit=1000,
+        system_prompt_override="ROLE PROMPT",
+        reasoning_effort_override="high",
+    )
+    captured = _make_constrained(monkeypatch, config=config, context_reasoning="low")
+    # Override wins over the parent context value.
+    assert captured["reasoning_effort"] == "high"
+
+
+def test_constrained_orchestrator_inherits_reasoning_effort(monkeypatch):
+    config = SubAgentConfig(
+        role=SubAgentRole.EXECUTOR,
+        task="t",
+        allowed_tools=[],
+        tool_budget=5,
+        context_limit=1000,
+        system_prompt_override="ROLE PROMPT",
+    )
+    captured = _make_constrained(monkeypatch, config=config, context_reasoning="medium")
+    # No override -> inherits the parent's reasoning_effort.
+    assert captured["reasoning_effort"] == "medium"

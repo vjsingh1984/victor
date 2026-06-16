@@ -927,3 +927,57 @@ async def test_message_conversion(openai_provider):
         assert openai_messages[0] == {"role": "system", "content": "System"}
         assert openai_messages[1] == {"role": "user", "content": "User"}
         assert openai_messages[2] == {"role": "assistant", "content": "Assistant"}
+
+
+# -- reasoning_effort capability + defensive strip --------------------------
+
+
+def _mock_chat_response():
+    msg = MagicMock()
+    msg.content = "ok"
+    msg.tool_calls = None
+    choice = MagicMock()
+    choice.message = msg
+    choice.finish_reason = "stop"
+    resp = MagicMock()
+    resp.choices = [choice]
+    resp.usage = None
+    resp.model_dump = lambda: {}
+    return resp
+
+
+@pytest.mark.asyncio
+async def test_supports_reasoning_effort(openai_provider):
+    assert openai_provider.supports_reasoning_effort("o3-mini") is True
+    assert openai_provider.supports_reasoning_effort("gpt-5.1") is True
+    assert openai_provider.supports_reasoning_effort("gpt-4o") is False
+    assert openai_provider.supports_reasoning_effort(None) is False
+
+
+@pytest.mark.asyncio
+async def test_chat_keeps_reasoning_effort_for_reasoning_model(openai_provider):
+    with patch.object(
+        openai_provider.client.chat.completions, "create", new_callable=AsyncMock
+    ) as mock_create:
+        mock_create.return_value = _mock_chat_response()
+        await openai_provider.chat(
+            messages=[Message(role="user", content="hi")],
+            model="o3-mini",
+            reasoning_effort="high",
+        )
+        assert mock_create.call_args.kwargs.get("reasoning_effort") == "high"
+
+
+@pytest.mark.asyncio
+async def test_chat_strips_reasoning_effort_for_standard_model(openai_provider):
+    with patch.object(
+        openai_provider.client.chat.completions, "create", new_callable=AsyncMock
+    ) as mock_create:
+        mock_create.return_value = _mock_chat_response()
+        await openai_provider.chat(
+            messages=[Message(role="user", content="hi")],
+            model="gpt-4o",
+            reasoning_effort="high",
+        )
+        # Standard models reject reasoning_effort -> must be stripped.
+        assert "reasoning_effort" not in mock_create.call_args.kwargs

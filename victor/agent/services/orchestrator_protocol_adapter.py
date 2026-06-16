@@ -473,6 +473,21 @@ class OrchestratorProtocolAdapter:
         self._orchestrator.temperature = value
 
     @property
+    def reasoning_effort(self) -> Optional[str]:
+        """Get the configured reasoning effort (None = inherit/omit)."""
+        return getattr(self._orchestrator, "reasoning_effort", None)
+
+    def supports_reasoning_effort(self, model: Optional[str] = None) -> bool:
+        """Whether the underlying provider accepts reasoning_effort for ``model``."""
+        provider = getattr(self._orchestrator, "provider", None)
+        if provider is None:
+            return False
+        try:
+            return bool(provider.supports_reasoning_effort(model))
+        except Exception:  # pragma: no cover - capability probe must not break the turn
+            return False
+
+    @property
     def max_tokens(self) -> int:
         """Get max tokens."""
         return self._orchestrator.max_tokens

@@ -1599,9 +1599,23 @@ class TurnExecutor:
             CompletionResponse from model
         """
         temperature = kwargs.pop("temperature_override", None) or self._provider_context.temperature
+
+        # Forward a configured per-member reasoning_effort only when the
+        # provider+model report support, so it is never sent to a model that
+        # would reject it (the provider also strips it defensively).
+        model = self._provider_context.model
+        reasoning_effort = getattr(self._provider_context, "reasoning_effort", None)
+        if (
+            reasoning_effort
+            and "reasoning_effort" not in kwargs
+            and getattr(self._provider_context, "supports_reasoning_effort", None) is not None
+            and self._provider_context.supports_reasoning_effort(model)
+        ):
+            kwargs["reasoning_effort"] = reasoning_effort
+
         return await self._execution_provider.execute_turn(
             messages=self._chat_context.messages,
-            model=self._provider_context.model,
+            model=model,
             temperature=temperature,
             max_tokens=self._provider_context.max_tokens,
             tools=tools,

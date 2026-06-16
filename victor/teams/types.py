@@ -396,6 +396,9 @@ class TeamMember:
     provider: Optional[str] = None
     model: Optional[str] = None
     temperature: Optional[float] = None
+    # Per-member reasoning effort ("low"/"medium"/"high") for reasoning-capable
+    # models. None inherits/omits; forwarded only where the provider supports it.
+    reasoning_effort: Optional[str] = None
     # Formation role binding for context-driven formations (e.g. "generator"/
     # "critic" for REFLECTION). None = bound positionally.
     formation_role: Optional[str] = None

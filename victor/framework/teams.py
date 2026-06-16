@@ -313,6 +313,10 @@ class TeamMemberSpec:
     provider: Optional[str] = None
     model: Optional[str] = None
     temperature: Optional[float] = None
+    # Per-member reasoning effort ("low"/"medium"/"high") for reasoning-capable
+    # models (e.g. reviewer thinks hard at "high", writer at "low"). None
+    # inherits/omits; forwarded only to providers/models that support it.
+    reasoning_effort: Optional[str] = None
     # Formation role for context-driven formations (e.g. "generator"/"critic"
     # for REFLECTION). None = positional binding.
     formation_role: Optional[str] = None
@@ -370,6 +374,7 @@ class TeamMemberSpec:
             provider=self.provider,
             model=self.model,
             temperature=self.temperature,
+            reasoning_effort=self.reasoning_effort,
             formation_role=self.formation_role,
         )
 

@@ -1458,3 +1458,60 @@ async def test_no_gate_is_zero_behavior_change():
     result = await executor.execute_agentic_loop("hello")
 
     assert result is sentinel
+
+
+# ---------------------------------------------------------------------------
+# reasoning_effort forwarding (capability-gated)
+# ---------------------------------------------------------------------------
+
+
+def _make_reasoning_executor(model, reasoning_effort, supported):
+    executor = _make_executor()
+    pc = executor._provider_context
+    pc.temperature = 0.7
+    pc.model = model
+    pc.max_tokens = 1024
+    pc.reasoning_effort = reasoning_effort
+    pc.supports_reasoning_effort = MagicMock(return_value=supported)
+    executor._chat_context.messages = []
+    executor._execution_provider.execute_turn = AsyncMock(
+        return_value=CompletionResponse(content="ok", role="assistant")
+    )
+    return executor
+
+
+async def test_execute_model_turn_forwards_reasoning_effort_when_supported():
+    executor = _make_reasoning_executor("o3-mini", "high", supported=True)
+    await executor._execute_model_turn(tools=None)
+    kwargs = executor._execution_provider.execute_turn.await_args.kwargs
+    assert kwargs.get("reasoning_effort") == "high"
+
+
+async def test_execute_model_turn_omits_reasoning_effort_when_unsupported():
+    executor = _make_reasoning_executor("gpt-4o", "high", supported=False)
+    await executor._execute_model_turn(tools=None)
+    kwargs = executor._execution_provider.execute_turn.await_args.kwargs
+    assert "reasoning_effort" not in kwargs
+
+
+async def test_execute_model_turn_omits_reasoning_effort_when_none():
+    executor = _make_reasoning_executor("o3-mini", None, supported=True)
+    await executor._execute_model_turn(tools=None)
+    kwargs = executor._execution_provider.execute_turn.await_args.kwargs
+    assert "reasoning_effort" not in kwargs
+
+
+async def test_adapter_exposes_reasoning_effort_and_capability():
+    from victor.agent.services.orchestrator_protocol_adapter import (
+        OrchestratorProtocolAdapter,
+    )
+
+    class _Prov:
+        def supports_reasoning_effort(self, model=None):
+            return model == "o3-mini"
+
+    orch = SimpleNamespace(reasoning_effort="high", provider=_Prov())
+    adapter = OrchestratorProtocolAdapter(orch)
+    assert adapter.reasoning_effort == "high"
+    assert adapter.supports_reasoning_effort("o3-mini") is True
+    assert adapter.supports_reasoning_effort("gpt-4o") is False
