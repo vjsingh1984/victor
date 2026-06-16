@@ -336,12 +336,16 @@ class ProviderHealthChecker:
 
             # Try to make a simple call (most providers will fail or succeed quickly)
             try:
-                with asyncio.timeout(timeout):
-                    await provider_instance.chat(
+                # asyncio.wait_for (not asyncio.timeout, which is 3.11+) for
+                # Python 3.10 compatibility.
+                await asyncio.wait_for(
+                    provider_instance.chat(
                         messages=[test_message],
                         model=model,
                         max_tokens=1,
-                    )
+                    ),
+                    timeout=timeout,
+                )
                 return {"success": True, "response": "Connectivity OK"}
             except asyncio.TimeoutError:
                 return {

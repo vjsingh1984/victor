@@ -413,11 +413,12 @@ class PreloadManager:
         success = False
 
         try:
-            async with asyncio.timeout(task.timeout):
-                logger.info(f"Executing preload task: {task.name}")
-                await task.func()
-                success = True
-                logger.info(f"Completed preload task: {task.name}")
+            # asyncio.wait_for (not asyncio.timeout, which is 3.11+) so the
+            # preload runtime keeps working on Python 3.10.
+            logger.info(f"Executing preload task: {task.name}")
+            await asyncio.wait_for(task.func(), timeout=task.timeout)
+            success = True
+            logger.info(f"Completed preload task: {task.name}")
         except asyncio.TimeoutError:
             error = f"Timeout after {task.timeout}s"
             logger.warning(f"Preload task '{task.name}' timed out")
