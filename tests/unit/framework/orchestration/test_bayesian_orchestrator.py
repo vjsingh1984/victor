@@ -277,6 +277,16 @@ class TestBayesianUpdates:
             initial_belief={"success": 0.5, "failure": 0.5},
         )
 
+        # get_reliability_weight uses Thompson sampling (np.random.beta), so the
+        # belief shift is random. Locally pytest-randomly reseeds numpy per test
+        # (deterministic), but CI has no pytest-randomly — leaving the sample
+        # dependent on accumulated global RNG state, which occasionally drew a
+        # high weight and pushed success above the threshold (non-deterministic
+        # CI failure). Seed numpy so the sampled weight is reproducible.
+        import numpy as np
+
+        np.random.seed(0)
+
         # Update with unreliable agent
         updated_belief = service.update_belief_with_message(
             belief_id=belief.belief_id,
