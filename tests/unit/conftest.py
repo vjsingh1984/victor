@@ -382,6 +382,50 @@ def isolate_project_victor_storage(isolated_project_victor_dir):
 
 
 @pytest.fixture(autouse=True)
+def isolate_global_victor_db(tmp_path, monkeypatch):
+    """Redirect the GLOBAL ``~/.victor`` database to a temp dir for each test.
+
+    The global database (``~/.victor/victor.db``) holds user-wide RL data —
+    ``rl_outcomes`` and the ``*_q_values`` tables that drive model/tool routing,
+    including the chat banner's "Routing hint". Only the *project* database and
+    API keys were isolated previously, so any test exercising the RL or session
+    code paths wrote outcomes straight into the developer's real DB, skewing the
+    learned routing (e.g. surfacing ``fake:fake`` / ``test-profile`` providers).
+
+    ``DatabaseManager`` resolves ``Path.home()/.victor/victor.db`` at runtime, so
+    pointing ``HOME`` at a per-test temp dir (plus resetting the singleton and the
+    cached ``GLOBAL_VICTOR_DIR``) sandboxes every global-DB write without changing
+    production code.
+    """
+    fake_home = tmp_path / "global_home"
+    # Mirror the global ~/.victor structure production creates on first use, so
+    # tests asserting these dirs exist still pass under the sandboxed home.
+    (fake_home / ".victor" / "logs").mkdir(parents=True, exist_ok=True)
+    monkeypatch.setenv("HOME", str(fake_home))
+    monkeypatch.setenv("USERPROFILE", str(fake_home))  # Windows
+
+    import victor.config.settings as _settings
+
+    monkeypatch.setattr(_settings, "GLOBAL_VICTOR_DIR", fake_home / ".victor", raising=False)
+
+    try:
+        from victor.core.database import reset_database
+
+        reset_database()
+    except Exception:
+        pass
+
+    yield
+
+    try:
+        from victor.core.database import reset_database
+
+        reset_database()
+    except Exception:
+        pass
+
+
+@pytest.fixture(autouse=True)
 def reset_extension_cache():
     """Reset VerticalExtensionLoader caches between tests."""
     yield
