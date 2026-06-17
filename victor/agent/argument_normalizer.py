@@ -587,6 +587,52 @@ class ArgumentNormalizer:
         )
         return decoded
 
+    @staticmethod
+    def extract_write_payload_greedy(value: str) -> Optional[Dict[str, str]]:
+        """Best-effort recover ``{path, content}`` from a malformed write envelope.
+
+        Models (notably glm-5.1 via the ``value`` envelope) frequently emit a
+        ``write`` call as a single JSON *string* whose large ``content`` field is
+        not validly escaped — literal newlines, unescaped ``"`` and ``}`` from
+        markdown/mermaid (e.g. ``A{decision}``), or a truncated tail with no
+        closing ``"}``. Strict and lookahead parsers then fail or stop early.
+
+        ``content`` is the *trailing* field of the write envelope, so it can be
+        recovered greedily: take everything after ``"content":"`` to the end of
+        the string, trim a single trailing object terminator, and decode standard
+        escapes. This tolerates unescaped quotes/braces and truncation.
+
+        Returns ``{"path": ..., "content": ...}`` only when *both* markers are
+        located (never fabricates empty content, which would clobber a file), else
+        ``None``.
+        """
+        import re
+
+        path_match = re.search(r'["\']path["\']\s*:\s*["\']([^"\']+)["\']', value)
+        if not path_match:
+            return None
+
+        content_match = re.search(r'["\']content["\']\s*:\s*["\']', value)
+        if not content_match:
+            return None
+
+        raw = value[content_match.end() :]
+        # Trim a single trailing object terminator: closing quote (+ ws) + `}` at
+        # end; failing that, a lone trailing quote. A truncated tail keeps as-is.
+        trimmed = re.sub(r'["\']\s*\}\s*$', "", raw)
+        if trimmed == raw:
+            trimmed = re.sub(r'["\']\s*$', "", raw)
+
+        content = (
+            trimmed.replace("\\n", "\n")
+            .replace("\\t", "\t")
+            .replace("\\r", "\r")
+            .replace('\\"', '"')
+            .replace("\\'", "'")
+            .replace("\\\\", "\\")
+        )
+        return {"path": path_match.group(1), "content": content}
+
     def _try_salvage_large_payload(self, value: str) -> Any:
         """Salvage tool arguments from large malformed JSON payloads.
 
@@ -598,36 +644,20 @@ class ArgumentNormalizer:
         import re
 
         try:
-            # Try to extract the path parameter (usually first and well-formed)
+            # Greedy recovery handles the common failure: large `content` with
+            # unescaped quotes/braces or a truncated tail (content is the
+            # trailing field, so take it to end-of-string).
+            recovered = self.extract_write_payload_greedy(value)
+            if recovered:
+                return recovered
+
+            # No `content` marker — at least recover the path so the model gets a
+            # precise, actionable error instead of a silent failure.
             path_match = re.search(r'"path"\s*:\s*"([^"]+)"', value)
             if not path_match:
                 path_match = re.search(r"'path'\s*:\s*'([^']+)'", value)
-
             if path_match:
-                path = path_match.group(1)
-                # Try to find content boundaries
-                content_start = value.find('"content"')
-                if content_start == -1:
-                    content_start = value.find("'content'")
-
-                if content_start > 0:
-                    # Find the colon after content
-                    colon_pos = value.find(":", content_start)
-                    if colon_pos > 0:
-                        # Skip whitespace and find the quote
-                        rest = value[colon_pos + 1 :]
-                        quote_match = re.search(r'(["\'])([^\1]*?)\1\s*\}\s*$', rest, re.DOTALL)
-                        if quote_match:
-                            content = quote_match.group(2)
-                            return {"path": path, "content": content}
-                        else:
-                            # Fallback: extract everything after the colon until end
-                            content = rest.lstrip()[1:]  # Skip opening quote
-                            # Remove trailing quote/brace
-                            content = content.rstrip("\"'").rstrip("}")
-                            return {"path": path, "content": content}
-
-                return {"path": path, "content": ""}  # Minimum viable payload
+                return {"path": path_match.group(1), "content": ""}
 
         except Exception as exc:
             logger.debug("Payload salvage failed: %s", str(exc)[:100])
@@ -767,6 +797,28 @@ class ArgumentNormalizer:
         )
 
         if isinstance(payload, str):
+            # Write `content` is the trailing field and frequently arrives with
+            # unescaped quotes/braces or a truncated tail. The lenient structured
+            # parser can "succeed" with TRUNCATED content (stopping at the first
+            # inner `"`), silently writing a partial file. For write, prefer a
+            # strict parse, then greedy-to-end recovery, BEFORE the lenient path.
+            if canonical_tool_name == "write":
+                import json as _json
+
+                try:
+                    _strict = _json.loads(payload)
+                except Exception:
+                    _strict = None
+                if not (isinstance(_strict, dict) and {"path", "content"} <= set(_strict)):
+                    _greedy = self.extract_write_payload_greedy(payload)
+                    if _greedy:
+                        logger.info(
+                            "[%s] Greedy recovery of write value envelope " "(content_len=%d)",
+                            self.provider_name,
+                            len(_greedy["content"]),
+                        )
+                        return _greedy
+
             # Check for common LLM error patterns
             payload_size = len(payload)
             if payload_size > 10000:

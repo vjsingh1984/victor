@@ -254,7 +254,23 @@ class MissingParameterHandler(ErrorRecoveryHandler):
             if payload_size > 10000 and tool_name == "write" and isinstance(args.get("value"), str):
                 import re
 
+                from victor.agent.argument_normalizer import ArgumentNormalizer
+
                 raw_value = args.get("value", "")
+                # `content` is the trailing field, so recover it greedily —
+                # tolerant of unescaped quotes/braces and a truncated tail.
+                recovered = ArgumentNormalizer.extract_write_payload_greedy(raw_value)
+                if recovered and all(p in recovered for p in missing_params):
+                    self._logger.warning(
+                        "Recovered write payload (path + content_len=%d) from "
+                        "malformed value envelope (size=%d)",
+                        len(recovered["content"]),
+                        payload_size,
+                    )
+                    return recovered
+
+                # Last resort: at least recover the path so the agent gets a
+                # precise error instead of a silent, repeated failure.
                 path_match = re.search(r'"path"\s*:\s*"([^"]+)"', raw_value)
                 if path_match and "path" in missing_params:
                     self._logger.warning(

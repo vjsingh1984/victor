@@ -1442,3 +1442,62 @@ embedded newlines and "quotes" that aren't escaped.
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
+
+class TestGreedyWriteEnvelopeRecovery:
+    """Recover large/malformed `write` value-envelopes (glm-5.1 regression).
+
+    Reproduces the docs-audit failure: a 15KB BLUEPRINT.md write was emitted as
+    a single `value` string whose `content` had unescaped quotes, mermaid braces
+    and a possibly-truncated tail, so strict + lookahead parsers recovered only
+    `path` -> the write retried with no content and failed.
+    """
+
+    def _malformed_envelope(self, content: str) -> str:
+        # Mimic a model that wrapped {path, content} in a `value` string but did
+        # NOT escape the inner double-quotes/newlines in `content`.
+        return '{"path":"docs/architecture/BLUEPRINT.md","content":"' + content + '"}'
+
+    def test_greedy_recovers_content_with_quotes_and_mermaid_braces(self):
+        content = (
+            "# Victor Blueprint\n\n"
+            '```mermaid\nflowchart TD\n  A{"decision?"} -->|yes| B[run]\n```\n\n'
+            'See the "tools" guide and the {config} block.\n'
+        )
+        payload = self._malformed_envelope(content)
+        out = ArgumentNormalizer.extract_write_payload_greedy(payload)
+        assert out is not None
+        assert out["path"] == "docs/architecture/BLUEPRINT.md"
+        # Full content recovered (not truncated at the first inner `}` or `"`).
+        assert out["content"] == content
+
+    def test_greedy_recovers_truncated_tail_without_closing_brace(self):
+        # Model truncated mid-content: no closing `"}`.
+        content = "# Victor\n\nLots of text ... [workflows]()"
+        payload = '{"path":"docs/x.md","content":"' + content
+        out = ArgumentNormalizer.extract_write_payload_greedy(payload)
+        assert out is not None
+        assert out["path"] == "docs/x.md"
+        assert out["content"] == content
+
+    def test_greedy_returns_none_without_content_marker(self):
+        # Never fabricate empty content (would clobber the file).
+        assert ArgumentNormalizer.extract_write_payload_greedy('{"path":"a.md"}') is None
+        assert ArgumentNormalizer.extract_write_payload_greedy("no json here") is None
+
+    def test_normalize_arguments_unwraps_malformed_write_envelope(self):
+        content = '# Doc\n\nA{node} and a "quoted" word.\n' * 50  # large + bracey + quotes
+        payload = self._malformed_envelope(content)
+        normalizer = ArgumentNormalizer(provider_name="zai")
+        result, _strategy = normalizer.normalize_arguments({"value": payload}, "write")
+        # The value envelope must be unwrapped into path + content (not left as
+        # {"value": ...}, which fails the write tool's required-arg validation).
+        assert result.get("path") == "docs/architecture/BLUEPRINT.md"
+        assert result.get("content") == content
+        assert "value" not in result
+
+    def test_escapes_are_decoded(self):
+        payload = r'{"path":"a.md","content":"line1\nline2\ttabbed and a \"quote\""}'
+        out = ArgumentNormalizer.extract_write_payload_greedy(payload)
+        assert out is not None
+        assert out["content"] == 'line1\nline2\ttabbed and a "quote"'
