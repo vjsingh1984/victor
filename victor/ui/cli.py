@@ -520,6 +520,13 @@ def callback(
     ),
 ) -> None:
     """Victor - Open-source agentic AI framework with multi-provider support."""
+    # Install in-process hang/crash diagnostics as early as possible so a wedged
+    # session can be introspected with `kill -USR1 <pid>` (no root / py-spy needed,
+    # which matters on macOS hardened-runtime Python where attach is blocked).
+    from victor.ui.diagnostics import install_fault_diagnostics
+
+    install_fault_diagnostics()
+
     if ctx.invoked_subcommand is None:
         # Check if this is a first-time user
         if not skip_onboarding:
