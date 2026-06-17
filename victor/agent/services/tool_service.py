@@ -1446,9 +1446,18 @@ class ToolService:
 
         _failed = failed_signatures if failed_signatures is not None else set()
 
-        # Single authority for raw-args coercion + value-envelope recovery +
-        # normalization (replaces the locally-duplicated json/ast/{value:...} ladder).
-        normalized_args, strategy = argument_normalizer.parse_tool_arguments(raw_args, tool_name)
+        # Coerce via the single shared ladder (json/ast/native-repair/{value:...}),
+        # then delegate to the INJECTED normalizer's normalize_arguments — preserving
+        # the dependency-injection seam (callers may pass a custom/mock normalizer).
+        from victor.agent.argument_normalizer import ArgumentNormalizer
+
+        if isinstance(raw_args, str):
+            tool_args = ArgumentNormalizer.coerce_arg_string(raw_args)
+        elif raw_args is None:
+            tool_args = {}
+        else:
+            tool_args = raw_args
+        normalized_args, strategy = argument_normalizer.normalize_arguments(tool_args, tool_name)
         normalized_args = tool_adapter.normalize_arguments(normalized_args, tool_name)
         normalized_args = infer_git_operation(original_name, tool_name, normalized_args)
 
