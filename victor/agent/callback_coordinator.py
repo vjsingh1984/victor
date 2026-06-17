@@ -12,7 +12,7 @@ from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
 if TYPE_CHECKING:
     from victor.agent.tool_pipeline import ToolCallResult
     from victor.agent.streaming_controller import StreamingSession
-    from victor.agent.services.metrics_service import MetricsCoordinator
+    from victor.agent.services.metrics_service import AgentMetricsService
 
 logger = logging.getLogger(__name__)
 
@@ -21,13 +21,13 @@ class CallbackCoordinator:
     """Coordinates callbacks for tool and streaming lifecycle events.
 
     Replaces inline callback methods on the orchestrator with clean delegation
-    to MetricsCoordinator, ToolService, and UsageAnalytics.
+    to AgentMetricsService, ToolService, and UsageAnalytics.
     """
 
     def __init__(
         self,
         *,
-        metrics_coordinator: "MetricsCoordinator",
+        metrics_coordinator: "AgentMetricsService",
         get_observability: Callable[[], Optional[Any]],
         get_iteration_count: Callable[[], int],
         get_usage_analytics: Callable[[], Optional[Any]],

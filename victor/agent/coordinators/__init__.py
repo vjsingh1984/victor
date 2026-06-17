@@ -46,8 +46,6 @@ _SUBMODULE_MAP: dict[str, str] = {
     # Runtime coordinators from services
     "ExplorationCoordinator": "services.exploration_runtime",
     "ExplorationResult": "services.exploration_runtime",
-    "MetricsCoordinator": "services.metrics_service",
-    "create_metrics_coordinator": "services.metrics_service",
     "PlanningCoordinator": "services.planning_runtime",
     "PlanningConfig": "services.planning_runtime",
     "PlanningMode": "services.planning_runtime",
@@ -218,8 +216,6 @@ def __getattr__(name: str) -> Any:
         # Runtime coordinators from services
         "ExplorationCoordinator",
         "ExplorationResult",
-        "MetricsCoordinator",
-        "create_metrics_coordinator",
         "SafetyCoordinator",
         "SafetyRule",
         "SafetyCheckResult",
@@ -240,8 +236,6 @@ def __getattr__(name: str) -> Any:
         # Import from appropriate service module
         if name in {"ExplorationCoordinator", "ExplorationResult"}:
             module = importlib.import_module("victor.agent.services.exploration_runtime")
-        elif name in {"MetricsCoordinator", "create_metrics_coordinator"}:
-            module = importlib.import_module("victor.agent.services.metrics_service")
         elif name in {
             "SafetyCoordinator",
             "SafetyRule",
