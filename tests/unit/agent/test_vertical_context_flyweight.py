@@ -7,6 +7,18 @@ import pytest
 from victor.agent.vertical_context import VerticalContext, create_vertical_context
 
 
+def test_mutable_vertical_context_protocol_reexport_matches_core_contract():
+    from victor.agent.vertical_context import (
+        MutableVerticalContextProtocol as AgentMutableVerticalContextProtocol,
+    )
+    from victor.core.shared_types import MutableVerticalContextProtocol
+
+    context = create_vertical_context(name="coding")
+
+    assert AgentMutableVerticalContextProtocol is MutableVerticalContextProtocol
+    assert isinstance(context, MutableVerticalContextProtocol)
+
+
 class TestCreateChildContext:
 
     def _parent_context(self) -> VerticalContext:
@@ -145,6 +157,10 @@ class TestSubAgentVerticalContextInheritance:
         subagent._presentation = MagicMock()
 
         orch = subagent._create_constrained_orchestrator()
+
+        MockOrch.assert_called_once()
+        assert MockOrch.call_args.kwargs["system_prompt_override"]
+        mock_orch.set_system_prompt.assert_not_called()
 
         # Verify vertical context was set on child orchestrator
         assert hasattr(mock_orch, "_vertical_context")

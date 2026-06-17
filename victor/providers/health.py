@@ -43,6 +43,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
+from victor.core.health import HealthStatus
 from victor.providers.registry import ProviderRegistry
 from victor.providers.resolution import (
     UnifiedApiKeyResolver,
@@ -51,15 +52,6 @@ from victor.providers.resolution import (
 )
 
 logger = logging.getLogger(__name__)
-
-
-class HealthStatus:
-    """Health status enumeration for providers."""
-
-    HEALTHY = "healthy"
-    DEGRADED = "degraded"
-    UNHEALTHY = "unhealthy"
-    UNKNOWN = "unknown"
 
 
 @dataclass
@@ -344,15 +336,22 @@ class ProviderHealthChecker:
 
             # Try to make a simple call (most providers will fail or succeed quickly)
             try:
-                with asyncio.timeout(timeout):
-                    await provider_instance.chat(
+                # asyncio.wait_for (not asyncio.timeout, which is 3.11+) for
+                # Python 3.10 compatibility.
+                await asyncio.wait_for(
+                    provider_instance.chat(
                         messages=[test_message],
                         model=model,
                         max_tokens=1,
-                    )
+                    ),
+                    timeout=timeout,
+                )
                 return {"success": True, "response": "Connectivity OK"}
             except asyncio.TimeoutError:
-                return {"success": False, "error": f"Connectivity check timed out after {timeout}s"}
+                return {
+                    "success": False,
+                    "error": f"Connectivity check timed out after {timeout}s",
+                }
             except Exception as e:
                 # Some providers may return auth errors which is also useful info
                 error_str = str(e).lower()

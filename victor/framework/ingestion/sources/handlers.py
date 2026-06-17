@@ -27,7 +27,10 @@ from typing import Any, Dict, List, Optional, Set
 from urllib.parse import urlparse
 
 from victor.framework.ingestion.models import DocumentType, SourceContent
-from victor.framework.ingestion.chunker import detect_document_type, EXTENSION_TO_DOCTYPE
+from victor.framework.ingestion.chunker import (
+    detect_document_type,
+    EXTENSION_TO_DOCTYPE,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -101,7 +104,10 @@ def extract_text_from_html(html_content: str) -> str:
         logger.warning("BeautifulSoup not available, using basic HTML extraction")
         # Remove script and style tags
         text = re.sub(
-            r"<script[^>]*>.*?</script>", "", html_content, flags=re.DOTALL | re.IGNORECASE
+            r"<script[^>]*>.*?</script>",
+            "",
+            html_content,
+            flags=re.DOTALL | re.IGNORECASE,
         )
         text = re.sub(r"<style[^>]*>.*?</style>", "", text, flags=re.DOTALL | re.IGNORECASE)
         # Remove all tags

@@ -16,8 +16,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Any, Optional, Tuple
+from dataclasses import dataclass, field
+from typing import Any, Dict, Optional, Tuple
 
 
 @dataclass(frozen=True)
@@ -26,6 +26,7 @@ class MemoryRuntimeComponents:
 
     memory_manager: Optional[Any]
     memory_session_id: Optional[str]
+    memory_initialization_diagnostics: Dict[str, Any] = field(default_factory=dict)
 
 
 def create_memory_runtime_components(
@@ -39,9 +40,12 @@ def create_memory_runtime_components(
         provider_name,
         native_tool_calls,
     )
+    diagnostics_getter = getattr(factory, "get_memory_initialization_diagnostics", None)
+    diagnostics = diagnostics_getter() if callable(diagnostics_getter) else {}
     return MemoryRuntimeComponents(
         memory_manager=memory_manager,
         memory_session_id=memory_session_id,
+        memory_initialization_diagnostics=dict(diagnostics or {}),
     )
 
 
@@ -50,8 +54,8 @@ def initialize_conversation_embedding_store(
     memory_manager: Any,
 ) -> Tuple[Optional[Any], Optional[Any]]:
     """Create conversation embedding store and semantic cache handle."""
-    from victor.agent.coordinators.session_coordinator import SessionCoordinator
+    from victor.agent.services.session_service import SessionService
 
-    return SessionCoordinator.init_conversation_embedding_store(
+    return SessionService.init_conversation_embedding_store(
         memory_manager=memory_manager,
     )

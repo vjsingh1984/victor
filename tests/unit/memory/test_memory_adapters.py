@@ -155,6 +155,7 @@ class MockConversationMessage:
         tool_call_id: Optional[str] = None,
         priority_value: int = 50,
         token_count: int = 10,
+        metadata: Optional[dict] = None,
     ):
         self.id = id
         self.role = MagicMock()
@@ -166,6 +167,7 @@ class MockConversationMessage:
         self.priority.value = priority_value
         self.token_count = token_count
         self.timestamp = datetime.now(timezone.utc)
+        self.metadata = metadata or {}
 
 
 class MockConversationStore:
@@ -412,6 +414,55 @@ class TestConversationMemoryAdapter:
         assert len(results) == 1
         assert results[0].id == "msg_async"
         store.aget_semantically_relevant_messages.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_search_supports_dual_trace_filters(self, conversation_store):
+        """Adapter should expose separate semantic and execution traces when requested."""
+        adapter = ConversationMemoryAdapter(conversation_store, session_id="session_1")
+        semantic_message = MockConversationMessage(
+            "msg_semantic",
+            "assistant",
+            "Authentication middleware failed during startup.",
+            metadata={"memory_trace_kind": "semantic"},
+        )
+        execution_message = MockConversationMessage(
+            "msg_execution",
+            "tool",
+            '<TOOL_OUTPUT tool="read" path="src/auth.py">...</TOOL_OUTPUT>',
+            tool_name="read",
+            tool_call_id="call_1",
+            metadata={
+                "memory_trace_kind": "execution",
+                "memory_execution_text": "tool read path src/auth.py config loader",
+            },
+        )
+        conversation_store.aget_dual_trace_relevant_messages = AsyncMock(
+            return_value={
+                "semantic": [(semantic_message, 0.92)],
+                "execution": [(execution_message, 0.81)],
+            }
+        )
+        conversation_store.get_message_trace_text = MagicMock(
+            side_effect=lambda message, trace_kind=None: (
+                message.metadata.get("memory_execution_text") or message.content
+            )
+        )
+
+        results = await adapter.search(
+            MemoryQuery(
+                query="authentication config",
+                limit=5,
+                session_id="session_1",
+                filters={"dual_trace": True},
+            )
+        )
+
+        assert [result.metadata["trace_kind"] for result in results] == [
+            "semantic",
+            "execution",
+        ]
+        assert results[1].content["trace_text"] == "tool read path src/auth.py config loader"
+        conversation_store.aget_dual_trace_relevant_messages.assert_awaited_once()
 
     def test_is_available(self, adapter):
         """Test availability check."""

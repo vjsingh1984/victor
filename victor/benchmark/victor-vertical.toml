@@ -16,8 +16,8 @@ category = "evaluation"
 tags = ["benchmark", "swe-bench", "humaneval", "evaluation", "testing"]
 
 [vertical.class]
-module = "victor.benchmark.benchmark_assistant"
-class_name = "BenchmarkAssistant"
+module = "victor.benchmark.assistant"
+class_name = "BenchmarkVertical"
 provides_tools = [
     "run_benchmark",
     "evaluate_results",

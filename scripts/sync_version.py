@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
 """Synchronize package version strings from VERSION files.
 
-victor-ai and victor-sdk have independent version files:
+victor-ai and victor-contracts have independent version files:
   - VERSION          → victor-ai version
-  - victor-sdk/VERSION → victor-sdk version
+  - victor-contracts/VERSION → victor-contracts version
 
 Updates:
   - pyproject.toml (victor-ai) version
-  - victor-sdk/pyproject.toml version
-  - victor-ai's victor-sdk dependency lower bound
+  - victor-contracts/pyproject.toml version
+  - victor-ai's victor-contracts dependency lower bound
 
 Usage:
   python scripts/sync_version.py          # Sync both packages
   python scripts/sync_version.py --ai     # Sync victor-ai only
-  python scripts/sync_version.py --sdk    # Sync victor-sdk only
+  python scripts/sync_version.py --sdk    # Sync victor-contracts only
 """
 
 import re
@@ -47,16 +47,16 @@ def sync_ai():
 
 
 def sync_sdk():
-    """Sync victor-sdk version from its own VERSION file."""
-    sdk_version_file = ROOT / "victor-sdk" / "VERSION"
+    """Sync victor-contracts version from its own VERSION file."""
+    sdk_version_file = ROOT / "victor-contracts" / "VERSION"
     if not sdk_version_file.exists():
-        print("ERROR: victor-sdk/VERSION file not found")
+        print("ERROR: victor-contracts/VERSION file not found")
         sys.exit(1)
 
     version = sdk_version_file.read_text().strip()
-    print(f"Syncing victor-sdk to version {version}")
+    print(f"Syncing victor-contracts to version {version}")
 
-    sdk_toml = ROOT / "victor-sdk" / "pyproject.toml"
+    sdk_toml = ROOT / "victor-contracts" / "pyproject.toml"
     text = sdk_toml.read_text()
     text = re.sub(
         r'^(version\s*=\s*)"[^"]+"',
@@ -72,8 +72,8 @@ def sync_sdk():
     ai_toml = ROOT / "pyproject.toml"
     text = ai_toml.read_text()
     text = re.sub(
-        r'"victor-sdk[><=!~,. 0-9]+"',
-        f'"victor-sdk>={version},<1.0"',
+        r'"victor-contracts[><=!~,. 0-9]+"',
+        f'"victor-contracts>={version},<1.0"',
         text,
         count=1,
     )

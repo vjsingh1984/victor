@@ -12,38 +12,40 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Project context loader for init.md files.
+"""Project-context loader with shared instruction discovery.
 
-This module provides functionality similar to Claude Code's CLAUDE.md,
-allowing projects to define context, instructions, and configuration
-that Victor uses when working in that codebase.
-
-Configuration is driven by settings.py:
-- VICTOR_DIR_NAME: Directory name (default: .victor)
-- VICTOR_CONTEXT_FILE: Context file name (default: init.md)
-
-Primary location: {project_root}/.victor/init.md
-Legacy locations: .victor.md, VICTOR.md (for backwards compatibility)
+Victor prefers native instruction files such as `.victor/init.md`, but it also
+imports compatibility surfaces like `AGENTS.md` and `CLAUDE.md` through the
+shared discovery module. The current workspace directory is walked upward
+toward the filesystem root, nearer files are treated as more specific, and
+Victor-native files take precedence within a single directory.
 """
+
+from __future__ import annotations
 
 import logging
 import threading
-import time
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from victor.config.settings import (
     VICTOR_DIR_NAME,
     VICTOR_CONTEXT_FILE,
     get_project_paths,
 )
+from victor.context.instruction_discovery import (
+    InstructionFile,
+    build_instruction_signature,
+    discover_instruction_files,
+)
 
 # Cache for ProjectContext instances and their content
-# Key: (root_path, mtime) -> (content, parsed_sections)
-_context_cache: Dict[Tuple[str, float], Tuple[str, Dict[str, str]]] = {}
+# Key: (root_path, instruction signature)
+_context_cache: Dict[
+    Tuple[str, Tuple[Tuple[str, float, int], ...]],
+    Tuple[Optional[Path], Tuple[InstructionFile, ...], str, str, Dict[str, str]],
+] = {}
 _cache_lock = threading.Lock()
-_cache_ttl = 60.0  # Seconds to cache before checking mtime again
-_last_cache_check: Dict[str, float] = {}
 
 logger = logging.getLogger(__name__)
 
@@ -53,10 +55,7 @@ CONTEXT_FILE_PATH = f"{VICTOR_DIR_NAME}/{VICTOR_CONTEXT_FILE}"
 
 
 class ProjectContext:
-    """Loads and manages project-specific context from init.md files.
-
-    Location: .victor/init.md (configurable via settings.py)
-    """
+    """Loads and manages project-specific context from discovered instruction files."""
 
     def __init__(self, root_path: Optional[str] = None):
         """Initialize project context loader.
@@ -68,90 +67,71 @@ class ProjectContext:
         self.root_path = Path(root_path) if root_path else Path.cwd()
         self._context_file: Optional[Path] = None
         self._content: Optional[str] = None
+        self._primary_content: Optional[str] = None
         self._parsed_sections: Dict[str, str] = {}
+        self._instruction_files: List[InstructionFile] = []
 
     def find_context_file(self) -> Optional[Path]:
-        """Find the project context file.
-
-        Looks for .victor/init.md (configurable via settings.py).
-        Searches current directory and parent directories up to git root.
+        """Find the canonical primary instruction file for this workspace.
 
         Returns:
             Path to context file if found, None otherwise.
         """
-        search_path = self.root_path
-
-        # Search up the directory tree
-        while search_path != search_path.parent:
-            # Use settings-driven path
-            context_file = search_path / CONTEXT_FILE_PATH
-            if context_file.exists() and context_file.is_file():
-                logger.info(f"Found project context file: {context_file}")
-                return context_file
-
-            # Stop at git root if found
-            if (search_path / ".git").exists():
-                break
-
-            search_path = search_path.parent
-
-        return None
+        discovered = discover_instruction_files(self.root_path)
+        if not discovered:
+            return None
+        return discovered[0].path
 
     def load(self, force_reload: bool = False) -> bool:
-        """Load project context from file with caching.
-
-        Uses mtime-based caching to avoid re-reading unchanged files.
-        Cache is automatically invalidated when the file is modified.
+        """Load project context from discovered instruction files with signature caching.
 
         Args:
-            force_reload: Force re-reading the file even if cached.
+            force_reload: Force re-reading files even if the current signature is cached.
 
         Returns:
             True if context was loaded successfully, False otherwise.
         """
-        self._context_file = self.find_context_file()
-
-        if not self._context_file:
+        instruction_files = discover_instruction_files(self.root_path)
+        if not instruction_files:
             logger.debug("No project context file found")
             return False
 
+        self._context_file = instruction_files[0].path
+
         try:
             root_key = str(self.root_path)
-            now = time.time()
-
-            # Check if we should skip cache check (within TTL)
-            if not force_reload and root_key in _last_cache_check:
-                if now - _last_cache_check[root_key] < _cache_ttl:
-                    # Use cached content if available
-                    for (cached_root, _), (content, sections) in _context_cache.items():
-                        if cached_root == root_key:
-                            self._content = content
-                            self._parsed_sections = sections
-                            logger.debug(f"Using cached project context for {root_key}")
-                            return True
-
-            # Get file mtime for cache key
-            mtime = self._context_file.stat().st_mtime
-            cache_key = (root_key, mtime)
+            signature = build_instruction_signature(instruction_files)
+            cache_key = (root_key, signature)
 
             with _cache_lock:
-                # Check cache with mtime
                 if not force_reload and cache_key in _context_cache:
-                    self._content, self._parsed_sections = _context_cache[cache_key]
-                    _last_cache_check[root_key] = now
-                    logger.debug(f"Using cached project context for {self._context_file}")
+                    (
+                        self._context_file,
+                        cached_files,
+                        self._primary_content,
+                        self._content,
+                        self._parsed_sections,
+                    ) = _context_cache[cache_key]
+                    self._instruction_files = list(cached_files)
+                    logger.debug("Using cached project context for %s", self._context_file)
                     return True
 
-                # Load from file
-                self._content = self._context_file.read_text(encoding="utf-8")
-                self._parse_sections()
+                self._instruction_files = list(instruction_files)
+                self._primary_content = self._instruction_files[0].content
+                self._content = self._join_instruction_content(self._instruction_files)
+                self._parse_sections(self._primary_content)
 
                 # Update cache (clear old entries for same root)
                 keys_to_remove = [k for k in _context_cache if k[0] == root_key]
                 for k in keys_to_remove:
                     del _context_cache[k]
-                _context_cache[cache_key] = (self._content, self._parsed_sections)
-                _last_cache_check[root_key] = now
+                _context_cache[cache_key] = (
+                    self._context_file,
+                    tuple(self._instruction_files),
+                    self._primary_content,
+                    self._content,
+                    self._parsed_sections.copy(),
+                )
 
             logger.info(f"Loaded project context from {self._context_file}")
             return True
@@ -165,19 +145,26 @@ class ProjectContext:
         """Clear the project context cache (for testing or hot-reload)."""
         with _cache_lock:
             _context_cache.clear()
-            _last_cache_check.clear()
         logger.debug("Cleared project context cache")
 
-    def _parse_sections(self) -> None:
+    @staticmethod
+    def _join_instruction_content(instruction_files: List[InstructionFile]) -> str:
+        """Join discovered instruction content for compatibility consumers."""
+        return "\n\n".join(
+            file.content.strip() for file in instruction_files if file.content.strip()
+        ).strip()
+
+    def _parse_sections(self, content: Optional[str] = None) -> None:
         """Parse markdown content into sections by headers."""
-        if not self._content:
+        source = content if content is not None else self._content
+        if not source:
             return
 
         self._parsed_sections = {}
         current_section = "overview"
         current_content: List[str] = []
 
-        for line in self._content.split("\n"):
+        for line in source.split("\n"):
             if line.startswith("## "):
                 # Save previous section
                 if current_content:
@@ -202,6 +189,22 @@ class ProjectContext:
         """Get the path to the loaded context file."""
         return self._context_file
 
+    @property
+    def instruction_files(self) -> List[InstructionFile]:
+        """Get the ordered instruction files used for this project context."""
+        return list(self._instruction_files)
+
+    def get_context_signature(self) -> Tuple[Tuple[str, float, int], ...]:
+        """Return a live signature for prompt invalidation and cache refresh."""
+        live_signature: List[Tuple[str, float, int]] = []
+        for item in self._instruction_files:
+            try:
+                stat = item.path.stat()
+                live_signature.append((str(item.path), stat.st_mtime, stat.st_size))
+            except OSError:
+                live_signature.append((str(item.path), item.mtime, item.size))
+        return tuple(live_signature)
+
     def get_section(self, section_name: str) -> str:
         """Get a specific section from the context.
 
@@ -223,16 +226,133 @@ class ProjectContext:
         if not self._content:
             return ""
 
-        # Use actual file name or default to configured name
-        file_name = self._context_file.name if self._context_file else VICTOR_CONTEXT_FILE
+        loaded_files = "\n".join(
+            f"- {self._display_path(item.path)} ({item.scope}, source={item.source_type})"
+            for item in self._instruction_files
+        )
+        rendered_files = "\n\n".join(
+            (
+                f"## {self._display_path(item.path)}"
+                f" (scope: {item.scope}, source: {item.source_type})\n{item.content}"
+            )
+            for item in self._instruction_files
+        )
 
         return f"""
 <project-context>
-The following is project-specific context from {file_name}:
+Victor loaded project instructions by walking upward from the current working directory.
+Nearer files are more specific. Within the same directory, Victor-native files load before
+AGENTS/CLAUDE compatibility files.
 
-{self._content}
+Loaded instruction files:
+{loaded_files}
+
+{rendered_files}
 </project-context>
 """
+
+    def _display_path(self, path: Path) -> str:
+        """Render instruction paths relative to the workspace when possible."""
+        try:
+            return str(path.relative_to(self.root_path.resolve()))
+        except ValueError:
+            return str(path)
+
+    @classmethod
+    def auto_generate(cls, root_path: str) -> Optional[Path]:
+        """Auto-generate a compact init.md for a project if not present.
+
+        Creates a lightweight (~500 token) context file from:
+        - README.md first 1500 chars
+        - Top-level directory listing (max 20)
+        - Detected build system
+
+        Idempotent: skips if init.md already exists.
+
+        Args:
+            root_path: Project root directory
+
+        Returns:
+            Path to created init.md, or None if already exists or failed
+        """
+        root = Path(root_path)
+        victor_dir = root / VICTOR_DIR_NAME
+        init_file = victor_dir / VICTOR_CONTEXT_FILE
+
+        if init_file.exists():
+            logger.debug(f"init.md already exists at {init_file}")
+            return None
+
+        sections = []
+        project_name = root.name
+
+        # 1. Extract README summary (first 1500 chars of first text paragraph)
+        readme_summary = ""
+        for readme_name in ["README.md", "README.rst", "README.txt", "readme.md"]:
+            readme_path = root / readme_name
+            if readme_path.exists():
+                try:
+                    raw = readme_path.read_text(encoding="utf-8")[:3000]
+                    for para in raw.split("\n\n"):
+                        stripped = para.strip()
+                        if not stripped:
+                            continue
+                        if stripped.startswith(("#", "![", "<", "[!", "---", "```")):
+                            continue
+                        if stripped.startswith("[") and stripped.endswith(")"):
+                            continue
+                        readme_summary = stripped[:1500]
+                        break
+                except Exception:
+                    pass
+                break
+
+        sections.append(f"# {project_name}\n")
+        if readme_summary:
+            sections.append(readme_summary + "\n")
+
+        # 2. Top-level directory listing
+        try:
+            dirs = sorted(
+                d.name
+                for d in root.iterdir()
+                if d.is_dir() and not d.name.startswith((".", "_", "venv", "env", "node_modules"))
+            )[:20]
+            if dirs:
+                sections.append("## Structure\n")
+                sections.append("```")
+                sections.append("\n".join(f"{d}/" for d in dirs))
+                sections.append("```\n")
+        except OSError:
+            pass
+
+        # 3. Detect build system
+        build_hints = []
+        if (root / "pyproject.toml").exists():
+            build_hints.append("Python (pyproject.toml)")
+        elif (root / "setup.py").exists():
+            build_hints.append("Python (setup.py)")
+        if (root / "package.json").exists():
+            build_hints.append("Node.js")
+        if (root / "Cargo.toml").exists():
+            build_hints.append("Rust")
+        if (root / "go.mod").exists():
+            build_hints.append("Go")
+
+        if build_hints:
+            sections.append(f"**Build**: {', '.join(build_hints)}\n")
+
+        content = "\n".join(sections)
+
+        # Write file
+        try:
+            victor_dir.mkdir(parents=True, exist_ok=True)
+            init_file.write_text(content, encoding="utf-8")
+            logger.info(f"Auto-generated init.md at {init_file} ({len(content)} chars)")
+            return init_file
+        except Exception as e:
+            logger.warning(f"Failed to auto-generate init.md: {e}")
+            return None
 
     def get_package_layout_hint(self) -> str:
         """Extract package layout hints from context.
@@ -444,3 +564,190 @@ def init_victor_md(root_path: Optional[str] = None, force: bool = False) -> Opti
     except Exception as e:
         logger.error(f"Failed to create {VICTOR_CONTEXT_FILE}: {e}")
         return None
+
+
+async def generate_victor_md_with_graph(
+    root_path: Optional[str] = None,
+    task: Optional[str] = None,
+    max_symbols: Optional[int] = None,
+) -> str:
+    """Generate project context file with graph-based enhancements.
+
+    This async version includes graph-aware context when available:
+    - Relevant symbols from graph traversal
+    - Symbol dependencies
+    - Data flow information
+    - Similar code patterns
+
+    Args:
+        root_path: Root directory to analyze. Defaults to current directory.
+        task: Optional task description for context relevance. If None,
+              uses a generic "understand this codebase" task.
+        max_symbols: Maximum number of symbols to include in graph context.
+                     If None, uses settings.graph.init_max_symbols.
+
+    Returns:
+        Generated markdown content for init.md with graph enhancements
+    """
+    from victor.config.settings import get_settings
+
+    root = Path(root_path) if root_path else Path.cwd()
+    settings = get_settings()
+
+    # Start with standard content
+    content = generate_victor_md(root_path)
+    sections = [content]
+
+    # Check if graph-enhanced context is enabled
+    graph_enabled = getattr(settings, "graph", None)
+    if graph_enabled is None:
+        logger.debug("Graph settings not available, skipping graph context")
+        return content
+
+    if not getattr(graph_enabled, "enable_graph_rag", False):
+        logger.debug("Graph RAG not enabled, skipping graph context")
+        return content
+
+    if not getattr(graph_enabled, "enable_graph_context_in_init", True):
+        logger.debug("Graph context in init.md disabled via settings")
+        return content
+
+    # Use setting for max_symbols if not provided
+    if max_symbols is None:
+        max_symbols = getattr(graph_enabled, "init_max_symbols", 50)
+
+    # Check feature flag
+    try:
+        from victor.core.feature_flags import get_feature_flag_manager, FeatureFlag
+
+        if not get_feature_flag_manager().is_enabled(FeatureFlag.USE_GRAPH_ENHANCED_CONTEXT):
+            logger.debug("USE_GRAPH_ENHANCED_CONTEXT feature flag disabled")
+            return content
+    except Exception:
+        logger.debug("Feature flag check failed, proceeding with graph context")
+
+    # Try to add graph context
+    try:
+        from victor.storage.graph import create_graph_store
+
+        # Get graph store path from settings
+        graph_path = getattr(graph_enabled, "codebase_graph_path", None) or str(
+            root / ".victor" / "graph.db"
+        )
+
+        graph_store = create_graph_store("sqlite", graph_path, root)
+        await graph_store.initialize()
+
+        # Check if graph has data
+        stats = await graph_store.stats()
+        if stats.get("node_count", 0) == 0:
+            logger.info("Graph store is empty, skipping graph context")
+            await graph_store.close()
+            return content
+
+        # Build graph context
+        from victor.context.graph_context_builder import GraphEnhancedContextBuilder
+
+        builder = GraphEnhancedContextBuilder(graph_store)
+
+        # Use provided task or generic understanding task
+        query_task = task or f"Understand the {root.name} codebase structure and key components"
+
+        result = await builder.build_context(query_task, max_symbols)
+
+        # Add graph context section
+        if result.context and result.symbols_included:
+            sections.append("\n## Code Graph Context\n")
+            sections.append(
+                f"*Graph analysis: {len(result.symbols_included)} relevant symbols, "
+                f"{result.build_time_ms:.0f}ms build time*\n"
+            )
+
+            # Add symbols section
+            if result.symbols_included:
+                sections.append("### Key Symbols\n")
+                for symbol in result.symbols_included[:20]:  # Limit display
+                    sections.append(f"- `{symbol}`")
+                sections.append("")
+
+            # Add dependencies section
+            if result.dependencies_found:
+                sections.append("### Dependencies\n")
+                count = 0
+                for symbol_name, deps in result.dependencies_found.items():
+                    if deps and count < 10:  # Limit display
+                        sections.append(
+                            f"- `{symbol_name}` → " + ", ".join(f"`{d}`" for d in deps[:3])
+                        )
+                        count += 1
+                sections.append("")
+
+            # Add data flow section if available
+            if result.metadata.get("dependency_count", 0) > 0:
+                sections.append(
+                    f"*Total dependencies tracked: {result.metadata['dependency_count']}*\n"
+                )
+
+        await graph_store.close()
+
+        logger.info(f"Generated graph-enhanced init.md with {len(result.symbols_included)} symbols")
+
+    except ImportError as e:
+        logger.debug(f"Graph dependencies not available: {e}")
+    except Exception as e:
+        logger.warning(f"Failed to generate graph context: {e}")
+
+    return "\n".join(sections)
+
+
+async def init_victor_md_with_graph(
+    root_path: Optional[str] = None,
+    force: bool = False,
+    task: Optional[str] = None,
+    max_symbols: int = 50,
+) -> Optional[Path]:
+    """Initialize project context file with graph-based enhancements (async).
+
+    Creates the file at the configured location (default: .victor/init.md)
+    with graph-aware context included.
+
+    Args:
+        root_path: Root directory to create file in. Defaults to current directory.
+        force: If True, overwrite existing file.
+        task: Optional task description for context relevance.
+        max_symbols: Maximum number of symbols to include in graph context.
+
+    Returns:
+        Path to created file, or None if file exists and force=False.
+    """
+    root = Path(root_path) if root_path else Path.cwd()
+
+    # Use settings-driven path
+    paths = get_project_paths(root)
+    target_file = paths.project_context_file
+
+    # Ensure .victor directory exists
+    target_file.parent.mkdir(parents=True, exist_ok=True)
+
+    if target_file.exists() and not force:
+        logger.warning(f"{VICTOR_CONTEXT_FILE} already exists at {target_file}")
+        return None
+
+    content = await generate_victor_md_with_graph(root_path, task, max_symbols)
+
+    try:
+        target_file.write_text(content, encoding="utf-8")
+        logger.info(f"Created graph-enhanced {VICTOR_CONTEXT_FILE} at {target_file}")
+        return target_file
+    except Exception as e:
+        logger.error(f"Failed to create {VICTOR_CONTEXT_FILE}: {e}")
+        return None
+
+
+__all__ = [
+    "ProjectContext",
+    "generate_victor_md",
+    "init_victor_md",
+    "generate_victor_md_with_graph",
+    "init_victor_md_with_graph",
+]

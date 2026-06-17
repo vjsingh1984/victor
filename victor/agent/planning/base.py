@@ -90,8 +90,8 @@ class StepStatus(Enum):
     IN_PROGRESS = "in_progress"  # Currently executing
     COMPLETED = "completed"  # Successfully finished
     FAILED = "failed"  # Failed with error
-    SKIPPED = "skipped"  # Skipped due to dependency failure
-    BLOCKED = "blocked"  # Blocked by user approval
+    SKIPPED = "skipped"  # Intentionally skipped, e.g. inactive conditional branch
+    BLOCKED = "blocked"  # Blocked by approval or failed required dependency
 
 
 class StepType(Enum):
@@ -136,27 +136,54 @@ class PlanStep:
     estimated_tool_calls: int = 10
     requires_approval: bool = False
     sub_agent_role: Optional[str] = None  # "researcher", "executor", etc.
+    allowed_tools: List[str] = field(default_factory=list)
     context: Dict[str, Any] = field(default_factory=dict)
     status: StepStatus = StepStatus.PENDING
     result: Optional["StepResult"] = None
+    # Explicit execution node type: "compute", "tool", "agent", "team", "loop", "conditional"
+    # Empty string means infer from step_type (backward-compatible default).
+    execution: str = ""
+    exit_criteria: List[str] = field(default_factory=list)
+    # Data-flow inputs: plan_state keys this step consumes from prior steps.
+    # When non-empty, only these named outputs are injected into the task description
+    # instead of the full plan_state.  Set by the LLM plan or inferred by _enrich_step_dicts.
+    inputs: List[str] = field(default_factory=list)
 
-    def is_ready(self, completed_steps: Set[str]) -> bool:
+    def __post_init__(self) -> None:
+        """Normalize flexible plan input into stable runtime fields."""
+        if isinstance(self.allowed_tools, str):
+            self.allowed_tools = [
+                tool.strip() for tool in self.allowed_tools.split(",") if tool.strip()
+            ]
+
+    def is_ready(
+        self,
+        completed_steps: Set[str],
+        valid_step_ids: Optional[Set[str]] = None,
+    ) -> bool:
         """Check if this step is ready to execute.
 
         A step is ready when:
         - It's in PENDING status
-        - All dependencies are completed
-        - It doesn't require approval (or approval was granted)
+        - All dependencies are completed (or are phantom / non-existent step IDs)
 
         Args:
-            completed_steps: Set of step IDs that have completed
+            completed_steps: Set of step IDs that have completed or been skipped.
+            valid_step_ids: Full set of step IDs in this plan.  When provided, deps
+                that reference a non-existent ID are treated as satisfied — the LLM
+                sometimes references a base ID like "7" when only "7a"/"7b" exist.
 
         Returns:
             True if step is ready to execute
         """
         if self.status != StepStatus.PENDING:
             return False
-        return all(dep in completed_steps for dep in self.depends_on)
+        for dep in self.depends_on:
+            if valid_step_ids is not None and dep not in valid_step_ids:
+                continue  # Phantom dep — step doesn't exist; treat as satisfied
+            if dep not in completed_steps:
+                return False
+        return True
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for serialization."""
@@ -168,9 +195,12 @@ class PlanStep:
             "estimated_tool_calls": self.estimated_tool_calls,
             "requires_approval": self.requires_approval,
             "sub_agent_role": self.sub_agent_role,
+            "allowed_tools": self.allowed_tools,
             "context": self.context,
             "status": self.status.value,
             "result": self.result.to_dict() if self.result else None,
+            "execution": self.execution,
+            "exit_criteria": self.exit_criteria,
         }
 
     @classmethod
@@ -187,10 +217,47 @@ class PlanStep:
             estimated_tool_calls=data.get("estimated_tool_calls", 10),
             requires_approval=data.get("requires_approval", False),
             sub_agent_role=data.get("sub_agent_role"),
+            allowed_tools=data.get("allowed_tools", []),
             context=data.get("context", {}),
             status=StepStatus(data.get("status", "pending")),
             result=result,
+            execution=data.get("execution", ""),
+            exit_criteria=data.get("exit_criteria", []),
         )
+
+
+def get_step_allowed_tools(
+    step: PlanStep,
+    *,
+    include_core_navigation: bool = True,
+) -> Optional[List[str]]:
+    """Return normalized explicit tool hints for a plan step.
+
+    Compact plans can carry tools either as ``PlanStep.allowed_tools`` or as
+    legacy/context metadata. Execution adapters use this helper so sub-agent
+    allowlists stay consistent across team and single-plan execution paths.
+    """
+    tools = list(getattr(step, "allowed_tools", None) or [])
+    if not tools:
+        context_tools = (getattr(step, "context", None) or {}).get("tools")
+        if isinstance(context_tools, str):
+            tools = [tool.strip() for tool in context_tools.split(",") if tool.strip()]
+        elif isinstance(context_tools, list):
+            tools = [str(tool).strip() for tool in context_tools if str(tool).strip()]
+    if not tools:
+        return None
+
+    ordered_tools = [*tools]
+    if include_core_navigation:
+        ordered_tools = ["read", "ls", "grep", *ordered_tools]
+
+    deduped: List[str] = []
+    seen = set()
+    for tool in ordered_tools:
+        if tool not in seen:
+            deduped.append(tool)
+            seen.add(tool)
+    return deduped
 
 
 @dataclass
@@ -214,6 +281,7 @@ class StepResult:
     tool_calls_used: int = 0
     duration_seconds: float = 0.0
     artifacts: List[str] = field(default_factory=list)
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary."""
@@ -224,6 +292,7 @@ class StepResult:
             "tool_calls_used": self.tool_calls_used,
             "duration_seconds": self.duration_seconds,
             "artifacts": self.artifacts,
+            "metadata": self.metadata,
         }
 
     @classmethod
@@ -236,6 +305,7 @@ class StepResult:
             tool_calls_used=data.get("tool_calls_used", 0),
             duration_seconds=data.get("duration_seconds", 0.0),
             artifacts=data.get("artifacts", []),
+            metadata=data.get("metadata", {}),
         )
 
 
@@ -276,8 +346,19 @@ class ExecutionPlan:
         Returns:
             List of steps ready to execute (pending with satisfied dependencies)
         """
-        completed = {s.id for s in self.steps if s.status == StepStatus.COMPLETED}
-        return [s for s in self.steps if s.is_ready(completed)]
+        # SKIPPED counts as satisfied: a conditional branch that skipped step X means
+        # X's work is "done" for dependency purposes.  Without this, post-branch steps
+        # that depend on both branch arms (e.g. depends_on=["7a","7b"]) would block
+        # forever when one arm is SKIPPED by the conditional node.
+        satisfied = {
+            s.id for s in self.steps if s.status in (StepStatus.COMPLETED, StepStatus.SKIPPED)
+        }
+        # Pass the full set of valid IDs so is_ready() can treat phantom deps as satisfied.
+        # A phantom dep (step ID that doesn't exist in this plan) was typically generated by
+        # the LLM referencing a base ID like "7" when the plan only has branch IDs "7a"/"7b".
+        # Pass 7 of _enrich_step_dicts normalizes these at parse time; this is the fallback.
+        valid_ids = {s.id for s in self.steps}
+        return [s for s in self.steps if s.is_ready(satisfied, valid_ids)]
 
     def get_completed_steps(self) -> List[PlanStep]:
         """Get all completed steps."""
@@ -288,8 +369,9 @@ class ExecutionPlan:
         return [s for s in self.steps if s.status == StepStatus.FAILED]
 
     def is_complete(self) -> bool:
-        """Check if the plan is fully complete."""
-        return all(s.status == StepStatus.COMPLETED for s in self.steps)
+        """Check if the plan is fully complete (all steps executed or intentionally skipped)."""
+        _terminal = (StepStatus.COMPLETED, StepStatus.SKIPPED)
+        return all(s.status in _terminal for s in self.steps)
 
     def is_failed(self) -> bool:
         """Check if any step failed (and plan cannot continue)."""
@@ -403,6 +485,19 @@ class PlanResult:
     total_duration: float = 0.0
     final_output: str = ""
     step_results: Dict[str, StepResult] = field(default_factory=dict)
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def error_message(self) -> str:
+        """Return a concise execution error summary for compatibility callers."""
+        errors = [
+            step_result.error for step_result in self.step_results.values() if step_result.error
+        ]
+        if errors:
+            return "; ".join(errors)
+        if not self.success and self.final_output:
+            return self.final_output
+        return ""
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary."""
@@ -416,6 +511,7 @@ class PlanResult:
             "total_duration": self.total_duration,
             "final_output": self.final_output,
             "step_results": {k: v.to_dict() for k, v in self.step_results.items()},
+            "metadata": self.metadata,
         }
 
 

@@ -10,7 +10,7 @@ import { ServerStatus } from '../serverManager';
 /**
  * Agent modes available in Victor
  */
-export type AgentMode = 'build' | 'plan' | 'explore';
+export type AgentMode = 'build' | 'plan' | 'review' | 'delegate' | 'explore';
 
 /**
  * LLM Provider types
@@ -107,6 +107,7 @@ export interface ContextItem {
  * Session state
  */
 export interface SessionState {
+    profile: string;
     mode: AgentMode;
     model: ModelInfo;
     conversation: ConversationState;

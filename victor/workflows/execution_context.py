@@ -26,7 +26,7 @@ from typing import Any, Optional
 logger = logging.getLogger(__name__)
 
 
-class ExecutionContext:
+class WorkflowNodeContext:
     """Execution context for workflow nodes.
 
     Responsibility (SRP):
@@ -38,6 +38,11 @@ class ExecutionContext:
     Non-responsibility:
     - State management (handled by StateGraph)
     - Node execution logic (handled by node executors)
+
+    Note:
+        Renamed from ExecutionContext (2026-04-19) to avoid name collision
+        with victor.runtime.context.RuntimeExecutionContext. Use WorkflowNodeContext
+        for workflow node execution contexts.
     """
 
     def __init__(
@@ -73,4 +78,8 @@ class ExecutionContext:
         return self._services
 
 
-__all__ = ["ExecutionContext"]
+# Backward compatibility alias
+ExecutionContext = WorkflowNodeContext
+
+
+__all__ = ["WorkflowNodeContext", "ExecutionContext"]

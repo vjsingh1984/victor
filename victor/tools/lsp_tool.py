@@ -354,7 +354,14 @@ async def _do_close(file_path: str) -> Dict[str, Any]:
     priority=Priority.MEDIUM,  # Task-specific code intelligence
     access_mode=AccessMode.MIXED,  # Manages LSP processes, reads files
     danger_level=DangerLevel.SAFE,  # No file modifications
-    keywords=["lsp", "language server", "hover", "definition", "references", "diagnostics"],
+    keywords=[
+        "lsp",
+        "language server",
+        "hover",
+        "definition",
+        "references",
+        "diagnostics",
+    ],
 )
 async def lsp(
     action: str,
@@ -365,7 +372,7 @@ async def lsp(
     max_items: int = 20,
     max_results: int = 50,
 ) -> Dict[str, Any]:
-    """Language Server Protocol operations for code intelligence.
+    """Run Language Server operations: diagnostics, completions, formatting.
 
     Actions: status, start, stop, completions, hover, definition, references, diagnostics.
     Position-based actions require: file_path, line, character.

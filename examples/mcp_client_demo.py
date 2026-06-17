@@ -165,8 +165,7 @@ async def demo_client():
     print("  ✓ Stdio transport support")
 
     print("\n\n📚 Use Cases:")
-    print(
-        """
+    print("""
 1. Extend Victor with external tools:
    - Database query tools
    - API integration tools
@@ -185,12 +184,10 @@ async def demo_client():
 4. Chain multiple MCP servers:
    - Victor + Database MCP + API MCP
    - Compose powerful workflows
-"""
-    )
+""")
 
     print("\n\n🔌 Integration Example:")
-    print(
-        """
+    print("""
 # In Victor's agent orchestrator:
 from victor.integrations.mcp import MCPClient
 
@@ -206,8 +203,7 @@ async with MCPClient() as client:
 
     # Use results in agent response
     print(result.result)
-"""
-    )
+""")
 
 
 if __name__ == "__main__":

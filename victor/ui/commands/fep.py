@@ -92,6 +92,23 @@ def _get_template_path() -> Path:
     return template_path
 
 
+def _format_authors(authors: list) -> str:
+    """Format author list for display.
+
+    Shows first 2 authors with indication of additional authors.
+
+    Args:
+        authors: List of author dicts with 'name' key
+
+    Returns:
+        Formatted author string
+    """
+    formatted = ", ".join([a.get("name", "") for a in authors[:2]])
+    if len(authors) > 2:
+        formatted += f" (+{len(authors) - 2})"
+    return formatted
+
+
 @fep_app.command("create")
 def create_fep(
     title: str = typer.Option(..., "--title", "-t", help="FEP title"),
@@ -436,7 +453,7 @@ This PR proposes {metadata.title.lower()}.
         console.print(f"  2. Stage file: git add {fep_path}")
         console.print(f"  3. Commit: git commit -m '{pr_title}'")
         console.print(f"  4. Push: git push -u origin {branch_name}")
-        console.print(f"  5. Create PR on GitHub")
+        console.print("  5. Create PR on GitHub")
         raise typer.Exit(1)
 
 
@@ -514,9 +531,7 @@ def list_feps(
         table.add_column("Modified", style="dim")
 
     for fep in feps:
-        authors = ", ".join([a.get("name", "") for a in fep.authors[:2]])
-        if len(fep.authors) > 2:
-            authors += f" (+{len(fep.authors) - 2})"
+        authors = _format_authors(fep.authors)
 
         row = [
             f"FEP-{fep.fep:04d}",
@@ -564,7 +579,7 @@ def view_fep(
     # Find FEP file
     fep_files = list(feps_dir.glob(f"fep-{fep_number:04d}-*.md"))
     if not fep_files:
-        console.print(f"[bold red]Error:[/] FEP file not found")
+        console.print("[bold red]Error:[/] FEP file not found")
         raise typer.Exit(1)
 
     fep_file = fep_files[0]
@@ -599,7 +614,7 @@ def view_fep(
                 panel_content += f"\n{author_str}"
 
         if metadata.reviewers:
-            panel_content += f"\n\n[bold]Reviewers:[/]\n"
+            panel_content += "\n\n[bold]Reviewers:[/]\n"
             for reviewer in metadata.reviewers:
                 panel_content += f"  • {reviewer}"
 
@@ -685,7 +700,11 @@ def show_fep_stats() -> None:
 
     console.print()
     console.print(
-        Panel(f"[bold]Total FEPs:[/] {stats['total']}", title="FEP Statistics", border_style="cyan")
+        Panel(
+            f"[bold]Total FEPs:[/] {stats['total']}",
+            title="FEP Statistics",
+            border_style="cyan",
+        )
     )
     console.print()
 
@@ -750,9 +769,7 @@ def search_feps(
     table.add_column("Authors", style="blue")
 
     for fep in results[:10]:  # Limit to 10 results
-        authors = ", ".join([a.get("name", "") for a in fep.authors[:2]])
-        if len(fep.authors) > 2:
-            authors += f" (+{len(fep.authors) - 2})"
+        authors = _format_authors(fep.authors)
 
         table.add_row(
             f"FEP-{fep.fep:04d}",

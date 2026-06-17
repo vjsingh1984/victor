@@ -36,6 +36,12 @@ class TestListProviders:
         # Should contain table title
         assert "Available Providers" in result.stdout or "Provider" in result.stdout
 
+    def test_list_flag_alias_outputs_table(self):
+        """Test --list remains accepted for users expecting option-style listing."""
+        result = runner.invoke(providers_app, ["--list"])
+        assert result.exit_code == 0
+        assert "Available Providers" in result.stdout or "Provider" in result.stdout
+
     def test_list_providers_shows_known_providers(self):
         """Test that common providers are shown in the list."""
         result = runner.invoke(providers_app, [])
@@ -68,7 +74,10 @@ class TestListProviders:
     @patch("victor.ui.commands.providers.ProviderRegistry")
     def test_list_providers_with_mocked_registry(self, mock_registry):
         """Test list_providers with mocked registry."""
-        mock_registry.list_providers.return_value = ["test_provider", "another_provider"]
+        mock_registry.list_providers.return_value = [
+            "test_provider",
+            "another_provider",
+        ]
 
         result = runner.invoke(providers_app, [])
         assert result.exit_code == 0
@@ -206,6 +215,20 @@ class TestConsoleOutput:
         assert result.exit_code == 0
         assert "profiles" in result.stdout.lower()
 
+    @patch("victor.ui.commands.providers._load_configured_provider_summary")
+    @patch("victor.ui.commands.providers.ProviderRegistry")
+    def test_output_includes_configured_account_context(self, mock_registry, mock_configured):
+        """Provider list should connect catalog providers to configured accounts."""
+        mock_registry.list_providers.return_value = ["openai"]
+        mock_registry.get_aliases.return_value = {}
+        mock_configured.return_value = ({"openai": ["openai-cheap"]}, "openai")
+
+        result = runner.invoke(providers_app, [])
+
+        assert result.exit_code == 0
+        assert "Configured" in result.stdout
+        assert "openai-cheap" in result.stdout
+
 
 class TestProviderRegistryIntegration:
     """Integration tests with actual ProviderRegistry."""
@@ -272,7 +295,10 @@ class TestEdgeCases:
     @patch("victor.ui.commands.providers.ProviderRegistry")
     def test_unicode_in_provider_name(self, mock_registry):
         """Test handling of unicode in provider names."""
-        mock_registry.list_providers.return_value = ["provider_日本語", "provider_emoji_🚀"]
+        mock_registry.list_providers.return_value = [
+            "provider_日本語",
+            "provider_emoji_🚀",
+        ]
 
         result = runner.invoke(providers_app, [])
         assert result.exit_code == 0

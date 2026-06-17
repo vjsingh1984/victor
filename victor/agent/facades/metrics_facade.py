@@ -19,7 +19,8 @@ and debug logging components behind a single interface.
 
 This facade wraps already-initialized components from the orchestrator,
 providing a coherent grouping without changing initialization ordering.
-The orchestrator delegates property access through this facade.
+The orchestrator delegates property access through this facade. It does not own
+metrics behavior.
 """
 
 from __future__ import annotations

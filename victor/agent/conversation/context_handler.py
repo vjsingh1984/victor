@@ -24,7 +24,7 @@ Part of SOLID-based refactoring to eliminate god class anti-pattern.
 import logging
 from typing import Any, Dict, List, Optional
 
-from victor.agent.conversation_controller import ConversationController, ContextMetrics
+from victor.agent.conversation.controller import ConversationController, ContextMetrics
 from victor.agent.protocols import IContextOverflowHandler
 
 logger = logging.getLogger(__name__)

@@ -612,13 +612,9 @@ class WorkflowScheduler:
     ) -> None:
         """Default workflow execution using UnifiedWorkflowCompiler.
 
-        **Architecture Note**: Uses UnifiedWorkflowCompiler for scheduled workflows
-        to benefit from two-level caching, which is important for recurring
-        executions where the same workflow is run multiple times.
-
-        For one-off workflow execution, consider using the plugin API:
-            compiler = create_compiler("workflow.yaml")
-            compiled = compiler.compile("workflow.yaml")
+        **Architecture Note**: UnifiedWorkflowCompiler is the canonical compiler API.
+        Scheduled workflows benefit from its two-level caching, which avoids
+        re-parsing YAML on recurring executions of the same workflow.
 
         Args:
             schedule: Scheduled workflow

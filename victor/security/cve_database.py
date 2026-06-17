@@ -253,8 +253,8 @@ class LocalCVECache:
                 if cve.cvss
                 else None
             ),
-            "published_date": cve.published_date.isoformat() if cve.published_date else None,
-            "modified_date": cve.modified_date.isoformat() if cve.modified_date else None,
+            "published_date": (cve.published_date.isoformat() if cve.published_date else None),
+            "modified_date": (cve.modified_date.isoformat() if cve.modified_date else None),
             "references": cve.references,
             "cwe_ids": cve.cwe_ids,
             "affected_products": cve.affected_products,

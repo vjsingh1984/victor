@@ -178,7 +178,10 @@ class TestHttpTest:
             mock_client.return_value = mock_instance
 
             result = await http(
-                method="GET", url="https://api.example.com", mode="test", expected_status=200
+                method="GET",
+                url="https://api.example.com",
+                mode="test",
+                expected_status=200,
             )
 
             assert result["success"] is True
@@ -209,7 +212,10 @@ class TestHttpTest:
             mock_client.return_value = mock_instance
 
             result = await http(
-                method="GET", url="https://api.example.com", mode="test", expected_status=200
+                method="GET",
+                url="https://api.example.com",
+                mode="test",
+                expected_status=200,
             )
 
             assert result["success"] is False

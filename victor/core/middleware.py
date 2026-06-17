@@ -12,10 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Middleware pipeline for cross-cutting concerns.
+"""Generic request/response pipeline middleware (internal use only).
 
-This module provides a composable middleware system for handling cross-cutting
-concerns such as logging, metrics, error handling, and validation.
+This module implements cross-cutting concerns (logging, metrics, error
+handling, retry, timeout) for **HTTP/provider/workflow pipelines** using an
+inheritance-based ``Middleware[TRequest, TResponse]`` ABC.
+
+**Do NOT use this for tool execution middleware.** For tool-call interception,
+implement ``MiddlewareProtocol`` from
+``victor.core.verticals.protocols.middleware`` and register via a vertical's
+``get_middleware()`` hook. Those middlewares are processed by
+``victor.agent.middleware_chain.MiddlewareChain``, not by this pipeline.
+
+The two systems are intentionally separate:
+- This module: internal HTTP/provider pipelines (inheritance-based)
+- ``victor.framework.middleware``: tool-call pipeline (protocol-based, SDK-blessed)
 
 Design Patterns:
 - Chain of Responsibility: Middleware chain for request processing

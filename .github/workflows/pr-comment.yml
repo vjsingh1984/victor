@@ -16,6 +16,9 @@ on:
         type: string
         default: 'success'
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 permissions:
   pull-requests: write
 

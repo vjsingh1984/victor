@@ -90,7 +90,7 @@ edges:
 """
 
     # Save workflow
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
         f.write(workflow_yaml)
         workflow_path = f.name
 
@@ -99,7 +99,7 @@ edges:
         agent = Agent.create()
         result = await agent.run_workflow(
             workflow_path,
-            input={"document": "Victor AI Framework v0.5.8 release notes..."}
+            input={"document": "Victor AI Framework v0.5.8 release notes..."},
         )
         return result.content
     finally:
@@ -191,15 +191,14 @@ edges:
     to: "complete"
 """
 
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
         f.write(workflow_yaml)
         workflow_path = f.name
 
     try:
         agent = Agent.create()
         result = await agent.run_workflow(
-            workflow_path,
-            input={"input": "Need content for product launch next month"}
+            workflow_path, input={"input": "Need content for product launch next month"}
         )
         return result.content
     finally:
@@ -283,7 +282,7 @@ edges:
     to: "complete"
 """
 
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
         f.write(workflow_yaml)
         workflow_path = f.name
 
@@ -291,10 +290,7 @@ edges:
         agent = Agent.create(vertical="dataanalysis")
         result = await agent.run_workflow(
             workflow_path,
-            input={
-                "data_file": "sales_data.csv",
-                "output_file": "monthly_report.md"
-            }
+            input={"data_file": "sales_data.csv", "output_file": "monthly_report.md"},
         )
         return result.content
     finally:
@@ -404,15 +400,14 @@ edges:
     to: "complete"
 """
 
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
         f.write(workflow_yaml)
         workflow_path = f.name
 
     try:
         agent = Agent.create()
         result = await agent.run_workflow(
-            workflow_path,
-            input={"email": "Subject: Partnership inquiry...\n\n..."}
+            workflow_path, input={"email": "Subject: Partnership inquiry...\n\n..."}
         )
         return result.content
     finally:
@@ -435,4 +430,5 @@ async def demo_automation_workflows():
 
 if __name__ == "__main__":
     import asyncio
+
     asyncio.run(demo_automation_workflows())

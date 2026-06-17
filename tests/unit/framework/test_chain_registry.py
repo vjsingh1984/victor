@@ -332,6 +332,53 @@ class TestChainRegistryFind:
 
         assert len(chains) == 2  # Both have quality and review
 
+    def test_registry_replacement_updates_tag_indexes(self):
+        """Replacing a chain should remove stale tag index entries."""
+        registry = ChainRegistry()
+        original = MagicMock(name="OriginalChain")
+        replacement = MagicMock(name="ReplacementChain")
+
+        registry.register("chain", original, tags=["old"], vertical="coding")
+        registry.register(
+            "chain",
+            replacement,
+            tags=["new"],
+            vertical="coding",
+            replace=True,
+        )
+
+        assert registry.find_by_tag("old") == {}
+        assert registry.find_by_tag("new") == {"coding:chain": replacement}
+        assert registry.find_by_vertical("coding") == {"coding:chain": replacement}
+
+    def test_registry_unregister_clears_index_entries(self):
+        """Unregistering a chain should remove all indexed lookup entries."""
+        registry = ChainRegistry()
+        chain = MagicMock(name="Chain")
+
+        registry.register("chain", chain, tags=["review"], vertical="coding")
+        assert registry.unregister("chain", vertical="coding") is True
+
+        assert registry.find_by_tag("review") == {}
+        assert registry.find_by_vertical("coding") == {}
+
+    def test_registry_factory_metadata_is_indexed_by_vertical(self):
+        """Factory metadata should remain discoverable through vertical indexes."""
+        registry = ChainRegistry()
+
+        registry.register_factory(
+            "factory",
+            lambda: MagicMock(name="FactoryChain"),
+            vertical="coding",
+            tags=["lazy"],
+        )
+
+        metadata = registry.list_metadata(vertical="coding")
+
+        assert len(metadata) == 1
+        assert metadata[0].name == "factory"
+        assert metadata[0].is_factory is True
+
 
 # =============================================================================
 # ChainRegistry Bulk Operations Tests

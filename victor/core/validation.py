@@ -1001,7 +1001,9 @@ def validate_mode_definition_dict(definition: Dict[str, Any]) -> ModeDefinitionS
     return ModeDefinitionSchema.model_validate(definition)
 
 
-def validate_vertical_mode_config_dict(config: Dict[str, Any]) -> VerticalModeConfigSchema:
+def validate_vertical_mode_config_dict(
+    config: Dict[str, Any],
+) -> VerticalModeConfigSchema:
     """Validate and create VerticalModeConfigSchema from dict.
 
     Args:

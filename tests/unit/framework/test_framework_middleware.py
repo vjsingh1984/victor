@@ -97,12 +97,23 @@ class TestLoggingMiddleware:
     @pytest.mark.asyncio
     async def test_excluded_tools_not_logged(self):
         """LoggingMiddleware should not log excluded tools."""
-        middleware = LoggingMiddleware(exclude_tools={"read_file"})
+        middleware = LoggingMiddleware(exclude_tools={"read"})
 
         result = await middleware.before_tool_call("read_file", {})
         assert result.proceed is True
 
         result = await middleware.after_tool_call("read_file", {}, "data", True)
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_excluded_tools_canonicalize_aliases(self):
+        """LoggingMiddleware should treat legacy aliases as the same excluded tool."""
+        middleware = LoggingMiddleware(exclude_tools={"read"})
+
+        result = await middleware.before_tool_call("read", {})
+        assert result.proceed is True
+
+        result = await middleware.after_tool_call("read", {}, "data", True)
         assert result is None
 
     @pytest.mark.asyncio
@@ -440,6 +451,13 @@ class TestGitSafetyMiddleware:
     async def test_ignores_non_applicable_tools(self, middleware):
         """GitSafetyMiddleware should ignore non-applicable tools."""
         result = await middleware.before_tool_call("read_file", {"path": "/etc/passwd"})
+
+        assert result.proceed is True
+
+    @pytest.mark.asyncio
+    async def test_handles_bash_alias_via_canonicalization(self, middleware):
+        """GitSafetyMiddleware should handle shell aliases through canonical matching."""
+        result = await middleware.before_tool_call("bash", {"command": "git status"})
 
         assert result.proceed is True
 

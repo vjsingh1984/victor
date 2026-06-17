@@ -83,8 +83,7 @@ class HITLMode(str, Enum):
     """HITL interaction mode - determines transport mechanism."""
 
     # Local/Interactive modes (require terminal/TTY)
-    CLI = "cli"  # Interactive CLI prompt (Rich/input)
-    TUI = "tui"  # TUI interface (Textual)
+    CLI = "cli"  # Interactive prompt-toolkit CLI prompt
 
     # Remote/Async modes (serverless-compatible)
     API = "api"  # REST API callback (pause workflow, resume via API)
@@ -152,7 +151,6 @@ class HITLCategory(str, Enum):
 # Map modes to categories
 HITL_MODE_CATEGORIES: Dict[HITLMode, HITLCategory] = {
     HITLMode.CLI: HITLCategory.LOCAL,
-    HITLMode.TUI: HITLCategory.LOCAL,
     HITLMode.API: HITLCategory.ASYNC_API,
     HITLMode.WEBHOOK: HITLCategory.ASYNC_API,
     HITLMode.POLLING: HITLCategory.ASYNC_API,
@@ -193,7 +191,6 @@ DEPLOYMENT_HITL_COMPATIBILITY = {
     # Local targets - all modes work
     "inline": [
         HITLMode.CLI,
-        HITLMode.TUI,
         HITLMode.INLINE,
         HITLMode.AUTO_APPROVE,
         HITLMode.AUTO_REJECT,
@@ -206,7 +203,6 @@ DEPLOYMENT_HITL_COMPATIBILITY = {
     ],
     "local": [
         HITLMode.CLI,
-        HITLMode.TUI,
         HITLMode.INLINE,
         HITLMode.AUTO_APPROVE,
         HITLMode.AUTO_REJECT,
@@ -366,8 +362,18 @@ DEPLOYMENT_HITL_COMPATIBILITY = {
         HITLMode.AUTO_REJECT,
     ],
     "spark": [HITLMode.AUTO_APPROVE, HITLMode.AUTO_REJECT],  # Batch-only typically
-    "ray": [HITLMode.API, HITLMode.WEBHOOK, HITLMode.AUTO_APPROVE, HITLMode.AUTO_REJECT],
-    "dask": [HITLMode.API, HITLMode.WEBHOOK, HITLMode.AUTO_APPROVE, HITLMode.AUTO_REJECT],
+    "ray": [
+        HITLMode.API,
+        HITLMode.WEBHOOK,
+        HITLMode.AUTO_APPROVE,
+        HITLMode.AUTO_REJECT,
+    ],
+    "dask": [
+        HITLMode.API,
+        HITLMode.WEBHOOK,
+        HITLMode.AUTO_APPROVE,
+        HITLMode.AUTO_REJECT,
+    ],
     # Task queues
     "celery": [
         HITLMode.API,
@@ -378,7 +384,12 @@ DEPLOYMENT_HITL_COMPATIBILITY = {
         HITLMode.AUTO_REJECT,
     ],
     # Serverless platforms
-    "modal": [HITLMode.API, HITLMode.WEBHOOK, HITLMode.AUTO_APPROVE, HITLMode.AUTO_REJECT],
+    "modal": [
+        HITLMode.API,
+        HITLMode.WEBHOOK,
+        HITLMode.AUTO_APPROVE,
+        HITLMode.AUTO_REJECT,
+    ],
 }
 
 
@@ -515,7 +526,7 @@ class HITLHandler(Protocol):
     """Protocol for handling HITL interactions.
 
     Implementations provide UI-specific handling for HITL requests
-    (CLI, TUI, web API, etc.).
+    (CLI, web API, etc.).
     """
 
     async def request_human_input(self, request: HITLRequest) -> HITLResponse:
@@ -632,10 +643,10 @@ class HITLExecutor:
     """Executes HITL nodes during workflow execution.
 
     Handles the async communication between workflow executor and
-    human interface (CLI, TUI, API, or external integrations via transports).
+    human interface (CLI, API, or external integrations via transports).
 
     Supports two modes:
-    1. Handler mode: Direct handler (CLI, TUI, inline) for local/interactive use
+    1. Handler mode: Direct handler (CLI, inline) for local/interactive use
     2. Transport mode: Uses transport adapters for remote integrations
        (Slack, Email, GitHub PR, etc.)
     """
@@ -666,7 +677,6 @@ class HITLExecutor:
         """Get or create the transport adapter."""
         if self._transport is None and self.mode not in [
             HITLMode.CLI,
-            HITLMode.TUI,
             HITLMode.INLINE,
             HITLMode.AUTO_APPROVE,
             HITLMode.AUTO_REJECT,
@@ -682,7 +692,6 @@ class HITLExecutor:
             self.mode
             not in [
                 HITLMode.CLI,
-                HITLMode.TUI,
                 HITLMode.INLINE,
             ]
             and self._get_transport() is not None
@@ -697,7 +706,7 @@ class HITLExecutor:
         """Execute a HITL node, waiting for human response.
 
         Automatically chooses between:
-        - Handler mode: Direct CLI/TUI interaction
+        - Handler mode: Direct CLI interaction
         - Transport mode: Send via external system (Slack, Email, GitHub, etc.)
         - Auto mode: Automatic approve/reject for testing
 

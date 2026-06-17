@@ -37,6 +37,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
 
 from victor.framework.ingestion.models import Chunk, ChunkingConfig
@@ -44,46 +45,57 @@ from victor.framework.ingestion.models import Chunk, ChunkingConfig
 logger = logging.getLogger(__name__)
 
 
+class DocumentType(str, Enum):
+    """Document type for content detection and chunking strategy selection."""
+
+    HTML = "html"
+    MARKDOWN = "markdown"
+    CODE = "code"
+    JSON = "json"
+    XML = "xml"
+    TEXT = "text"
+
+
 # Document type detection from file extensions
-EXTENSION_TO_DOCTYPE: Dict[str, str] = {
+EXTENSION_TO_DOCTYPE: Dict[str, DocumentType] = {
     # HTML/Web
-    ".html": "html",
-    ".htm": "html",
-    ".xhtml": "html",
+    ".html": DocumentType.HTML,
+    ".htm": DocumentType.HTML,
+    ".xhtml": DocumentType.HTML,
     # Markdown
-    ".md": "markdown",
-    ".markdown": "markdown",
-    ".rst": "markdown",
+    ".md": DocumentType.MARKDOWN,
+    ".markdown": DocumentType.MARKDOWN,
+    ".rst": DocumentType.MARKDOWN,
     # Code (common languages)
-    ".py": "code",
-    ".js": "code",
-    ".ts": "code",
-    ".jsx": "code",
-    ".tsx": "code",
-    ".java": "code",
-    ".go": "code",
-    ".rs": "code",
-    ".c": "code",
-    ".cpp": "code",
-    ".h": "code",
-    ".cs": "code",
-    ".rb": "code",
-    ".php": "code",
-    ".swift": "code",
-    ".kt": "code",
+    ".py": DocumentType.CODE,
+    ".js": DocumentType.CODE,
+    ".ts": DocumentType.CODE,
+    ".jsx": DocumentType.CODE,
+    ".tsx": DocumentType.CODE,
+    ".java": DocumentType.CODE,
+    ".go": DocumentType.CODE,
+    ".rs": DocumentType.CODE,
+    ".c": DocumentType.CODE,
+    ".cpp": DocumentType.CODE,
+    ".h": DocumentType.CODE,
+    ".cs": DocumentType.CODE,
+    ".rb": DocumentType.CODE,
+    ".php": DocumentType.CODE,
+    ".swift": DocumentType.CODE,
+    ".kt": DocumentType.CODE,
     # Data formats
-    ".json": "json",
-    ".yaml": "yaml",
-    ".yml": "yaml",
-    ".xml": "xml",
-    ".csv": "csv",
+    ".json": DocumentType.JSON,
+    ".yaml": DocumentType.TEXT,
+    ".yml": DocumentType.TEXT,
+    ".xml": DocumentType.XML,
+    ".csv": DocumentType.TEXT,
     # Documents
-    ".txt": "text",
-    ".pdf": "text",  # After extraction
+    ".txt": DocumentType.TEXT,
+    ".pdf": DocumentType.TEXT,  # After extraction
 }
 
 
-def detect_document_type(source: str, content: str) -> str:
+def detect_document_type(source: str, content: str) -> DocumentType:
     """Detect document type from source URL/path and content.
 
     Priority:
@@ -96,7 +108,7 @@ def detect_document_type(source: str, content: str) -> str:
         content: Document content
 
     Returns:
-        Document type string: "html", "markdown", "code", "json", "xml", "text"
+        Document type enum value
     """
     source_lower = source.lower()
 
@@ -116,14 +128,14 @@ def detect_document_type(source: str, content: str) -> str:
         re.IGNORECASE,
     ):
         logger.debug("Detected doc_type=html from content")
-        return "html"
+        return DocumentType.HTML
 
     # JSON detection
     if content_sample.startswith(("{", "[")):
         try:
             json.loads(content[:10000])
             logger.debug("Detected doc_type=json from content")
-            return "json"
+            return DocumentType.JSON
         except json.JSONDecodeError:
             pass
 
@@ -131,12 +143,12 @@ def detect_document_type(source: str, content: str) -> str:
     if content_sample.startswith("<?xml") or re.match(r"<\w+[^>]*>", content_sample):
         if not re.search(r"<(html|head|body)\b", content_sample, re.IGNORECASE):
             logger.debug("Detected doc_type=xml from content")
-            return "xml"
+            return DocumentType.XML
 
     # Markdown detection
     if re.search(r"^#{1,6}\s+\w+", content_sample, re.MULTILINE) or "```" in content_sample:
         logger.debug("Detected doc_type=markdown from content")
-        return "markdown"
+        return DocumentType.MARKDOWN
 
     # Code detection
     if re.search(
@@ -145,10 +157,10 @@ def detect_document_type(source: str, content: str) -> str:
         re.MULTILINE,
     ):
         logger.debug("Detected doc_type=code from content")
-        return "code"
+        return DocumentType.CODE
 
     logger.debug("Defaulting to doc_type=text")
-    return "text"
+    return DocumentType.TEXT
 
 
 class BaseChunker:

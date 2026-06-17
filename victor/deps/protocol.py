@@ -105,7 +105,11 @@ class Version:
 
     def __lt__(self, other: "Version") -> bool:
         """Compare versions."""
-        return (self.major, self.minor, self.patch) < (other.major, other.minor, other.patch)
+        return (self.major, self.minor, self.patch) < (
+            other.major,
+            other.minor,
+            other.patch,
+        )
 
     def __le__(self, other: "Version") -> bool:
         return self == other or self < other
@@ -119,7 +123,11 @@ class Version:
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Version):
             return False
-        return (self.major, self.minor, self.patch) == (other.major, other.minor, other.patch)
+        return (self.major, self.minor, self.patch) == (
+            other.major,
+            other.minor,
+            other.patch,
+        )
 
 
 @dataclass

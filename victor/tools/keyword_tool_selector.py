@@ -27,12 +27,16 @@ import logging
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set
 
 from victor.providers.base import ToolDefinition
-from victor.tools.base import AccessMode, ExecutionCategory, ToolRegistry
+from victor.tools.base import AccessMode, ExecutionCategory
+from victor.tools.registry import ToolRegistry
 from victor.tools.selection_common import get_tools_from_message
 from victor.tools.selection_filters import is_small_model
 
 if TYPE_CHECKING:
-    from victor.agent.conversation_state import ConversationStage, ConversationStateMachine
+    from victor.agent.conversation.state_machine import (
+        ConversationStage,
+        ConversationStateMachine,
+    )
     from victor.agent.protocols import ToolSelectionContext, ToolSelectorFeatures
 
 logger = logging.getLogger(__name__)
@@ -246,7 +250,7 @@ class KeywordToolSelector:
         if stage is None:
             return self._get_core_tools_cached()
 
-        from victor.agent.conversation_state import ConversationStage
+        from victor.agent.conversation.state_machine import ConversationStage
 
         if stage in {
             ConversationStage.INITIAL,
@@ -344,12 +348,22 @@ class KeywordToolSelector:
         return any(kw in prompt_lower for kw in write_keywords)
 
     def _filter_tools_for_stage(
-        self, tools: List[ToolDefinition], stage: Optional["ConversationStage"], prompt: str = ""
+        self,
+        tools: List[ToolDefinition],
+        stage: Optional["ConversationStage"],
+        prompt: str = "",
     ) -> List[ToolDefinition]:
-        """Remove write/execute tools during exploration/analysis stages.
+        """Keep write tools available but inject HITL prompt guidance for
+        exploration/analysis stages.
 
-        Note: Vertical core tools would be preserved if tiered config was available,
-        but KeywordToolSelector doesn't have access to that (it's in ToolSelector).
+        Instead of removing write tools entirely (which prevents the LLM from
+        even proposing edits), we keep all tools and annotate the descriptions
+        of write-capable tools with a human-in-the-loop directive.  This means
+        the LLM can still *plan* a write/edit operation and present it to the
+        user for approval, rather than silently losing the capability.
+
+        If the user's prompt already shows clear write intent, we skip the
+        HITL annotation entirely — the user explicitly asked for a mutation.
 
         Args:
             tools: List of tool definitions
@@ -357,18 +371,19 @@ class KeywordToolSelector:
             prompt: User message (used to detect write intent)
 
         Returns:
-            Filtered list of tools
+            Tool list (all preserved; write tools may carry HITL prompt)
         """
         if stage is None:
             return tools
 
-        # Skip stage filtering if user has write intent
+        # Skip HITL annotation if user has explicit write intent
         if prompt and self._has_write_intent(prompt):
-            logger.info("Write intent detected in prompt, skipping stage-based filtering")
+            logger.info("Write intent detected in prompt, skipping HITL annotation")
             return tools
 
-        from victor.agent.conversation_state import ConversationStage
+        from victor.agent.conversation.state_machine import ConversationStage
 
+        # Only annotate during exploration/analysis stages
         if stage not in {
             ConversationStage.INITIAL,
             ConversationStage.PLANNING,
@@ -377,28 +392,35 @@ class KeywordToolSelector:
         }:
             return tools
 
-        # Filter to readonly tools
-        filtered = [t for t in tools if self._is_readonly_tool(t.name)]
-
-        if filtered:
-            return filtered
-
-        # Fallback to core readonly if filtering removed everything
-        readonly_core = self._get_stage_core_tools(stage)
-        fallback: List[ToolDefinition] = []
-        for tool in tools:
-            if tool.name in readonly_core:
-                fallback.append(tool)
-
-        if fallback:
-            logger.debug(
-                f"Stage filtering fallback: {len(fallback)} core readonly tools "
-                f"from {len(tools)} original"
-            )
-            return fallback
-
-        # Last resort: return first few tools
-        logger.warning(
-            f"Stage filtering: no readonly tools found, returning first {min(5, len(tools))} tools"
+        # Annotate write tools with HITL prompt instead of removing them
+        hitl_suffix = (
+            "\n\n[HITL] During this stage you MUST present the proposed "
+            "write/edit command to the user and obtain explicit approval "
+            "before executing. Describe what will change and why, then ask "
+            "for confirmation."
         )
-        return tools[:5]
+
+        annotated: List[ToolDefinition] = []
+        write_tool_count = 0
+        for tool in tools:
+            if not self._is_readonly_tool(tool.name):
+                # Annotate write tool with HITL prompt
+                annotated.append(
+                    ToolDefinition(
+                        name=tool.name,
+                        description=tool.description + hitl_suffix,
+                        parameters=tool.parameters,
+                        schema_level=getattr(tool, "schema_level", None),
+                    )
+                )
+                write_tool_count += 1
+            else:
+                annotated.append(tool)
+
+        if write_tool_count:
+            logger.info(
+                f"Stage {stage.value}: {write_tool_count} write tools "
+                f"annotated with HITL prompt (kept, not removed)"
+            )
+
+        return annotated

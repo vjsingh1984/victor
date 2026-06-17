@@ -75,6 +75,33 @@ from victor.providers.base import Message, ToolDefinition  # noqa: E402
 from victor.providers.openai_provider import OpenAIProvider  # noqa: E402
 
 
+def _exception_chain_contains(exc, text: str) -> bool:
+    """Check whether an exception chain contains a specific message fragment."""
+    needle = text.lower()
+    current = exc
+    seen = set()
+
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        if needle in str(current).lower():
+            return True
+
+        next_error = (
+            getattr(current, "raw_error", None)
+            or getattr(current, "__cause__", None)
+            or getattr(current, "__context__", None)
+        )
+        current = next_error if isinstance(next_error, BaseException) else None
+
+    return False
+
+
+def _skip_if_no_models_loaded(exc) -> None:
+    """Convert LM Studio's transient no-model state into a test skip."""
+    if _exception_chain_contains(exc, "no models loaded"):
+        pytest.skip("LMStudio reported that no model is currently loaded")
+
+
 @pytest.fixture
 async def lmstudio_provider():
     """Create LMStudio provider and check if available."""
@@ -139,12 +166,16 @@ async def test_lmstudio_simple_chat(lmstudio_provider):
 
     messages = [Message(role="user", content="Say 'Hello from LMStudio' and nothing else.")]
 
-    response = await lmstudio_provider.chat(
-        messages=messages,
-        model=model_name,
-        temperature=0.1,
-        max_tokens=50,
-    )
+    try:
+        response = await lmstudio_provider.chat(
+            messages=messages,
+            model=model_name,
+            temperature=0.1,
+            max_tokens=50,
+        )
+    except Exception as exc:
+        _skip_if_no_models_loaded(exc)
+        raise
 
     assert response.content
     assert len(response.content) > 0
@@ -169,12 +200,16 @@ async def test_lmstudio_code_generation(lmstudio_provider):
         ),
     ]
 
-    response = await lmstudio_provider.chat(
-        messages=messages,
-        model=model_name,
-        temperature=0.2,
-        max_tokens=512,
-    )
+    try:
+        response = await lmstudio_provider.chat(
+            messages=messages,
+            model=model_name,
+            temperature=0.2,
+            max_tokens=512,
+        )
+    except Exception as exc:
+        _skip_if_no_models_loaded(exc)
+        raise
 
     assert response.content
     assert "def" in response.content or "add" in response.content.lower()
@@ -195,16 +230,20 @@ async def test_lmstudio_streaming(lmstudio_provider):
     chunks = []
     full_content = ""
 
-    async for chunk in lmstudio_provider.stream(
-        messages=messages,
-        model=model_name,
-        temperature=0.1,
-        max_tokens=100,
-    ):
-        chunks.append(chunk)
-        if chunk.content:
-            full_content += chunk.content
-            print(chunk.content, end="", flush=True)
+    try:
+        async for chunk in lmstudio_provider.stream(
+            messages=messages,
+            model=model_name,
+            temperature=0.1,
+            max_tokens=100,
+        ):
+            chunks.append(chunk)
+            if chunk.content:
+                full_content += chunk.content
+                print(chunk.content, end="", flush=True)
+    except Exception as exc:
+        _skip_if_no_models_loaded(exc)
+        raise
 
     print()  # New line
 
@@ -274,23 +313,31 @@ async def test_lmstudio_multi_turn_conversation(lmstudio_provider):
     # Turn 1
     messages = [Message(role="user", content="My name is Bob.")]
 
-    response1 = await lmstudio_provider.chat(
-        messages=messages,
-        model=model_name,
-        temperature=0.7,
-        max_tokens=100,
-    )
+    try:
+        response1 = await lmstudio_provider.chat(
+            messages=messages,
+            model=model_name,
+            temperature=0.7,
+            max_tokens=100,
+        )
+    except Exception as exc:
+        _skip_if_no_models_loaded(exc)
+        raise
 
     # Turn 2
     messages.append(Message(role="assistant", content=response1.content))
     messages.append(Message(role="user", content="What is my name?"))
 
-    response2 = await lmstudio_provider.chat(
-        messages=messages,
-        model=model_name,
-        temperature=0.7,
-        max_tokens=100,
-    )
+    try:
+        response2 = await lmstudio_provider.chat(
+            messages=messages,
+            model=model_name,
+            temperature=0.7,
+            max_tokens=100,
+        )
+    except Exception as exc:
+        _skip_if_no_models_loaded(exc)
+        raise
 
     assert response2.content
     # Model should remember Bob
@@ -348,16 +395,23 @@ async def test_lmstudio_with_custom_parameters(lmstudio_provider):
         model_name = response.json()["data"][0]["id"]
 
     messages = [
-        Message(role="user", content="Write a one-line function to double a number in Python.")
+        Message(
+            role="user",
+            content="Write a one-line function to double a number in Python.",
+        )
     ]
 
-    response = await lmstudio_provider.chat(
-        messages=messages,
-        model=model_name,
-        temperature=0.1,  # Very low for deterministic output
-        top_p=0.95,
-        max_tokens=100,
-    )
+    try:
+        response = await lmstudio_provider.chat(
+            messages=messages,
+            model=model_name,
+            temperature=0.1,  # Very low for deterministic output
+            top_p=0.95,
+            max_tokens=100,
+        )
+    except Exception as exc:
+        _skip_if_no_models_loaded(exc)
+        raise
 
     assert response.content
     assert (
@@ -394,12 +448,16 @@ async def test_lmstudio_large_context(lmstudio_provider):
 
     messages.append(Message(role="user", content="Summarize our discussion in one sentence."))
 
-    response = await lmstudio_provider.chat(
-        messages=messages,
-        model=model_name,
-        temperature=0.5,
-        max_tokens=200,
-    )
+    try:
+        response = await lmstudio_provider.chat(
+            messages=messages,
+            model=model_name,
+            temperature=0.5,
+            max_tokens=200,
+        )
+    except Exception as exc:
+        _skip_if_no_models_loaded(exc)
+        raise
 
     assert response.content
     print(f"\nLMStudio Large context response: {response.content}")

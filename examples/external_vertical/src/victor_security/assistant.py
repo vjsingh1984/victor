@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""SDK-only external vertical example for security analysis."""
+"""Contract-only external vertical example for security analysis."""
 
-from victor_sdk import (
+from victor_contracts import (
     CapabilityIds,
     CapabilityRequirement,
     StageDefinition,
@@ -25,7 +25,7 @@ from victor_sdk import (
 
 
 class SecurityAssistant(VerticalBase):
-    """Security analysis vertical authored against `victor-sdk` only."""
+    """Security analysis vertical authored against `victor_contracts` only."""
 
     name = "security"
     description = "Security auditing, vulnerability analysis, and compliance review"
@@ -111,13 +111,15 @@ Priorities:
     def get_prompt_templates(cls) -> dict[str, str]:
         return {
             "vulnerability_scan": (
-                "Audit the target for vulnerabilities, explain severity, and cite concrete evidence."
+                "Audit the target for vulnerabilities, explain severity, and cite "
+                "concrete evidence."
             ),
             "dependency_audit": (
-                "Identify vulnerable dependencies, affected packages, and remediation options."
+                "Identify vulnerable dependencies, affected packages, and " "remediation options."
             ),
             "incident_review": (
-                "Review the repository for indicators of compromise and summarize the blast radius."
+                "Review the repository for indicators of compromise and summarize "
+                "the blast radius."
             ),
         }
 
@@ -125,7 +127,10 @@ Priorities:
     def get_task_type_hints(cls) -> dict[str, dict[str, object]]:
         return {
             "vulnerability_scan": {
-                "hint": "Start with architecture reconnaissance, then run targeted searches and scanners.",
+                "hint": (
+                    "Start with architecture reconnaissance, then run targeted "
+                    "searches and scanners."
+                ),
                 "tool_budget": 18,
                 "priority_tools": [
                     ToolNames.READ,
@@ -134,7 +139,9 @@ Priorities:
                 ],
             },
             "dependency_audit": {
-                "hint": "Inspect package manifests first, then confirm with dependency scanners.",
+                "hint": (
+                    "Inspect package manifests first, then confirm with dependency " "scanners."
+                ),
                 "tool_budget": 14,
                 "priority_tools": [
                     ToolNames.READ,
@@ -143,7 +150,10 @@ Priorities:
                 ],
             },
             "incident_review": {
-                "hint": "Preserve evidence, avoid destructive actions, and summarize confidence level.",
+                "hint": (
+                    "Preserve evidence, avoid destructive actions, and summarize "
+                    "confidence level."
+                ),
                 "tool_budget": 20,
                 "priority_tools": [
                     ToolNames.READ,
@@ -164,7 +174,7 @@ Priorities:
             ),
             "analysis": StageDefinition(
                 name="analysis",
-                description="Perform focused security review and scanner-assisted analysis.",
+                description=("Perform focused security review and scanner-assisted analysis."),
                 required_tools=[ToolNames.READ, ToolNames.CODE_SEARCH],
                 optional_tools=[ToolNames.SHELL, ToolNames.WEB_SEARCH],
             ),
@@ -189,18 +199,23 @@ Priorities:
         return {
             "security_review_team": {
                 "name": "Security Review Team",
-                "description": "Two-stage security review with analysis and validation.",
+                "description": ("Two-stage security review with analysis and validation."),
                 "formation": "pipeline",
                 "members": [
                     {
                         "role": "researcher",
-                        "goal": "Inspect the repository and identify likely security risks.",
+                        "goal": ("Inspect the repository and identify likely security risks."),
                         "name": "Security Analyst",
                         "tool_budget": 18,
                         "backstory": (
-                            "You specialize in application security reviews and threat discovery."
+                            "You specialize in application security reviews and "
+                            "threat discovery."
                         ),
-                        "expertise": ["static analysis", "dependency risk", "secret detection"],
+                        "expertise": [
+                            "static analysis",
+                            "dependency risk",
+                            "secret detection",
+                        ],
                         "personality": "methodical and evidence-driven",
                         "memory": True,
                     },
@@ -209,7 +224,9 @@ Priorities:
                         "goal": "Validate findings and summarize remediation guidance.",
                         "name": "Validation Reviewer",
                         "tool_budget": 12,
-                        "backstory": "You verify findings before they are escalated to developers.",
+                        "backstory": (
+                            "You verify findings before they are escalated to " "developers."
+                        ),
                         "expertise": ["severity calibration", "secure remediation"],
                         "personality": "skeptical and precise",
                     },

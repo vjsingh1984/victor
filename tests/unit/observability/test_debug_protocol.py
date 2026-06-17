@@ -16,7 +16,7 @@
 
 from pathlib import Path
 
-from victor.debug.protocol import (
+from victor.observability.debug.protocol import (
     AttachConfiguration,
     Breakpoint,
     DebugSession,

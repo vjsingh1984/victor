@@ -196,6 +196,10 @@ class OllamaCapabilityDetector:
     def get_tool_support(self, model: str, use_cache: bool = True) -> ModelToolSupport:
         """Check if a model supports native tool calling.
 
+        Uses a two-tier detection strategy:
+        1. Check the `capabilities` field from /api/show (authoritative, Ollama 0.20+)
+        2. Fall back to template inspection for older Ollama versions
+
         Args:
             model: Model name (e.g., "qwen2.5-coder:14b")
             use_cache: Whether to use cached results
@@ -220,9 +224,28 @@ class OllamaCapabilityDetector:
             self._cache[model] = result
             return result
 
-        # Detect tool support from template
-        template = info.get("template", "")
-        result = self.detect_tool_support(template)
+        # Primary: Check capabilities array (authoritative, Ollama 0.20+)
+        # Models like gemma4 use RENDERER/PARSER instead of template-based
+        # tools, so the capabilities field is the only reliable source.
+        capabilities = info.get("capabilities", [])
+        if "tools" in capabilities:
+            result = ModelToolSupport(
+                model=model,
+                supports_tools=True,
+                template_has_tools=True,
+                detection_method="capabilities_api",
+            )
+            # Still detect format from template if available
+            template = info.get("template", "")
+            for pattern, format_name in TOOL_FORMAT_PATTERNS:
+                if re.search(pattern, template):
+                    result.tool_response_format = format_name
+                    break
+        else:
+            # Fallback: Detect tool support from template inspection
+            template = info.get("template", "")
+            result = self.detect_tool_support(template)
+
         result.model = model
 
         # Add reliability rating
@@ -295,7 +318,9 @@ class OllamaCapabilityDetector:
 _global_detector: Optional[OllamaCapabilityDetector] = None
 
 
-def get_global_detector(base_url: str = "http://localhost:11434") -> OllamaCapabilityDetector:
+def get_global_detector(
+    base_url: str = "http://localhost:11434",
+) -> OllamaCapabilityDetector:
     """Get or create the global detector instance.
 
     Args:

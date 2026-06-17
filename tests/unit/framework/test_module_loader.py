@@ -427,10 +427,12 @@ class TestFileWatching:
     def test_setup_file_watcher_without_watchdog(self, module_loader):
         """Test setup_file_watcher when watchdog is not available."""
         with patch.dict(
-            sys.modules, {"watchdog": None, "watchdog.events": None, "watchdog.observers": None}
+            sys.modules,
+            {"watchdog": None, "watchdog.events": None, "watchdog.observers": None},
         ):
             with patch(
-                "victor.framework.module_loader.importlib.import_module", side_effect=ImportError
+                "victor.framework.module_loader.importlib.import_module",
+                side_effect=ImportError,
             ):
                 # Force fresh import attempt
                 result = module_loader.setup_file_watcher()
@@ -822,7 +824,10 @@ class TestCachedEntryPoints:
         data = cached_entry_points.to_dict()
 
         assert data["group"] == "test.group"
-        assert data["entries"] == {"entry1": "module1:Class1", "entry2": "module2:func2"}
+        assert data["entries"] == {
+            "entry1": "module1:Class1",
+            "entry2": "module2:func2",
+        }
         assert data["env_hash"] == "abc123"
         assert "timestamp" in data
         assert data["ttl"] == 3600.0
@@ -1182,11 +1187,33 @@ class TestEntryPointCache:
         )
 
         with patch.object(
-            entry_point_cache, "_scan_entry_points", return_value={"new_entry": "mod:New"}
+            entry_point_cache,
+            "_scan_entry_points",
+            return_value={"new_entry": "mod:New"},
         ):
             result = entry_point_cache.get_entry_points("test.group", force_refresh=True)
             assert "new_entry" in result
             assert "old_entry" not in result
+
+    def test_get_entry_points_force_refresh_invalidates_shared_registry(self, entry_point_cache):
+        """Force refresh should invalidate the shared registry before scanning."""
+        with patch(
+            "victor.framework.entry_point_registry.get_entry_point_values",
+            return_value={"plugin1": "mypackage.module:MyClass"},
+        ) as mock_get_entry_point_values:
+            result = entry_point_cache.get_entry_points("test.group", force_refresh=True)
+
+        assert result == {"plugin1": "mypackage.module:MyClass"}
+        mock_get_entry_point_values.assert_called_once_with("test.group", force=True)
+
+    def test_scan_entry_points_handles_error(self, entry_point_cache):
+        """Test _scan_entry_points handles errors gracefully."""
+        with patch(
+            "victor.framework.entry_point_registry.get_entry_point_values",
+            side_effect=Exception("Test error"),
+        ):
+            result = entry_point_cache._scan_entry_points("test.group")
+            assert result == {}
 
     def test_get_entry_points_refreshes_on_expired(self, entry_point_cache):
         """Test get_entry_points refreshes expired cache."""
@@ -1200,7 +1227,9 @@ class TestEntryPointCache:
         )
 
         with patch.object(
-            entry_point_cache, "_scan_entry_points", return_value={"new_entry": "mod:New"}
+            entry_point_cache,
+            "_scan_entry_points",
+            return_value={"new_entry": "mod:New"},
         ):
             result = entry_point_cache.get_entry_points("test.group")
             assert "new_entry" in result
@@ -1216,7 +1245,9 @@ class TestEntryPointCache:
         )
 
         with patch.object(
-            entry_point_cache, "_scan_entry_points", return_value={"new_entry": "mod:New"}
+            entry_point_cache,
+            "_scan_entry_points",
+            return_value={"new_entry": "mod:New"},
         ):
             result = entry_point_cache.get_entry_points("test.group")
             assert "new_entry" in result
@@ -1237,42 +1268,14 @@ class TestEntryPointCache:
             assert isinstance(name, str)
             assert isinstance(value, str)
 
-    def test_scan_entry_points_handles_error(self, entry_point_cache):
-        """Test _scan_entry_points handles errors gracefully."""
-        with patch("victor.framework.module_loader.sys.version_info", (3, 10)):
-            with patch(
-                "importlib.metadata.entry_points",
-                side_effect=Exception("Test error"),
-            ):
-                result = entry_point_cache._scan_entry_points("test.group")
-                assert result == {}
-
     def test_scan_entry_points_with_mock_entry_points(self, entry_point_cache):
         """Test _scan_entry_points processes entry points correctly."""
-        from victor.framework.entry_point_registry import EntryPointGroup
-
-        # Create mock entry points
-        mock_ep1 = MagicMock()
-        mock_ep1.name = "plugin1"
-        mock_ep1.value = "mypackage.module:MyClass"
-
-        mock_ep2 = MagicMock()
-        mock_ep2.name = "plugin2"
-        mock_ep2.value = "another.module:function"
-
-        # Build a mock registry returning a group with these entry points
-        mock_group = EntryPointGroup(group_name="test.group")
-        mock_group.entry_points = {
-            "plugin1": (mock_ep1, False),
-            "plugin2": (mock_ep2, False),
-        }
-
-        mock_registry = MagicMock()
-        mock_registry.get_group.return_value = mock_group
-
         with patch(
-            "victor.framework.entry_point_registry.get_entry_point_registry",
-            return_value=mock_registry,
+            "victor.framework.entry_point_registry.get_entry_point_values",
+            return_value={
+                "plugin1": "mypackage.module:MyClass",
+                "plugin2": "another.module:function",
+            },
         ):
             result = entry_point_cache._scan_entry_points("test.group")
             assert result["plugin1"] == "mypackage.module:MyClass"
@@ -1282,7 +1285,9 @@ class TestEntryPointCache:
     async def test_get_entry_points_async(self, entry_point_cache):
         """Test get_entry_points_async returns results."""
         with patch.object(
-            entry_point_cache, "get_entry_points", return_value={"async_entry": "mod:Async"}
+            entry_point_cache,
+            "get_entry_points",
+            return_value={"async_entry": "mod:Async"},
         ):
             result = await entry_point_cache.get_entry_points_async("test.group")
             assert "async_entry" in result
@@ -1296,9 +1301,15 @@ class TestEntryPointCache:
             timestamp=time.time(),
         )
 
-        count = entry_point_cache.invalidate("test.group")
+        with patch(
+            "victor.framework.entry_point_registry.get_entry_point_registry",
+            return_value=MagicMock(),
+        ) as mock_get_registry:
+            count = entry_point_cache.invalidate("test.group")
+
         assert count == 1
         assert "test.group" not in entry_point_cache._memory_cache
+        mock_get_registry.return_value.invalidate.assert_called_once()
 
     def test_invalidate_nonexistent_group(self, entry_point_cache):
         """Test invalidate returns 0 for nonexistent group."""
@@ -1315,10 +1326,16 @@ class TestEntryPointCache:
         )
         entry_point_cache._env_hash = "cached_hash"
 
-        count = entry_point_cache.invalidate()
+        with patch(
+            "victor.framework.entry_point_registry.get_entry_point_registry",
+            return_value=MagicMock(),
+        ) as mock_get_registry:
+            count = entry_point_cache.invalidate()
+
         assert count == 2
         assert len(entry_point_cache._memory_cache) == 0
         assert entry_point_cache._env_hash is None
+        mock_get_registry.return_value.invalidate.assert_called_once()
 
     def test_invalidate_on_env_change_when_changed(self, entry_point_cache):
         """Test invalidate_on_env_change when environment changed."""

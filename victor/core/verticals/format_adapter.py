@@ -65,7 +65,9 @@ class VerticalFormatAdapter:
     """
 
     @staticmethod
-    def normalize_mode_config(mode_config: Union["ModeConfig", Dict[str, Any], Any]) -> ModeConfig:
+    def normalize_mode_config(
+        mode_config: Union["ModeConfig", Dict[str, Any], Any],
+    ) -> ModeConfig:
         """Convert any mode config format to standard ModeConfig.
 
         Handles:
@@ -281,7 +283,9 @@ class VerticalFormatAdapter:
         }
 
     @staticmethod
-    def normalize_stage_definitions(stages: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
+    def normalize_stage_definitions(
+        stages: Dict[str, Any],
+    ) -> Dict[str, Dict[str, Any]]:
         """Normalize all stage definitions in a dictionary.
 
         Args:

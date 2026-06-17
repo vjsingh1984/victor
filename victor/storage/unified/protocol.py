@@ -27,9 +27,7 @@ Design Principles:
 
 Backend Substitution Examples:
 - SQLite + LanceDB (default, local)
-- PostgreSQL + pgvector (single store, cloud)
-- LanceDB only (vectors + metadata in single store)
-- DuckDB + LanceDB (analytical queries)
+- ProximaDB (planned single-engine backend)
 """
 
 from __future__ import annotations

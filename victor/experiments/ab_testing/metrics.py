@@ -27,6 +27,7 @@ import numpy as np
 from scipy import stats
 
 from victor.core.events import MessagingEvent, get_observability_bus
+from victor.experiments.ab_testing.paths import get_default_ab_test_db_path
 from victor.experiments.ab_testing.models import (
     AggregatedMetrics,
     ExecutionMetrics,
@@ -61,7 +62,7 @@ class MetricsCollector:
             buffer_size: Number of metrics to buffer before flushing
         """
         if storage_path is None:
-            storage_path = "~/.victor/ab_tests.db"
+            storage_path = str(get_default_ab_test_db_path())
 
         self.storage_path = Path(storage_path).expanduser()
         self.buffer_size = buffer_size

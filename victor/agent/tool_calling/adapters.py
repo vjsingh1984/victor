@@ -37,6 +37,7 @@ from victor.agent.tool_calling.base import (
 )
 from victor.agent.tool_calling.capabilities import ModelCapabilityLoader
 from victor.providers.base import ToolDefinition
+from victor.tools.tool_names import get_canonical_name
 
 logger = logging.getLogger(__name__)
 
@@ -119,14 +120,21 @@ class AnthropicToolCallingAdapter(BaseToolCallingAdapter):
             return ToolCallParseResult(remaining_content=content)
 
         tool_calls = []
+        warnings = []
         for tc in raw_tool_calls:
-            if not self.is_valid_tool_name(tc.get("name", "")):
+            name = tc.get("name", "")
+            tc_id = tc.get("id")
+            if not self.is_valid_tool_name(name):
+                warnings.append(f"Skipped invalid tool name: {name}")
+                # Keep with id so pipeline generates error response
+                if tc_id:
+                    tool_calls.append(ToolCall(name=name, arguments={}, id=tc_id))
                 continue
             tool_calls.append(
                 ToolCall(
-                    name=tc.get("name", ""),
+                    name=name,
                     arguments=tc.get("arguments", {}),
-                    id=tc.get("id"),
+                    id=tc_id,
                 )
             )
 
@@ -135,6 +143,7 @@ class AnthropicToolCallingAdapter(BaseToolCallingAdapter):
             remaining_content=content,
             parse_method="native",
             confidence=1.0,
+            warnings=warnings,
         )
 
 
@@ -183,14 +192,17 @@ class OpenAIToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
                 "IMPORTANT - TOOL USAGE REQUIRED:",
                 "- You MUST use the provided tools to complete tasks.",
                 "- DO NOT speculate or guess about file contents - READ them with tools.",
-                "- When asked to read a file, call read() or read_file() immediately.",
-                "- When asked to run a command, call shell() or bash() immediately.",
+                "- When asked to read a file, call read() immediately.",
+                "- When asked to run a command, call shell() immediately.",
                 "- Only provide your answer AFTER gathering information with tools.",
+                "- For multiline shell scripts, keep the tool call structured and use a heredoc inside cmd.",
                 "",
                 "TOOL CALL FORMAT:",
-                "- Use the tool calling API to invoke tools.",
-                "- If you cannot use the API, write: tool_name(arg='value')",
-                "- Example: read(path='file.py') or shell(command='ls -la')",
+                "- When calling tools, use structured function calls in JSON format.",
+                "- NEVER mix JSON tool calls with Python-style syntax in the same response.",
+                '- Correct example: Call the \'read\' tool with arguments {"path": "file.py"}',
+                "- Incorrect example: read(path='file.py')  # Do NOT use this format in JSON tool calls",
+                "- If you need to explain tool usage, do so in natural language after the JSON tool call.",
             ]
             return "\n".join(hints)
 
@@ -258,8 +270,13 @@ class OpenAIToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
 
             for tc in raw_tool_calls:
                 name = tc.get("name", "")
+                tc_id = tc.get("id")
                 if not self.is_valid_tool_name(name):
                     native_warnings.append(f"Skipped invalid tool name: {name}")
+                    # Keep with id so pipeline generates error response
+                    # (OpenAI spec: every tool_calls[].id needs a role=tool)
+                    if tc_id:
+                        tool_calls.append(ToolCall(name=name, arguments={}, id=tc_id))
                     continue
 
                 # Parse arguments (may be string or dict)
@@ -271,7 +288,7 @@ class OpenAIToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
                         native_warnings.append(f"Failed to parse arguments for {name}")
                         args = {}
 
-                tool_calls.append(ToolCall(name=name, arguments=args, id=tc.get("id")))
+                tool_calls.append(ToolCall(name=name, arguments=args, id=tc_id))
 
             if tool_calls:
                 return ToolCallParseResult(
@@ -452,7 +469,9 @@ class OllamaToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
         )
 
         try:
-            from victor.providers.ollama_capability_detector import OllamaCapabilityDetector
+            from victor.providers.ollama_capability_detector import (
+                OllamaCapabilityDetector,
+            )
 
             detector = OllamaCapabilityDetector(base_url, timeout=5)
             support = detector.get_tool_support(self.model)
@@ -517,7 +536,7 @@ class OllamaToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
                 tool_call_format=format_hint,
                 argument_format=caps.argument_format,
                 recommended_max_tools=caps.recommended_max_tools if has_native else 10,
-                recommended_tool_budget=caps.recommended_tool_budget if has_native else 5,
+                recommended_tool_budget=(caps.recommended_tool_budget if has_native else 5),
             )
 
         # Apply model-specific overrides that YAML can't detect
@@ -660,7 +679,7 @@ class OllamaToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
         if capabilities.native_tool_calls:
             hints = [
                 "TOOL USAGE:",
-                "- Use list_directory and read_file to inspect code.",
+                "- Use ls and read to inspect code.",
                 "- Call tools one at a time, waiting for results.",
                 "- After 2-3 successful tool calls, provide your answer.",
                 "- Do NOT make identical repeated tool calls.",
@@ -860,10 +879,10 @@ class GoogleToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
 
         Handles patterns like:
         - <execute_bash>ls -la</execute_bash>
-        - <tool_code>print(read_file("path"))</tool_code>
+        - <tool_code>print(read("path"))</tool_code>
         - <ctrl42>call: `tool_name` ```json {...}```
         - call: `tool_name` ```json {...}```
-        - print(list_directory(path="..."))
+        - print(ls(path="..."))
         """
         tool_calls = []
         warnings = []
@@ -876,7 +895,13 @@ class GoogleToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
             if tool_name and self.is_valid_tool_name(tool_name):
                 try:
                     args = json.loads(json_str) if json_str else {}
-                    tool_calls.append(ToolCall(name=tool_name, arguments=args))
+                    canonical_tool_name = get_canonical_name(tool_name)
+                    tool_calls.append(
+                        ToolCall(
+                            name=canonical_tool_name,
+                            arguments=self.normalize_arguments(args, canonical_tool_name),
+                        )
+                    )
                     remaining = remaining.replace(match.group(0), "")
                     logger.debug(f"Parsed ctrl42 call: {tool_name}({args})")
                 except json.JSONDecodeError:
@@ -889,7 +914,13 @@ class GoogleToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
             if tool_name and self.is_valid_tool_name(tool_name):
                 try:
                     args = json.loads(json_str) if json_str else {}
-                    tool_calls.append(ToolCall(name=tool_name, arguments=args))
+                    canonical_tool_name = get_canonical_name(tool_name)
+                    tool_calls.append(
+                        ToolCall(
+                            name=canonical_tool_name,
+                            arguments=self.normalize_arguments(args, canonical_tool_name),
+                        )
+                    )
                     remaining = remaining.replace(match.group(0), "")
                     logger.debug(f"Parsed simple call: {tool_name}({args})")
                 except json.JSONDecodeError:
@@ -906,16 +937,22 @@ class GoogleToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
             tool_name = match.group(1).strip()
             arg_value = match.group(2).strip()
             if tool_name and self.is_valid_tool_name(tool_name):
+                canonical_tool_name = get_canonical_name(tool_name)
                 # Map common tool argument names
-                if tool_name in ("list_directory", "read_file"):
+                if canonical_tool_name in ("ls", "read"):
                     args = {"path": arg_value}
-                elif tool_name == "execute_bash":
-                    args = {"command": arg_value}
+                elif canonical_tool_name == "shell":
+                    args = {"cmd": arg_value}
                 elif tool_name in ("code_search", "semantic_code_search"):
                     args = {"query": arg_value}
                 else:
                     args = {"path": arg_value}  # Default
-                tool_calls.append(ToolCall(name=tool_name, arguments=args))
+                tool_calls.append(
+                    ToolCall(
+                        name=canonical_tool_name,
+                        arguments=self.normalize_arguments(args, canonical_tool_name),
+                    )
+                )
                 remaining = remaining.replace(match.group(0), "")
                 logger.debug(f"Parsed Python call: {tool_name}({args})")
 
@@ -925,8 +962,8 @@ class GoogleToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
             if command:
                 tool_calls.append(
                     ToolCall(
-                        name="execute_bash",
-                        arguments={"command": command},
+                        name="shell",
+                        arguments={"cmd": command},
                     )
                 )
                 remaining = remaining.replace(match.group(0), "")
@@ -936,12 +973,12 @@ class GoogleToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
             code = match.group(1).strip()
             if code:
                 # Try to extract read_file calls
-                read_file_match = re.search(r'read_file\s*\(\s*["\']([^"\']+)["\']\s*\)', code)
+                read_file_match = re.search(r'read(?:_file)?\s*\(\s*["\']([^"\']+)["\']\s*\)', code)
                 if read_file_match:
                     path = read_file_match.group(1)
                     tool_calls.append(
                         ToolCall(
-                            name="read_file",
+                            name="read",
                             arguments={"path": path},
                         )
                     )
@@ -954,12 +991,12 @@ class GoogleToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
         for match in self.CODE_BLOCK_PATTERN.finditer(content):
             code = match.group(1).strip()
             if code:
-                read_file_match = re.search(r'read_file\s*\(\s*["\']([^"\']+)["\']\s*\)', code)
+                read_file_match = re.search(r'read(?:_file)?\s*\(\s*["\']([^"\']+)["\']\s*\)', code)
                 if read_file_match:
                     path = read_file_match.group(1)
                     tool_calls.append(
                         ToolCall(
-                            name="read_file",
+                            name="read",
                             arguments={"path": path},
                         )
                     )
@@ -1342,8 +1379,12 @@ class OpenAICompatToolCallingAdapter(BaseToolCallingAdapter):
             tool_calls = []
             for tc in raw_tool_calls:
                 name = tc.get("name", "")
+                tc_id = tc.get("id")
                 if not self.is_valid_tool_name(name):
                     warnings.append(f"Skipped invalid tool name: {name}")
+                    # Keep with id so pipeline generates error response
+                    if tc_id:
+                        tool_calls.append(ToolCall(name=name, arguments={}, id=tc_id))
                     continue
 
                 args = tc.get("arguments", {})
@@ -1354,7 +1395,7 @@ class OpenAICompatToolCallingAdapter(BaseToolCallingAdapter):
                         warnings.append(f"Failed to parse arguments for {name}")
                         args = {}
 
-                tool_calls.append(ToolCall(name=name, arguments=args, id=tc.get("id")))
+                tool_calls.append(ToolCall(name=name, arguments=args, id=tc_id))
 
             if tool_calls:
                 return ToolCallParseResult(
@@ -1599,6 +1640,7 @@ class DeepSeekToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
             tool_calls = []
 
             for tc in raw_tool_calls:
+                tc_id = tc.get("id")
                 # Handle OpenAI format with nested function
                 if "function" in tc:
                     func = tc["function"]
@@ -1611,6 +1653,9 @@ class DeepSeekToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
 
                 if not self.is_valid_tool_name(name):
                     warnings.append(f"Skipped invalid tool name: {name}")
+                    # Keep with id so pipeline generates error response
+                    if tc_id:
+                        tool_calls.append(ToolCall(name=name, arguments={}, id=tc_id))
                     continue
 
                 # Parse arguments (may be string or dict)
@@ -1621,7 +1666,7 @@ class DeepSeekToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
                         warnings.append(f"Failed to parse arguments for {name}")
                         args = {}
 
-                tool_calls.append(ToolCall(name=name, arguments=args, id=tc.get("id")))
+                tool_calls.append(ToolCall(name=name, arguments=args, id=tc_id))
 
             if tool_calls:
                 return ToolCallParseResult(
@@ -1784,9 +1829,13 @@ class BedrockToolCallingAdapter(BaseToolCallingAdapter):
 
         for tc in raw_tool_calls:
             name = tc.get("name", "")
+            tc_id = tc.get("id")
 
             if not self.is_valid_tool_name(name):
                 warnings.append(f"Skipped invalid tool name: {name}")
+                # Keep with id so pipeline generates error response
+                if tc_id:
+                    tool_calls.append(ToolCall(name=name, arguments={}, id=tc_id))
                 continue
 
             # Bedrock returns arguments already parsed as dict
@@ -1802,7 +1851,7 @@ class BedrockToolCallingAdapter(BaseToolCallingAdapter):
                 ToolCall(
                     name=name,
                     arguments=arguments,
-                    id=tc.get("id"),
+                    id=tc_id,
                 )
             )
 
@@ -1932,6 +1981,7 @@ class AzureOpenAIToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter
             tool_calls = []
 
             for tc in raw_tool_calls:
+                tc_id = tc.get("id")
                 # Handle OpenAI format with nested function
                 if "function" in tc:
                     func = tc["function"]
@@ -1944,6 +1994,9 @@ class AzureOpenAIToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter
 
                 if not self.is_valid_tool_name(name):
                     warnings.append(f"Skipped invalid tool name: {name}")
+                    # Keep with id so pipeline generates error response
+                    if tc_id:
+                        tool_calls.append(ToolCall(name=name, arguments={}, id=tc_id))
                     continue
 
                 # Parse arguments (may be string or dict)
@@ -1954,7 +2007,7 @@ class AzureOpenAIToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter
                         warnings.append(f"Failed to parse arguments for {name}")
                         args = {}
 
-                tool_calls.append(ToolCall(name=name, arguments=args, id=tc.get("id")))
+                tool_calls.append(ToolCall(name=name, arguments=args, id=tc_id))
 
             if tool_calls:
                 return ToolCallParseResult(

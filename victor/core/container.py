@@ -45,6 +45,7 @@ Example Usage:
 
 from __future__ import annotations
 
+import inspect
 import logging
 import threading
 from dataclasses import dataclass
@@ -87,6 +88,15 @@ class Disposable(Protocol):
 
     def dispose(self) -> None:
         """Release resources held by the service."""
+        ...
+
+
+@runtime_checkable
+class AsyncDisposable(Protocol):
+    """Protocol for services that need async cleanup."""
+
+    async def adispose(self) -> None:
+        """Asynchronously release resources."""
         ...
 
 
@@ -155,24 +165,48 @@ class ServiceScope:
 
     def dispose(self) -> None:
         """Dispose all scoped services."""
-        if self._disposed:
-            return
+        with self._lock:
+            if self._disposed:
+                return
+            self._disposed = True
+            for service in self._scoped_instances.values():
+                if isinstance(service, Disposable):
+                    try:
+                        service.dispose()
+                    except Exception as e:
+                        logger.warning(f"Error disposing scoped service: {e}")
+            self._scoped_instances.clear()
 
-        self._disposed = True
-        for service in self._scoped_instances.values():
-            if isinstance(service, Disposable):
-                try:
-                    service.dispose()
-                except Exception as e:
-                    logger.warning(f"Error disposing scoped service: {e}")
-
-        self._scoped_instances.clear()
+    async def adispose(self) -> None:
+        """Async dispose all scoped services."""
+        with self._lock:
+            if self._disposed:
+                return
+            self._disposed = True
+            for service in self._scoped_instances.values():
+                if isinstance(service, AsyncDisposable):
+                    try:
+                        await service.adispose()
+                    except Exception as e:
+                        logger.warning(f"Error async-disposing scoped: {e}")
+                elif isinstance(service, Disposable):
+                    try:
+                        service.dispose()
+                    except Exception as e:
+                        logger.warning(f"Error disposing scoped service: {e}")
+            self._scoped_instances.clear()
 
     def __enter__(self) -> "ServiceScope":
         return self
 
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         self.dispose()
+
+    async def __aenter__(self) -> "ServiceScope":
+        return self
+
+    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        await self.adispose()
 
 
 class ServiceNotFoundError(Exception):
@@ -205,6 +239,39 @@ class ScopeDisposedError(Exception):
     pass
 
 
+class ContainerFrozenError(Exception):
+    """Raised when trying to modify a frozen container."""
+
+    pass
+
+
+def _resolve_constructor(cls: type, container: "ServiceContainer"):
+    """Auto-resolve constructor params from container annotations.
+
+    For each parameter with a type annotation, attempt to resolve it
+    from the container. Falls back to default value if resolution fails
+    and a default exists. Skips ``self``, ``*args``, ``**kwargs``.
+    """
+    sig = inspect.signature(cls.__init__)
+    kwargs = {}
+    for name, param in sig.parameters.items():
+        if name == "self":
+            continue
+        if param.kind in (
+            inspect.Parameter.VAR_POSITIONAL,
+            inspect.Parameter.VAR_KEYWORD,
+        ):
+            continue
+        if param.annotation is not inspect.Parameter.empty:
+            try:
+                kwargs[name] = container.get(param.annotation)
+            except (ServiceNotFoundError, ServiceResolutionError):
+                if param.default is inspect.Parameter.empty:
+                    raise
+        # No annotation and no default → cls() will naturally fail
+    return cls(**kwargs)
+
+
 class ServiceContainer:
     """Central dependency injection container.
 
@@ -234,7 +301,31 @@ class ServiceContainer:
         self._descriptors: Dict[Type, ServiceDescriptor] = {}
         self._lock = threading.RLock()
         self._disposed = False
-        self._resolving: set = set()  # Circular dependency detection
+        self._frozen = False
+        self._resolving = threading.local()  # Per-thread cycle detection
+
+    def _get_resolving(self) -> set:
+        """Get the per-thread resolution tracking set."""
+        if not hasattr(self._resolving, "stack"):
+            self._resolving.stack = set()
+        return self._resolving.stack
+
+    def freeze(self) -> "ServiceContainer":
+        """Freeze container to prevent further registrations.
+
+        Call after bootstrap completes. Resolution still works.
+
+        Returns:
+            Self for method chaining
+        """
+        with self._lock:
+            self._frozen = True
+        return self
+
+    def _check_frozen(self) -> None:
+        """Raise if container is frozen."""
+        if self._frozen:
+            raise ContainerFrozenError("Container is frozen; registrations are not allowed")
 
     def register(
         self,
@@ -254,7 +345,9 @@ class ServiceContainer:
 
         Raises:
             ServiceAlreadyRegisteredError: If service type already registered
+            ContainerFrozenError: If container is frozen
         """
+        self._check_frozen()
         with self._lock:
             if service_type in self._descriptors:
                 raise ServiceAlreadyRegisteredError(service_type)
@@ -278,6 +371,7 @@ class ServiceContainer:
         Returns:
             Self for method chaining
         """
+        self._check_frozen()
         with self._lock:
             if service_type in self._descriptors:
                 raise ServiceAlreadyRegisteredError(service_type)
@@ -311,6 +405,7 @@ class ServiceContainer:
         Returns:
             Self for method chaining
         """
+        self._check_frozen()
         with self._lock:
             # Dispose existing singleton if present
             if service_type in self._descriptors:
@@ -345,28 +440,29 @@ class ServiceContainer:
         """
         descriptor = self._get_descriptor(service_type)
 
-        # Circular dependency detection
-        if service_type in self._resolving:
-            chain = " -> ".join(t.__name__ for t in self._resolving)
+        # Circular dependency detection (per-thread)
+        resolving = self._get_resolving()
+        if service_type in resolving:
+            chain = " -> ".join(t.__name__ for t in resolving)
             raise ServiceResolutionError(
-                f"Circular dependency detected: {chain} -> {service_type.__name__}"
+                f"Circular dependency detected: " f"{chain} -> {service_type.__name__}"
             )
 
         if descriptor.lifetime == ServiceLifetime.TRANSIENT:
-            self._resolving.add(service_type)
+            resolving.add(service_type)
             try:
                 return descriptor.create_instance(self)
             finally:
-                self._resolving.discard(service_type)
+                resolving.discard(service_type)
 
-        # Singleton or Scoped (scoped in root container acts as singleton)
+        # Singleton or Scoped (scoped in root acts as singleton)
         with self._lock:
             if descriptor.instance is None:
-                self._resolving.add(service_type)
+                resolving.add(service_type)
                 try:
                     descriptor.instance = descriptor.create_instance(self)
                 finally:
-                    self._resolving.discard(service_type)
+                    resolving.discard(service_type)
             return descriptor.instance
 
     def get_optional(self, service_type: Type[T]) -> Optional[T]:
@@ -466,12 +562,13 @@ class ServiceContainer:
         """
 
         def decorator(cls: Type[T]) -> Type[T]:
+            self._check_frozen()
             with self._lock:
                 if service_type in self._descriptors:
                     raise ServiceAlreadyRegisteredError(service_type)
 
                 def factory(c: ServiceContainer) -> T:
-                    return cls()  # type: ignore[call-arg]
+                    return _resolve_constructor(cls, c)
 
                 self._descriptors[service_type] = ServiceDescriptor(
                     service_type=service_type,
@@ -550,20 +647,75 @@ class ServiceContainer:
             for service_type in self.get_registered_types()
         }
 
+    def validate(self) -> list:
+        """Eagerly validate all registrations by trial resolution.
+
+        Attempts to create each service to catch circular dependencies
+        and missing registrations early. Does not cache singletons —
+        the trial runs through ``_try_resolve`` which discards results.
+
+        Returns:
+            List of exceptions encountered (empty = healthy).
+        """
+        errors: list = []
+        for service_type in list(self._descriptors):
+            try:
+                self._try_resolve(service_type)
+            except Exception as e:
+                errors.append(e)
+        return errors
+
+    def _try_resolve(self, service_type: Type[T]) -> None:
+        """Resolve a service without caching the singleton instance."""
+        descriptor = self._get_descriptor(service_type)
+        resolving = self._get_resolving()
+
+        if service_type in resolving:
+            chain = " -> ".join(t.__name__ for t in resolving)
+            raise ServiceResolutionError(
+                f"Circular dependency detected: " f"{chain} -> {service_type.__name__}"
+            )
+
+        resolving.add(service_type)
+        try:
+            descriptor.create_instance(self)
+        finally:
+            resolving.discard(service_type)
+
     def dispose(self) -> None:
         """Dispose all singleton services and clear registrations."""
-        if self._disposed:
-            return
-
-        self._disposed = True
         with self._lock:
+            if self._disposed:
+                return
+            self._disposed = True
             for descriptor in self._descriptors.values():
                 if descriptor.instance is not None and isinstance(descriptor.instance, Disposable):
                     try:
                         descriptor.instance.dispose()
                     except Exception as e:
                         logger.warning(f"Error disposing service: {e}")
+            self._descriptors.clear()
 
+    async def adispose(self) -> None:
+        """Async dispose: awaits AsyncDisposable, calls sync Disposable."""
+        with self._lock:
+            if self._disposed:
+                return
+            self._disposed = True
+            for descriptor in self._descriptors.values():
+                inst = descriptor.instance
+                if inst is None:
+                    continue
+                if isinstance(inst, AsyncDisposable):
+                    try:
+                        await inst.adispose()
+                    except Exception as e:
+                        logger.warning(f"Error async-disposing service: {e}")
+                elif isinstance(inst, Disposable):
+                    try:
+                        inst.dispose()
+                    except Exception as e:
+                        logger.warning(f"Error disposing service: {e}")
             self._descriptors.clear()
 
     def __enter__(self) -> "ServiceContainer":
@@ -571,6 +723,12 @@ class ServiceContainer:
 
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         self.dispose()
+
+    async def __aenter__(self) -> "ServiceContainer":
+        return self
+
+    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        await self.adispose()
 
 
 # =============================================================================

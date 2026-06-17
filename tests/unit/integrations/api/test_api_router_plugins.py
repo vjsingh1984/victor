@@ -20,11 +20,15 @@ from fastapi import APIRouter
 from fastapi.testclient import TestClient
 
 from victor.integrations.api import fastapi_server
+from victor.integrations.api.fastapi_server import collect_route_paths
 from victor.integrations.api.router_plugins import APIRouterRegistration
 
 
 def _route_paths(app) -> set[str]:
-    return {getattr(route, "path", "") for route in app.routes}
+    # Use the production collector so the assertions are robust across Starlette
+    # versions (newer Starlette stores lazily-included routers as wrappers in
+    # app.routes rather than eagerly flattening their sub-routes).
+    return collect_route_paths(app)
 
 
 def _create_test_lsp_router() -> APIRouter:

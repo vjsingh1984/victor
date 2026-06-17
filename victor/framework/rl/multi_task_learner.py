@@ -50,6 +50,7 @@ from datetime import datetime
 from typing import Any, Dict, Optional, Tuple
 
 from victor.framework.rl.base import BaseLearner, RLOutcome, RLRecommendation
+from victor.core.constants import DEFAULT_VERTICAL
 from victor.framework.rl.shared_encoder import (
     ContextEmbedding,
     get_shared_encoder,
@@ -394,7 +395,7 @@ class MultiTaskLearner(BaseLearner):
         provider: str,
         model: str,
         task_type: str,
-        vertical: str = "coding",
+        vertical: str = DEFAULT_VERTICAL,
     ) -> Optional[RLRecommendation]:
         """Get recommendation combining vertical and transferred knowledge.
 

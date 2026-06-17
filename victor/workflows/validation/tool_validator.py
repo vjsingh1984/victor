@@ -306,16 +306,13 @@ class ToolDependencyValidator:
                     severity=severity,
                 )
             )
-            if self.strict:
-                logger.error(
-                    f"Workflow validation: tool '{tool_name}' in node "
-                    f"'{node_id}' not found in registry"
-                )
-            else:
-                logger.warning(
-                    f"Workflow validation: tool '{tool_name}' in node "
-                    f"'{node_id}' not found in registry"
-                )
+            logger.debug(
+                "Workflow validation: tool '%s' in node '%s' not found in registry "
+                "(severity=%s)",
+                tool_name,
+                node_id,
+                severity,
+            )
 
     def validate_tools_exist(
         self,

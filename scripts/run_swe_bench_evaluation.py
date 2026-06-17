@@ -138,10 +138,18 @@ Examples:
         help="HuggingFace dataset name (default: princeton-nlp/SWE-bench_Lite)",
     )
     dataset_group.add_argument(
-        "--max-tasks", "-n", type=int, default=0, help="Maximum number of tasks to run (0 = all)"
+        "--max-tasks",
+        "-n",
+        type=int,
+        default=0,
+        help="Maximum number of tasks to run (0 = all)",
     )
     dataset_group.add_argument(
-        "--instance-ids", "-i", nargs="+", default=[], help="Specific instance IDs to run"
+        "--instance-ids",
+        "-i",
+        nargs="+",
+        default=[],
+        help="Specific instance IDs to run",
     )
     dataset_group.add_argument(
         "--repos",
@@ -154,13 +162,22 @@ Examples:
     # Agent options
     agent_group = parser.add_argument_group("Agent Options")
     agent_group.add_argument(
-        "--profile", "-p", default="default", help="Victor profile name (default: default)"
+        "--profile",
+        "-p",
+        default="default",
+        help="Victor profile name (default: default)",
     )
     agent_group.add_argument(
-        "--max-turns", type=int, default=20, help="Maximum agent turns per task (default: 20)"
+        "--max-turns",
+        type=int,
+        default=20,
+        help="Maximum agent turns per task (default: 20)",
     )
     agent_group.add_argument(
-        "--max-tool-calls", type=int, default=50, help="Maximum tool calls per task (default: 50)"
+        "--max-tool-calls",
+        type=int,
+        default=50,
+        help="Maximum tool calls per task (default: 50)",
     )
 
     # Output options
@@ -200,7 +217,11 @@ Examples:
     # Execution options
     exec_group = parser.add_argument_group("Execution Options")
     exec_group.add_argument(
-        "--parallel", "-j", type=int, default=1, help="Number of parallel tasks (default: 1)"
+        "--parallel",
+        "-j",
+        type=int,
+        default=1,
+        help="Number of parallel tasks (default: 1)",
     )
     exec_group.add_argument(
         "--timeout",

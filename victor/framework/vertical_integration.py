@@ -21,7 +21,7 @@ paths apply identical vertical configurations.
 Design Philosophy:
 - Single implementation for all vertical integration
 - Protocol-based access (no private attribute writes)
-- Type-safe configuration through VerticalContext
+- Type-safe configuration through MutableVerticalContextProtocol
 - SOLID-compliant extension points
 - Step handlers for Single Responsibility (Phase 3.1)
 
@@ -131,6 +131,7 @@ import time
 import warnings
 import weakref
 from dataclasses import dataclass, field
+from enum import Enum
 
 from victor.framework.integration_registry import IntegrationPlanRegistry
 from pathlib import Path
@@ -150,7 +151,6 @@ from typing import (
     runtime_checkable,
 )
 
-from victor.agent.vertical_context import VerticalContext, create_vertical_context
 from victor.core.context import bind_active_vertical
 from victor.core.events.emit_helper import emit_event_sync
 from victor.core.verticals.base import VerticalRegistry
@@ -162,6 +162,7 @@ from victor.core.verticals.manifest_contract import (
 from victor.core.verticals.namespace_executor import get_namespace_executor_pool
 
 if TYPE_CHECKING:
+    from victor.core.shared_types import MutableVerticalContextProtocol
     from victor.framework.step_handlers import StepHandlerRegistry
     from victor.core.verticals.base import VerticalBase
     from victor.framework.vertical_cache_policy import VerticalIntegrationCachePolicy
@@ -195,7 +196,6 @@ def _warn_legacy_extension_registry_api(api_name: str) -> None:
         "See victor.framework.step_handlers.ExtensionsStepHandler.extension_registry. "
         "This will be removed in v1.0."
     )
-    warnings.warn(message, DeprecationWarning, stacklevel=3)
     logger.warning(message)
 
 
@@ -218,7 +218,14 @@ class ExtensionHandlerInfo:
     name: str
     attr_name: str
     handler: Callable[
-        ["VerticalIntegrationPipeline", Any, Any, VerticalContext, "IntegrationResult"], None
+        [
+            "VerticalIntegrationPipeline",
+            Any,
+            Any,
+            MutableVerticalContextProtocol,
+            "IntegrationResult",
+        ],
+        None,
     ]
     order: int = 100
 
@@ -463,8 +470,27 @@ class ExtensionLoadErrorInfo:
         }
 
 
-# Type alias for validation status
-ValidationStatus = Literal["success", "partial", "failed"]
+# =============================================================================
+# Enums for Vertical Integration
+# =============================================================================
+
+
+class ValidationStatus(str, Enum):
+    """Validation status for vertical capabilities.
+
+    Indicates the validation result:
+    - SUCCESS: All capabilities validated successfully
+    - PARTIAL: Some capabilities validated, others failed
+    - FAILED: All capabilities failed validation
+    """
+
+    SUCCESS = "success"  # All capabilities validated
+    PARTIAL = "partial"  # Some capabilities validated
+    FAILED = "failed"  # All capabilities failed
+
+
+# Backward compatibility
+_ValidationStatusLiteral = Literal["success", "partial", "failed"]
 
 
 @dataclass
@@ -474,7 +500,7 @@ class IntegrationResult:
     Attributes:
         success: Whether integration succeeded
         vertical_name: Name of the applied vertical
-        context: The created VerticalContext
+        context: The created vertical context.
         tools_applied: Set of tools enabled
         middleware_count: Number of middleware applied
         safety_patterns_count: Number of safety patterns applied
@@ -493,7 +519,7 @@ class IntegrationResult:
 
     success: bool = True
     vertical_name: Optional[str] = None
-    context: Optional[VerticalContext] = None
+    context: Optional[MutableVerticalContextProtocol] = None
     tools_applied: Set[str] = field(default_factory=set)
     middleware_count: int = 0
     safety_patterns_count: int = 0
@@ -659,10 +685,11 @@ class IntegrationResult:
         }
 
     def persist(self, base_path: Optional[Path] = None) -> Optional[Path]:
-        """Persist integration result to JSONL file for auditing (SRP: persistence).
+        """Persist integration result to JSONL file for auditing.
 
-        Uses append-only JSONL format for efficiency - avoids file locking issues
-        and reduces filesystem overhead. Each line is a complete JSON record.
+        .. deprecated:: 0.7.0
+            Use :class:`victor.observability.IntegrationAuditService` directly.
+            ``IntegrationResult.persist()`` will be removed in v1.0.
 
         Args:
             base_path: Base path for audit logs. Defaults to ~/.victor/logs/integration/
@@ -670,36 +697,17 @@ class IntegrationResult:
         Returns:
             Path to the JSONL file, or None if persistence failed
         """
-        import json
-        from datetime import datetime, timezone
+        import warnings
 
-        try:
-            # Use default path if not provided
-            if base_path is None:
-                base_path = Path.home() / ".victor" / "logs" / "integration"
+        warnings.warn(
+            "IntegrationResult.persist() is deprecated and will be removed in v1.0. "
+            "Use victor.observability.IntegrationAuditService().record(result) instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        from victor.observability.integration_audit import IntegrationAuditService
 
-            # Ensure directory exists
-            base_path.mkdir(parents=True, exist_ok=True)
-
-            # Use append-only JSONL file (one per day for easy rotation)
-            date_str = datetime.now(timezone.utc).strftime("%Y%m%d")
-            filepath = base_path / f"integration_{date_str}.jsonl"
-
-            # Append JSON line (atomic on most filesystems)
-            record = {
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-                "vertical_name": self.vertical_name,
-                "result": self.to_dict(),
-            }
-            with open(filepath, "a") as f:
-                f.write(json.dumps(record) + "\n")
-
-            logger.debug(f"IntegrationResult appended to: {filepath}")
-            return filepath
-
-        except Exception as e:
-            logger.warning(f"Failed to persist IntegrationResult: {e}")
-            return None
+        return IntegrationAuditService().record(self, base_path=base_path)
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "IntegrationResult":
@@ -758,7 +766,7 @@ class OrchestratorVerticalProtocol(Protocol):
     ensures SOLID compliance (no private attribute access).
     """
 
-    def set_vertical_context(self, context: VerticalContext) -> None:
+    def set_vertical_context(self, context: MutableVerticalContextProtocol) -> None:
         """Set the vertical context."""
         ...
 
@@ -842,7 +850,8 @@ class VerticalIntegrationPipeline:
         cache_ttl: int = 3600,
         max_cache_entries: int = 256,
         cache_policy: Optional["VerticalIntegrationCachePolicy"] = None,
-        parallel_enabled: bool = False,
+        parallel_enabled: bool = True,
+        context_factory: Optional[Callable[..., "MutableVerticalContextProtocol"]] = None,
     ):
         """Initialize the pipeline.
 
@@ -860,6 +869,7 @@ class VerticalIntegrationPipeline:
                 Set <= 0 for unbounded cache.
             cache_policy: Optional custom cache policy implementation.
             parallel_enabled: If True, enable parallel execution (Phase 2.2, default: False)
+            context_factory: Optional factory for the mutable vertical context protocol.
         """
         self._strict_mode = strict_mode
         self._pre_hooks = pre_hooks or []
@@ -870,6 +880,7 @@ class VerticalIntegrationPipeline:
         self._max_cache_entries = max_cache_entries
         self._parallel_enabled = parallel_enabled
         self._cache_policy = cache_policy or InMemoryLRUVerticalIntegrationCachePolicy()
+        self._context_factory = context_factory
 
         # Initialize cache (eagerly, to avoid attribute errors in tests)
         self._cache: Dict[str, str] = {}
@@ -936,7 +947,7 @@ class VerticalIntegrationPipeline:
 
         This is the main entry point for vertical integration. It:
         1. Resolves the vertical (if string name)
-        2. Creates a VerticalContext
+        2. Creates a mutable vertical context
         3. Applies all vertical extensions via step handlers (or legacy methods)
         4. Attaches context to orchestrator
 
@@ -970,7 +981,7 @@ class VerticalIntegrationPipeline:
             cache_hit = False
 
             # Check cache for pre-computed integration metadata (Phase 1: Caching)
-            # NOTE: cached IntegrationResult does not include VerticalContext; we must
+            # NOTE: cached IntegrationResult does not include vertical context; we must
             # always replay step handlers to apply side effects on the target orchestrator.
             if self._enable_cache:
                 cache_key = self._generate_cache_key(vertical_class)
@@ -1141,6 +1152,7 @@ class VerticalIntegrationPipeline:
             key_string = "|".join(key_parts)
             full_hash = hashlib.sha256(key_string.encode()).hexdigest()
 
+            logger.debug("Cache key tier=v1 (source file) for vertical=%s", vertical.name)
             return f"v1_{vertical.name}_{full_hash[:16]}"
 
         except Exception as e:
@@ -1193,6 +1205,10 @@ class VerticalIntegrationPipeline:
                             ]
                             key_string = "|".join(key_parts)
                             full_hash = hashlib.sha256(key_string.encode()).hexdigest()
+                            logger.debug(
+                                "Cache key tier=v2 (module file fallback) for vertical=%s",
+                                vertical.name,
+                            )
                             return f"v2_{vertical.name}_{full_hash[:16]}"
                     except Exception:
                         pass  # Fall back to id-based key
@@ -1205,10 +1221,20 @@ class VerticalIntegrationPipeline:
             ]
             key_string = "|".join(key_parts)
             full_hash = hashlib.sha256(key_string.encode()).hexdigest()
+            logger.debug(
+                "Cache key tier=v3 (class id fallback) for vertical=%s — "
+                "cache invalidation on code change is not available",
+                vertical.name,
+            )
             return f"v3_{vertical.name}_{full_hash[:16]}"
 
         except Exception:
             # Ultimate fallback
+            logger.debug(
+                "Cache key tier=v4 (id-only fallback) for vertical=%s — "
+                "cache key is unstable across reloads",
+                vertical.name,
+            )
             return f"v4_{vertical.name}_{id(vertical)}"
 
     def _hash_source_file(self, source_file: Path) -> str:
@@ -1275,7 +1301,7 @@ class VerticalIntegrationPipeline:
         """Save integration result to in-memory cache.
 
         Uses JSON serialization via to_dict() to avoid pickle issues with
-        unpicklable middleware objects. Note: The VerticalContext is NOT
+        unpicklable middleware objects. Note: The vertical context is NOT
         cached as it contains unpicklable references.
 
         Args:
@@ -1852,6 +1878,8 @@ class VerticalIntegrationPipeline:
                             result,
                             strict_mode=self._strict_mode,
                         )
+                    if self._should_stop_after_handler(handler_name, result):
+                        return
                 except Exception as e:
                     if self._strict_mode:
                         result.add_error(f"Step handler '{handler.name}' failed: {e}")
@@ -1861,6 +1889,8 @@ class VerticalIntegrationPipeline:
                         f"Step handler '{handler.name}' failed: {e}",
                         exc_info=True,
                     )
+                    if self._should_stop_after_handler(handler_name, result):
+                        return
 
         # Emit vertical_applied event for observability (async parity with sync apply)
         await self._emit_vertical_applied_event_async(orchestrator, result, cache_hit=cache_hit)
@@ -2099,11 +2129,20 @@ class VerticalIntegrationPipeline:
 
         return levels
 
+    def _build_context(self, **kwargs: Any) -> "MutableVerticalContextProtocol":
+        # DIP bridge: this is the only intentional framework→agent dependency.
+        # Eliminate by passing context_factory= at VerticalIntegrationPipeline construction.
+        if self._context_factory is not None:
+            return self._context_factory(**kwargs)
+        from victor.agent.vertical_context import create_vertical_context
+
+        return create_vertical_context(**kwargs)
+
     async def _apply_with_step_handlers_parallel(
         self,
         orchestrator: Any,
         vertical: Type["VerticalBase"],
-        context: VerticalContext,
+        context: MutableVerticalContextProtocol,
         result: IntegrationResult,
         *,
         skip_handlers: Optional[Set[str]] = None,
@@ -2151,6 +2190,9 @@ class VerticalIntegrationPipeline:
                 )
                 for handler in sequential_handlers:
                     await self._run_handler_async(handler, orchestrator, vertical, context, result)
+                    handler_name = str(getattr(handler, "name", handler.__class__.__name__))
+                    if self._should_stop_after_handler(handler_name, result):
+                        return
 
             if parallel_handlers:
                 logger.debug(
@@ -2175,13 +2217,22 @@ class VerticalIntegrationPipeline:
                             result.add_error(message)
                         else:
                             result.add_warning(message)
+                    handler_name = str(
+                        getattr(
+                            parallel_handlers[idx],
+                            "name",
+                            parallel_handlers[idx].__class__.__name__,
+                        )
+                    )
+                    if self._should_stop_after_handler(handler_name, result):
+                        return
 
     async def _run_handler_async(
         self,
         handler: Any,
         orchestrator: Any,
         vertical: Type["VerticalBase"],
-        context: VerticalContext,
+        context: MutableVerticalContextProtocol,
         result: IntegrationResult,
     ) -> None:
         """Run a single handler with async support (Phase 2.2).
@@ -2212,7 +2263,7 @@ class VerticalIntegrationPipeline:
                 # Run sync handler in thread pool to avoid blocking
                 import asyncio
 
-                loop = asyncio.get_event_loop()
+                loop = asyncio.get_running_loop()
                 executor = get_namespace_executor_pool().get_executor(namespace)
                 await loop.run_in_executor(
                     executor,
@@ -2241,7 +2292,7 @@ class VerticalIntegrationPipeline:
         self,
         orchestrator: Any,
         vertical: Type["VerticalBase"],
-        context: VerticalContext,
+        context: MutableVerticalContextProtocol,
         result: IntegrationResult,
         *,
         skip_handlers: Optional[Set[str]] = None,
@@ -2276,6 +2327,8 @@ class VerticalIntegrationPipeline:
                     result,
                     strict_mode=self._strict_mode,
                 )
+                if self._should_stop_after_handler(handler_name, result):
+                    return
             except Exception as e:
                 message = self._format_handler_failure(vertical, handler.name, e)
                 if self._strict_mode:
@@ -2286,6 +2339,14 @@ class VerticalIntegrationPipeline:
                     message,
                     exc_info=True,
                 )
+                if self._should_stop_after_handler(handler_name, result):
+                    return
+
+    @staticmethod
+    def _should_stop_after_handler(handler_name: str, result: IntegrationResult) -> bool:
+        """Return True when a handler failure must abort remaining integration."""
+
+        return handler_name == "compatibility" and not result.success
 
     def _format_handler_failure(
         self,
@@ -2335,15 +2396,15 @@ class VerticalIntegrationPipeline:
         orchestrator: Any,
         vertical: Type["VerticalBase"],
         result: IntegrationResult,
-    ) -> Optional[VerticalContext]:
-        """Create the VerticalContext for this vertical.
+    ) -> Optional[MutableVerticalContextProtocol]:
+        """Create the mutable vertical context for this vertical.
 
         Args:
             vertical: Vertical class
             result: Result to update
 
         Returns:
-            VerticalContext or None on error
+            Mutable vertical context or None on error.
         """
         try:
             from victor.framework.sdk_capability_registry import (
@@ -2352,10 +2413,7 @@ class VerticalIntegrationPipeline:
 
             config = vertical.get_config()
             definition = vertical.get_definition()
-            context = create_vertical_context(
-                name=vertical.name,
-                config=config,
-            )
+            context = self._build_context(name=vertical.name, config=config)
             capability_resolutions = resolve_capability_requirements(
                 definition.capability_requirements,
                 orchestrator=orchestrator,
@@ -2420,7 +2478,7 @@ def create_integration_pipeline(
     cache_ttl: int = 3600,
     max_cache_entries: int = 256,
     cache_policy: Optional["VerticalIntegrationCachePolicy"] = None,
-    enable_parallel: bool = False,
+    enable_parallel: bool = True,
 ) -> VerticalIntegrationPipeline:
     """Create a vertical integration pipeline with feature flags (Phase 2).
 
@@ -2463,7 +2521,7 @@ def create_integration_pipeline_with_handlers(
     cache_ttl: int = 3600,
     max_cache_entries: int = 256,
     cache_policy: Optional["VerticalIntegrationCachePolicy"] = None,
-    enable_parallel: bool = False,
+    enable_parallel: bool = True,
 ) -> VerticalIntegrationPipeline:
     """Create a pipeline with custom step handlers.
 

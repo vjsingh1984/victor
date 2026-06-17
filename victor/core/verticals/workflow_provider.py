@@ -53,14 +53,13 @@ class VerticalWorkflowProvider(ABC):
         registration pattern.
 
         Example:
-            # Default implementation (no override needed):
-            # For CodingAssistant (name="coding"):
-            # - Imports from victor_coding.handlers → HANDLERS
+            # Default implementation uses vertical_runtime_module_candidates()
+            # for dynamic discovery. No static imports needed.
             #
-            # Custom override (if needed):
+            # Custom override (in external vertical package):
             @classmethod
             def get_handlers(cls) -> Dict[str, Any]:
-                from victor_coding.handlers import HANDLERS
+                from my_vertical.handlers import HANDLERS
                 return HANDLERS
 
         Returns:
@@ -93,16 +92,14 @@ class VerticalWorkflowProvider(ABC):
         Override to provide vertical-specific workflows.
 
         Example:
-            # Default implementation (no override needed):
-            # For CodingAssistant (name="coding"):
-            # - Imports CodingWorkflowProvider from victor_coding.workflows
-            # - Returns an instance: CodingWorkflowProvider()
+            # Default implementation uses vertical_runtime_module_candidates()
+            # for dynamic discovery. No static imports needed.
             #
-            # Custom override (if needed):
+            # Custom override (in external vertical package):
             @classmethod
             def get_workflow_provider(cls) -> Optional[Any]:
-                from victor_coding.workflows import CodingWorkflowProvider
-                return CodingWorkflowProvider()
+                from my_vertical.workflows import MyWorkflowProvider
+                return MyWorkflowProvider()
 
         Returns:
             Workflow provider instance (WorkflowProviderProtocol) or None if not found

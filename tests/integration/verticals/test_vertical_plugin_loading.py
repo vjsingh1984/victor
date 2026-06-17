@@ -17,7 +17,7 @@
 These tests reflect the post-extraction architecture:
 - external packages publish ``VictorPlugin`` objects via ``victor.plugins``
 - plugin registration populates ``VerticalRegistry`` with vertical classes
-- SDK-only vertical definitions are adapted into runtime ``VerticalBase``
+- contract-only vertical definitions are adapted into runtime ``VerticalBase``
   classes when the framework resolves or activates them
 
 The legacy ``victor.verticals`` path remains covered as a compatibility shim.
@@ -35,9 +35,9 @@ from victor.core.plugins.registry import PluginRegistry
 from victor.core.verticals.adapters import ensure_runtime_vertical
 from victor.core.verticals.base import VerticalBase, VerticalRegistry
 from victor.core.verticals.vertical_loader import VerticalLoader
-from victor_sdk import PluginContext, VictorPlugin
-from victor_sdk import VerticalBase as SdkVerticalBase
-from victor_sdk.verticals import register_vertical
+from victor_contracts import PluginContext, VictorPlugin
+from victor_contracts import VerticalBase as SdkVerticalBase
+from victor_contracts.verticals import register_vertical
 
 
 @register_vertical(
@@ -47,10 +47,10 @@ from victor_sdk.verticals import register_vertical
     plugin_namespace="sdk.external",
 )
 class SdkOnlyExternalVertical(SdkVerticalBase):
-    """SDK-only external vertical used to verify runtime adaptation."""
+    """contract-only external vertical used to verify runtime adaptation."""
 
     name = "sdk_external"
-    description = "SDK-only external vertical"
+    description = "contract-only external vertical"
     version = "1.0.0"
 
     @classmethod
@@ -67,7 +67,7 @@ class SdkOnlyExternalVertical(SdkVerticalBase):
 
     @classmethod
     def get_system_prompt(cls) -> str:
-        return "You are an SDK-only test assistant."
+        return "You are an contract-only test assistant."
 
     @classmethod
     def customize_config(cls, config):
@@ -75,7 +75,7 @@ class SdkOnlyExternalVertical(SdkVerticalBase):
 
 
 class _SdkExternalPlugin(VictorPlugin):
-    """Plugin wrapper that registers the SDK-only vertical."""
+    """Plugin wrapper that registers the contract-only vertical."""
 
     @property
     def name(self) -> str:
@@ -130,7 +130,7 @@ class LegacySdkExternalVertical(SdkVerticalBase):
 
     @classmethod
     def get_system_prompt(cls) -> str:
-        return "Legacy SDK-only prompt."
+        return "Legacy contract-only prompt."
 
 
 @pytest.fixture(autouse=True)
@@ -158,12 +158,8 @@ def test_plugin_registry_registers_sdk_vertical_into_vertical_registry(monkeypat
 
     registry = PluginRegistry()
     monkeypatch.setattr(
-        "victor.core.plugins.registry.get_entry_point_cache",
-        lambda: MagicMock(
-            get_entry_points=MagicMock(
-                return_value={"sdk_external": "victor_sdk_external.plugin:plugin"}
-            )
-        ),
+        "victor.core.plugins.registry.get_entry_point_values",
+        lambda *args, **kwargs: {"sdk_external": "victor_contracts_external.plugin:plugin"},
     )
     monkeypatch.setattr(
         registry,
@@ -178,7 +174,7 @@ def test_plugin_registry_registers_sdk_vertical_into_vertical_registry(monkeypat
 
 @pytest.mark.integration
 def test_vertical_loader_resolve_adapts_registered_sdk_vertical():
-    """SDK-only verticals should remain raw in the registry and adapt at runtime."""
+    """contract-only verticals should remain raw in the registry and adapt at runtime."""
 
     VerticalRegistry.register(SdkOnlyExternalVertical)
 
@@ -214,7 +210,9 @@ def test_vertical_loader_load_activates_sdk_vertical_through_adapter(monkeypatch
 
 
 @pytest.mark.integration
-def test_legacy_vertical_registry_discovery_still_supports_victor_verticals(monkeypatch):
+def test_legacy_vertical_registry_discovery_still_supports_victor_verticals(
+    monkeypatch,
+):
     """Legacy raw-vertical discovery should remain available for compatibility."""
 
     class _LegacyEntryPoint:
@@ -227,27 +225,27 @@ def test_legacy_vertical_registry_discovery_still_supports_victor_verticals(monk
     class _LegacyGroup:
         entry_points = {"legacy_sdk_external": (_LegacyEntryPoint(), False)}
 
-    class _LegacyRegistry:
+    class _PluginRegistry:
         def get_group(self, group_name: str):
-            assert group_name == "victor.verticals"
+            # VerticalRegistry now uses victor.plugins (unified architecture)
+            assert group_name == "victor.plugins"
             return _LegacyGroup()
 
     VerticalRegistry.reset_discovery()
     monkeypatch.setattr(
         "victor.framework.entry_point_registry.get_entry_point_registry",
-        lambda: _LegacyRegistry(),
+        lambda: _PluginRegistry(),
     )
 
-    with pytest.warns(DeprecationWarning, match="victor.verticals"):
-        discovered = VerticalRegistry.discover_external_verticals()
+    discovered = VerticalRegistry.discover_external_verticals()
 
     assert discovered["legacy_sdk_external"] is LegacySdkExternalVertical
     assert VerticalRegistry.get("legacy_sdk_external") is LegacySdkExternalVertical
 
 
 @pytest.mark.integration
-def test_legacy_vertical_registry_warning_is_emitted_only_once(monkeypatch):
-    """Compatibility discovery should warn once per reset cycle."""
+def test_legacy_vertical_registry_discovery_is_idempotent(monkeypatch):
+    """Discovery should only run once per reset cycle."""
 
     class _LegacyEntryPoint:
         name = "legacy_sdk_external"
@@ -259,32 +257,24 @@ def test_legacy_vertical_registry_warning_is_emitted_only_once(monkeypatch):
     class _LegacyGroup:
         entry_points = {"legacy_sdk_external": (_LegacyEntryPoint(), False)}
 
-    class _LegacyRegistry:
+    class _PluginRegistry:
         def get_group(self, group_name: str):
-            assert group_name == "victor.verticals"
+            assert group_name == "victor.plugins"
             return _LegacyGroup()
 
     VerticalRegistry.reset_discovery()
     monkeypatch.setattr(
         "victor.framework.entry_point_registry.get_entry_point_registry",
-        lambda: _LegacyRegistry(),
+        lambda: _PluginRegistry(),
     )
 
-    with pytest.warns(DeprecationWarning, match="victor.verticals"):
-        VerticalRegistry.discover_external_verticals()
+    # First discovery loads verticals
+    VerticalRegistry.discover_external_verticals()
 
-    with warnings.catch_warnings(record=True) as recorded:
-        warnings.simplefilter("always")
-        VerticalRegistry.discover_external_verticals()
-    assert not recorded
-
-    VerticalRegistry.reset_discovery()
-    monkeypatch.setattr(
-        "victor.framework.entry_point_registry.get_entry_point_registry",
-        lambda: _LegacyRegistry(),
-    )
-    with pytest.warns(DeprecationWarning, match="victor.verticals"):
-        VerticalRegistry.discover_external_verticals()
+    # Second discovery is idempotent (no re-loading)
+    discovered = VerticalRegistry.discover_external_verticals()
+    # Returns empty dict on second call (already discovered)
+    assert isinstance(discovered, dict)
 
 
 @pytest.mark.integration
@@ -292,4 +282,5 @@ def test_canonical_and_legacy_entry_point_groups_are_explicit():
     """Current architecture keeps plugins canonical and legacy discovery optional."""
 
     assert PluginRegistry.ENTRY_POINT_GROUP == "victor.plugins"
-    assert VerticalRegistry.ENTRY_POINT_GROUP == "victor.verticals"
+    # VerticalRegistry now uses plugin entry point group (unified architecture)
+    assert VerticalRegistry.ENTRY_POINT_GROUP == "victor.plugins"

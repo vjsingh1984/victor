@@ -52,7 +52,10 @@ class TestEditOperation:
     def test_modify_operation(self):
         """Test modify operation."""
         op = EditOperation(
-            type=OperationType.MODIFY, path="/test/file.txt", old_content="Old", new_content="New"
+            type=OperationType.MODIFY,
+            path="/test/file.txt",
+            old_content="Old",
+            new_content="New",
         )
 
         assert op.type == OperationType.MODIFY

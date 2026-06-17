@@ -201,32 +201,20 @@ class TestExecutorIsolationIntegration:
     @pytest.mark.asyncio
     async def test_executor_selects_docker_for_devops(self):
         """Test executor uses Docker sandbox for devops vertical."""
-        try:
-            from victor.workflows.executor import WorkflowExecutor
-            from victor.workflows.isolation import IsolationMapper
+        from victor.workflows.isolation import IsolationMapper
 
-            # Mock orchestrator
-            orchestrator = MagicMock()
-            WorkflowExecutor(orchestrator)
-
-            # Check that devops vertical would use docker
-            config = IsolationMapper.VERTICAL_DEFAULTS.get("devops")
-            assert config.sandbox_type == "docker"
-        except ImportError:
-            pytest.skip("WorkflowExecutor not available")
+        # Check that devops vertical would use docker
+        config = IsolationMapper.VERTICAL_DEFAULTS.get("devops")
+        assert config.sandbox_type == "docker"
 
     @pytest.mark.asyncio
     async def test_executor_selects_process_for_coding(self):
         """Test executor uses process sandbox for coding vertical."""
-        try:
-            from victor.workflows.executor import WorkflowExecutor
-            from victor.workflows.isolation import IsolationMapper
+        from victor.workflows.isolation import IsolationMapper
 
-            # Check that coding vertical would use process
-            config = IsolationMapper.VERTICAL_DEFAULTS.get("coding")
-            assert config.sandbox_type == "process"
-        except ImportError:
-            pytest.skip("WorkflowExecutor not available")
+        # Check that coding vertical would use process
+        config = IsolationMapper.VERTICAL_DEFAULTS.get("coding")
+        assert config.sandbox_type == "process"
 
 
 class TestConstraintTypes:

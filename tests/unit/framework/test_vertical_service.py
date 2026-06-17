@@ -25,8 +25,8 @@ from victor.framework.vertical_service import (
     clear_vertical_integration_pipeline_cache,
     get_vertical_integration_pipeline,
 )
-from victor_sdk import VerticalBase as SdkVerticalBase
-from victor_sdk.constants import CapabilityIds
+from victor_contracts import VerticalBase as SdkVerticalBase
+from victor_contracts.constants import CapabilityIds
 
 
 class DummyVertical:
@@ -52,7 +52,7 @@ class DefinitionOnlyVertical(VerticalBase):
 
 
 class SdkDefinitionOnlyVertical(SdkVerticalBase):
-    """SDK-only vertical that relies on runtime adaptation."""
+    """contract-only vertical that relies on runtime adaptation."""
 
     name = "sdk_definition_only"
     description = "SDK definition only test vertical"
@@ -224,7 +224,7 @@ class TestVerticalService:
         assert result.context.config.tools.tools == {"read", "write"}
 
     def test_apply_vertical_configuration_supports_sdk_only_verticals(self):
-        """SDK-only verticals should be adapted into runtime verticals transparently."""
+        """contract-only verticals should be adapted into runtime verticals transparently."""
         orchestrator = StubOrchestrator()
         get_vertical_integration_pipeline(reset=True)
 
@@ -242,7 +242,9 @@ class TestVerticalService:
         assert result.context.config.tools.tools == {"read", "write"}
         assert result.context.config.metadata["runtime_adapter"] == "sdk"
 
-    def test_apply_vertical_configuration_records_capability_requirement_diagnostics(self):
+    def test_apply_vertical_configuration_records_capability_requirement_diagnostics(
+        self,
+    ):
         """Capability requirements should be resolved and surfaced during application."""
         orchestrator = StubOrchestrator()
         get_vertical_integration_pipeline(reset=True)

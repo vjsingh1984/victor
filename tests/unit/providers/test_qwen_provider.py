@@ -267,7 +267,10 @@ class TestQwenChat:
             ToolDefinition(
                 name="get_weather",
                 description="Get weather",
-                parameters={"type": "object", "properties": {"city": {"type": "string"}}},
+                parameters={
+                    "type": "object",
+                    "properties": {"city": {"type": "string"}},
+                },
             )
         ]
         result = await provider.chat(messages=messages, model="qwen3.5", tools=tools)

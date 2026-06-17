@@ -32,6 +32,12 @@ from collections import deque
 from dataclasses import dataclass, field
 from typing import Deque, Dict, List, Optional, Set
 
+from victor.framework.prompt_document import (
+    PromptBlock,
+    PromptDeduplicationProcessor,
+    PromptDocument,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -203,19 +209,14 @@ class PromptNormalizer:
         Returns:
             List with duplicates removed (preserves order)
         """
-        seen_hashes: Set[str] = set()
-        unique: List[str] = []
-
-        for section in sections:
-            if not section or not section.strip():
-                continue
-
-            section_hash = self._hash_content(section.strip())
-            if section_hash not in seen_hashes:
-                seen_hashes.add(section_hash)
-                unique.append(section)
-            else:
-                logger.debug(f"Removed duplicate section (hash: {section_hash[:8]})")
+        document = PromptDocument(
+            PromptBlock(name=f"section_{index}", content=section, header="")
+            for index, section in enumerate(sections)
+        )
+        unique = [
+            block.content
+            for block in PromptDeduplicationProcessor().process(document).iter_renderable_blocks()
+        ]
 
         if len(unique) < len(sections):
             logger.info(f"Deduplicated prompt sections: {len(sections)} → {len(unique)}")

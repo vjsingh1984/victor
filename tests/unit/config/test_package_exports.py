@@ -21,7 +21,9 @@ import sys
 from unittest.mock import patch
 
 
-def test_config_package_lazily_resolves_api_keys_after_package_reimport(monkeypatch) -> None:
+def test_config_package_lazily_resolves_api_keys_after_package_reimport(
+    monkeypatch,
+) -> None:
     """Reloading victor.config should not orphan already-imported submodules."""
 
     api_keys_module = importlib.import_module("victor.config.api_keys")

@@ -27,6 +27,11 @@ from pathlib import Path
 from typing import Any, Dict
 from unittest.mock import MagicMock, patch
 
+from victor.core.loop_thresholds import (
+    DEFAULT_BLOCKED_CONSECUTIVE_THRESHOLD,
+    DEFAULT_BLOCKED_TOTAL_THRESHOLD,
+)
+
 # =============================================================================
 # Test Fixtures
 # =============================================================================
@@ -180,9 +185,19 @@ class TestModeAwareLoopDetection:
         from victor.agent.unified_task_tracker import UnifiedTaskTracker
 
         tracker = UnifiedTaskTracker()
-        # Default threshold is 4, multiplier is 1.0
         threshold = tracker._get_loop_threshold()
-        assert threshold >= 4
+        assert threshold == DEFAULT_BLOCKED_CONSECUTIVE_THRESHOLD
+
+    def test_loop_patience_limits_default(self):
+        """Default patience limits should match shared blocked-loop defaults."""
+        from victor.agent.unified_task_tracker import UnifiedTaskTracker
+
+        tracker = UnifiedTaskTracker()
+
+        assert tracker.get_loop_patience_limits() == (
+            DEFAULT_BLOCKED_CONSECUTIVE_THRESHOLD,
+            DEFAULT_BLOCKED_TOTAL_THRESHOLD,
+        )
 
     def test_loop_threshold_with_mode_multiplier(self):
         """Test loop threshold with PLAN mode multiplier (2.5x)."""
@@ -194,6 +209,15 @@ class TestModeAwareLoopDetection:
         threshold = tracker._get_loop_threshold()
         # Base 4 * 2.5 = 10
         assert threshold == 10
+
+    def test_loop_patience_limits_scale_with_mode_multiplier(self):
+        """Patience limits should preserve the shared ratio when exploration increases."""
+        from victor.agent.unified_task_tracker import UnifiedTaskTracker
+
+        tracker = UnifiedTaskTracker()
+        tracker.set_mode_exploration_multiplier(2.5)
+
+        assert tracker.get_loop_patience_limits() == (10, 15)
 
     def test_loop_threshold_with_explore_multiplier(self):
         """Test loop threshold with EXPLORE mode multiplier (3.0x)."""

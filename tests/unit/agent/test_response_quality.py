@@ -55,7 +55,9 @@ class TestQualityResult:
             dimension_scores=[
                 DimensionScore(dimension=ResponseQualityDimension.RELEVANCE, score=0.8, weight=1.0),
                 DimensionScore(
-                    dimension=ResponseQualityDimension.COMPLETENESS, score=0.7, weight=1.0
+                    dimension=ResponseQualityDimension.COMPLETENESS,
+                    score=0.7,
+                    weight=1.0,
                 ),
             ],
             passes_threshold=True,
@@ -72,7 +74,9 @@ class TestQualityResult:
             dimension_scores=[
                 DimensionScore(dimension=ResponseQualityDimension.RELEVANCE, score=0.9, weight=1.0),
                 DimensionScore(
-                    dimension=ResponseQualityDimension.COMPLETENESS, score=0.5, weight=1.0
+                    dimension=ResponseQualityDimension.COMPLETENESS,
+                    score=0.5,
+                    weight=1.0,
                 ),
                 DimensionScore(dimension=ResponseQualityDimension.ACCURACY, score=0.6, weight=1.0),
             ],

@@ -41,12 +41,14 @@ class _LazyProviderSpec:
 
     module_path: str
     class_name: str
+    primary_name: str
     preflight: Optional[Callable[[str], Optional[str]]] = None
 
 
 _lazy_provider_specs: Dict[str, _LazyProviderSpec] = {}
 _lazy_provider_lock = threading.Lock()
 _mlx_preflight_result: Optional[Tuple[bool, str]] = None
+_provider_aliases: Dict[str, str] = {}
 
 
 def _env_flag(name: str) -> Optional[bool]:
@@ -70,9 +72,16 @@ def _register_lazy_provider(
     preflight: Optional[Callable[[str], Optional[str]]] = None,
 ) -> None:
     """Register aliases that should be materialized on first use."""
-    spec = _LazyProviderSpec(module_path=module_path, class_name=class_name, preflight=preflight)
+    primary_name = aliases[0]
+    spec = _LazyProviderSpec(
+        module_path=module_path,
+        class_name=class_name,
+        primary_name=primary_name,
+        preflight=preflight,
+    )
     for alias in aliases:
         _lazy_provider_specs[alias] = spec
+        _provider_aliases[alias] = primary_name
 
 
 def _run_mlx_preflight() -> Tuple[bool, str]:
@@ -263,6 +272,7 @@ class ProviderRegistry:
             provider_class: Provider class
         """
         _lazy_provider_specs.pop(name, None)
+        _provider_aliases.setdefault(name, name)
         _registry_instance.register(name, provider_class)
 
     @classmethod
@@ -349,6 +359,13 @@ class ProviderRegistry:
         """
         removed_lazy = _lazy_provider_specs.pop(name, None) is not None
         removed_registered = _registry_instance.unregister(name)
+        primary_name = _provider_aliases.get(name)
+        if primary_name == name:
+            for alias, primary in list(_provider_aliases.items()):
+                if primary == name:
+                    _provider_aliases.pop(alias, None)
+        else:
+            _provider_aliases.pop(name, None)
         return removed_lazy or removed_registered
 
     @classmethod
@@ -356,8 +373,33 @@ class ProviderRegistry:
         """Clear all registered providers."""
         _registry_instance.clear()
         _lazy_provider_specs.clear()
+        _provider_aliases.clear()
         global _mlx_preflight_result
         _mlx_preflight_result = None
+
+    @classmethod
+    def get_aliases(cls) -> Dict[str, str]:
+        """Get mapping of provider aliases to their primary names.
+
+        Returns a dictionary where keys are all known aliases (including primary
+        names) and values are the canonical/primary provider name. This provides
+        a single source of truth for provider alias resolution.
+
+        Returns:
+            Dictionary mapping alias -> primary provider name
+
+        Example:
+            >>> aliases = ProviderRegistry.get_aliases()
+            >>> aliases["claude"]
+            "anthropic"
+            >>> aliases["anthropic"]
+            "anthropic"
+        """
+        aliases = dict(_provider_aliases)
+        for name in _registry_instance.list_all():
+            aliases.setdefault(name, name)
+
+        return aliases
 
 
 def get_provider_registry() -> _ProviderRegistryImpl:

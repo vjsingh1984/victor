@@ -111,8 +111,17 @@ async def create_agent_callback(
             "tokens_input": trace.tokens_input,
             "tokens_output": trace.tokens_output,
             "tokens_used": trace.tokens_used,
+            "cached_tokens": trace.cached_tokens,
+            "reasoning_tokens": trace.reasoning_tokens,
+            "cost_usd_micros": trace.cost_usd_micros,
             "tool_calls": len(trace.tool_calls),
             "turns": trace.turns,
+            "task_report": trace.task_report,
+            "cache_hit_rate": trace.cache_hit_rate,
+            "tool_schema_tokens": trace.tool_schema_tokens,
+            "compaction_saved_tokens": trace.compaction_saved_tokens,
+            "compaction_messages_removed": trace.compaction_messages_removed,
+            "metadata": trace.build_result_metadata(),
         }
 
     # Store agent reference for cleanup
@@ -252,10 +261,14 @@ class HighLevelEvaluationRunner:
             tokens_used=trace.tokens_used,
             tokens_input=trace.tokens_input,
             tokens_output=trace.tokens_output,
+            cached_tokens=trace.cached_tokens,
+            reasoning_tokens=trace.reasoning_tokens,
+            cost_usd_micros=trace.cost_usd_micros,
             tool_calls=len(trace.tool_calls),
             turns=trace.turns,
             duration_seconds=trace.duration_seconds,
             error_message=trace.error,
+            metadata=trace.build_result_metadata(),
         )
 
         self._results.append(result)

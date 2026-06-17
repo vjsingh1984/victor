@@ -22,6 +22,9 @@ from victor.agent.services.protocols.decision_service import (
     LLMDecisionServiceProtocol,
 )
 from victor.core.async_utils import run_sync as real_run_sync
+from victor.framework.runtime_evaluation_policy import RuntimeEvaluationFeedback
+from victor.providers.base import CompletionResponse
+from victor.providers.httpx_openai_compat import HttpxOpenAICompatProvider
 
 
 @dataclass
@@ -47,6 +50,51 @@ def _make_provider(response_json: dict) -> MagicMock:
     return provider
 
 
+class _FakeHttpxProvider(HttpxOpenAICompatProvider):
+    created_instances = 0
+    closed_instances = 0
+
+    def __init__(self, **kwargs):
+        type(self).created_instances += 1
+        super().__init__(
+            api_key=kwargs.pop("api_key", "test-key"),
+            base_url=kwargs.pop("base_url", "https://example.invalid"),
+            timeout=kwargs.pop("timeout", 5),
+            max_retries=kwargs.pop("max_retries", 0),
+            provider_name="fake-httpx",
+            **kwargs,
+        )
+
+    @property
+    def name(self) -> str:
+        return "fake-httpx"
+
+    def supports_tools(self) -> bool:
+        return False
+
+    def supports_streaming(self) -> bool:
+        return False
+
+    async def chat(
+        self,
+        messages,
+        *,
+        model: str,
+        temperature: float = 0.7,
+        max_tokens: int = 4096,
+        tools=None,
+        **kwargs,
+    ):
+        return CompletionResponse(
+            content='{"is_complete": true, "confidence": 0.9, "phase": "done"}',
+            model=model,
+        )
+
+    async def close(self) -> None:
+        type(self).closed_instances += 1
+        await super().close()
+
+
 class TestLLMDecisionServiceProtocol:
     """Test that LLMDecisionService satisfies the protocol."""
 
@@ -65,7 +113,11 @@ class TestHeuristicFastPath:
 
         result = await service.decide(
             DecisionType.TASK_COMPLETION,
-            context={"response_tail": "done", "deliverable_count": 1, "signal_count": 1},
+            context={
+                "response_tail": "done",
+                "deliverable_count": 1,
+                "signal_count": 1,
+            },
             heuristic_result="high",
             heuristic_confidence=0.9,
         )
@@ -110,7 +162,11 @@ class TestLLMCall:
 
         result = await service.decide(
             DecisionType.TASK_COMPLETION,
-            context={"response_tail": "some text", "deliverable_count": 1, "signal_count": 0},
+            context={
+                "response_tail": "some text",
+                "deliverable_count": 1,
+                "signal_count": 0,
+            },
             heuristic_confidence=0.3,
         )
 
@@ -340,9 +396,51 @@ class TestMetrics:
         service = LLMDecisionService(provider=None, model="test")
         assert service.is_healthy() is False
 
+    def test_exports_runtime_evaluation_feedback_from_config_threshold(self):
+        provider = _make_provider({})
+        service = LLMDecisionService(
+            provider=provider,
+            model="test",
+            config=LLMDecisionServiceConfig(confidence_threshold=0.72),
+        )
+
+        feedback = service.get_runtime_evaluation_feedback()
+
+        assert isinstance(feedback, RuntimeEvaluationFeedback)
+        assert feedback.completion_threshold == pytest.approx(0.72)
+        assert feedback.enhanced_progress_threshold == pytest.approx(0.57)
+        assert feedback.minimum_supported_evidence_score == pytest.approx(0.77)
+
 
 class TestSyncDecide:
     """Test synchronous decide wrapper."""
+
+    def test_sync_httpx_provider_uses_fresh_provider_in_thread(self):
+        """httpx-compatible providers should be recreated inside worker loops."""
+        _FakeHttpxProvider.created_instances = 0
+        _FakeHttpxProvider.closed_instances = 0
+
+        provider = _FakeHttpxProvider()
+        service = LLMDecisionService(provider=provider, model="glm-test")
+
+        async def _inner():
+            result = service.decide_sync(
+                DecisionType.TASK_COMPLETION,
+                context={
+                    "response_tail": "",
+                    "deliverable_count": 0,
+                    "signal_count": 0,
+                },
+                heuristic_confidence=0.1,
+            )
+            assert result.source == "llm"
+
+        asyncio.run(_inner())
+
+        # Original provider + one fresh provider for the worker thread.
+        assert _FakeHttpxProvider.created_instances >= 2
+        # The fresh thread-scoped provider should be closed after use.
+        assert _FakeHttpxProvider.closed_instances >= 1
 
     def test_sync_with_running_loop_uses_thread(self):
         """When called from within a running event loop, runs in a thread."""
@@ -353,7 +451,11 @@ class TestSyncDecide:
             # We're inside an event loop — decide_sync uses run_sync_in_thread
             result = service.decide_sync(
                 DecisionType.TASK_COMPLETION,
-                context={"response_tail": "", "deliverable_count": 0, "signal_count": 0},
+                context={
+                    "response_tail": "",
+                    "deliverable_count": 0,
+                    "signal_count": 0,
+                },
                 heuristic_result="loop_fallback",
                 heuristic_confidence=0.3,
             )
@@ -368,7 +470,11 @@ class TestSyncDecide:
         service = LLMDecisionService(provider=provider, model="test")
 
         # Run an async decide to populate cache
-        context = {"response_tail": "cache_test", "deliverable_count": 0, "signal_count": 0}
+        context = {
+            "response_tail": "cache_test",
+            "deliverable_count": 0,
+            "signal_count": 0,
+        }
         asyncio.run(
             service.decide(
                 DecisionType.TASK_COMPLETION,
@@ -395,7 +501,11 @@ class TestSyncDecide:
 
         result = service.decide_sync(
             DecisionType.TASK_COMPLETION,
-            context={"response_tail": "done", "deliverable_count": 1, "signal_count": 1},
+            context={
+                "response_tail": "done",
+                "deliverable_count": 1,
+                "signal_count": 1,
+            },
             heuristic_confidence=0.1,
         )
         # decide_sync uses run_sync_in_thread to bridge async-in-sync

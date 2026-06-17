@@ -14,8 +14,7 @@ async def slack_bot_integration():
 
     agent = Agent.create(temperature=0.5)
 
-    result = await agent.run(
-        """Generate Python code for a Slack bot that integrates Victor agents.
+    result = await agent.run("""Generate Python code for a Slack bot that integrates Victor agents.
 
         Requirements:
         - Use Slack SDK (slack-sdk)
@@ -41,8 +40,7 @@ async def slack_bot_integration():
         2. Event handling
         3. Error handling
         4. Environment variables needed
-        """
-    )
+        """)
 
     return result.content
 
@@ -53,8 +51,7 @@ async def discord_bot_integration():
 
     agent = Agent.create(temperature=0.5)
 
-    result = await agent.run(
-        """Generate Python code for a Discord bot using discord.py.
+    result = await agent.run("""Generate Python code for a Discord bot using discord.py.
 
         Features:
         - Commands (!help, !ask, !code, !review)
@@ -74,8 +71,7 @@ async def discord_bot_integration():
         2. Command handlers
         3. Event handlers
         4. Configuration
-        """
-    )
+        """)
 
     return result.content
 
@@ -86,8 +82,7 @@ async def telegram_bot_integration():
 
     agent = Agent.create(temperature=0.5)
 
-    result = await agent.run(
-        """Create a Telegram bot that integrates Victor AI.
+    result = await agent.run("""Create a Telegram bot that integrates Victor AI.
 
         Bot Commands:
         /start - Welcome and help
@@ -114,8 +109,7 @@ async def telegram_bot_integration():
         2. Handler functions
         3. Inline mode setup
         4. Safety measures
-        """
-    )
+        """)
 
     return result.content
 
@@ -126,8 +120,7 @@ async def rest_api_wrapper():
 
     agent = Agent.create(temperature=0.3)
 
-    result = await agent.run(
-        """Generate FastAPI code that wraps Victor agent in REST API.
+    result = await agent.run("""Generate FastAPI code that wraps Victor agent in REST API.
 
         API Endpoints:
         POST /api/v1/chat - Single-turn conversation
@@ -150,20 +143,18 @@ async def rest_api_wrapper():
         2. Pydantic schemas
         3. Middleware setup
         4. Dockerfile
-        """
-    )
+        """)
 
     return result.content
 
 
 async def graphql_api():
     """Generate GraphQL API for Victor."""
-    from victor = Agent
+    from victor import Agent
 
     agent = Agent.create(temperature=0.3)
 
-    result = await agent.run(
-        """Generate GraphQL API code using Strawberry.
+    result = await agent.run("""Generate GraphQL API code using Strawberry.
 
         Schema Definition:
         type Query {
@@ -189,20 +180,18 @@ async def graphql_api():
         2. Query resolvers
         3. Subscription setup
         4. FastAPI integration
-        """
-    )
+        """)
 
     return result.content
 
 
 async def webhook_handler():
     """Generate webhook handler for Victor."""
-    from victor = Agent
+    from victor import Agent
 
     agent = Agent.create(temperature=0.3)
 
-    result = await agent.run(
-        """Generate webhook handler code for common platforms.
+    result = await agent.run("""Generate webhook handler code for common platforms.
 
         Platforms:
         - GitHub (webhooks for repo events)
@@ -222,20 +211,18 @@ async def webhook_handler():
         2. Signature verification
         3. Event parsing logic
         4. Victor integration code
-        """
-    )
+        """)
 
     return result.content
 
 
 async def email_service_integration():
     """Integration with email services."""
-    from victor = Agent
+    from victor import Agent
 
     agent = Agent.create(temperature=0.3)
 
-    result = await agent.run(
-        """Create email service integration using SendGrid.
+    result = await agent.run("""Create email service integration using SendGrid.
 
         Use Cases:
         1. Automated email responses
@@ -255,20 +242,18 @@ async def email_service_integration():
         2. Template examples
         3. Sending logic
         4. Error handling
-        """
-    )
+        """)
 
     return result.content
 
 
 async def sms_service_integration():
     """Integration with SMS services."""
-    from victor = Agent
+    from victor import Agent
 
     agent = Agent.create(temperature=0.3)
 
-    result = await agent.run(
-        """Create SMS service integration using Twilio.
+    result = await agent.run("""Create SMS service integration using Twilio.
 
         Use Cases:
         1. Two-factor authentication codes
@@ -288,20 +273,18 @@ async def sms_service_integration():
         2. Message templates
         3. Verification code generation
         4. Error handling
-        """
-    )
+        """)
 
     return result.content
 
 
 async def stripe_payment_integration():
     """Integration with Stripe for payments."""
-    from victor = Agent
+    from victor import Agent
 
     agent = Agent.create(temperature=0.3)
 
-    result = await agent.run(
-        """Generate Stripe integration for agent payments.
+    result = await agent.run("""Generate Stripe integration for agent payments.
 
         Features:
         - Payment intent creation
@@ -323,23 +306,18 @@ async def stripe_payment_integration():
         2. Payment flow code
         3. Webhook handler
         4. Error handling
-        """
-    )
+        """)
 
     return result.content
 
 
 async def aws_s3_integration():
     """Integration with AWS S3 for file storage."""
-    from victor = Agent
+    from victor import Agent
 
-    agent = Agent.create(
-        tools=["read", "write"],
-        temperature=0.3
-    )
+    agent = Agent.create(tools=["read", "write"], temperature=0.3)
 
-    result = await agent.run(
-        """Generate code for AWS S3 integration.
+    result = await agent.run("""Generate code for AWS S3 integration.
 
         Use Cases:
         1. Upload generated files
@@ -359,8 +337,7 @@ async def aws_s3_integration():
         2. Upload functions
         3. Download functions
         4. Error handling
-        """
-    )
+        """)
 
     return result.content
 
@@ -380,4 +357,5 @@ async def demo_api_integrations():
 
 if __name__ == "__main__":
     import asyncio
+
     asyncio.run(demo_api_integrations())

@@ -23,14 +23,19 @@ Part of CRITICAL-001: Monolithic Orchestrator decomposition.
 from __future__ import annotations
 
 import logging
+import threading
+import time
 from typing import Any, Callable, Dict, List, Optional, Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from victor.config.settings import Settings
     from victor.providers.base import BaseProvider
-    from victor.agent.tool_calling import BaseToolCallingAdapter, ToolCallingCapabilities
+    from victor.agent.tool_calling import (
+        BaseToolCallingAdapter,
+        ToolCallingCapabilities,
+    )
     from victor.agent.response_sanitizer import ResponseSanitizer
-    from victor.agent.conversation_controller import ConversationController
+    from victor.agent.conversation.controller import ConversationController
     from victor.agent.tool_pipeline import ToolPipeline
     from victor.agent.streaming_controller import StreamingController
     from victor.agent.context_compactor import ContextCompactor
@@ -38,27 +43,31 @@ if TYPE_CHECKING:
     from victor.agent.tool_sequence_tracker import ToolSequenceTracker
     from victor.agent.tool_output_formatter import ToolOutputFormatter
     from victor.agent.metrics_collector import MetricsCollector
-    from victor.agent.conversation_memory import ConversationStore
-    from victor.analytics.logger import UsageLogger
-    from victor.analytics.streaming_metrics import StreamingMetricsCollector
+    from victor.agent.conversation.store import ConversationStore
+    from victor.observability.analytics.logger import UsageLogger
+    from victor.observability.analytics.streaming_metrics import (
+        StreamingMetricsCollector,
+    )
     from victor.agent.response_completer import ResponseCompleter
     from victor.agent.message_history import MessageHistory
-    from victor.agent.conversation_state import ConversationStateMachine
+    from victor.agent.conversation.state_machine import ConversationStateMachine
     from victor.agent.response_processor import ResponseProcessor
     from victor.agent.streaming.streaming_coordinator import StreamingCoordinator
     from victor.agent.streaming.handler import StreamingChatHandler
-    from victor.agent.streaming.pipeline import StreamingChatPipeline
-    from victor.agent.provider_switch_coordinator import ProviderSwitchCoordinator
+    from victor.agent.services.chat_stream_executor import StreamingChatExecutor
     from victor.agent.lifecycle_manager import LifecycleManager
     from victor.agent.provider_manager import ProviderManager
     from victor.tools.registry import ToolRegistry
-    from victor.agent.protocols.infrastructure_protocols import ReminderManagerProtocol
     from victor.agent.protocols.provider_protocols import (
         IProviderSwitcher,
         IProviderHealthMonitor,
     )
+    from victor.agent.services.protocols import ReminderManagerProtocol
 
 logger = logging.getLogger(__name__)
+
+_CONVERSATION_STORE_INIT_LOCK = threading.Lock()
+_CONVERSATION_STORE_LOCK_RETRY_DELAYS = (0.05, 0.2, 0.5)
 
 
 class RuntimeBuildersMixin:
@@ -145,17 +154,29 @@ class RuntimeBuildersMixin:
         logger.debug(f"StreamingChatHandler created (idle_timeout={session_idle_timeout})")
         return handler
 
-    def create_streaming_chat_pipeline(self, coordinator: Any) -> "StreamingChatPipeline":
-        """Create the canonical StreamingChatPipeline bound to a coordinator."""
-        from victor.agent.streaming import create_streaming_chat_pipeline
+    def create_streaming_chat_executor(self, runtime_owner: Any) -> "StreamingChatExecutor":
+        """Create the canonical streaming executor bound to a runtime owner."""
+        from victor.agent.services import create_streaming_chat_executor
 
-        pipeline = create_streaming_chat_pipeline(coordinator)
-        logger.debug("StreamingChatPipeline created and bound to coordinator")
-        return pipeline
+        executor = create_streaming_chat_executor(runtime_owner)
+        logger.debug("StreamingChatExecutor created and bound to runtime owner")
+        return executor
 
-    def create_streaming_metrics_collector(self) -> Optional["StreamingMetricsCollector"]:
+    def create_streaming_chat_adapter(self, runtime_owner: Any) -> Any:
+        """Create the canonical service-owned chat-stream adapter."""
+        from victor.agent.services.chat_stream_runtime import ServiceStreamingRuntime
+
+        adapter = ServiceStreamingRuntime(runtime_owner)
+        logger.debug("Streaming chat adapter created")
+        return adapter
+
+    def create_streaming_metrics_collector(
+        self,
+    ) -> Optional["StreamingMetricsCollector"]:
         """Create streaming metrics collector if enabled."""
-        from victor.analytics.streaming_metrics import StreamingMetricsCollector
+        from victor.observability.analytics.streaming_metrics import (
+            StreamingMetricsCollector,
+        )
 
         if not getattr(self.settings, "streaming_metrics_enabled", True):
             return None
@@ -208,7 +229,7 @@ class RuntimeBuildersMixin:
         Returns:
             ConversationController instance configured with model-aware settings
         """
-        from victor.agent.conversation_controller import (
+        from victor.agent.conversation.controller import (
             ConversationController,
             ConversationConfig,
             CompactionStrategy,
@@ -283,43 +304,96 @@ class RuntimeBuildersMixin:
             Tuple of (ConversationStore or None, session_id or None)
         """
         if not getattr(self.settings, "conversation_memory_enabled", True):
+            self._last_memory_initialization_diagnostics = {
+                "status": "disabled",
+                "recovered_from_lock": False,
+                "lock_retries": 0,
+                "db_path": None,
+                "session_id": None,
+                "last_error": None,
+            }
             return None, None
 
-        try:
-            from victor.config.settings import get_project_paths
-            from victor.agent.conversation_memory import ConversationStore
+        from victor.config.settings import get_project_paths
 
-            paths = get_project_paths()
-            paths.project_victor_dir.mkdir(parents=True, exist_ok=True)
-            db_path = paths.conversation_db
-            max_context = getattr(self.settings, "max_context_tokens", 100000)
-            response_reserve = getattr(self.settings, "response_token_reserve", 4096)
+        paths = get_project_paths()
+        paths.project_victor_dir.mkdir(parents=True, exist_ok=True)
+        db_path = paths.project_db
+        max_context = getattr(self.settings, "max_context_tokens", 100000)
+        response_reserve = getattr(self.settings, "response_token_reserve", 4096)
+        diagnostics: Dict[str, Any] = {
+            "status": "initializing",
+            "recovered_from_lock": False,
+            "lock_retries": 0,
+            "db_path": str(db_path),
+            "session_id": None,
+            "last_error": None,
+        }
+        self._last_memory_initialization_diagnostics = diagnostics
 
-            memory_manager = ConversationStore(
-                db_path=db_path,
-                max_context_tokens=max_context,
-                response_reserve=response_reserve,
-            )
+        attempts = len(_CONVERSATION_STORE_LOCK_RETRY_DELAYS) + 1
+        for attempt in range(attempts):
+            try:
+                from victor.agent.conversation.store import ConversationStore
 
-            project_path = str(paths.project_root)
-            session = memory_manager.create_session(
-                project_path=project_path,
-                provider=provider_name,
-                model=self.model,
-                max_tokens=max_context,
-                profile=self.profile_name,
-                tool_capable=tool_capable,
-            )
-            session_id = session.session_id
-            logger.info(
-                f"ConversationStore initialized via factory. "
-                f"Session: {session_id[:8]}..., DB: {db_path}"
-            )
-            return memory_manager, session_id
+                with _CONVERSATION_STORE_INIT_LOCK:
+                    memory_manager = ConversationStore(
+                        db_path=db_path,
+                        max_context_tokens=max_context,
+                        response_reserve=response_reserve,
+                    )
 
-        except Exception as e:
-            logger.warning(f"Failed to initialize ConversationStore: {e}")
-            return None, None
+                    project_path = str(paths.project_root)
+                    session = memory_manager.create_session(
+                        project_path=project_path,
+                        provider=provider_name,
+                        model=self.model,
+                        max_tokens=max_context,
+                        profile=self.profile_name,
+                        tool_capable=tool_capable,
+                    )
+                session_id = session.session_id
+                diagnostics.update(
+                    {
+                        "status": "initialized",
+                        "recovered_from_lock": diagnostics["lock_retries"] > 0,
+                        "session_id": session_id,
+                    }
+                )
+                logger.info(
+                    f"ConversationStore initialized via factory. "
+                    f"Session: {session_id[:8]}..., DB: {db_path}"
+                )
+                return memory_manager, session_id
+
+            except Exception as e:
+                diagnostics["last_error"] = str(e)
+                if not self._is_conversation_store_lock_error(e) or attempt == attempts - 1:
+                    diagnostics["status"] = "failed"
+                    logger.warning(f"Failed to initialize ConversationStore: {e}")
+                    return None, None
+
+                diagnostics["lock_retries"] = int(diagnostics["lock_retries"]) + 1
+                delay = _CONVERSATION_STORE_LOCK_RETRY_DELAYS[attempt]
+                logger.debug(
+                    "ConversationStore initialization hit SQLite lock; retrying in %.2fs (%d/%d)",
+                    delay,
+                    attempt + 1,
+                    attempts - 1,
+                )
+                time.sleep(delay)
+
+        return None, None
+
+    def get_memory_initialization_diagnostics(self) -> Dict[str, Any]:
+        """Return diagnostics for the last conversation memory initialization attempt."""
+        diagnostics = getattr(self, "_last_memory_initialization_diagnostics", None)
+        return dict(diagnostics) if isinstance(diagnostics, dict) else {}
+
+    @staticmethod
+    def _is_conversation_store_lock_error(exc: Exception) -> bool:
+        message = str(exc).lower()
+        return "database is locked" in message or "database table is locked" in message
 
     def create_message_history(self, system_prompt: str) -> "MessageHistory":
         """Create message history for conversation tracking.
@@ -430,29 +504,6 @@ class RuntimeBuildersMixin:
             manager.tool_adapter,
             manager.capabilities,
         )
-
-    def create_provider_switch_coordinator(
-        self,
-        provider_switcher: "IProviderSwitcher",
-        health_monitor: Optional["IProviderHealthMonitor"] = None,
-    ) -> "ProviderSwitchCoordinator":
-        """Create provider switch coordinator for switching workflow.
-
-        Args:
-            provider_switcher: ProviderSwitcher for switching logic
-            health_monitor: Optional ProviderHealthMonitor for pre-switch checks
-
-        Returns:
-            ProviderSwitchCoordinator instance for coordinating switches
-        """
-        from victor.agent.provider_switch_coordinator import ProviderSwitchCoordinator
-
-        coordinator = ProviderSwitchCoordinator(
-            provider_switcher=provider_switcher,
-            health_monitor=health_monitor,
-        )
-        logger.debug("ProviderSwitchCoordinator created")
-        return coordinator
 
     def create_response_completer(self) -> "ResponseCompleter":
         """Create response completer for ensuring complete responses after tool calls.

@@ -348,12 +348,19 @@ __all__ = [
             lines_saved = original_lines - new_lines
             percent_reduced = (lines_saved / original_lines) * 100 if original_lines > 0 else 0
 
-            print(f"✓ Migrated safety.py: saved {lines_saved} lines ({percent_reduced:.1f}% reduction)")
+            print(
+                f"✓ Migrated safety.py: saved {lines_saved} lines ({percent_reduced:.1f}% reduction)"
+            )
             return (lines_saved, percent_reduced)
         else:
-            print(f"[DRY RUN] Would migrate safety.py: ~{original_lines} lines → ~{len(content.splitlines())} lines")
+            print(
+                f"[DRY RUN] Would migrate safety.py: ~{original_lines} lines → ~{len(content.splitlines())} lines"
+            )
             estimated_lines = original_lines - len(content.splitlines())
-            return (estimated_lines, (estimated_lines / original_lines * 100) if original_lines > 0 else 0)
+            return (
+                estimated_lines,
+                (estimated_lines / original_lines * 100) if original_lines > 0 else 0,
+            )
 
     def _migrate_mode_config(self) -> Optional[Tuple[int, float]]:
         """Migrate mode_config.py to use BaseModeConfigProvider.
@@ -526,12 +533,19 @@ __all__ = [
             lines_saved = original_lines - new_lines
             percent_reduced = (lines_saved / original_lines) * 100 if original_lines > 0 else 0
 
-            print(f"✓ Migrated mode_config.py: saved {lines_saved} lines ({percent_reduced:.1f}% reduction)")
+            print(
+                f"✓ Migrated mode_config.py: saved {lines_saved} lines ({percent_reduced:.1f}% reduction)"
+            )
             return (lines_saved, percent_reduced)
         else:
-            print(f"[DRY RUN] Would migrate mode_config.py: ~{original_lines} lines → ~{len(content.splitlines())} lines")
+            print(
+                f"[DRY RUN] Would migrate mode_config.py: ~{original_lines} lines → ~{len(content.splitlines())} lines"
+            )
             estimated_lines = original_lines - len(content.splitlines())
-            return (estimated_lines, (estimated_lines / original_lines * 100) if original_lines > 0 else 0)
+            return (
+                estimated_lines,
+                (estimated_lines / original_lines * 100) if original_lines > 0 else 0,
+            )
 
 
 def print_report(report: MigrationReport):
@@ -562,7 +576,9 @@ def print_report(report: MigrationReport):
         print(f"  ✓ {report.conversation_migration}")
     print()
 
-    print(f"Estimated Code Reduction: {report.code_reduction_lines} lines ({report.code_reduction_percent:.1f}%)")
+    print(
+        f"Estimated Code Reduction: {report.code_reduction_lines} lines ({report.code_reduction_percent:.1f}%)"
+    )
     print()
 
     if report.warnings:
@@ -581,9 +597,7 @@ def print_report(report: MigrationReport):
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Migrate verticals to use victor.contrib packages"
-    )
+    parser = argparse.ArgumentParser(description="Migrate verticals to use victor.contrib packages")
     parser.add_argument(
         "--vertical",
         type=str,

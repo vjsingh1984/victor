@@ -777,7 +777,7 @@ metadata = ToolMetadata(
 Centralized registry for tool metadata:
 
 ```python
-from victor.tools.metadata import ToolMetadataRegistry
+from victor.tools.metadata_registry import ToolMetadataRegistry
 
 # Get singleton instance
 registry = ToolMetadataRegistry.get_instance()
@@ -789,10 +789,10 @@ if registry.needs_reindex(tools):
 # Access metadata
 metadata = registry.get_metadata("git")
 tools_in_category = registry.get_tools_by_category("filesystem")
-tools_with_keyword = registry.get_tools_by_keyword("search")
+tools_with_keyword = registry.get_by_keyword("search")
 
 # Search across all metadata
-matches = registry.search_tools("file")
+matches = registry.get_tools_matching_text("file")
 
 # Get statistics
 stats = registry.get_statistics()

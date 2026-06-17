@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from victor.agent.context_assembler import TurnBoundaryContextAssembler
+from victor.agent.conversation.assembler import TurnBoundaryContextAssembler
 from victor.providers.base import Message
 
 

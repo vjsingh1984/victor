@@ -27,8 +27,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-
 from victor.providers.base import ToolDefinition
+from victor.tools.core_tool_aliases import canonicalize_core_tool_name
 
 logger = logging.getLogger(__name__)
 
@@ -161,8 +161,13 @@ class ToolCall:
     raw: Optional[Any] = None  # Raw provider-specific data
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary format."""
-        result = {"name": self.name, "arguments": self.arguments}
+        """Convert to dictionary format with sanitization."""
+        from victor.agent.argument_sanitizer import sanitize_arguments_for_serialization
+
+        result = {
+            "name": self.name,
+            "arguments": sanitize_arguments_for_serialization(self.arguments),
+        }
         if self.id:
             result["id"] = self.id
         return result
@@ -276,9 +281,14 @@ class FallbackParsingMixin:
                 args = tc.get("arguments", {})
                 tc_id = tc.get("id")
 
-            # Validate tool name if validator provided
+            # Validate tool name if validator provided.
+            # Invalid names are still included so the pipeline can generate
+            # a proper error tool response with tool_call_id — OpenAI spec
+            # requires every tool_calls[].id to have a matching role=tool.
             if validate_name_fn and not validate_name_fn(name):
                 warnings.append(f"Skipped invalid tool name: {name}")
+                # Include with empty args — pipeline will produce error response
+                tool_calls.append(ToolCall(name=name, arguments={}, id=tc_id))
                 continue
             elif not name:
                 warnings.append("Skipped tool call with empty name")
@@ -415,6 +425,30 @@ class FallbackParsingMixin:
                     args = {p.strip(): v.strip() for p, v in param_matches}
                     matches.append((name, json.dumps(args)))
 
+        # Pattern 4: Attribute-style XML tags used by some models (e.g. glm-5.1):
+        #   <code_search query="..." path="..." mode="semantic"/>
+        #   <read path="..." limit="200"/>
+        # Only matches tag names that are valid tool names (via validate_name_fn).
+        if not matches:
+            attr_tag_re = re.compile(
+                r"<([a-z][a-z0-9_]*)(\s[^>]*?)\s*(?:/>|>(.*?)</\1>)",
+                re.DOTALL | re.IGNORECASE,
+            )
+            attr_kv_re = re.compile(r'(\w+)\s*=\s*"([^"]*)"')
+            attr_pattern_used = False
+            for m in attr_tag_re.finditer(content):
+                tag_name = m.group(1)
+                if validate_name_fn and not validate_name_fn(tag_name):
+                    continue
+                attrs = dict(attr_kv_re.findall(m.group(2) or ""))
+                body = (m.group(3) or "").strip()
+                if body and not attrs:
+                    attrs = {"content": body}
+                matches.append((tag_name, json.dumps(attrs)))
+                attr_pattern_used = True
+            if attr_pattern_used:
+                matched_patterns.append(attr_tag_re.pattern)
+
         if not matches:
             return ToolCallParseResult(remaining_content=content)
 
@@ -458,9 +492,9 @@ class FallbackParsingMixin:
         """Parse Python-style function calls from content (fallback).
 
         Handles text-based tool calls like:
-        - read_file(path='foo.py')
+        - read(path='foo.py')
         - shell(command="ls -la")
-        - edit(file_path='/path', old_string="x", new_string="y")
+        - edit(path='/path', old_string="x", new_string="y")
 
         Common with open-weight models on OpenAI-compatible providers
         (Cerebras, Groq, Together, etc.) that output tool calls as text.
@@ -664,18 +698,14 @@ class BaseToolCallingAdapter(ABC):
     ARGUMENT_ALIASES: Dict[tuple, str] = {
         # Shell tool: LLMs often use 'command' instead of 'cmd'
         ("shell", "command"): "cmd",
-        ("execute_bash", "command"): "cmd",
         # Read tool: 'file_path' or 'filename' instead of 'path'
         ("read", "file_path"): "path",
         ("read", "filename"): "path",
-        ("read_file", "file_path"): "path",
         # Write tool: 'file_path' or 'filename' instead of 'path'
         ("write", "file_path"): "path",
         ("write", "filename"): "path",
-        ("write_file", "file_path"): "path",
         # Edit tool: 'file_path' instead of 'path'
         ("edit", "file_path"): "path",
-        ("edit_file", "file_path"): "path",
         # Grep/search: 'pattern' instead of 'query'
         ("grep", "pattern"): "query",
         ("grep", "search"): "query",
@@ -684,35 +714,26 @@ class BaseToolCallingAdapter(ABC):
         # Ls tool: 'directory' instead of 'path'
         ("ls", "directory"): "path",
         ("ls", "dir"): "path",
-        ("list_directory", "directory"): "path",
     }
 
     # Default values for required parameters that providers may omit.
     # These are sensible defaults that preserve expected tool behavior.
     # Key: tool_name, Value: dict of parameter defaults
-    # NOTE: Includes both canonical short names and legacy names for backward compat
     TOOL_ARGUMENT_DEFAULTS: Dict[str, Dict[str, Any]] = {
-        # Canonical short names
         "ls": {"path": "."},
         "read": {"path": ""},  # Empty string will fail gracefully
         "shell": {"cmd": ""},  # Note: canonical param is 'cmd', not 'command'
         "grep": {"query": "", "path": "."},
         "search": {"query": "", "path": "."},
-        # Legacy names (backward compatibility - LLMs may still use these)
-        "list_directory": {"path": "."},
-        "read_file": {"path": ""},
-        "execute_bash": {"cmd": ""},  # Note: canonical param is 'cmd'
         "code_search": {"query": "", "path": "."},
         "semantic_code_search": {"query": "", "path": "."},
     }
 
     # Tool-specific valid arguments that should NOT be filtered even if they appear
     # in HALLUCINATED_ARGUMENTS. Some tools legitimately support pagination params.
-    # Key: tool_name (canonical or legacy), Value: set of valid argument names
+    # Key: canonical tool_name, Value: set of valid argument names
     TOOL_VALID_ARGUMENTS: Dict[str, set] = {
-        # read/read_file support offset/limit for pagination of large files
         "read": {"offset", "limit", "line_start", "line_end"},
-        "read_file": {"offset", "limit", "line_start", "line_end"},
         # grep/search support context lines
         "grep": {"context", "before", "after", "context_lines"},
         "search": {"context", "before", "after", "context_lines"},
@@ -785,6 +806,8 @@ class BaseToolCallingAdapter(ABC):
         import logging
 
         logger = logging.getLogger(__name__)
+
+        tool_name = canonicalize_core_tool_name(tool_name)
 
         # Step 1: Apply argument aliases (e.g., 'command' -> 'cmd' for shell)
         aliased = {}

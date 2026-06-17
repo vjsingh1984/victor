@@ -438,7 +438,10 @@ workflows:
         type: invalid_type
         goal: "This should fail"
 """
-        from victor.workflows.yaml_loader import load_workflow_from_yaml, YAMLWorkflowError
+        from victor.workflows.yaml_loader import (
+            load_workflow_from_yaml,
+            YAMLWorkflowError,
+        )
 
         with pytest.raises((ValueError, KeyError, YAMLWorkflowError)):
             load_workflow_from_yaml(yaml_content)
@@ -458,7 +461,10 @@ workflows:
         role: analyst
         # Missing: goal, tool_budget
 """
-        from victor.workflows.yaml_loader import load_workflow_from_yaml, YAMLWorkflowError
+        from victor.workflows.yaml_loader import (
+            load_workflow_from_yaml,
+            YAMLWorkflowError,
+        )
 
         try:
             workflows = load_workflow_from_yaml(yaml_content)

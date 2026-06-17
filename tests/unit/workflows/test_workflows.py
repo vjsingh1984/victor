@@ -1105,7 +1105,10 @@ class TestWorkflowExecutorExtended:
                 "transform": TransformNode(
                     id="transform",
                     name="Transform",
-                    transform=lambda ctx: {"processed": True, "count": ctx.get("count", 0) * 2},
+                    transform=lambda ctx: {
+                        "processed": True,
+                        "count": ctx.get("count", 0) * 2,
+                    },
                     next_nodes=["agent"],
                 ),
                 "agent": AgentNode(id="agent", name="Agent"),

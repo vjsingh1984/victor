@@ -32,6 +32,7 @@ from typing import (
     TYPE_CHECKING,
 )
 
+from victor.agent.conversation.history_metadata import build_internal_history_metadata
 from victor.agent.streaming.context import StreamingChatContext
 from victor.agent.streaming.iteration import (
     IterationAction,
@@ -42,7 +43,12 @@ from victor.agent.streaming.iteration import (
     create_continue_result,
     create_force_completion_result,
 )
+from victor.core.loop_thresholds import (
+    DEFAULT_BLOCKED_CONSECUTIVE_THRESHOLD,
+    DEFAULT_BLOCKED_TOTAL_THRESHOLD,
+)
 from victor.providers.base import StreamChunk
+from victor.tools.core_tool_aliases import canonicalize_core_tool_name
 
 if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
@@ -55,7 +61,7 @@ logger = logging.getLogger(__name__)
 class MessageAdder(Protocol):
     """Protocol for adding messages to conversation."""
 
-    def add_message(self, role: str, content: str) -> None:
+    def add_message(self, role: str, content: str, **metadata: Any) -> None:
         """Add a message to the conversation."""
         ...
 
@@ -105,6 +111,36 @@ class StreamingChatHandler:
             self._presentation = create_presentation_adapter()
         else:
             self._presentation = presentation
+
+    @staticmethod
+    def _infer_preview_language(path: str, preview_kind: str) -> str:
+        if preview_kind == "edit":
+            return "diff"
+
+        if "." not in path:
+            return "text"
+        suffix = path.rsplit(".", 1)[-1].lower()
+        return suffix or "text"
+
+    def _record_preview_message(self, kind: str, path: str, body: str) -> None:
+        """Persist preview metadata for session replay without affecting stream output."""
+        if not body:
+            return
+
+        header = f"{kind}: {path}" if path else kind
+        preview_kind = "edit" if kind.lower().startswith("edit") else "file"
+        try:
+            self.message_adder.add_message(
+                "system",
+                header,
+                preview_body=body,
+                preview_kind=preview_kind,
+                preview_language=self._infer_preview_language(path, preview_kind),
+                preview_path=path,
+            )
+        except TypeError:
+            # Older adapters may not accept metadata kwargs.
+            self.message_adder.add_message("system", header)
 
     def check_time_limit(self, ctx: StreamingChatContext) -> Optional[IterationResult]:
         """Check if session idle time limit has been exceeded.
@@ -262,6 +298,7 @@ class StreamingChatHandler:
             tool_args = result.get("args", {})
             success = result.get("success", False)
             error_msg = result.get("error", "failed") if not success else None
+            tool_output = result.get("result")  # Get actual tool output for preview
             chunks.append(
                 self.generate_tool_result_chunk(
                     tool_name=tool_name,
@@ -270,12 +307,14 @@ class StreamingChatHandler:
                     success=success,
                     error=error_msg,
                     follow_up_suggestions=result.get("follow_up_suggestions"),
+                    result=tool_output,  # Pass result for preview
                 )
             )
 
-        # Add thinking status
-        thinking_icon = self._presentation.icon("thinking", with_color=False)
-        chunks.append(StreamChunk(content="", metadata={"status": f"{thinking_icon} Thinking..."}))
+        # NOTE: We no longer add a "Thinking..." status chunk here because:
+        # 1. The main pipeline iteration logic already handles status updates.
+        # 2. Providers like z.ai/Anthropic yield their own reasoning/thinking content.
+        # 3. Adding it here often causes duplication in the UI.
         return chunks
 
     def generate_tool_start_chunk(
@@ -325,9 +364,9 @@ class StreamingChatHandler:
     ) -> Optional[IterationResult]:
         """Check if the response represents natural completion (substantial content, no tools).
 
-        Signal-based completion detection uses explicit markers (_DONE_, _TASK_DONE_)
+        Signal-based completion detection uses explicit rare completion markers
         instead of buffer/size heuristics. The TaskCompletionDetector handles all
-        completion detection based on explicit signals. This method is kept for
+        completion detection based on explicit markers. This method is kept for
         backward compatibility but always returns None.
 
         Args:
@@ -339,7 +378,7 @@ class StreamingChatHandler:
             IterationResult to break if natural completion, None otherwise
         """
         # Signal-based completion is always active - TaskCompletionDetector handles
-        # completion detection based on explicit signals (_DONE_, _TASK_DONE_, _SUMMARY_)
+        # completion detection based on explicit rare completion markers
         return None
 
     def handle_empty_response(self, ctx: StreamingChatContext) -> Optional[IterationResult]:
@@ -393,6 +432,16 @@ class StreamingChatHandler:
             StreamChunk with block notification
         """
         ctx.record_tool_blocked()
+
+        # Log detailed information about the blocked tool
+        args_summary = ", ".join(
+            f"{k}={repr(v)[:30]}" for k, v in tool_args.items() if k not in {"offset", "limit"}
+        )
+        logger.info(
+            f"[dedup-block-exec] BLOCKED tool execution: {tool_name}({args_summary}) | "
+            f"reason: {block_reason}"
+        )
+
         logger.debug(f"BLOCKED tool call: {tool_name}({tool_args}) - {block_reason}")
 
         # Add tool result feedback
@@ -484,8 +533,8 @@ class StreamingChatHandler:
         self,
         ctx: StreamingChatContext,
         all_blocked: bool,
-        consecutive_limit: int = 4,
-        total_limit: int = 6,
+        consecutive_limit: int = DEFAULT_BLOCKED_CONSECUTIVE_THRESHOLD,
+        total_limit: int = DEFAULT_BLOCKED_TOTAL_THRESHOLD,
     ) -> Optional[IterationResult]:
         """Check if blocked tool attempts have exceeded thresholds.
 
@@ -586,26 +635,49 @@ class StreamingChatHandler:
                 "mentioning tools you cannot use."
             )
 
-        self.message_adder.add_message("user", message)
+        self.message_adder.add_message(
+            "user",
+            message,
+            metadata=build_internal_history_metadata("force_tool_execution"),
+        )
         return create_continue_result()
 
     def check_tool_budget(
-        self, ctx: StreamingChatContext, warning_threshold: int = 250
+        self,
+        ctx: StreamingChatContext,
+        warning_threshold: int = 250,
+        warning_pct: float = 0.8,
+        warning_remaining: int = 5,
     ) -> Optional[IterationResult]:
         """Check tool budget and generate warning if approaching limit.
 
         Args:
             ctx: The streaming context
-            warning_threshold: Number of tool calls before warning
+            warning_threshold: Absolute used-call threshold before warning
+            warning_pct: Fraction of budget used before warning
+            warning_remaining: Warn when this many or fewer calls remain
 
         Returns:
             IterationResult with warning chunk if approaching limit, None otherwise
         """
-        if ctx.is_approaching_budget_limit(warning_threshold):
+        if ctx.budget_warning_shown:
+            return None
+
+        if ctx.is_approaching_budget_limit(
+            warning_threshold=warning_threshold,
+            warning_pct=warning_pct,
+            warning_remaining=warning_remaining,
+        ):
+            ctx.budget_warning_shown = True
             result = IterationResult(action=IterationAction.YIELD_AND_CONTINUE)
+            remaining = ctx.get_remaining_budget()
             result.add_chunk(
                 StreamChunk(
-                    content=f"[tool] {self._presentation.icon('warning', with_color=False)} Approaching tool budget limit: {ctx.tool_calls_used}/{ctx.tool_budget} calls used\n"
+                    content=(
+                        f"[tool] {self._presentation.icon('warning', with_color=False)} "
+                        f"Approaching tool budget limit: {ctx.tool_calls_used}/{ctx.tool_budget} "
+                        f"calls used ({remaining} remaining)\n"
+                    )
                 )
             )
             return result
@@ -752,7 +824,11 @@ class StreamingChatHandler:
         warning_chunk, system_message = self.get_force_completion_chunks(ctx, is_research)
 
         # Add system message to force summary
-        self.message_adder.add_message("system", system_message)
+        self.message_adder.add_message(
+            "user",
+            f"[SYSTEM: {system_message}]",
+            metadata=build_internal_history_metadata("force_completion"),
+        )
 
         result = IterationResult(action=IterationAction.YIELD_AND_BREAK)
         result.add_chunk(warning_chunk)
@@ -1017,6 +1093,9 @@ class StreamingChatHandler:
         success: bool,
         error: Optional[str] = None,
         follow_up_suggestions: Optional[List[Dict[str, Any]]] = None,
+        was_pruned: bool = False,
+        result: Any = None,  # Tool output for preview
+        original_result: Any = None,  # Full tool output for expansion/debug
     ) -> StreamChunk:
         """Generate a StreamChunk for a tool result.
 
@@ -1026,6 +1105,8 @@ class StreamingChatHandler:
             elapsed: Time elapsed for tool execution
             success: Whether the tool succeeded
             error: Optional error message if failed
+            follow_up_suggestions: Optional follow-up suggestions
+            result: Tool output (for preview display)
 
         Returns:
             StreamChunk with tool_result metadata
@@ -1042,6 +1123,16 @@ class StreamingChatHandler:
             metadata["tool_result"]["error"] = error
         if follow_up_suggestions:
             metadata["tool_result"]["follow_up_suggestions"] = follow_up_suggestions
+        if was_pruned:
+            metadata["tool_result"]["was_pruned"] = True
+        if result is not None:
+            # Show brief metadata-only message instead of full content
+            # User can expand with /expand or Ctrl+O to see full output
+            metadata["tool_result"][
+                "result"
+            ] = "Tool completed successfully. Use /expand or Ctrl+O at prompt to see full output."
+        if original_result is not None:
+            metadata["tool_result"]["original_result"] = str(original_result)
         return StreamChunk(content="", metadata=metadata)
 
     def generate_file_preview_chunk(
@@ -1083,29 +1174,55 @@ class StreamingChatHandler:
         old_string: str,
         new_string: str,
         path: str,
-        max_preview_len: int = 50,
+        context_lines: int = 2,
+        max_diff_lines: int = 40,
     ) -> Optional[StreamChunk]:
-        """Generate an edit preview chunk for edit_files operations.
+        """Generate an edit preview chunk as a real unified diff.
 
         Args:
-            old_string: The old string being replaced
-            new_string: The new string
+            old_string: The old string being replaced (empty for creates)
+            new_string: The new string (empty for deletes)
             path: The file path
-            max_preview_len: Maximum length of preview strings
+            context_lines: Unified diff context lines (n)
+            max_diff_lines: Cap on rendered diff lines to keep output compact
 
         Returns:
-            StreamChunk with edit_preview metadata, or None if no strings
+            StreamChunk with edit_preview metadata, or None if both sides empty
         """
-        if not old_string or not new_string:
+        if not old_string and not new_string:
             return None
 
-        old_preview = old_string[:max_preview_len]
-        new_preview = new_string[:max_preview_len]
+        import difflib
+
+        old_lines = old_string.splitlines(keepends=False) if old_string else []
+        new_lines = new_string.splitlines(keepends=False) if new_string else []
+
+        diff_lines = list(
+            difflib.unified_diff(
+                old_lines,
+                new_lines,
+                fromfile=f"a/{path}",
+                tofile=f"b/{path}",
+                lineterm="",
+                n=context_lines,
+            )
+        )
+
+        if not diff_lines:
+            # Strings differ but unified_diff produced nothing (e.g. identical
+            # after newline normalization). Show a minimal hint instead of None
+            # so the user still sees the file was touched.
+            diff_lines = [f"--- a/{path}", f"+++ b/{path}", "(no textual changes)"]
+
+        if len(diff_lines) > max_diff_lines:
+            diff_lines = diff_lines[:max_diff_lines] + [
+                f"... ({len(diff_lines) - max_diff_lines} more lines)"
+            ]
 
         return StreamChunk(
             content="",
             metadata={
-                "edit_preview": f"- {old_preview}...\n+ {new_preview}...",
+                "edit_preview": "\n".join(diff_lines),
                 "path": path,
             },
         )
@@ -1136,8 +1253,11 @@ class StreamingChatHandler:
         success = result.get("success", False)
         error = result.get("error") if not success else None
         follow_up_suggestions = result.get("follow_up_suggestions")
+        was_pruned = bool(result.get("was_pruned", False))
 
         # Main tool result chunk
+        tool_output = result.get("result") or result.get("content")
+        full_tool_output = result.get("full_result") or result.get("content") or tool_output
         chunks.append(
             self.generate_tool_result_chunk(
                 tool_name,
@@ -1146,30 +1266,124 @@ class StreamingChatHandler:
                 success,
                 error,
                 follow_up_suggestions=follow_up_suggestions,
+                was_pruned=was_pruned,
+                result=tool_output,  # Pass result for preview
+                original_result=full_tool_output if was_pruned else None,
             )
         )
 
         # Generate preview chunks for successful write/edit operations
         if success:
-            if tool_name == "write_file" and tool_args.get("content"):
+            canonical_tool_name = canonicalize_core_tool_name(tool_name)
+
+            if canonical_tool_name == "write" and tool_args.get("content"):
                 preview_chunk = self.generate_file_preview_chunk(
                     tool_args["content"],
                     tool_args.get("path", ""),
                 )
                 if preview_chunk:
                     chunks.append(preview_chunk)
+                    self._record_preview_message(
+                        "File preview",
+                        str(preview_chunk.metadata.get("path", "")),
+                        str(preview_chunk.metadata.get("file_preview", "")),
+                    )
 
-            elif tool_name == "edit_files" and tool_args.get("files"):
-                files = tool_args.get("files", [])
-                for file_edit in files[:max_files]:
-                    path = file_edit.get("path", "")
-                    edits = file_edit.get("edits", [])
-                    for edit in edits[:max_edits_per_file]:
-                        old_str = edit.get("old_string", "")
-                        new_str = edit.get("new_string", "")
-                        edit_chunk = self.generate_edit_preview_chunk(old_str, new_str, path)
-                        if edit_chunk:
-                            chunks.append(edit_chunk)
+            elif canonical_tool_name == "edit":
+                ops = tool_args.get("ops", [])
+                if isinstance(ops, list) and ops:
+                    preview_count = 0
+                    for op in ops:
+                        if not isinstance(op, dict):
+                            continue
+                        op_type = op.get("type")
+                        path = op.get("path", "")
+                        if op_type == "replace":
+                            edit_chunk = self.generate_edit_preview_chunk(
+                                op.get("old_str", ""),
+                                op.get("new_str", ""),
+                                path,
+                            )
+                            if edit_chunk:
+                                chunks.append(edit_chunk)
+                                self._record_preview_message(
+                                    "Edit preview",
+                                    str(edit_chunk.metadata.get("path", "")),
+                                    str(edit_chunk.metadata.get("edit_preview", "")),
+                                )
+                                preview_count += 1
+                        elif op_type == "create" and op.get("content"):
+                            # New file — show as full-add unified diff
+                            edit_chunk = self.generate_edit_preview_chunk(
+                                "", op.get("content", ""), path
+                            )
+                            if edit_chunk:
+                                chunks.append(edit_chunk)
+                                self._record_preview_message(
+                                    "Edit preview",
+                                    str(edit_chunk.metadata.get("path", "")),
+                                    str(edit_chunk.metadata.get("edit_preview", "")),
+                                )
+                                preview_count += 1
+                        elif op_type == "modify" and op.get("content"):
+                            preview_chunk = self.generate_file_preview_chunk(
+                                op.get("content", ""),
+                                path,
+                            )
+                            if preview_chunk:
+                                chunks.append(preview_chunk)
+                                self._record_preview_message(
+                                    "File preview",
+                                    str(preview_chunk.metadata.get("path", "")),
+                                    str(preview_chunk.metadata.get("file_preview", "")),
+                                )
+                                preview_count += 1
+                        elif op_type == "delete":
+                            # Deletion — surface the action with a one-line hint
+                            chunks.append(
+                                StreamChunk(
+                                    content="",
+                                    metadata={
+                                        "edit_preview": (
+                                            f"--- a/{path}\n+++ /dev/null\n" f"(file deleted)"
+                                        ),
+                                        "path": path,
+                                    },
+                                )
+                            )
+                            preview_count += 1
+                        elif op_type == "rename":
+                            new_path = op.get("new_path", "")
+                            chunks.append(
+                                StreamChunk(
+                                    content="",
+                                    metadata={
+                                        "edit_preview": (
+                                            f"--- a/{path}\n+++ b/{new_path}\n" f"(renamed)"
+                                        ),
+                                        "path": new_path or path,
+                                    },
+                                )
+                            )
+                            preview_count += 1
+                        if preview_count >= max_files * max_edits_per_file:
+                            break
+                elif tool_args.get("files"):
+                    files = tool_args.get("files", [])
+                    for file_edit in files[:max_files]:
+                        path = file_edit.get("path", "")
+                        edits = file_edit.get("edits", [])
+                        for edit in edits[:max_edits_per_file]:
+                            old_str = edit.get("old_string", "")
+                            new_str = edit.get("new_string", "")
+                            edit_chunk = self.generate_edit_preview_chunk(old_str, new_str, path)
+                            if edit_chunk:
+                                chunks.append(edit_chunk)
+                                self._record_preview_message(
+                                    "Edit preview",
+                                    str(edit_chunk.metadata.get("path", "")),
+                                    str(edit_chunk.metadata.get("edit_preview", "")),
+                                )
 
         return chunks
 
@@ -1217,7 +1431,11 @@ class StreamingChatHandler:
             return None
 
         warning_chunk, system_message = self.get_loop_warning_chunks(warning_message)
-        self.message_adder.add_message("system", system_message)
+        self.message_adder.add_message(
+            "user",
+            f"[SYSTEM: {system_message}]",
+            metadata=build_internal_history_metadata("force_completion"),
+        )
         return warning_chunk
 
     def generate_thinking_status_chunk(self) -> StreamChunk:

@@ -87,7 +87,7 @@ class SqliteLanceDBMigration:
         self.symbol_store_db_path = (
             Path(symbol_store_db_path).expanduser()
             if symbol_store_db_path
-            else project_paths.conversation_db
+            else project_paths.project_db
         )
 
     async def migrate(self, clear_target: bool = False) -> Dict[str, int]:
@@ -122,7 +122,8 @@ class SqliteLanceDBMigration:
     def _migrate_graph(self) -> Tuple[Tuple[int, int], Dict[str, str]]:
         if not self.graph_db_path.exists():
             logger.info(
-                "Graph database not found at %s; skipping graph migration", self.graph_db_path
+                "Graph database not found at %s; skipping graph migration",
+                self.graph_db_path,
             )
             return (0, 0), {}
 
@@ -199,7 +200,8 @@ class SqliteLanceDBMigration:
     def _migrate_vectors(self) -> Tuple[int, Dict[str, str]]:
         if not self.lancedb_dir.exists():
             logger.info(
-                "LanceDB directory not found at %s; skipping vector migration", self.lancedb_dir
+                "LanceDB directory not found at %s; skipping vector migration",
+                self.lancedb_dir,
             )
             return 0, {}
 

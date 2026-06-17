@@ -111,25 +111,45 @@ class Version:
 
     def __lt__(self, other: "Version") -> bool:
         """Compare versions."""
-        return (self.major, self.minor, self.patch) < (other.major, other.minor, other.patch)
+        return (self.major, self.minor, self.patch) < (
+            other.major,
+            other.minor,
+            other.patch,
+        )
 
     def __le__(self, other: "Version") -> bool:
         """Compare versions."""
-        return (self.major, self.minor, self.patch) <= (other.major, other.minor, other.patch)
+        return (self.major, self.minor, self.patch) <= (
+            other.major,
+            other.minor,
+            other.patch,
+        )
 
     def __gt__(self, other: "Version") -> bool:
         """Compare versions."""
-        return (self.major, self.minor, self.patch) > (other.major, other.minor, other.patch)
+        return (self.major, self.minor, self.patch) > (
+            other.major,
+            other.minor,
+            other.patch,
+        )
 
     def __ge__(self, other: "Version") -> bool:
         """Compare versions."""
-        return (self.major, self.minor, self.patch) >= (other.major, other.minor, other.patch)
+        return (self.major, self.minor, self.patch) >= (
+            other.major,
+            other.minor,
+            other.patch,
+        )
 
     def __eq__(self, other: object) -> bool:
         """Compare versions."""
         if not isinstance(other, Version):
             return NotImplemented
-        return (self.major, self.minor, self.patch) == (other.major, other.minor, other.patch)
+        return (self.major, self.minor, self.patch) == (
+            other.major,
+            other.minor,
+            other.patch,
+        )
 
     def is_compatible_with(
         self,
@@ -361,7 +381,7 @@ class NegotiationResult:
             "supported_features": self.supported_features,
             "unsupported_features": self.unsupported_features,
             "missing_required_features": self.missing_required_features,
-            "fallback_version": str(self.fallback_version) if self.fallback_version else None,
+            "fallback_version": (str(self.fallback_version) if self.fallback_version else None),
             "error": self.error,
         }
 
@@ -778,7 +798,9 @@ class CapabilityNegotiationProtocol:
         return capabilities
 
     @staticmethod
-    def _get_orchestrator_capabilities(orchestrator) -> Dict[str, CapabilityDeclaration]:
+    def _get_orchestrator_capabilities(
+        orchestrator,
+    ) -> Dict[str, CapabilityDeclaration]:
         """Extract capabilities from orchestrator.
 
         Args:

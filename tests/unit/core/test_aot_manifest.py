@@ -99,10 +99,20 @@ class TestAOTManifest:
             "env_hash": "hash456",
             "entries": {
                 "group1": [
-                    {"name": "entry1", "module": "mod1", "attr": "Attr1", "group": "group1"}
+                    {
+                        "name": "entry1",
+                        "module": "mod1",
+                        "attr": "Attr1",
+                        "group": "group1",
+                    }
                 ],
                 "group2": [
-                    {"name": "entry2", "module": "mod2", "attr": "Attr2", "group": "group2"}
+                    {
+                        "name": "entry2",
+                        "module": "mod2",
+                        "attr": "Attr2",
+                        "group": "group2",
+                    }
                 ],
             },
         }
@@ -254,7 +264,11 @@ class TestAOTManifestManagerSaveLoad:
         # Write manifest with wrong version directly
         with open(manager.manifest_path, "w") as f:
             json.dump(
-                {"version": "0.1", "env_hash": manager.compute_env_hash(), "entries": {}},
+                {
+                    "version": "0.1",
+                    "env_hash": manager.compute_env_hash(),
+                    "entries": {},
+                },
                 f,
             )
 

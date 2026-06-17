@@ -20,8 +20,8 @@ those imports remain available for compatibility and internal runtime integratio
 
 New external vertical packages should not be authored against ``victor.verticals``.
 Instead:
-- define verticals against ``victor_sdk.VerticalBase``
-- decorate them with ``victor_sdk.register_vertical``
+- define verticals against ``victor_contracts.VerticalBase``
+- decorate them with ``victor_contracts.register_vertical``
 - publish a thin ``VictorPlugin`` through the canonical ``victor.plugins``
   entry-point group
 

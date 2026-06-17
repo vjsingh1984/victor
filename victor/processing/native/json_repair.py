@@ -14,6 +14,7 @@
 
 """JSON repair and type coercion functions with native acceleration."""
 
+from functools import lru_cache
 import json
 from typing import Any, List, Optional, Tuple
 
@@ -180,10 +181,60 @@ def coerce_string_type(value: str) -> Tuple[str, str, Optional[str]]:
         - coerced_str: The value as a string in canonical form
         - error_or_none: Error message if coercion failed, else None
     """
-    if _NATIVE_AVAILABLE and hasattr(_native, "coerce_string_type"):
-        return _native.coerce_string_type(value)
+    if _NATIVE_AVAILABLE:
+        return _coerce_string_type_native_hot_path(value)
 
-    # Pure Python fallback
+    return _coerce_string_type_python_fallback(value)
+
+
+@lru_cache(maxsize=4096)
+def _coerce_string_type_native_hot_path(value: str) -> Tuple[str, str, Optional[str]]:
+    """Use a cached scalar fast path before paying native FFI overhead.
+
+    Tiny scalar strings are extremely common in tool arguments, and Python↔Rust
+    boundary costs can dominate the actual coercion work for these values.
+    For scalar inputs we match the native semantics directly in Python and only
+    cross the FFI boundary for structured JSON candidates.
+    """
+    stripped = value.strip()
+    lower = stripped.lower()
+
+    if lower in ("none", "null", "nil"):
+        return ("null", "null", None)
+
+    if lower == "true":
+        return ("bool", "true", None)
+    if lower == "false":
+        return ("bool", "false", None)
+
+    if stripped and stripped[0] not in "{[":
+        try:
+            int_val = int(stripped)
+            return ("int", str(int_val), None)
+        except ValueError:
+            pass
+
+        try:
+            float_val = float(stripped)
+            return ("float", str(float_val), None)
+        except ValueError:
+            pass
+
+        return ("string", stripped, None)
+
+    if _NATIVE_AVAILABLE and hasattr(_native, "coerce_string_type"):
+        type_name, coerced_str, third = _native.coerce_string_type(value)
+        return (
+            type_name,
+            coerced_str,
+            None if isinstance(third, float) else third,
+        )
+
+    return ("string", stripped, None)
+
+
+def _coerce_string_type_python_fallback(value: str) -> Tuple[str, str, Optional[str]]:
+    """Pure Python fallback used when the native module is unavailable."""
     # Check for null
     if value.lower() in ("none", "null", "nil"):
         return ("null", "null", None)

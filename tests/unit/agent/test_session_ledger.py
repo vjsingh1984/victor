@@ -36,7 +36,11 @@ class TestLedgerEntry:
 
     def test_frozen(self):
         entry = LedgerEntry(
-            timestamp=1000.0, category="decision", key="d1", summary="test", turn_index=1
+            timestamp=1000.0,
+            category="decision",
+            key="d1",
+            summary="test",
+            turn_index=1,
         )
         with pytest.raises(AttributeError):
             entry.summary = "changed"
@@ -111,10 +115,34 @@ class TestUpdateFromToolResult:
         entries = [e for e in ledger.entries if e.category == "file_read"]
         assert len(entries) == 1
 
+    def test_legacy_read_tool_extraction(self):
+        ledger = SessionLedger()
+        ledger.update_from_tool_result(
+            "read_file",
+            {"path": "/src/legacy.py"},
+            "line 1\nline 2",
+            turn_index=1,
+        )
+        assert "/src/legacy.py" in ledger.get_files_read()
+
     def test_edit_tool_extraction(self):
         ledger = SessionLedger()
         ledger.update_from_tool_result(
-            "edit", {"path": "/src/foo.py", "content": "new content"}, "OK", turn_index=2
+            "edit",
+            {"path": "/src/foo.py", "content": "new content"},
+            "OK",
+            turn_index=2,
+        )
+        entries = [e for e in ledger.entries if e.category == "file_modified"]
+        assert len(entries) == 1
+
+    def test_legacy_create_file_counts_as_write(self):
+        ledger = SessionLedger()
+        ledger.update_from_tool_result(
+            "create_file",
+            {"path": "/src/new.py", "content": "print('x')"},
+            "OK",
+            turn_index=2,
         )
         entries = [e for e in ledger.entries if e.category == "file_modified"]
         assert len(entries) == 1
@@ -135,6 +163,14 @@ class TestUpdateFromToolResult:
         result = '<TOOL_OUTPUT tool="read" path="/src/bar.py">content here</TOOL_OUTPUT>'
         ledger.update_from_tool_result("shell", {}, result, turn_index=1)
         assert "/src/bar.py" in ledger.get_files_read()
+
+    def test_tool_output_marker_parsing_legacy_alias(self):
+        ledger = SessionLedger()
+        result = (
+            '<TOOL_OUTPUT tool="read_file" path="/src/legacy_bar.py">content here</TOOL_OUTPUT>'
+        )
+        ledger.update_from_tool_result("shell", {}, result, turn_index=1)
+        assert "/src/legacy_bar.py" in ledger.get_files_read()
 
 
 class TestUpdateFromAssistantResponse:

@@ -5,7 +5,7 @@ from victor.core.verticals.capability_negotiator import (
     FRAMEWORK_CAPABILITIES,
     NegotiationResult,
 )
-from victor_sdk.verticals.manifest import ExtensionManifest, ExtensionType
+from victor_contracts.verticals.manifest import ExtensionManifest, ExtensionType
 
 
 class TestNegotiationResult:
@@ -82,7 +82,7 @@ class TestCapabilityNegotiator:
 
     def test_all_builtin_verticals_compatible(self):
         """All built-in verticals should produce compatible manifests."""
-        from victor_sdk.verticals.protocols.base import VerticalBase
+        from victor_contracts.verticals.protocols.base import VerticalBase
 
         class FakeBuiltin(VerticalBase):
             @classmethod

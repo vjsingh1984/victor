@@ -15,17 +15,23 @@
 """Comprehensive tests for OpenAI provider."""
 
 import json
+import ssl
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import httpx
+from openai import APIConnectionError
 
 from victor.providers.openai_provider import OpenAIProvider
 from victor.providers.base import (
     Message,
     ToolDefinition,
+    ProviderConnectionError,
     ProviderError,
     ProviderAuthError,
     ProviderRateLimitError,
 )
+from victor.providers.circuit_breaker import CircuitBreakerError, CircuitState
 
 
 @pytest.fixture
@@ -351,8 +357,66 @@ async def test_chat_generic_error(openai_provider):
                 model="gpt-4",
             )
 
-        assert "OpenAI API error" in str(exc_info.value)
+        assert "openai API error" in str(exc_info.value)
         assert exc_info.value.provider == "openai"
+
+
+@pytest.mark.asyncio
+async def test_chat_connection_error(openai_provider):
+    """Transport failures should surface as connection errors."""
+    connection_error = APIConnectionError(
+        request=httpx.Request("POST", "https://api.openai.com/v1/chat/completions")
+    )
+    connection_error.__cause__ = ssl.SSLError(
+        "[SSL: SSLV3_ALERT_BAD_RECORD_MAC] sslv3 alert bad record mac (_ssl.c:2559)"
+    )
+
+    with patch.object(
+        openai_provider.client.chat.completions,
+        "create",
+        new_callable=AsyncMock,
+    ) as mock_create:
+        mock_create.side_effect = connection_error
+
+        messages = [Message(role="user", content="Hello")]
+
+        with pytest.raises(ProviderConnectionError) as exc_info:
+            await openai_provider.chat(
+                messages=messages,
+                model="gpt-4",
+            )
+
+        assert "Connection failed" in str(exc_info.value)
+        assert exc_info.value.provider == "openai"
+
+
+@pytest.mark.asyncio
+async def test_chat_open_circuit_maps_to_rate_limit(openai_provider):
+    """Open circuit breaker errors should surface as retryable provider errors."""
+    breaker_error = CircuitBreakerError(
+        "Circuit breaker 'provider_OpenAIProvider' is OPEN. Retry after 7.2s",
+        state=CircuitState.OPEN,
+        retry_after=7.2,
+    )
+
+    with patch.object(
+        openai_provider,
+        "_execute_with_circuit_breaker",
+        new_callable=AsyncMock,
+    ) as mock_execute:
+        mock_execute.side_effect = breaker_error
+
+        messages = [Message(role="user", content="Hello")]
+
+        with pytest.raises(ProviderRateLimitError) as exc_info:
+            await openai_provider.chat(
+                messages=messages,
+                model="gpt-4",
+            )
+
+        assert exc_info.value.provider == "openai"
+        assert exc_info.value.retry_after == 7.2
+        assert exc_info.value.status_code == 429
 
 
 @pytest.mark.asyncio
@@ -452,6 +516,47 @@ async def test_stream_with_tools(openai_provider):
         assert "tools" in call_args.kwargs
         assert "tool_choice" in call_args.kwargs
         assert call_args.kwargs["stream"] is True
+
+
+@pytest.mark.asyncio
+async def test_stream_strips_internal_runtime_kwargs(openai_provider):
+    """Internal orchestration hints must not be forwarded to OpenAI SDK calls."""
+    mock_chunk = MagicMock()
+    mock_chunk.choices = [MagicMock(delta=MagicMock(content=""), finish_reason="stop")]
+
+    async def async_iter():
+        yield mock_chunk
+
+    with patch.object(
+        openai_provider.client.chat.completions,
+        "create",
+        new_callable=AsyncMock,
+    ) as mock_create:
+        mock_create.return_value = async_iter()
+
+        messages = [Message(role="user", content="Review architecture")]
+        chunks = []
+        async for chunk in openai_provider.stream(
+            messages=messages,
+            model="gpt-5.4-mini",
+            topology_action="team_plan",
+            topology_kind="team",
+            provider_hint="smart-router",
+            execution_mode="team_execution",
+            thinking={"type": "enabled"},
+        ):
+            chunks.append(chunk)
+
+        assert chunks
+        call_args = mock_create.call_args
+        for key in (
+            "topology_action",
+            "topology_kind",
+            "provider_hint",
+            "execution_mode",
+            "thinking",
+        ):
+            assert key not in call_args.kwargs
 
 
 @pytest.mark.asyncio
@@ -822,3 +927,57 @@ async def test_message_conversion(openai_provider):
         assert openai_messages[0] == {"role": "system", "content": "System"}
         assert openai_messages[1] == {"role": "user", "content": "User"}
         assert openai_messages[2] == {"role": "assistant", "content": "Assistant"}
+
+
+# -- reasoning_effort capability + defensive strip --------------------------
+
+
+def _mock_chat_response():
+    msg = MagicMock()
+    msg.content = "ok"
+    msg.tool_calls = None
+    choice = MagicMock()
+    choice.message = msg
+    choice.finish_reason = "stop"
+    resp = MagicMock()
+    resp.choices = [choice]
+    resp.usage = None
+    resp.model_dump = lambda: {}
+    return resp
+
+
+@pytest.mark.asyncio
+async def test_supports_reasoning_effort(openai_provider):
+    assert openai_provider.supports_reasoning_effort("o3-mini") is True
+    assert openai_provider.supports_reasoning_effort("gpt-5.1") is True
+    assert openai_provider.supports_reasoning_effort("gpt-4o") is False
+    assert openai_provider.supports_reasoning_effort(None) is False
+
+
+@pytest.mark.asyncio
+async def test_chat_keeps_reasoning_effort_for_reasoning_model(openai_provider):
+    with patch.object(
+        openai_provider.client.chat.completions, "create", new_callable=AsyncMock
+    ) as mock_create:
+        mock_create.return_value = _mock_chat_response()
+        await openai_provider.chat(
+            messages=[Message(role="user", content="hi")],
+            model="o3-mini",
+            reasoning_effort="high",
+        )
+        assert mock_create.call_args.kwargs.get("reasoning_effort") == "high"
+
+
+@pytest.mark.asyncio
+async def test_chat_strips_reasoning_effort_for_standard_model(openai_provider):
+    with patch.object(
+        openai_provider.client.chat.completions, "create", new_callable=AsyncMock
+    ) as mock_create:
+        mock_create.return_value = _mock_chat_response()
+        await openai_provider.chat(
+            messages=[Message(role="user", content="hi")],
+            model="gpt-4o",
+            reasoning_effort="high",
+        )
+        # Standard models reject reasoning_effort -> must be stripped.
+        assert "reasoning_effort" not in mock_create.call_args.kwargs

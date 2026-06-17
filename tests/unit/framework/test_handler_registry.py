@@ -66,7 +66,10 @@ class TestHandlerRegistration:
         handler.__class__.__name__ = "MockHandler"
 
         registry.register_vertical(
-            "test", {"handler1": handler}, category="test_category", description="Test handlers"
+            "test",
+            {"handler1": handler},
+            category="test_category",
+            description="Test handlers",
         )
 
         # Check handler is registered

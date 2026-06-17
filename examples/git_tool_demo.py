@@ -64,8 +64,7 @@ async def main():
 
         try:
             # Create some files
-            (tmpdir / "README.md").write_text(
-                """# Demo Project
+            (tmpdir / "README.md").write_text("""# Demo Project
 
 This is a demo project for testing Victor's git tool.
 
@@ -73,17 +72,14 @@ This is a demo project for testing Victor's git tool.
 - Git integration
 - AI-powered commit messages
 - Smart operations
-"""
-            )
+""")
 
-            (tmpdir / "main.py").write_text(
-                """def main():
+            (tmpdir / "main.py").write_text("""def main():
     print("Hello, World!")
 
 if __name__ == "__main__":
     main()
-"""
-            )
+""")
 
             # Test 1: Git status
             print("\n2️⃣ Git Status")
@@ -147,13 +143,11 @@ if __name__ == "__main__":
             # Test 7: Make more changes
             print("\n8️⃣ Making More Changes")
             print("-" * 70)
-            (tmpdir / "tests.py").write_text(
-                """import pytest
+            (tmpdir / "tests.py").write_text("""import pytest
 
 def test_main():
     assert True
-"""
-            )
+""")
 
             result = await git(operation="stage", files=["tests.py"])
             if result["success"]:
@@ -191,11 +185,9 @@ def test_main():
             # Test 11: Make changes on main
             print("\n1️⃣1️⃣ Making Changes on Main Branch")
             print("-" * 70)
-            (tmpdir / "utils.py").write_text(
-                """def helper():
+            (tmpdir / "utils.py").write_text("""def helper():
     return "Helper function"
-"""
-            )
+""")
 
             result = await git(operation="stage")
             result = await git(operation="commit", message="feat: Add utility functions")
@@ -239,8 +231,7 @@ def test_main():
             print("  • Conflict resolution suggestions (conflicts)")
 
             print("\n\n📚 API Examples:")
-            print(
-                """
+            print("""
 # Status
 result = await git(operation="status")
 
@@ -267,8 +258,7 @@ result = await git(operation="branch")
 
 # Create/switch branch
 result = await git(operation="branch", branch="feature/new-feature")
-"""
-            )
+""")
 
         finally:
             # Restore original directory

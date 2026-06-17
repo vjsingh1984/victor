@@ -23,10 +23,15 @@ from __future__ import annotations
 
 from typing import Dict
 
+from victor.agent.prompt_section_texts import (
+    GROUNDING_RULES as CANONICAL_GROUNDING_RULES,
+    GROUNDING_RULES_EXTENDED as CANONICAL_GROUNDING_RULES_EXTENDED,
+)
 from victor.core.verticals.protocols import PromptContributorProtocol, TaskTypeHint
 
 # Task-type-specific prompt hints for benchmark tasks
 # These guide the model's approach based on detected task type
+# Enhanced with token budgets and skip flags for optimization (arXiv:2604.04979, arXiv:2604.01681)
 BENCHMARK_TASK_TYPE_HINTS: Dict[str, TaskTypeHint] = {
     "swe_bench_issue": TaskTypeHint(
         task_type="swe_bench_issue",
@@ -51,6 +56,11 @@ You are evaluated on:
 - Efficiency: Did you find and fix the bug quickly?""",
         tool_budget=20,
         priority_tools=["read", "code_search", "edit", "test", "git"],
+        token_budget=2000,
+        context_budget=4000,
+        skip_planning=False,
+        skip_evaluation=False,
+        temperature_override=0.1,  # Precise bug analysis
     ),
     "code_generation": TaskTypeHint(
         task_type="code_generation",
@@ -74,6 +84,11 @@ You are evaluated on:
 - Efficiency: Does your code run within time limits?""",
         tool_budget=5,
         priority_tools=["write", "read", "shell"],
+        token_budget=800,
+        context_budget=2000,
+        skip_planning=True,
+        skip_evaluation=True,
+        temperature_override=0.2,  # Low variance for correct code
     ),
     "function_completion": TaskTypeHint(
         task_type="function_completion",
@@ -95,6 +110,10 @@ You are evaluated on:
 - Completeness: Does it handle all required cases?""",
         tool_budget=3,
         priority_tools=["read", "edit", "test"],
+        token_budget=600,  # Function bodies are concise
+        context_budget=1500,  # Only need function context
+        skip_planning=True,  # Direct implementation
+        skip_evaluation=False,  # Need to verify with tests
     ),
     "bug_fixing": TaskTypeHint(
         task_type="bug_fixing",
@@ -117,6 +136,10 @@ You are evaluated on:
 - Minimality: Did you make the smallest necessary change?""",
         tool_budget=8,
         priority_tools=["read", "edit", "test", "shell"],
+        token_budget=1000,  # Need space for explanation
+        context_budget=3000,  # Need context to understand bug
+        skip_planning=False,  # Debugging needs planning
+        skip_evaluation=False,  # Must verify fix works
     ),
     "code_review": TaskTypeHint(
         task_type="code_review",
@@ -140,6 +163,10 @@ You are evaluated on:
 - Actionability: Is your feedback specific and helpful?""",
         tool_budget=15,
         priority_tools=["read", "grep", "code_search"],
+        token_budget=1500,  # Reviews can be detailed
+        context_budget=3500,  # Need full code context
+        skip_planning=True,  # Direct analysis
+        skip_evaluation=True,  # No verification needed
     ),
     "test_generation": TaskTypeHint(
         task_type="test_generation",
@@ -164,6 +191,10 @@ You are evaluated on:
 - Effectiveness: Do tests catch real bugs?""",
         tool_budget=12,
         priority_tools=["read", "write", "test", "shell"],
+        token_budget=1200,  # Test code can be lengthy
+        context_budget=2500,  # Need code context
+        skip_planning=True,  # Direct test writing
+        skip_evaluation=False,  # Must run tests
     ),
     "passk_sampling": TaskTypeHint(
         task_type="passk_sampling",
@@ -191,6 +222,10 @@ You are evaluated on:
 - Quality: Are all solutions well-written?""",
         tool_budget=50,
         priority_tools=["read", "write", "test", "shell"],
+        token_budget=3000,  # Multiple solutions need space
+        context_budget=2000,  # Standard context
+        skip_planning=False,  # Need planning for diverse solutions
+        skip_evaluation=False,  # Must test each candidate
     ),
     "benchmark_analysis": TaskTypeHint(
         task_type="benchmark_analysis",
@@ -214,39 +249,39 @@ You are evaluated on:
 - Actionability: Are your recommendations useful?""",
         tool_budget=10,
         priority_tools=["read", "grep", "shell"],
+        token_budget=1000,  # Analysis requires detail
+        context_budget=3000,  # Need data context
+        skip_planning=True,  # Direct analysis
+        skip_evaluation=True,  # No verification needed
     ),
 }
 
 
 # Benchmark-specific grounding rules
-BENCHMARK_GROUNDING_RULES = """
-GROUNDING: Base ALL responses on tool output only. Never invent file paths or content.
-Quote code exactly from tool output. If more info needed, call another tool.
-
+BENCHMARK_EVALUATION_GROUNDING_CONTEXT = """
 BENCHMARK EVALUATION: Your responses will be evaluated for correctness and quality.
 Focus on precision and accuracy in all interactions.
 """.strip()
 
+BENCHMARK_GROUNDING_RULES = (
+    f"{CANONICAL_GROUNDING_RULES}\n\n{BENCHMARK_EVALUATION_GROUNDING_CONTEXT}"
+).strip()
+
 
 # Extended grounding for benchmark evaluation
-BENCHMARK_GROUNDING_EXTENDED = """
-CRITICAL - TOOL OUTPUT GROUNDING:
-When you receive tool output in <TOOL_OUTPUT> tags:
-1. The content between ═══ markers is ACTUAL file/command output - NEVER ignore it
-2. You MUST base your analysis ONLY on this actual content
-3. NEVER fabricate, invent, or imagine file contents that differ from tool output
-4. If you need more information, call another tool - do NOT guess
-5. When citing code, quote EXACTLY from the tool output
-6. If tool output is empty or truncated, acknowledge this limitation
-
+BENCHMARK_EVALUATION_EXTENDED_CONTEXT = """
 BENCHMARK EVALUATION CONTEXT:
 - You are being evaluated on correctness and efficiency
 - Minimal, focused changes are preferred over large refactors
 - Test verification is critical for confirming solutions
 - Precision matters more than speed
-
-VIOLATION OF THESE RULES WILL RESULT IN INCORRECT ANALYSIS AND POOR EVALUATION SCORES.
 """.strip()
+
+BENCHMARK_GROUNDING_EXTENDED = (
+    f"{CANONICAL_GROUNDING_RULES_EXTENDED}\n\n"
+    f"{BENCHMARK_EVALUATION_EXTENDED_CONTEXT}\n\n"
+    "VIOLATION OF THESE RULES WILL RESULT IN INCORRECT ANALYSIS AND POOR EVALUATION SCORES."
+).strip()
 
 
 # Benchmark-specific system prompt section

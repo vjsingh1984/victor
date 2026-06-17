@@ -56,7 +56,10 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional
 
 from victor.agent.model_switcher import ModelSwitcher, SwitchReason, ModelSwitchEvent
-from victor.agent.tool_calling import ToolCallingAdapterRegistry, ToolCallingCapabilities
+from victor.agent.tool_calling import (
+    ToolCallingAdapterRegistry,
+    ToolCallingCapabilities,
+)
 from victor.agent.provider import (
     ProviderSwitcher,
     ProviderHealthMonitor,
@@ -68,6 +71,7 @@ from victor.core.errors import ProviderNotFoundError
 from victor.providers.base import BaseProvider
 from victor.providers.registry import ProviderRegistry
 from victor.providers.runtime_capabilities import ProviderRuntimeCapabilities
+from victor.providers.capability_contract import ProviderCapabilityContract
 
 logger = logging.getLogger(__name__)
 
@@ -115,6 +119,7 @@ class ProviderState:
     last_error: Optional[str] = None
     runtime_capabilities: Optional[ProviderRuntimeCapabilities] = None
     switch_count: int = 0
+    contract: Optional[ProviderCapabilityContract] = None
 
 
 class ProviderManager:
@@ -345,7 +350,9 @@ class ProviderManager:
 
         return capabilities
 
-    async def _discover_and_cache_capabilities(self) -> Optional[ProviderRuntimeCapabilities]:
+    async def _discover_and_cache_capabilities(
+        self,
+    ) -> Optional[ProviderRuntimeCapabilities]:
         """Discover provider capabilities asynchronously and cache result."""
         if not self._current_state:
             return None
@@ -445,7 +452,10 @@ class ProviderManager:
                     provider=provider_name,
                     model=new_model,
                     reason=reason,
-                    metadata={"from_provider": self.provider_name, "from_model": self.model},
+                    metadata={
+                        "from_provider": self.provider_name,
+                        "from_model": self.model,
+                    },
                 )
 
             return True
@@ -586,7 +596,7 @@ class ProviderManager:
         return {
             "provider": self.provider_name,
             "model": self.model,
-            "supports_tools": self.provider.supports_tools() if self.provider else False,
+            "supports_tools": (self.provider.supports_tools() if self.provider else False),
             "native_tool_calls": caps.native_tool_calls if caps else False,
             "streaming_tool_calls": caps.streaming_tool_calls if caps else False,
             "parallel_tool_calls": caps.parallel_tool_calls if caps else False,

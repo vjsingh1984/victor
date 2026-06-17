@@ -227,7 +227,11 @@ class TestPythonSimilarityComputer:
     def test_batch_cosine(self, similarity_computer, sample_vectors):
         """Test batch cosine similarity."""
         query = sample_vectors["unit_x"]
-        corpus = [sample_vectors["unit_x"], sample_vectors["unit_y"], sample_vectors["neg_x"]]
+        corpus = [
+            sample_vectors["unit_x"],
+            sample_vectors["unit_y"],
+            sample_vectors["neg_x"],
+        ]
 
         sims = similarity_computer.batch_cosine(query, corpus)
 

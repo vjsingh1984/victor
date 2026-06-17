@@ -42,7 +42,7 @@ from dataclasses import dataclass, field
 from typing import Any, List, Optional
 
 from victor.providers.base import ToolDefinition
-from victor.tools.base import ToolRegistry, CostTier
+from victor.tools.registry import ToolRegistry, CostTier
 
 logger = logging.getLogger(__name__)
 

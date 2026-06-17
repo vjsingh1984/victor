@@ -117,7 +117,7 @@ class TestToolsQuery:
         mock_tool.name = "read_file"
         mock_tool.description = "Read a file"
 
-        with patch("victor.tools.base.ToolRegistry") as MockRegistry:
+        with patch("victor.tools.registry.ToolRegistry") as MockRegistry:
             MockRegistry.return_value.list_tools.return_value = [mock_tool]
             result = await schema.execute("{ tools { name description category } }")
 

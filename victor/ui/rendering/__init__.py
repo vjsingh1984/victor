@@ -12,7 +12,7 @@ Design Pattern: Strategy + Protocol
 
 Benefits:
 - Single streaming loop eliminates code duplication
-- Easy to add new renderers (JSON, plain text, TUI, etc.)
+- Easy to add new renderers (JSON, plain text, IDE integrations, etc.)
 - Consistent behavior across all modes
 - Testable - can mock the renderer for unit tests
 
@@ -22,6 +22,8 @@ Package Structure:
 - formatter_renderer.py: OutputFormatter-based renderer
 - live_renderer.py: Rich Live display-based renderer
 - handler.py: stream_response() unified handler
+- overlay.py: Lightweight overlay panels for contextual information
+- table_builder.py: Rich table builders with consistent styling
 
 Thinking Content Handling (dual-mode):
 - **API-based reasoning**: DeepSeek API sends reasoning via metadata field
@@ -37,8 +39,35 @@ from victor.ui.rendering.buffered import BufferedRenderer
 from victor.ui.rendering.formatter_renderer import FormatterRenderer
 from victor.ui.rendering.handler import stream_response
 from victor.ui.rendering.live_renderer import LiveDisplayRenderer
+from victor.ui.rendering.metrics import StreamingMetrics
+from victor.ui.rendering.overlay import (
+    build_compact_shortcuts_table,
+    show_context_overlay,
+    show_mini_help_overlay,
+    show_plan_progress_overlay,
+    show_plan_status_overlay,
+    show_shortcuts_overlay,
+    show_status_overlay,
+)
 from victor.ui.rendering.protocol import StreamRenderer
+from victor.ui.rendering.table_builder import (
+    create_name_description_table,
+    create_name_status_table,
+    create_plan_list_table,
+    create_plan_task_table,
+    create_provider_table,
+    create_skill_table,
+    create_table,
+    format_configured_status,
+    format_enabled_status,
+    format_plan_status,
+    format_status,
+    format_task_status,
+    render_table_from_dict,
+    render_table_from_list,
+)
 from victor.ui.rendering.utils import (
+    StreamDeltaNormalizer,
     format_tool_args,
     render_edit_preview,
     render_file_preview,
@@ -53,12 +82,38 @@ __all__ = [
     "BufferedRenderer",
     "FormatterRenderer",
     "LiveDisplayRenderer",
+    # Metrics
+    "StreamingMetrics",
     # Handler
     "stream_response",
     # Utilities
+    "StreamDeltaNormalizer",
     "format_tool_args",
     "render_file_preview",
     "render_edit_preview",
     "render_thinking_indicator",
     "render_thinking_text",
+    # Table builders
+    "create_table",
+    "create_name_status_table",
+    "create_name_description_table",
+    "create_plan_task_table",
+    "create_plan_list_table",
+    "create_provider_table",
+    "create_skill_table",
+    "format_status",
+    "format_configured_status",
+    "format_enabled_status",
+    "format_plan_status",
+    "format_task_status",
+    "render_table_from_dict",
+    "render_table_from_list",
+    # Overlay panels
+    "show_shortcuts_overlay",
+    "show_status_overlay",
+    "show_plan_progress_overlay",
+    "show_plan_status_overlay",
+    "show_context_overlay",
+    "show_mini_help_overlay",
+    "build_compact_shortcuts_table",
 ]

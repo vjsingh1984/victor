@@ -31,17 +31,20 @@ from victor.providers.base import (
     is_streaming_provider,
     is_tool_calling_provider,
 )
+from victor.core.circuit_breaker import CircuitBreakerError, CircuitState
 from victor.providers.circuit_breaker import (
     CircuitBreaker,
-    CircuitBreakerError,
     CircuitBreakerRegistry,
-    CircuitState,
 )
 from victor.providers.registry import ProviderRegistry
 
 __all__ = [
     # Base classes
     "BaseProvider",
+    # HttpxOpenAICompatProvider is intentionally NOT eagerly imported here to
+    # avoid pulling ProviderLogger → resolution → settings into the providers
+    # package import chain. Import it directly:
+    #   from victor.providers.httpx_openai_compat import HttpxOpenAICompatProvider
     "Message",
     "CompletionResponse",
     "StreamChunk",

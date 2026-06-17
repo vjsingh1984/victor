@@ -69,7 +69,13 @@ class PipelineAnalyzerTool(BaseTool):
         "properties": {
             "action": {
                 "type": "string",
-                "enum": ["analyze", "coverage", "compare_coverage", "summary", "detect"],
+                "enum": [
+                    "analyze",
+                    "coverage",
+                    "compare_coverage",
+                    "summary",
+                    "detect",
+                ],
                 "description": "Action to perform",
             },
             "platform": {

@@ -36,7 +36,7 @@ Example:
         communication_style=CommunicationStyle.TECHNICAL,
         expertise_level=ExpertiseLevel.EXPERT,
         strengths=["pattern recognition", "thorough analysis"],
-        preferred_tools=["grep_codebase", "read_file"],
+        preferred_tools=["code_search", "read"],
     )
 
     # Create a team template

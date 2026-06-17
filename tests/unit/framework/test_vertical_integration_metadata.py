@@ -7,8 +7,11 @@ from typing import List
 from unittest.mock import patch
 
 from victor.core.verticals.base import VerticalBase, VerticalRegistry
-from victor.framework.vertical_integration import IntegrationResult, VerticalIntegrationPipeline
-from victor_sdk.verticals.manifest import ExtensionManifest, ExtensionType
+from victor.framework.vertical_integration import (
+    IntegrationResult,
+    VerticalIntegrationPipeline,
+)
+from victor_contracts.verticals.manifest import ExtensionManifest, ExtensionType
 
 
 def test_vertical_applied_payload_includes_manifest_metadata() -> None:
@@ -146,7 +149,8 @@ def test_async_handler_uses_namespace_executor_pool() -> None:
     sentinel_executor = object()
 
     with patch(
-        "victor.framework.vertical_integration.asyncio.get_event_loop", return_value=fake_loop
+        "victor.framework.vertical_integration.asyncio.get_running_loop",
+        return_value=fake_loop,
     ):
         with patch(
             "victor.framework.vertical_integration.get_namespace_executor_pool",

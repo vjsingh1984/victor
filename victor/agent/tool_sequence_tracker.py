@@ -28,12 +28,12 @@ Usage:
     tracker = ToolSequenceTracker()
 
     # Record tool executions
-    tracker.record_execution("read_file")
-    tracker.record_execution("edit_files")
+    tracker.record_execution("read")
+    tracker.record_execution("edit")
 
     # Get next tool suggestions with confidence boosts
     suggestions = tracker.get_next_suggestions(top_k=5)
-    # Returns: [("run_tests", 0.35), ("git", 0.20), ...]
+    # Returns: [("test", 0.35), ("git", 0.20), ...]
 
     # Apply boosts to existing tool scores
     boosted = tracker.apply_confidence_boost(tool_scores)
@@ -44,6 +44,8 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Set, Tuple
 
+from victor.tools.tool_names import ToolNames, get_canonical_name
+
 logger = logging.getLogger(__name__)
 
 
@@ -51,85 +53,85 @@ logger = logging.getLogger(__name__)
 # Format: (trigger_tool, likely_next_tools_with_base_weight)
 COMMON_TOOL_SEQUENCES: Dict[str, List[Tuple[str, float]]] = {
     # File exploration → editing pattern
-    "read_file": [
-        ("edit_files", 0.35),
+    ToolNames.READ: [
+        (ToolNames.EDIT, 0.35),
         ("code_search", 0.20),
         ("semantic_code_search", 0.15),
-        ("list_directory", 0.10),
+        (ToolNames.LS, 0.10),
     ],
     # Editing → verification pattern
-    "edit_files": [
-        ("read_file", 0.25),  # Verify changes
-        ("run_tests", 0.30),
+    ToolNames.EDIT: [
+        (ToolNames.READ, 0.25),  # Verify changes
+        (ToolNames.TEST, 0.30),
         ("git", 0.20),
-        ("execute_bash", 0.15),
+        (ToolNames.SHELL, 0.15),
     ],
     # Search → exploration pattern
     "code_search": [
-        ("read_file", 0.40),
+        (ToolNames.READ, 0.40),
         ("semantic_code_search", 0.20),
-        ("list_directory", 0.15),
+        (ToolNames.LS, 0.15),
     ],
     "semantic_code_search": [
-        ("read_file", 0.45),
+        (ToolNames.READ, 0.45),
         ("code_search", 0.20),
-        ("list_directory", 0.15),
+        (ToolNames.LS, 0.15),
     ],
     # Directory exploration → file reading
-    "list_directory": [
-        ("read_file", 0.40),
+    ToolNames.LS: [
+        (ToolNames.READ, 0.40),
         ("code_search", 0.25),
-        ("list_directory", 0.15),  # Deeper exploration
+        (ToolNames.LS, 0.15),  # Deeper exploration
     ],
     # Testing → debugging pattern
-    "run_tests": [
-        ("read_file", 0.30),
-        ("edit_files", 0.35),
-        ("execute_bash", 0.15),
+    ToolNames.TEST: [
+        (ToolNames.READ, 0.30),
+        (ToolNames.EDIT, 0.35),
+        (ToolNames.SHELL, 0.15),
     ],
     # Git operations pattern
     "git": [
-        ("read_file", 0.25),
-        ("edit_files", 0.20),
-        ("run_tests", 0.20),
+        (ToolNames.READ, 0.25),
+        (ToolNames.EDIT, 0.20),
+        (ToolNames.TEST, 0.20),
         ("git", 0.15),  # Chained git operations
     ],
     # Web research pattern
     "web_search": [
         ("web_fetch", 0.40),
-        ("read_file", 0.20),
-        ("edit_files", 0.15),
+        (ToolNames.READ, 0.20),
+        (ToolNames.EDIT, 0.15),
     ],
     "web_fetch": [
-        ("read_file", 0.25),
-        ("edit_files", 0.30),
+        (ToolNames.READ, 0.25),
+        (ToolNames.EDIT, 0.30),
         ("web_fetch", 0.20),  # Multiple pages
     ],
     # Documentation pattern
     "plan_files": [
-        ("read_file", 0.35),
-        ("list_directory", 0.25),
+        (ToolNames.READ, 0.35),
+        (ToolNames.LS, 0.25),
         ("code_search", 0.20),
     ],
     # Bash execution pattern
-    "execute_bash": [
-        ("read_file", 0.25),
-        ("edit_files", 0.20),
-        ("execute_bash", 0.25),  # Chained commands
-        ("run_tests", 0.15),
+    ToolNames.SHELL: [
+        (ToolNames.READ, 0.25),
+        (ToolNames.EDIT, 0.20),
+        (ToolNames.SHELL, 0.25),  # Chained commands
+        (ToolNames.TEST, 0.15),
     ],
 }
 
 # Multi-step workflow patterns (sequences of 3+ tools)
 WORKFLOW_PATTERNS: List[Tuple[List[str], str, float]] = [
     # Pattern: [previous tools] → suggested tool, weight
-    (["read_file", "edit_files"], "run_tests", 0.40),
-    (["code_search", "read_file"], "edit_files", 0.35),
-    (["list_directory", "read_file"], "edit_files", 0.30),
-    (["edit_files", "run_tests"], "git", 0.35),
-    (["run_tests", "edit_files"], "run_tests", 0.40),  # Fix and re-test
-    (["web_search", "web_fetch"], "edit_files", 0.30),
-    (["semantic_code_search", "read_file"], "edit_files", 0.35),
+    ([ToolNames.READ, ToolNames.EDIT], ToolNames.TEST, 0.40),
+    (["code_search", ToolNames.READ], ToolNames.EDIT, 0.35),
+    ([ToolNames.LS, ToolNames.READ], ToolNames.EDIT, 0.30),
+    ([ToolNames.EDIT, ToolNames.TEST], "git", 0.35),
+    ([ToolNames.TEST, ToolNames.EDIT], ToolNames.TEST, 0.40),  # Fix and re-test
+    (["web_search", "web_fetch"], ToolNames.EDIT, 0.30),
+    (["semantic_code_search", ToolNames.READ], ToolNames.EDIT, 0.35),
 ]
 
 
@@ -202,6 +204,11 @@ class ToolSequenceTracker:
 
         logger.debug("ToolSequenceTracker initialized")
 
+    @staticmethod
+    def _canonicalize_tool_name(tool_name: str) -> str:
+        """Normalize aliases to the canonical runtime tool name."""
+        return get_canonical_name(tool_name)
+
     def _load_predefined_patterns(self) -> None:
         """Load predefined patterns into transition matrix."""
         for from_tool, transitions in COMMON_TOOL_SEQUENCES.items():
@@ -224,6 +231,8 @@ class ToolSequenceTracker:
             success: Whether the execution succeeded
             execution_time: Time taken for execution
         """
+        tool_name = self._canonicalize_tool_name(tool_name)
+
         # Update transitions from previous tool
         if self._history:
             prev_tool = self._history[-1]
@@ -267,7 +276,7 @@ class ToolSequenceTracker:
         Returns:
             List of (tool_name, confidence) tuples sorted by confidence
         """
-        exclude = exclude_tools or set()
+        exclude = {self._canonicalize_tool_name(tool) for tool in (exclude_tools or set())}
         suggestions: Dict[str, float] = {}
 
         if not self._history:
@@ -327,7 +336,7 @@ class ToolSequenceTracker:
         # Apply boosts
         boosted_scores = {}
         for tool, score in tool_scores.items():
-            boost = boost_map.get(tool, 0.0)
+            boost = boost_map.get(self._canonicalize_tool_name(tool), 0.0)
             # Apply multiplicative boost
             boosted_scores[tool] = score * (1.0 + boost * self.config.boost_multiplier)
 
@@ -350,10 +359,10 @@ class ToolSequenceTracker:
 
         # Common workflow definitions
         workflows = {
-            "file_editing": ["read_file", "edit_files", "run_tests", "git"],
-            "code_exploration": ["list_directory", "code_search", "read_file"],
-            "web_research": ["web_search", "web_fetch", "read_file", "edit_files"],
-            "testing": ["run_tests", "read_file", "edit_files", "run_tests"],
+            "file_editing": [ToolNames.READ, ToolNames.EDIT, ToolNames.TEST, "git"],
+            "code_exploration": [ToolNames.LS, "code_search", ToolNames.READ],
+            "web_research": ["web_search", "web_fetch", ToolNames.READ, ToolNames.EDIT],
+            "testing": [ToolNames.TEST, ToolNames.READ, ToolNames.EDIT, ToolNames.TEST],
         }
 
         best_match = None
@@ -427,7 +436,12 @@ class ToolSequenceTracker:
             dependencies: Dict mapping tool names to list of dependent tools.
                          e.g., {"edit_files": ["read_file", "run_tests"]}
         """
-        self._vertical_dependencies = dependencies or {}
+        self._vertical_dependencies = {
+            self._canonicalize_tool_name(tool): [
+                self._canonicalize_tool_name(dep_tool) for dep_tool in deps
+            ]
+            for tool, deps in (dependencies or {}).items()
+        }
 
         # Add dependencies as transition weights
         for tool, deps in self._vertical_dependencies.items():
@@ -437,7 +451,7 @@ class ToolSequenceTracker:
                 # Blend with existing count (don't override)
                 stats.count = max(stats.count, 3)  # At least 3 pseudo-observations
 
-        logger.debug(f"Set {len(dependencies)} vertical tool dependencies")
+        logger.debug(f"Set {len(self._vertical_dependencies)} vertical tool dependencies")
 
     def set_sequences(self, sequences: Dict[str, List[Tuple[str, float]]]) -> None:
         """Set vertical-provided tool sequences.
@@ -449,7 +463,12 @@ class ToolSequenceTracker:
             sequences: Dict mapping tool names to list of (next_tool, weight) tuples.
                       e.g., {"read_file": [("edit_files", 0.4), ("code_search", 0.3)]}
         """
-        self._vertical_sequences = sequences or {}
+        self._vertical_sequences = {
+            self._canonicalize_tool_name(from_tool): [
+                (self._canonicalize_tool_name(to_tool), weight) for to_tool, weight in transitions
+            ]
+            for from_tool, transitions in (sequences or {}).items()
+        }
 
         # Merge vertical sequences into transition matrix
         for from_tool, transitions in self._vertical_sequences.items():
@@ -461,7 +480,7 @@ class ToolSequenceTracker:
                 # Vertical sequences are considered reliable
                 stats.success_rate = max(stats.success_rate, 0.9)
 
-        logger.debug(f"Set {len(sequences)} vertical tool sequences")
+        logger.debug(f"Set {len(self._vertical_sequences)} vertical tool sequences")
 
     def get_vertical_dependencies(self) -> Dict[str, List[str]]:
         """Get the vertical-provided tool dependencies.

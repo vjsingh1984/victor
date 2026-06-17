@@ -8,7 +8,9 @@ from victor.core.verticals.cache_invalidation import (
 )
 
 
-def test_invalidate_vertical_runtime_state_calls_all_runtime_reset_hooks(monkeypatch) -> None:
+def test_invalidate_vertical_runtime_state_calls_all_runtime_reset_hooks(
+    monkeypatch,
+) -> None:
     """Invalidation should clear config caches, registry discovery, and loader caches."""
 
     calls: list[str] = []
@@ -45,7 +47,9 @@ def test_invalidate_vertical_runtime_state_calls_all_runtime_reset_hooks(monkeyp
     assert result.successful is True
 
 
-def test_invalidate_vertical_runtime_state_collects_partial_failures(monkeypatch) -> None:
+def test_invalidate_vertical_runtime_state_collects_partial_failures(
+    monkeypatch,
+) -> None:
     """Invalidation should remain best-effort and surface partial failures."""
 
     monkeypatch.setattr(

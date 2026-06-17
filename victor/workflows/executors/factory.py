@@ -95,7 +95,7 @@ class NodeExecutorFactory:
         from victor.workflows.executors.condition import ConditionNodeExecutor
         from victor.workflows.executors.hitl import HITLNodeExecutor
         from victor.workflows.executors.parallel import ParallelNodeExecutor
-        from victor.workflows.executors.team import TeamNodeExecutor
+        from victor.workflows.executors.team import TeamStepExecutor
         from victor.workflows.executors.transform import TransformNodeExecutor
 
         self.register_executor_type("agent", AgentNodeExecutor, replace=True)
@@ -103,12 +103,14 @@ class NodeExecutorFactory:
         self.register_executor_type("transform", TransformNodeExecutor, replace=True)
         self.register_executor_type("parallel", ParallelNodeExecutor, replace=True)
         self.register_executor_type("condition", ConditionNodeExecutor, replace=True)
-        self.register_executor_type("team", TeamNodeExecutor, replace=True)
+        self.register_executor_type("team", TeamStepExecutor, replace=True)
         self.register_executor_type("hitl", HITLNodeExecutor, replace=True)
 
     def _register_extension_executor_types(self) -> None:
         """Register plugin- or application-provided workflow node executors."""
-        from victor.workflows.executors.registry import get_workflow_node_executor_registry
+        from victor.workflows.executors.registry import (
+            get_workflow_node_executor_registry,
+        )
 
         registry = get_workflow_node_executor_registry()
         for registration in registry.get_registrations().values():
@@ -207,16 +209,21 @@ class NodeExecutorFactory:
         )
 
     def _resolve_execution_context(self) -> Any:
-        """Resolve execution context for registered executors."""
+        """Resolve execution context for registered executors.
+
+        SEAM BOUNDARY: Workflow node-level execution context (not agent or tool-level)
+        - Use WorkflowNodeContext for: Workflow node executors, per-node execution state
+        - Do NOT use for: Agent orchestrator (use RuntimeExecutionContext), tools (use ToolExecutionContext)
+        """
         from victor.workflows.compiler_protocols import ExecutionContextProtocol
-        from victor.workflows.execution_context import ExecutionContext
+        from victor.workflows.execution_context import WorkflowNodeContext
 
         if hasattr(self._container, "get_optional"):
             context = self._container.get_optional(ExecutionContextProtocol)
             if context is not None:
                 return context
 
-        return ExecutionContext(services=self._container)
+        return WorkflowNodeContext(services=self._container)
 
     def supports_node_type(self, node_type: str) -> bool:
         """Check if a node type is supported.

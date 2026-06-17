@@ -27,6 +27,7 @@ from victor.providers.resolution import (
     KeySource,
     get_api_key_with_resolution,
     _get_provider_env_var,
+    _get_key_from_sentinelpass,
 )
 
 
@@ -143,6 +144,65 @@ class TestUnifiedApiKeyResolver:
             assert result.source == "environment"
             assert "DEEPSEEK_API_KEY" in result.source_detail
             assert result.confidence == "high"
+
+    def test_get_api_key_prefers_environment_over_sentinelpass(self):
+        """Environment variables must win over SentinelPass lookups."""
+        with patch.dict(
+            os.environ,
+            {
+                "ANTHROPIC_API_KEY": "sk-ant-env-key",
+                "VICTOR_SENTINELPASS_ENABLED": "true",
+            },
+            clear=True,
+        ):
+            with patch(
+                "victor.providers.resolution._get_key_from_sentinelpass"
+            ) as mock_sentinelpass:
+                resolver = UnifiedApiKeyResolver(non_interactive=True)
+                result = resolver.get_api_key("anthropic")
+
+                assert result.key == "sk-ant-env-key"
+                assert result.source == "environment"
+                mock_sentinelpass.assert_not_called()
+
+    def test_get_api_key_from_sentinelpass_when_enabled(self):
+        """SentinelPass is used after env vars and before keyring/file fallback."""
+        with patch.dict(os.environ, {"VICTOR_SENTINELPASS_ENABLED": "true"}, clear=True):
+            with patch(
+                "victor.providers.resolution._get_key_from_sentinelpass",
+                return_value="sk-ant-sentinelpass",
+            ):
+                resolver = UnifiedApiKeyResolver(non_interactive=True)
+                result = resolver.get_api_key("anthropic")
+
+                assert result.key == "sk-ant-sentinelpass"
+                assert result.source == "sentinelpass"
+                assert result.source_detail == "SentinelPass local vault"
+                assert any(source.source == "sentinelpass" for source in result.sources_attempted)
+
+    def test_get_key_from_sentinelpass_invokes_secret_get_without_logging_value(self):
+        """SentinelPass helper shells out to `sentinelpass secret-get` and returns stdout."""
+        completed = MagicMock()
+        completed.returncode = 0
+        completed.stdout = "sk-ant-from-vault\n"
+        completed.stderr = ""
+
+        with patch.dict(os.environ, {"VICTOR_SENTINELPASS_ENABLED": "true"}, clear=True):
+            with patch(
+                "victor.providers.resolution.shutil.which",
+                return_value="/usr/bin/sentinelpass",
+            ):
+                with patch(
+                    "victor.providers.resolution.subprocess.run", return_value=completed
+                ) as run:
+                    key = _get_key_from_sentinelpass("anthropic")
+
+        assert key == "sk-ant-from-vault"
+        cmd = run.call_args.args[0]
+        assert cmd[:2] == ["/usr/bin/sentinelpass", "secret-get"]
+        assert "--domain" in cmd
+        assert "anthropic" in cmd
+        assert "sk-ant-from-vault" not in cmd
 
     def test_get_api_key_not_found(self):
         """Test API key not found."""

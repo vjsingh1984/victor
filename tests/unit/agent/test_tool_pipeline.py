@@ -1,9 +1,11 @@
 """Tests for ToolPipeline, ToolCallResult, ToolPipelineConfig."""
 
 from unittest.mock import AsyncMock, MagicMock, patch
+import logging
 
 import pytest
 
+from victor.agent.tool_call_tracker import ToolCallTracker
 from victor.agent.tool_pipeline import (
     ToolCallResult,
     ToolPipeline,
@@ -11,6 +13,26 @@ from victor.agent.tool_pipeline import (
     PipelineExecutionResult,
     LRUToolCache,
 )
+from victor.agent.tool_executor import ToolExecutionResult
+
+
+@pytest.fixture
+def log_capture():
+    """Fixture to capture log messages."""
+    log_messages = []
+
+    class LogHandler(logging.Handler):
+        def emit(self, record):
+            log_messages.append(self.format(record))
+
+    handler = LogHandler()
+    logger = logging.getLogger("victor.agent.tool_pipeline")
+    logger.addHandler(handler)
+    logger.setLevel(logging.INFO)
+
+    yield log_messages
+
+    logger.removeHandler(handler)
 
 
 @pytest.fixture
@@ -110,12 +132,38 @@ class TestExecuteToolCalls:
         result = await pipeline.execute_tool_calls(tool_calls)
         assert result.results[0].skipped is True
         assert "budget" in result.results[0].skip_reason.lower()
+        assert result.results[0].outcome_kind == "budget_exhausted"
+        assert result.results[0].block_source == "tool_budget"
+        assert result.results[0].retryable is False
 
     async def test_unknown_tool_skipped(self, pipeline):
         pipeline.tools.is_tool_enabled.return_value = False
         tool_calls = [{"name": "nonexistent", "arguments": {}}]
         result = await pipeline.execute_tool_calls(tool_calls)
         assert result.results[0].skipped is True
+
+    async def test_camel_case_provider_tool_name_normalized_before_unknown_check(self, pipeline):
+        pipeline.tools.is_tool_enabled.return_value = False
+
+        result = await pipeline.execute_tool_calls(
+            [{"name": "setGlobalAxisManager", "arguments": {}}]
+        )
+
+        call_result = result.results[0]
+        assert call_result.skipped is True
+        assert call_result.tool_name == "set_global_axis_manager"
+        assert call_result.outcome_kind == "tool_unavailable"
+        assert "set_global_axis_manager" in call_result.skip_reason
+
+    async def test_camel_case_provider_tool_name_executes_as_normalized_name(
+        self, pipeline, mock_tool_executor
+    ):
+        await pipeline.execute_tool_calls(
+            [{"name": "readFile", "arguments": {"path": "/tmp/f.py"}}]
+        )
+
+        mock_tool_executor.execute.assert_awaited()
+        assert mock_tool_executor.execute.await_args.kwargs["tool_name"] == "read_file"
 
     async def test_callbacks_invoked(self, pipeline):
         on_start = MagicMock()
@@ -126,6 +174,297 @@ class TestExecuteToolCalls:
         await pipeline.execute_tool_calls(tool_calls)
         on_start.assert_called()
         on_complete.assert_called()
+
+    async def test_legacy_read_file_uses_exact_dedup_key(self, pipeline):
+        await pipeline.execute_tool_calls(
+            [{"name": "read_file", "arguments": {"path": "/tmp/f.py"}}]
+        )
+        assert "/tmp/f.py:None:None" in pipeline._read_file_timestamps
+
+    async def test_write_file_invalidates_read_dedup_key(self, pipeline, mock_tool_executor):
+        await pipeline.execute_tool_calls(
+            [{"name": "read_file", "arguments": {"path": "/tmp/f.py"}}]
+        )
+        assert "/tmp/f.py:None:None" in pipeline._read_file_timestamps
+
+        mock_tool_executor.execute.return_value = ToolExecutionResult(
+            tool_name="write",
+            success=True,
+            result="updated",
+            execution_time=0.01,
+        )
+        await pipeline.execute_tool_calls(
+            [{"name": "write_file", "arguments": {"path": "/tmp/f.py", "content": "x"}}]
+        )
+
+        assert "/tmp/f.py:None:None" not in pipeline._read_file_timestamps
+
+    async def test_write_file_marks_code_search_index_stale(self, pipeline, mock_tool_executor):
+        mock_tool_executor.execute.return_value = ToolExecutionResult(
+            tool_name="write",
+            success=True,
+            result="updated",
+            execution_time=0.01,
+        )
+
+        with patch(
+            "victor.tools.code_search_tool.mark_index_cache_stale_for_path",
+            return_value=2,
+        ) as mark_stale:
+            await pipeline.execute_tool_calls(
+                [
+                    {
+                        "name": "write_file",
+                        "arguments": {"path": "/tmp/f.py", "content": "x"},
+                    }
+                ]
+            )
+
+        mark_stale.assert_called_once()
+
+    async def test_duplicate_read_sets_structured_skip_metadata(self, pipeline):
+        with patch.object(pipeline, "_is_duplicate_read", return_value=True):
+            result = await pipeline.execute_tool_calls(
+                [{"name": "read", "arguments": {"path": "/tmp/f.py"}}]
+            )
+
+        call_result = result.results[0]
+        assert call_result.skipped is True
+        assert call_result.success is True
+        assert call_result.outcome_kind == "duplicate_read"
+        assert call_result.block_source == "session_read_dedup"
+        assert call_result.retryable is True
+        assert "already read with the same offset/limit" in call_result.user_message
+
+    async def test_failed_read_suggestion_redirects_next_identical_path(
+        self,
+        pipeline,
+        mock_tool_executor,
+    ):
+        error = (
+            "File not found: src/compute/distance/mod.rs\n"
+            "Did you mean one of these?\n"
+            "  - src/compute/distance_computation/mod.rs"
+        )
+        mock_tool_executor.execute.side_effect = [
+            ToolExecutionResult("read", success=False, result=None, error=error),
+            ToolExecutionResult("read", success=False, result=None, error=error),
+            ToolExecutionResult("read", success=True, result="correct file"),
+        ]
+
+        first = await pipeline.execute_tool_calls(
+            [{"name": "read", "arguments": {"path": "src/compute/distance/mod.rs"}}]
+        )
+        second = await pipeline.execute_tool_calls(
+            [{"name": "read", "arguments": {"path": "src/compute/distance/mod.rs"}}]
+        )
+
+        assert first.results[0].success is False
+        assert second.results[0].success is True
+        assert second.results[0].arguments["path"] == "src/compute/distance_computation/mod.rs"
+        assert (
+            mock_tool_executor.execute.await_args_list[-1].kwargs["arguments"]["path"]
+            == "src/compute/distance_computation/mod.rs"
+        )
+
+    async def test_successful_recovery_result_does_not_record_failed_signature(
+        self,
+        pipeline,
+        mock_tool_executor,
+    ):
+        error = (
+            "File not found: src/compute/distance/mod.rs\n"
+            "Did you mean one of these?\n"
+            "  - src/compute/distance_computation/mod.rs"
+        )
+        bad_args = {"path": "src/compute/distance/mod.rs"}
+        mock_tool_executor.execute.side_effect = [
+            ToolExecutionResult("read", success=False, result=None, error=error),
+            ToolExecutionResult("read", success=True, result="correct file"),
+        ]
+
+        result = await pipeline.execute_tool_calls([{"name": "read", "arguments": bad_args}])
+
+        assert result.results[0].success is True
+        assert pipeline.is_known_failure("read", bad_args) is False
+        assert result.results[0].arguments["path"] == "src/compute/distance_computation/mod.rs"
+
+    async def test_failed_read_self_suggestion_does_not_redirect(
+        self,
+        pipeline,
+        mock_tool_executor,
+    ):
+        error = "File not found: Cargo.toml\n" "Did you mean one of these?\n" "  - Cargo.toml"
+        mock_tool_executor.execute.return_value = ToolExecutionResult(
+            "read",
+            success=False,
+            result=None,
+            error=error,
+        )
+
+        await pipeline.execute_tool_calls([{"name": "read", "arguments": {"path": "Cargo.toml"}}])
+
+        assert pipeline._failed_path_redirects == {}
+
+    async def test_log_message_shows_actual_skip_reasons(self, pipeline, log_capture):
+        """Test that log messages show actual skip reasons, not hardcoded text."""
+        # Force budget exhaustion
+        pipeline.config.tool_budget = 1
+        pipeline._calls_used = 1
+
+        # Execute a tool call that will be skipped due to budget
+        await pipeline.execute_tool_calls([{"name": "read", "arguments": {"path": "/tmp/f.py"}}])
+
+        # Check that the log message contains the actual skip reason
+        log_text = " ".join(log_capture)
+        assert "Tool budget exhausted" in log_text or "budget" in log_text.lower()
+
+    async def test_log_message_multiple_skip_reasons(self, pipeline, log_capture):
+        """Test that log messages show multiple different skip reasons."""
+        # First call exhausts budget
+        pipeline.config.tool_budget = 1
+        pipeline._calls_used = 1
+
+        # Execute multiple tool calls that will be skipped
+        await pipeline.execute_tool_calls(
+            [
+                {"name": "read", "arguments": {"path": "/tmp/f1.py"}},
+                {"name": "ls", "arguments": {"path": "/tmp"}},
+            ]
+        )
+
+        # Check that the log message contains skip reason information
+        log_text = " ".join(log_capture)
+        # Should mention tools were skipped
+        assert "skipped" in log_text.lower()
+
+    async def test_write_clears_search_dedup_history_for_verification(self, mock_tool_registry):
+        executor = MagicMock()
+        executor.execute = AsyncMock(
+            side_effect=[
+                ToolExecutionResult(
+                    tool_name="code_search",
+                    success=True,
+                    result="before",
+                    execution_time=0.01,
+                ),
+                ToolExecutionResult(
+                    tool_name="write",
+                    success=True,
+                    result="updated",
+                    execution_time=0.01,
+                ),
+                ToolExecutionResult(
+                    tool_name="code_search",
+                    success=True,
+                    result="after",
+                    execution_time=0.01,
+                ),
+            ]
+        )
+        pipeline = ToolPipeline(
+            tool_registry=mock_tool_registry,
+            tool_executor=executor,
+            config=ToolPipelineConfig(
+                enable_idempotent_caching=False,
+                enable_output_aggregation=False,
+                enable_synthesis_checkpoints=False,
+                enable_semantic_caching=False,
+            ),
+            deduplication_tracker=ToolCallTracker(),
+        )
+
+        search_call = [{"name": "code_search", "arguments": {"query": "node_ids"}}]
+        write_call = [{"name": "write", "arguments": {"path": "/tmp/f.py", "content": "x"}}]
+
+        first = await pipeline.execute_tool_calls(search_call, {})
+        assert first.results[0].skipped is False
+
+        with patch(
+            "victor.tools.code_search_tool.mark_index_cache_stale_for_path",
+            return_value=1,
+        ):
+            await pipeline.execute_tool_calls(write_call, {})
+
+        second = await pipeline.execute_tool_calls(search_call, {})
+        assert second.results[0].skipped is False
+        assert second.results[0].result == "after"
+        assert executor.execute.await_count == 3
+
+
+class TestCodeIntelligenceFirstNavigation:
+    async def test_build_mode_routes_broad_code_read_to_diagnostics(
+        self,
+        pipeline,
+        mock_tool_executor,
+    ):
+        mock_tool_executor.execute.return_value = ToolExecutionResult(
+            tool_name="lsp",
+            success=True,
+            result={"diagnostics": [{"file_path": "/tmp/service.py", "line": 88}]},
+            execution_time=0.01,
+        )
+
+        result = await pipeline.execute_tool_calls(
+            [{"name": "read", "arguments": {"path": "/tmp/service.py"}}],
+            {"mode": "build"},
+        )
+
+        call_result = result.results[0]
+        assert call_result.tool_name == "lsp"
+        assert call_result.arguments == {
+            "action": "diagnostics",
+            "file_path": "/tmp/service.py",
+        }
+        assert "Steered broad read(path=...)" in call_result.user_message
+        mock_tool_executor.execute.assert_awaited_once_with(
+            tool_name="lsp",
+            arguments={"action": "diagnostics", "file_path": "/tmp/service.py"},
+            context={"mode": "build"},
+        )
+
+    async def test_build_mode_follow_up_broad_read_uses_diagnostic_range(
+        self,
+        pipeline,
+        mock_tool_executor,
+    ):
+        mock_tool_executor.execute.side_effect = [
+            ToolExecutionResult(
+                tool_name="lsp",
+                success=True,
+                result={"diagnostics": [{"file_path": "/tmp/service.py", "line": 88}]},
+                execution_time=0.01,
+            ),
+            ToolExecutionResult(
+                tool_name="read",
+                success=True,
+                result="targeted contents",
+                execution_time=0.01,
+            ),
+        ]
+
+        await pipeline.execute_tool_calls(
+            [{"name": "read", "arguments": {"path": "/tmp/service.py"}}],
+            {"mode": "build"},
+        )
+        result = await pipeline.execute_tool_calls(
+            [{"name": "read", "arguments": {"path": "/tmp/service.py"}}],
+            {"mode": "build"},
+        )
+
+        call_result = result.results[0]
+        assert call_result.tool_name == "read"
+        assert call_result.arguments == {
+            "path": "/tmp/service.py",
+            "offset": 48,
+            "limit": 120,
+        }
+        assert "line 88" in call_result.user_message
+        mock_tool_executor.execute.assert_awaited_with(
+            tool_name="read",
+            arguments={"path": "/tmp/service.py", "offset": 48, "limit": 120},
+            context={"mode": "build"},
+        )
 
 
 class TestLRUToolCache:
@@ -147,3 +486,213 @@ class TestLRUToolCache:
         cache.set("k", "v")
         cache.clear()
         assert len(cache) == 0
+
+
+class TestNavigationHintLoopDetection:
+    """Test navigation hint loop detection and expiration mechanisms."""
+
+    async def test_explicit_offset_limit_supersedes_navigation_hints(
+        self, pipeline, mock_tool_executor
+    ):
+        """When agent provides explicit offset/limit, navigation hints should be ignored."""
+        import time
+        from victor.agent.file_state import normalize_file_path
+
+        now = time.monotonic()
+        # Set up a navigation hint for line 100 using normalized path
+        test_file = "/tmp/test.py"
+        normalized_path = normalize_file_path(test_file)
+        pipeline._recent_code_navigation_hints[normalized_path] = {
+            "source_tool": "refs",
+            "file_path": test_file,
+            "line": 100,
+            "use_count": 0,
+            "created_at": now,
+            "last_result_hash": None,
+        }
+
+        # Call with explicit offset/limit that differs from hint
+        result = pipeline._select_follow_up_code_read_rewrite(
+            test_file,
+            offset=500,
+            limit=200,
+            context={},
+        )
+
+        # Should return None (don't rewrite) when explicit params provided
+        assert result is None
+
+    async def test_navigation_hint_expires_after_max_uses(self, pipeline, mock_tool_executor):
+        """Navigation hints should expire after max_uses is reached."""
+        import time
+        from victor.agent.file_state import normalize_file_path
+
+        now = time.monotonic()
+        test_file = "/tmp/test.py"
+        normalized_path = normalize_file_path(test_file)
+        # Set up a navigation hint with use_count at max
+        pipeline._recent_code_navigation_hints[normalized_path] = {
+            "source_tool": "refs",
+            "file_path": test_file,
+            "line": 100,
+            "use_count": 3,  # At max_uses
+            "created_at": now,
+            "last_result_hash": None,
+        }
+
+        # Call should clear the hint
+        result = pipeline._select_follow_up_code_read_rewrite(
+            test_file,
+            offset=None,
+            limit=None,
+            context={},
+        )
+
+        # Hint should be cleared and return None
+        assert result is None
+        assert normalized_path not in pipeline._recent_code_navigation_hints
+
+    async def test_navigation_hint_increments_use_count(self, pipeline, mock_tool_executor):
+        """Using a navigation hint should increment its use_count."""
+        import time
+        from victor.agent.file_state import normalize_file_path
+
+        now = time.monotonic()
+        test_file = "/tmp/test.py"
+        normalized_path = normalize_file_path(test_file)
+        # Set up a navigation hint with use_count=0
+        pipeline._recent_code_navigation_hints[normalized_path] = {
+            "source_tool": "refs",
+            "file_path": test_file,
+            "line": 100,
+            "use_count": 0,
+            "created_at": now,
+            "last_result_hash": None,
+        }
+
+        # Call should return rewrite and increment use_count
+        result = pipeline._select_follow_up_code_read_rewrite(
+            test_file,
+            offset=None,
+            limit=None,
+            context={},
+        )
+
+        assert result is not None
+        assert result[0] == "read"
+        assert result[1]["offset"] == 60  # max(100 - 40, 0)
+        assert result[1]["limit"] == 120
+        assert pipeline._recent_code_navigation_hints[normalized_path]["use_count"] == 1
+
+    async def test_no_hint_returns_none(self, pipeline, mock_tool_executor):
+        """When no navigation hint exists, should return None."""
+        result = pipeline._select_follow_up_code_read_rewrite(
+            "/tmp/nonexistent.py",
+            offset=None,
+            limit=None,
+            context={},
+        )
+
+        assert result is None
+
+    async def test_none_line_number_skips_rewrite(self, pipeline, mock_tool_executor):
+        """Navigation hints with None line number should not trigger rewrite."""
+        import time
+        from victor.agent.file_state import normalize_file_path
+
+        now = time.monotonic()
+        test_file = "/tmp/test.py"
+        normalized_path = normalize_file_path(test_file)
+        pipeline._recent_code_navigation_hints[normalized_path] = {
+            "source_tool": "project_overview",
+            "file_path": test_file,
+            "line": None,
+            "use_count": 0,
+            "created_at": now,
+            "last_result_hash": None,
+        }
+
+        result = pipeline._select_follow_up_code_read_rewrite(
+            test_file,
+            offset=None,
+            limit=None,
+            context={},
+        )
+
+        assert result is None
+
+    async def test_different_files_maintain_separate_hints(self, pipeline, mock_tool_executor):
+        """Navigation hints should be tracked independently per file."""
+        import time
+        from victor.agent.file_state import normalize_file_path
+
+        now = time.monotonic()
+        file1 = "/tmp/file1.py"
+        file2 = "/tmp/file2.py"
+        normalized_path1 = normalize_file_path(file1)
+        normalized_path2 = normalize_file_path(file2)
+        pipeline._recent_code_navigation_hints[normalized_path1] = {
+            "source_tool": "refs",
+            "file_path": file1,
+            "line": 100,
+            "use_count": 0,
+            "created_at": now,
+            "last_result_hash": None,
+        }
+        pipeline._recent_code_navigation_hints[normalized_path2] = {
+            "source_tool": "symbol",
+            "file_path": file2,
+            "line": 200,
+            "use_count": 1,
+            "created_at": now,
+            "last_result_hash": None,
+        }
+
+        result1 = pipeline._select_follow_up_code_read_rewrite(
+            file1,
+            offset=None,
+            limit=None,
+            context={},
+        )
+        result2 = pipeline._select_follow_up_code_read_rewrite(
+            file2,
+            offset=None,
+            limit=None,
+            context={},
+        )
+
+        assert result1 is not None
+        assert result1[1]["offset"] == 60  # 100 - 40
+        assert result2 is not None
+        assert result2[1]["offset"] == 160  # 200 - 40
+        assert pipeline._recent_code_navigation_hints[normalized_path1]["use_count"] == 1
+        assert pipeline._recent_code_navigation_hints[normalized_path2]["use_count"] == 2
+
+    async def test_navigation_hint_expires_after_ttl(self, pipeline, mock_tool_executor):
+        """Navigation hints should expire after TTL seconds."""
+        import time
+        from victor.agent.file_state import normalize_file_path
+
+        test_file = "/tmp/test.py"
+        normalized_path = normalize_file_path(test_file)
+        # Set up an expired hint (older than TTL)
+        expired_time = time.monotonic() - 700  # Older than 600s TTL
+        pipeline._recent_code_navigation_hints[normalized_path] = {
+            "source_tool": "refs",
+            "file_path": test_file,
+            "line": 100,
+            "use_count": 0,
+            "created_at": expired_time,
+            "last_result_hash": None,
+        }
+
+        result = pipeline._select_follow_up_code_read_rewrite(
+            test_file,
+            offset=None,
+            limit=None,
+            context={},
+        )
+
+        # Expired hint should be cleared
+        assert result is None
+        assert normalized_path not in pipeline._recent_code_navigation_hints

@@ -434,7 +434,10 @@ async def run_benchmark(
         print(flush=True)
 
     result = await harness.run_evaluation(
-        config, agent_callback, progress_callback=print_progress, retry_callback=retry_callback
+        config,
+        agent_callback,
+        progress_callback=print_progress,
+        retry_callback=retry_callback,
     )
 
     # Get metrics from harness

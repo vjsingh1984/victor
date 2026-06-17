@@ -98,10 +98,12 @@ class TestProviderHealthChecker:
         checker = ProviderHealthChecker()
 
         with patch(
-            "victor.providers.health.ProviderRegistry.list_providers", return_value=["ollama"]
+            "victor.providers.health.ProviderRegistry.list_providers",
+            return_value=["ollama"],
         ):
             with patch(
-                "victor.providers.health.ProviderRegistry.get", side_effect=Exception("Not found")
+                "victor.providers.health.ProviderRegistry.get",
+                side_effect=Exception("Not found"),
             ):
 
                 async def run_check():

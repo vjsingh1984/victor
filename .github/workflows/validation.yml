@@ -10,6 +10,9 @@ on:
       - 'victor/**'
   workflow_dispatch:
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 permissions:
   contents: read
   pull-requests: write
@@ -47,7 +50,7 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install torch --index-url https://download.pytorch.org/whl/cpu
-          pip install -e ./victor-sdk
+          pip install -e ./victor-contracts
           pip install -e ".[dev]"
 
       - name: Find modified FEP files
@@ -113,7 +116,7 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install torch --index-url https://download.pytorch.org/whl/cpu
-          pip install -e ./victor-sdk
+          pip install -e ./victor-contracts
           pip install -e ".[dev]"
 
       - name: Find modified vertical directories

@@ -16,10 +16,11 @@
 
 from datetime import datetime
 import io
+import logging
 from pathlib import Path
 from types import SimpleNamespace
 import pytest
-from unittest.mock import MagicMock, AsyncMock
+from unittest.mock import MagicMock, AsyncMock, call, patch
 
 from rich.console import Console
 
@@ -31,6 +32,7 @@ from victor.ui.slash import (
     get_command_registry,
     register_command,
 )
+from victor.ui.slash.registry import CommandRegistry
 
 
 class TestCommandMetadata:
@@ -273,7 +275,7 @@ class TestSlashCommandHandlerExecute:
     async def test_execute_unknown_command(self):
         """Test executing an unknown command still returns True (handled)."""
         stdout = io.StringIO()
-        console = Console(file=stdout, force_terminal=False)
+        console = Console(file=stdout, force_terminal=False, width=160)
         settings = MagicMock()
         handler = SlashCommandHandler(console=console, settings=settings)
 
@@ -323,7 +325,7 @@ class TestSlashCommandHandlerHelp:
     async def test_help_shows_commands(self):
         """Test help command shows available commands."""
         stdout = io.StringIO()
-        console = Console(file=stdout, force_terminal=False)
+        console = Console(file=stdout, force_terminal=False, width=160)
         settings = MagicMock()
         handler = SlashCommandHandler(console=console, settings=settings)
 
@@ -336,7 +338,7 @@ class TestSlashCommandHandlerHelp:
     async def test_help_specific_command(self):
         """Test help for specific command."""
         stdout = io.StringIO()
-        console = Console(file=stdout, force_terminal=False)
+        console = Console(file=stdout, force_terminal=False, width=160)
         settings = MagicMock()
         handler = SlashCommandHandler(console=console, settings=settings)
 
@@ -350,7 +352,7 @@ class TestSlashCommandHandlerHelp:
     async def test_help_graph_tool_modes(self):
         """Test help can describe graph tool call modes."""
         stdout = io.StringIO()
-        console = Console(file=stdout, force_terminal=False)
+        console = Console(file=stdout, force_terminal=False, width=160)
         settings = MagicMock()
         handler = SlashCommandHandler(console=console, settings=settings)
 
@@ -382,7 +384,7 @@ class TestSlashCommandHandlerClear:
     async def test_clear_without_agent(self):
         """Test clear command without agent shows warning."""
         stdout = io.StringIO()
-        console = Console(file=stdout, force_terminal=False)
+        console = Console(file=stdout, force_terminal=False, width=160)
         settings = MagicMock()
 
         handler = SlashCommandHandler(console=console, settings=settings)
@@ -416,7 +418,7 @@ class TestSlashCommandHandlerStatus:
         stdout = io.StringIO()
         console = Console(file=stdout, force_terminal=False)
         settings = MagicMock()
-        settings.tool_call_budget = 25
+        settings.tools.tool_call_budget = 25
 
         agent = MagicMock()
         agent.provider_name = "anthropic"
@@ -493,12 +495,13 @@ class TestAllCommandsRegistered:
         "serialization",
         "learning",
         "mlstats",
+        "bayesian",
     ]
 
     # Expected aliases mapping
     EXPECTED_ALIASES = {
-        "help": ["?", "commands"],
-        "model": ["models"],
+        "help": ["?"],
+        "model": ["models", "switch"],
         "profile": ["profiles"],
         "provider": ["providers"],
         "clear": ["reset"],
@@ -509,13 +512,13 @@ class TestAllCommandsRegistered:
         "compact": ["summarize"],
         "mcp": ["servers"],
         "bug": ["issue", "feedback"],
-        "exit": ["quit", "bye"],
+        "exit": ["quit"],
         "theme": ["dark", "light"],
-        "changes": ["diff", "rollback"],
-        "cost": ["usage", "tokens", "stats"],
+        "changes": ["diff"],
+        "cost": ["usage"],
         "approvals": ["safety"],
         "search": ["web"],
-        "directory": ["dir", "cd", "pwd"],
+        "directory": ["cd"],
         "snapshots": ["snap"],
         "commit": ["ci"],
         "mode": ["m"],
@@ -524,6 +527,7 @@ class TestAllCommandsRegistered:
         "serialization": ["serialize", "ser"],
         "learning": ["qlearn", "rl"],
         "mlstats": ["ml", "analytics"],
+        "bayesian": ["bayes"],
     }
 
     def test_all_commands_registered(self):
@@ -607,7 +611,7 @@ class TestSlashCommandCategories:
         settings = MagicMock()
         handler = SlashCommandHandler(console=console, settings=settings)
 
-        metrics_commands = ["cost", "metrics", "mlstats", "learning"]
+        metrics_commands = ["cost", "metrics", "mlstats", "learning", "bayesian"]
         for cmd in metrics_commands:
             assert handler.registry.has(cmd), f"Metrics command '{cmd}' missing"
 
@@ -649,6 +653,31 @@ class TestCommandRegistry:
         # Help should be in system category
         help_in_system = any(c.metadata.name == "help" for c in system_commands)
         assert help_in_system, "Help command not in system category"
+
+    def test_duplicate_registration_logs_debug_not_warning(self, caplog):
+        """Duplicate slash command registration is expected during reloads."""
+
+        class DuplicateCommand(BaseSlashCommand):
+            @property
+            def metadata(self):
+                return CommandMetadata(
+                    name="duplicate",
+                    description="duplicate command",
+                    usage="/duplicate",
+                )
+
+        registry = CommandRegistry()
+        command = DuplicateCommand()
+        registry.register(command)
+
+        with caplog.at_level(logging.DEBUG, logger="victor.ui.slash.registry"):
+            registry.register(command)
+
+        duplicate_records = [
+            record for record in caplog.records if "already registered" in record.message
+        ]
+        assert duplicate_records
+        assert all(record.levelno == logging.DEBUG for record in duplicate_records)
 
 
 class TestBaseSlashCommand:
@@ -766,6 +795,89 @@ class TestLearningCommandUnified:
         # Should show some output
         assert len(output) > 0
 
+    def test_learning_prefers_runtime_intelligence_capability_for_stats(self):
+        """Learning stats should resolve the canonical runtime-intelligence capability first."""
+        from victor.ui.slash.commands.metrics import LearningCommand
+
+        stdout = io.StringIO()
+        console = Console(file=stdout, force_terminal=False)
+        settings = MagicMock()
+        stats = SimpleNamespace(
+            session_duration=12.5,
+            total_requests=4,
+            enhanced_requests=3,
+            quality_validations=2,
+            avg_quality_score=0.85,
+            avg_grounding_score=0.75,
+        )
+        integration = SimpleNamespace(
+            get_stats=lambda: stats,
+            mode_controller=SimpleNamespace(
+                get_session_stats=lambda: {
+                    "profile_name": "coding",
+                    "total_reward": 1.25,
+                    "mode_transitions": 2,
+                    "exploration_rate": 0.15,
+                    "modes_visited": ["READING", "ACTING"],
+                }
+            ),
+        )
+
+        def get_capability_value(name: str):
+            if name == "runtime_intelligence_integration":
+                return integration
+            raise AssertionError(f"Unexpected capability lookup: {name}")
+
+        agent = SimpleNamespace(
+            runtime_intelligence_integration=None,
+            get_capability_value=MagicMock(side_effect=get_capability_value),
+            provider_name="ollama",
+        )
+        ctx = CommandContext(console=console, settings=settings, agent=agent)
+
+        with patch("victor.framework.rl.coordinator.get_rl_coordinator") as mock_get_coordinator:
+            mock_get_coordinator.return_value.get_learner.return_value = None
+            LearningCommand().execute(ctx)
+
+        output = stdout.getvalue()
+        assert "Runtime-Intelligence:" in output
+        assert "Intelligent Pipeline:" not in output
+        assert agent.get_capability_value.call_args_list == [
+            call("runtime_intelligence_integration")
+        ]
+
+    def test_learning_reset_prefers_runtime_intelligence_capability(self):
+        """Learning reset should resolve the canonical runtime-intelligence capability first."""
+        from victor.ui.slash.commands.metrics import LearningCommand
+
+        stdout = io.StringIO()
+        console = Console(file=stdout, force_terminal=False)
+        settings = MagicMock()
+        integration = MagicMock()
+        learner = MagicMock()
+
+        def get_capability_value(name: str):
+            if name == "runtime_intelligence_integration":
+                return integration
+            raise AssertionError(f"Unexpected capability lookup: {name}")
+
+        agent = SimpleNamespace(
+            runtime_intelligence_integration=None,
+            get_capability_value=MagicMock(side_effect=get_capability_value),
+            provider_name="ollama",
+        )
+        ctx = CommandContext(console=console, settings=settings, agent=agent, args=["reset"])
+
+        with patch("victor.framework.rl.coordinator.get_rl_coordinator") as mock_get_coordinator:
+            mock_get_coordinator.return_value.get_learner.return_value = learner
+            LearningCommand().execute(ctx)
+
+        integration.reset_session.assert_called_once_with()
+        learner.reset.assert_called_once_with()
+        assert agent.get_capability_value.call_args_list == [
+            call("runtime_intelligence_integration")
+        ]
+
 
 # =============================================================================
 # SYSTEM COMMANDS TESTS
@@ -845,12 +957,12 @@ class TestSystemCommands:
         stdout = io.StringIO()
         console = Console(file=stdout, force_terminal=False)
         settings = MagicMock()
-        settings.default_provider = "anthropic"
-        settings.default_model = "claude-3-5-sonnet"
+        settings.provider.default_provider = "anthropic"
+        settings.provider.default_model = "claude-3-5-sonnet"
         settings.ollama_base_url = "http://localhost:11434"
         settings.airgapped_mode = False
         settings.use_semantic_tool_selection = True
-        settings.unified_embedding_model = "all-MiniLM-L6-v2"
+        settings.search.unified_embedding_model = "all-MiniLM-L6-v2"
         settings.codebase_graph_store = "sqlite"
         settings.graph_enabled = True
 
@@ -908,6 +1020,74 @@ class TestModeCommands:
 
         assert meta.name == "explore"
         assert meta.category in ["mode", "system", "general"]
+
+    def test_review_command_metadata(self):
+        """Test ReviewCommand metadata."""
+        from victor.ui.slash.commands.mode import ReviewCommand
+
+        cmd = ReviewCommand()
+        meta = cmd.metadata
+
+        assert meta.name == "review"
+        assert meta.category in ["mode", "system", "general"]
+
+    def test_delegate_command_metadata(self):
+        """Test DelegateCommand metadata."""
+        from victor.ui.slash.commands.mode import DelegateCommand
+
+        cmd = DelegateCommand()
+        meta = cmd.metadata
+
+        assert meta.name == "delegate"
+        assert meta.category in ["mode", "system", "general"]
+
+    def test_mode_command_switches_canonical_controller_and_refreshes_prompt(self):
+        """Mode command should use the canonical AgentMode enum and refresh prompt."""
+        from victor.agent.mode_controller import AgentMode, AgentModeController
+        from victor.ui.slash.commands.mode import ModeCommand
+
+        console = Console(file=io.StringIO())
+        controller = AgentModeController()
+        agent = SimpleNamespace(
+            mode_controller=controller,
+            refresh_system_prompt=MagicMock(),
+        )
+        ctx = CommandContext(
+            console=console,
+            settings=MagicMock(),
+            agent=agent,
+            args=["plan"],
+        )
+
+        ModeCommand().execute(ctx)
+
+        assert controller.current_mode == AgentMode.PLAN
+        assert controller.config.name == "Plan"
+        agent.refresh_system_prompt.assert_called_once()
+
+    def test_mode_command_switches_to_review_mode(self):
+        """Mode command should support the review-focused coding mode."""
+        from victor.agent.mode_controller import AgentMode, AgentModeController
+        from victor.ui.slash.commands.mode import ModeCommand
+
+        console = Console(file=io.StringIO())
+        controller = AgentModeController()
+        agent = SimpleNamespace(
+            mode_controller=controller,
+            refresh_system_prompt=MagicMock(),
+        )
+        ctx = CommandContext(
+            console=console,
+            settings=MagicMock(),
+            agent=agent,
+            args=["review"],
+        )
+
+        ModeCommand().execute(ctx)
+
+        assert controller.current_mode == AgentMode.REVIEW
+        assert controller.config.name == "Review"
+        agent.refresh_system_prompt.assert_called_once()
 
 
 # =============================================================================
@@ -1138,6 +1318,49 @@ class TestSessionCommands:
         assert meta.name == "save"
         assert meta.category in ["session", "general"]
 
+    def test_save_command_surfaces_preview_counts(self):
+        """Test SaveCommand shows saved message and preview counts."""
+        from victor.ui.slash.commands.session import SaveCommand
+
+        stdout = io.StringIO()
+        console = Console(file=stdout, force_terminal=False, width=160)
+        settings = MagicMock()
+        settings.current_profile = "default"
+        agent = MagicMock()
+        agent.active_session_id = None
+        agent.model = "claude-sonnet-4-20250514"
+        agent.provider_name = "anthropic"
+        agent.conversation = MagicMock()
+        agent.conversation.message_count.return_value = 3
+        agent.conversation.preview_messages = [
+            {
+                "role": "assistant",
+                "content": "diff",
+                "metadata": {"preview_path": "app.py"},
+            }
+        ]
+
+        store = MagicMock()
+        store.save_session.return_value = "test-session-123"
+
+        ctx = CommandContext(
+            console=console, settings=settings, agent=agent, args=["Preview Session"]
+        )
+
+        with patch("victor.agent.conversation.store.ConversationStore", return_value=store):
+            SaveCommand().execute(ctx)
+
+        output = stdout.getvalue()
+        assert "Session Saved" in output
+        assert "test-session-123" in output
+        assert "Messages:" in output
+        assert "Previews:" in output
+        assert "Preview Files:" in output
+        assert "Preview Session" in output
+        assert "app.py" in output
+        assert "3" in output
+        assert "1" in output
+
     def test_load_command_metadata(self):
         """Test LoadCommand metadata."""
         from victor.ui.slash.commands.session import LoadCommand
@@ -1156,6 +1379,178 @@ class TestSessionCommands:
         meta = cmd.metadata
 
         assert meta.name == "sessions"
+
+    def test_sessions_command_displays_preview_counts(self):
+        """Test SessionsCommand shows preview counts in the listing table."""
+        from victor.ui.slash.commands.session import SessionsCommand
+        from victor.agent.conversation.store import ConversationSession
+
+        stdout = io.StringIO()
+        console = Console(file=stdout, force_terminal=False, width=160)
+        settings = MagicMock()
+        store = MagicMock()
+        store.list_sessions.return_value = [
+            ConversationSession(
+                session_id="test-session-123",
+                title="Preview Session",
+                model="claude-sonnet-4-20250514",
+                provider="anthropic",
+                messages=[MagicMock(), MagicMock()],
+                preview_messages=[MagicMock()],
+                created_at=datetime.fromisoformat("2026-03-19T10:00:00"),
+            )
+        ]
+
+        ctx = CommandContext(console=console, settings=settings, args=[])
+
+        with patch("victor.agent.conversation.store.ConversationStore", return_value=store):
+            SessionsCommand().execute(ctx)
+
+        output = stdout.getvalue()
+        assert "Saved Sessions" in output
+        assert "test-session-123" in output
+        assert "Preview Session" in output
+        assert "claude-sonnet-4-20250514" in output
+        assert "1" in output
+
+    def test_load_command_surfaces_preview_counts(self):
+        """Test LoadCommand shows preview counts from persisted preview messages."""
+        from victor.ui.slash.commands.session import LoadCommand
+
+        stdout = io.StringIO()
+        console = Console(file=stdout, force_terminal=False, width=160)
+        settings = MagicMock()
+        agent = MagicMock()
+        session = MagicMock()
+        session.conversation = {
+            "messages": [{"role": "user", "content": "hello"}],
+            "preview_messages": [
+                {
+                    "role": "assistant",
+                    "content": "diff",
+                    "metadata": {"preview_path": "app.py"},
+                }
+            ],
+        }
+        session.conversation_state = None
+        session.metadata = SimpleNamespace(
+            title="Preview Session",
+            model="claude-sonnet-4-20250514",
+            provider="anthropic",
+            message_count=2,
+            created_at="2026-03-19T10:00:00",
+        )
+
+        ctx = CommandContext(
+            console=console,
+            settings=settings,
+            agent=agent,
+            args=["test-session-123"],
+        )
+
+        with patch("victor.agent.session.get_session_manager") as get_session_manager:
+            get_session_manager.return_value.load_session.return_value = session
+            LoadCommand().execute(ctx)
+
+        output = stdout.getvalue()
+        assert "Session Loaded" in output
+        assert "Previews:" in output
+        assert "Preview Files:" in output
+        assert "Preview Session" in output
+        assert "app.py" in output
+        assert "1" in output
+
+    def test_resume_command_surfaces_resume_summary(self):
+        """Test ResumeCommand shows SessionContextLinker resume summary."""
+        from victor.agent.session_context_linker import SessionResumeContext
+        from victor.ui.slash.commands.session import ResumeCommand
+
+        stdout = io.StringIO()
+        console = Console(file=stdout, force_terminal=False, width=160)
+        settings = MagicMock()
+        agent = MagicMock()
+        agent.conversation_controller = None
+
+        store = MagicMock()
+        store.load_session.return_value = {
+            "metadata": {
+                "session_id": "test-session-123",
+                "title": "Preview Session",
+                "model": "claude-sonnet-4-20250514",
+                "provider": "anthropic",
+                "message_count": 2,
+                "created_at": "2026-03-19T10:00:00",
+            },
+            "conversation": {
+                "messages": [{"role": "user", "content": "hello"}],
+                "preview_messages": [
+                    {
+                        "role": "assistant",
+                        "content": "diff",
+                        "metadata": {"preview_path": "app.py"},
+                    }
+                ],
+            },
+        }
+        linker_instance = MagicMock()
+        linker_instance.build_resume_context.return_value = SessionResumeContext(
+            resume_summary="[Resumed session. previews: app.py.]"
+        )
+
+        ctx = CommandContext(
+            console=console, settings=settings, agent=agent, args=["test-session-123"]
+        )
+
+        with (
+            patch("victor.agent.conversation.store.ConversationStore", return_value=store),
+            patch(
+                "victor.agent.session_context_linker.SessionContextLinker",
+                return_value=linker_instance,
+            ),
+        ):
+            ResumeCommand().execute(ctx)
+
+        output = stdout.getvalue()
+        assert "Session Resumed" in output
+        assert "Previews:" in output
+        assert "Preview Files:" in output
+        assert "Resume:" in output
+        assert "app.py" in output
+        assert "1" in output
+
+    def test_resume_command_selection_displays_preview_counts(self):
+        """Test interactive ResumeCommand listing shows preview counts."""
+        from victor.ui.slash.commands.session import ResumeCommand
+        from victor.agent.conversation.store import ConversationSession
+
+        stdout = io.StringIO()
+        console = Console(file=stdout, force_terminal=False, width=160)
+        settings = MagicMock()
+        agent = MagicMock()
+        store = MagicMock()
+        store.list_sessions.return_value = [
+            ConversationSession(
+                session_id="test-session-123",
+                title="Preview Session",
+                model="claude-sonnet-4-20250514",
+                provider="anthropic",
+                messages=[MagicMock(), MagicMock()],
+                preview_messages=[MagicMock()],
+                created_at=datetime.fromisoformat("2026-03-19T10:00:00"),
+            )
+        ]
+
+        ctx = CommandContext(console=console, settings=settings, agent=agent, args=[])
+
+        with patch("victor.agent.conversation.store.ConversationStore", return_value=store):
+            ResumeCommand().execute(ctx)
+
+        output = stdout.getvalue()
+        assert "Recent Sessions" in output
+        assert "Previews" in output
+        assert "test-session-123" in output
+        assert "Preview Session" in output
+        assert "/resume <session_id>" in output
 
 
 # =============================================================================
@@ -1282,6 +1677,43 @@ class TestMetricsCommands:
 
         assert meta.name == "mlstats"
 
+    def test_bayesian_command_metadata(self):
+        """Test BayesianCommand metadata."""
+        from victor.ui.slash.commands.bayesian import BayesianCommand
+
+        cmd = BayesianCommand()
+        meta = cmd.metadata
+
+        assert meta.name == "bayesian"
+        assert "bayes" in meta.aliases
+        assert meta.category == "metrics"
+
+    def test_bayesian_command_shows_summary(self):
+        """Test BayesianCommand renders summary output."""
+        from victor.ui.slash.commands.bayesian import BayesianCommand
+
+        stdout = io.StringIO()
+        console = Console(file=stdout, force_terminal=False)
+        settings = MagicMock()
+        service = MagicMock()
+        service.render_summary.return_value = "Bayesian summary body"
+
+        with patch(
+            "victor.ui.slash.commands.bayesian.get_bayesian_monitoring_service",
+            return_value=service,
+        ):
+            BayesianCommand().execute(
+                CommandContext(
+                    console=console,
+                    settings=settings,
+                    args=["summary", "--days", "14"],
+                )
+            )
+
+        output = stdout.getvalue()
+        assert "Bayesian summary body" in output
+        service.render_summary.assert_called_once_with(14)
+
 
 # =============================================================================
 # CODEBASE COMMANDS TESTS
@@ -1309,6 +1741,70 @@ class TestCodebaseCommands:
         meta = cmd.metadata
 
         assert meta.name == "init"
+
+    @pytest.mark.asyncio
+    async def test_reindex_command_passes_graph_writer_settings(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+    ) -> None:
+        """ReindexCommand should pass graph settings through to CodebaseIndexFactory.create."""
+        from victor.ui.slash.commands.codebase import ReindexCommand
+
+        stdout = io.StringIO()
+        console = Console(file=stdout, force_terminal=False)
+        graph_path = tmp_path / "graph.sqlite"
+        settings = SimpleNamespace(
+            codebase_graph_writer_mode="off",
+            codebase_graph_store="sqlite",
+            codebase_graph_path=str(graph_path),
+            codebase_vector_store="lancedb",
+            codebase_embedding_provider="sentence-transformers",
+            codebase_embedding_model="BAAI/bge-small-en-v1.5",
+        )
+        paths = SimpleNamespace(embeddings_dir=tmp_path / ".victor" / "embeddings")
+        mock_index = MagicMock()
+        mock_index.ensure_indexed = AsyncMock()
+        mock_index.get_stats.return_value = {
+            "total_files": 3,
+            "total_symbols": 11,
+            "total_lines": 420,
+            "embeddings_enabled": True,
+            "is_indexed": True,
+        }
+        mock_factory = MagicMock()
+        mock_factory.create.return_value = mock_index
+        mock_registry = MagicMock()
+        mock_registry.get.return_value = mock_factory
+
+        monkeypatch.setattr("victor.config.settings.load_settings", lambda: settings)
+        monkeypatch.setattr(
+            "victor.config.settings.get_project_paths",
+            lambda root=None: paths,
+        )
+        monkeypatch.setattr(
+            "victor.core.capability_registry.CapabilityRegistry.get_instance",
+            lambda: mock_registry,
+        )
+        monkeypatch.chdir(tmp_path)
+
+        ctx = CommandContext(console=console, settings=settings, args=[])
+        await ReindexCommand().execute(ctx)
+
+        mock_factory.create.assert_called_once_with(
+            root_path=str(tmp_path),
+            use_embeddings=True,
+            embedding_config={
+                "vector_store": "lancedb",
+                "embedding_model_type": "sentence-transformers",
+                "embedding_model_name": "BAAI/bge-small-en-v1.5",
+                "persist_directory": str(paths.embeddings_dir),
+            },
+            graph_writer_mode="off",
+            graph_store_name="sqlite",
+            graph_path=graph_path,
+        )
+        mock_index.ensure_indexed.assert_awaited_once_with(auto_reindex=True)
 
     @pytest.mark.asyncio
     async def test_init_command_quick_mode_writes_generated_content(
@@ -1352,5 +1848,58 @@ class TestCodebaseCommands:
 
         await InitCommand().execute(ctx)
 
-        assert target_path.read_text(encoding="utf-8") == generated
+        content = target_path.read_text(encoding="utf-8")
+        assert content.startswith(generated)
+        assert "## Repository Working Agreements" in content
+        assert "Preserve user work in git" in content
         assert "Created" in stdout.getvalue()
+
+    @pytest.mark.asyncio
+    async def test_init_command_reports_architecture_pattern_count(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+    ) -> None:
+        """InitCommand should count markdown architecture bullets accurately."""
+        from victor.ui.slash.commands.codebase import InitCommand
+
+        stdout = io.StringIO()
+        console = Console(file=stdout, force_terminal=False)
+        settings = MagicMock()
+        target_path = tmp_path / ".victor" / "init.md"
+        project_victor_dir = target_path.parent
+
+        monkeypatch.setattr(
+            "victor.config.settings.get_project_paths",
+            lambda: SimpleNamespace(
+                project_context_file=target_path,
+                project_victor_dir=project_victor_dir,
+            ),
+        )
+
+        generated = """# init.md
+
+## Architecture Patterns
+
+- **Facade**: One entry point
+- **Registry**: Shared extension lookup
+"""
+
+        def load_attr(name: str):
+            if name == "generate_smart_victor_md":
+                return lambda: generated
+            if name == "generate_enhanced_init_md":
+                return AsyncMock(return_value="# deep init\n")
+            if name == "generate_victor_md_from_index":
+                return AsyncMock(return_value="# index init\n")
+            raise AssertionError(f"unexpected analyzer export requested: {name}")
+
+        monkeypatch.setattr(
+            "victor.ui.slash.commands.codebase.load_codebase_analyzer_attr", load_attr
+        )
+
+        ctx = CommandContext(console=console, settings=settings, args=[])
+
+        await InitCommand().execute(ctx)
+
+        assert "Patterns: 2" in stdout.getvalue()

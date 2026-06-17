@@ -16,9 +16,9 @@ def test_load_sdk_vertical_extensions_falls_back_to_package_export(monkeypatch) 
     real_import_module = importlib.import_module
 
     def fake_import_module(name: str, package: str | None = None):
-        if name == "victor_sdk.verticals.extensions":
+        if name == "victor_contracts.verticals.extensions":
             raise ModuleNotFoundError(name)
-        if name == "victor_sdk.verticals":
+        if name == "victor_contracts.verticals":
             return type(
                 "FakeVerticalPackage",
                 (),
@@ -43,7 +43,7 @@ def test_load_sdk_vertical_extensions_returns_none_when_sdk_layout_is_unavailabl
     real_import_module = importlib.import_module
 
     def fake_import_module(name: str, package: str | None = None):
-        if name.startswith("victor_sdk.verticals"):
+        if name.startswith("victor_contracts.verticals"):
             raise ModuleNotFoundError(name)
         return real_import_module(name, package)
 

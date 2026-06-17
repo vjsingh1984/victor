@@ -2,17 +2,21 @@
 
 This module provides ToolSet for configuring which tools are
 available to an agent. Most users can use the preset methods
-(default, minimal, full, airgapped) without understanding
-individual tools.
+without needing to name individual tools.
+
+Presets (in order of scope):
+    minimal()   — core only (7 tools: read, write, edit, shell, search,
+                  code_search, ls)
+    default()   — core + filesystem + git (~20 tools); recommended starting point
+    airgapped() — core + filesystem + git + analysis; no network tools
+    coding()    — core + filesystem + git + testing + refactoring
+    research()  — core + filesystem + web
+    full()      — all categories including web, database, docker, communication
 
 Example:
-    # Default tools (most common)
     agent = await Agent.create(tools=ToolSet.default())
-
-    # Minimal for simple tasks
     agent = await Agent.create(tools=ToolSet.minimal())
-
-    # Full access
+    agent = await Agent.create(tools=ToolSet.airgapped())
     agent = await Agent.create(tools=ToolSet.full())
 
     # Custom selection
@@ -26,8 +30,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import List, Optional, Set, Union
 
-from victor_sdk.core.types import Tier as SdkTier
-from victor_sdk.core.types import ToolSet as SdkToolSet
+from victor_contracts.core.types import Tier as SdkTier
+from victor_contracts.core.types import ToolSet as SdkToolSet
 
 
 class ToolCategory(str, Enum):
@@ -97,7 +101,10 @@ def _load_builtin_category_tools() -> dict:
     Returns:
         Dict mapping ToolCategory enum -> set of tool names
     """
-    from victor.config.tool_categories import load_tool_categories, get_fallback_categories
+    from victor.config.tool_categories import (
+        load_tool_categories,
+        get_fallback_categories,
+    )
 
     # Try loading from YAML
     yaml_categories = load_tool_categories()
@@ -410,10 +417,12 @@ class ToolSet:
 
     Example:
         # Use presets for common cases
-        tools = ToolSet.default()     # Core + filesystem + git
-        tools = ToolSet.minimal()     # Just core tools
-        tools = ToolSet.full()        # Everything
-        tools = ToolSet.airgapped()   # No network tools
+        tools = ToolSet.default()     # core + filesystem + git (~20 tools)
+        tools = ToolSet.minimal()     # core only (7 tools)
+        tools = ToolSet.airgapped()   # core + filesystem + git, no network
+        tools = ToolSet.coding()      # adds testing + refactoring to default
+        tools = ToolSet.research()    # core + filesystem + web
+        tools = ToolSet.full()        # all 14 categories (includes network + comms)
 
         # Custom selection
         tools = ToolSet.from_categories(["filesystem", "git"])
@@ -463,10 +472,13 @@ class ToolSet:
 
     @classmethod
     def default(cls) -> "ToolSet":
-        """Default tool set - core + filesystem + git.
+        """Default tool set — core + filesystem + git (~20 tools).
 
-        This is the recommended starting point for most use cases.
-        Includes file operations, shell access, and git integration.
+        Recommended starting point for most use cases. Covers:
+          core:       read, write, edit, shell, search, code_search, ls
+          filesystem: list_directory, glob, find_files, file_info, mkdir,
+                      rm, mv, cp (plus core file tools)
+          git:        git, git_status, git_diff, git_commit, git_branch, git_log
 
         Returns:
             ToolSet with sensible defaults
@@ -481,12 +493,11 @@ class ToolSet:
 
     @classmethod
     def minimal(cls) -> "ToolSet":
-        """Minimal tool set - only core operations.
+        """Minimal tool set — core operations only (7 tools).
 
-        Use this for simple tasks that don't need git or
-        advanced file operations.
+        Use for simple tasks that don't need git or filesystem navigation.
 
-        Includes: read, write, edit, shell, search
+        Includes: read, write, edit, shell, search, code_search, ls
 
         Returns:
             ToolSet with minimal tools
@@ -495,9 +506,14 @@ class ToolSet:
 
     @classmethod
     def full(cls) -> "ToolSet":
-        """Full tool set - all available tools.
+        """Full tool set — all 14 built-in categories.
 
-        Use with caution - gives the agent access to everything.
+        Includes every category: core, filesystem, git, search, web,
+        database, docker, testing, refactoring, documentation, analysis,
+        communication (slack/teams/jira), notebook, task_management.
+
+        Use with caution — grants network access, shell execution, and
+        external service integrations.
 
         Returns:
             ToolSet with all categories
@@ -506,10 +522,13 @@ class ToolSet:
 
     @classmethod
     def airgapped(cls) -> "ToolSet":
-        """Tool set for air-gapped environments (no network).
+        """Tool set for air-gapped environments (no network access).
 
-        Includes core, filesystem, and git but excludes all
-        network-dependent tools.
+        Includes core, filesystem, and git. Explicitly excludes
+        web_search, web_fetch, http_request, and fetch_url regardless
+        of any category extensions that might add them.
+
+        Does not include web, database, docker, or communication categories.
 
         Returns:
             ToolSet without network tools
@@ -528,6 +547,8 @@ class ToolSet:
         """Tool set optimized for coding tasks.
 
         Includes core, filesystem, git, testing, and refactoring.
+          testing:     run_tests, pytest, test_runner, test
+          refactoring: refactor, rename_symbol, extract_function, rename
 
         Returns:
             ToolSet for coding workflows
@@ -546,7 +567,8 @@ class ToolSet:
     def research(cls) -> "ToolSet":
         """Tool set optimized for research tasks.
 
-        Includes core, web, and filesystem tools.
+        Includes core, filesystem, and web tools.
+          web: web_search, web_fetch, http_request, fetch_url
 
         Returns:
             ToolSet for research workflows

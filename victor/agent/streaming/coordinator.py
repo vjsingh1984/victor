@@ -66,6 +66,10 @@ from victor.agent.streaming.iteration import (
     create_break_result,
     create_force_completion_result,
 )
+from victor.core.loop_thresholds import (
+    DEFAULT_BLOCKED_CONSECUTIVE_THRESHOLD,
+    DEFAULT_BLOCKED_TOTAL_THRESHOLD,
+)
 from victor.providers.base import StreamChunk
 
 if TYPE_CHECKING:
@@ -98,6 +102,8 @@ class CoordinatorConfig:
     Attributes:
         session_idle_timeout: Maximum idle time in seconds.
         budget_warning_threshold: Tool calls before budget warning.
+        budget_warning_pct: Fraction of tool budget used before warning.
+        budget_warning_remaining: Warn when this many or fewer tool calls remain.
         consecutive_blocked_limit: Blocked attempts before force.
         total_blocked_limit: Total blocked attempts before force.
         max_empty_responses: Empty responses before recovery.
@@ -105,8 +111,10 @@ class CoordinatorConfig:
 
     session_idle_timeout: float = 180.0
     budget_warning_threshold: int = 250
-    consecutive_blocked_limit: int = 4
-    total_blocked_limit: int = 6
+    budget_warning_pct: float = 0.8
+    budget_warning_remaining: int = 5
+    consecutive_blocked_limit: int = DEFAULT_BLOCKED_CONSECUTIVE_THRESHOLD
+    total_blocked_limit: int = DEFAULT_BLOCKED_TOTAL_THRESHOLD
     max_empty_responses: int = 3
 
 
@@ -142,12 +150,27 @@ class IterationCoordinator:
         self._handler = handler
         self._loop_detector = loop_detector
         self._settings = settings
-        self._config = config or CoordinatorConfig()
+        if config is not None:
+            self._config = config
+        elif settings is not None:
+            self._config = CoordinatorConfig(
+                budget_warning_threshold=getattr(
+                    settings, "tool_call_budget_warning_threshold", 250
+                ),
+                budget_warning_pct=getattr(settings, "tool_call_budget_warning_pct", 0.8),
+                budget_warning_remaining=getattr(settings, "tool_call_budget_warning_remaining", 5),
+            )
+        else:
+            self._config = CoordinatorConfig()
 
     @property
     def config(self) -> CoordinatorConfig:
         """Get the coordinator configuration."""
         return self._config
+
+    def _sync_blocked_thresholds(self, ctx: StreamingChatContext) -> None:
+        """Ensure context-based blocked checks use coordinator-configured limits."""
+        ctx.max_blocked_before_force = self._config.consecutive_blocked_limit
 
     def should_continue(
         self,
@@ -166,6 +189,8 @@ class IterationCoordinator:
         Returns:
             True if loop should continue, False otherwise.
         """
+        self._sync_blocked_thresholds(ctx)
+
         # Check if last result says to break
         if last_result is not None and last_result.should_break:
             return False
@@ -204,6 +229,8 @@ class IterationCoordinator:
         Returns:
             IterationResult if loop should stop/yield, None to continue.
         """
+        self._sync_blocked_thresholds(ctx)
+
         # Increment iteration counter
         ctx.increment_iteration()
 
@@ -242,7 +269,12 @@ class IterationCoordinator:
             IterationResult if additional action needed, None otherwise.
         """
         # Check budget warning
-        budget_result = self._handler.check_tool_budget(ctx, self._config.budget_warning_threshold)
+        budget_result = self._handler.check_tool_budget(
+            ctx,
+            self._config.budget_warning_threshold,
+            self._config.budget_warning_pct,
+            self._config.budget_warning_remaining,
+        )
         if budget_result is not None:
             return budget_result
 

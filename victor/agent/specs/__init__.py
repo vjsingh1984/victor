@@ -33,14 +33,14 @@ Example (Python DSL):
     researcher = AgentSpec(
         name="researcher",
         description="Gathers information and analyzes data",
-        capabilities=["web_search", "code_search", "read_file"],
+        capabilities=["web_search", "code_search", "read"],
         model_preference="reasoning",  # Let system pick best model
     )
 
     coder = AgentSpec(
         name="coder",
         description="Writes and modifies code",
-        capabilities=["edit_file", "write_file", "execute_bash"],
+        capabilities=["edit", "write", "shell"],
         model_preference="coding",
     )
 
@@ -56,7 +56,7 @@ Example (YAML):
 
       - name: coder
         description: Writes code
-        capabilities: [edit_file, write_file]
+        capabilities: [edit, write]
 
     ensemble:
       type: pipeline

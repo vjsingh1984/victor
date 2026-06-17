@@ -297,6 +297,21 @@ class ExternalPluginManager:
         plugin = self._plugins[plugin_id]
         tool_spec = next(t for t in plugin.manifest.tools if t.name == tool_name)
 
+        # Permission enforcement (Codex finding #6 — was advisory only)
+        required_perm = getattr(tool_spec, "required_permission", "workspace-write")
+        if required_perm == "danger-full-access":
+            allow_dangerous = getattr(self, "_allow_dangerous", False)
+            if not allow_dangerous:
+                logger.warning(
+                    f"[permission] Tool '{tool_name}' requires 'danger-full-access' "
+                    f"but dangerous execution is not enabled. Denied."
+                )
+                return PluginToolResult(
+                    output=f"Permission denied: '{tool_name}' requires 'danger-full-access'",
+                    is_error=True,
+                    return_code=126,
+                )
+
         # Resolve command path
         command = tool_spec.command
         if command.startswith("./") or command.startswith("../"):

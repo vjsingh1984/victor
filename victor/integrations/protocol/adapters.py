@@ -174,6 +174,30 @@ class DirectProtocolAdapter(VictorProtocol):
         self._pending_provider = provider
         self._pending_model = model
 
+    async def get_effective_config(self) -> dict[str, Any]:
+        """Return effective runtime configuration for direct clients."""
+        from victor.config.settings import load_settings
+        from victor.framework.runtime_discovery import effective_runtime_config
+
+        return effective_runtime_config(load_settings())
+
+    async def get_profiles(self) -> list[dict[str, Any]]:
+        """List configured runtime profiles."""
+        from victor.config.settings import load_settings
+        from victor.framework.runtime_discovery import list_runtime_profiles
+
+        return [profile.to_dict() for profile in list_runtime_profiles(load_settings())]
+
+    async def get_modes(self) -> list[dict[str, str]]:
+        """List supported runtime modes."""
+        from victor.framework.runtime_discovery import list_runtime_modes
+
+        return list_runtime_modes()
+
+    async def switch_profile(self, profile: str) -> None:
+        """Record a pending runtime profile switch for direct clients."""
+        self._pending_profile = profile
+
     async def switch_mode(self, mode: AgentMode) -> None:
         """Switch agent mode."""
         if hasattr(self._orchestrator, "set_mode"):
@@ -364,6 +388,34 @@ class HTTPProtocolAdapter(VictorProtocol):
         response = await self._client.post(
             "/model/switch",
             json={"provider": provider, "model": model},
+        )
+        response.raise_for_status()
+
+    async def get_effective_config(self) -> dict[str, Any]:
+        """Return effective runtime configuration."""
+        response = await self._client.get("/config/effective")
+        response.raise_for_status()
+        return dict(response.json())
+
+    async def get_profiles(self) -> list[dict[str, Any]]:
+        """List configured runtime profiles."""
+        response = await self._client.get("/profiles")
+        response.raise_for_status()
+        data = response.json()
+        return list(data.get("profiles", []))
+
+    async def get_modes(self) -> list[dict[str, str]]:
+        """List supported runtime modes."""
+        response = await self._client.get("/modes")
+        response.raise_for_status()
+        data = response.json()
+        return list(data.get("modes", []))
+
+    async def switch_profile(self, profile: str) -> None:
+        """Switch active runtime profile."""
+        response = await self._client.post(
+            "/profile/switch",
+            json={"profile": profile},
         )
         response.raise_for_status()
 

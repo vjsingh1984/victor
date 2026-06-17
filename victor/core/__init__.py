@@ -22,6 +22,8 @@ This package provides foundational infrastructure:
 """
 
 from victor.core.container import (
+    AsyncDisposable,
+    ContainerFrozenError,
     ServiceContainer,
     ServiceScope,
     ServiceLifetime,
@@ -46,6 +48,7 @@ from victor.core.protocols import (
     IntentClassifierProtocol,
     EmbeddingServiceProtocol,
     ToolCallingAdapterProtocol,
+    RuntimeIntelligencePipelineProtocol,
     IntelligentPipelineProtocol,
     ProviderProtocol,
     CacheProtocol,
@@ -138,7 +141,6 @@ from victor.core.repository import (
     AttributeSpecification,
     BaseSpecification,
     CachedRepository,
-    ConcurrencyError as RepositoryConcurrencyError,
     Entity,
     EntityExistsError,
     EntityNotFoundError,
@@ -224,6 +226,8 @@ from victor.core.schema import (
 
 __all__ = [
     # Container
+    "AsyncDisposable",
+    "ContainerFrozenError",
     "ServiceContainer",
     "ServiceScope",
     "ServiceLifetime",
@@ -244,6 +248,7 @@ __all__ = [
     "IntentClassifierProtocol",
     "EmbeddingServiceProtocol",
     "ToolCallingAdapterProtocol",
+    "RuntimeIntelligencePipelineProtocol",
     "IntelligentPipelineProtocol",
     "ProviderProtocol",
     "CacheProtocol",
@@ -332,7 +337,6 @@ __all__ = [
     "ReadOnlyRepository",
     "Repository",
     "RepositoryError",
-    "RepositoryConcurrencyError",
     "SQLiteRepository",
     "create_cached_repository",
     "create_repository",

@@ -56,7 +56,8 @@ class TestArgumentNormalizerInit:
         normalizer = ArgumentNormalizer()
         assert normalizer.provider_name == "unknown"
         assert normalizer.config == {}
-        assert normalizer.parameter_aliases == {}
+        # parameter_aliases may be loaded from YAML config at init
+        assert isinstance(normalizer.parameter_aliases, dict)
 
     def test_init_with_provider_name(self):
         """Test initialization with provider name."""
@@ -70,10 +71,11 @@ class TestArgumentNormalizerInit:
         assert normalizer.config == config
 
     def test_init_with_parameter_aliases(self):
-        """Test initialization with parameter aliases."""
+        """Test initialization with parameter aliases merges with defaults."""
         config = {"parameter_aliases": {"read": {"line_start": "offset"}}}
         normalizer = ArgumentNormalizer(config=config)
-        assert normalizer.parameter_aliases == {"read": {"line_start": "offset"}}
+        assert "read" in normalizer.parameter_aliases
+        assert normalizer.parameter_aliases["read"]["line_start"] == "offset"
 
     def test_initial_stats(self):
         """Test initial stats are zeroed."""
@@ -131,6 +133,14 @@ class TestNormalizeParameterAliases:
         assert result == {"path": "test.py", "offset": 10, "max_lines": 100}
         assert was_aliased is True
 
+    def test_edit_operations_alias_applied(self):
+        """Canonical edit should accept the legacy operations key."""
+        normalizer = ArgumentNormalizer()
+        args = {"operations": []}
+        result, was_aliased = normalizer.normalize_parameter_aliases(args, "edit")
+        assert result == {"ops": []}
+        assert was_aliased is True
+
 
 class TestNormalizeArgumentsDirectPath:
     """Tests for normalize_arguments - direct valid JSON path."""
@@ -166,6 +176,22 @@ class TestNormalizeArgumentsDirectPath:
         assert normalizer.stats["total_calls"] == 1
         assert normalizer.stats["normalizations"]["direct"] == 1
 
+    def test_write_content_preserves_json_like_string(self):
+        """Write content should remain a raw string even if it looks like JSON."""
+        normalizer = ArgumentNormalizer()
+        args = {"path": "config.json", "content": '{"enabled": false, "count": 3}\n'}
+        result, strategy = normalizer.normalize_arguments(args, "write")
+        assert result == args
+        assert strategy == NormalizationStrategy.DIRECT
+
+    def test_shell_cmd_with_heredoc_preserved(self):
+        """Shell heredoc commands should survive normalization unchanged."""
+        normalizer = ArgumentNormalizer()
+        cmd = "python - <<'PY'\nprint('hello')\nPY"
+        result, strategy = normalizer.normalize_arguments({"cmd": cmd}, "shell")
+        assert result["cmd"] == cmd
+        assert strategy == NormalizationStrategy.DIRECT
+
 
 class TestNormalizeArgumentsAST:
     """Tests for normalize_arguments - AST normalization path."""
@@ -176,8 +202,9 @@ class TestNormalizeArgumentsAST:
         args = {"operations": "[{'type': 'modify', 'path': 'test.py'}]"}
         result, strategy = normalizer.normalize_arguments(args, "edit_files")
         assert strategy == NormalizationStrategy.PYTHON_AST
-        # The result should be valid JSON
-        assert "type" in result["operations"]
+        # The result should be a parsed Python list
+        assert isinstance(result["ops"], list)
+        assert "type" in result["ops"][0]
 
     def test_python_syntax_dict_normalized(self):
         """Test Python syntax dict is normalized to JSON."""
@@ -209,6 +236,64 @@ class TestNormalizeArgumentsAST:
         result, strategy = normalizer.normalize_arguments(args, "process")
         assert strategy == NormalizationStrategy.PYTHON_AST
 
+    def test_edit_ops_python_syntax_normalized_for_canonical_tool(self):
+        """Canonical edit should normalize Python-syntax ops payloads."""
+        normalizer = ArgumentNormalizer()
+        args = {"ops": "[{'type': 'create', 'path': 'test.txt', 'content': 'hi'}]"}
+        result, strategy = normalizer.normalize_arguments(args, "edit")
+        assert strategy == NormalizationStrategy.PYTHON_AST
+        assert isinstance(result["ops"], list)
+        assert result["ops"][0]["type"] == "create"
+
+    def test_edit_value_envelope_with_wrapped_dict_payload(self):
+        """Canonical edit should recover dict payloads wrapped in a generic value key."""
+        normalizer = ArgumentNormalizer()
+        args = {
+            "value": {
+                "ops": [{"type": "create", "path": "test.txt", "content": "hi"}],
+            }
+        }
+        result, strategy = normalizer.normalize_arguments(args, "edit")
+        assert strategy == NormalizationStrategy.DIRECT
+        assert isinstance(result["ops"], list)
+        assert result["ops"][0]["path"] == "test.txt"
+
+    def test_edit_value_envelope_with_raw_newline_json_string(self):
+        """Canonical edit should recover wrapped JSON strings with raw newlines."""
+        normalizer = ArgumentNormalizer()
+        args = {"value": ('{"ops":[{"type":"create","path":"test.txt","content":"line1\nline2"}]}')}
+        result, strategy = normalizer.normalize_arguments(args, "edit")
+        assert strategy == NormalizationStrategy.DIRECT
+        assert isinstance(result["ops"], list)
+        assert result["ops"][0]["content"] == "line1\nline2"
+
+    def test_write_value_envelope_with_wrapped_dict_payload(self):
+        """Canonical write should recover dict payloads wrapped in a generic value key."""
+        normalizer = ArgumentNormalizer()
+        args = {
+            "value": {
+                "path": "victor/framework/graph_protocols.py",
+                "content": "print('hi')\n",
+            }
+        }
+        result, strategy = normalizer.normalize_arguments(args, "write")
+        assert strategy == NormalizationStrategy.DIRECT
+        assert result["path"] == "victor/framework/graph_protocols.py"
+        assert result["content"] == "print('hi')\n"
+
+    def test_write_value_envelope_with_aliases_in_json_string(self):
+        """Canonical write should recover wrapped JSON strings and normalize aliases."""
+        normalizer = ArgumentNormalizer()
+        args = {
+            "value": (
+                '{"file_path":"victor/framework/graph_protocols.py",' '"text":"line1\\nline2"}'
+            )
+        }
+        result, strategy = normalizer.normalize_arguments(args, "write")
+        assert strategy == NormalizationStrategy.DIRECT
+        assert result["path"] == "victor/framework/graph_protocols.py"
+        assert result["content"] == "line1\nline2"
+
 
 class TestNormalizeArgumentsRegex:
     """Tests for normalize_arguments - regex normalization path."""
@@ -238,7 +323,10 @@ class TestNormalizeArgumentsManualRepair:
         args = {"operations": "[{'type': 'modify'}]"}
         result, strategy = normalizer.normalize_arguments(args, "edit_files")
         # Should be normalized via AST or manual repair
-        assert strategy in (NormalizationStrategy.PYTHON_AST, NormalizationStrategy.MANUAL_REPAIR)
+        assert strategy in (
+            NormalizationStrategy.PYTHON_AST,
+            NormalizationStrategy.MANUAL_REPAIR,
+        )
 
 
 class TestNormalizeArgumentsFailure:
@@ -309,14 +397,14 @@ class TestNormalizeViaAST:
         normalizer = ArgumentNormalizer()
         args = {"data": "['a', 'b', 'c']"}
         result = normalizer._normalize_via_ast(args)
-        assert result["data"] == '["a", "b", "c"]'
+        assert result["data"] == ["a", "b", "c"]
 
     def test_string_with_python_dict(self):
         """Test string with Python dict syntax."""
         normalizer = ArgumentNormalizer()
         args = {"data": "{'key': 'value'}"}
         result = normalizer._normalize_via_ast(args)
-        assert result["data"] == '{"key": "value"}'
+        assert result["data"] == {"key": "value"}
 
     def test_non_json_string_unchanged(self):
         """Test non-JSON string is unchanged."""
@@ -407,8 +495,9 @@ class TestRepairEditFilesArgs:
         normalizer = ArgumentNormalizer()
         args = {"operations": "[{'type': 'modify', 'path': 'test.py'}]"}
         result = normalizer._repair_edit_files_args(args)
-        # Should be valid JSON string now
-        assert "type" in result["operations"]
+        # _repair_edit_files_args converts Python syntax to a JSON string
+        assert isinstance(result["operations"], str)
+        assert '"type"' in result["operations"]
 
     def test_non_string_operations_unchanged(self):
         """Test non-string operations are unchanged."""
@@ -516,8 +605,8 @@ class TestIntegration:
         assert strategy != NormalizationStrategy.FAILED
 
         # Result should be valid JSON
-        if isinstance(result["operations"], str):
-            parsed = json.loads(result["operations"])
+        if isinstance(result["ops"], str):
+            parsed = json.loads(result["ops"])
             assert parsed[0]["type"] == "modify"
 
     def test_gpt_oss_aliases(self):
@@ -622,8 +711,8 @@ class TestPreemptiveASTNormalization:
         result, strategy = normalizer.normalize_arguments(args, "test")
 
         assert strategy == NormalizationStrategy.PYTHON_AST
-        # Verify the result is valid JSON
-        assert json.loads(result["data"])[0]["key"] == "value"
+        # Result is a parsed Python object, not a JSON string
+        assert result["data"][0]["key"] == "value"
 
     def test_preemptive_ast_with_dict_string(self):
         """Test preemptive AST normalization for dict-like strings."""
@@ -784,6 +873,18 @@ class TestCoercePrimitiveTypes:
 
         assert result["line_start"] == 10
 
+    def test_shell_cmd_true_not_coerced(self):
+        """Shell commands are raw strings even when they look boolean-like."""
+        normalizer = ArgumentNormalizer()
+        result = normalizer._coerce_primitive_types({"cmd": "true"}, "shell")
+        assert result["cmd"] == "true"
+
+    def test_write_content_false_not_coerced(self):
+        """Write content is raw text even when it looks boolean-like."""
+        normalizer = ArgumentNormalizer()
+        result = normalizer._coerce_primitive_types({"content": "false"}, "write")
+        assert result["content"] == "false"
+
 
 class TestTryCoerceString:
     """Tests for _try_coerce_string method (lines 559-605)."""
@@ -860,9 +961,8 @@ class TestNormalizeViaASTExtended:
         args = {"data": "[{'a': {'b': [1, 2, {'c': 'd'}]}}]"}
         result = normalizer._normalize_via_ast(args)
 
-        # Should be valid JSON
-        parsed = json.loads(result["data"])
-        assert parsed[0]["a"]["b"][2]["c"] == "d"
+        # Result is a parsed Python object
+        assert result["data"][0]["a"]["b"][2]["c"] == "d"
 
     def test_primitive_value_in_json_like_string(self):
         """Test AST with primitive value evaluated from JSON-like string."""
@@ -871,8 +971,8 @@ class TestNormalizeViaASTExtended:
         args = {"val": "[42]"}  # List with single integer
         result = normalizer._normalize_via_ast(args)
 
-        # Should be normalized
-        assert result["val"] == "[42]"
+        # Should be converted to a Python list
+        assert result["val"] == [42]
 
     def test_mixed_types_in_structure(self):
         """Test AST with mixed types in structure."""
@@ -880,11 +980,11 @@ class TestNormalizeViaASTExtended:
         args = {"data": "[{'str': 'value', 'int': 42, 'float': 3.14, 'bool': True}]"}
         result = normalizer._normalize_via_ast(args)
 
-        parsed = json.loads(result["data"])
-        assert parsed[0]["str"] == "value"
-        assert parsed[0]["int"] == 42
-        assert parsed[0]["float"] == 3.14
-        assert parsed[0]["bool"] is True
+        # Result is a parsed Python object
+        assert result["data"][0]["str"] == "value"
+        assert result["data"][0]["int"] == 42
+        assert result["data"][0]["float"] == 3.14
+        assert result["data"][0]["bool"] is True
 
 
 class TestNormalizeViaRegexExtended:
@@ -1053,8 +1153,8 @@ class TestEdgeCases:
         result, strategy = normalizer.normalize_arguments(args, "test")
 
         assert strategy == NormalizationStrategy.PYTHON_AST
-        parsed = json.loads(result["data"])
-        assert parsed[0]["msg"] == "你好"
+        # Result is a parsed Python object
+        assert result["data"][0]["msg"] == "你好"
 
     def test_null_equivalent_values(self):
         """Test handling of null/none equivalent string values."""
@@ -1141,6 +1241,203 @@ class TestIntegrationScenarios:
 
         # Python syntax should be normalized
         assert strategy == NormalizationStrategy.PYTHON_AST
+
+
+class TestLargePayloadHandling:
+    """Tests for handling large payloads with potential JSON issues."""
+
+    def test_large_write_payload_with_newlines(self):
+        """Test unwrapping large write payload with embedded newlines in content."""
+        normalizer = ArgumentNormalizer(provider_name="zai")
+
+        # Simulate a large write payload that might have unescaped newlines
+        large_content = "# Large file\n" * 100  # Simulates markdown content
+        args = {"value": f'{{"path": "test.md", "content": "{large_content}"}}'}
+
+        result, strategy = normalizer.normalize_arguments(args, "write")
+
+        # Should successfully unwrap the value envelope
+        assert "path" in result
+        assert result["path"] == "test.md"
+        # Content might be partial due to parsing issues, but path should be extracted
+
+    def test_value_envelope_unwrap_with_malformed_json(self):
+        """Test value envelope unwrapping with malformed JSON."""
+        normalizer = ArgumentNormalizer(provider_name="zai")
+
+        # Malformed JSON with missing closing brace
+        args = {"value": '{"path": "test.py", "content": "hello world"'}
+
+        result, strategy = normalizer.normalize_arguments(args, "write")
+
+        # Should attempt recovery - might get partial result
+        # The key is that it doesn't crash and provides best-effort unwrapping
+        assert isinstance(result, dict)
+
+    def test_value_envelope_unwrap_with_trailing_comma(self):
+        """Test value envelope unwrapping with Python-style trailing comma."""
+        normalizer = ArgumentNormalizer(provider_name="ollama")
+
+        # Python dict syntax with trailing comma
+        args = {"value": "{'path': 'test.py', 'content': 'hello',}"}
+
+        result, strategy = normalizer.normalize_arguments(args, "write")
+
+        # Should successfully unwrap via AST parsing
+        assert "path" in result
+        assert result["path"] == "test.py"
+        assert "content" in result
+
+    def test_large_payload_salvage_for_write_tool(self):
+        """Test the salvage mechanism for large write payloads."""
+        normalizer = ArgumentNormalizer(provider_name="zai")
+
+        # Create a payload where content has unescaped characters
+        malformed_payload = """{"path": "docs/architecture.md", "content": "# Architecture
+
+This is a large file with
+embedded newlines and "quotes" that aren't escaped.
+"}"""
+
+        args = {"value": malformed_payload}
+        result, strategy = normalizer.normalize_arguments(args, "write")
+
+        # Should at minimum extract the path even if content parsing fails
+        assert "path" in result
+        assert result["path"] == "docs/architecture.md"
+
+    def test_value_envelope_preserves_original_on_complete_failure(self):
+        """Test that original args are preserved when unwrapping completely fails."""
+        normalizer = ArgumentNormalizer(provider_name="test")
+
+        # Completely malformed payload that can't be salvaged
+        args = {"value": "not valid json at all [["}
+
+        result, strategy = normalizer.normalize_arguments(args, "write")
+
+        # Should return original arguments when parsing completely fails
+        # This allows the error recovery system to provide better error messages
+        assert isinstance(result, dict)
+        assert "value" in result
+
+    def test_read_value_envelope_unwrap(self):
+        """Test value envelope unwrapping for read tool."""
+        normalizer = ArgumentNormalizer(provider_name="zai")
+
+        args = {"value": '{"path": "/path/to/file.txt"}'}
+        result, strategy = normalizer.normalize_arguments(args, "read")
+
+        assert "path" in result
+        assert result["path"] == "/path/to/file.txt"
+        assert "value" not in result  # Should be unwrapped
+
+    def test_shell_value_envelope_unwrap(self):
+        """Test value envelope unwrapping for shell tool."""
+        normalizer = ArgumentNormalizer(provider_name="zai")
+
+        args = {"value": '{"cmd": "ls -la"}'}
+        result, strategy = normalizer.normalize_arguments(args, "shell")
+
+        assert "cmd" in result
+        assert result["cmd"] == "ls -la"
+        assert "value" not in result
+
+    def test_tolerant_extraction_handles_unescaped_newlines_and_quotes(self):
+        """Comprehensive: tolerant state-machine extractor must recover
+        write/shell payloads even when content has unescaped newlines AND
+        embedded quotes (the actual zai/glm failure mode from transcripts).
+        """
+        normalizer = ArgumentNormalizer(provider_name="zai")
+
+        # Real-world failure: shell heredoc writing markdown with mermaid,
+        # apostrophes, embedded "quotes", literal newlines, and triple backticks.
+        malformed_cmd = (
+            "cat > docs/BLUEPRINT.md << 'EOF'\n"
+            "# Blueprint\n\n"
+            'Victor\'s documentation says "use the framework" not "call internals".\n'
+            "```mermaid\n"
+            'flowchart TB\n    A["Agent"]\n    A --> B["Provider"]\n'
+            "```\n\n"
+            "Section 1: it's all about flexibility\n" + "More content line.\n" * 200 + "Done."
+            "\nEOF"
+        )
+        # The provider wraps this in {"value": stringified-JSON-of-cmd}
+        wrapped = '{"cmd": "' + malformed_cmd + '"}'
+        args = {"value": wrapped}
+
+        result, _strategy = normalizer.normalize_arguments(args, "shell")
+
+        assert "cmd" in result, f"cmd not recovered; got keys={list(result.keys())}"
+        recovered = result["cmd"]
+        assert isinstance(recovered, str)
+        assert "Done." in recovered, (
+            f"Tolerant extractor truncated payload to {len(recovered)} chars "
+            f"(missing 'Done.' marker). Last 200: ...{recovered[-200:]!r}"
+        )
+        assert "mermaid" in recovered
+        assert "Victor's" in recovered  # apostrophe preserved
+        assert '"use the framework"' in recovered  # embedded quotes preserved
+
+    def test_tolerant_extraction_for_write_with_markdown_content(self):
+        """Tolerant extractor must recover write tool's content arg even
+        when markdown has unescaped quotes, code blocks, and newlines.
+        """
+        normalizer = ArgumentNormalizer(provider_name="zai")
+
+        content = (
+            "# Title\n\n"
+            'See `victor.framework.client.VictorClient` — "the canonical entry point".\n'
+            "```python\n"
+            'agent = await VictorClient.create(provider="anthropic")\n'
+            "```\n\n" + "Filler.\n" * 300 + "END_MARKER"
+        )
+        wrapped = '{"path": "docs/test.md", "content": "' + content + '"}'
+        args = {"value": wrapped}
+
+        result, _strategy = normalizer.normalize_arguments(args, "write")
+
+        assert result.get("path") == "docs/test.md"
+        assert "END_MARKER" in result.get(
+            "content", ""
+        ), f"Content truncated; got {len(result.get('content', ''))} chars"
+
+    def test_regex_fallback_preserves_apostrophes_in_content(self):
+        """Regression test: regex fallback must NOT truncate content at the
+        first apostrophe inside the value.
+
+        Bug: previous regex character class `[^"\\'\\\\]` excluded both quote
+        types, so any unescaped apostrophe inside markdown content terminated
+        the match early — yielding ~80-char content from a 15kB payload.
+        """
+        normalizer = ArgumentNormalizer(provider_name="zai")
+
+        # Build a payload that JSON.loads cannot parse (unescaped newlines
+        # inside the content), forcing the regex fallback. Content contains
+        # multiple apostrophes that previously truncated the result.
+        long_content = (
+            "# Victor Blueprint\n\n"
+            "Victor's documentation covers don't, let's, and it's.\n"
+            "Section A: who's who in the codebase\n"
+            "Section B: what's new in 0.7\n" + "Filler line.\n" * 500 + "End of document marker"
+        )
+        # Malformed JSON: literal newlines inside the string value
+        # (json.loads would reject this; AST also fails on multiline strings).
+        # Build via concatenation rather than f-string with embedded payload
+        # so the regex fallback at Layer 4 is actually exercised.
+        malformed = '{"path": "docs/blueprint.md", "content": "' + long_content + '"}'
+        args = {"value": malformed}
+        result, _strategy = normalizer.normalize_arguments(args, "write")
+
+        assert "content" in result, "Regex fallback failed to extract 'content' key"
+        recovered = result["content"]
+        assert isinstance(recovered, str)
+        # The end marker must be present — earlier truncation would have
+        # stopped at the first apostrophe (~30 chars in).
+        assert "End of document marker" in recovered, (
+            f"Content was truncated to {len(recovered)} chars; "
+            f"end marker missing. Last 120 chars: ...{recovered[-120:]!r}"
+        )
+        assert len(recovered) > 500, f"Content unexpectedly short ({len(recovered)} chars)"
 
 
 if __name__ == "__main__":

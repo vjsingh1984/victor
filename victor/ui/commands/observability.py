@@ -40,6 +40,7 @@ from victor.framework.observability import (
     MetricsSnapshot,
     ObservabilityManager,
 )
+from victor.ui.json_utils import create_json_option, print_json_data
 
 app = typer.Typer(
     name="observability",
@@ -89,15 +90,16 @@ def format_bytes(bytes_value: int) -> str:
 
 @app.command("dashboard")
 def dashboard_command(
-    json_output: bool = typer.Option(
-        False, "--json", "-j", help="Output as JSON instead of formatted text"
-    ),
+    json_output: bool = create_json_option(),
     watch: bool = typer.Option(False, "--watch", "-w", help="Continuously update dashboard"),
     interval: float = typer.Option(
         5.0, "--interval", "-i", help="Update interval in seconds (for --watch)"
     ),
     rich: bool = typer.Option(
-        False, "--rich", "-r", help="Use rich terminal dashboard (requires rich library)"
+        False,
+        "--rich",
+        "-r",
+        help="Use rich terminal dashboard (requires rich library)",
     ),
 ) -> None:
     """Display observability dashboard data.
@@ -129,19 +131,20 @@ def dashboard_command(
                 dashboard.display()
 
             return
-        except ImportError as e:
+        except ImportError:
             typer.echo(
-                f"Error: Rich dashboard requires rich library. Install it with: pip install rich",
+                "Error: Rich dashboard requires rich library. Install it with: pip install rich",
                 err=True,
             )
             raise typer.Exit(1)
 
     def print_dashboard() -> None:
         """Print the dashboard."""
+        manager = ObservabilityManager.get_instance()
         data = manager.get_dashboard_data()
 
         if json_output:
-            typer.echo(json.dumps(data.to_dict(), indent=2))
+            print_json_data(data.to_dict())
             return
 
         # Print formatted dashboard
@@ -256,9 +259,7 @@ def metrics_command(
         None, help="Source ID to filter by (shows all if not specified)"
     ),
     source_type: Optional[str] = typer.Option(None, "--type", "-t", help="Filter by source type"),
-    json_output: bool = typer.Option(
-        False, "--json", "-j", help="Output as JSON instead of formatted text"
-    ),
+    json_output: bool = create_json_option(),
 ) -> None:
     """Show metrics for a specific source or all sources.
 
@@ -299,7 +300,7 @@ def metrics_command(
 
     if json_output:
         output = [s.to_dict() for s in snapshots]
-        typer.echo(json.dumps(output, indent=2))
+        print_json_data(output)
         return
 
     # Print formatted metrics
@@ -355,9 +356,7 @@ def history_command(
     hours: float = typer.Option(1.0, "--hours", "-h", help="Hours of history to show"),
     source: Optional[str] = typer.Option(None, "--source", "-s", help="Filter by source ID"),
     source_type: Optional[str] = typer.Option(None, "--type", "-t", help="Filter by source type"),
-    json_output: bool = typer.Option(
-        False, "--json", "-j", help="Output as JSON instead of formatted text"
-    ),
+    json_output: bool = create_json_option(),
 ) -> None:
     """Show historical metrics data.
 
@@ -382,7 +381,7 @@ def history_command(
 
     if json_output:
         output = [c.to_dict() for c in history]
-        typer.echo(json.dumps(output, indent=2))
+        print_json_data(output)
         return
 
     typer.echo(f"\nHistorical metrics for the last {hours} hours\n")
@@ -401,9 +400,7 @@ def history_command(
 
 @app.command("stats")
 def stats_command(
-    json_output: bool = typer.Option(
-        False, "--json", "-j", help="Output as JSON instead of formatted text"
-    ),
+    json_output: bool = create_json_option(),
 ) -> None:
     """Show observability manager statistics.
 
@@ -418,7 +415,7 @@ def stats_command(
     stats = manager.get_stats()
 
     if json_output:
-        typer.echo(json.dumps(stats, indent=2))
+        print_json_data(stats)
         return
 
     typer.echo("\nObservability Manager Statistics")
@@ -436,9 +433,7 @@ def stats_command(
 
 @app.command("sources")
 def sources_command(
-    json_output: bool = typer.Option(
-        False, "--json", "-j", help="Output as JSON instead of formatted text"
-    ),
+    json_output: bool = create_json_option(),
 ) -> None:
     """List all registered metrics sources.
 
@@ -450,7 +445,7 @@ def sources_command(
     sources = manager.list_sources()
 
     if json_output:
-        typer.echo(json.dumps({"sources": sources}, indent=2))
+        print_json_data({"sources": sources})
         return
 
     if not sources:

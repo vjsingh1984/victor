@@ -16,6 +16,7 @@ This section contains step-by-step guides for common tasks, from basic setup to 
 | [**Multi-Agent Teams**](MULTI_AGENT_TEAMS.md) | Coordinate AI agents | Intermediate |
 | [**Observability**](observability/) | Events and metrics | Intermediate |
 | [**MCP Clients**](integration/mcp-clients.md) | Using MCP servers | Intermediate |
+| [**Codebase Verification**](CODEBASE_VERIFICATION.md) | Semantic validation & FP detection | Intermediate |
 | [**Development Setup**](development/local-models.md) | Local model setup | Beginner |
 | [**Performance**](../operations/performance/benchmarks.md) | Optimization and tuning | Advanced |
 | [**Security**](../operations/security/compliance.md) | Best practices | Intermediate |

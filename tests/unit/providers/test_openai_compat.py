@@ -3,9 +3,12 @@
 from victor.providers.openai_compat import (
     convert_tools_to_openai_format,
     convert_tools_to_anthropic_format,
+    consume_last_tool_message_cleanup_stats,
     convert_messages_to_openai_format,
     parse_openai_tool_calls,
     parse_openai_stream_chunk,
+    build_openai_messages,
+    fix_orphaned_tool_messages,
 )
 from victor.providers.base import Message, ToolDefinition
 
@@ -81,7 +84,13 @@ class TestConvertMessagesToOpenAIFormat:
             Message(
                 role="assistant",
                 content="",
-                tool_calls=[{"id": "call_123", "name": "test_func", "arguments": {"arg1": "val1"}}],
+                tool_calls=[
+                    {
+                        "id": "call_123",
+                        "name": "test_func",
+                        "arguments": {"arg1": "val1"},
+                    }
+                ],
             )
         ]
         result = convert_messages_to_openai_format(messages)
@@ -136,7 +145,12 @@ class TestParseOpenAIToolCalls:
 
     def test_parse_invalid_json_arguments(self):
         """Test parsing tool calls with invalid JSON arguments."""
-        data = [{"id": "call_123", "function": {"name": "test", "arguments": "invalid json"}}]
+        data = [
+            {
+                "id": "call_123",
+                "function": {"name": "test", "arguments": "invalid json"},
+            }
+        ]
         result = parse_openai_tool_calls(data)
         assert result is not None
         assert result[0]["arguments"] == {"raw": "invalid json"}
@@ -205,3 +219,319 @@ class TestParseOpenAIStreamChunk:
         chunk = {}
         result = parse_openai_stream_chunk(chunk)
         assert result["content"] is None
+
+
+class TestBuildOpenAIMessages:
+    """Tests for build_openai_messages."""
+
+    def test_tool_message_with_name_and_tool_call_id(self):
+        """Test that tool messages preserve both tool_call_id and name fields when paired."""
+        messages = [
+            Message(role="user", content="Use the tool"),
+        ]
+        # Create assistant message with tool_calls
+        assistant_msg = Message(role="assistant", content="")
+        assistant_msg.tool_calls = [
+            {"id": "call_123", "name": "test_tool", "arguments": {"arg": "value"}}
+        ]
+        messages.append(assistant_msg)
+        # Create a tool message with both tool_call_id and name
+        tool_msg = Message(role="tool", content="Result")
+        tool_msg.tool_call_id = "call_123"
+        tool_msg.name = "test_tool"
+        messages.append(tool_msg)
+
+        result = build_openai_messages(messages)
+
+        # Find the tool message in result
+        tool_result = [m for m in result if m["role"] == "tool"][0]
+        assert tool_result["tool_call_id"] == "call_123"
+        assert tool_result["name"] == "test_tool"
+
+    def test_orphaned_tool_message_is_removed(self):
+        """Test that orphaned tool messages (no matching tool_call) are removed."""
+        messages = [
+            Message(role="user", content="Hello"),
+            Message(role="assistant", content="Hi"),
+        ]
+        # Create an orphaned tool message (no assistant message with tool_calls)
+        tool_msg = Message(role="tool", content="Orphaned result")
+        tool_msg.tool_call_id = "orphaned_123"
+        tool_msg.name = "test_tool"
+        messages.append(tool_msg)
+
+        result = build_openai_messages(messages)
+        stats = consume_last_tool_message_cleanup_stats()
+
+        # The orphaned tool message should be removed by fix_orphaned_tool_messages
+        assert not any(m["role"] == "tool" for m in result)
+        assert stats["history_repaired"] is True
+        assert stats["removed_orphaned_tool_responses"] == 1
+
+    def test_paired_tool_call_and_response(self):
+        """Test that properly paired tool_calls and tool responses are preserved."""
+        messages = [
+            Message(role="user", content="Use the tool"),
+        ]
+        # Create assistant message with tool_calls
+        assistant_msg = Message(role="assistant", content="")
+        assistant_msg.tool_calls = [
+            {"id": "call_abc", "name": "test_tool", "arguments": {"arg": "value"}}
+        ]
+        messages.append(assistant_msg)
+
+        # Create tool response
+        tool_msg = Message(role="tool", content="Success")
+        tool_msg.tool_call_id = "call_abc"
+        tool_msg.name = "test_tool"
+        messages.append(tool_msg)
+
+        result = build_openai_messages(messages)
+
+        # Both should be present
+        assert len(result) == 3
+        assistant_result = [m for m in result if m["role"] == "assistant"][0]
+        tool_result = [m for m in result if m["role"] == "tool"][0]
+
+        assert "tool_calls" in assistant_result
+        assert assistant_result["tool_calls"][0]["id"] == "call_abc"
+        assert tool_result["tool_call_id"] == "call_abc"
+        assert tool_result["name"] == "test_tool"
+
+    def test_no_fallback_tool_call_id_generated(self):
+        """Test that no fallback tool_call_id is generated for missing IDs."""
+        messages = [
+            Message(role="user", content="Hello"),
+        ]
+        # Create a tool message without tool_call_id
+        tool_msg = Message(role="tool", content="Result")
+        # tool_call_id is None
+        messages.append(tool_msg)
+
+        result = build_openai_messages(messages)
+        stats = consume_last_tool_message_cleanup_stats()
+
+        # Tool message should be removed (orphaned) since no tool_call_id
+        assert not any(m["role"] == "tool" for m in result)
+        assert stats["history_repaired"] is True
+        assert stats["skipped_tool_messages_without_id"] == 1
+
+    def test_empty_tool_content_gets_placeholder(self):
+        """Test that tool messages with empty content get a placeholder value.
+
+        DeepSeek and some other providers reject tool messages with empty content.
+        This test verifies that empty content is replaced with a placeholder.
+        """
+        messages = [
+            Message(role="user", content="Use the tool"),
+        ]
+        # Create assistant message with tool_calls
+        assistant_msg = Message(role="assistant", content="")
+        assistant_msg.tool_calls = [{"id": "call_123", "name": "test_tool", "arguments": {}}]
+        messages.append(assistant_msg)
+
+        # Create tool message with empty content
+        tool_msg = Message(role="tool", content="")
+        tool_msg.tool_call_id = "call_123"
+        tool_msg.name = "test_tool"
+        messages.append(tool_msg)
+
+        result = build_openai_messages(messages)
+
+        # Find the tool message in result
+        tool_result = [m for m in result if m["role"] == "tool"][0]
+        # Empty content should be replaced with placeholder
+        assert tool_result["content"] == "(no output)"
+        assert tool_result["tool_call_id"] == "call_123"
+
+    def test_raw_dict_messages_are_accepted(self):
+        """OpenAI-compatible callers may pass raw chat dicts."""
+        result = build_openai_messages([{"role": "user", "content": "Summarize this"}])
+
+        assert result == [{"role": "user", "content": "Summarize this"}]
+
+    def test_raw_dict_tool_calls_are_normalized(self):
+        """Raw OpenAI-style dict tool calls should survive provider serialization."""
+        messages = [
+            {"role": "user", "content": "Use the tool"},
+            {
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [
+                    {
+                        "id": "call_dict",
+                        "type": "function",
+                        "function": {"name": "read", "arguments": '{"path": "a.py"}'},
+                    }
+                ],
+            },
+            {
+                "role": "tool",
+                "content": "contents",
+                "tool_call_id": "call_dict",
+                "name": "read",
+            },
+        ]
+
+        result = build_openai_messages(messages)
+
+        assert result[1]["tool_calls"][0]["id"] == "call_dict"
+        assert result[1]["content"] is None
+        assert result[2]["tool_call_id"] == "call_dict"
+        assert result[2]["name"] == "read"
+
+
+class TestFixOrphanedToolMessages:
+    """Tests for fix_orphaned_tool_messages."""
+
+    def test_removes_orphaned_tool_response(self):
+        """Test that tool responses without matching tool_calls are removed."""
+        messages = [
+            {"role": "user", "content": "Hello"},
+            {"role": "tool", "tool_call_id": "orphan_123", "content": "Result"},
+        ]
+
+        result = fix_orphaned_tool_messages(messages)
+
+        # Orphaned tool message should be removed
+        assert len(result) == 1
+        assert result[0]["role"] == "user"
+
+    def test_removes_tool_calls_without_responses(self):
+        """Test that tool_calls without matching responses are stripped."""
+        messages = [
+            {"role": "user", "content": "Hello"},
+            {
+                "role": "assistant",
+                "content": None,
+                "tool_calls": [
+                    {
+                        "id": "call_123",
+                        "type": "function",
+                        "function": {"name": "test", "arguments": "{}"},
+                    }
+                ],
+            },
+        ]
+
+        result = fix_orphaned_tool_messages(messages)
+
+        # tool_calls should be stripped from assistant message
+        assert len(result) == 2
+        assert result[1]["role"] == "assistant"
+        assert "tool_calls" not in result[1]
+        assert result[1]["content"] == ""
+
+    def test_preserves_valid_tool_call_pairs(self):
+        """Test that valid tool_call/response pairs are preserved."""
+        messages = [
+            {"role": "user", "content": "Hello"},
+            {
+                "role": "assistant",
+                "content": None,
+                "tool_calls": [
+                    {
+                        "id": "call_123",
+                        "type": "function",
+                        "function": {"name": "test", "arguments": "{}"},
+                    }
+                ],
+            },
+            {"role": "tool", "tool_call_id": "call_123", "content": "Result"},
+        ]
+
+        result = fix_orphaned_tool_messages(messages)
+
+        # Both should be preserved
+        assert len(result) == 3
+        assert "tool_calls" in result[1]
+        assert result[2]["role"] == "tool"
+        assert result[2]["tool_call_id"] == "call_123"
+
+
+# Consolidated from per-provider duplicates (vLLM/llama.cpp) — the extraction
+# helpers now live in victor.providers.openai_compat.
+from victor.providers.openai_compat import (  # noqa: E402
+    extract_thinking_content,
+    extract_tool_calls_from_content,
+)
+
+
+class TestExtractThinkingContent:
+    """Tests for extract_thinking_content function."""
+
+    def test_extract_thinking(self):
+        """Test extracting thinking content."""
+        response = "<think>Let me think about this...</think>Here is my answer."
+        thinking, content = extract_thinking_content(response)
+        assert thinking == "Let me think about this..."
+        assert content == "Here is my answer."
+
+    def test_extract_multiple_thinking_blocks(self):
+        """Test extracting multiple thinking blocks."""
+        response = "<think>First thought</think>Text<think>Second thought</think>More text"
+        thinking, content = extract_thinking_content(response)
+        assert "First thought" in thinking
+        assert "Second thought" in thinking
+        assert "Text" in content
+        assert "More text" in content
+
+    def test_no_thinking_tags(self):
+        """Test content without thinking tags."""
+        response = "Just a normal response"
+        thinking, content = extract_thinking_content(response)
+        assert thinking == ""
+        assert content == "Just a normal response"
+
+    def test_case_insensitive(self):
+        """Test case-insensitive tag matching."""
+        response = "<THINK>Thinking</THINK>Answer"
+        thinking, content = extract_thinking_content(response)
+        assert thinking == "Thinking"
+        assert content == "Answer"
+
+
+class TestExtractToolCallsFromContent:
+    """Tests for extract_tool_calls_from_content function."""
+
+    def test_extract_json_block(self):
+        """Test extracting tool call from JSON code block."""
+        content = '```json\n{"name": "read_file", "arguments": {"path": "test.py"}}\n```'
+        tool_calls, remaining = extract_tool_calls_from_content(content)
+        assert len(tool_calls) == 1
+        assert tool_calls[0]["name"] == "read_file"
+        assert tool_calls[0]["arguments"]["path"] == "test.py"
+
+    def test_extract_tool_output_tags(self):
+        """Test extracting tool call from TOOL_OUTPUT tags."""
+        content = '<TOOL_OUTPUT>{"name": "search", "arguments": {"query": "test"}}</TOOL_OUTPUT>'
+        tool_calls, remaining = extract_tool_calls_from_content(content)
+        assert len(tool_calls) == 1
+        assert tool_calls[0]["name"] == "search"
+
+    def test_extract_inline_json(self):
+        """Test extracting inline JSON tool call."""
+        content = '{"name": "list_files", "arguments": {"directory": "."}}'
+        tool_calls, remaining = extract_tool_calls_from_content(content)
+        assert len(tool_calls) == 1
+        assert tool_calls[0]["name"] == "list_files"
+        assert remaining == ""
+
+    def test_no_tool_calls(self):
+        """Test content without tool calls."""
+        content = "This is just regular text without any tool calls."
+        tool_calls, remaining = extract_tool_calls_from_content(content)
+        assert len(tool_calls) == 0
+        assert remaining == content
+
+    def test_invalid_json(self):
+        """Test handling of invalid JSON."""
+        content = "```json\n{invalid json here}\n```"
+        tool_calls, remaining = extract_tool_calls_from_content(content)
+        assert len(tool_calls) == 0
+
+    def test_json_without_name(self):
+        """Test JSON that doesn't have name field."""
+        content = '{"type": "object", "value": 42}'
+        tool_calls, remaining = extract_tool_calls_from_content(content)
+        assert len(tool_calls) == 0

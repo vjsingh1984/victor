@@ -83,7 +83,9 @@ class TestInitializationPhaseManager:
 
         result = manager.run_all_phases(orchestrator)
         assert result.all_succeeded is True
-        assert len(result.phases) == 8
+        assert len(result.phases) == 9
+        provider_runtime_phase = next(p for p in result.phases if p.name == "provider_runtime")
+        assert provider_runtime_phase.components_created == ["provider_runtime"]
 
         # Verify all init methods were called
         orchestrator._initialize_provider_runtime.assert_called_once()

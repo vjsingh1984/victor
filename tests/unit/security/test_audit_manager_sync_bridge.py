@@ -27,7 +27,9 @@ class TestAuditManagerSyncBridge:
                 audit_manager_module, "create_event", return_value=event
             ) as mock_create_event,
             patch.object(
-                audit_manager_module.asyncio, "get_running_loop", side_effect=RuntimeError
+                audit_manager_module.asyncio,
+                "get_running_loop",
+                side_effect=RuntimeError,
             ),
             patch.object(audit_manager_module, "run_sync", return_value=None) as mock_run_sync,
         ):

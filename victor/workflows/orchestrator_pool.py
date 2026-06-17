@@ -60,7 +60,7 @@ class OrchestratorPool:
         Returns:
             AgentOrchestrator instance
         """
-        # TODO: Implement proper orchestrator pool
+        # STUB: Proper orchestrator pooling — future feature for workflow parallelism
         logger.debug(f"OrchestratorPool.get_orchestrator({profile}) - stub implementation")
         return None
 

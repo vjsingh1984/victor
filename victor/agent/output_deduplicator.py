@@ -242,8 +242,9 @@ class OutputDeduplicator:
 
         for block_hash, block, is_duplicate in results:
             self._stats.total_blocks += 1
+            duplicate_across_calls = bool(block_hash) and block_hash in self._seen_hashes
 
-            if is_duplicate:
+            if is_duplicate or duplicate_across_calls:
                 self._stats.duplicates_removed += 1
                 self._stats.bytes_saved += len(block)
                 logger.debug(

@@ -25,7 +25,10 @@ import logging
 import re
 from typing import List, Optional
 
-from victor.config.orchestrator_constants import ReferentialIntentConfig, REFERENTIAL_INTENT_CONFIG
+from victor.config.orchestrator_constants import (
+    ReferentialIntentConfig,
+    REFERENTIAL_INTENT_CONFIG,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +36,10 @@ logger = logging.getLogger(__name__)
 DEFAULT_REFERENTIAL_PATTERNS = [
     re.compile(r"\bdo\s+it\b", re.IGNORECASE),
     re.compile(r"\bdo\s+that\b", re.IGNORECASE),
-    re.compile(r"\bapply\s+(?:the\s+)?(?:changes|recommendations|fixes|updates)\b", re.IGNORECASE),
+    re.compile(
+        r"\bapply\s+(?:the\s+)?(?:changes|recommendations|fixes|updates)\b",
+        re.IGNORECASE,
+    ),
     re.compile(r"\bupdate\s+(?:as\s+)?(?:discussed|recommended|suggested|per)\b", re.IGNORECASE),
     re.compile(r"\bas\s+(?:discussed|recommended|suggested|mentioned)\b", re.IGNORECASE),
     re.compile(r"\bgo\s+ahead\b", re.IGNORECASE),

@@ -64,7 +64,7 @@ Standalone Usage (without full agent):
 from __future__ import annotations
 
 # Re-export from agent.conversation_state for backward compatibility
-from victor.agent.conversation_state import (
+from victor.agent.conversation.state_machine import (
     ConversationStage,
     ConversationState,
     ConversationStateMachine,

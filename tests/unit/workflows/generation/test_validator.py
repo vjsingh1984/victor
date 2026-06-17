@@ -152,7 +152,10 @@ class TestGraphStructureValidator:
                 {"id": "start", "type": "agent", "role": "executor", "goal": "Start"},
                 {"id": "end", "type": "agent", "role": "executor", "goal": "End"},
             ],
-            "edges": [{"source": "start", "target": "end"}, {"source": "end", "target": "__end__"}],
+            "edges": [
+                {"source": "start", "target": "end"},
+                {"source": "end", "target": "__end__"},
+            ],
             "entry_point": "start",
         }
 
@@ -295,7 +298,11 @@ class TestSemanticValidator:
 
         workflow = {
             "nodes": [
-                {"id": "cond1", "type": "condition", "branches": "not_a_dict"}  # Invalid type
+                {
+                    "id": "cond1",
+                    "type": "condition",
+                    "branches": "not_a_dict",
+                }  # Invalid type
             ]
         }
 
@@ -583,7 +590,10 @@ class TestValidationIntegration:
                 {
                     "id": "check_quality",
                     "type": "condition",
-                    "branches": {"good_quality": "generate_report", "needs_work": "fetch_data"},
+                    "branches": {
+                        "good_quality": "generate_report",
+                        "needs_work": "fetch_data",
+                    },
                 },
                 {
                     "id": "generate_report",
@@ -598,7 +608,10 @@ class TestValidationIntegration:
                 {"source": "analyze", "target": "check_quality"},
                 {
                     "source": "check_quality",
-                    "target": {"good_quality": "generate_report", "needs_work": "fetch_data"},
+                    "target": {
+                        "good_quality": "generate_report",
+                        "needs_work": "fetch_data",
+                    },
                 },
                 {"source": "generate_report", "target": "__end__"},
             ],

@@ -1,0 +1,22 @@
+{
+  "benchmark": "mbpp",
+  "timestamp": "2026-05-08T00:00:00",
+  "checksum_algorithm": "sha256",
+  "artifact_count": 1,
+  "artifacts": [
+    {
+      "framework": "victor",
+      "model": "fixture-model-mbpp",
+      "artifact_path": "",
+      "source": "MBPP Fixture A",
+      "prompt_candidate_hash": "",
+      "section_name": "",
+      "dataset_metadata": {
+        "source_name": "MBPP Fixture A"
+      },
+      "bundled_artifact_path": "comparison_report_fixtures/01_victor_fixture-model-mbpp.json",
+      "bundled_artifact_size_bytes": 354,
+      "bundled_artifact_sha256": "b7cc88c93abc9aed9c3b10d3eae4c3227322dd7f37dace233e17ba4f9d3bffc4"
+    }
+  ]
+}

@@ -20,14 +20,30 @@ promoted from verticals to eliminate duplication.
 
 import pytest
 
+from victor.agent.config import UnifiedAgentConfig as CanonicalUnifiedAgentConfig
 from victor.framework.config import (
+    UnifiedAgentConfig,
     SafetyConfig,
     StyleConfig,
     ToolConfig,
     SafetyLevel,
     SafetyRule,
     SafetyEnforcer,
+    ExecutionConfig,
 )
+
+# =============================================================================
+# Agent Config Re-export Tests
+# =============================================================================
+
+
+class TestAgentConfigExports:
+    """Tests for framework-facing agent config exports."""
+
+    def test_unified_agent_config_re_export(self):
+        """framework.config should re-export the canonical UnifiedAgentConfig."""
+        assert UnifiedAgentConfig is CanonicalUnifiedAgentConfig
+
 
 # =============================================================================
 # SafetyConfig Tests
@@ -236,7 +252,10 @@ class TestToolConfig:
     def test_get_tool_setting(self):
         """get_tool_setting should return tool-specific setting."""
         config = ToolConfig(
-            tool_settings={"docker": {"runtime": "python3.12"}, "git": {"default_branch": "main"}}
+            tool_settings={
+                "docker": {"runtime": "python3.12"},
+                "git": {"default_branch": "main"},
+            }
         )
 
         assert config.get_tool_setting("docker", "runtime") == "python3.12"
@@ -395,7 +414,10 @@ class TestSafetyEnforcer:
         enforcer = SafetyEnforcer(config=SafetyConfig())
         enforcer.add_rule(
             SafetyRule(
-                name="high", description="High", check_fn=lambda op: True, level=SafetyLevel.HIGH
+                name="high",
+                description="High",
+                check_fn=lambda op: True,
+                level=SafetyLevel.HIGH,
             )
         )
         enforcer.add_rule(
@@ -408,7 +430,10 @@ class TestSafetyEnforcer:
         )
         enforcer.add_rule(
             SafetyRule(
-                name="low", description="Low", check_fn=lambda op: True, level=SafetyLevel.LOW
+                name="low",
+                description="Low",
+                check_fn=lambda op: True,
+                level=SafetyLevel.LOW,
             )
         )
 
@@ -548,3 +573,109 @@ class TestVerticalSafetyIntegration:
         # Should have stats tracking
         stats = ext.get_safety_stats()
         assert isinstance(stats, dict)
+
+
+# =============================================================================
+# SafetyConfig Validation Tests — Wave R
+# =============================================================================
+
+
+class TestSafetyConfigValidation:
+    """SafetyConfig should validate enum values in from_dict."""
+
+    def test_from_dict_with_invalid_level_raises(self):
+        """from_dict should raise ValueError for invalid safety level."""
+        with pytest.raises(ValueError, match="Invalid safety level"):
+            SafetyConfig.from_dict({"level": "invalid_level"})
+
+        with pytest.raises(ValueError, match="Invalid safety level"):
+            SafetyConfig.from_dict({"level": "not_a_real_level"})
+
+    def test_from_dict_with_valid_level_passes(self):
+        """from_dict should accept valid safety levels."""
+        config = SafetyConfig.from_dict({"level": "low"})
+        assert config.level == SafetyLevel.LOW
+
+        config = SafetyConfig.from_dict({"level": "medium"})
+        assert config.level == SafetyLevel.MEDIUM
+
+        config = SafetyConfig.from_dict({"level": "high"})
+        assert config.level == SafetyLevel.HIGH
+
+    def test_from_dict_with_case_insensitive_level(self):
+        """from_dict should handle case-insensitive level values."""
+        config = SafetyConfig.from_dict({"level": "LOW"})
+        assert config.level == SafetyLevel.LOW
+
+        config = SafetyConfig.from_dict({"level": "High"})
+        assert config.level == SafetyLevel.HIGH
+
+        config = SafetyConfig.from_dict({"level": "MeDiUm"})
+        assert config.level == SafetyLevel.MEDIUM
+
+
+# =============================================================================
+# ExecutionConfig Validation Tests — Wave P
+# =============================================================================
+
+
+class TestExecutionConfigValidation:
+    """ExecutionConfig numeric fields must have valid ranges."""
+
+    def test_default_config_passes(self):
+        """Default ExecutionConfig should pass all validations."""
+        config = ExecutionConfig()
+        assert config.max_iterations == 25
+        assert config.timeout is None
+        assert config.recursion_limit == 100
+
+    def test_max_iterations_below_one_raises(self):
+        """max_iterations must be >= 1."""
+        with pytest.raises(ValueError, match="max_iterations must be >= 1"):
+            ExecutionConfig(max_iterations=0)
+
+        with pytest.raises(ValueError, match="max_iterations must be >= 1"):
+            ExecutionConfig(max_iterations=-10)
+
+    def test_timeout_below_point_one_raises(self):
+        """timeout must be >= 0.1 if set."""
+        with pytest.raises(ValueError, match="timeout must be >= 0.1"):
+            ExecutionConfig(timeout=0.0)
+
+        with pytest.raises(ValueError, match="timeout must be >= 0.1"):
+            ExecutionConfig(timeout=0.01)
+
+    def test_timeout_none_passes(self):
+        """timeout=None should pass (no limit)."""
+        config = ExecutionConfig(timeout=None)
+        assert config.timeout is None
+
+    def test_recursion_limit_below_one_raises(self):
+        """recursion_limit must be >= 1."""
+        with pytest.raises(ValueError, match="recursion_limit must be >= 1"):
+            ExecutionConfig(recursion_limit=0)
+
+        with pytest.raises(ValueError, match="recursion_limit must be >= 1"):
+            ExecutionConfig(recursion_limit=-1)
+
+    def test_boundary_values_pass(self):
+        """Boundary values (1, 0.1) should pass validation."""
+        config = ExecutionConfig(
+            max_iterations=1,
+            timeout=0.1,
+            recursion_limit=1,
+        )
+        assert config.max_iterations == 1
+        assert config.timeout == 0.1
+        assert config.recursion_limit == 1
+
+    def test_large_values_pass(self):
+        """Large reasonable values should pass validation."""
+        config = ExecutionConfig(
+            max_iterations=1000000,
+            timeout=86400.0,  # 1 day
+            recursion_limit=10000,
+        )
+        assert config.max_iterations == 1000000
+        assert config.timeout == 86400.0
+        assert config.recursion_limit == 10000

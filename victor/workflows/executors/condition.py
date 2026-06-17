@@ -83,7 +83,7 @@ class ConditionNodeExecutor:
             success=True,
             output={
                 "passthrough": True,
-                "branches": list(node.branches.keys()) if hasattr(node, "branches") else [],
+                "branches": (list(node.branches.keys()) if hasattr(node, "branches") else []),
             },
         )
 

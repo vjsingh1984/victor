@@ -29,8 +29,10 @@ with a single config.yaml file.
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import subprocess
+from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -38,6 +40,16 @@ import typer
 from rich.console import Console
 from rich.panel import Panel
 from rich.prompt import Confirm, Prompt
+
+
+class AuthStatus(str, Enum):
+    """OAuth authentication status for a provider."""
+
+    AUTHENTICATED = "authenticated"  # Valid token exists and is not expired
+    EXPIRED = "expired"  # Token exists but has expired
+    PENDING = "pending"  # No valid token (not authenticated or token missing)
+
+
 from rich.table import Table
 from rich.text import Text
 
@@ -48,7 +60,24 @@ from victor.config.accounts import (
     get_account_manager,
 )
 from victor.config.connection_validation import ConnectionValidator, ValidationResult
-from victor.config.migration import ConfigMigrator, check_migration_needed, run_migration
+from victor.config.migration import (
+    ConfigMigrator,
+    check_migration_needed,
+    run_migration,
+)
+from victor.config.profiles import ProfileManager
+from victor.config.settings import get_project_paths
+
+
+def _sync_profile_from_account(
+    account: ProviderAccount,
+    config_dir: Optional[Path] = None,
+) -> bool:
+    """Create or update the chat profile for a saved provider account."""
+    if config_dir is None:
+        config_dir = get_project_paths().global_victor_dir
+    return ProfileManager.for_config_dir(config_dir).upsert_account_profile(account)
+
 
 # =============================================================================
 # Popular provider models (for quick selection)
@@ -61,10 +90,11 @@ POPULAR_MODELS: Dict[str, List[str]] = {
         "claude-opus-4-6",
     ],
     "openai": [
-        "gpt-4.1",
-        "gpt-4o",
-        "o3-mini",
-        "o1",
+        "gpt-5-nano",
+        "gpt-5-mini",
+        "gpt-5",
+        "gpt-5.2",
+        "o4-mini",
     ],
     "google": [
         "gemini-2.5-pro",
@@ -111,6 +141,56 @@ auth_app = typer.Typer(name="auth", help="Manage authentication and provider acc
 console = Console()
 
 
+def _get_oauth_tokens_file() -> Path:
+    """Resolve the OAuth token store through centralized Victor paths."""
+    return get_project_paths().global_victor_dir / "oauth_tokens.yaml"
+
+
+def _get_oauth_status(provider: str, source: str = "victor") -> AuthStatus:
+    """Check OAuth token status for a provider without triggering login.
+
+    Returns:
+        AuthStatus enum: AUTHENTICATED if valid token exists, EXPIRED if token expired, PENDING otherwise.
+    """
+    if source in {"codex", "claude-code"}:
+        try:
+            from victor.providers.oauth_manager import OAuthTokenManager
+
+            tokens = OAuthTokenManager(provider, token_source=source)._load_cached()
+            if tokens is None:
+                return AuthStatus.PENDING
+            return AuthStatus.EXPIRED if tokens.is_expired else AuthStatus.AUTHENTICATED
+        except Exception:
+            return AuthStatus.PENDING
+
+    token_file = _get_oauth_tokens_file()
+
+    if not token_file.exists():
+        return AuthStatus.PENDING
+
+    try:
+        import yaml
+
+        with open(token_file) as f:
+            all_tokens = yaml.safe_load(f) or {}
+        data = all_tokens.get(provider)
+        if data is None or not data.get("access_token"):
+            return AuthStatus.PENDING
+
+        # Check expiry
+        expires_at = data.get("expires_at")
+        if expires_at:
+            from datetime import datetime, timezone
+
+            exp = datetime.fromisoformat(expires_at)
+            if exp <= datetime.now(timezone.utc):
+                return AuthStatus.EXPIRED
+
+        return AuthStatus.AUTHENTICATED
+    except Exception:
+        return AuthStatus.PENDING
+
+
 # =============================================================================
 # Setup Command
 # =============================================================================
@@ -151,29 +231,67 @@ def auth_add(
     auth_method: str = typer.Option(
         "api_key", "--auth-method", help="Authentication method (api_key, oauth, none)"
     ),
+    source: str = typer.Option(
+        "keyring",
+        "--source",
+        help="Credential source (keyring, env, file, sentinelpass)",
+    ),
     endpoint: Optional[str] = typer.Option(None, "--endpoint", "-e", help="Custom endpoint URL"),
     api_key: Optional[str] = typer.Option(
         None, "--api-key", help="API key (will prompt if not provided)"
     ),
+    sentinelpass_domain: Optional[str] = typer.Option(
+        None,
+        "--sentinelpass-domain",
+        help="SentinelPass lookup domain when --source sentinelpass is used",
+    ),
     tags: Optional[str] = typer.Option(None, "--tags", help="Comma-separated tags"),
+    temperature: Optional[float] = typer.Option(None, "--temperature", "-t", help="Temperature"),
+    max_tokens: Optional[int] = typer.Option(None, "--max-tokens", help="Max output tokens"),
+    set_default: bool = typer.Option(False, "--default", help="Set this account as default"),
 ) -> None:
     """Quick add a provider account.
 
     Example:
         victor auth add --provider anthropic --model claude-sonnet-4-5
         victor auth add --provider zai --model glm-4.6:coding --name glm-coding
-        victor auth add --provider openai --model gpt-4o --auth-method oauth
+        victor auth add --provider openai --model gpt-5-nano --auth-method oauth --source codex
+        victor auth add --provider anthropic --model claude-haiku-4-5-20251001 --auth-method oauth --source claude-code
+        victor auth add --provider anthropic --model claude-sonnet-4-5 --source sentinelpass
     """
+    source = source.lower()
+    valid_sources = {"keyring", "env", "file", "sentinelpass", "codex", "claude-code"}
+    if source not in valid_sources:
+        console.print(f"[red]✗[/] Unknown credential source: {source}")
+        console.print(f"[dim]Valid sources: {', '.join(sorted(valid_sources))}[/]")
+        raise typer.Exit(1)
+    if source == "codex" and not (provider == "openai" and auth_method == "oauth"):
+        console.print("[red]✗[/] --source codex is only valid with OpenAI OAuth accounts")
+        console.print(
+            "[dim]Use: victor auth add --provider openai --model gpt-5-nano "
+            "--auth-method oauth --source codex[/]"
+        )
+        raise typer.Exit(1)
+    if source == "claude-code" and not (provider == "anthropic" and auth_method == "oauth"):
+        console.print("[red]✗[/] --source claude-code is only valid with Anthropic OAuth accounts")
+        console.print(
+            "[dim]Use: victor auth add --provider anthropic --model claude-haiku-4-5-20251001 "
+            "--auth-method oauth --source claude-code[/]"
+        )
+        raise typer.Exit(1)
+
     # Parse tags
     tag_list = tags.split(",") if tags else []
 
     # Get API key if needed
-    if auth_method == "api_key" and not api_key:
+    if auth_method == "api_key" and source != "sentinelpass" and not api_key:
         api_key = Prompt.ask(f"Enter API key for {provider}", password=True)
 
     # Create auth config
-    auth = AuthConfig(method=auth_method, source="keyring")
-    if api_key:
+    auth = AuthConfig(method=auth_method, source=source)
+    if source == "sentinelpass":
+        auth.value = sentinelpass_domain or provider
+    elif api_key:
         auth.value = api_key
 
     # Create account
@@ -184,14 +302,21 @@ def auth_add(
         auth=auth,
         endpoint=endpoint,
         tags=tag_list,
+        temperature=temperature,
+        max_tokens=max_tokens,
     )
 
-    # Save account
+    # Save account and matching chat profile
     manager = get_account_manager()
     manager.save_account(account)
+    profile_synced = _sync_profile_from_account(account)
+    if set_default:
+        config = manager.load_config()
+        config.defaults.account = name
+        manager.save_config(config)
 
     # Save API key to keyring if provided
-    if api_key and auth_method == "api_key":
+    if api_key and auth_method == "api_key" and source == "keyring":
         try:
             from victor.config.api_keys import _set_key_in_keyring
 
@@ -202,8 +327,18 @@ def auth_add(
             console.print("[dim]API key stored in config file instead[/]")
 
     console.print(f"[green]✓[/] Account '{name}' added successfully")
+    if profile_synced:
+        console.print(f"[green]✓[/] Profile '{name}' added to profiles.yaml")
     console.print(f"[dim]Provider: {provider}[/]")
     console.print(f"[dim]Model: {model}[/]")
+    if set_default:
+        console.print("[dim]Default: yes[/]")
+    if source == "sentinelpass":
+        console.print(f"[dim]SentinelPass domain: {auth.value}[/]")
+    if source == "codex":
+        console.print("[dim]OAuth source: Codex ~/.codex/auth.json[/]")
+    if source == "claude-code":
+        console.print("[dim]OAuth source: Claude Code credentials[/]")
 
 
 # =============================================================================
@@ -226,25 +361,58 @@ def auth_list() -> None:
         console.print("[dim]Run 'victor auth setup' to add your first account.[/]")
         return
 
+    # Determine default account name
+    default_name = manager.load_config().defaults.account
+
+    # Check OAuth token status for oauth accounts
+    oauth_status: dict[str, str] = {}
+    for account in accounts:
+        if account.auth.method == "oauth":
+            oauth_status[account.name] = _get_oauth_status(account.provider, account.auth.source)
+
     table = Table(title="Configured Accounts", show_header=True)
     table.add_column("Name", style="cyan", no_wrap=True)
     table.add_column("Provider", style="green")
     table.add_column("Model", style="yellow")
     table.add_column("Auth", style="blue")
+    table.add_column("Status", style="dim")
     table.add_column("Tags", style="dim")
 
     for account in sorted(accounts, key=lambda a: a.name):
         tags_str = ", ".join(account.tags) if account.tags else ""
+        # Mark default account
+        name_display = account.name
+        if account.name == default_name:
+            name_display = f"{account.name} ★"
+
+        # Auth display with OAuth status
+        auth_display = account.auth.method
+        if account.auth.source != "keyring":
+            auth_display = f"{account.auth.method}/{account.auth.source}"
+        if account.auth.method == "oauth":
+            status = oauth_status.get(account.name, "pending")
+            status_display = (
+                "[green]authenticated[/]"
+                if status == "authenticated"
+                else ("[yellow]pending login[/]" if status == "pending" else f"[red]{status}[/]")
+            )
+        elif account.auth.method == "none":
+            status_display = "[dim]local[/]"
+        else:
+            status_display = "[green]configured[/]"
+
         table.add_row(
-            account.name,
+            name_display,
             account.provider,
             account.model,
-            account.auth.method,
+            auth_display,
+            status_display,
             tags_str,
         )
 
     console.print(table)
     console.print(f"\n[dim]Total: {len(accounts)} account(s)[/]")
+    console.print("[dim]★ = default account[/]")
 
 
 # =============================================================================
@@ -390,12 +558,18 @@ def auth_test(
             console.print(f"[red]✗[/] Account '{name}' not found")
             raise typer.Exit(1)
     elif provider:
-        # Find first account for this provider
+        # First try as provider name
         accounts = [a for a in manager.list_accounts() if a.provider == provider]
-        if not accounts:
-            console.print(f"[red]✗[/] No account found for provider '{provider}'")
-            raise typer.Exit(1)
-        account = accounts[0]
+        if accounts:
+            account = accounts[0]
+        else:
+            # Fall back: treat as account name (user may have used -p instead of -n)
+            account = manager.get_account(provider)
+            if not account:
+                console.print(f"[red]✗[/] No account or provider named '{provider}'")
+                console.print("[dim]Hint: use --name/-n to test by account name[/]")
+                raise typer.Exit(1)
+            console.print(f"[dim]Matched account '{provider}' (hint: use -n for account names)[/]")
     else:
         # Use default account
         account = manager.get_account()
@@ -445,6 +619,261 @@ def auth_test(
                 console.print(f"  [yellow]⚠[/] {validation.message}")
 
         raise typer.Exit(1)
+
+
+# =============================================================================
+# OAuth Commands (consolidated from victor providers auth)
+# =============================================================================
+
+OAUTH_LOGIN_PROVIDERS = ["openai", "qwen", "google", "github-copilot"]
+OAUTH_SUPPORTED_PROVIDERS = [*OAUTH_LOGIN_PROVIDERS, "anthropic"]
+
+
+@auth_app.command("login")
+def auth_login(
+    provider: str = typer.Argument(
+        ..., help=f"Provider to authenticate ({', '.join(OAUTH_LOGIN_PROVIDERS)})"
+    ),
+    force: bool = typer.Option(
+        False, "--force", "-f", help="Force re-authentication even if token is cached"
+    ),
+) -> None:
+    """Log in to a provider via OAuth (opens browser).
+
+    Example:
+        victor auth login openai
+        victor auth login qwen --force
+    """
+    provider = provider.lower()
+    if provider not in OAUTH_LOGIN_PROVIDERS:
+        console.print(
+            f"[red]\u2717[/] OAuth not supported for '{provider}'. "
+            f"Supported: {', '.join(OAUTH_LOGIN_PROVIDERS)}"
+        )
+        raise typer.Exit(1)
+
+    from victor.core.async_utils import run_sync
+    from victor.providers.oauth_manager import OAuthTokenManager
+
+    async def _login():
+        mgr = OAuthTokenManager(provider)
+        if not force:
+            cached = mgr._load_cached()
+            if cached is not None and not cached.is_expired:
+                console.print(f"[green]\u2713[/] Already authenticated with {provider}")
+                console.print(
+                    f"  Token expires: {cached.expires_at.strftime('%Y-%m-%d %H:%M UTC')}"
+                )
+                console.print("[dim]Use --force to re-authenticate[/]")
+                return
+        console.print(f"[cyan]Opening browser for {provider} OAuth login...[/]")
+        try:
+            token = await mgr.get_valid_token()
+            if token:
+                console.print(f"[green]\u2713[/] Successfully authenticated with {provider}")
+            else:
+                console.print(f"[red]\u2717[/] Authentication failed for {provider}")
+                raise typer.Exit(1)
+        except typer.Exit:
+            raise
+        except Exception as e:
+            console.print(f"[red]\u2717[/] OAuth login failed: {e}")
+            raise typer.Exit(1)
+
+    run_sync(_login())
+
+
+@auth_app.command("import-codex")
+def auth_import_codex(
+    provider: str = typer.Argument("openai", help="Provider to import for (currently: openai)"),
+    codex_auth: Optional[Path] = typer.Option(
+        None,
+        "--codex-auth",
+        help="Path to Codex auth.json (default: ~/.codex/auth.json)",
+    ),
+    storage_dir: Optional[Path] = typer.Option(
+        None,
+        "--storage-dir",
+        help="Victor config directory (default: ~/.victor)",
+    ),
+    force: bool = typer.Option(False, "--force", "-f", help="Overwrite existing Victor token"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Validate without writing tokens"),
+) -> None:
+    """Import OpenAI OAuth tokens from an existing Codex CLI login.
+
+    This reuses local ChatGPT/Codex OAuth credentials without printing token values.
+
+    Example:
+        victor auth import-codex openai
+        victor auth import-codex openai --force
+    """
+    provider = provider.lower()
+    if provider != "openai":
+        console.print("[red]✗[/] Codex OAuth import currently supports only OpenAI.")
+        raise typer.Exit(1)
+
+    codex_auth_path = codex_auth or Path.home() / ".codex" / "auth.json"
+    victor_storage_dir = storage_dir or get_project_paths().global_victor_dir
+
+    try:
+        tokens = _load_codex_openai_tokens(codex_auth_path)
+    except ValueError as e:
+        console.print(f"[red]✗[/] {e}")
+        raise typer.Exit(1) from e
+
+    from victor.providers.oauth_manager import OAuthTokenManager
+
+    manager = OAuthTokenManager(provider, storage_dir=victor_storage_dir)
+    if manager._load_cached() is not None and not force:
+        console.print("[yellow]Victor already has OpenAI OAuth tokens.[/]")
+        console.print("[dim]Use --force to replace them, or --dry-run to validate Codex tokens.[/]")
+        raise typer.Exit(1)
+
+    console.print(f"[dim]Source: {codex_auth_path}[/]")
+    console.print(f"[dim]Destination: {victor_storage_dir / 'oauth_tokens.yaml'}[/]")
+
+    if dry_run:
+        console.print("[green]✓[/] Codex OpenAI OAuth tokens are importable")
+        return
+
+    imported = manager.save_imported_tokens(tokens, overwrite=force)
+    if not imported:
+        console.print("[yellow]Victor already has OpenAI OAuth tokens.[/]")
+        console.print("[dim]Use --force to replace them.[/]")
+        raise typer.Exit(1)
+
+    account = ProviderAccount(
+        name="openai-oauth",
+        provider="openai",
+        model="gpt-5.4",
+        auth=AuthConfig(method="oauth", source="keyring"),
+    )
+    account_manager = get_account_manager()
+    if account_manager.get_account(name=account.name) is None:
+        account_manager.save_account(account)
+    profile_synced = _sync_profile_from_account(account, config_dir=victor_storage_dir)
+
+    console.print("[green]✓[/] Imported OpenAI OAuth tokens from Codex")
+    if profile_synced:
+        console.print("[green]✓[/] Profile 'openai-oauth' added to profiles.yaml")
+    console.print("[dim]Validate with: victor auth oauth-status openai[/]")
+    console.print(
+        "[dim]Add or select an OAuth account with: victor auth add --provider openai "
+        "--model <model> --auth-method oauth --name <name>[/]"
+    )
+
+
+def _load_codex_openai_tokens(codex_auth_path: Path):
+    """Load OpenAI OAuth tokens from Codex auth.json without exposing token values."""
+    if not codex_auth_path.exists():
+        raise ValueError(f"Codex auth file not found: {codex_auth_path}")
+
+    try:
+        data = json.loads(codex_auth_path.read_text())
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Codex auth file is not valid JSON: {codex_auth_path}") from e
+
+    tokens_data = data.get("tokens")
+    if not isinstance(tokens_data, dict):
+        raise ValueError("Codex auth file does not contain a tokens object")
+
+    access_token = tokens_data.get("access_token")
+    if not access_token:
+        raise ValueError("Codex auth file does not contain an access_token")
+
+    scopes = tokens_data.get("scopes") or tokens_data.get("scope") or []
+    if isinstance(scopes, str):
+        scopes = scopes.split()
+    if not isinstance(scopes, list):
+        scopes = []
+
+    from victor.workflows.services.credentials import SSOTokens
+
+    return SSOTokens(
+        access_token=access_token,
+        refresh_token=tokens_data.get("refresh_token"),
+        id_token=tokens_data.get("id_token"),
+        token_type=tokens_data.get("token_type", "Bearer"),
+        expires_at=None,
+        scopes=scopes,
+    )
+
+
+@auth_app.command("logout")
+def auth_logout(
+    provider: str = typer.Argument(
+        ..., help=f"Provider to log out from ({', '.join(OAUTH_SUPPORTED_PROVIDERS)})"
+    ),
+) -> None:
+    """Remove cached OAuth tokens for a provider.
+
+    Example:
+        victor auth logout openai
+    """
+    provider = provider.lower()
+    if provider not in OAUTH_SUPPORTED_PROVIDERS:
+        console.print(
+            f"[red]\u2717[/] OAuth not supported for '{provider}'. "
+            f"Supported: {', '.join(OAUTH_SUPPORTED_PROVIDERS)}"
+        )
+        raise typer.Exit(1)
+
+    from victor.providers.oauth_manager import OAuthTokenManager
+
+    mgr = OAuthTokenManager(provider)
+    mgr.clear()
+    console.print(f"[green]\u2713[/] Logged out from {provider} (tokens cleared)")
+
+
+@auth_app.command("oauth-status")
+def auth_oauth_status(
+    provider: Optional[str] = typer.Argument(
+        None, help="Check specific provider (or all if omitted)"
+    ),
+) -> None:
+    """Show OAuth authentication status for providers.
+
+    Example:
+        victor auth oauth-status
+        victor auth oauth-status openai
+    """
+    from victor.providers.oauth_manager import OAuthTokenManager
+
+    providers_to_check = [provider.lower()] if provider else OAUTH_SUPPORTED_PROVIDERS
+
+    table = Table(title="OAuth Authentication Status", show_header=True)
+    table.add_column("Provider", style="cyan")
+    table.add_column("Status")
+    table.add_column("Expires")
+    table.add_column("Token Store", style="dim")
+
+    for prov in providers_to_check:
+        if prov not in OAUTH_SUPPORTED_PROVIDERS:
+            table.add_row(prov, "[red]Not supported[/]", "", "")
+            continue
+
+        mgr = OAuthTokenManager(prov)
+        cached = mgr._load_cached()
+
+        if cached is None:
+            table.add_row(prov, "[dim]Not authenticated[/]", "", "")
+        elif cached.is_expired:
+            table.add_row(
+                prov,
+                "[yellow]Expired[/]",
+                (cached.expires_at.strftime("%Y-%m-%d %H:%M UTC") if cached.expires_at else ""),
+                "stored",
+            )
+        else:
+            table.add_row(
+                prov,
+                "[green]\u2713 Active[/]",
+                (cached.expires_at.strftime("%Y-%m-%d %H:%M UTC") if cached.expires_at else ""),
+                "stored",
+            )
+
+    console.print(table)
+    console.print("\n[dim]Login: victor auth login <provider>[/]")
 
 
 # =============================================================================
@@ -836,8 +1265,9 @@ class AuthSetupWizard:
             tags=self.state.get("tags", []),
         )
 
-        # Save to config
+        # Save to config and matching chat profile
         self.account_manager.save_account(account)
+        profile_synced = _sync_profile_from_account(account)
 
         # Save API key to keyring
         if self.state["auth_method"] == "api_key" and "api_key" in self.state:
@@ -861,6 +1291,8 @@ class AuthSetupWizard:
             self.console.print("[green]✓[/] Set as default account")
 
         self.console.print(f"[green]✓[/] Account '{account.name}' saved")
+        if profile_synced:
+            self.console.print(f"[green]✓[/] Profile '{account.name}' added to profiles.yaml")
 
     def _show_completion(self) -> None:
         """Show completion message."""

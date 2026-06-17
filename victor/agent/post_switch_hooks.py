@@ -30,7 +30,7 @@ Usage:
         SystemPromptHook,
         ToolBudgetHook,
     )
-    from victor.agent.provider_switch_coordinator import HookPriority
+    from victor.agent.provider.switch_contracts import HookPriority
 
     # Register hooks with coordinator
     coordinator.register_hook(
@@ -44,7 +44,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any, Callable, Optional
 
-from victor.agent.provider_switch_coordinator import SwitchContext
+from victor.agent.provider.switch_contracts import HookPriority, SwitchContext
 
 if TYPE_CHECKING:
     from victor.agent.unified_tracker import UnifiedTracker
@@ -271,8 +271,6 @@ def create_standard_hooks(
     Returns:
         List of (hook, priority) tuples ready for registration
     """
-    from victor.agent.provider_switch_coordinator import HookPriority
-
     return [
         (
             ExplorationSettingsHook(unified_tracker, get_capabilities),

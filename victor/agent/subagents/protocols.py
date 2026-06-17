@@ -156,6 +156,15 @@ class SubAgentContextAdapter:
         return self._orchestrator.temperature
 
     @property
+    def reasoning_effort(self) -> Optional[str]:
+        """Get the parent orchestrator's reasoning_effort (None = unset).
+
+        Lets a sub-agent inherit the parent's reasoning effort when the member
+        spec doesn't override it.
+        """
+        return getattr(self._orchestrator, "reasoning_effort", None)
+
+    @property
     def vertical_context(self) -> Any:
         """Get vertical context from orchestrator.
 
@@ -249,7 +258,17 @@ class DefaultRoleToolProvider:
             "web_fetch",
         ],
         "planner": ["read", "ls", "grep", "search", "plan_files"],
-        "executor": ["read", "write", "edit", "ls", "grep", "search", "shell", "test", "git"],
+        "executor": [
+            "read",
+            "write",
+            "edit",
+            "ls",
+            "grep",
+            "search",
+            "shell",
+            "test",
+            "git",
+        ],
         "reviewer": ["read", "ls", "grep", "search", "git", "test", "shell"],
         "tester": ["read", "write", "ls", "grep", "search", "test", "shell"],
     }

@@ -12,17 +12,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Ensemble orchestration patterns.
+"""Ensemble orchestration patterns (DEPRECATED).
 
-Provides composable patterns for coordinating multiple agents:
-- Pipeline: Sequential execution (A -> B -> C)
-- Parallel: Concurrent execution (A | B | C)
-- Hierarchical: Manager delegates to workers
+.. deprecated:: 0.6.0
+    Use ``victor.teams`` instead. The teams API provides the same patterns
+    (SEQUENTIAL, PARALLEL, HIERARCHICAL, PIPELINE, CONSENSUS) with full
+    orchestrator integration, formation switching, and team spec providers.
 
-Inspired by:
-- Prefect/Airflow task DAGs
-- Kubernetes Pod/Deployment patterns
-- MapReduce paradigms
+    Migration::
+
+        # Old (ensemble)
+        from victor.agent.specs.ensemble import Pipeline
+        pipeline = Pipeline([agent_a, agent_b])
+
+        # New (teams)
+        from victor.teams import UnifiedTeamCoordinator, TeamFormation
+        coordinator = UnifiedTeamCoordinator(orchestrator)
+        coordinator.set_formation(TeamFormation.PIPELINE)
+        result = await coordinator.execute(task)
+
+This module is kept for backward compatibility but will be removed in v1.0.
 """
 
 import asyncio
@@ -168,6 +177,69 @@ class Ensemble(ABC):
             "agents": [a.to_dict() for a in self.agents],
         }
 
+    async def _execute_agent(
+        self,
+        agent: AgentSpec,
+        task: str,
+        context: Dict[str, Any],
+        orchestrator: Optional[Any],
+    ) -> AgentResult:
+        """Execute a single agent, using orchestrator if available."""
+        start_time = datetime.now(timezone.utc)
+
+        try:
+            if orchestrator:
+                output = await self._run_with_orchestrator(agent, task, context, orchestrator)
+            else:
+                output = f"[{agent.name}] Completed: {task}"
+
+            return AgentResult(
+                agent_name=agent.name,
+                status=ExecutionStatus.COMPLETED,
+                output=output,
+                started_at=start_time,
+                completed_at=datetime.now(timezone.utc),
+                duration_ms=(datetime.now(timezone.utc) - start_time).total_seconds() * 1000,
+            )
+
+        except Exception as e:
+            logger.error("Agent %s failed: %s", agent.name, e)
+            return AgentResult(
+                agent_name=agent.name,
+                status=ExecutionStatus.FAILED,
+                error=str(e),
+                started_at=start_time,
+                completed_at=datetime.now(timezone.utc),
+            )
+
+    async def _run_with_orchestrator(
+        self,
+        agent: AgentSpec,
+        task: str,
+        context: Dict[str, Any],
+        orchestrator: Any,
+    ) -> Any:
+        """Run agent using the orchestrator."""
+        prompt_parts = [f"Task: {task}"]
+
+        if "previous_output" in context:
+            prompt_parts.append(f"\nPrevious agent output:\n{context['previous_output']}")
+
+        if agent.system_prompt:
+            prompt_parts.insert(0, agent.system_prompt)
+
+        prompt = "\n\n".join(prompt_parts)
+
+        try:
+            response = await orchestrator.chat(prompt)
+            content = getattr(response, "content", None)
+            if content:
+                return content
+            return str(response)
+        except Exception as e:
+            logger.warning("Orchestrator call failed for %s: %s", agent.name, e)
+            return f"[{agent.name}] Error: {e}"
+
 
 class Pipeline(Ensemble):
     """Sequential pipeline execution.
@@ -241,67 +313,7 @@ class Pipeline(Ensemble):
 
         return result
 
-    async def _execute_agent(
-        self,
-        agent: AgentSpec,
-        task: str,
-        context: Dict[str, Any],
-        orchestrator: Optional[Any],
-    ) -> AgentResult:
-        """Execute a single agent."""
-        start_time = datetime.now(timezone.utc)
-
-        try:
-            if orchestrator:
-                # Use real orchestrator
-                output = await self._run_with_orchestrator(agent, task, context, orchestrator)
-            else:
-                # Mock execution for testing
-                output = f"[{agent.name}] Completed: {task}"
-
-            return AgentResult(
-                agent_name=agent.name,
-                status=ExecutionStatus.COMPLETED,
-                output=output,
-                started_at=start_time,
-                completed_at=datetime.now(timezone.utc),
-                duration_ms=(datetime.now(timezone.utc) - start_time).total_seconds() * 1000,
-            )
-
-        except Exception as e:
-            logger.error(f"Agent {agent.name} failed: {e}")
-            return AgentResult(
-                agent_name=agent.name,
-                status=ExecutionStatus.FAILED,
-                error=str(e),
-                started_at=start_time,
-                completed_at=datetime.now(timezone.utc),
-            )
-
-    async def _run_with_orchestrator(
-        self,
-        agent: AgentSpec,
-        task: str,
-        context: Dict[str, Any],
-        orchestrator: Any,
-    ) -> Any:
-        """Run agent using the orchestrator."""
-        # Build prompt with context
-        prompt_parts = [f"Task: {task}"]
-
-        if "previous_output" in context:
-            prompt_parts.append(f"\nPrevious agent output:\n{context['previous_output']}")
-
-        if agent.system_prompt:
-            prompt_parts.insert(0, agent.system_prompt)
-
-        _prompt = "\n\n".join(
-            prompt_parts
-        )  # noqa: F841 - Built for future orchestrator integration
-
-        # TODO: Integrate with actual orchestrator
-        # For now, return mock output
-        return f"[{agent.name}] Output for: {task}"
+    # _execute_agent and _run_with_orchestrator inherited from Ensemble
 
 
 class Parallel(Ensemble):
@@ -386,36 +398,7 @@ class Parallel(Ensemble):
 
         return result
 
-    async def _execute_agent(
-        self,
-        agent: AgentSpec,
-        task: str,
-        context: Dict[str, Any],
-        orchestrator: Optional[Any],
-    ) -> AgentResult:
-        """Execute a single agent."""
-        start_time = datetime.now(timezone.utc)
-
-        try:
-            # Mock execution for now
-            output = f"[{agent.name}] Parallel result: {task}"
-
-            return AgentResult(
-                agent_name=agent.name,
-                status=ExecutionStatus.COMPLETED,
-                output=output,
-                started_at=start_time,
-                completed_at=datetime.now(timezone.utc),
-            )
-
-        except Exception as e:
-            return AgentResult(
-                agent_name=agent.name,
-                status=ExecutionStatus.FAILED,
-                error=str(e),
-                started_at=start_time,
-                completed_at=datetime.now(timezone.utc),
-            )
+    # _execute_agent inherited from Ensemble
 
     def _default_aggregator(self, results: List[AgentResult]) -> Dict[str, Any]:
         """Default result aggregation."""
@@ -480,14 +463,13 @@ class Hierarchical(Ensemble):
             result.completed_at = datetime.now(timezone.utc)
             return result
 
-        # Execute worker tasks (mock for now)
+        # Execute worker tasks via orchestrator
         for worker in self.workers:
-            worker_result = AgentResult(
-                agent_name=worker.name,
-                status=ExecutionStatus.COMPLETED,
-                output=f"[{worker.name}] Completed delegated task",
-                started_at=datetime.now(timezone.utc),
-                completed_at=datetime.now(timezone.utc),
+            worker_result = await self._execute_agent(
+                worker,
+                f"Delegated from {self.manager.name}: {task}",
+                context or {},
+                orchestrator,
             )
             result.agent_results.append(worker_result)
 

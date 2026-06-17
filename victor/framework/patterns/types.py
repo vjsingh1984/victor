@@ -25,6 +25,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
+from victor.core.constants import DEFAULT_VERTICAL
 
 
 class PatternStatus(Enum):
@@ -109,7 +110,7 @@ class TaskContext:
 
     task_description: str
     required_capabilities: List[str] = field(default_factory=list)
-    vertical: str = "coding"
+    vertical: str = DEFAULT_VERTICAL
     complexity: str = "medium"  # low, medium, high
     constraints: Dict[str, Any] = field(default_factory=dict)
     metadata: Dict[str, Any] = field(default_factory=dict)

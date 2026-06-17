@@ -175,8 +175,16 @@ class TestMCPClientRefreshResources:
         mock_response = {
             "result": {
                 "resources": [
-                    {"uri": "file:///test1.txt", "name": "Test 1", "description": "Test file 1"},
-                    {"uri": "file:///test2.txt", "name": "Test 2", "description": "Test file 2"},
+                    {
+                        "uri": "file:///test1.txt",
+                        "name": "Test 1",
+                        "description": "Test file 1",
+                    },
+                    {
+                        "uri": "file:///test2.txt",
+                        "name": "Test 2",
+                        "description": "Test file 2",
+                    },
                 ]
             }
         }

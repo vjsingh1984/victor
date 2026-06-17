@@ -429,8 +429,8 @@ class TestCallbacks:
 
         stats = collector._tool_usage_stats.get("test_tool")
         assert stats is not None
-        assert stats["calls"] == 1
-        assert stats["successes"] == 1
+        assert stats["total_calls"] == 1
+        assert stats["successful_calls"] == 1
 
     def test_on_streaming_session_complete(self, collector):
         """Test on_streaming_session_complete callback."""

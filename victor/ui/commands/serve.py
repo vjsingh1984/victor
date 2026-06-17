@@ -6,6 +6,7 @@ from rich.panel import Panel
 
 from victor.core.async_utils import run_sync
 from victor.ui.commands.utils import setup_logging
+from victor.workflows.hitl_api import get_default_hitl_db_path
 
 serve_app = typer.Typer(
     name="serve",
@@ -41,6 +42,11 @@ def serve(
         "--profile",
         help="Profile to use for the server",
     ),
+    mode: str = typer.Option(
+        "build",
+        "--mode",
+        help="Initial agent mode for API sessions",
+    ),
     enable_hitl: bool = typer.Option(
         False,
         "--enable-hitl",
@@ -64,7 +70,7 @@ def serve(
         victor serve --enable-hitl   # Enable HITL endpoints for approvals
     """
     if ctx.invoked_subcommand is None:
-        _serve(host, port, log_level, profile, enable_hitl, hitl_auth_token)
+        _serve(host, port, log_level, profile, mode, enable_hitl, hitl_auth_token)
 
 
 def _serve(
@@ -72,6 +78,7 @@ def _serve(
     port: int,
     log_level: Optional[str],
     profile: str,
+    mode: str,
     enable_hitl: bool = False,
     hitl_auth_token: Optional[str] = None,
 ):
@@ -80,6 +87,15 @@ def _serve(
         log_level = log_level.upper()
         if log_level == "WARN":
             log_level = "WARNING"
+
+    from victor.framework.runtime_discovery import CANONICAL_AGENT_MODES
+
+    if mode not in CANONICAL_AGENT_MODES:
+        console.print(
+            f"[red]Error:[/] Unsupported mode '{mode}'. "
+            f"Choose one of: {', '.join(CANONICAL_AGENT_MODES)}"
+        )
+        raise typer.Exit(1)
 
     # Use centralized logging config (serve has INFO default in logging_config.yaml)
     setup_logging(command="serve", cli_log_level=log_level)
@@ -97,7 +113,8 @@ def _serve(
             f"[bold]Host:[/] [cyan]{host}[/]\n"
             f"[bold]Port:[/] [cyan]{port}[/]\n"
             f"[bold]Backend:[/] [cyan]fastapi[/]\n"
-            f"[bold]Profile:[/] [cyan]{profile}[/]"
+            f"[bold]Profile:[/] [cyan]{profile}[/]\n"
+            f"[bold]Mode:[/] [cyan]{mode}[/]"
             f"{backend_info}"
             f"{hitl_info}\n\n"
             f"[dim]Press Ctrl+C to stop[/]",
@@ -106,13 +123,14 @@ def _serve(
         )
     )
 
-    run_sync(_run_fastapi_server(host, port, profile, enable_hitl, hitl_auth_token))
+    run_sync(_run_fastapi_server(host, port, profile, mode, enable_hitl, hitl_auth_token))
 
 
 async def _run_fastapi_server(
     host: str,
     port: int,
     profile: str,
+    mode: str,
     enable_hitl: bool = False,
     hitl_auth_token: Optional[str] = None,
 ) -> None:
@@ -123,6 +141,7 @@ async def _run_fastapi_server(
         import uvicorn
 
         from victor.integrations.api.fastapi_server import VictorFastAPIServer
+        from victor.framework.session_config import SessionConfig
 
         server = VictorFastAPIServer(
             host=host,
@@ -130,6 +149,7 @@ async def _run_fastapi_server(
             workspace_root=str(Path.cwd()),
             enable_hitl=enable_hitl,
             hitl_auth_token=hitl_auth_token,
+            session_config=SessionConfig.from_cli_flags(agent_profile=profile, mode=mode),
         )
 
         config = uvicorn.Config(
@@ -237,9 +257,7 @@ def serve_hitl(
 
     storage_info = ""
     if persistent:
-        from pathlib import Path
-
-        effective_db = db_path or str(Path.home() / ".victor" / "hitl.db")
+        effective_db = db_path or str(get_default_hitl_db_path())
         storage_info = f"\n[bold]Storage:[/] [green]SQLite[/] ({effective_db})"
     else:
         storage_info = "\n[bold]Storage:[/] [dim]In-memory[/]"

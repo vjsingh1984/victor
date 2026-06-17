@@ -139,7 +139,7 @@ async def run_swe_bench(
     adapter_config = AdapterConfig(
         max_turns=max_turns,
         tool_budget=tool_budget,
-        timeout_per_turn=timeout // max_turns,
+        total_timeout=timeout,
         track_file_edits=True,
         track_diffs=True,
     )
@@ -162,7 +162,7 @@ async def run_swe_bench(
             PatchApplicationValidator(),
             TestPassingValidator(),
             FileEditValidator(),
-            ToolUsageValidator(min_tool_calls=1),
+            ToolUsageValidator(),
         ],
         timeout=timeout,
     )

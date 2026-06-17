@@ -27,7 +27,10 @@ This module tests the BaseToolDependencyProvider class, covering:
 
 import pytest
 
-from victor.core.tool_dependency_base import BaseToolDependencyProvider, ToolDependencyConfig
+from victor.core.tool_dependency_base import (
+    BaseToolDependencyProvider,
+    ToolDependencyConfig,
+)
 from victor.core.tool_types import ToolDependency, ToolDependencyProviderProtocol
 
 # =============================================================================

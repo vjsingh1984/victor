@@ -615,7 +615,7 @@ pytest tests/unit/tools/test_weather_tool.py::TestGetWeather::test_weather_succe
 Start Victor and test your tool interactively:
 
 ```bash
-victor chat --no-tui
+victor chat
 ```
 
 Then ask:

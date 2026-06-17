@@ -261,31 +261,7 @@ class RustCodeValidator(BaseCodeValidator):
 
     def _check_brackets(self, code: str) -> Optional[str]:
         """Check for balanced brackets, braces, and angle brackets."""
-        # Remove string contents and comments
-        cleaned = self._remove_strings_and_comments(code)
-
-        bracket_pairs = {"(": ")", "[": "]", "{": "}"}
-        stack: list[tuple[str, int]] = []
-
-        for i, char in enumerate(cleaned):
-            if char in bracket_pairs:
-                stack.append((char, i))
-            elif char in bracket_pairs.values():
-                if not stack:
-                    line = code[:i].count("\n") + 1
-                    return f"Unmatched closing '{char}' at line {line}"
-
-                open_bracket, _ = stack.pop()
-                if bracket_pairs[open_bracket] != char:
-                    line = code[:i].count("\n") + 1
-                    return f"Mismatched brackets: expected '{bracket_pairs[open_bracket]}' but found '{char}' at line {line}"
-
-        if stack:
-            open_bracket, pos = stack[-1]
-            line = code[:pos].count("\n") + 1
-            return f"Unclosed '{open_bracket}' starting at line {line}"
-
-        return None
+        return super()._check_brackets(code)
 
     def _check_main_function(self, code: str) -> Optional[str]:
         """Check for main function in standalone code."""
@@ -372,26 +348,10 @@ class RustCodeValidator(BaseCodeValidator):
 
     def _check_incomplete_code(self, code: str) -> Optional[str]:
         """Check for obviously incomplete code."""
-        stripped = code.strip()
-
-        if not stripped:
-            return "Empty code"
-
-        # Check for truncated code
-        truncation_patterns = [
-            r"=\s*$",  # Ends with assignment
-            r"{\s*$",  # Ends with open brace
-            r"\(\s*$",  # Ends with open paren
-            r"->\s*$",  # Ends with arrow
-        ]
-
-        for pattern in truncation_patterns:
-            if re.search(pattern, stripped):
-                # Only flag if also has unclosed brackets
-                if self._check_brackets(stripped):
-                    return "Code appears to be truncated"
-
-        return None
+        return super()._check_incomplete_code(
+            code,
+            extra_patterns=[r"->\s*$"],  # Rust-specific: ends with arrow
+        )
 
     def _check_lifetimes(self, code: str) -> list[str]:
         """Check lifetime annotations for common issues."""
@@ -410,22 +370,11 @@ class RustCodeValidator(BaseCodeValidator):
 
     def _remove_strings_and_comments(self, code: str) -> str:
         """Remove string contents and comments for structural analysis."""
-        # Remove single-line comments
-        result = re.sub(r"//.*$", "", code, flags=re.MULTILINE)
-
-        # Remove multi-line comments
-        result = re.sub(r"/\*.*?\*/", "", result, flags=re.DOTALL)
-
-        # Remove string contents
-        result = re.sub(r'"[^"\\]*(?:\\.[^"\\]*)*"', '""', result)
-
-        # Remove raw strings (simplified)
-        result = re.sub(r'r#*".*?"#*', '""', result)
-
-        # Remove char literals
-        result = re.sub(r"'[^'\\]'|'\\.'", "''", result)
-
-        return result
+        return super()._remove_strings_and_comments(
+            code,
+            has_raw_strings=True,  # Rust has r#"..."# raw strings
+            has_char_literals=True,  # Rust has 'x' char literals
+        )
 
     def _add_missing_imports(self, code: str, missing: list[str]) -> str:
         """Add missing use statements."""

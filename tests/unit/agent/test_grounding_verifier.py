@@ -110,7 +110,7 @@ class TestVerificationResult:
         feedback = result.generate_feedback_prompt()
         assert "GROUNDING CORRECTION REQUIRED" in feedback
         assert "missing.py" in feedback
-        assert "read_file" in feedback or "list_directory" in feedback
+        assert "Use read or ls" in feedback
 
     def test_generate_feedback_prompt_symbol_not_found(self):
         """Should generate feedback for symbol not found issues."""
@@ -284,6 +284,19 @@ class MyClass:
         assert "utils.py" in paths
         assert "src/module.py" in paths
 
+    def test_extract_line_references_includes_rust_files(self, verifier):
+        """Should extract exact line references across supported code extensions."""
+        response = "See src/storage/engine.rs:38 and main.py lines 2-4."
+
+        refs = verifier.extract_line_references(response)
+
+        assert {
+            "path": "src/storage/engine.rs",
+            "start_line": 38,
+            "end_line": 38,
+        } in refs
+        assert {"path": "main.py", "start_line": 2, "end_line": 4} in refs
+
     def test_extract_code_snippets(self, verifier):
         """Should extract code blocks from response."""
         response = """
@@ -322,6 +335,19 @@ class MyClass:
         assert "helper" in symbols
 
     @pytest.mark.asyncio
+    async def test_verify_ignores_explanatory_nouns_as_symbols(self, verifier):
+        """Common prose nouns should not trigger symbol verification loops."""
+        response = "The `information` and `findings` are enough to answer the question."
+
+        result = await verifier.verify(response)
+
+        assert not any(
+            issue.issue_type == IssueType.SYMBOL_NOT_FOUND
+            and issue.reference in {"information", "findings"}
+            for issue in result.issues
+        )
+
+    @pytest.mark.asyncio
     async def test_verify_existing_file_paths(self, verifier):
         """Should verify existing file paths."""
         response = "Check the main.py file for details."
@@ -330,6 +356,19 @@ class MyClass:
 
         assert "main.py" in result.verified_references
         assert result.confidence > 0.7
+
+    @pytest.mark.asyncio
+    async def test_verify_flags_line_reference_outside_file_bounds(self, verifier):
+        """Should flag exact file:line claims that exceed the file length."""
+        response = "The implementation is in main.py:999."
+
+        result = await verifier.verify(response)
+
+        assert any(
+            issue.issue_type == IssueType.UNVERIFIABLE and issue.reference == "main.py:999"
+            for issue in result.issues
+        )
+        assert "main.py:999" in result.unverified_references
 
     @pytest.mark.asyncio
     async def test_verify_nonexistent_file_paths(self, verifier):

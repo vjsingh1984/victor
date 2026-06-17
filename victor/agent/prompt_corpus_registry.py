@@ -817,8 +817,8 @@ OUTPUT FORMAT:
 # =============================================================================
 
 
-class PromptBuilder:
-    """Base class for category-specific prompt builders."""
+class PromptTemplateBuilder:
+    """Base class for category-specific prompt template builders."""
 
     category: PromptCategory = PromptCategory.GENERAL_CODING
 
@@ -843,73 +843,73 @@ class PromptBuilder:
         )
 
 
-class FunctionCompletionBuilder(PromptBuilder):
+class FunctionCompletionBuilder(PromptTemplateBuilder):
     """Builder for function completion prompts."""
 
     category = PromptCategory.FUNCTION_COMPLETION
 
 
-class AlgorithmImplementationBuilder(PromptBuilder):
+class AlgorithmImplementationBuilder(PromptTemplateBuilder):
     """Builder for algorithm implementation prompts."""
 
     category = PromptCategory.ALGORITHM_IMPLEMENTATION
 
 
-class DataStructureBuilder(PromptBuilder):
+class DataStructureBuilder(PromptTemplateBuilder):
     """Builder for data structure prompts."""
 
     category = PromptCategory.DATA_STRUCTURE
 
 
-class StringManipulationBuilder(PromptBuilder):
+class StringManipulationBuilder(PromptTemplateBuilder):
     """Builder for string manipulation prompts."""
 
     category = PromptCategory.STRING_MANIPULATION
 
 
-class MathematicalBuilder(PromptBuilder):
+class MathematicalBuilder(PromptTemplateBuilder):
     """Builder for mathematical prompts."""
 
     category = PromptCategory.MATHEMATICAL
 
 
-class FileIOBuilder(PromptBuilder):
+class FileIOBuilder(PromptTemplateBuilder):
     """Builder for file I/O prompts."""
 
     category = PromptCategory.FILE_IO
 
 
-class CodeDebuggingBuilder(PromptBuilder):
+class CodeDebuggingBuilder(PromptTemplateBuilder):
     """Builder for code debugging prompts."""
 
     category = PromptCategory.CODE_DEBUGGING
 
 
-class CodeExplanationBuilder(PromptBuilder):
+class CodeExplanationBuilder(PromptTemplateBuilder):
     """Builder for code explanation prompts."""
 
     category = PromptCategory.CODE_EXPLANATION
 
 
-class CodeRefactoringBuilder(PromptBuilder):
+class CodeRefactoringBuilder(PromptTemplateBuilder):
     """Builder for code refactoring prompts."""
 
     category = PromptCategory.CODE_REFACTORING
 
 
-class APIIntegrationBuilder(PromptBuilder):
+class APIIntegrationBuilder(PromptTemplateBuilder):
     """Builder for API integration prompts."""
 
     category = PromptCategory.API_INTEGRATION
 
 
-class TestingBuilder(PromptBuilder):
+class TestingBuilder(PromptTemplateBuilder):
     """Builder for testing prompts."""
 
     category = PromptCategory.TESTING
 
 
-class GeneralCodingBuilder(PromptBuilder):
+class GeneralCodingBuilder(PromptTemplateBuilder):
     """Builder for general coding prompts."""
 
     category = PromptCategory.GENERAL_CODING
@@ -973,7 +973,7 @@ class PromptCorpusRegistry:
         self._corpus_hash: Optional[str] = None
 
         # Initialize default builders
-        self._builders: Dict[PromptCategory, PromptBuilder] = {
+        self._builders: Dict[PromptCategory, PromptTemplateBuilder] = {
             PromptCategory.FUNCTION_COMPLETION: FunctionCompletionBuilder(),
             PromptCategory.ALGORITHM_IMPLEMENTATION: AlgorithmImplementationBuilder(),
             PromptCategory.DATA_STRUCTURE: DataStructureBuilder(),
@@ -988,7 +988,7 @@ class PromptCorpusRegistry:
             PromptCategory.GENERAL_CODING: GeneralCodingBuilder(),
         }
 
-    def register_builder(self, builder: PromptBuilder) -> None:
+    def register_builder(self, builder: PromptTemplateBuilder) -> None:
         """Register a custom builder for a category.
 
         Args:
@@ -1338,6 +1338,11 @@ class PromptCorpusRegistry:
         """
         match = self.match(user_prompt)
         return match.category, match.confidence
+
+
+# Backward-compatible alias for older imports. New code should use
+# PromptTemplateBuilder to avoid confusion with the canonical prompt builder.
+PromptBuilder = PromptTemplateBuilder
 
 
 # =============================================================================

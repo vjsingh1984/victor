@@ -19,7 +19,16 @@ Defines the interface for context and state management operations.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Protocol, Tuple, runtime_checkable
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Dict,
+    List,
+    Optional,
+    Protocol,
+    Tuple,
+    runtime_checkable,
+)
 
 if TYPE_CHECKING:
     Message = Dict[str, Any]
@@ -72,14 +81,11 @@ class ContextMetrics(Protocol):
 
 @runtime_checkable
 class ContextServiceProtocol(Protocol):
-    """Protocol for context and state management service.
+    """[CANONICAL] Protocol for context and state management service.
 
-    Handles:
-    - Context size monitoring and metrics
-    - Context overflow detection and prevention
-    - Context compaction and optimization
-    - Message history management
-    - Token counting and estimation
+    This protocol represents the target architecture for context operations,
+    replacing the facade-driven Coordinator pattern with a state-passed
+    Service pattern.
 
     This protocol follows the Interface Segregation Principle (ISP)
     by focusing only on context-related operations.
@@ -169,6 +175,36 @@ class ContextServiceProtocol(Protocol):
         Example:
             removed = await context_service.compact_context(strategy="tiered")
             logger.info(f"Compacted context by removing {removed} messages")
+        """
+        ...
+
+    async def prepare_for_tool_output_injection(
+        self,
+        estimated_output_tokens: int,
+        *,
+        provider_name: str = "",
+        model_name: str = "",
+        task_type: str = "",
+        min_messages: int = 6,
+        default_strategy: str = "tiered",
+    ) -> Dict[str, Any]:
+        """Optionally compact before large tool outputs are injected into context.
+
+        The canonical runtime uses this hook to keep pre-injection compaction
+        policy owned by ContextService rather than scattered across execution
+        helpers.
+
+        Args:
+            estimated_output_tokens: Estimated tokens for the incoming tool output
+            provider_name: Active provider identifier
+            model_name: Active model identifier
+            task_type: Current task classification
+            min_messages: Minimum messages to retain if compaction runs
+            default_strategy: Preferred fallback strategy
+
+        Returns:
+            Structured decision/result metadata including whether compaction was
+            needed, whether it occurred, the chosen strategy, and the policy reason.
         """
         ...
 

@@ -14,8 +14,13 @@
 
 """Provider runtime boundaries for AgentOrchestrator.
 
-This module extracts provider runtime wiring from orchestrator construction and
-adds lazy coordinator materialization to reduce startup overhead.
+This module extracts provider runtime wiring from orchestrator construction.
+
+Migration Notes (2026-05-01):
+- ProviderCoordinator removed from ProviderRuntimeComponents (unused internally)
+- ProviderSwitchCoordinator removed from ProviderRuntimeComponents (unused internally)
+- ProviderService is the canonical owner for provider operations
+- Removed coordinator root shims stay absent in v1.0.0+
 """
 
 from __future__ import annotations
@@ -70,40 +75,36 @@ class LazyRuntimeProxy(Generic[T]):
 
 @dataclass(frozen=True)
 class ProviderRuntimeComponents:
-    """Provider runtime handles exposed to the orchestrator facade."""
+    """Provider runtime handles exposed to the orchestrator facade.
 
-    provider_coordinator: LazyRuntimeProxy[Any]
-    provider_switch_coordinator: LazyRuntimeProxy[Any]
+    Migration Notes (2026-05-01):
+    - provider_coordinator removed: use ProviderService instead
+    - provider_switch_coordinator removed: use ProviderService instead
+    - Removed coordinator shims must not be reintroduced
+    """
+
     pool: Optional[Any] = None
 
 
 def create_provider_runtime_components(
     *,
-    factory: Any,
     settings: Any,
     provider_manager: Any,
     pool: Optional[Any] = None,
+    get_provider_service: Optional[Callable[[], Any]] = None,
 ) -> ProviderRuntimeComponents:
-    """Create lazy provider runtime components for orchestrator wiring."""
+    """Create lazy provider runtime components for orchestrator wiring.
 
-    def _build_provider_coordinator() -> Any:
-        from victor.agent.provider_coordinator import (
-            ProviderCoordinator,
-            ProviderCoordinatorConfig,
-        )
+    ``get_provider_service`` is accepted as a no-op compatibility kwarg so
+    mixed-version environments do not fail during the coordinator-removal
+    migration. The canonical ProviderService is now initialized directly by the
+    orchestrator.
+    """
 
-        return ProviderCoordinator(
-            provider_manager=provider_manager,
-            config=ProviderCoordinatorConfig(
-                max_rate_limit_retries=getattr(settings, "max_rate_limit_retries", 3),
-                enable_health_monitoring=getattr(settings, "provider_health_checks", True),
-            ),
-        )
-
-    def _build_provider_switch_coordinator() -> Any:
-        return factory.create_provider_switch_coordinator(
-            provider_switcher=provider_manager._provider_switcher,
-            health_monitor=provider_manager._health_monitor,
+    if get_provider_service is not None:
+        logger.debug(
+            "Ignoring deprecated get_provider_service compatibility kwarg in "
+            "create_provider_runtime_components()"
         )
 
     # Feature-flagged provider pooling
@@ -122,13 +123,5 @@ def create_provider_runtime_components(
                 logger.debug("ProviderPool not available")
 
     return ProviderRuntimeComponents(
-        provider_coordinator=LazyRuntimeProxy(
-            factory=_build_provider_coordinator,
-            name="provider_coordinator",
-        ),
-        provider_switch_coordinator=LazyRuntimeProxy(
-            factory=_build_provider_switch_coordinator,
-            name="provider_switch_coordinator",
-        ),
         pool=resolved_pool,
     )

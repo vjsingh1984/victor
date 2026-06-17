@@ -37,7 +37,9 @@ def temp_git_repo():
         # Initialize git repo
         subprocess.run(["git", "init"], cwd=repo, capture_output=True)
         subprocess.run(
-            ["git", "config", "user.email", "test@test.com"], cwd=repo, capture_output=True
+            ["git", "config", "user.email", "test@test.com"],
+            cwd=repo,
+            capture_output=True,
         )
         subprocess.run(["git", "config", "user.name", "Test User"], cwd=repo, capture_output=True)
 

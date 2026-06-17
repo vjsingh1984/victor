@@ -67,7 +67,10 @@ class TestToolResult:
     def test_tool_result_failure(self):
         """Test failed ToolResult."""
         result = ToolResult(
-            success=False, output=None, error="Test error", metadata={"exception": "ValueError"}
+            success=False,
+            output=None,
+            error="Test error",
+            metadata={"exception": "ValueError"},
         )
 
         assert result.success is False
@@ -285,6 +288,43 @@ class TestToolRegistry:
 
         # Should not raise error
         registry.unregister("nonexistent")
+
+    def test_higher_priority_registration_replaces_lower_priority_conflict(self):
+        """Native tools should replace lower-priority conflicting tools."""
+        registry = ToolRegistry()
+
+        class MCPStyleTool(ConcreteTool):
+            def __init__(self):
+                super().__init__()
+                self._name = "mcp_test_tool"
+                self._tool_source = "mcp"
+
+        low_priority_tool = MCPStyleTool()
+        high_priority_tool = ConcreteTool()
+
+        registry.register(low_priority_tool)
+        registry.register(high_priority_tool)
+
+        assert registry.get("test_tool") is high_priority_tool
+        assert registry.get("mcp_test_tool") is None
+
+    def test_clear_resets_auxiliary_registry_state(self):
+        """Clearing the registry should reset caches and state-tracking indexes."""
+        registry = ToolRegistry()
+
+        class ConfigurableTool(ConcreteTool):
+            @property
+            def requires_configuration(self) -> bool:
+                return True
+
+        registry.register(ConfigurableTool())
+        registry.get_tool_schemas()
+
+        registry.clear()
+
+        assert registry.list_tools() == []
+        assert registry.get_tool_schemas() == []
+        assert registry._dynamic_availability_tools == set()
 
     def test_get_tool(self):
         """Test getting a tool by name."""

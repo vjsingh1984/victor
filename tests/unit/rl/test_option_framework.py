@@ -63,7 +63,7 @@ class TestOptionState:
         """Test custom state values."""
         state = OptionState(
             current_mode="explore",
-            tools_used=["read_file", "code_search"],
+            tools_used=["read", "code_search"],
             iterations=5,
             context_size=10000,
             task_progress=0.5,
@@ -187,7 +187,13 @@ class TestExploreOption:
         """Test action sequence."""
         state = OptionState(tools_used=["semantic_code_search"])
         action = option.get_action(state)
-        assert action == "read_file"
+        assert action == "read"
+
+    def test_get_action_normalizes_legacy_history(self, option: ExploreOption) -> None:
+        """Test legacy history still yields canonical actions."""
+        state = OptionState(tools_used=["semantic_code_search", "read_file"])
+        action = option.get_action(state)
+        assert action == "ls"
 
     def test_start_and_step(self, option: ExploreOption) -> None:
         """Test option lifecycle."""
@@ -245,7 +251,7 @@ class TestImplementOption:
 
     def test_get_action_after_write(self, option: ImplementOption) -> None:
         """Test action after writing."""
-        state = OptionState(tools_used=["write_file"])
+        state = OptionState(tools_used=["write"])
         action = option.get_action(state)
         assert action == "run_tests"
 
@@ -256,7 +262,7 @@ class TestImplementOption:
             last_tool_success=False,
         )
         action = option.get_action(state)
-        assert action == "edit_file"
+        assert action == "edit"
 
 
 class TestDebugOption:
@@ -299,14 +305,14 @@ class TestDebugOption:
         option._steps = 0
         state = OptionState()
         action = option.get_action(state)
-        assert action == "read_file"
+        assert action == "read"
 
     def test_get_action_after_read(self, option: DebugOption) -> None:
         """Test action after reading."""
         option._steps = 1
-        state = OptionState(tools_used=["read_file"])
+        state = OptionState(tools_used=["read"])
         action = option.get_action(state)
-        assert action == "edit_file"
+        assert action == "edit"
 
 
 class TestReviewOption:
@@ -345,7 +351,7 @@ class TestReviewOption:
         assert option.get_action(state) == "run_tests"
 
         option._steps = 1
-        assert option.get_action(state) == "read_file"
+        assert option.get_action(state) == "read"
 
         option._steps = 2
         assert option.get_action(state) == "code_search"

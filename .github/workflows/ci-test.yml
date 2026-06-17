@@ -1,15 +1,36 @@
 # Test Workflow with Sharding
 # Tests run sequentially within each shard for reliable isolation
-# Splits tests across 6 shards for parallel matrix execution
+# Splits tests across 12 shards for parallel matrix execution
 
 name: CI - Tests
 
 on:
   push:
     branches: [main, develop]
+    paths:
+      - '.github/workflows/ci-test.yml'
+      - 'victor/**'
+      - 'victor-contracts/**'
+      - 'tests/**'
+      - 'pyproject.toml'
+      - 'requirements*.txt'
+      - 'Makefile'
+      - 'MANIFEST.in'
   pull_request:
     branches: [main, develop]
+    paths:
+      - '.github/workflows/ci-test.yml'
+      - 'victor/**'
+      - 'victor-contracts/**'
+      - 'tests/**'
+      - 'pyproject.toml'
+      - 'requirements*.txt'
+      - 'Makefile'
+      - 'MANIFEST.in'
   workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -20,15 +41,19 @@ jobs:
   test:
     name: Test (Py${{ matrix.python-version }}, Shard ${{ matrix.shard }})
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # Stopgap: the unit suite runs at ~1.1s/test (heavy autouse fixtures), so a
+    # 12-way split lands shards near 40-45 min and many were cancelled at the
+    # old 45-min cap. Raise headroom while the fixture-speed/duration-balancing
+    # work is tracked separately. See the CI-Tests stabilization issue.
+    timeout-minutes: 75
     needs: []  # No dependencies - run in parallel with ci-fast
     env:
       PYTHONPATH: ${{ github.workspace }}
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10", "3.11", "3.12"]
-        shard: [1, 2, 3, 4, 5, 6]
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
     steps:
       - uses: actions/checkout@v4
 
@@ -60,35 +85,86 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           # Uninstall any existing victor packages to ensure clean state
-          pip uninstall -y victor victor-ai victor-sdk || true
+          pip uninstall -y victor victor-ai victor-contracts || true
           # Use CPU-only torch for faster CI
           pip install torch --index-url https://download.pytorch.org/whl/cpu
+          # Install the in-repo SDK FIRST so victor-ai can resolve victor-contracts>=X.Y
+          # from the local editable install instead of requiring it on PyPI.
+          pip install --no-cache-dir -e ./victor-contracts
           # Install the full development + CI dependency set explicitly. Avoid relying on
           # self-referential extras, which can leave async/test plugins unresolved in matrix jobs.
-          pip install --force-reinstall --no-cache-dir -e ".[dev,ci,api]"
-          # Reinstall the in-repo SDK last so the test matrix exercises the local SDK surface
-          # instead of any published victor-sdk version pulled in as a transitive dependency.
-          pip install --force-reinstall --no-cache-dir -e ./victor-sdk
+          # NOTE: Do NOT use --force-reinstall here — it overwrites the local editable
+          # victor-contracts (0.7.0 with cli module) with the older PyPI release (0.6.0 without it).
+          pip install --no-cache-dir -e ".[dev,ci,api]"
+          # Re-install SDK editably to guarantee the local version wins even if
+          # pip resolved victor-contracts from PyPI as a transitive dependency above.
+          pip install --no-cache-dir --no-deps -e ./victor-contracts
           # Install pytest-split for sharding across CI jobs
           pip install pytest-split
 
       - name: Verify local victor import path and CI extras
         run: |
-          python -c "import victor, victor_sdk.cli, lancedb, pytest_asyncio, scipy; print(victor.__file__)"
+          python -c "import victor, victor_contracts.cli, lancedb, pytest_asyncio, scipy; print(victor.__file__)"
+
+      - name: Pre-cache embedding model
+        env:
+          # Authenticated HF requests get a much higher rate limit, which avoids
+          # the '429 Too Many Requests' that 12 parallel shards trigger on the
+          # unauthenticated endpoint. No-op when the secret is unset.
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          # EmbeddingService / SemanticResponseCache lazily load
+          # BAAI/bge-small-en-v1.5 the first time a test exercises them. A failed
+          # in-test HuggingFace download then surfaces as a NON-deterministic test
+          # failure (e.g. semantic cache / weighted-similarity / prompt-corpus
+          # tests). Pre-fetch the model here with retries so it is cached on disk
+          # before the suite runs. Best-effort: never fail the job on a model
+          # download issue (tests degrade as before, no worse).
+          cat > /tmp/precache_model.py <<'PY'
+          from sentence_transformers import SentenceTransformer
+
+          SentenceTransformer("BAAI/bge-small-en-v1.5")
+          print("embedding model cached")
+          PY
+          for attempt in 1 2 3 4 5; do
+            if python /tmp/precache_model.py; then
+              # Only go offline for the test run when the model is actually
+              # cached. Offline + uncached would turn a transient HF outage into
+              # a HARD failure (OSError) instead of degrading to the baseline.
+              echo "HF_HUB_OFFLINE=1" >> "$GITHUB_ENV"
+              echo "TRANSFORMERS_OFFLINE=1" >> "$GITHUB_ENV"
+              break
+            fi
+            echo "Embedding model pre-cache attempt ${attempt} failed; retrying..."
+            sleep $((attempt * 5))
+          done || true
 
       - name: Run tests (sharded)
+        # HF_HUB_OFFLINE / TRANSFORMERS_OFFLINE are exported by the pre-cache step
+        # ONLY when the model was successfully cached. When cached, offline loads
+        # skip the network metadata (HEAD) request that returns '429 Too Many
+        # Requests' under 12 parallel shards (a non-deterministic embedding-test
+        # failure source). When the pre-cache misses, offline is NOT set and the
+        # tests fall back to the online baseline (never a hard offline error) —
+        # HF_TOKEN (if set) keeps those online loads under the rate limit, and
+        # EmbeddingService retries + degrades gracefully as a final backstop.
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
+          # Coverage only on 3.11 shard 1 (where Codecov upload happens)
+          if [ "${{ matrix.python-version }}" = "3.11" ] && [ "${{ matrix.shard }}" = "1" ]; then
+            COV_FLAGS="--cov=victor --cov-report=xml --cov-report=term-missing"
+          else
+            COV_FLAGS="--no-cov"
+          fi
           python -m pytest tests/unit \
             -m "not slow and not integration" \
             --splitting-algorithm=least_duration \
-            --splits=6 \
+            --splits=12 \
             --group=${{ matrix.shard }} \
             -v \
             --tb=short \
-            --cov=victor \
-            --cov-report=xml \
-            --cov-report=term-missing \
-            --cov-context=test
+            $COV_FLAGS
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
@@ -139,16 +215,19 @@ jobs:
         run: |
           pip install --upgrade pip
           # Uninstall any existing victor packages to ensure clean state
-          pip uninstall -y victor victor-ai victor-sdk || true
+          pip uninstall -y victor victor-ai victor-contracts || true
           pip install torch --index-url https://download.pytorch.org/whl/cpu
-          # Install victor-ai with embeddings extra (needed for CLI import chain)
-          pip install --force-reinstall --no-cache-dir -e ".[embeddings]"
-          # Reinstall the local SDK last so smoke tests run against the in-repo contract surface.
-          pip install --force-reinstall --no-cache-dir -e ./victor-sdk
+          # Install the in-repo SDK first so victor-ai can resolve the dependency locally.
+          pip install --no-cache-dir -e ./victor-contracts
+          # Install victor-ai with embeddings extra (needed for CLI import chain).
+          # Do NOT use --force-reinstall — it overwrites local editable SDK with PyPI version.
+          pip install --no-cache-dir -e ".[embeddings]"
+          # Re-install SDK editably to guarantee the local version wins
+          pip install --no-cache-dir --no-deps -e ./victor-contracts
 
       - name: Test CLI commands
         run: |
-          python -c "import victor, victor_sdk.cli; print(victor.__file__)"
+          python -c "import victor, victor_contracts.cli; print(victor.__file__)"
           victor --version
           victor --help
           echo "✓ CLI smoke test passed"

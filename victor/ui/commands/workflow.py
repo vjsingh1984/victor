@@ -49,6 +49,11 @@ from rich.panel import Panel
 from rich.table import Table
 
 from victor.core.async_utils import run_sync
+from victor.ui.delegate_follow_up import (
+    DelegateFollowUpContractError,
+    load_delegate_follow_up_contract_file,
+)
+from victor.ui.errors import print_error
 
 workflow_app = typer.Typer(
     name="workflow",
@@ -56,6 +61,13 @@ workflow_app = typer.Typer(
 )
 
 console = Console()
+
+
+def _create_compile_only_compiler() -> Any:
+    """Create the canonical compile-only workflow compiler for CLI checks."""
+    from victor.workflows.unified_compiler import UnifiedWorkflowCompiler
+
+    return UnifiedWorkflowCompiler(enable_caching=False)
 
 
 def _load_workflow_file(workflow_path: Path) -> dict:
@@ -74,11 +86,11 @@ def _load_workflow_file(workflow_path: Path) -> dict:
     from victor.workflows.definition import WorkflowDefinition
 
     if not workflow_path.exists():
-        console.print(f"[bold red]Error:[/] Workflow file not found: {workflow_path}")
+        print_error(f"Workflow file not found: {workflow_path}")
         raise typer.Exit(1)
 
     if workflow_path.suffix not in {".yaml", ".yml"}:
-        console.print(f"[bold red]Error:[/] File must be .yaml or .yml: {workflow_path}")
+        print_error(f"File must be .yaml or .yml: {workflow_path}")
         raise typer.Exit(1)
 
     try:
@@ -91,13 +103,25 @@ def _load_workflow_file(workflow_path: Path) -> dict:
             workflows = {loaded.name: loaded}
 
         if not workflows:
-            console.print("[bold red]Error:[/] No workflows found in file")
+            print_error("No workflows found in file")
             raise typer.Exit(1)
 
         return workflows
 
     except YAMLWorkflowError as e:
-        console.print(f"[bold red]Error:[/] Failed to parse workflow: {e}")
+        print_error(f"Failed to parse workflow: {e}")
+        raise typer.Exit(1)
+
+
+def _load_delegate_follow_up_contract_file(contract_path: Path) -> Dict[str, Any]:
+    """Load a delegate follow-up contract JSON file for workflow resume."""
+    try:
+        return load_delegate_follow_up_contract_file(contract_path)
+    except FileNotFoundError:
+        console.print(f"[bold red]Error:[/] Delegate follow-up contract not found: {contract_path}")
+        raise typer.Exit(1)
+    except DelegateFollowUpContractError as e:
+        console.print(f"[bold red]Error:[/] {e}")
         raise typer.Exit(1)
 
 
@@ -130,7 +154,14 @@ def _detect_vertical_from_path(workflow_path: Path) -> Optional[str]:
     - victor/coding/workflows/feature.yaml -> coding
     - victor/research/workflows/paper.yaml -> research
     """
-    known_verticals = {"coding", "devops", "rag", "dataanalysis", "research", "benchmark"}
+    known_verticals = {
+        "coding",
+        "devops",
+        "rag",
+        "dataanalysis",
+        "research",
+        "benchmark",
+    }
     parts = workflow_path.parts
 
     for part in parts:
@@ -185,11 +216,23 @@ def _load_registered_handlers(vertical: Optional[str]) -> Set[str]:
         try:
             module_name = f"victor.{vertical}.handlers"
             import importlib
+            import inspect
 
             module = importlib.import_module(module_name)
 
             if hasattr(module, "register_handlers"):
-                module.register_handlers()
+                from victor.workflows.compute_registry import register_compute_handler
+
+                register_handlers = module.register_handlers
+                try:
+                    parameters = inspect.signature(register_handlers).parameters
+                except (TypeError, ValueError):
+                    parameters = {}
+
+                if parameters:
+                    register_handlers(register_compute_handler)
+                else:
+                    register_handlers()
             if hasattr(module, "HANDLERS"):
                 handlers.update(module.HANDLERS.keys())
         except ImportError:
@@ -197,7 +240,7 @@ def _load_registered_handlers(vertical: Optional[str]) -> Set[str]:
 
     # Get all registered handlers from executor
     try:
-        from victor.workflows.executor import list_compute_handlers
+        from victor.workflows.compute_registry import list_compute_handlers
 
         handlers.update(list_compute_handlers())
     except ImportError:
@@ -407,8 +450,6 @@ def validate_workflow(
         victor workflow validate ./workflows/analysis.yaml --check-handlers
         victor workflow validate ./workflows/analysis.yaml --vertical coding
     """
-    from victor.workflows.yaml_to_graph_compiler import YAMLToStateGraphCompiler
-
     path = Path(workflow_path)
     console.print(f"\n[bold blue]Validating:[/] {path.name}")
     console.print("[dim]" + "─" * 50 + "[/]")
@@ -420,7 +461,7 @@ def validate_workflow(
 
     workflows = _load_workflow_file(path)
 
-    compiler = YAMLToStateGraphCompiler()
+    compiler = _create_compile_only_compiler()
     all_valid = True
     total_warnings = 0
 
@@ -447,7 +488,7 @@ def validate_workflow(
 
         # Try to compile to state graph
         try:
-            _compiled = compiler.compile(workflow)
+            _compiled = compiler.compile_definition(workflow)
             if is_valid:
                 console.print("[bold green]✓[/] Validation passed")
             else:
@@ -747,7 +788,9 @@ async def _execute_workflow_async(
     profile: Optional[str],
 ) -> None:
     from victor.config.settings import load_settings
-    from victor.framework.shim import FrameworkShim
+
+    from victor.framework.session_config import SessionConfig
+    from victor.framework.session_runner import create_victor_client
     from victor.ui.commands.utils import graceful_shutdown
     from victor.workflows import ExecutorConfig, StateGraphExecutor
     from victor.workflows.definition import AgentNode
@@ -755,7 +798,7 @@ async def _execute_workflow_async(
     import logging
 
     logger = logging.getLogger(__name__)
-    settings = load_settings()
+    load_settings()
 
     orchestrators = {}
     has_agent_nodes = any(isinstance(node, AgentNode) for node in workflow.nodes.values())
@@ -783,12 +826,10 @@ async def _execute_workflow_async(
         for profile_name in sorted(all_profiles):
             try:
                 logger.debug(f"Creating orchestrator for profile: {profile_name}")
-                shim = FrameworkShim(
-                    settings,
-                    profile_name=profile_name,
-                    vertical=None,
-                )
-                orchestrator = await shim.create_orchestrator()
+                # ✅ PROPER: Use the framework client seam instead of FrameworkShim
+                config = SessionConfig(profile=profile_name)
+                client = create_victor_client(config)
+                orchestrator = await client.initialize()
                 orchestrators[profile_name] = orchestrator
                 logger.debug(f"Successfully created orchestrator for profile: {profile_name}")
                 console.print(f"  [dim]✓ Profile '{profile_name}' initialized[/]")
@@ -835,7 +876,9 @@ async def _execute_workflow_async(
         logger.debug(f"   Success: {result.success}")
         logger.debug(f"   Duration: {result.duration_seconds:.2f}s")
         logger.debug(f"   Nodes Executed: {len(result.nodes_executed)}")
-        logger.debug(f"   Final State Keys: {list(result.state.keys())}")
+        # Convert Pydantic model to dict if needed for keys()
+        state_dict = result.state.to_dict() if hasattr(result.state, "to_dict") else result.state
+        logger.debug(f"   Final State Keys: {list(state_dict.keys())}")
         logger.debug(f"{'='*80}\n")
 
         console.print("[dim]" + "─" * 50 + "[/]")
@@ -847,9 +890,13 @@ async def _execute_workflow_async(
 
             if result.state:
                 console.print("\n[bold]Final State:[/]")
+                # Convert Pydantic model to dict if needed
+                state_dict = (
+                    result.state.to_dict() if hasattr(result.state, "to_dict") else result.state
+                )
                 display_state = {
                     k: v
-                    for k, v in result.state.items()
+                    for k, v in state_dict.items()
                     if not k.startswith("_") and k not in {"messages", "history"}
                 }
                 console.print(json.dumps(display_state, indent=2, default=str)[:2000])
@@ -887,6 +934,19 @@ def run_workflow(
         "-f",
         help="Path to JSON file with initial context",
     ),
+    delegate_follow_up_contract: Optional[str] = typer.Option(
+        None,
+        "--delegate-follow-up-contract",
+        help=(
+            "Path to a JSON delegate follow-up contract to inject into workflow state "
+            "for TeamStep resume/review/merge execution"
+        ),
+    ),
+    delegate_next_step_id: Optional[str] = typer.Option(
+        None,
+        "--delegate-next-step-id",
+        help="Explicit follow-up step_id to execute from the delegate follow-up contract",
+    ),
     workflow_name: Optional[str] = typer.Option(
         None,
         "--name",
@@ -918,11 +978,10 @@ def run_workflow(
     Example:
         victor workflow run ./workflows/analysis.yaml -c '{"symbol": "AAPL"}'
         victor workflow run ./workflows/analysis.yaml -f context.json
+        victor workflow run ./workflows/delegate.yaml --delegate-follow-up-contract follow-up.json
         victor workflow run ./workflows/analysis.yaml --dry-run
         victor workflow run ./workflows/analysis.yaml --log-level DEBUG
     """
-    from victor.workflows.yaml_to_graph_compiler import YAMLToStateGraphCompiler
-
     # Set log level if specified
     if log_level:
         import logging
@@ -963,6 +1022,9 @@ def run_workflow(
         except json.JSONDecodeError as e:
             console.print(f"[bold red]Error:[/] Invalid JSON in --context: {e}")
             raise typer.Exit(1)
+        if not isinstance(initial_context, dict):
+            console.print("[bold red]Error:[/] --context must be a JSON object")
+            raise typer.Exit(1)
 
     if context_file:
         context_path = Path(context_file)
@@ -972,10 +1034,26 @@ def run_workflow(
         try:
             with open(context_path) as f:
                 file_context = json.load(f)
+                if not isinstance(file_context, dict):
+                    console.print("[bold red]Error:[/] Context file must contain a JSON object")
+                    raise typer.Exit(1)
                 initial_context.update(file_context)
         except json.JSONDecodeError as e:
             console.print(f"[bold red]Error:[/] Invalid JSON in context file: {e}")
             raise typer.Exit(1)
+
+    if delegate_follow_up_contract:
+        follow_up_contract = _load_delegate_follow_up_contract_file(
+            Path(delegate_follow_up_contract)
+        )
+        initial_context["delegate_follow_up_contract"] = follow_up_contract
+        if delegate_next_step_id:
+            initial_context["delegate_next_step_id"] = delegate_next_step_id
+    elif delegate_next_step_id:
+        console.print(
+            "[bold red]Error:[/] --delegate-next-step-id requires " "--delegate-follow-up-contract"
+        )
+        raise typer.Exit(1)
 
     console.print(f"\n[bold blue]Workflow:[/] {workflow.name}")
     console.print("[dim]" + "─" * 50 + "[/]")
@@ -988,9 +1066,9 @@ def run_workflow(
         console.print("\n[bold yellow]Dry run mode[/] - showing execution plan:")
 
         # Show execution order
-        compiler = YAMLToStateGraphCompiler()
+        compiler = _create_compile_only_compiler()
         try:
-            compiler.compile(workflow)  # Validate compilation
+            compiler.compile_definition(workflow)  # Validate compilation
             console.print("[bold green]✓[/] Workflow can be compiled")
             console.print(f"[dim]Start node: {workflow.start_node}[/]")
         except Exception as e:
@@ -1101,7 +1179,9 @@ async def _generate_workflow_async(
     dry_run: bool,
 ) -> None:
     from victor.config.settings import load_settings
-    from victor.framework.shim import FrameworkShim
+
+    from victor.framework.session_config import SessionConfig
+    from victor.framework.session_runner import create_victor_client
     from victor.ui.commands.utils import graceful_shutdown
     from victor.workflows.generation import (
         PipelineMode,
@@ -1112,16 +1192,14 @@ async def _generate_workflow_async(
 
     import yaml
 
-    settings = load_settings()
+    load_settings()
 
     profile_name = profile or "default"
     try:
-        shim = FrameworkShim(
-            settings,
-            profile_name=profile_name,
-            vertical=vertical,
-        )
-        orchestrator = await shim.create_orchestrator()
+        # ✅ PROPER: Use the framework client seam instead of FrameworkShim
+        config = SessionConfig(profile=profile_name, vertical=vertical)
+        client = create_victor_client(config)
+        orchestrator = await client.initialize()
         console.print(f"[dim]Using profile: {profile_name}[/]")
     except Exception as e:
         console.print(f"[bold red]Error:[/] Failed to create orchestrator: {e}")
@@ -1333,7 +1411,14 @@ def generate_workflow(
         raise typer.Exit(1)
 
     # Validate vertical
-    valid_verticals = {"coding", "devops", "research", "rag", "dataanalysis", "benchmark"}
+    valid_verticals = {
+        "coding",
+        "devops",
+        "research",
+        "rag",
+        "dataanalysis",
+        "benchmark",
+    }
     if vertical.lower() not in valid_verticals:
         console.print(f"[bold red]Error:[/] Unknown vertical: {vertical}")
         console.print(f"Valid options: {', '.join(valid_verticals)}")

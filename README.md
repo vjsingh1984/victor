@@ -2,196 +2,171 @@
 
 # Victor
 
-**Open-source agentic AI framework. Build, orchestrate, and evaluate AI agents across 22 providers.**
+**An contract-first agentic AI framework for building reliable agents across local and cloud models.**
 
 [![PyPI version](https://badge.fury.io/py/victor-ai.svg)](https://pypi.org/project/victor-ai/)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![Fast Checks](https://github.com/vjsingh1984/victor/actions/workflows/ci-fast.yml/badge.svg)](https://github.com/vjsingh1984/victor/actions/workflows/ci-fast.yml)
+[![Tests](https://github.com/vjsingh1984/victor/actions/workflows/ci-test.yml/badge.svg)](https://github.com/vjsingh1984/victor/actions/workflows/ci-test.yml)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Tests](https://github.com/vjsingh1984/victor/actions/workflows/test.yml/badge.svg)](https://github.com/vjsingh1984/victor/actions/workflows/test.yml)
-[![Coverage](https://img.shields.io/badge/coverage-85%25-brightgreen.svg)](https://github.com/vjsingh1984/victor/actions)
 [![Docker](https://img.shields.io/badge/docker-ghcr.io-blue.svg)](https://ghcr.io/vjsingh1984/victor)
 
 </div>
 
 ---
 
-## Features
+Victor gives you a typed Python framework, a service-first agent runtime, and an contract-first plugin ecosystem for building agents that can reason, call tools, run workflows, coordinate teams, and operate against project-local code intelligence.
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                     VICTOR FRAMEWORK                        │
-│                                                             │
-│  Agents ─── Teams ─── Workflows ─── Evaluation              │
-│    │          │          │              │                    │
-│  run()    Sequential   StateGraph    SWE-bench              │
-│  stream()  Parallel    YAML DSL      Harnesses              │
-│  chat()   Hierarchical Checkpoints   Code Quality           │
-│           Pipeline                                          │
-│                                                             │
-│  24 Providers │ 34 Tool Modules │ 9 Verticals │ 4 Scopes   │
-└─────────────────────────────────────────────────────────────┘
-```
+It is designed for teams that need agent systems to be testable, extensible, observable, and portable across Anthropic, OpenAI-compatible providers, Gemini, Bedrock, local models, and air-gapped environments.
 
-- **24 LLM Providers** — Cloud (Anthropic, OpenAI, Google, Azure, Bedrock, DeepSeek, Vertex) + local (Ollama, LM Studio, vLLM)
-- **34 Tool Modules** — File ops, git, shell, web, search, docker, testing, refactoring, analysis
-- **9 Domain Verticals** — Coding, DevOps, RAG, Data Analysis, Research, Security, IaC, Classification, Benchmark
-- **Multi-Agent Teams** — 4 formations: sequential, parallel, hierarchical, pipeline
-- **Stateful Workflows** — YAML DSL compiled to StateGraph with typed state and checkpointing
-- **Air-Gapped Mode** — Full functionality with local models for secure, offline environments
-- **Built-in Resilience** — Automatic retry with exponential backoff on rate limits, circuit breaker protection
+## Why Victor
 
-### Benchmark Results (March 2026)
+| Capability | What it gives you |
+|------------|-------------------|
+| **Service-first runtime** | Chat, tools, sessions, context, provider routing, and recovery are owned by focused runtime services instead of a monolithic orchestrator. |
+| **StateGraph workflows** | Build typed graph workflows and use teams as graph nodes without inventing a separate multi-agent graph abstraction. |
+| **Local and cloud models** | Use cloud providers for capability, local providers for privacy/cost, and provider-specific caching strategies for performance. |
+| **Tool-rich execution** | Compose filesystem, git, shell, code search, graph, verification, Docker, web, testing, and refactoring tools. |
+| **contract-first plugins** | Put domain behavior in sibling `victor-*` packages through `victor-contracts` and public framework extension contracts. |
+| **Project code intelligence** | Keep graph indexes, semantic search, conversations, and project memory in project-local state. |
 
-Victor achieves **100% task success rate** across multiple providers:
-
-| Provider | Model | 5-Task Success | Avg Time/Task | Cost/1M tokens |
-|----------|-------|---------------|--------------|----------------|
-| Anthropic | Claude Haiku 4.5 | **100%** | 16.9s | $0.80 in |
-| OpenAI | GPT-4o-mini | **100%** | 14.7s | $0.15 in |
-| DeepSeek | DeepSeek-Chat V3 | **100%** | 35.9s | $0.07 in |
-
-> Tasks: code generation, research synthesis, file operations, security audit, workflow orchestration.
-> See [full results](docs/benchmarking/results/BENCHMARK_RESULTS_2026-03-16.md)
-
-## At a glance
-
-```
-                              ┌─────────────────────────────────┐
-                              │       Agent Orchestrator        │
-                              │                                 │
-[You] ──▶ [CLI/TUI/API] ──▶  │  ProviderManager ──▶ 24 LLMs   │ ──▶ [Response]
-                              │  ToolPipeline    ──▶ 34 Tools   │
-                              │  TeamCoordinator ──▶ Agents     │
-                              │  StateManager    ──▶ 4 Scopes   │
-                              └─────────────────────────────────┘
-```
-
-## Choose your path
-
-| Persona | Start here | Typical goals |
-|---------|------------|---------------|
-| **New user** | [Getting Started](docs/getting-started/) | Install, first run, local vs cloud |
-| **Daily user** | [User Guide](docs/user-guide/) | Commands, modes, profiles, workflows |
-| **Operator** | [Operations](docs/operations/) | Deployment, monitoring, security |
-| **Contributor** | [Development](docs/development/) | Setup, testing, architecture, extending |
-| **Architect** | [Architecture](ARCHITECTURE.md) | System overview, core components |
-
-## Quick start
+## Quick Start
 
 | Path | Commands | Best for |
 |------|----------|----------|
-| **Local model** | `pipx install victor-ai`<br>`ollama pull qwen2.5-coder:7b`<br>`victor chat "Hello"` | Privacy, offline, free tier |
-| **Cloud model** | `pipx install victor-ai`<br>`export ANTHROPIC_API_KEY=...`<br>`victor chat --provider anthropic` | Max capability |
-| **Docker** | `docker pull ghcr.io/vjsingh1984/victor:latest`<br>`docker run -it -v ~/.victor:/root/.victor ghcr.io/vjsingh1984/victor:latest` | Isolated env |
-
-## Supported Providers
-
-Victor supports **22 LLM providers** — switch mid-conversation without losing context.
-
-| Category | Providers |
-|----------|-----------|
-| **Frontier Cloud** | Anthropic, OpenAI, Google Gemini, Azure OpenAI |
-| **Cloud Platforms** | AWS Bedrock, Google Vertex |
-| **Specialized** | xAI, DeepSeek, Mistral, Groq, Cerebras, Moonshot, ZAI |
-| **Aggregators** | OpenRouter, Together AI, Fireworks AI, Replicate, Hugging Face |
-| **Local (air-gapped)** | Ollama, LM Studio, vLLM, llama.cpp |
-
-[Full Provider Reference](docs/reference/providers/)
+| Local model | `pipx install victor-ai`<br>`ollama pull qwen2.5-coder:7b`<br>`victor chat "Explain this repo"` | Private, low-cost, air-gapped work |
+| Cloud model | `pipx install victor-ai`<br>`export ANTHROPIC_API_KEY=...`<br>`victor chat --provider anthropic "Plan this refactor"` | Highest model capability |
+| Python API | `pip install victor-ai` | Embedding Victor in applications |
+| Docker | `docker pull ghcr.io/vjsingh1984/victor:latest` | Isolated CLI/API runtime |
 
 ## Python API
 
-Victor provides a clean Python API for programmatic use:
-
 ```python
-from victor.framework import Agent, EventType
-
-# Simple use case
-agent = await Agent.create(provider="anthropic")
-result = await agent.run("Explain this codebase structure")
-print(result.content)
-
-# Streaming responses
-async for event in agent.stream("Refactor this function"):
-    if event.type == EventType.CONTENT:
-        print(event.content, end="")
-    elif event.type == EventType.TOOL_CALL:
-        print(f"\nUsing tool: {event.tool_name}")
-
-# With tool configuration
-from victor.framework import ToolSet
+from victor.framework import Agent, EventType, ToolSet
 
 agent = await Agent.create(
-    provider="openai",
-    model="gpt-4o",
-    tools=ToolSet.default()  # or ToolSet.minimal(), ToolSet.full()
+    provider="anthropic",
+    tools=ToolSet.default(),
 )
 
-# Multi-turn conversation
-session = agent.chat()
-await session.send("What files are in this project?")
-await session.send("Now explain the main entry point")
+result = await agent.run("Explain the architecture of this codebase")
+print(result.content)
+
+async for event in agent.stream("Review the changed files"):
+    if event.type == EventType.CONTENT:
+        print(event.content, end="")
 ```
 
-### StateGraph Workflows
+## StateGraph Workflows
 
 ```python
-from victor.framework import StateGraph, END
 from typing import TypedDict
 
-class MyState(TypedDict):
+from victor.framework import END, StateGraph
+
+
+class ReviewState(TypedDict):
     query: str
-    result: str
+    findings: list[str]
 
-graph = StateGraph(MyState)
 
-graph.add_node("research", research_fn)
-graph.add_node("synthesize", synthesize_fn)
+async def inspect(state: ReviewState) -> ReviewState:
+    return {**state, "findings": ["example finding"]}
 
-graph.add_edge("research", "synthesize")
-graph.add_edge("synthesize", END)
 
-compiled = graph.compile()
-result = await compiled.invoke({"query": "AI trends 2025"})
+graph = StateGraph(ReviewState)
+graph.add_node("inspect", inspect)
+graph.add_edge("inspect", END)
+
+result = await graph.compile().invoke({"query": "review this module", "findings": []})
 ```
 
-## Core capabilities
+## Architecture
 
-| Capability | What it means | Docs |
-|------------|---------------|------|
-| **Agent abstractions** | `run()`, `stream()`, `chat()`, `run_workflow()`, `run_team()` | [Framework](docs/development/architecture/) |
-| **22 Providers** | Cloud + local LLMs; switch mid-thread without losing context | [Providers](docs/reference/providers/) |
-| **33 Tool modules** | File ops, git, shell, web, search, docker, testing, analysis | [Tool catalog](docs/reference/tools/) |
-| **Workflows** | YAML DSL compiled to StateGraph with typed state + checkpointing | [Workflows](docs/guides/workflow-development/) |
-| **Multi-agent teams** | 4 formations: sequential, parallel, hierarchical, pipeline | [Multi-agent](docs/guides/multi-agent/) |
-| **State management** | 4 scopes: workflow, conversation, team, global | [State](docs/development/architecture/) |
-| **9 Verticals** | Domain-focused agents with tools, prompts, and workflows | [Verticals](docs/reference/verticals/) |
-| **Evaluation** | Agent harnesses, code quality analysis, SWE-bench integration | [Evaluation](docs/development/) |
+The core rule is simple: interfaces compose framework APIs, framework APIs delegate to the service-first runtime, and domain packages plug in through SDK/public extension contracts.
 
-## Command quick reference
+![Victor 0.7 architecture](docs/diagrams/architecture/victor_0_7_readme_architecture.svg)
 
-| Command | Purpose | Example |
-|---------|---------|---------|
-| `victor` | TUI mode | `victor` |
-| `victor chat` | CLI mode | `victor chat "refactor this"` |
-| `victor chat --mode plan` | Plan-only analysis | `victor chat --mode plan` |
-| `victor serve` | HTTP API | `victor serve --port 8080` |
-| `victor mcp` | MCP server | `victor mcp --stdio` |
-| `/provider` | Switch provider in chat | `/provider openai --model gpt-4` |
+Victor 0.7 makes the framework/plugin split explicit:
 
-## Screenshots
+- `victor.framework` is the stable public contract for agents, tools, StateGraph, workflows, events, and extension surfaces.
+- `victor.agent` is the internal runtime implementation behind that contract.
+- `victor.agent.services` owns effectful runtime behavior through `ChatService`, `ToolService`, `SessionService`, `ContextService`, `ProviderService`, and `RecoveryService`.
+- `victor-contracts` is the definition-layer contract for external verticals and plugins.
+- Sibling `victor-*` packages own domain behavior such as coding, DevOps, RAG, research, data analysis, and investment workflows.
 
-<!-- TUI Screenshot -->
-![Victor TUI](docs/assets/tui-screenshot.png)
-*The Victor TUI provides an interactive terminal interface with syntax highlighting and tool status.*
+Detailed references:
 
-<!-- CLI Screenshot -->
-![Victor CLI](docs/assets/cli-screenshot.png)
-*CLI mode for quick queries and script integration.*
+- [Architecture overview](ARCHITECTURE.md)
+- [Internal architecture diagram](docs/diagrams/architecture/victor_0_7_architecture.mmd)
+- [contracts boundary](docs/architecture/CONTRACTS_BOUNDARY.md)
+- [State-passed architecture](docs/architecture/state-passed-architecture.md)
+
+## Plugin Ecosystem
+
+External and first-party domain packages should use `victor-contracts` and public framework extension contracts. The root framework stays generic; domain-specific behavior belongs in plugins and vertical packages.
+
+| Package | Focus |
+|---------|-------|
+| `victor-coding` | Code review, editing, test generation, language tooling |
+| `victor-devops` | Infrastructure, containers, CI/CD, cloud operations |
+| `victor-rag` | Ingestion, retrieval, hybrid search, grounded answers |
+| `victor-dataanalysis` | Data cleaning, statistics, dataframe analysis, visualization |
+| `victor-research` | Source research, synthesis, fact checking |
+| `victor-invest` | Investment research workflows and dashboard/API integration |
+| `victor-registry` | Package marketplace and registry metadata |
+
+Plugin rules:
+
+- Use the `victor.plugins` entry point as the canonical discovery seam.
+- Register capabilities through `VictorPlugin.register(context)`.
+- Import from `victor_contracts`, `victor.framework.extensions`, or documented public APIs.
+- Do not import `victor.agent.*` or private root runtime internals from external packages.
+
+## Use Cases
+
+- Build local or cloud-backed coding agents that can inspect files, search graphs, run tests, and produce review findings.
+- Compose workflow agents with typed StateGraph nodes, deterministic handoffs, and resumable execution.
+- Run tool-using assistants through CLI, TUI, HTTP API, MCP, or embedded Python.
+- Build domain plugins without copying framework internals into vertical packages.
+- Keep project code intelligence local while preserving global preferences, learning, and provider settings separately.
+
+## State and Code Intelligence
+
+Victor uses a two-database model:
+
+| Scope | Location | Purpose |
+|-------|----------|---------|
+| Global database | `~/.victor/victor.db` | Settings, API keys, profiles, RL outcomes, tool/model preferences, cross-project patterns |
+| Project database | `./.victor/project.db` | Graph nodes/edges, conversations, project sessions, entity memory, change tracking |
+
+Project code intelligence is derived, rebuildable state. Graph indexes, vector indexes, file watcher state, and `.victor/` runtime artifacts should not become source-of-truth release artifacts.
+
+## Development
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -e ".[dev]"
+
+make test-quick
+make test
+make lint
+make check-repo-hygiene
+```
+
+Subprojects are scoped:
+
+```bash
+npm --prefix ui run build
+npm --prefix web/ui run build
+npm --prefix vscode-victor run compile
+cd rust && cargo test
+```
 
 ## Documentation
 
 - [Getting Started](docs/getting-started/)
-- [User Guide](docs/user-guide/)
 - [Guides](docs/guides/)
 - [Reference](docs/reference/)
 - [Operations](docs/operations/)
@@ -201,28 +176,8 @@ result = await compiled.invoke({"query": "AI trends 2025"})
 
 ## Contributing
 
-We welcome contributions. Start with [CONTRIBUTING.md](CONTRIBUTING.md) and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
-
-## Community
-
-- [GitHub](https://github.com/vjsingh1984/victor)
-- [Discussions](https://github.com/vjsingh1984/victor/discussions)
-- [Issues](https://github.com/vjsingh1984/victor/issues)
-- [Discord](https://discord.gg/...)
-
-## Acknowledgments
-
-Victor is built on the shoulders of excellent open-source projects:
-
-- **[Pydantic](https://docs.pydantic.dev/)** - Data validation and settings management
-- **[Tree-sitter](https://tree-sitter.github.io/)** - Incremental parsing for code analysis
-- **[Textual](https://textual.textualize.io/)** - Modern TUI framework
-- **[Typer](https://typer.tiangolo.com/)** - CLI interface with type hints
-- **[Rich](https://rich.readthedocs.io/)** - Beautiful terminal formatting
-- **[httpx](https://www.python-httpx.org/)** - Async HTTP client
-- **[Anthropic SDK](https://github.com/anthropics/anthropic-sdk-python)** - Claude API client
-- **[OpenAI SDK](https://github.com/openai/openai-python)** - OpenAI API client
+Start with [CONTRIBUTING.md](CONTRIBUTING.md), [AGENTS.md](AGENTS.md), and the architecture constraints in [CLAUDE.md](CLAUDE.md) or [GEMINI.md](GEMINI.md). Keep changes scoped, prefer public framework/SDK contracts over internal imports, and update docs/tests when public behavior changes.
 
 ## License
 
-Apache License 2.0 - see [LICENSE](LICENSE).
+Apache License 2.0. See [LICENSE](LICENSE).

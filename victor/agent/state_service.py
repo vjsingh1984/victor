@@ -158,7 +158,9 @@ class StateService:
             "enabled_tools_json": (
                 json.dumps(list(context.enabled_tools)) if context.enabled_tools else None
             ),
-            "mode_configs_json": json.dumps(context.mode_configs) if context.mode_configs else None,
+            "mode_configs_json": (
+                json.dumps(context.mode_configs) if context.mode_configs else None
+            ),
             "negotiation_results_json": (
                 json.dumps(context.capability_negotiation_results)
                 if context.capability_negotiation_results
@@ -282,7 +284,7 @@ class StateService:
                         if context.safety_patterns
                         else None
                     ),
-                    json.dumps(list(context.enabled_tools)) if context.enabled_tools else None,
+                    (json.dumps(list(context.enabled_tools)) if context.enabled_tools else None),
                     json.dumps(context.mode_configs) if context.mode_configs else None,
                     (
                         json.dumps(context.capability_negotiation_results)

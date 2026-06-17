@@ -18,7 +18,11 @@ import pytest
 from pathlib import Path
 
 from victor.contrib.editing import DiffEditor
-from victor.framework.vertical_protocols import EditOperation, EditResult, EditValidationResult
+from victor.framework.vertical_protocols import (
+    EditOperation,
+    EditResult,
+    EditValidationResult,
+)
 
 
 @pytest.fixture

@@ -27,6 +27,48 @@ from victor.ui.slash.registry import register_command
 logger = logging.getLogger(__name__)
 
 
+def _preview_count(preview_messages: object) -> int:
+    """Return a stable preview-message count for persisted/session history data."""
+    return len(preview_messages) if isinstance(preview_messages, list) else 0
+
+
+def _preview_path_summary(preview_messages: object, *, max_paths: int = 3) -> str | None:
+    """Return a compact summary of preview file paths for session UI."""
+    if not isinstance(preview_messages, list):
+        return None
+
+    paths: list[str] = []
+    seen: set[str] = set()
+    for preview in preview_messages:
+        if not isinstance(preview, dict):
+            continue
+        metadata = preview.get("metadata", {})
+        if not isinstance(metadata, dict):
+            continue
+        preview_path = str(metadata.get("preview_path", "")).strip()
+        if not preview_path or preview_path in seen:
+            continue
+        seen.add(preview_path)
+        paths.append(preview_path)
+
+    if not paths:
+        return None
+
+    visible_paths = paths[:max_paths]
+    summary = ", ".join(visible_paths)
+    remaining = len(paths) - len(visible_paths)
+    if remaining > 0:
+        summary = f"{summary}, +{remaining} more"
+
+    return summary
+
+
+def _session_preview_count(session: object) -> int:
+    """Return a stable preview-message count for persisted session objects."""
+    preview_messages = getattr(session, "preview_messages", None)
+    return len(preview_messages) if isinstance(preview_messages, list) else 0
+
+
 @register_command
 class SaveCommand(BaseSlashCommand):
     """Save current conversation to a session file."""
@@ -46,7 +88,7 @@ class SaveCommand(BaseSlashCommand):
             return
 
         from victor.agent.session import get_session_manager
-        from victor.agent.sqlite_session_persistence import get_sqlite_session_persistence
+        from victor.agent.conversation.store import ConversationStore
 
         # Check for --new flag
         force_new = self._has_flag(ctx, "--new", "-n")
@@ -56,7 +98,11 @@ class SaveCommand(BaseSlashCommand):
         title = " ".join(args) if args else None
 
         try:
-            sqlite_persistence = get_sqlite_session_persistence()
+            store = ConversationStore()
+            preview_messages = getattr(ctx.agent.conversation, "preview_messages", [])
+            message_count = ctx.agent.conversation.message_count()
+            preview_count = _preview_count(preview_messages)
+            preview_paths = _preview_path_summary(preview_messages)
 
             # Determine session_id to use
             if force_new:
@@ -89,7 +135,7 @@ class SaveCommand(BaseSlashCommand):
                 if hm and hasattr(hm, "to_dict"):
                     compaction_hierarchy = hm.to_dict()
 
-            session_id = sqlite_persistence.save_session(
+            session_id = store.save_session(
                 conversation=ctx.agent.conversation,
                 model=ctx.agent.model,
                 provider=ctx.agent.provider_name,
@@ -105,13 +151,18 @@ class SaveCommand(BaseSlashCommand):
             if session_id:
                 # Set active_session_id on agent
                 ctx.agent.active_session_id = session_id
+                preview_paths_line = (
+                    f"[bold]Preview Files:[/] {preview_paths}\n" if preview_paths else ""
+                )
 
                 ctx.console.print(
                     Panel(
                         f"{action}!\n\n"
                         f"[bold]Session ID:[/] {session_id}\n"
-                        f"[bold]Database:[/] {sqlite_persistence._db_path}\n"
                         f"[bold]Title:[/] {title or 'Auto-generated'}\n\n"
+                        f"[bold]Messages:[/] {message_count}\n"
+                        f"[bold]Previews:[/] {preview_count}\n"
+                        f"{preview_paths_line}\n"
                         f"[dim]Use '/resume {session_id}' to restore[/]\n"
                         f"[dim]Use '/save --new' to create a new session[/]",
                         title="Session Saved",
@@ -119,7 +170,7 @@ class SaveCommand(BaseSlashCommand):
                     )
                 )
             else:
-                ctx.console.print("[red]Failed to save session to SQLite[/]")
+                ctx.console.print("[red]Failed to save session[/]")
                 logger.error("Session ID was empty after save")
 
         except Exception as e:
@@ -150,7 +201,7 @@ class LoadCommand(BaseSlashCommand):
         if not self._require_agent(ctx):
             return
 
-        from victor.agent.conversation_state import ConversationStateMachine
+        from victor.agent.conversation.state_machine import ConversationStateMachine
         from victor.agent.message_history import MessageHistory
         from victor.agent.session import get_session_manager
 
@@ -165,7 +216,15 @@ class LoadCommand(BaseSlashCommand):
                 return
 
             # Restore conversation
-            ctx.agent.conversation = MessageHistory.from_dict(session.conversation)
+            conversation_dict = session.conversation
+            preview_messages = conversation_dict.get("preview_messages", [])
+            preview_count = _preview_count(preview_messages)
+            preview_paths = _preview_path_summary(preview_messages)
+            preview_paths_line = (
+                f"[bold]Preview Files:[/] {preview_paths}\n" if preview_paths else ""
+            )
+
+            ctx.agent.conversation = MessageHistory.from_dict(conversation_dict)
 
             # Set active session ID for parallel session support
             ctx.agent.active_session_id = session_id
@@ -186,6 +245,8 @@ class LoadCommand(BaseSlashCommand):
                     f"[bold]Model:[/] {session.metadata.model}\n"
                     f"[bold]Provider:[/] {session.metadata.provider}\n"
                     f"[bold]Messages:[/] {session.metadata.message_count}\n"
+                    f"[bold]Previews:[/] {preview_count}\n"
+                    f"{preview_paths_line}"
                     f"[bold]Created:[/] {session.metadata.created_at}",
                     title="Session Loaded",
                     border_style="green",
@@ -211,47 +272,44 @@ class SessionsCommand(BaseSlashCommand):
         )
 
     def execute(self, ctx: CommandContext) -> None:
-        from victor.agent.sqlite_session_persistence import get_sqlite_session_persistence
+        from victor.agent.conversation.store import ConversationStore
 
         limit = self._parse_int_arg(ctx, 0, default=10)
 
         try:
-            persistence = get_sqlite_session_persistence()
-            sessions = persistence.list_sessions(limit=limit)
+            store = ConversationStore()
+            sessions = store.list_sessions(limit=limit)
 
             if not sessions:
                 ctx.console.print("[dim]No saved sessions found[/]")
-                ctx.console.print(f"[dim]Database: {persistence._db_path}[/]")
                 return
 
-            table = Table(title=f"Saved Sessions (SQLite - last {len(sessions)})")
+            table = Table(title=f"Saved Sessions (last {len(sessions)})")
             table.add_column("ID", style="cyan", no_wrap=True)
             table.add_column("Title", style="white")
             table.add_column("Model", style="yellow")
             table.add_column("Provider", style="blue")
             table.add_column("Messages", justify="right")
+            table.add_column("Previews", justify="right")
             table.add_column("Created", style="dim")
 
             for session in sessions:
                 try:
-                    from datetime import datetime
-
-                    dt = datetime.fromisoformat(session["created_at"])
-                    date_str = dt.strftime("%Y-%m-%d %H:%M")
+                    date_str = session.created_at.strftime("%Y-%m-%d %H:%M")
                 except Exception:
-                    date_str = session["created_at"][:16]
+                    date_str = str(session.created_at)[:16]
 
-                title = (
-                    session["title"][:40] + "..."
-                    if len(session["title"]) > 40
-                    else session["title"]
-                )
+                title = session.title or "Untitled"
+                if len(title) > 40:
+                    title = title[:40] + "..."
+
                 table.add_row(
-                    session["session_id"],
+                    session.session_id,
                     title,
-                    session["model"],
-                    session["provider"],
-                    str(session["message_count"]),
+                    session.model or "unknown",
+                    session.provider or "unknown",
+                    str(len(session.messages)),
+                    str(_session_preview_count(session)),
                     date_str,
                 )
 
@@ -283,9 +341,9 @@ class ResumeCommand(BaseSlashCommand):
         if not self._require_agent(ctx):
             return
 
-        from victor.agent.conversation_state import ConversationStateMachine
+        from victor.agent.conversation.state_machine import ConversationStateMachine
         from victor.agent.message_history import MessageHistory
-        from victor.agent.sqlite_session_persistence import get_sqlite_session_persistence
+        from victor.agent.conversation.store import ConversationStore
 
         # If session_id provided as argument, load it directly
         if ctx.args:
@@ -295,43 +353,41 @@ class ResumeCommand(BaseSlashCommand):
 
         # Otherwise, show interactive selection
         try:
-            persistence = get_sqlite_session_persistence()
-            sessions = persistence.list_sessions(limit=20)
+            store = ConversationStore()
+            sessions = store.list_sessions(limit=20)
 
             if not sessions:
-                ctx.console.print("[yellow]No sessions found in SQLite database[/]")
+                ctx.console.print("[yellow]No sessions found[/]")
                 ctx.console.print("[dim]Start a conversation to create sessions[/]")
                 return
 
             # Display sessions with numbers
-            table = Table(title="Recent Sessions (SQLite)")
+            table = Table(title="Recent Sessions")
             table.add_column("#", style="cyan", no_wrap=True, width=4)
             table.add_column("ID", style="cyan", no_wrap=True)
             table.add_column("Title", style="white")
             table.add_column("Model", style="yellow")
             table.add_column("Messages", justify="right")
+            table.add_column("Previews", justify="right")
             table.add_column("Date", style="dim")
 
             for idx, session in enumerate(sessions, 1):
                 try:
-                    from datetime import datetime
-
-                    dt = datetime.fromisoformat(session["created_at"])
-                    date_str = dt.strftime("%Y-%m-%d %H:%M")
+                    date_str = session.created_at.strftime("%Y-%m-%d %H:%M")
                 except Exception:
-                    date_str = session["created_at"][:16]
+                    date_str = str(session.created_at)[:16]
 
-                title = (
-                    session["title"][:40] + "..."
-                    if len(session["title"]) > 40
-                    else session["title"]
-                )
+                title = session.title or "Untitled"
+                if len(title) > 40:
+                    title = title[:40] + "..."
+
                 table.add_row(
                     str(idx),
-                    session["session_id"],
+                    session.session_id,
                     title,
-                    session["model"],
-                    str(session["message_count"]),
+                    session.model or "unknown",
+                    str(len(session.messages)),
+                    str(_session_preview_count(session)),
                     date_str,
                 )
 
@@ -350,13 +406,13 @@ class ResumeCommand(BaseSlashCommand):
             ctx: Command context
             session_id: Session ID to load
         """
-        from victor.agent.conversation_state import ConversationStateMachine
+        from victor.agent.conversation.state_machine import ConversationStateMachine
         from victor.agent.message_history import MessageHistory
-        from victor.agent.sqlite_session_persistence import get_sqlite_session_persistence
+        from victor.agent.conversation.store import ConversationStore
 
         try:
-            persistence = get_sqlite_session_persistence()
-            session_data = persistence.load_session(session_id)
+            store = ConversationStore()
+            session_data = store.load_session(session_id)
 
             if session_data is None:
                 ctx.console.print(f"[red]Session not found:[/] {session_id}")
@@ -365,6 +421,12 @@ class ResumeCommand(BaseSlashCommand):
             # Restore conversation
             metadata = session_data.get("metadata", {})
             conversation_dict = session_data.get("conversation", {})
+            preview_messages = conversation_dict.get("preview_messages", [])
+            preview_count = _preview_count(preview_messages)
+            preview_paths = _preview_path_summary(preview_messages)
+            preview_paths_line = (
+                f"[bold]Preview Files:[/] {preview_paths}\n" if preview_paths else ""
+            )
 
             ctx.agent.conversation = MessageHistory.from_dict(conversation_dict)
 
@@ -387,7 +449,7 @@ class ResumeCommand(BaseSlashCommand):
             # Restore ledger + execution state via SessionContextLinker
             from victor.agent.session_context_linker import SessionContextLinker
 
-            linker = SessionContextLinker(session_persistence=persistence)
+            linker = SessionContextLinker(session_persistence=store)
             resume_ctx = linker.build_resume_context(session_id)
 
             if resume_ctx.ledger and hasattr(ctx.agent, "session_ledger"):
@@ -444,7 +506,10 @@ class ResumeCommand(BaseSlashCommand):
                     f"[bold]Model:[/] {metadata.get('model', 'N/A')}\n"
                     f"[bold]Provider:[/] {metadata.get('provider', 'N/A')}\n"
                     f"[bold]Messages:[/] {metadata.get('message_count', 0)}\n"
-                    f"[bold]Created:[/] {metadata.get('created_at', 'N/A')}",
+                    f"[bold]Previews:[/] {preview_count}\n"
+                    f"{preview_paths_line}"
+                    f"[bold]Created:[/] {metadata.get('created_at', 'N/A')}\n"
+                    f"[bold]Resume:[/] {resume_ctx.resume_summary}",
                     title="Session Resumed",
                     border_style="green",
                 )
@@ -521,7 +586,10 @@ class CompactCommand(BaseSlashCommand):
                 from victor.agent.message_types import Message
 
                 new_messages = [
-                    Message(role="system", content=f"[Previous conversation summary]\n{summary}"),
+                    Message(
+                        role="system",
+                        content=f"[Previous conversation summary]\n{summary}",
+                    ),
                     *messages[-keep_recent:],
                 ]
                 ctx.agent.conversation.messages = new_messages

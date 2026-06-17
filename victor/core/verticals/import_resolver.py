@@ -22,10 +22,6 @@ from typing import List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
-_PACKAGE_OVERRIDES = {
-    "dataanalysis": "victor_dataanalysis",
-}
-
 _RUNTIME_MODULE_PREFIXES = frozenset(
     {
         "capabilities",
@@ -80,12 +76,7 @@ def _external_package_candidates(vertical_name: str) -> List[str]:
     """Return external package candidates for a vertical."""
     normalized = normalize_vertical_name(vertical_name)
 
-    candidates: List[str] = []
-    override = _PACKAGE_OVERRIDES.get(normalized) or _PACKAGE_OVERRIDES.get(vertical_name)
-    if override:
-        candidates.append(override)
-    else:
-        candidates.append(f"victor_{normalized}")
+    candidates: List[str] = [f"victor_{normalized}"]
 
     # Support historical spellings like data_analysis vs dataanalysis.
     if "_" in normalized:
@@ -186,7 +177,9 @@ def module_import_candidates(module_path: str) -> List[str]:
     return [path]
 
 
-def import_module_with_fallback(module_path: str) -> Tuple[Optional[ModuleType], Optional[str]]:
+def import_module_with_fallback(
+    module_path: str,
+) -> Tuple[Optional[ModuleType], Optional[str]]:
     """Import first available module from compatibility candidates."""
     for candidate in module_import_candidates(module_path):
         try:
@@ -219,6 +212,5 @@ def _warn_legacy_resolution(resolved_module_path: str) -> None:
                 f"'{resolved_module_path}'. Migrate to the extracted 'victor_<vertical>' package."
             )
 
-        warnings.warn(message, DeprecationWarning, stacklevel=3)
         logger.warning(message)
         _WARNED_LEGACY_RESOLUTIONS.add(resolved_module_path)

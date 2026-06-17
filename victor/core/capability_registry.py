@@ -52,25 +52,32 @@ class CapabilityStatus(Enum):
     ENHANCED = "enhanced"
 
 
-class CapabilityRegistry:
-    """Singleton registry for optional capabilities.
+class OptionalFeatureRegistry:
+    """Singleton registry for optional feature capabilities.
+
+    Manages optional capabilities (tree-sitter parsing, codebase indexing, LSP, etc.)
+    with stub/enhanced provider semantics.
 
     Capabilities are registered with a protocol type as key and a provider
     instance as value. Each registration has a status (STUB or ENHANCED).
 
     Enhanced registrations will not be downgraded to STUB. This ensures
     that once a vertical installs an enhanced provider, it stays active.
+
+    Note: Previously named CapabilityRegistry - renamed for clarity.
     """
 
-    _instance: Optional[CapabilityRegistry] = None
+    _instance: Optional["OptionalFeatureRegistry"] = None
     _providers: Dict[Type, tuple[Any, CapabilityStatus]]
+    _metadata: Dict[Type, Dict[str, Any]]
 
     def __init__(self) -> None:
         self._providers = {}
+        self._metadata = {}
         self._bootstrapped = False
 
     @classmethod
-    def get_instance(cls) -> CapabilityRegistry:
+    def get_instance(cls) -> "OptionalFeatureRegistry":
         """Get the singleton registry instance."""
         if cls._instance is None:
             cls._instance = cls()
@@ -94,6 +101,7 @@ class CapabilityRegistry:
         protocol_type: Type,
         provider: Any,
         status: CapabilityStatus = CapabilityStatus.STUB,
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> None:
         """Register a capability provider.
 
@@ -104,6 +112,7 @@ class CapabilityRegistry:
             protocol_type: The protocol type to register against
             provider: The provider instance
             status: STUB or ENHANCED
+            metadata: Optional metadata describing the provider registration.
         """
         existing = self._providers.get(protocol_type)
         if existing is not None:
@@ -114,8 +123,18 @@ class CapabilityRegistry:
                     f"— ENHANCED provider already registered"
                 )
                 return
+            if existing_status == CapabilityStatus.ENHANCED and status == CapabilityStatus.ENHANCED:
+                logger.debug(
+                    f"Skipping duplicate ENHANCED registration for {protocol_type.__name__} "
+                    f"— provider already registered"
+                )
+                return
 
         self._providers[protocol_type] = (provider, status)
+        if metadata is not None:
+            self._metadata[protocol_type] = dict(metadata)
+        else:
+            self._metadata.pop(protocol_type, None)
         logger.debug(f"Registered {status.value} capability for {protocol_type.__name__}")
 
     def get(self, protocol_type: Type[T]) -> Optional[T]:
@@ -159,6 +178,10 @@ class CapabilityRegistry:
             return None
         return entry[1]
 
+    def get_metadata(self, protocol_type: Type) -> Dict[str, Any]:
+        """Get registration metadata for a capability provider."""
+        return dict(self._metadata.get(protocol_type, {}))
+
     def list_capabilities(self) -> Dict[str, str]:
         """List all registered capabilities and their status.
 
@@ -169,4 +192,62 @@ class CapabilityRegistry:
 
 
 # Module-level shortcut for convenient access
-capabilities = CapabilityRegistry.get_instance()
+capabilities = OptionalFeatureRegistry.get_instance()
+
+
+# ---------------------------------------------------------------------------
+# Capability → method name mappings (consolidated from framework/capability_registry.py)
+# ---------------------------------------------------------------------------
+
+from typing import Dict  # noqa: E402  (re-import after class defs for clarity)
+
+CAPABILITY_METHOD_MAPPINGS: Dict[str, str] = {
+    # Tool capabilities
+    "enabled_tools": "set_enabled_tools",
+    "tool_dependencies": "set_tool_dependencies",
+    "tool_sequences": "set_tool_sequences",
+    "tiered_tool_config": "set_tiered_tool_config",
+    # Vertical capabilities
+    "vertical_middleware": "apply_vertical_middleware",
+    "vertical_safety_patterns": "apply_vertical_safety_patterns",
+    "vertical_context": "set_vertical_context",
+    # RL capabilities
+    "rl_hooks": "set_rl_hooks",
+    # Team capabilities
+    "team_specs": "set_team_specs",
+    # Mode capabilities
+    "mode_configs": "set_mode_configs",
+    "default_budget": "set_default_budget",
+    # Prompt capabilities
+    "custom_prompt": "set_custom_prompt",
+    "prompt_builder": "prompt_builder",
+    "prompt_section": "add_prompt_section",
+    "task_type_hints": "set_task_type_hints",
+    # Safety capabilities
+    "safety_patterns": "add_safety_patterns",
+    # Enrichment capabilities
+    "enrichment_strategy": "set_enrichment_strategy",
+    "enrichment_service": "enrichment_service",
+    # LSP capabilities
+    "lsp": "set_lsp",
+}
+
+
+def get_method_for_capability(capability_name: str) -> str:
+    """Get the method name for a capability.
+
+    Args:
+        capability_name: Name of the capability
+
+    Returns:
+        Method name to call for this capability
+    """
+    return CAPABILITY_METHOD_MAPPINGS.get(capability_name, f"set_{capability_name}")
+
+
+# =============================================================================
+# Backward compatibility aliases
+# =============================================================================
+
+# Alias for backward compatibility - was renamed for clarity
+CapabilityRegistry = OptionalFeatureRegistry

@@ -20,7 +20,7 @@ Tests for model metadata parsing, known model lookups, and message serialization
 import pytest
 from datetime import datetime
 from unittest.mock import AsyncMock
-from victor.agent.conversation_memory import (
+from victor.agent.conversation.store import (
     MessageRole,
     MessagePriority,
     ModelFamily,
@@ -48,7 +48,7 @@ class TestMessageRole:
         assert MessageRole.USER.value == "user"
         assert MessageRole.ASSISTANT.value == "assistant"
         assert MessageRole.TOOL_CALL.value == "tool_call"
-        assert MessageRole.TOOL_RESULT.value == "tool_result"
+        assert MessageRole.TOOL.value == "tool"
 
 
 # =============================================================================
@@ -246,7 +246,8 @@ class TestSemanticRetrievalBoundaries:
 
     @pytest.fixture
     def store(self, tmp_path):
-        return ConversationStore(db_path=tmp_path / "conversation.db")
+        # Tests use temporary project.db for isolation.
+        return ConversationStore(db_path=tmp_path / "project.db")
 
     @pytest.mark.asyncio
     async def test_async_semantic_retrieval_uses_embedding_store(self, store):
@@ -289,6 +290,56 @@ class TestSemanticRetrievalBoundaries:
             match="Use await aget_semantically_relevant_messages",
         ):
             store.get_semantically_relevant_messages(session.session_id, "auth failure")
+
+    def test_add_message_encodes_execution_trace_metadata(self, store):
+        """Tool-oriented messages should be tagged as execution traces."""
+        session = store.create_session(session_id="session-3")
+
+        message = store.add_message(
+            session.session_id,
+            MessageRole.TOOL,
+            '<TOOL_OUTPUT tool="read" path="src/auth.py">...</TOOL_OUTPUT>',
+            tool_name="read",
+            tool_call_id="call_read_1",
+        )
+
+        assert message.metadata["memory_trace_kind"] == "execution"
+        assert "tool read" in message.metadata["memory_execution_text"].lower()
+        assert "call_read_1" in message.metadata["memory_execution_text"]
+
+    @pytest.mark.asyncio
+    async def test_dual_trace_retrieval_separates_semantic_and_execution_messages(self, store):
+        """Dual-trace retrieval should bucket semantic and execution matches separately."""
+        session = store.create_session(session_id="session-4")
+        semantic_message = store.add_message(
+            session.session_id,
+            MessageRole.USER,
+            "Authentication middleware fails when loading tenant config.",
+        )
+        execution_message = store.add_message(
+            session.session_id,
+            MessageRole.TOOL,
+            '<TOOL_OUTPUT tool="read" path="src/auth.py">tenant config loader</TOOL_OUTPUT>',
+            tool_name="read",
+            tool_call_id="call_read_2",
+        )
+
+        hit = type("SearchHit", (), {"message_id": semantic_message.id, "similarity": 0.94})()
+        embedding_store = AsyncMock()
+        embedding_store.search_similar = AsyncMock(return_value=[hit])
+        store.set_embedding_store(embedding_store)
+
+        traces = await store.aget_dual_trace_relevant_messages(
+            session.session_id,
+            "authentication read tenant config",
+            semantic_limit=2,
+            execution_limit=2,
+        )
+
+        assert [msg.id for msg, _score in traces["semantic"]] == [semantic_message.id]
+        assert [msg.id for msg, _score in traces["execution"]] == [execution_message.id]
+        assert store.get_message_trace_kind(semantic_message) == "semantic"
+        assert store.get_message_trace_kind(execution_message) == "execution"
 
     def test_parse_qwen_3(self):
         """Parse qwen3 model."""
@@ -545,7 +596,7 @@ class TestConversationMessageSerialization:
         """Convert tool result to provider format."""
         msg = ConversationMessage(
             id="msg-1",
-            role=MessageRole.TOOL_RESULT,
+            role=MessageRole.TOOL,
             content="Result",
             timestamp=datetime.now(),
             token_count=6,
@@ -554,7 +605,7 @@ class TestConversationMessageSerialization:
 
         provider_format = msg.to_provider_format()
 
-        assert provider_format["role"] == "assistant"  # Tool results map to assistant
+        assert provider_format["role"] == "tool"  # Per OpenAI spec, tool results keep role=tool
         assert provider_format["tool_call_id"] == "call-123"
 
     def test_to_dict_roundtrip(self):
@@ -578,7 +629,11 @@ class TestConversationMessageSerialization:
         restored = ConversationMessage.from_dict(msg_dict)
 
         assert restored.id == original.id
-        assert restored.role == original.role
+        # role is normalized to string after roundtrip (enum → str via to_dict)
+        original_role = (
+            original.role.value if isinstance(original.role, MessageRole) else original.role
+        )
+        assert restored.role == original_role
         assert restored.content == original.content
         assert restored.priority == original.priority
         assert restored.tool_name == original.tool_name

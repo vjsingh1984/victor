@@ -256,31 +256,7 @@ class JavaScriptCodeValidator(BaseCodeValidator):
 
     def _check_brackets(self, code: str) -> Optional[str]:
         """Check for balanced brackets and braces."""
-        # Remove string contents to avoid false positives
-        cleaned = self._remove_strings_and_comments(code)
-
-        bracket_pairs = {"(": ")", "[": "]", "{": "}"}
-        stack: list[tuple[str, int]] = []
-
-        for i, char in enumerate(cleaned):
-            if char in bracket_pairs:
-                stack.append((char, i))
-            elif char in bracket_pairs.values():
-                if not stack:
-                    line = code[:i].count("\n") + 1
-                    return f"Unmatched closing '{char}' at line {line}"
-
-                open_bracket, _ = stack.pop()
-                if bracket_pairs[open_bracket] != char:
-                    line = code[:i].count("\n") + 1
-                    return f"Mismatched brackets: expected '{bracket_pairs[open_bracket]}' but found '{char}' at line {line}"
-
-        if stack:
-            open_bracket, pos = stack[-1]
-            line = code[:pos].count("\n") + 1
-            return f"Unclosed '{open_bracket}' starting at line {line}"
-
-        return None
+        return super()._check_brackets(code)
 
     def _check_quotes(self, code: str) -> Optional[str]:
         """Check for unmatched quotes."""
@@ -340,26 +316,15 @@ class JavaScriptCodeValidator(BaseCodeValidator):
 
     def _check_incomplete_code(self, code: str) -> Optional[str]:
         """Check for obviously incomplete code."""
-        stripped = code.strip()
-
-        if not stripped:
-            return "Empty code"
-
-        # Check for truncated code (ends with incomplete statement)
-        truncation_patterns = [
-            r"=\s*$",  # Ends with assignment
-            r",\s*$",  # Ends with comma
-            r"\(\s*$",  # Ends with open paren
-            r"\[\s*$",  # Ends with open bracket
-            r"{\s*$",  # Ends with open brace (could be valid)
-            r"=>\s*$",  # Ends with arrow
-        ]
-
-        for pattern in truncation_patterns:
-            if re.search(pattern, stripped):
-                return "Code appears to be truncated (ends with incomplete statement)"
-
-        return None
+        return super()._check_incomplete_code(
+            code,
+            extra_patterns=[
+                r",\s*$",  # Ends with comma
+                r"\[\s*$",  # Ends with open bracket
+                r"=>\s*$",  # Ends with arrow
+            ],
+            check_brackets=False,  # JS allows object literals at end
+        )
 
     def _check_imports(self, code: str) -> list[str]:
         """Check import statements for common issues."""
@@ -394,14 +359,11 @@ class JavaScriptCodeValidator(BaseCodeValidator):
 
     def _remove_strings_and_comments(self, code: str) -> str:
         """Remove string contents and comments for structural analysis."""
-        result = self._remove_comments(code)
-
-        # Remove string contents but keep quotes for structure
-        result = re.sub(r"'[^'\\]*(?:\\.[^'\\]*)*'", "''", result)
-        result = re.sub(r'"[^"\\]*(?:\\.[^"\\]*)*"', '""', result)
-        result = re.sub(r"`[^`\\]*(?:\\.[^`\\]*)*`", "``", result)
-
-        return result
+        return super()._remove_strings_and_comments(
+            code,
+            has_template_strings=True,  # JS/TS has template strings
+            has_char_literals=True,  # JS has single-quote strings
+        )
 
     def _remove_comments(self, code: str) -> str:
         """Remove comments from code."""

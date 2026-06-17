@@ -49,17 +49,28 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 import time
-import uuid
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional, Protocol, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    AsyncIterator,
+    Dict,
+    List,
+    Optional,
+    Union,
+)
 
 from victor.agent.subagents.protocols import SubAgentContext, SubAgentContextAdapter
+from victor.agent.runtime.naming import build_display_name, generate_agent_id
 
 if TYPE_CHECKING:
+    from victor.agent.runtime.context import AgentRuntimeContext
     from victor.agent.presentation import PresentationProtocol
     from victor.agent.orchestrator import AgentOrchestrator
+    from victor.agent.services.context_lifecycle_service import ContextLifecycleService
     from victor.core.container import ServiceContainer
     from victor.providers.base import StreamChunk
     from victor.teams.types import AgentMessage
@@ -71,38 +82,7 @@ logger = logging.getLogger(__name__)
 from victor.core.shared_types import SubAgentRole  # noqa: F401
 
 
-# Local IAgent protocol to avoid circular import at runtime
-# The canonical IAgent is in victor.protocols.team but we can't import it
-# at module level due to circular dependencies
-class _IAgentProtocol(Protocol):
-    """Local IAgent protocol for type checking.
-
-    This protocol is used instead of importing IAgent from victor.protocols.team
-    to avoid circular import issues at module initialization time.
-    """
-
-    @property
-    def id(self) -> str:
-        """Unique identifier for this agent."""
-        ...
-
-    @property
-    def role(self) -> Any:
-        """Role of this agent."""
-        ...
-
-    @property
-    def persona(self) -> Optional[Any]:
-        """Persona of this agent."""
-        ...
-
-    async def execute_task(self, task: str, context: Dict[str, Any]) -> str:
-        """Execute a task using this agent."""
-        ...
-
-    async def receive_message(self, message: Any) -> Optional[Any]:
-        """Receive a message from another agent."""
-        ...
+from victor.protocols.team import IAgent
 
 
 @dataclass
@@ -123,6 +103,8 @@ class SubAgentConfig:
         timeout_seconds: Maximum execution time in seconds
         system_prompt_override: Optional custom system prompt (overrides role default)
         disable_embeddings: Disable codebase embeddings for this sub-agent (workflow service mode)
+        result_summary_max_chars: Maximum chars retained in ``SubAgentResult.summary``.
+            ``None`` preserves the full response for parent handoff.
     """
 
     role: SubAgentRole
@@ -135,6 +117,38 @@ class SubAgentConfig:
     timeout_seconds: int = 300
     system_prompt_override: Optional[str] = None
     disable_embeddings: bool = False
+    member_id: Optional[str] = None
+    agent_id: Optional[str] = None
+    display_name: Optional[str] = None
+    team_id: Optional[str] = None
+    plan_id: Optional[str] = None
+    plan_step_id: Optional[str] = None
+    parent_session_id: Optional[str] = None
+    child_session_id: Optional[str] = None
+    result_summary_max_chars: Optional[int] = None
+    # Heterogeneous execution: a pre-resolved provider instance, model, and
+    # temperature to use instead of inheriting the parent's. None = inherit.
+    provider_override: Optional[Any] = None
+    model_override: Optional[str] = None
+    temperature_override: Optional[float] = None
+    reasoning_effort_override: Optional[str] = None
+
+    def to_runtime_context(self) -> "AgentRuntimeContext":
+        """Build the common per-agent runtime context from this config."""
+        from victor.agent.runtime.context import AgentRuntimeContext
+
+        agent_id = self.agent_id or generate_agent_id(self.role)
+        return AgentRuntimeContext(
+            agent_id=agent_id,
+            display_name=self.display_name or build_display_name(self.role, task=self.task),
+            role=self.role.value,
+            session_id=self.child_session_id or agent_id,
+            parent_session_id=self.parent_session_id,
+            team_id=self.team_id,
+            plan_id=self.plan_id,
+            plan_step_id=self.plan_step_id,
+            member_id=self.member_id,
+        )
 
 
 @dataclass
@@ -176,7 +190,16 @@ class SubAgentResult:
         }
 
 
-class SubAgent(_IAgentProtocol):  # type: ignore[misc]
+def _bounded_result_summary(content: Optional[str], max_chars: Optional[int]) -> str:
+    """Return sub-agent summary content, preserving full handoff by default."""
+    if not content:
+        return ""
+    if max_chars is None or max_chars <= 0:
+        return content
+    return content[:max_chars]
+
+
+class SubAgent(IAgent):  # type: ignore[misc]
     """Represents a spawned sub-agent instance.
 
     A sub-agent is a wrapper around AgentOrchestrator with:
@@ -212,6 +235,7 @@ class SubAgent(_IAgentProtocol):  # type: ignore[misc]
         config: SubAgentConfig,
         parent: Union["AgentOrchestrator", SubAgentContext],
         presentation: Optional["PresentationProtocol"] = None,
+        context_lifecycle: Optional["ContextLifecycleService"] = None,
     ):
         """Initialize sub-agent with configuration and parent context.
 
@@ -229,7 +253,11 @@ class SubAgent(_IAgentProtocol):  # type: ignore[misc]
             testing through protocol-based dependency injection.
         """
         self.config = config
-        self._id = uuid.uuid4().hex[:12]
+        self._id = config.agent_id or generate_agent_id(config.role)
+        if self.config.agent_id is None:
+            self.config.agent_id = self._id
+        if self.config.display_name is None:
+            self.config.display_name = build_display_name(self.config.role, task=self.config.task)
 
         # Lazy init for backward compatibility
         if presentation is None:
@@ -251,6 +279,8 @@ class SubAgent(_IAgentProtocol):  # type: ignore[misc]
         # (some code may access self.parent directly)
         self.parent = parent
         self.orchestrator: Optional["AgentOrchestrator"] = None
+        self._context_lifecycle = context_lifecycle
+        self._owned_context_lifecycle: Optional["ContextLifecycleService"] = None
 
         logger.info(
             f"Created {config.role.value} sub-agent: {config.task[:50]}... "
@@ -320,14 +350,39 @@ class SubAgent(_IAgentProtocol):  # type: ignore[misc]
         settings.tool_budget = self.config.tool_budget
         settings.max_context_chars = self.config.context_limit
 
-        # Create new orchestrator instance with same provider
+        # Heterogeneous execution: use a per-member provider override when one
+        # was resolved (cross-vendor teams); otherwise inherit the parent's
+        # provider/model so behavior is unchanged for members without overrides.
+        provider = self.config.provider_override or self._context.provider
+        model = self.config.model_override or self._context.model
+        if self.config.provider_override is not None:
+            provider_name = getattr(
+                self.config.provider_override, "provider_name", self._context.provider_name
+            )
+        else:
+            provider_name = self._context.provider_name
+        temperature = (
+            self.config.temperature_override
+            if self.config.temperature_override is not None
+            else self._context.temperature
+        )
+        # Per-member reasoning_effort override; inherit the parent's when unset.
+        reasoning_effort = (
+            self.config.reasoning_effort_override
+            if self.config.reasoning_effort_override is not None
+            else getattr(self._context, "reasoning_effort", None)
+        )
+
+        # Create new orchestrator instance.
         # Use the actual provider object (not just the name) for proper initialization
         orchestrator = AgentOrchestrator(
             settings=settings,
-            provider=self._context.provider,
-            model=self._context.model,
-            temperature=self._context.temperature,
-            provider_name=self._context.provider_name,
+            provider=provider,
+            model=model,
+            temperature=temperature,
+            provider_name=provider_name,
+            system_prompt_override=self._get_role_prompt(),
+            reasoning_effort=reasoning_effort,
             # Note: We'll share the parent's DI container for now
             # In production, we might want isolated scoped containers
         )
@@ -348,10 +403,6 @@ class SubAgent(_IAgentProtocol):  # type: ignore[misc]
             )
             if hasattr(orchestrator, "_session_state_manager"):
                 orchestrator._session_state_manager.execution_state.disable_embeddings = True
-
-        # Set role-specific system prompt
-        system_prompt = self._get_role_prompt()
-        orchestrator.set_system_prompt(system_prompt)
 
         # Register only allowed tools
         self._configure_allowed_tools(orchestrator)
@@ -472,9 +523,12 @@ class SubAgent(_IAgentProtocol):  # type: ignore[misc]
                     )
                     break
 
-                # Calculate exponential backoff delay: 2^(attempt-1) * base_delay
-                # This is similar to Fibonacci: 1, 2, 4, 8, 16, 32...
-                delay = min(base_delay * (2 ** (attempt - 1)), max_delay)
+                retry_after = getattr(e, "retry_after", None)
+                if isinstance(retry_after, (int, float)) and retry_after > 0:
+                    delay = min(float(retry_after), max_delay)
+                else:
+                    # Calculate exponential backoff delay: 2^(attempt-1) * base_delay.
+                    delay = min(base_delay * (2 ** (attempt - 1)), max_delay)
 
                 logger.info(
                     f"Sub-agent {self.config.role.value}: Attempt {attempt}/{max_attempts} failed with "
@@ -515,24 +569,53 @@ class SubAgent(_IAgentProtocol):  # type: ignore[misc]
 
             # Run the task with retry on rate limits
             response = await self._execute_with_retry()
+            response_metadata = getattr(response, "metadata", None) or {}
+            execution_success = response_metadata.get("agentic_loop_success") is not False
+            execution_error = (
+                response_metadata.get("agentic_loop_error") if not execution_success else None
+            )
 
             # Extract metrics
             tool_calls_used = getattr(self.orchestrator, "tool_calls_used", 0)
             context_size = len(str(self.orchestrator.get_messages()))
 
-            # Create success result
+            # Create structured result. A failed agentic loop is a real sub-agent
+            # failure even when the provider returned a final response object.
+            runtime_context = self.config.to_runtime_context()
+            lifecycle_report = await self._run_context_lifecycle(runtime_context)
+            status = "success" if execution_success else "failed"
             result = SubAgentResult(
-                success=True,
-                summary=response.content[:500] if response.content else "",
+                success=execution_success,
+                summary=_bounded_result_summary(
+                    response.content,
+                    self.config.result_summary_max_chars,
+                ),
                 details={
                     "full_response": response.content,
                     "tool_calls": getattr(response, "tool_calls", []) or [],
+                    "tool_evidence": self._build_tool_evidence_handoff(),
                     "role": self.config.role.value,
+                    "agentic_loop_success": execution_success,
+                    "context_lifecycle": lifecycle_report,
+                    "parent_handoff": self._build_parent_handoff(
+                        runtime_context,
+                        summary=response.content or "",
+                        status=status,
+                        metadata={
+                            "tool_calls_used": tool_calls_used,
+                            "agentic_loop_success": execution_success,
+                            **({"agentic_loop_error": execution_error} if execution_error else {}),
+                        },
+                    ),
+                    **self._identity_metadata(),
                 },
                 tool_calls_used=tool_calls_used,
                 context_size=context_size,
                 duration_seconds=time.time() - start_time,
+                error=execution_error,
             )
+            if execution_error:
+                result.details["agentic_loop_error"] = execution_error
 
             logger.info(
                 f"{self.config.role.value} sub-agent completed: "
@@ -559,6 +642,7 @@ class SubAgent(_IAgentProtocol):  # type: ignore[misc]
                 except Exception as e:
                     logger.debug("Failed to compute sub-agent context size: %s", e)
 
+            runtime_context = self.config.to_runtime_context()
             return SubAgentResult(
                 success=False,
                 summary=f"Sub-agent failed: {error_msg[:450]}",
@@ -566,12 +650,148 @@ class SubAgent(_IAgentProtocol):  # type: ignore[misc]
                     "error_type": type(e).__name__,
                     "error_message": str(e),
                     "role": self.config.role.value,
+                    "parent_handoff": self._build_parent_handoff(
+                        runtime_context,
+                        summary=error_msg,
+                        status="failed",
+                        metadata={"tool_calls_used": tool_calls_used},
+                    ),
+                    **self._identity_metadata(),
                 },
                 tool_calls_used=tool_calls_used,
                 context_size=context_size,
                 duration_seconds=time.time() - start_time,
                 error=error_msg,
             )
+
+    def _identity_metadata(self) -> Dict[str, Any]:
+        """Return stable team/session identity metadata for this runtime."""
+        return {
+            "member_id": self.config.member_id,
+            "agent_id": self.id,
+            "display_name": self.config.display_name,
+            "team_id": self.config.team_id,
+            "plan_id": self.config.plan_id,
+            "plan_step_id": self.config.plan_step_id,
+            "parent_session_id": self.config.parent_session_id,
+            "child_session_id": self.config.child_session_id,
+        }
+
+    async def _run_context_lifecycle(
+        self, runtime_context: "AgentRuntimeContext"
+    ) -> Dict[str, Any]:
+        """Run common per-agent context lifecycle hooks for this sub-agent."""
+        lifecycle = self._context_lifecycle or self._default_context_lifecycle()
+        messages = self._get_orchestrator_messages()
+        return await lifecycle.after_agent_turn(
+            runtime_context,
+            messages=messages,
+            min_messages=6,
+        )
+
+    def _build_parent_handoff(
+        self,
+        runtime_context: "AgentRuntimeContext",
+        *,
+        summary: str,
+        status: str,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        lifecycle = self._context_lifecycle or self._default_context_lifecycle()
+        return lifecycle.build_parent_handoff(
+            runtime_context,
+            summary=summary,
+            status=status,
+            metadata=metadata,
+        )
+
+    def _default_context_lifecycle(self) -> "ContextLifecycleService":
+        """Create a local lifecycle service when no parent-scoped service is injected."""
+        from victor.agent.services.context_lifecycle_service import (
+            ContextLifecycleService,
+        )
+
+        if self._owned_context_lifecycle is not None:
+            return self._owned_context_lifecycle
+        max_tokens = max(1, int(self.config.context_limit or 50000) // 4)
+        self._owned_context_lifecycle = ContextLifecycleService.with_defaults(max_tokens=max_tokens)
+        return self._owned_context_lifecycle
+
+    def _get_orchestrator_messages(self) -> List[Any]:
+        if self.orchestrator is None:
+            return []
+        get_messages = getattr(self.orchestrator, "get_messages", None)
+        if not callable(get_messages):
+            return []
+        try:
+            messages = get_messages()
+        except Exception as exc:
+            logger.debug("Failed to collect sub-agent messages for lifecycle: %s", exc)
+            return []
+        return list(messages or [])
+
+    def _build_tool_evidence_handoff(self) -> Dict[str, Any]:
+        """Return a bounded digest of tool outputs for parent plan-state extraction.
+
+        Some providers finish a long tool-backed turn with a very short final message.
+        Planning mode still needs enough evidence to populate named ``produces`` keys,
+        so sub-agents hand back a compact, tool-output-derived digest alongside the
+        final response. The digest is metadata only; the parent execution adapter
+        decides when to use it.
+        """
+        messages = self._get_orchestrator_messages()
+        entries: List[Dict[str, str]] = []
+        tool_names: List[str] = []
+        total_chars = 0
+
+        for message in messages:
+            role = getattr(message, "role", None)
+            if hasattr(role, "value"):
+                role = role.value
+            if isinstance(message, dict):
+                role = message.get("role", role)
+            if str(role or "").lower() != "tool":
+                continue
+
+            name = ""
+            if isinstance(message, dict):
+                name = str(
+                    message.get("name")
+                    or (message.get("metadata") or {}).get("tool_name")
+                    or (message.get("metadata") or {}).get("name")
+                    or "tool"
+                )
+                content = str(message.get("content") or "")
+            else:
+                metadata = getattr(message, "metadata", None) or {}
+                name = str(
+                    getattr(message, "name", None)
+                    or metadata.get("tool_name")
+                    or metadata.get("name")
+                    or "tool"
+                )
+                content = str(getattr(message, "content", "") or "")
+
+            content = content.strip()
+            if not content:
+                continue
+            if name not in tool_names:
+                tool_names.append(name)
+
+            snippet = re.sub(r"\s+", " ", content)
+            snippet = snippet[:700]
+            total_chars += len(content)
+            entries.append({"tool": name, "snippet": snippet})
+            if len(entries) >= 24:
+                break
+
+        lines = [f"{entry['tool']}: {entry['snippet']}" for entry in entries]
+        return {
+            "count": len(entries),
+            "tool_names": tool_names,
+            "total_chars": total_chars,
+            "summary": "\n".join(lines)[:12000],
+        }
 
     async def stream_execute(self) -> AsyncIterator["StreamChunk"]:
         """Execute sub-agent task with streaming output.

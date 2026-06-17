@@ -38,7 +38,7 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
     async def list_tools() -> JSONResponse:
         """List available tools with metadata."""
         try:
-            from victor.tools.base import ToolRegistry
+            from victor.tools.registry import ToolRegistry
 
             registry = ToolRegistry()
             tools_info = []

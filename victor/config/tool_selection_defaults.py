@@ -39,7 +39,23 @@ Usage:
 """
 
 from dataclasses import dataclass
+from enum import Enum
 from typing import Final, FrozenSet, List, Set
+
+# =============================================================================
+# Enums for Tool Categories
+# =============================================================================
+
+
+class ToolCategory(str, Enum):
+    """Canonical tool category names for classification."""
+
+    FILE_OPS = "file_ops"
+    GIT_OPS = "git_ops"
+    CODE_ANALYSIS = "code_analysis"
+    SEARCH = "search"
+    EDIT = "edit"
+
 
 # =============================================================================
 # Semantic Selector Defaults
@@ -325,29 +341,30 @@ class CategoryAliases:
     EDIT: Final[Set[str]] = frozenset({"edit", "write", "modify", "change", "update"})
 
     @classmethod
-    def get_canonical_category(cls, category: str) -> str:
+    def get_canonical_category(cls, category: str) -> ToolCategory:
         """Get the canonical category name for an alias.
 
         Args:
             category: Category name or alias
 
         Returns:
-            Canonical category name
+            ToolCategory enum value
         """
         category_lower = category.lower()
 
         if category_lower in cls.FILE_OPS:
-            return "file_ops"
+            return ToolCategory.FILE_OPS
         if category_lower in cls.GIT_OPS:
-            return "git_ops"
+            return ToolCategory.GIT_OPS
         if category_lower in cls.CODE_ANALYSIS:
-            return "code_analysis"
+            return ToolCategory.CODE_ANALYSIS
         if category_lower in cls.SEARCH:
-            return "search"
+            return ToolCategory.SEARCH
         if category_lower in cls.EDIT:
-            return "edit"
+            return ToolCategory.EDIT
 
-        return category_lower
+        # Return as-is (could add more categories dynamically)
+        return ToolCategory(category_lower)  # type: ignore
 
 
 __all__ = [

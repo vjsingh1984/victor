@@ -14,6 +14,7 @@
 
 """Tests for StateGraphExecutor."""
 
+import asyncio
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -145,6 +146,78 @@ class TestStateGraphExecutor:
 
         assert executor.config.max_iterations == 50
         assert executor.config.timeout == 120.0
+
+    def test_get_compiler_uses_canonical_native_boundary(self):
+        """Default compiler path should use the native boundary compiler."""
+        executor = StateGraphExecutor(
+            orchestrators={"default": MagicMock(name="default_orchestrator")},
+            tool_registry=MagicMock(name="tool_registry"),
+            config=ExecutorConfig(
+                max_iterations=77,
+                timeout=12.0,
+                enable_checkpointing=False,
+                interrupt_nodes=["approval"],
+            ),
+        )
+
+        with (
+            patch(
+                "victor.workflows.unified_executor.CompatibilityNodeExecutorFactory"
+            ) as factory_cls,
+            patch("victor.workflows.unified_executor.NativeWorkflowGraphCompiler") as compiler_cls,
+        ):
+            compiler = executor._get_compiler()
+
+        assert compiler is compiler_cls.return_value
+        factory_cls.assert_called_once_with(
+            orchestrator=executor.orchestrator,
+            orchestrators=executor.orchestrators,
+            tool_registry=executor.tool_registry,
+        )
+        compiler_cls.assert_called_once()
+        kwargs = compiler_cls.call_args.kwargs
+        assert kwargs["node_executor_factory"] is factory_cls.return_value
+        assert kwargs["enable_checkpointing"] is False
+        assert kwargs["interrupt_on_hitl"] is True
+
+    @pytest.mark.asyncio
+    async def test_execute_with_custom_checkpointer_uses_canonical_boundary_override(
+        self,
+    ):
+        """Per-call checkpointers should be applied through the canonical compiler path."""
+        executor = StateGraphExecutor(config=ExecutorConfig(enable_checkpointing=True))
+        workflow = WorkflowBuilder("checkpointer").add_transform("step", lambda ctx: ctx).build()
+        checkpointer = MagicMock(name="checkpointer")
+        compiled = MagicMock(name="compiled_graph")
+        compiled.invoke = AsyncMock(
+            return_value=MagicMock(
+                success=True,
+                state={"_workflow_id": "session-123", "result": "ok"},
+                error=None,
+                node_history=["step"],
+                iterations=1,
+            )
+        )
+        cached_compiler = MagicMock(name="cached_compiler")
+        executor._compiler = cached_compiler
+
+        with patch("victor.workflows.unified_executor.NativeWorkflowGraphCompiler") as compiler_cls:
+            compiler_cls.return_value.compile.return_value = compiled
+
+            result = await executor.execute(
+                workflow,
+                {"input": "data"},
+                thread_id="session-123",
+                checkpointer=checkpointer,
+            )
+
+        assert result.success is True
+        assert executor._compiler is cached_compiler
+        compiler_cls.assert_called_once()
+        kwargs = compiler_cls.call_args.kwargs
+        assert kwargs["enable_checkpointing"] is True
+        assert kwargs["interrupt_on_hitl"] is False
+        assert kwargs["checkpointer_factory"]() is checkpointer
 
     @pytest.mark.asyncio
     async def test_execute_simple_workflow(self):
@@ -383,3 +456,94 @@ class TestWorkflowPatterns:
         assert result.success is True
         # (5 * 2) + 10 = 20
         assert result.get("value") == 20
+
+
+# ---------------------------------------------------------------------------
+# Item 6 - Hot-path test coverage additions
+# ---------------------------------------------------------------------------
+
+
+class TestTimeoutEnforcement:
+    """Timeout configuration is honoured by the executor."""
+
+    async def test_timeout_raises_when_exceeded(self):
+        """When the compiled graph raises TimeoutError, execute returns failure."""
+        executor = StateGraphExecutor(config=ExecutorConfig(timeout=0.001))
+        workflow = WorkflowBuilder("timeout_test").add_transform("step", lambda ctx: ctx).build()
+
+        compiled = MagicMock()
+        compiled.invoke = AsyncMock(side_effect=asyncio.TimeoutError("exceeded"))
+
+        with patch.object(executor, "_compile_workflow", return_value=compiled):
+            result = await executor.execute(workflow, {})
+
+        assert result.success is False
+
+    async def test_timeout_none_does_not_restrict(self):
+        """With timeout=None, execution completes without artificial limit."""
+        executor = StateGraphExecutor(config=ExecutorConfig(timeout=None))
+        workflow = (
+            WorkflowBuilder("no_timeout")
+            .add_transform("step", lambda ctx: {**ctx, "done": True})
+            .build()
+        )
+
+        result = await executor.execute(workflow, {})
+
+        assert result.success is True
+        assert result.get("done") is True
+
+
+class TestHITLInterruptNodes:
+    """interrupt_nodes config wires interrupt_on_hitl flag into the compiler."""
+
+    def test_interrupt_node_stops_execution(self):
+        """Non-empty interrupt_nodes enables interrupt_on_hitl."""
+        executor = StateGraphExecutor(config=ExecutorConfig(interrupt_nodes=["approval"]))
+
+        with patch("victor.workflows.unified_executor.NativeWorkflowGraphCompiler") as cls:
+            executor._get_compiler()
+
+        cls.assert_called_once()
+        assert cls.call_args.kwargs.get("interrupt_on_hitl") is True
+
+    def test_no_interrupt_when_node_not_in_list(self):
+        """Empty interrupt_nodes disables interrupt_on_hitl."""
+        executor = StateGraphExecutor(config=ExecutorConfig(interrupt_nodes=[]))
+
+        with patch("victor.workflows.unified_executor.NativeWorkflowGraphCompiler") as cls:
+            executor._get_compiler()
+
+        cls.assert_called_once()
+        assert cls.call_args.kwargs.get("interrupt_on_hitl") is False
+
+
+class TestCyclicWorkflow:
+    """max_iterations from config is embedded in the compiled workflow definition."""
+
+    async def test_max_iterations_prevents_infinite_loop(self):
+        """max_iterations from ExecutorConfig flows into ParsedWorkflowDefinition.workflow."""
+        executor = StateGraphExecutor(config=ExecutorConfig(max_iterations=3))
+        workflow = WorkflowBuilder("cycle").add_transform("step", lambda ctx: ctx).build()
+
+        captured: dict = {}
+
+        def _fake_compile(parsed):
+            captured["max_iterations"] = parsed.workflow.max_iterations
+            m = MagicMock()
+            m.invoke = AsyncMock(
+                return_value=MagicMock(
+                    success=True,
+                    state={},
+                    error=None,
+                    node_history=["step"],
+                    iterations=3,
+                )
+            )
+            return m
+
+        with patch.object(executor, "_get_compiler") as gc:
+            gc.return_value.compile.side_effect = _fake_compile
+            await executor.execute(workflow, {})
+
+        assert captured.get("max_iterations") == 3

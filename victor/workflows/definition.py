@@ -61,6 +61,7 @@ from __future__ import annotations
 
 import functools
 import logging
+import warnings
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
@@ -69,6 +70,7 @@ from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
 if TYPE_CHECKING:
     from victor.agent.subagents import SubAgentRole
     from victor.workflows.protocols import RetryPolicy
+    from victor.tools.write_path_policy import WritePathPolicy
 
 logger = logging.getLogger(__name__)
 
@@ -264,11 +266,11 @@ class TransformNode(WorkflowNode):
 
 
 @dataclass
-class TeamNodeWorkflow(WorkflowNode):
-    """Node that spawns an ad-hoc multi-agent team.
+class TeamStepWorkflow(WorkflowNode):
+    """Workflow-definition step that invokes an ad-hoc multi-agent team.
 
-    This node type enables hybrid orchestration by spawning teams within
-    workflow graphs. Teams use the victor/teams/ infrastructure.
+    This step type enables hybrid orchestration by invoking teams within
+    workflow graphs. Teams use the ``victor.teams`` runtime infrastructure.
 
     Attributes:
         goal: Overall goal for the team
@@ -319,6 +321,33 @@ class TeamNodeWorkflow(WorkflowNode):
             }
         )
         return d
+
+
+_DEPRECATED_ALIAS_MAP = {
+    "TeamNodeWorkflow": TeamStepWorkflow,
+}
+_TEAM_NODE_REMOVAL_VERSION = "v0.9.0"
+_TEAM_NODE_REMOVAL_DATE = "2027-03-31"
+
+
+def __getattr__(name: str) -> Any:
+    if name in _DEPRECATED_ALIAS_MAP:
+        warnings.warn(
+            f"{name} is deprecated; use "
+            f"{_DEPRECATED_ALIAS_MAP[name].__name__} instead. "
+            f"This compatibility alias remains supported through "
+            f"{_TEAM_NODE_REMOVAL_VERSION} ({_TEAM_NODE_REMOVAL_DATE}) and "
+            "will be removed after that milestone. "
+            "See docs/architecture/migration.md for migration guidance.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return _DEPRECATED_ALIAS_MAP[name]
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def __dir__() -> List[str]:
+    return sorted(set(globals()) | set(_DEPRECATED_ALIAS_MAP))
 
 
 class ConstraintsProtocol(ABC):
@@ -379,6 +408,9 @@ class TaskConstraints(ConstraintsProtocol):
         timeout: Maximum execution time in seconds (default: 300)
         allowed_tools: Explicit list of allowed tools (None = all)
         blocked_tools: Explicit list of blocked tools (None = none)
+        write_path_policy: Granular path-tier write policy (takes precedence over write_allowed
+            when set). Use WritePathPolicy.analysis_safe() to allow ./tmp/, ./victor/analysis/,
+            and ./docs/*.md without enabling full source-code writes.
 
     Example YAML:
         constraints:
@@ -401,6 +433,7 @@ class TaskConstraints(ConstraintsProtocol):
     _timeout: float = 300.0
     allowed_tools: Optional[List[str]] = None
     blocked_tools: Optional[List[str]] = None
+    write_path_policy: Optional["WritePathPolicy"] = None
 
     @property
     def timeout(self) -> float:
@@ -430,7 +463,7 @@ class TaskConstraints(ConstraintsProtocol):
         return True
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
+        d: Dict[str, Any] = {
             "llm_allowed": self.llm_allowed,
             "network_allowed": self.network_allowed,
             "write_allowed": self.write_allowed,
@@ -440,6 +473,9 @@ class TaskConstraints(ConstraintsProtocol):
             "allowed_tools": self.allowed_tools,
             "blocked_tools": self.blocked_tools,
         }
+        if self.write_path_policy is not None:
+            d["write_path_policy_tier"] = self.write_path_policy.max_tier.name
+        return d
 
 
 # Standard constraint presets
@@ -1232,7 +1268,9 @@ def workflow(
         Decorator function
     """
 
-    def decorator(func: Callable[[], WorkflowDefinition]) -> Callable[[], WorkflowDefinition]:
+    def decorator(
+        func: Callable[[], WorkflowDefinition],
+    ) -> Callable[[], WorkflowDefinition]:
         @functools.wraps(func)
         def wrapper() -> WorkflowDefinition:
             defn = func()
@@ -1254,6 +1292,10 @@ def get_registered_workflows() -> Dict[str, Callable[[], WorkflowDefinition]]:
     return _workflow_registry.copy()
 
 
+if TYPE_CHECKING:
+    TeamNodeWorkflow = TeamStepWorkflow
+
+
 __all__ = [
     # Node types
     "WorkflowNodeType",
@@ -1263,6 +1305,8 @@ __all__ = [
     "ConditionNode",
     "ParallelNode",
     "TransformNode",
+    "TeamStepWorkflow",
+    "TeamNodeWorkflow",
     # Constraints (extensible protocol + standard implementations)
     "ConstraintsProtocol",
     "TaskConstraints",

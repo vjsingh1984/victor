@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
 from victor.processing.native._base import _NATIVE_AVAILABLE, _native
+from victor.processing.native.observability import dispatch_with_observability
 from victor.processing.native.streaming import strip_thinking_tokens
 
 # =============================================================================
@@ -297,11 +298,15 @@ _CLEANUP_PATTERNS = [
     (re.compile(r"</?parameter[^>]*>"), ""),  # Parameter tags
     (re.compile(r"</?tool[^>]*>"), ""),  # Tool tags
     (re.compile(r"</?IMPORTANT[^>]*>"), ""),  # Important tags
-    (re.compile(r'\{"name":\s*"[^"]+",\s*"arguments":\s*\{[^}]*\}\}'), ""),  # JSON tool calls
+    (
+        re.compile(r'\{"name":\s*"[^"]+",\s*"arguments":\s*\{[^}]*\}\}'),
+        "",
+    ),  # JSON tool calls
     (re.compile(r"\n{4,}"), "\n\n\n"),  # Excessive newlines
 ]
 
 
+@dispatch_with_observability("sanitize_response")
 def sanitize_response_fast(text: str) -> str:
     """Sanitize model response by removing malformed patterns.
 
@@ -342,6 +347,7 @@ def sanitize_response_fast(text: str) -> str:
     return text.strip()
 
 
+@dispatch_with_observability("is_garbage_content")
 def is_garbage_content_fast(content: str) -> bool:
     """Detect if content is garbage/malformed output.
 
@@ -399,6 +405,7 @@ def detect_leakage_patterns(text: str) -> List[Tuple[int, int, str]]:
     return matches
 
 
+@dispatch_with_observability("strip_markup")
 def strip_markup_fast(text: str) -> str:
     """Remove XML/HTML-like tags to salvage plain text.
 

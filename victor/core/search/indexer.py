@@ -93,28 +93,47 @@ class CodebaseIndexFactory(CodebaseIndexFactoryProtocol):
 
 
 class EnhancedCodebaseIndexFactory(CodebaseIndexFactoryProtocol):
-    """Factory that delegates to victor-coding's CodebaseIndex when available.
+    """Factory that delegates to an external codebase indexing provider.
 
-    This bridges the gap between the framework capability registry and
-    external vertical packages that provide rich indexing (embeddings,
-    graph stores, symbol extraction).
+    External vertical packages (e.g., victor-coding) register their
+    CodebaseIndex factory as a capability via CapabilityRegistry at
+    bootstrap time. This factory discovers and delegates to that provider.
     """
 
     def create(self, root_path: str, **kwargs: Any) -> Any:
-        """Create a CodebaseIndex from victor-coding."""
-        from victor_coding.codebase.indexer import CodebaseIndex
+        """Create a CodebaseIndex from an installed codebase indexing provider.
 
-        return CodebaseIndex(root_path=root_path, **kwargs)
+        Discovery order:
+        1. CapabilityRegistry (if a different factory was registered)
+        2. Direct import of victor_coding.codebase.indexer.CodebaseIndex
+        3. ImportError with install instructions
+        """
+        # 1. Check registry for a different (non-self) factory
+        from victor.core.capability_registry import CapabilityRegistry
+
+        registry = CapabilityRegistry.get_instance()
+        factory = registry.get(CodebaseIndexFactoryProtocol)
+        if factory is not None and factory is not self:
+            return factory.create(root_path, **kwargs)
+
+        # No fallback — external verticals must register via CapabilityRegistry.
+        # Direct imports of victor_coding violate the core→external boundary.
+        raise ImportError(
+            "CodebaseIndex requires a codebase indexing provider "
+            "(e.g., pip install victor-coding). The provider registers "
+            "its factory via CapabilityRegistry at bootstrap."
+        )
 
 
 def detect_enhanced_index_factory() -> Optional[CodebaseIndexFactoryProtocol]:
-    """Detect if victor-coding is installed and return an enhanced factory.
+    """Detect if a codebase indexing provider is registered.
 
-    Returns None if victor-coding is not available.
+    Returns None if no provider is available via CapabilityRegistry.
     """
-    try:
-        import victor_coding.codebase.indexer  # noqa: F401
+    from victor.core.capability_registry import CapabilityRegistry
 
+    registry = CapabilityRegistry.get_instance()
+    factory = registry.get(CodebaseIndexFactoryProtocol)
+    if factory is not None:
         return EnhancedCodebaseIndexFactory()
-    except ImportError:
-        return None
+    return None

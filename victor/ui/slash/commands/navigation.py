@@ -39,7 +39,7 @@ class DirectoryCommand(BaseSlashCommand):
             name="directory",
             description="Show or change working directory",
             usage="/directory [path]",
-            aliases=["dir", "cd", "pwd"],
+            aliases=["cd"],
             category="navigation",
         )
 
@@ -85,7 +85,7 @@ class ChangesCommand(BaseSlashCommand):
             name="changes",
             description="View, diff, or revert file changes",
             usage="/changes [show|revert|stash] [file]",
-            aliases=["diff", "rollback"],
+            aliases=["diff"],
             category="navigation",
             requires_agent=True,
         )
@@ -323,7 +323,11 @@ class SnapshotsCommand(BaseSlashCommand):
                 diff = store.get_diff(snapshot_id)
                 if diff:
                     ctx.console.print(
-                        Panel(diff[:2000], title=f"Diff: {snapshot_id[:8]}", border_style="yellow")
+                        Panel(
+                            diff[:2000],
+                            title=f"Diff: {snapshot_id[:8]}",
+                            border_style="yellow",
+                        )
                     )
                 else:
                     ctx.console.print(f"[red]Snapshot not found:[/] {snapshot_id}")

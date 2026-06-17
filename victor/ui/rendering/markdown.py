@@ -8,6 +8,7 @@ from typing import Iterable, List, Tuple
 
 from rich.console import Group, RenderableType
 from rich.markdown import Markdown
+from rich.markup import escape as escape_markup
 from rich.panel import Panel
 from rich.syntax import Syntax
 from rich.text import Text
@@ -19,10 +20,46 @@ _TOKEN_PATTERN = re.compile(
     re.DOTALL,
 )
 
+# Pattern to detect Rich markup tags that could cause parsing errors
+# Matches: [tag], [/tag], [tag=value], [tag=value1,value2]
+_RICH_MARKUP_PATTERN = re.compile(r"\[/?[\w]+(?:=[^\]]+)?(?:,\s*[^\]]+)*\]")
+
+
+def _escape_rich_markup_from_text(text: str) -> str:
+    """Escape Rich markup tags that could cause parsing errors.
+
+    This function escapes Rich-specific markup tags like [bold], [/], [red], etc.
+    while preserving markdown syntax. It's designed to handle cases where LLM
+    output contains strings that look like Rich markup but aren't intended to be.
+
+    Note: This is a best-effort escape. It escapes square brackets that look like
+    Rich markup tags, which is safer than trying to parse and validate them.
+
+    Args:
+        text: The text to escape
+
+    Returns:
+        Text with Rich markup tags escaped by replacing [ with \\[
+    """
+
+    # Escape Rich markup tags by replacing [ with \\[
+    # This is a simple approach that works for most cases
+    # We escape patterns that look like Rich tags: [word], [/word], [tag=value]
+    def _escape_match(match: re.Match) -> str:
+        return match.group(0).replace("[", "\\[")
+
+    return _RICH_MARKUP_PATTERN.sub(_escape_match, text)
+
 
 def _markdown_block(text: str) -> Markdown:
-    """Consistently style markdown output with a lighter base."""
-    return Markdown(text, style="markdown.text", justify="left")
+    """Consistently style markdown output with a lighter base.
+
+    Content is escaped to prevent Rich markup parsing errors when LLM
+    output contains strings that look like Rich tags (e.g., file paths).
+    """
+    # Escape Rich markup to prevent parsing errors
+    safe_text = _escape_rich_markup_from_text(text)
+    return Markdown(safe_text, style="markdown.text", justify="left")
 
 
 def render_markdown_with_hooks(content: str) -> RenderableType:
@@ -31,43 +68,62 @@ def render_markdown_with_hooks(content: str) -> RenderableType:
     Splits markdown into chunks so diagram code blocks and inline images can:
     - Render Mermaid snippets as ASCII trees for quick preview
     - Show textual placeholders for image links (since Rich can't display images)
+
+    Falls back to plain text if Rich markup parsing fails, preventing rendering
+    errors from breaking the agentic loop.
     """
     if not content.strip():
         return _markdown_block("")
 
-    parts: List[RenderableType] = []
-    cursor = 0
-    for match in _TOKEN_PATTERN.finditer(content):
-        start, end = match.span()
-        if start > cursor:
-            chunk = content[cursor:start]
-            if chunk.strip():
-                parts.append(_markdown_block(chunk))
+    try:
+        parts: List[RenderableType] = []
+        cursor = 0
+        for match in _TOKEN_PATTERN.finditer(content):
+            start, end = match.span()
+            if start > cursor:
+                chunk = content[cursor:start]
+                if chunk.strip():
+                    parts.append(_markdown_block(chunk))
 
-        lang = match.group("lang")
-        if lang:
-            lang = lang.lower()
-            code = (match.group("code") or "").strip()
-            if lang in _DIAGRAM_LANGS:
-                parts.append(_render_diagram(lang, code))
+            lang = match.group("lang")
+            if lang:
+                lang = lang.lower()
+                code = (match.group("code") or "").strip()
+                if lang in _DIAGRAM_LANGS:
+                    parts.append(_render_diagram(lang, code))
+                else:
+                    parts.append(_markdown_block(match.group(0)))
             else:
-                parts.append(_markdown_block(match.group(0)))
-        else:
-            alt = match.group("alt") or "image"
-            src = match.group("src") or ""
-            parts.append(_render_image_placeholder(alt, src))
+                alt = match.group("alt") or "image"
+                src = match.group("src") or ""
+                parts.append(_render_image_placeholder(alt, src))
 
-        cursor = end
+            cursor = end
 
-    remaining = content[cursor:]
-    if remaining.strip():
-        parts.append(_markdown_block(remaining))
+        remaining = content[cursor:]
+        if remaining.strip():
+            parts.append(_markdown_block(remaining))
 
-    if not parts:
-        return _markdown_block(content)
-    if len(parts) == 1:
-        return parts[0]
-    return Group(*parts)
+        if not parts:
+            return _markdown_block(content)
+        if len(parts) == 1:
+            return parts[0]
+        return Group(*parts)
+
+    except Exception as e:
+        # If Rich rendering fails, fall back to plain text to prevent
+        # rendering errors from breaking the agentic loop
+        import logging
+
+        logger = logging.getLogger(__name__)
+        logger.warning(
+            "Rich rendering failed, falling back to plain text: %s",
+            str(e)[:200],
+        )
+        # Return as plain text (Rich Text object, not Markdown)
+        from rich.text import Text
+
+        return Text(content, style="dim")
 
 
 def _render_diagram(lang: str, code: str) -> RenderableType:

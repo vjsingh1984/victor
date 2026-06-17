@@ -210,7 +210,9 @@ def _build_pipeline(
     return pipeline, side_effect_handler_names
 
 
-def _run_sync(iterations: int, side_effect_delay_seconds: float, pure_delay_seconds: float) -> _BenchResult:
+def _run_sync(
+    iterations: int, side_effect_delay_seconds: float, pure_delay_seconds: float
+) -> _BenchResult:
     # Warm full-replay benchmark: cache hit path on fresh orchestrators (no no-op plan state).
     full_pipeline, _ = _build_pipeline(
         side_effect_delay_seconds=side_effect_delay_seconds,

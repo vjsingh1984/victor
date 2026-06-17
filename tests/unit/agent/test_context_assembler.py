@@ -16,7 +16,7 @@
 
 import pytest
 
-from victor.agent.context_assembler import TurnBoundaryContextAssembler
+from victor.agent.conversation.assembler import TurnBoundaryContextAssembler
 from victor.agent.session_ledger import SessionLedger
 from victor.config.orchestrator_constants import ContextAssemblerConfig
 from victor.providers.base import Message
@@ -36,7 +36,11 @@ class TestContextAssemblerConfig:
 class TestAssembleBasic:
     def test_short_conversation_passes_through(self):
         assembler = TurnBoundaryContextAssembler()
-        msgs = [_msg("system", "You are helpful"), _msg("user", "hello"), _msg("assistant", "hi")]
+        msgs = [
+            _msg("system", "You are helpful"),
+            _msg("user", "hello"),
+            _msg("assistant", "hi"),
+        ]
         result = assembler.assemble(msgs, max_context_chars=100000)
         # No ledger/score_fn = passthrough
         assert len(result) == 3

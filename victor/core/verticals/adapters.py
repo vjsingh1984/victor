@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Runtime adapters for SDK-only vertical classes.
+"""Runtime adapters for contract-only vertical classes.
 
 This module bridges SDK-pure vertical definitions into the core runtime without
 forcing those external packages to inherit from victor.core.verticals.base.
@@ -27,29 +27,19 @@ from typing import Any, ClassVar, Dict, List, Optional, Type, cast
 from victor.core.vertical_types import StageDefinition
 from victor.core.verticals.base import VerticalBase, VerticalConfig
 from victor.framework.tools import ToolSet
-from victor_sdk.core.types import (
+from victor_contracts.core.types import (
     StageDefinition as SdkStageDefinition,
     ToolSet as SdkToolSet,
     VerticalConfig as SdkVerticalConfig,
     normalize_stage_definition,
 )
-from victor_sdk.verticals.protocols.base import VerticalBase as SdkVerticalBase
+from victor_contracts.verticals.protocols.base import VerticalBase as SdkVerticalBase
 
 
 def _to_runtime_stage(stage_name: str, stage: Any) -> StageDefinition:
     """Convert an SDK/declarative stage into the core runtime shape."""
 
-    normalized = normalize_stage_definition(stage_name, stage)
-    return StageDefinition(
-        name=normalized.name,
-        description=normalized.description,
-        required_tools=list(normalized.required_tools),
-        optional_tools=list(normalized.optional_tools),
-        allow_custom_tools=normalized.allow_custom_tools,
-        keywords=list(normalized.keywords),
-        next_stages=set(normalized.next_stages),
-        min_confidence=float(normalized.min_confidence),
-    )
+    return normalize_stage_definition(stage_name, stage)
 
 
 def _to_runtime_stages(stages: Dict[str, Any]) -> Dict[str, StageDefinition]:

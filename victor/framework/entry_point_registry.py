@@ -37,11 +37,26 @@ from importlib.metadata import entry_points
 
 logger = logging.getLogger(__name__)
 
+LEGACY_SDK_PROTOCOLS_ENTRY_POINT_GROUP = "victor.sdk.protocols"
+LEGACY_SDK_CAPABILITIES_ENTRY_POINT_GROUP = "victor.sdk.capabilities"
+EXTENSION_PROTOCOLS_ENTRY_POINT_GROUP = "victor.extension.protocols"
+EXTENSION_CAPABILITIES_ENTRY_POINT_GROUP = "victor.extension.capabilities"
+
+PROTOCOL_ENTRY_POINT_GROUPS = (
+    EXTENSION_PROTOCOLS_ENTRY_POINT_GROUP,
+    LEGACY_SDK_PROTOCOLS_ENTRY_POINT_GROUP,
+)
+CAPABILITY_ENTRY_POINT_GROUPS = (
+    EXTENSION_CAPABILITIES_ENTRY_POINT_GROUP,
+    "victor.capabilities",
+    LEGACY_SDK_CAPABILITIES_ENTRY_POINT_GROUP,
+)
+
 # All Victor entry point groups used by the framework
 ENTRY_POINT_GROUPS = frozenset(
     {
-        "victor.verticals",
         "victor.plugins",
+        "victor.tools",
         "victor.tool_dependencies",
         "victor.safety_rules",
         "victor.rl_configs",
@@ -54,15 +69,15 @@ ENTRY_POINT_GROUPS = frozenset(
         "victor.escape_hatches",
         "victor.commands",
         "victor.api_routers",
-        "victor.capabilities",
-        "victor.sdk.capabilities",
+        *CAPABILITY_ENTRY_POINT_GROUPS,
         "victor.chunking_strategies",
         # Extended provider groups: sandbox, permissions, hooks, compaction
         "victor.sandbox.providers",
         "victor.permission.providers",
         "victor.hook.providers",
         "victor.compaction.providers",
-        "victor.sdk.protocols",
+        *PROTOCOL_ENTRY_POINT_GROUPS,
+        "victor.skills",
     }
 )
 
@@ -425,6 +440,51 @@ def get_entry_point_group(group_name: str) -> Optional[EntryPointGroup]:
     return registry.get_group(group_name)
 
 
+def get_entry_point_objects(group_name: str, *, force: bool = False) -> tuple[Any, ...]:
+    """Get raw entry point objects for a group.
+
+    This provides a shared discovery surface for legacy callers that still
+    expect raw ``EntryPoint`` objects rather than loaded targets.
+
+    Args:
+        group_name: Entry point group name
+        force: If True, invalidate the shared registry before lookup
+
+    Returns:
+        Tuple of raw entry point objects for the group
+    """
+    registry = get_entry_point_registry()
+    if force:
+        registry.invalidate()
+
+    group = registry.get_group(group_name)
+    if not group:
+        return ()
+
+    return tuple(entry[0] for entry in group.entry_points.values())
+
+
+def get_entry_point_values(group_name: str, *, force: bool = False) -> Dict[str, str]:
+    """Get entry point ``name -> value`` mappings for a group.
+
+    Args:
+        group_name: Entry point group name
+        force: If True, invalidate the shared registry before lookup
+
+    Returns:
+        Dictionary mapping entry point names to ``module:attr`` values
+    """
+    registry = get_entry_point_registry()
+    if force:
+        registry.invalidate()
+
+    group = registry.get_group(group_name)
+    if not group:
+        return {}
+
+    return {name: entry[0].value for name, entry in group.entry_points.items()}
+
+
 # Legacy function for backward compatibility
 def _cached_entry_points(group: str) -> tuple:
     """Legacy function - now uses unified registry.
@@ -441,11 +501,4 @@ def _cached_entry_points(group: str) -> tuple:
         f"_cached_entry_points('{group}') is deprecated. " f"Use UnifiedEntryPointRegistry instead."
     )
 
-    registry = get_entry_point_registry()
-    group = registry.get_group(group)
-
-    if not group:
-        return ()
-
-    # Convert to tuple format for backward compatibility
-    return tuple(ep for ep, _ in group.entry_points.values())
+    return get_entry_point_objects(group)

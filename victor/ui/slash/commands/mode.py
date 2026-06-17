@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Agent mode slash commands: mode, build, explore, plan."""
+"""Agent mode slash commands: mode, build, plan, review, delegate, explore."""
 
 from __future__ import annotations
 
@@ -28,14 +28,14 @@ logger = logging.getLogger(__name__)
 
 @register_command
 class ModeCommand(BaseSlashCommand):
-    """Switch agent mode (build/plan/explore)."""
+    """Switch agent mode."""
 
     @property
     def metadata(self) -> CommandMetadata:
         return CommandMetadata(
             name="mode",
-            description="Switch agent mode (build/plan/explore)",
-            usage="/mode [build|plan|explore]",
+            description="Switch agent mode (build/plan/review/delegate/explore)",
+            usage="/mode [build|plan|review|delegate|explore]",
             aliases=["m"],
             category="mode",
             requires_agent=True,
@@ -45,10 +45,24 @@ class ModeCommand(BaseSlashCommand):
         if not self._require_agent(ctx):
             return
 
-        from victor.agent.adaptive_mode_controller import AgentMode
+        from victor.agent.mode_controller import AgentMode, get_mode_controller
 
-        # Use ModeAwareMixin's public mode_controller property (lazy-loads)
-        mode_controller = ctx.agent.mode_controller
+        # Safely get mode controller - try multiple methods
+        mode_controller = None
+
+        # Method 1: Direct attribute (if agent is AgentOrchestrator with ModeAwareMixin)
+        if hasattr(ctx.agent, "mode_controller"):
+            try:
+                mode_controller = ctx.agent.mode_controller
+            except Exception as e:
+                logger.debug(f"Failed to access mode_controller attribute: {e}")
+
+        # Method 2: Get from DI container/singleton
+        if mode_controller is None:
+            try:
+                mode_controller = get_mode_controller()
+            except Exception as e:
+                logger.debug(f"Failed to get mode controller from singleton: {e}")
 
         if not ctx.args:
             # Show current mode using public interface
@@ -62,9 +76,11 @@ class ModeCommand(BaseSlashCommand):
                 Panel(
                     f"[bold]Current Mode:[/] [cyan]{current_mode.value}[/]\n\n"
                     "[bold]Available Modes:[/]\n"
-                    "  [cyan]build[/]   - Implementation mode (default)\n"
-                    "  [cyan]plan[/]    - Planning and research mode\n"
-                    "  [cyan]explore[/] - Code navigation and analysis mode\n\n"
+                    "  [cyan]build[/]    - Implementation mode (default)\n"
+                    "  [cyan]plan[/]     - Planning and research mode\n"
+                    "  [cyan]review[/]   - Findings-first review and validation mode\n"
+                    "  [cyan]delegate[/] - Parallel-work delegation and merge planning mode\n"
+                    "  [cyan]explore[/]  - Advanced code navigation and analysis mode\n\n"
                     "[dim]Switch with: /mode <mode_name>[/]",
                     title="Agent Mode",
                     border_style="cyan",
@@ -73,7 +89,7 @@ class ModeCommand(BaseSlashCommand):
             return
 
         mode_name = ctx.args[0].lower()
-        valid_modes = {"build", "plan", "explore"}
+        valid_modes = {"build", "plan", "review", "delegate", "explore"}
 
         if mode_name not in valid_modes:
             ctx.console.print(f"[red]Invalid mode:[/] {mode_name}")
@@ -86,13 +102,11 @@ class ModeCommand(BaseSlashCommand):
             if mode_controller:
                 mode_controller.switch_mode(new_mode)
             else:
-                # Use ModeAwareMixin's mode_controller property (lazy-loads)
-                mc = ctx.agent.mode_controller
-                if mc:
-                    mc.switch_mode(new_mode)
-                else:
-                    ctx.console.print("[yellow]Mode controller not available[/]")
-                    return
+                ctx.console.print("[yellow]Mode controller not available, mode not switched[/]")
+                return
+
+            if hasattr(ctx.agent, "refresh_system_prompt"):
+                ctx.agent.refresh_system_prompt()
 
             ctx.console.print(f"[green]Switched to mode:[/] [cyan]{mode_name}[/]")
 
@@ -100,6 +114,8 @@ class ModeCommand(BaseSlashCommand):
             hints = {
                 "build": "Implementation mode: Focused on writing and modifying code",
                 "plan": "Planning mode: Research and design before implementation",
+                "review": "Review mode: Diagnose issues and report findings before changes",
+                "delegate": "Delegate mode: Break work into scoped parallel tasks and merge plans",
                 "explore": "Explore mode: Code navigation and analysis without changes",
             }
             ctx.console.print(f"[dim]{hints.get(mode_name, '')}[/]")
@@ -149,6 +165,44 @@ class ExploreCommand(BaseSlashCommand):
 
 
 @register_command
+class ReviewCommand(BaseSlashCommand):
+    """Switch to review mode for diagnostics and findings-first feedback."""
+
+    @property
+    def metadata(self) -> CommandMetadata:
+        return CommandMetadata(
+            name="review",
+            description="Switch to review mode for diagnostics and code review",
+            usage="/review",
+            category="mode",
+            requires_agent=True,
+        )
+
+    def execute(self, ctx: CommandContext) -> None:
+        ctx.args = ["review"]
+        ModeCommand().execute(ctx)
+
+
+@register_command
+class DelegateCommand(BaseSlashCommand):
+    """Switch to delegate mode for work decomposition and merge planning."""
+
+    @property
+    def metadata(self) -> CommandMetadata:
+        return CommandMetadata(
+            name="delegate",
+            description="Switch to delegate mode for parallel worker planning",
+            usage="/delegate",
+            category="mode",
+            requires_agent=True,
+        )
+
+    def execute(self, ctx: CommandContext) -> None:
+        ctx.args = ["delegate"]
+        ModeCommand().execute(ctx)
+
+
+@register_command
 class PlanCommand(BaseSlashCommand):
     """Enter planning mode and manage plans.
 
@@ -192,16 +246,33 @@ class PlanCommand(BaseSlashCommand):
                 self._show_plan(ctx)
                 return
 
-        from victor.agent.adaptive_mode_controller import AgentMode
+        from victor.agent.mode_controller import AgentMode, get_mode_controller
 
-        # Switch to plan mode using public interface
-        # Uses ModeAwareMixin's mode_controller property (lazy-loads)
-        mc = ctx.agent.mode_controller
-        if mc:
-            mc.switch_mode(AgentMode.PLAN)
+        # Safely get mode controller - try multiple methods
+        mode_controller = None
+
+        # Method 1: Direct attribute (if agent is AgentOrchestrator with ModeAwareMixin)
+        if hasattr(ctx.agent, "mode_controller"):
+            try:
+                mode_controller = ctx.agent.mode_controller
+            except Exception as e:
+                logger.debug(f"Failed to access mode_controller attribute: {e}")
+
+        # Method 2: Get from DI container/singleton
+        if mode_controller is None:
+            try:
+                mode_controller = get_mode_controller()
+            except Exception as e:
+                logger.debug(f"Failed to get mode controller from singleton: {e}")
+
+        if mode_controller:
+            mode_controller.switch_mode(AgentMode.PLAN)
         else:
             ctx.console.print("[yellow]Mode controller not available[/]")
             return
+
+        if hasattr(ctx.agent, "refresh_system_prompt"):
+            ctx.agent.refresh_system_prompt()
 
         ctx.console.print("[green]Switched to planning mode[/]")
         ctx.console.print("[dim]Sandbox edits enabled in .victor/sandbox/ directory[/]")
@@ -337,12 +408,14 @@ class PlanCommand(BaseSlashCommand):
             ctx.console.print(f"[red]Failed to load plan:[/] {e}")
 
     def _list_plans(self, ctx: CommandContext) -> None:
-        """List saved plans."""
+        """List saved plans with enhanced table styling."""
         from pathlib import Path
 
-        from rich.table import Table
-
         from victor.agent.planning.store import get_plan_store
+        from victor.ui.rendering.table_builder import (
+            create_plan_list_table,
+            format_plan_status,
+        )
 
         try:
             store = get_plan_store(Path.cwd())
@@ -355,18 +428,21 @@ class PlanCommand(BaseSlashCommand):
                 )
                 return
 
-            table = Table(title="Saved Plans", border_style="cyan")
-            table.add_column("ID", style="cyan")
-            table.add_column("Goal", style="white")
-            table.add_column("Created", style="dim")
-            table.add_column("Status", style="green")
+            table = create_plan_list_table(title="Saved Plans")
 
             for p in plans:
+                # Format status with icon and color
+                status_formatted = format_plan_status(p.get("status", "unknown"))
+                # Count tasks if available
+                task_count = p.get("task_count", 0)
+                tasks_str = f"{task_count}" if task_count else "—"
+
                 table.add_row(
                     p["id"][:8] + "...",
                     p["goal"],
                     p["created_at"][:16],
-                    p["status"],
+                    status_formatted,
+                    tasks_str,
                 )
 
             ctx.console.print(table)
@@ -375,7 +451,7 @@ class PlanCommand(BaseSlashCommand):
             ctx.console.print(f"[red]Failed to list plans:[/] {e}")
 
     def _show_plan(self, ctx: CommandContext) -> None:
-        """Show the current plan."""
+        """Show the current plan with enhanced table display."""
         conversation_controller = getattr(ctx.agent, "conversation_controller", None)
         current_plan = (
             getattr(conversation_controller, "current_plan", None)
@@ -396,11 +472,70 @@ class PlanCommand(BaseSlashCommand):
             return
 
         from rich.markdown import Markdown
+        from rich.panel import Panel
+
+        from victor.ui.rendering.table_builder import (
+            create_plan_task_table,
+            format_task_status,
+        )
+
+        # Show plan header
+        progress = current_plan.progress_percentage()
+        total_steps = len(current_plan.steps)
+        completed_steps = len(current_plan.get_completed_steps())
 
         ctx.console.print(
             Panel(
-                Markdown(current_plan.to_markdown()),
-                title=f"Current Plan: {current_plan.id}",
+                f"[bold]{current_plan.goal}[/]\n\n"
+                f"Progress: [cyan]{completed_steps}/{total_steps}[/] "
+                f"([cyan]{progress:.0f}%[/])",
+                title=f"Plan: {current_plan.id[:12]}...",
                 border_style="blue",
             )
         )
+
+        # Show plan steps in a table if there are steps
+        if current_plan.steps:
+            table = create_plan_task_table(title="Tasks")
+
+            for idx, step in enumerate(current_plan.steps, 1):
+                # Format status with icon and color
+                status_str = (
+                    step.status.value if hasattr(step.status, "value") else str(step.status)
+                )
+                status_formatted = format_task_status(status_str)
+
+                # Build details string (dependencies, estimated calls)
+                details_parts = []
+                if hasattr(step, "depends_on") and step.depends_on:
+                    deps = ", ".join(step.depends_on[:2])
+                    if len(step.depends_on) > 2:
+                        deps += f" +{len(step.depends_on) - 2}"
+                    details_parts.append(f"after: {deps}")
+
+                details = " • ".join(details_parts) if details_parts else ""
+
+                # Truncate description for table
+                description = (
+                    step.description[:60] + "..."
+                    if len(step.description) > 60
+                    else step.description
+                )
+
+                table.add_row(
+                    str(idx),
+                    description,
+                    status_formatted,
+                    details,
+                )
+
+            ctx.console.print(table)
+        else:
+            # Fallback to markdown display if no steps
+            ctx.console.print(
+                Panel(
+                    Markdown(current_plan.to_markdown()),
+                    title=f"Plan: {current_plan.id}",
+                    border_style="blue",
+                )
+            )

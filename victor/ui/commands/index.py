@@ -55,5 +55,5 @@ def index(
                 "or index will load from disk on first semantic search.[/dim]"
             )
         else:
-            console.print(f"\n[red]✗ Indexing failed[/red]")
+            console.print("\n[red]✗ Indexing failed[/red]")
             raise typer.Exit(1)

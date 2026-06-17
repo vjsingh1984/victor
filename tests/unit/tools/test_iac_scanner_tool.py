@@ -286,7 +286,13 @@ class TestSummaryAction:
             "files_scanned": 5,
             "total_resources": 10,
             "scan_duration_ms": 100,
-            "by_severity": {"critical": 5, "high": 10, "medium": 5, "low": 0, "info": 0},
+            "by_severity": {
+                "critical": 5,
+                "high": 10,
+                "medium": 5,
+                "low": 0,
+                "info": 0,
+            },
             "by_category": {},
             "top_rules": [],
         }

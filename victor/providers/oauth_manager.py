@@ -27,9 +27,14 @@ Security:
 - Resolution order: env var > keychain > error
 """
 
+import json
 import logging
 import os
+import getpass
+import hashlib
+import platform
 import stat
+import subprocess
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -53,6 +58,8 @@ REFRESH_GRACE_MINUTES = 5
 OAUTH_CLIENT_ID_ENV_VARS = {
     "openai": "VICTOR_OPENAI_OAUTH_CLIENT_ID",
     "qwen": "VICTOR_QWEN_OAUTH_CLIENT_ID",
+    "google": "VICTOR_GOOGLE_OAUTH_CLIENT_ID",
+    "github-copilot": "VICTOR_GITHUB_COPILOT_OAUTH_CLIENT_ID",
 }
 
 # OAuth client ID keychain service names
@@ -113,6 +120,8 @@ def _set_oauth_client_id_in_keyring(provider: str, client_id: str) -> bool:
 # See: https://github.com/openai/codex (codex-rs/core/src/auth.rs)
 _PUBLIC_OAUTH_CLIENT_IDS: Dict[str, str] = {
     "openai": "app_EMoamEEZ73f0CkXaXp7hrann",
+    # Google public client for installed apps (same as Gemini CLI)
+    "google": ("681255809395-oo8ft2oprdrnp9e3aqf6av3hmdib135j" ".apps.googleusercontent.com"),
 }
 
 
@@ -176,6 +185,15 @@ class OAuthProviderConfig:
     scopes: List[str] = field(default_factory=lambda: ["openid", "profile", "email"])
     token_endpoint: str = "/oauth/token"
     redirect_port: int = 8400
+    # Config-driven overrides for providers with non-standard OAuth endpoints
+    client_secret: Optional[str] = None  # Public secret (e.g. Google installed apps)
+    authorize_path: Optional[str] = None  # e.g. "/o/oauth2/v2/auth" for Google
+    token_url: Optional[str] = None  # Full token URL when host differs from issuer
+    callback_path: str = "/callback"  # Redirect callback path
+    extra_auth_params: Optional[Dict[str, str]] = None  # e.g. {"access_type": "offline"}
+    # Device code flow (GitHub Copilot, headless environments)
+    use_device_flow: bool = False
+    device_code_url: Optional[str] = None
 
     def get_client_id(self) -> str:
         """Get the OAuth client_id for this provider.
@@ -192,19 +210,25 @@ class OAuthProviderConfig:
 
     def to_sso_config(self) -> SSOConfig:
         """Convert to SSOConfig for use with SSOAuthenticator."""
-        # OpenAI uses /auth/callback (matching Codex CLI), others use /callback
+        # OpenAI uses /auth/callback (matching Codex CLI), others use their callback_path
         if self.sso_provider == SSOProvider.OPENAI_CODEX:
             redirect_uri = f"http://localhost:{self.redirect_port}/auth/callback"
         else:
-            redirect_uri = f"http://localhost:{self.redirect_port}/callback"
+            redirect_uri = f"http://localhost:{self.redirect_port}{self.callback_path}"
 
         return SSOConfig(
             provider=self.sso_provider,
             issuer_url=self.issuer_url,
             client_id=self.get_client_id(),
+            client_secret=self.client_secret,
             scopes=self.scopes,
             redirect_uri=redirect_uri,
-            use_pkce=True,
+            use_pkce=not self.use_device_flow,
+            authorize_path=self.authorize_path,
+            token_url=self.token_url,
+            extra_auth_params=self.extra_auth_params,
+            use_device_flow=self.use_device_flow,
+            device_code_url=self.device_code_url,
         )
 
 
@@ -235,9 +259,119 @@ OAUTH_PROVIDERS: Dict[str, OAuthProviderConfig] = {
         scopes=["openid", "profile", "email", "offline_access"],
         token_endpoint="/oauth/token",
     ),
+    "google": OAuthProviderConfig(
+        provider_name="google",
+        sso_provider=SSOProvider.GOOGLE_GEMINI,
+        issuer_url="https://accounts.google.com",
+        scopes=[
+            "https://www.googleapis.com/auth/cloud-platform",
+            "https://www.googleapis.com/auth/userinfo.email",
+            "https://www.googleapis.com/auth/userinfo.profile",
+        ],
+        token_url="https://oauth2.googleapis.com/token",
+        authorize_path="/o/oauth2/v2/auth",
+        # Public client secret (standard for Google installed apps, same as Gemini CLI)
+        client_secret="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",
+        callback_path="/oauth2callback",
+        redirect_port=8401,
+        extra_auth_params={"access_type": "offline"},
+    ),
+    "github-copilot": OAuthProviderConfig(
+        provider_name="github-copilot",
+        sso_provider=SSOProvider.GITHUB_COPILOT,
+        issuer_url="https://github.com",
+        scopes=["copilot"],
+        use_device_flow=True,
+        device_code_url="https://github.com/login/device/code",
+        token_url="https://github.com/login/oauth/access_token",
+    ),
 }
 
 _DEFAULT_STORAGE_DIR = Path.home() / ".victor"
+
+
+def _get_default_claude_credentials_path() -> Path:
+    config_dir = os.getenv("CLAUDE_CONFIG_DIR")
+    if config_dir:
+        return Path(config_dir) / ".credentials.json"
+    return Path.home() / ".claude" / ".credentials.json"
+
+
+def _get_claude_code_keychain_service() -> str:
+    config_dir = os.getenv("CLAUDE_CONFIG_DIR")
+    suffix = "-custom-oauth" if os.getenv("CLAUDE_CODE_CUSTOM_OAUTH_URL") else ""
+    config_hash = ""
+    if config_dir:
+        normalized = str(Path(config_dir)).encode("utf-8")
+        config_hash = f"-{hashlib.sha256(normalized).hexdigest()[:8]}"
+    return f"Claude Code{suffix}-credentials{config_hash}"
+
+
+def _load_claude_code_keychain_credentials() -> Optional[Dict[str, Any]]:
+    """Read Claude Code's macOS Keychain credentials without logging token values."""
+    if platform.system() != "Darwin":
+        return None
+
+    try:
+        result = subprocess.run(
+            [
+                "security",
+                "find-generic-password",
+                "-a",
+                getpass.getuser(),
+                "-w",
+                "-s",
+                _get_claude_code_keychain_service(),
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+
+    if result.returncode != 0 or not result.stdout.strip():
+        return None
+
+    try:
+        data = json.loads(result.stdout.strip())
+    except json.JSONDecodeError:
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def _find_oauth_token_dict(data: Any) -> Optional[Dict[str, Any]]:
+    """Find a nested OAuth token dictionary without depending on one CLI schema."""
+    if not isinstance(data, dict):
+        return None
+
+    if data.get("access_token") or data.get("accessToken"):
+        return data
+
+    for key in ("tokens", "oauth", "oauthAccount", "claudeAiOauth", "claude_ai_oauth"):
+        value = data.get(key)
+        if isinstance(value, dict):
+            found = _find_oauth_token_dict(value)
+            if found is not None:
+                return found
+
+    return None
+
+
+def _parse_external_expires_at(value: Any) -> Optional[datetime]:
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return datetime.fromtimestamp(
+            value / 1000 if value > 10_000_000_000 else value, timezone.utc
+        )
+    if isinstance(value, str):
+        try:
+            return datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+    return None
 
 
 class OAuthTokenManager:
@@ -254,17 +388,25 @@ class OAuthTokenManager:
         self,
         provider: str,
         storage_dir: Optional[Path] = None,
+        token_source: str = "victor",
+        codex_auth_path: Optional[Path] = None,
+        claude_credentials_path: Optional[Path] = None,
     ):
         self._provider = provider
         self._storage_dir = storage_dir or _DEFAULT_STORAGE_DIR
         self._token_file = self._storage_dir / "oauth_tokens.yaml"
+        self._token_source = token_source
+        self._codex_auth_path = codex_auth_path or Path.home() / ".codex" / "auth.json"
+        self._claude_credentials_path = (
+            claude_credentials_path or _get_default_claude_credentials_path()
+        )
 
-        if provider not in OAUTH_PROVIDERS:
+        if provider not in OAUTH_PROVIDERS and provider != "anthropic":
             raise KeyError(
                 f"Provider '{provider}' does not support OAuth. "
-                f"Supported: {list(OAUTH_PROVIDERS.keys())}"
+                f"Supported: {list(OAUTH_PROVIDERS.keys()) + ['anthropic']}"
             )
-        self._config = OAUTH_PROVIDERS[provider]
+        self._config = OAUTH_PROVIDERS.get(provider)
 
     # ------------------------------------------------------------------
     # Public API
@@ -295,6 +437,8 @@ class OAuthTokenManager:
 
     async def login(self) -> SSOTokens:
         """Perform browser-based OAuth PKCE login."""
+        if self._config is None:
+            raise ValueError(f"Browser OAuth login is not implemented for {self._provider}")
         sso_config = self._config.to_sso_config()
         auth = SSOAuthenticator(sso_config)
         tokens = await auth.login()
@@ -307,6 +451,8 @@ class OAuthTokenManager:
         cached = self._load_cached()
         if cached is None or cached.refresh_token is None:
             raise ValueError(f"No refresh token available for {self._provider}")
+        if self._config is None:
+            raise ValueError(f"OAuth refresh is not implemented for {self._provider}")
 
         sso_config = self._config.to_sso_config()
         auth = SSOAuthenticator(sso_config)
@@ -322,6 +468,24 @@ class OAuthTokenManager:
             del all_tokens[self._provider]
             self._write_all(all_tokens)
             logger.info("OAuth tokens cleared for %s", self._provider)
+
+    def save_imported_tokens(self, tokens: SSOTokens, *, overwrite: bool = False) -> bool:
+        """Persist externally obtained OAuth tokens.
+
+        Args:
+            tokens: Tokens imported from a trusted local OAuth client.
+            overwrite: Replace existing cached tokens for the provider.
+
+        Returns:
+            True when tokens were written, False when an existing token was preserved.
+        """
+        all_tokens = self._load_all()
+        if self._provider in all_tokens and not overwrite:
+            return False
+
+        self._save(tokens)
+        logger.info("OAuth tokens imported for %s", self._provider)
+        return True
 
     # ------------------------------------------------------------------
     # Persistence
@@ -342,6 +506,21 @@ class OAuthTokenManager:
 
     def _load_cached(self) -> Optional[SSOTokens]:
         """Load cached tokens for this provider."""
+        if self._token_source == "codex":
+            return self._load_codex_cached()
+        if self._token_source == "claude-code":
+            return self._load_claude_code_cached()
+        if self._token_source == "auto":
+            cached = self._load_victor_cached()
+            if cached is not None:
+                return cached
+            if self._provider == "anthropic":
+                return self._load_claude_code_cached()
+            return self._load_codex_cached()
+        return self._load_victor_cached()
+
+    def _load_victor_cached(self) -> Optional[SSOTokens]:
+        """Load cached tokens from Victor's native token store."""
         all_tokens = self._load_all()
         data = all_tokens.get(self._provider)
         if data is None:
@@ -358,6 +537,93 @@ class OAuthTokenManager:
             token_type=data.get("token_type", "Bearer"),
             expires_at=expires_at,
             scopes=data.get("scopes", []),
+        )
+
+    def _load_codex_cached(self) -> Optional[SSOTokens]:
+        """Load OpenAI OAuth tokens from Codex auth.json as a read-only source."""
+        if self._provider != "openai" or not self._codex_auth_path.exists():
+            return None
+
+        try:
+            data = json.loads(self._codex_auth_path.read_text())
+        except (json.JSONDecodeError, OSError):
+            logger.warning("Failed to load Codex OAuth tokens")
+            return None
+
+        tokens_data = data.get("tokens")
+        if not isinstance(tokens_data, dict) or not tokens_data.get("access_token"):
+            return None
+
+        scopes = tokens_data.get("scopes") or tokens_data.get("scope") or []
+        if isinstance(scopes, str):
+            scopes = scopes.split()
+        if not isinstance(scopes, list):
+            scopes = []
+
+        return SSOTokens(
+            access_token=tokens_data["access_token"],
+            refresh_token=tokens_data.get("refresh_token"),
+            id_token=tokens_data.get("id_token"),
+            token_type=tokens_data.get("token_type", "Bearer"),
+            expires_at=None,
+            scopes=scopes,
+        )
+
+    def _load_claude_code_cached(self) -> Optional[SSOTokens]:
+        """Load Anthropic OAuth tokens from Claude Code env/file sources."""
+        if self._provider != "anthropic":
+            return None
+
+        env_token = os.getenv("CLAUDE_CODE_OAUTH_TOKEN")
+        if env_token:
+            return SSOTokens(access_token=env_token, token_type="Bearer")
+
+        keychain_data = _load_claude_code_keychain_credentials()
+        if keychain_data is not None:
+            tokens = self._tokens_from_claude_code_data(keychain_data)
+            if tokens is not None:
+                return tokens
+
+        if not self._claude_credentials_path.exists():
+            return None
+
+        try:
+            data = json.loads(self._claude_credentials_path.read_text())
+        except (json.JSONDecodeError, OSError):
+            logger.warning("Failed to load Claude Code OAuth credentials")
+            return None
+
+        return self._tokens_from_claude_code_data(data)
+
+    @staticmethod
+    def _tokens_from_claude_code_data(data: Dict[str, Any]) -> Optional[SSOTokens]:
+        tokens_data = _find_oauth_token_dict(data)
+        if tokens_data is None:
+            return None
+
+        access_token = tokens_data.get("access_token") or tokens_data.get("accessToken")
+        if not access_token:
+            return None
+
+        expires_at = _parse_external_expires_at(
+            tokens_data.get("expires_at")
+            or tokens_data.get("expiresAt")
+            or tokens_data.get("expiry")
+            or tokens_data.get("expires")
+        )
+        scopes = tokens_data.get("scopes") or tokens_data.get("scope") or []
+        if isinstance(scopes, str):
+            scopes = scopes.split()
+        if not isinstance(scopes, list):
+            scopes = []
+
+        return SSOTokens(
+            access_token=access_token,
+            refresh_token=tokens_data.get("refresh_token") or tokens_data.get("refreshToken"),
+            id_token=tokens_data.get("id_token") or tokens_data.get("idToken"),
+            token_type=tokens_data.get("token_type") or tokens_data.get("tokenType") or "Bearer",
+            expires_at=expires_at,
+            scopes=scopes,
         )
 
     def _load_all(self) -> Dict[str, Any]:

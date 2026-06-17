@@ -54,7 +54,6 @@ from typing import Any, Callable, Dict, List, Optional, Set
 from victor.core.events import (
     ObservabilityBus,
     MessagingEvent,
-    UnifiedEventType,
     get_observability_bus,
     SubscriptionHandle,
 )

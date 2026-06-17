@@ -22,7 +22,14 @@ class TestCompactionEvents:
             MagicMock(utilization=0.5, char_count=5000),
         ]
         mock_controller.smart_compact_history.return_value = 5
-        mock_controller.messages = [MagicMock()] * 10
+        # Create mock messages with proper content attribute (string, not MagicMock)
+        mock_messages = []
+        for _ in range(10):
+            msg = MagicMock()
+            msg.content = "some message content"
+            msg.role = "user"
+            mock_messages.append(msg)
+        mock_controller.messages = mock_messages
 
         mock_event_bus = MagicMock()
 
@@ -57,7 +64,14 @@ class TestCompactionEvents:
             MagicMock(utilization=0.5, char_count=5000),
         ]
         mock_controller.smart_compact_history.return_value = 5
-        mock_controller.messages = [MagicMock()] * 10
+        # Create mock messages with proper content attribute (string, not MagicMock)
+        mock_messages = []
+        for _ in range(10):
+            msg = MagicMock()
+            msg.content = "some message content"
+            msg.role = "user"
+            mock_messages.append(msg)
+        mock_controller.messages = mock_messages
 
         compactor = ContextCompactor(
             controller=mock_controller,

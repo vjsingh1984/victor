@@ -1,286 +1,309 @@
-"""Tests for workflow protocol definitions.
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
-These tests verify that the workflow protocols are properly defined
-and that implementations can be validated at runtime.
-"""
+"""Tests for Workflow Compiler Protocols (DIP compliance)."""
 
 import pytest
+import typing
 from typing import Any, Dict, List, Optional
-from dataclasses import dataclass
-
 from victor.workflows.protocols import (
-    ProtocolNodeStatus,
-    RetryPolicy,
-    NodeResult,
-    IWorkflowNode,
-    IWorkflowEdge,
-    IWorkflowGraph,
-    ICheckpointStore,
-    IWorkflowExecutor,
+    IWorkflowCompiler,
+    IWorkflowLoader,
+    IWorkflowValidator,
 )
 
 
-class TestProtocolNodeStatus:
-    """Tests for ProtocolNodeStatus enum."""
+class TestIWorkflowCompilerProtocol:
+    """Tests for IWorkflowCompiler protocol."""
 
-    def test_has_pending_status(self):
-        """ProtocolNodeStatus should have PENDING state."""
-        assert ProtocolNodeStatus.PENDING is not None
-        assert ProtocolNodeStatus.PENDING.value == "pending"
-
-    def test_has_running_status(self):
-        """ProtocolNodeStatus should have RUNNING state."""
-        assert ProtocolNodeStatus.RUNNING is not None
-        assert ProtocolNodeStatus.RUNNING.value == "running"
-
-    def test_has_completed_status(self):
-        """ProtocolNodeStatus should have COMPLETED state."""
-        assert ProtocolNodeStatus.COMPLETED is not None
-        assert ProtocolNodeStatus.COMPLETED.value == "completed"
-
-    def test_has_failed_status(self):
-        """ProtocolNodeStatus should have FAILED state."""
-        assert ProtocolNodeStatus.FAILED is not None
-        assert ProtocolNodeStatus.FAILED.value == "failed"
-
-    def test_has_skipped_status(self):
-        """ProtocolNodeStatus should have SKIPPED state."""
-        assert ProtocolNodeStatus.SKIPPED is not None
-        assert ProtocolNodeStatus.SKIPPED.value == "skipped"
-
-
-class TestRetryPolicy:
-    """Tests for RetryPolicy dataclass."""
-
-    def test_default_values(self):
-        """RetryPolicy should have sensible defaults."""
-        policy = RetryPolicy()
-        assert policy.max_retries == 3
-        assert policy.delay_seconds == 1.0
-        assert policy.exponential_backoff is True
-        assert policy.retry_on_exceptions == (Exception,)
-
-    def test_custom_values(self):
-        """RetryPolicy should accept custom values."""
-        policy = RetryPolicy(
-            max_retries=5,
-            delay_seconds=2.0,
-            exponential_backoff=False,
-            retry_on_exceptions=(ValueError, TypeError),
+    def test_compiler_protocol_has_compile_method(self):
+        """Test that compiler protocol requires compile method."""
+        # This test verifies the protocol exists and has the right method signature
+        # Check if it's a Protocol by checking MRO (Python 3.10+ compatible)
+        assert any(c.__name__ == "Protocol" for c in IWorkflowCompiler.__mro__)
+        # The protocol should require a compile method - check direct attribute
+        assert hasattr(IWorkflowCompiler, "compile") or callable(
+            getattr(IWorkflowCompiler, "compile", None)
         )
-        assert policy.max_retries == 5
-        assert policy.delay_seconds == 2.0
-        assert policy.exponential_backoff is False
-        assert policy.retry_on_exceptions == (ValueError, TypeError)
+
+    def test_concrete_compiler_implementation(self):
+        """Test that a concrete implementation can satisfy the protocol."""
+        from victor.framework.graph import CompiledGraph
+
+        class ConcreteCompiler:
+            """Concrete implementation of IWorkflowCompiler."""
+
+            def compile(self, workflow_def: Dict[str, Any]) -> CompiledGraph:
+                """Compile workflow definition into executable graph."""
+                # Mock implementation
+                from victor.framework.graph import CompiledGraph
+
+                # Create a minimal CompiledGraph instance
+                return CompiledGraph(
+                    nodes={},
+                    edges={},
+                    entry_point="start",
+                )
+
+        # Should satisfy protocol
+        compiler = ConcreteCompiler()
+        assert isinstance(compiler, IWorkflowCompiler)
+
+        # Should have compile method
+        assert hasattr(compiler, "compile")
+
+        # Should return CompiledGraph
+        result = compiler.compile({"name": "test"})
+        assert result is not None
 
 
-class TestNodeResult:
-    """Tests for NodeResult dataclass."""
+class TestIWorkflowLoaderProtocol:
+    """Tests for IWorkflowLoader protocol."""
 
-    def test_successful_result(self):
-        """NodeResult should store successful execution data."""
-        result = NodeResult(
-            status=ProtocolNodeStatus.COMPLETED,
-            output={"key": "value"},
+    def test_loader_protocol_has_load_method(self):
+        """Test that loader protocol requires load method."""
+        # Check if it's a Protocol by checking MRO (Python 3.10+ compatible)
+        assert any(c.__name__ == "Protocol" for c in IWorkflowLoader.__mro__)
+        # The protocol should require a load method - check direct attribute
+        assert hasattr(IWorkflowLoader, "load") or callable(getattr(IWorkflowLoader, "load", None))
+
+    def test_concrete_loader_implementation(self):
+        """Test that a concrete implementation can satisfy the protocol."""
+
+        class ConcreteLoader:
+            """Concrete implementation of IWorkflowLoader."""
+
+            def load(self, source: str) -> Dict[str, Any]:
+                """Load workflow definition from source."""
+                # Mock implementation
+                return {"name": "test", "nodes": []}
+
+        # Should satisfy protocol
+        loader = ConcreteLoader()
+        assert isinstance(loader, IWorkflowLoader)
+
+        # Should have load method
+        assert hasattr(loader, "load")
+
+        # Should return dict
+        result = loader.load("test_source")
+        assert isinstance(result, dict)
+
+
+class TestIWorkflowValidatorProtocol:
+    """Tests for IWorkflowValidator protocol."""
+
+    def test_validator_protocol_has_validate_method(self):
+        """Test that validator protocol requires validate method."""
+        # Check if it's a Protocol by checking MRO (Python 3.10+ compatible)
+        assert any(c.__name__ == "Protocol" for c in IWorkflowValidator.__mro__)
+        # The protocol should require a validate method - check direct attribute
+        assert hasattr(IWorkflowValidator, "validate") or callable(
+            getattr(IWorkflowValidator, "validate", None)
         )
-        assert result.status == ProtocolNodeStatus.COMPLETED
-        assert result.output == {"key": "value"}
-        assert result.error is None
 
-    def test_failed_result(self):
-        """NodeResult should store failure information."""
-        error = ValueError("Something went wrong")
-        result = NodeResult(
-            status=ProtocolNodeStatus.FAILED,
-            output=None,
-            error=error,
-        )
-        assert result.status == ProtocolNodeStatus.FAILED
-        assert result.output is None
-        assert result.error is error
+    def test_concrete_validator_implementation(self):
+        """Test that a concrete implementation can satisfy the protocol."""
+        from dataclasses import dataclass
 
-    def test_result_with_metadata(self):
-        """NodeResult should support metadata."""
-        result = NodeResult(
-            status=ProtocolNodeStatus.COMPLETED,
-            output="result",
-            metadata={"duration_ms": 150, "retries": 2},
-        )
-        assert result.metadata == {"duration_ms": 150, "retries": 2}
+        @dataclass
+        class ValidationResult:
+            """Result of workflow validation."""
 
+            is_valid: bool
+            errors: List[str]
 
-class TestIWorkflowNode:
-    """Tests for IWorkflowNode protocol."""
+        class ConcreteValidator:
+            """Concrete implementation of IWorkflowValidator."""
 
-    def test_protocol_is_runtime_checkable(self):
-        """IWorkflowNode should be runtime checkable."""
-        from typing import runtime_checkable, Protocol
+            def validate(self, workflow_def: Dict[str, Any]) -> ValidationResult:
+                """Validate workflow definition."""
+                # Mock implementation
+                return ValidationResult(is_valid=True, errors=[])
 
-        assert hasattr(IWorkflowNode, "__protocol_attrs__") or isinstance(IWorkflowNode, type)
+        # Should satisfy protocol
+        validator = ConcreteValidator()
+        assert isinstance(validator, IWorkflowValidator)
 
-    def test_compliant_class_is_instance(self):
-        """A compliant class should pass isinstance check."""
+        # Should have validate method
+        assert hasattr(validator, "validate")
 
-        class MockNode:
-            @property
-            def id(self) -> str:
-                return "node_1"
-
-            @property
-            def name(self) -> str:
-                return "Test Node"
-
-            @property
-            def retry_policy(self) -> RetryPolicy:
-                return RetryPolicy()
-
-            async def execute(
-                self, state: Dict[str, Any], context: Optional[Dict[str, Any]] = None
-            ) -> NodeResult:
-                return NodeResult(status=ProtocolNodeStatus.COMPLETED, output=state)
-
-        node = MockNode()
-        assert isinstance(node, IWorkflowNode)
-
-    def test_non_compliant_class_is_not_instance(self):
-        """A non-compliant class should fail isinstance check."""
-
-        class IncompleteNode:
-            @property
-            def id(self) -> str:
-                return "node_1"
-
-            # Missing name, retry_policy, and execute
-
-        node = IncompleteNode()
-        assert not isinstance(node, IWorkflowNode)
+        # Should return ValidationResult
+        result = validator.validate({"name": "test"})
+        assert result.is_valid is True
 
 
-class TestIWorkflowEdge:
-    """Tests for IWorkflowEdge protocol."""
+class TestProtocolComposition:
+    """Tests for protocol composition and dependency injection."""
 
-    def test_compliant_class_is_instance(self):
-        """A compliant edge class should pass isinstance check."""
+    def test_compiler_with_loader_and_validator(self):
+        """Test compiler using injected loader and validator."""
+        from victor.framework.graph import CompiledGraph
 
-        class MockEdge:
-            @property
-            def source_id(self) -> str:
-                return "node_1"
+        class MockLoader:
+            def load(self, source: str) -> Dict[str, Any]:
+                return {"name": "loaded_workflow", "nodes": []}
 
-            @property
-            def target_id(self) -> str:
-                return "node_2"
+        class MockValidator:
+            def validate(self, workflow_def: Dict[str, Any]) -> Any:
+                return type("ValidationResult", (), {"is_valid": True, "errors": []})()
 
-            def should_traverse(self, state: Dict[str, Any]) -> bool:
-                return True
+        class DIPCompiler:
+            """Compiler that depends on abstractions (DIP compliance)."""
 
-        edge = MockEdge()
-        assert isinstance(edge, IWorkflowEdge)
+            def __init__(self, loader: IWorkflowLoader, validator: IWorkflowValidator):
+                self._loader = loader
+                self._validator = validator
 
-    def test_edge_with_condition(self):
-        """Edge should support conditional traversal."""
+            def compile(self, source: str) -> CompiledGraph:
+                """Compile from source using injected dependencies."""
+                # Load
+                workflow_def = self._loader.load(source)
 
-        class ConditionalMockEdge:
-            @property
-            def source_id(self) -> str:
-                return "check_node"
+                # Validate
+                validation_result = self._validator.validate(workflow_def)
+                if not validation_result.is_valid:
+                    raise ValueError(f"Invalid workflow: {validation_result.errors}")
 
-            @property
-            def target_id(self) -> str:
-                return "success_node"
+                # Compile (mock)
+                return CompiledGraph(nodes={}, edges={}, entry_point="start")
 
-            def should_traverse(self, state: Dict[str, Any]) -> bool:
-                return state.get("success", False)
+        # Create instances
+        loader = MockLoader()
+        validator = MockValidator()
+        compiler = DIPCompiler(loader, validator)
 
-        edge = ConditionalMockEdge()
-        assert edge.should_traverse({"success": True}) is True
-        assert edge.should_traverse({"success": False}) is False
+        # Should compile successfully
+        result = compiler.compile("test_source")
+        assert result is not None
+
+    def test_compiler_can_swap_implementations(self):
+        """Test that compiler can work with different loader/validator implementations."""
+        from victor.framework.graph import CompiledGraph
+
+        class FileLoader:
+            def load(self, source: str) -> Dict[str, Any]:
+                return {"name": "file_workflow", "source": "file"}
+
+        class StringLoader:
+            def load(self, source: str) -> Dict[str, Any]:
+                return {"name": "string_workflow", "source": "string"}
+
+        class StrictValidator:
+            def validate(self, workflow_def: Dict[str, Any]) -> Any:
+                has_name = "name" in workflow_def
+                return type(
+                    "ValidationResult",
+                    (),
+                    {
+                        "is_valid": has_name,
+                        "errors": [] if has_name else ["Missing name"],
+                    },
+                )()
+
+        class LenientValidator:
+            def validate(self, workflow_def: Dict[str, Any]) -> Any:
+                return type("ValidationResult", (), {"is_valid": True, "errors": []})()
+
+        class FlexibleCompiler:
+            def __init__(self, loader: IWorkflowLoader, validator: IWorkflowValidator):
+                self._loader = loader
+                self._validator = validator
+
+            def compile(self, source: str) -> CompiledGraph:
+                workflow_def = self._loader.load(source)
+                validation_result = self._validator.validate(workflow_def)
+                return CompiledGraph(nodes={}, edges={}, entry_point="start")
+
+        # Test with file loader + strict validator
+        compiler1 = FlexibleCompiler(FileLoader(), StrictValidator())
+        result1 = compiler1.compile("test")
+        assert result1 is not None
+
+        # Test with string loader + lenient validator (swap implementations)
+        compiler2 = FlexibleCompiler(StringLoader(), LenientValidator())
+        result2 = compiler2.compile("test")
+        assert result2 is not None
 
 
-class TestIWorkflowGraph:
-    """Tests for IWorkflowGraph protocol."""
+class TestProtocolRuntimeChecking:
+    """Tests for runtime protocol checking."""
 
-    def test_compliant_class_is_instance(self):
-        """A compliant graph class should pass isinstance check."""
+    def test_runtime_check_with_isinstance(self):
+        """Test that isinstance works with protocols (runtime_checkable)."""
 
-        class MockGraph:
-            def add_node(self, node: IWorkflowNode) -> "MockGraph":
-                return self
-
-            def add_edge(self, edge: IWorkflowEdge) -> "MockGraph":
-                return self
-
-            def get_node(self, node_id: str) -> Optional[IWorkflowNode]:
+        class ValidCompiler:
+            def compile(self, workflow_def: Dict[str, Any]) -> Any:
                 return None
 
-            def get_entry_node(self) -> Optional[IWorkflowNode]:
-                return None
-
-            def get_next_nodes(self, node_id: str, state: Dict[str, Any]) -> List[IWorkflowNode]:
-                return []
-
-            def validate(self) -> List[str]:
-                return []
-
-        graph = MockGraph()
-        assert isinstance(graph, IWorkflowGraph)
-
-
-class TestICheckpointStore:
-    """Tests for ICheckpointStore protocol."""
-
-    def test_compliant_class_is_instance(self):
-        """A compliant checkpoint store should pass isinstance check."""
-
-        class MockCheckpointStore:
-            async def save(
-                self,
-                workflow_id: str,
-                checkpoint_id: str,
-                state: Dict[str, Any],
-                metadata: Optional[Dict[str, Any]] = None,
-            ) -> None:
+        class InvalidCompiler:
+            def do_something_else(self) -> None:
                 pass
 
-            async def load(self, workflow_id: str, checkpoint_id: str) -> Optional[Dict[str, Any]]:
-                return None
+        # Valid implementation should satisfy protocol
+        assert isinstance(ValidCompiler(), IWorkflowCompiler)
 
-            async def list_checkpoints(self, workflow_id: str) -> List[str]:
-                return []
+        # Invalid implementation should not satisfy protocol
+        assert not isinstance(InvalidCompiler(), IWorkflowCompiler)
 
-            async def delete(self, workflow_id: str, checkpoint_id: str) -> bool:
-                return True
+    def test_runtime_check_with_loader(self):
+        """Test runtime checking for loader protocol."""
 
-        store = MockCheckpointStore()
-        assert isinstance(store, ICheckpointStore)
-
-
-class TestIWorkflowExecutor:
-    """Tests for IWorkflowExecutor protocol."""
-
-    def test_compliant_class_is_instance(self):
-        """A compliant executor should pass isinstance check."""
-
-        class MockExecutor:
-            async def execute(
-                self,
-                graph: IWorkflowGraph,
-                initial_state: Dict[str, Any],
-                checkpoint_store: Optional[ICheckpointStore] = None,
-            ) -> Dict[str, Any]:
-                return initial_state
-
-            async def resume(
-                self,
-                graph: IWorkflowGraph,
-                checkpoint_store: ICheckpointStore,
-                workflow_id: str,
-                checkpoint_id: str,
-            ) -> Dict[str, Any]:
+        class ValidLoader:
+            def load(self, source: str) -> Dict[str, Any]:
                 return {}
 
-            def cancel(self) -> None:
-                pass
+        assert isinstance(ValidLoader(), IWorkflowLoader)
 
-        executor = MockExecutor()
-        assert isinstance(executor, IWorkflowExecutor)
+    def test_runtime_check_with_validator(self):
+        """Test runtime checking for validator protocol."""
+
+        class ValidValidator:
+            def validate(self, workflow_def: Dict[str, Any]) -> Any:
+                return type("Result", (), {"is_valid": True, "errors": []})()
+
+        assert isinstance(ValidValidator(), IWorkflowValidator)
+
+
+class TestProtocolTypeHints:
+    """Tests for proper type hints in protocols."""
+
+    def test_compiler_method_signatures(self):
+        """Test that compiler has correct method signatures."""
+        import inspect
+
+        # Get the protocol's signature
+        if hasattr(IWorkflowCompiler, "compile"):
+            sig = inspect.signature(IWorkflowCompiler.compile)
+            # Should have 'self' and 'workflow_def' parameters
+            params = list(sig.parameters.keys())
+            assert "workflow_def" in params or len(params) >= 1
+
+    def test_loader_method_signatures(self):
+        """Test that loader has correct method signatures."""
+        import inspect
+
+        if hasattr(IWorkflowLoader, "load"):
+            sig = inspect.signature(IWorkflowLoader.load)
+            params = list(sig.parameters.keys())
+            assert "source" in params or len(params) >= 1
+
+    def test_validator_method_signatures(self):
+        """Test that validator has correct method signatures."""
+        import inspect
+
+        if hasattr(IWorkflowValidator, "validate"):
+            sig = inspect.signature(IWorkflowValidator.validate)
+            params = list(sig.parameters.keys())
+            assert "workflow_def" in params or len(params) >= 1

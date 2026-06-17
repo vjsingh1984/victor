@@ -16,7 +16,10 @@
 
 import pytest
 
-from victor.framework.middleware_profiles.profiles import MiddlewareProfile, MiddlewareProfiles
+from victor.framework.middleware_profiles.profiles import (
+    MiddlewareProfile,
+    MiddlewareProfiles,
+)
 from victor.framework.middleware_profiles.builder import MiddlewareProfileBuilder
 from victor.core.verticals.protocols import MiddlewareProtocol
 

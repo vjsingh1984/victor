@@ -132,7 +132,10 @@ def test_get_workflow_provider_prefers_runtime_module(monkeypatch) -> None:
         "victor.core.verticals.workflow_provider.vertical_runtime_module_candidates",
         side_effect=[
             ["victor_research.runtime.workflows", "victor_research.workflows"],
-            ["victor_research.runtime.workflows.provider", "victor_research.workflows.provider"],
+            [
+                "victor_research.runtime.workflows.provider",
+                "victor_research.workflows.provider",
+            ],
         ],
     ):
         provider = _ResearchVertical.get_workflow_provider()

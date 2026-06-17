@@ -17,8 +17,10 @@
 from typing import Any, List, Tuple
 
 from victor.processing.native._base import _NATIVE_AVAILABLE, _native
+from victor.processing.native.observability import dispatch_with_observability
 
 
+@dispatch_with_observability("classify_task")
 def classify_task_native(text: str) -> Any:
     """Classify a task using native classifier.
 
@@ -37,6 +39,7 @@ def classify_task_native(text: str) -> Any:
     return classify_task(text)
 
 
+@dispatch_with_observability("has_action_keywords")
 def has_action_keywords(text: str) -> bool:
     """Check if text contains action keywords.
 
@@ -70,6 +73,7 @@ def has_action_keywords(text: str) -> bool:
     return any(kw in text_lower for kw in action_keywords)
 
 
+@dispatch_with_observability("has_analysis_keywords")
 def has_analysis_keywords(text: str) -> bool:
     """Check if text contains analysis keywords.
 
@@ -101,6 +105,7 @@ def has_analysis_keywords(text: str) -> bool:
     return any(kw in text_lower for kw in analysis_keywords)
 
 
+@dispatch_with_observability("has_generation_keywords")
 def has_generation_keywords(text: str) -> bool:
     """Check if text contains generation keywords.
 
@@ -130,6 +135,7 @@ def has_generation_keywords(text: str) -> bool:
     return any(kw in text_lower for kw in generation_keywords)
 
 
+@dispatch_with_observability("has_negation")
 def has_negation(text: str) -> bool:
     """Check if text contains negation patterns.
 

@@ -17,7 +17,10 @@ import numpy as np
 import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
 
-from victor.agent.conversation_state import ConversationStage, ConversationStateMachine
+from victor.agent.conversation.state_machine import (
+    ConversationStage,
+    ConversationStateMachine,
+)
 from victor.agent.tool_selection import ToolSelector
 from victor.tools.base import (
     AccessMode,
@@ -26,9 +29,9 @@ from victor.tools.base import (
     ExecutionCategory,
     Priority,
     ToolMetadata,
-    ToolRegistry,
     ToolResult,
 )
+from victor.tools.registry import ToolRegistry
 from victor.tools.semantic_selector import SemanticToolSelector
 from victor.tools import metadata_registry
 
@@ -168,8 +171,11 @@ def test_analysis_stage_includes_only_readonly_core():
     names = {t.name for t in selected}
 
     assert "read_ro" in names
-    assert "shell_exec" not in names
-    assert "write_any" not in names
+    # Write tools are now kept but annotated with HITL prompt
+    assert "write_any" in names
+    # Verify HITL annotation on write tool
+    write_tool = next(t for t in selected if t.name == "write_any")
+    assert "[HITL]" in write_tool.description
 
 
 def test_execution_stage_includes_full_core():

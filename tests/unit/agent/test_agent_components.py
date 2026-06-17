@@ -22,8 +22,9 @@ from victor.framework.agent_components import (
     create_builder,
     create_session,
 )
+from victor.agent.config import UnifiedAgentConfig
 from victor.framework.config import AgentConfig
-from victor.framework.errors import AgentError, ConfigurationError
+from victor.core.errors import AgentError, ConfigurationError
 from victor.framework.events import AgentExecutionEvent, EventType
 from victor.framework.task import TaskResult
 from victor.framework.tools import ToolSet
@@ -109,6 +110,14 @@ class TestAgentBuildOptions:
         assert options.model == "gpt-4"
         assert options.temperature == 0.5
         assert options.thinking
+
+    def test_legacy_config_is_normalized(self):
+        """Legacy AgentConfig inputs should be stored canonically."""
+        options = AgentBuildOptions(config=AgentConfig.high_budget())
+
+        assert isinstance(options.config, UnifiedAgentConfig)
+        assert options.config.tool_budget == 200
+        assert options.config.max_iterations == 100
 
 
 # =============================================================================
@@ -200,7 +209,9 @@ class TestAgentBuilder:
         """Test fluent config setting."""
         config = AgentConfig.high_budget()
         builder = AgentBuilder().config(config)
-        assert builder._options.config is config
+        assert isinstance(builder._options.config, UnifiedAgentConfig)
+        assert builder._options.config.tool_budget == config.tool_budget
+        assert builder._options.config.max_iterations == config.max_iterations
 
     def test_system_prompt_chain(self):
         """Test fluent system prompt setting."""
@@ -264,19 +275,21 @@ class TestBuilderPresets:
         """Test DEFAULT preset."""
         builder = AgentBuilder().preset(BuilderPreset.DEFAULT)
         assert builder._options.tools is not None
-        assert builder._options.config is not None
+        assert isinstance(builder._options.config, UnifiedAgentConfig)
+        assert builder._options.config.mode == "foreground"
         assert BuilderPreset.DEFAULT in builder._presets_applied
 
     def test_preset_minimal(self):
         """Test MINIMAL preset."""
         builder = AgentBuilder().preset(BuilderPreset.MINIMAL)
         assert not builder._options.enable_observability
-        assert builder._options.config is not None
+        assert isinstance(builder._options.config, UnifiedAgentConfig)
+        assert builder._options.config.tool_budget == 15
 
     def test_preset_high_budget(self):
         """Test HIGH_BUDGET preset."""
         builder = AgentBuilder().preset(BuilderPreset.HIGH_BUDGET)
-        assert builder._options.config is not None
+        assert isinstance(builder._options.config, UnifiedAgentConfig)
         # High budget config should have higher limits
         assert builder._options.config.tool_budget > AgentConfig.default().tool_budget
 
@@ -284,6 +297,9 @@ class TestBuilderPresets:
         """Test AIRGAPPED preset."""
         builder = AgentBuilder().preset(BuilderPreset.AIRGAPPED)
         assert builder._options.airgapped
+        assert isinstance(builder._options.config, UnifiedAgentConfig)
+        assert builder._options.config.enable_semantic_search is False
+        assert builder._options.config.enable_analytics is False
 
     def test_multiple_presets(self):
         """Test applying multiple presets."""
@@ -421,6 +437,16 @@ class TestAgentSession:
         assert result is not None
         assert len(session.turns) == 1
         assert session.turns[0]["context"] == {"error": "IndexError"}
+
+    @pytest.mark.asyncio
+    async def test_send_uses_message_when_initial_prompt_not_provided(self, mock_agent):
+        """Deferred sessions should use the first send() message as the opening turn."""
+        session = AgentSession(mock_agent)
+
+        await session.send("Deferred first turn")
+
+        assert session.turn_count == 1
+        assert session.turns[0]["prompt"] == "Deferred first turn"
 
     @pytest.mark.asyncio
     async def test_stream(self, mock_agent):
@@ -707,11 +733,11 @@ class TestAgentBuilderIntegration:
     @pytest.mark.asyncio
     async def test_build_with_mock_create(self):
         """Test build calls Agent.create with correct options."""
-        # Patch at the location where Agent is imported in agent_components.py
-        with patch("victor.framework.agent.Agent") as mock_agent_class:
-            mock_agent = MagicMock()
-            mock_agent.get_orchestrator.return_value = MagicMock()
-            mock_agent_class.create = AsyncMock(return_value=mock_agent)
+        mock_agent = MagicMock()
+        mock_agent.get_orchestrator.return_value = MagicMock()
+        with patch(
+            "victor.framework.Agent.create", new=AsyncMock(return_value=mock_agent)
+        ) as create:
 
             builder = (
                 AgentBuilder().provider("openai").model("gpt-4").temperature(0.5).thinking(True)
@@ -720,12 +746,9 @@ class TestAgentBuilderIntegration:
             await builder.build()
 
             # Verify create was called with correct options
-            mock_agent_class.create.assert_called_once()
-            call_kwargs = mock_agent_class.create.call_args.kwargs
-            assert (
-                call_kwargs.get("provider") == "openai"
-                or mock_agent_class.create.call_args.args[0] == "openai"
-            )
+            create.assert_called_once()
+            call_kwargs = create.call_args.kwargs
+            assert call_kwargs.get("provider") == "openai" or create.call_args.args[0] == "openai"
 
 
 # =============================================================================
@@ -876,11 +899,9 @@ class TestAgentBuilderContainerIntegration:
         provider = FrameworkServiceProvider()
         provider.register_services(container)
 
-        with patch("victor.framework.agent.Agent") as mock_agent_class:
-            mock_agent = MagicMock()
-            mock_agent.get_orchestrator.return_value = MagicMock()
-
-            mock_agent_class.create = AsyncMock(return_value=mock_agent)
+        mock_agent = MagicMock()
+        mock_agent.get_orchestrator.return_value = MagicMock()
+        with patch("victor.framework.Agent.create", new=AsyncMock(return_value=mock_agent)):
 
             builder = AgentBuilder(container=container)
             await builder.build()
@@ -903,12 +924,10 @@ class TestAgentBuilderContainerIntegration:
 
         mock_filter = MagicMock()
 
-        with patch("victor.framework.agent.Agent") as mock_agent_class:
-            mock_agent = MagicMock()
-            mock_orchestrator = MagicMock()
-            mock_agent.get_orchestrator.return_value = mock_orchestrator
-
-            mock_agent_class.create = AsyncMock(return_value=mock_agent)
+        mock_agent = MagicMock()
+        mock_orchestrator = MagicMock()
+        mock_agent.get_orchestrator.return_value = mock_orchestrator
+        with patch("victor.framework.Agent.create", new=AsyncMock(return_value=mock_agent)):
 
             # Get the configurator to verify filters are added
             configurator = container.get(ToolConfiguratorService)
@@ -937,12 +956,10 @@ class TestAgentBuilderContainerIntegration:
         """Test that tool filters work without container (fallback)."""
         mock_filter = MagicMock()
 
-        with patch("victor.framework.agent.Agent") as mock_agent_class:
-            mock_agent = MagicMock()
-            mock_orchestrator = MagicMock()
-            mock_agent.get_orchestrator.return_value = mock_orchestrator
-
-            mock_agent_class.create = AsyncMock(return_value=mock_agent)
+        mock_agent = MagicMock()
+        mock_orchestrator = MagicMock()
+        mock_agent.get_orchestrator.return_value = mock_orchestrator
+        with patch("victor.framework.Agent.create", new=AsyncMock(return_value=mock_agent)):
 
             # Patch at the source module where get_tool_configurator is defined
             with patch(

@@ -22,6 +22,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Set
 
+from victor.core.loop_thresholds import DEFAULT_BLOCKED_CONSECUTIVE_THRESHOLD
 from victor.agent.stream_handler import StreamMetrics
 from victor.agent.unified_classifier import ClassifierTaskType
 
@@ -63,6 +64,9 @@ class StreamingChatContext:
     total_iterations: int = 0
     force_completion: bool = False
     force_completion_warning_shown: bool = False  # Prevent duplicate warnings
+    skip_continuation: bool = (
+        False  # Skip continuation strategy when completion is forced (agentic loop fix)
+    )
 
     # Task classification
     unified_task_type: ClassifierTaskType = ClassifierTaskType.DEFAULT
@@ -72,6 +76,7 @@ class StreamingChatContext:
     is_action_task: bool = False
     is_complex_task: bool = False  # GAP-16: Track COMPLEX complexity for lenient progress checking
     needs_execution: bool = False
+    is_qa_task: bool = False  # Pure Q&A task — skip tools entirely
     coarse_task_type: str = "default"
 
     # Content accumulation
@@ -80,13 +85,14 @@ class StreamingChatContext:
 
     # Goals for tool selection
     goals: List[str] = field(default_factory=list)
+    planned_tools: Optional[List[Any]] = None
 
     # Quality tracking
     last_quality_score: float = 0.5
 
     # Blocked attempts tracking
     consecutive_blocked_attempts: int = 0
-    max_blocked_before_force: int = 3
+    max_blocked_before_force: int = DEFAULT_BLOCKED_CONSECUTIVE_THRESHOLD
 
     # Garbage detection
     garbage_detected: bool = False
@@ -100,6 +106,11 @@ class StreamingChatContext:
     full_content: str = ""
     mentioned_tools_detected: List[str] = field(default_factory=list)
 
+    # Thinking/reasoning content accumulation
+    reasoning_buffer: str = (
+        ""  # Accumulate LLM reasoning/thinking content separately from regular content
+    )
+
     # Recovery tracking
     consecutive_empty_responses: int = 0
     total_blocked_attempts: int = 0
@@ -112,10 +123,49 @@ class StreamingChatContext:
     # Substantial content threshold for recovery decisions
     substantial_content_threshold: int = 500
 
+    # Pre-execution intent log (LogAct-inspired)
+    intent_log: List[Dict[str, Any]] = field(default_factory=list)
+    task_intent: str = ""
+    plan_steps: List[str] = field(default_factory=list)
+
     # Tool execution tracking (for budget and progress checks)
     tool_budget: int = 200  # Default tool budget
     tool_calls_used: int = 0
     unique_resources: Set[str] = field(default_factory=set)
+    executed_tool_names: Set[str] = field(default_factory=set)
+    budget_warning_shown: bool = False
+    budget_relief_uses: int = 0
+    # Rolling window of tool call counts per iteration (last 5 iterations).
+    # Used by budget-aware loop detection to distinguish productive agents
+    # from spinning ones — see continuation_strategy.py is_productive check.
+    recent_iteration_tool_counts: List[int] = field(default_factory=list)
+
+    # Compaction tracking (P0 fix for post-compaction continuation)
+    compaction_occurred: bool = False
+    compaction_summary: str = ""
+    last_compaction_turn: int = -1
+    compaction_message_removed_count: int = 0
+    last_compaction_strategy: str = ""
+    last_compaction_reason: str = ""
+    last_compaction_policy_reason: str = ""
+
+    # Topology/runtime override tracking
+    runtime_context_overrides: Dict[str, Any] = field(default_factory=dict)
+    provider_kwargs: Dict[str, Any] = field(default_factory=dict)
+    topology_input: Optional[Dict[str, Any]] = None
+    topology_decision: Optional[Dict[str, Any]] = None
+    topology_plan: Optional[Dict[str, Any]] = None
+    topology_preparation: Optional[Dict[str, Any]] = None
+    structured_routing_policy: Optional[Dict[str, Any]] = None
+    topology_events: List[Dict[str, Any]] = field(default_factory=list)
+    degradation_events: List[Dict[str, Any]] = field(default_factory=list)
+    recovery_events: List[Dict[str, Any]] = field(default_factory=list)
+    provider_status_events: List[Dict[str, Any]] = field(default_factory=list)
+    runtime_override_snapshot: Optional[Dict[str, Any]] = None
+    degraded_resume_state: bool = False
+    resume_summary: str = ""
+    resume_recent_resources: List[str] = field(default_factory=list)
+    resume_recent_tools: List[str] = field(default_factory=list)
 
     def elapsed_time(self) -> float:
         """Get idle time since last activity (provider response or tool execution)."""
@@ -137,6 +187,25 @@ class StreamingChatContext:
         """Increment and return the iteration count."""
         self.total_iterations += 1
         return self.total_iterations
+
+    def record_iteration_tool_count(self, count: int) -> None:
+        """Append per-iteration tool call count to the rolling window (size 5)."""
+        try:
+            self.recent_iteration_tool_counts.append(int(count))
+        except (TypeError, ValueError):
+            self.recent_iteration_tool_counts.append(0)
+        # Keep only the last 5 iterations
+        if len(self.recent_iteration_tool_counts) > 5:
+            self.recent_iteration_tool_counts = self.recent_iteration_tool_counts[-5:]
+
+    @property
+    def recent_tool_call_count(self) -> int:
+        """Sum of tool calls across the last 5 iterations.
+
+        Returns 0 if no iterations have been recorded yet. Used by
+        budget-aware loop detection to decide if the agent is still productive.
+        """
+        return sum(self.recent_iteration_tool_counts)
 
     def is_over_time_limit(self, limit_seconds: float) -> bool:
         """Check if session has exceeded idle time limit.
@@ -171,8 +240,57 @@ class StreamingChatContext:
         self.total_accumulated_chars += len(content)
 
     def update_context_message(self, content: str) -> None:
-        """Update the context message for next iteration."""
-        self.context_msg = content or self.user_message
+        """Update the context message for next iteration.
+
+        Deduplicates content to prevent the LLM feedback loop: if the new
+        content is largely a repeat of the current context_msg, we keep the
+        existing context_msg unchanged. This prevents the model from seeing
+        its own repeated output and continuing/regenerating it.
+
+        The strategy:
+        - If content is empty, fall back to user_message
+        - If >60% of words in new content already appear in context_msg,
+          strip the overlapping portion and only append genuinely new text
+        - Otherwise, replace context_msg with the new content
+        """
+        if not content:
+            self.context_msg = self.user_message
+            return
+
+        # If context_msg is still the original user_message, always update
+        if self.context_msg == self.user_message:
+            self.context_msg = content
+            return
+
+        # Compute word-level overlap between new content and current context_msg
+        new_words = content.split()
+        existing_words = set(self.context_msg.split())
+
+        if not existing_words or not new_words:
+            self.context_msg = content
+            return
+
+        overlap_count = sum(1 for w in new_words if w in existing_words)
+        overlap_ratio = overlap_count / len(new_words) if new_words else 0
+
+        if overlap_ratio > 0.6:
+            # High overlap — extract only the genuinely new portion
+            # Find the suffix of content that doesn't overlap with context_msg
+            for split_point in range(min(len(new_words), 20), 0, -1):
+                candidate = " ".join(new_words[:split_point])
+                if candidate in self.context_msg:
+                    # Everything after this split point is new
+                    remaining = " ".join(new_words[split_point:])
+                    if remaining.strip():
+                        self.context_msg = self.context_msg + " " + remaining
+                    # else: entirely duplicate — don't update at all
+                    return
+
+            # Couldn't find a clean split — don't update (break the feedback loop)
+            return
+        else:
+            # Low overlap — genuinely new content, safe to replace
+            self.context_msg = content
 
     def record_empty_response(self) -> bool:
         """Record an empty response and return True if threshold exceeded."""
@@ -208,13 +326,31 @@ class StreamingChatContext:
         """Check if tool budget is exhausted."""
         return self.get_remaining_budget() <= 0
 
-    def is_approaching_budget_limit(self, warning_threshold: int = 250) -> bool:
+    def is_approaching_budget_limit(
+        self,
+        warning_threshold: int = 250,
+        warning_pct: float = 0.8,
+        warning_remaining: int = 5,
+    ) -> bool:
         """Check if approaching budget limit."""
-        return self.tool_calls_used >= warning_threshold and self.get_remaining_budget() > 0
+        remaining = self.get_remaining_budget()
+        if remaining <= 0 or self.tool_budget <= 0:
+            return False
+
+        dynamic_remaining = min(max(1, self.tool_budget // 5), max(1, warning_remaining))
+        over_absolute_threshold = self.tool_calls_used >= max(1, warning_threshold)
+        over_ratio_threshold = (self.tool_calls_used / self.tool_budget) >= warning_pct
+        low_remaining = remaining <= dynamic_remaining
+        return over_absolute_threshold or over_ratio_threshold or low_remaining
 
     def record_tool_execution(self, count: int = 1) -> None:
         """Record tool calls used."""
         self.tool_calls_used += count
+
+    def record_executed_tool_name(self, tool_name: str) -> None:
+        """Track a successfully issued tool name for completion policy checks."""
+        if tool_name:
+            self.executed_tool_names.add(tool_name)
 
     def add_unique_resource(self, resource: str) -> None:
         """Track a unique resource accessed by tools."""
@@ -251,6 +387,132 @@ class StreamingChatContext:
         """Update the last quality score."""
         self.last_quality_score = score
 
+    @staticmethod
+    def _normalize_ledger_text(value: Any, limit: int = 220) -> str:
+        """Normalize free-form ledger text into a compact single line."""
+        if value is None:
+            return ""
+        text = " ".join(str(value).split()).strip()
+        if len(text) <= limit:
+            return text
+        return text[: limit - 3].rstrip() + "..."
+
+    def set_task_intent(self, intent: str) -> None:
+        """Set the current task intent for continuation recovery."""
+        normalized = self._normalize_ledger_text(intent, limit=260)
+        if normalized:
+            self.task_intent = normalized
+
+    def extend_plan_steps(self, steps: List[str]) -> None:
+        """Add concise plan steps to the continuation ledger."""
+        for step in steps:
+            normalized = self._normalize_ledger_text(step, limit=140)
+            if normalized and normalized not in self.plan_steps:
+                self.plan_steps.append(normalized)
+        if len(self.plan_steps) > 8:
+            self.plan_steps = self.plan_steps[:8]
+
+    def record_intent_event(
+        self,
+        kind: str,
+        summary: str,
+        **metadata: Any,
+    ) -> None:
+        """Record a bounded continuation-ledger event for post-compaction recovery."""
+        normalized_summary = self._normalize_ledger_text(summary, limit=180)
+        if not normalized_summary:
+            return
+
+        event: Dict[str, Any] = {
+            "timestamp": time.time(),
+            "kind": str(kind or "event"),
+            "summary": normalized_summary,
+        }
+        for key, value in metadata.items():
+            if value in (None, "", [], {}, set()):
+                continue
+            if isinstance(value, (list, tuple, set)):
+                event[key] = [self._normalize_ledger_text(item, limit=80) for item in value][:6]
+            else:
+                event[key] = self._normalize_ledger_text(value, limit=120)
+
+        self.intent_log.append(event)
+        if len(self.intent_log) > 20:
+            self.intent_log = self.intent_log[-20:]
+
+    def record_compaction_event(
+        self,
+        *,
+        summary: str = "",
+        messages_removed: int = 0,
+        strategy: str = "",
+        reason: str = "",
+        policy_reason: str = "",
+    ) -> None:
+        """Persist compaction state and ledger metadata for recovery prompts."""
+        self.compaction_occurred = True
+        self.last_compaction_turn = self.total_iterations
+        self.compaction_message_removed_count = max(0, int(messages_removed or 0))
+        if summary:
+            self.compaction_summary = self._normalize_ledger_text(summary, limit=240)
+        if strategy:
+            self.last_compaction_strategy = str(strategy)
+        if reason:
+            self.last_compaction_reason = str(reason)
+        if policy_reason:
+            self.last_compaction_policy_reason = str(policy_reason)
+
+        detail = f"{self.compaction_message_removed_count} messages removed"
+        if self.last_compaction_strategy:
+            detail += f" via {self.last_compaction_strategy}"
+        if self.last_compaction_reason:
+            detail += f" ({self.last_compaction_reason})"
+        self.record_intent_event(
+            "compaction",
+            detail,
+            compaction_summary=self.compaction_summary,
+            compaction_policy_reason=self.last_compaction_policy_reason,
+        )
+
+    def build_continuation_ledger(
+        self,
+        *,
+        max_events: int = 4,
+        max_plan_steps: int = 4,
+        max_chars: int = 700,
+    ) -> str:
+        """Render a compact task/plan ledger for continuation after compaction."""
+        lines: List[str] = []
+        if self.task_intent:
+            lines.append(f"Intent: {self.task_intent}")
+        if self.plan_steps:
+            lines.append("Plan: " + "; ".join(self.plan_steps[:max_plan_steps]))
+        if self.resume_summary:
+            lines.append("Resume: " + self._normalize_ledger_text(self.resume_summary, limit=180))
+        if self.resume_recent_tools:
+            lines.append("Recent tools: " + ", ".join(self.resume_recent_tools[:4]))
+        if self.resume_recent_resources:
+            lines.append("Recent files: " + ", ".join(self.resume_recent_resources[:4]))
+
+        recent_events = self.intent_log[-max_events:]
+        if recent_events:
+            lines.append(
+                "Recent actions: "
+                + "; ".join(
+                    self._normalize_ledger_text(event.get("summary", ""), limit=120)
+                    for event in recent_events
+                    if event.get("summary")
+                )
+            )
+
+        if not lines:
+            return ""
+
+        rendered = "\n".join(f"- {line}" for line in lines if line.strip()).strip()
+        if len(rendered) <= max_chars:
+            return rendered
+        return rendered[: max_chars - 3].rstrip() + "..."
+
 
 @dataclass
 class PreparedStreamContext:
@@ -270,6 +532,7 @@ def create_stream_context(
     max_iterations: int = 30,
     max_exploration: int = 10,
     tool_budget: Optional[int] = None,
+    max_blocked_before_force: Optional[int] = None,
 ) -> StreamingChatContext:
     """Factory function to create a StreamingChatContext.
 
@@ -278,6 +541,7 @@ def create_stream_context(
         max_iterations: Maximum total iterations
         max_exploration: Maximum exploration iterations
         tool_budget: Optional tool budget override
+        max_blocked_before_force: Optional blocked-attempt threshold override
 
     Returns:
         Initialized StreamingChatContext
@@ -290,4 +554,6 @@ def create_stream_context(
     )
     if tool_budget is not None:
         ctx.complexity_tool_budget = tool_budget
+    if max_blocked_before_force is not None:
+        ctx.max_blocked_before_force = max_blocked_before_force
     return ctx

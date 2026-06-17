@@ -117,6 +117,19 @@ class TimeoutConfig:
     # Circuit breaker recovery timeout
     CIRCUIT_BREAKER_RECOVERY: float = 30.0
 
+    # =========================================================================
+    # Code Indexing Timeouts
+    # =========================================================================
+
+    # Codebase index build timeout (dynamic based on codebase size, this is max)
+    INDEX_BUILD_MAX: float = 600.0  # 10 minutes for very large codebases
+
+    # Codebase index integrity probe timeout (quick health check)
+    INDEX_PROBE: float = 15.0  # Increased from 5s to reduce false rebuilds
+
+    # Symbol embedding generation timeout (per batch)
+    SYMBOL_EMBEDDING_BATCH: float = 30.0
+
     @classmethod
     def from_env(cls) -> "TimeoutConfig":
         """Create config with environment variable overrides.
@@ -168,6 +181,9 @@ class TimeoutConfig:
             CIRCUIT_BREAKER_RECOVERY=get_float(
                 "CIRCUIT_BREAKER_RECOVERY", cls.CIRCUIT_BREAKER_RECOVERY
             ),
+            INDEX_BUILD_MAX=get_float("INDEX_BUILD_MAX", cls.INDEX_BUILD_MAX),
+            INDEX_PROBE=get_float("INDEX_PROBE", cls.INDEX_PROBE),
+            SYMBOL_EMBEDDING_BATCH=get_float("SYMBOL_EMBEDDING_BATCH", cls.SYMBOL_EMBEDDING_BATCH),
         )
 
 
@@ -213,3 +229,39 @@ class McpTimeouts:
     TERMINATE = Timeouts.MCP_PROCESS_TERMINATE
     KILL = Timeouts.MCP_PROCESS_KILL
     SERVER_IDLE = Timeouts.MCP_SERVER_IDLE
+
+
+@dataclass(frozen=True)
+class SubprocessResourceLimits:
+    """Resource limits for tool subprocess execution.
+
+    Applied via POSIX ``resource.setrlimit`` in a ``preexec_fn`` callback.
+    On non-POSIX platforms these limits are silently skipped.
+
+    Environment variables follow the pattern VICTOR_SUBPROCESS_{FIELD_NAME}.
+    """
+
+    max_memory_mb: int = 512
+    max_cpu_seconds: int = 300
+    max_output_bytes: int = 10 * 1024 * 1024  # 10 MB
+    max_file_descriptors: int = 1024
+
+    @classmethod
+    def from_env(cls) -> "SubprocessResourceLimits":
+        """Create config with environment variable overrides."""
+
+        def _int(name: str, default: int) -> int:
+            val = os.environ.get(f"VICTOR_SUBPROCESS_{name}")
+            if val is not None:
+                try:
+                    return int(val)
+                except ValueError:
+                    pass
+            return default
+
+        return cls(
+            max_memory_mb=_int("MAX_MEMORY_MB", cls.max_memory_mb),
+            max_cpu_seconds=_int("MAX_CPU_SECONDS", cls.max_cpu_seconds),
+            max_output_bytes=_int("MAX_OUTPUT_BYTES", cls.max_output_bytes),
+            max_file_descriptors=_int("MAX_FILE_DESCRIPTORS", cls.max_file_descriptors),
+        )

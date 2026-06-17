@@ -270,7 +270,8 @@ async def test_vllm_code_generation(vllm_provider):
     messages = [
         Message(role="system", content="You are an expert Python programmer."),
         Message(
-            role="user", content="Write a Python function to calculate factorial. Keep it simple."
+            role="user",
+            content="Write a Python function to calculate factorial. Keep it simple.",
         ),
     ]
 
@@ -425,7 +426,10 @@ async def test_vllm_large_context(vllm_provider):
     # Add several exchanges
     for i in range(5):
         messages.append(
-            Message(role="user", content=f"Tell me about Python feature {i+1} in one sentence.")
+            Message(
+                role="user",
+                content=f"Tell me about Python feature {i+1} in one sentence.",
+            )
         )
         messages.append(Message(role="assistant", content=f"Python feature {i+1} is important."))
 

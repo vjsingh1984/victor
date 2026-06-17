@@ -28,6 +28,7 @@ from typing import (
     List,
     Optional,
     Protocol,
+    Set,
     runtime_checkable,
 )
 
@@ -59,6 +60,43 @@ class ConversationStage(str, Enum):
     EXECUTION = "execution"
     VERIFICATION = "verification"
     COMPLETION = "completion"
+
+
+class TaskPhase(str, Enum):
+    """High-level phases of task execution for context management.
+
+    Maps 7 ConversationStages to 4 broader TaskPhases for more efficient
+    context management. Each phase has different context needs:
+
+    EXPLORATION: Keep diverse file coverage (40-60% of conversation)
+    PLANNING: Focus on task-relevant messages (10-20% of conversation)
+    EXECUTION: Prioritize recent context with tool results (20-30% of conversation)
+    REVIEW: Full context with comprehensive history (10-15% of conversation)
+
+    This is the canonical source for task phases.
+    Uses string values for serialization compatibility.
+    """
+
+    EXPLORATION = "exploration"
+    PLANNING = "planning"
+    EXECUTION = "execution"
+    REVIEW = "review"
+
+
+# Stage-to-phase mapping (7 stages → 4 phases)
+STAGE_TO_PHASE_MAP: Dict[ConversationStage, TaskPhase] = {
+    # EXPLORATION: INITIAL, READING, ANALYSIS (40-60% of conversation)
+    ConversationStage.INITIAL: TaskPhase.EXPLORATION,
+    ConversationStage.READING: TaskPhase.EXPLORATION,
+    ConversationStage.ANALYSIS: TaskPhase.EXPLORATION,
+    # PLANNING: PLANNING (10-20% of conversation)
+    ConversationStage.PLANNING: TaskPhase.PLANNING,
+    # EXECUTION: EXECUTION (20-30% of conversation)
+    ConversationStage.EXECUTION: TaskPhase.EXECUTION,
+    # REVIEW: VERIFICATION, COMPLETION (10-15% of conversation)
+    ConversationStage.VERIFICATION: TaskPhase.REVIEW,
+    ConversationStage.COMPLETION: TaskPhase.REVIEW,
+}
 
 
 # =============================================================================
@@ -161,6 +199,68 @@ class VerticalContextProtocol(Protocol):
 
     @property
     def mode_configs(self) -> Dict[str, "ModeConfig"]: ...
+
+    @property
+    def enabled_tools(self) -> Set[str]: ...
+
+
+@runtime_checkable
+class MutableVerticalContextProtocol(VerticalContextProtocol, Protocol):
+    """Protocol for applying vertical configuration to context state.
+
+    This is the framework-facing contract for vertical integration handlers.
+    The concrete ``VerticalContext`` implementation remains a runtime state
+    container, but setup code should depend on this protocol.
+    """
+
+    def apply_vertical(self, name: str, config: Optional[Any] = None) -> None: ...
+
+    def apply_stages(self, stages: Dict[str, Any]) -> None: ...
+
+    def apply_middleware(self, middleware: List[Any]) -> None: ...
+
+    def apply_safety_patterns(self, patterns: List[Any]) -> None: ...
+
+    def apply_task_hints(self, hints: Dict[str, Any]) -> None: ...
+
+    def apply_mode_configs(
+        self,
+        configs: Dict[str, Any],
+        default_mode: str = "default",
+        default_budget: int = 10,
+    ) -> None: ...
+
+    def apply_tool_dependencies(
+        self,
+        dependencies: List[Any],
+        sequences: List[List[str]],
+    ) -> None: ...
+
+    def apply_system_prompt(self, prompt: str) -> None: ...
+
+    def apply_enabled_tools(self, tools: Set[str]) -> None: ...
+
+    def apply_tiered_config(self, config: Any) -> None: ...
+
+    def add_prompt_section(self, section: str) -> None: ...
+
+    def apply_rl_config(self, config: Any) -> None: ...
+
+    def apply_rl_hooks(self, hooks: List[Any]) -> None: ...
+
+    def apply_team_specs(self, specs: List[Any]) -> None: ...
+
+    def apply_workflows(self, workflows: List[Any]) -> None: ...
+
+    def apply_tool_selection_strategy(self, strategy: Any) -> None: ...
+
+    def apply_enrichment_strategy(self, strategy: Any) -> None: ...
+
+    def set_capability_config(self, name: str, config: Any) -> None: ...
+
+    def get_capability_config(self, name: str, default: Any = None) -> Any: ...
+
+    def apply_capability_configs(self, configs: Dict[str, Any]) -> None: ...
 
 
 # =============================================================================

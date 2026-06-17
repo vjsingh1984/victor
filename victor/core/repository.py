@@ -77,6 +77,8 @@ from typing import (
     runtime_checkable,
 )
 
+from victor.core.event_sourcing import ConcurrencyError
+
 logger = logging.getLogger(__name__)
 
 
@@ -439,18 +441,6 @@ class EntityExistsError(RepositoryError):
     def __init__(self, entity_id: str):
         self.entity_id = entity_id
         super().__init__(f"Entity already exists: {entity_id}")
-
-
-class ConcurrencyError(RepositoryError):
-    """Raised when version conflict is detected."""
-
-    def __init__(self, entity_id: str, expected: int, actual: int):
-        self.entity_id = entity_id
-        self.expected = expected
-        self.actual = actual
-        super().__init__(
-            f"Concurrency error for {entity_id}: expected version {expected}, got {actual}"
-        )
 
 
 # =============================================================================

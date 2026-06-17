@@ -98,9 +98,7 @@ from typing import (
     Dict,
     List,
     Optional,
-    Protocol,
     Set,
-    runtime_checkable,
 )
 
 if TYPE_CHECKING:
@@ -120,75 +118,11 @@ if TYPE_CHECKING:
 # =============================================================================
 
 
-# Re-export from canonical location for backward compatibility
-from victor.core.shared_types import VerticalContextProtocol  # noqa: F401
-
-
-@runtime_checkable
-class MutableVerticalContextProtocol(VerticalContextProtocol, Protocol):
-    """Protocol for mutable vertical context operations.
-
-    Extends VerticalContextProtocol with mutation methods for
-    applying vertical configuration.
-    """
-
-    def apply_vertical(
-        self,
-        name: str,
-        config: Optional["VerticalConfig"] = None,
-    ) -> None:
-        """Apply a vertical to this context."""
-        ...
-
-    def apply_stages(self, stages: Dict[str, Any]) -> None:
-        """Apply stage configuration."""
-        ...
-
-    def apply_middleware(self, middleware: List["MiddlewareProtocol"]) -> None:
-        """Apply middleware list."""
-        ...
-
-    def apply_safety_patterns(self, patterns: List["SafetyPattern"]) -> None:
-        """Apply safety patterns."""
-        ...
-
-    def apply_task_hints(self, hints: Dict[str, "TaskTypeHint"]) -> None:
-        """Apply task type hints."""
-        ...
-
-    def apply_mode_configs(
-        self,
-        configs: Dict[str, "ModeConfig"],
-        default_mode: str = "default",
-        default_budget: int = 10,
-    ) -> None:
-        """Apply mode configurations."""
-        ...
-
-    def apply_tool_dependencies(
-        self,
-        dependencies: List["ToolDependency"],
-        sequences: List[List[str]],
-    ) -> None:
-        """Apply tool dependencies."""
-        ...
-
-    def apply_system_prompt(self, prompt: str) -> None:
-        """Apply custom system prompt."""
-        ...
-
-    def set_capability_config(self, name: str, config: Any) -> None:
-        """Store a capability configuration."""
-        ...
-
-    def get_capability_config(self, name: str, default: Any = None) -> Any:
-        """Retrieve a capability configuration."""
-        ...
-
-    def apply_capability_configs(self, configs: Dict[str, Any]) -> None:
-        """Apply multiple capability configurations at once."""
-        ...
-
+# Re-export from canonical location for backward compatibility.
+from victor.core.shared_types import (  # noqa: F401
+    MutableVerticalContextProtocol,
+    VerticalContextProtocol,
+)
 
 # =============================================================================
 # Vertical Context Data Class
@@ -670,6 +604,27 @@ class VerticalContext:
             parts.append(self.system_prompt)
         parts.extend(self.prompt_sections)
         return "\n\n".join(parts)
+
+    @staticmethod
+    def get_vertical_tiered_config() -> Any:
+        """Get TieredToolConfig from active vertical canonical API.
+
+        Returns:
+            TieredToolConfig or None
+        """
+        try:
+            from victor.core.verticals.vertical_loader import get_vertical_loader
+
+            loader = get_vertical_loader()
+            if loader.active_vertical:
+                getter = getattr(loader.active_vertical, "get_tiered_tool_config", None)
+                if callable(getter):
+                    return getter()
+        except Exception as e:
+            import logging
+
+            logging.getLogger(__name__).debug(f"Could not get tiered config from vertical: {e}")
+        return None
 
     # ==========================================================================
     # Serialization

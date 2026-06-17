@@ -15,7 +15,6 @@ from victor.providers.base import (
     ToolDefinition,
 )
 
-
 OUTPUT_PATH = Path(__file__).resolve().parent.parent / "docs" / "TOOL_CATALOG.md"
 
 

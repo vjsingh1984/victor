@@ -27,6 +27,7 @@ Features:
 """
 
 import asyncio
+from functools import partial
 import json
 import logging
 import secrets
@@ -35,7 +36,7 @@ import time
 import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any, AsyncIterator, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional
 
 from fastapi import (
     Body,
@@ -73,6 +74,9 @@ from victor.observability.request_correlation import request_correlation_id
 from fastapi.responses import HTMLResponse
 
 logger = logging.getLogger(__name__)
+
+if TYPE_CHECKING:
+    from victor.framework.session_config import SessionConfig
 
 
 # =============================================================================
@@ -223,6 +227,12 @@ class SwitchModeRequest(BaseModel):
     mode: str
 
 
+class SwitchProfileRequest(BaseModel):
+    """Profile switch request."""
+
+    profile: str
+
+
 class PatchApplyRequest(BaseModel):
     """Patch apply request."""
 
@@ -341,9 +351,71 @@ class TerminalCommandResponse(BaseModel):
     requires_approval: bool = True
 
 
+class _LegacyOrchestratorClientAdapter:
+    """Small compatibility adapter for tests and legacy injected orchestrators."""
+
+    def __init__(self, orchestrator: Any) -> None:
+        self._orchestrator = orchestrator
+
+    async def initialize(self) -> Any:
+        return self._orchestrator
+
+    async def chat(self, message: str) -> Any:
+        from victor.runtime.chat_runtime import resolve_chat_runtime
+
+        return await resolve_chat_runtime(self._orchestrator).chat(message)
+
+    async def stream_chat(self, message: str) -> AsyncIterator[Any]:
+        from victor.runtime.chat_runtime import resolve_chat_runtime
+
+        async for chunk in resolve_chat_runtime(self._orchestrator).stream_chat(message):
+            yield chunk
+
+    async def close(self) -> None:
+        shutdown = getattr(self._orchestrator, "graceful_shutdown", None)
+        if shutdown is not None:
+            await shutdown()
+
+
 # =============================================================================
 # FastAPI Server Class
 # =============================================================================
+
+
+def collect_route_paths(app: Any) -> set[str]:
+    """Collect all concrete route paths from a FastAPI/Starlette app.
+
+    Robust across Starlette versions. Newer Starlette stores lazily-included
+    routers as ``_IncludedRouter`` wrapper objects in ``app.routes`` (resolved
+    at request time) instead of eagerly flattening their sub-routes; a naive
+    ``{route.path for route in app.routes}`` then misses every included path
+    (and capability detection silently reports nothing). This recurses into
+    included routers / mounts so it works on both old (flat) and new (lazy)
+    Starlette.
+    """
+    paths: set[str] = set()
+    seen: set[int] = set()
+
+    def _walk(routes: Any) -> None:
+        for route in routes or []:
+            if id(route) in seen:
+                continue
+            seen.add(id(route))
+            path = getattr(route, "path", None)
+            if isinstance(path, str) and path:
+                paths.add(path)
+            # Newer Starlette wraps included routers; the real router (with the
+            # concrete sub-routes) is exposed as ``original_router``.
+            included = getattr(route, "original_router", None)
+            sub = getattr(included, "routes", None) if included is not None else None
+            if sub is None:
+                # Mounts / sub-apps expose nested routes directly.
+                sub = getattr(route, "routes", None)
+            if sub:
+                _walk(sub)
+
+    _walk(getattr(app, "routes", None))
+    return paths
 
 
 class VictorFastAPIServer:
@@ -361,6 +433,7 @@ class VictorFastAPIServer:
         hitl_auth_token: Optional[str] = None,
         hitl_persistent: bool = True,
         enable_graphql: bool = True,
+        session_config: Optional["SessionConfig"] = None,
     ):
         """Initialize the FastAPI server.
 
@@ -389,11 +462,23 @@ class VictorFastAPIServer:
 
         from victor.config.settings import load_settings
         from victor.core.bootstrap import ensure_bootstrapped
+        from victor.framework.session_config import SessionConfig
+        from victor.framework.session_runner import (
+            FrameworkSessionRunner,
+            create_victor_client,
+        )
 
         self._settings = load_settings()
+        self._session_config = session_config or SessionConfig()
         self._container = ensure_bootstrapped(self._settings)
+        self._session_runner = FrameworkSessionRunner(
+            self._settings,
+            self._session_config,
+            client_factory=partial(create_victor_client, container=self._container),
+        )
 
         self._orchestrator = None
+        self._victor_client = None
         self._ws_clients: List[WebSocket] = []
         self._pending_tool_approvals: Dict[str, Dict[str, Any]] = {}
         self._hitl_store = None
@@ -427,7 +512,12 @@ class VictorFastAPIServer:
                 allow_origin_regex=r"^(http://localhost:\d+|http://127\.0\.0\.1:\d+|vscode-webview://[a-z0-9-]+)$",
                 allow_credentials=True,
                 allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-                allow_headers=["Content-Type", "Accept", "Authorization", "X-Requested-With"],
+                allow_headers=[
+                    "Content-Type",
+                    "Accept",
+                    "Authorization",
+                    "X-Requested-With",
+                ],
             )
 
         # Setup routes
@@ -521,7 +611,7 @@ class VictorFastAPIServer:
 
     def _detect_capabilities(self) -> List[str]:
         """Detect capabilities from currently mounted API routes."""
-        route_paths = {getattr(route, "path", "") for route in self.app.routes}
+        route_paths = collect_route_paths(self.app)
         capabilities: set[str] = set()
 
         if "/chat" in route_paths:
@@ -607,12 +697,71 @@ class VictorFastAPIServer:
     async def _get_orchestrator(self) -> Any:
         """Get or create the orchestrator."""
         if self._orchestrator is None:
-            from victor.agent.orchestrator import AgentOrchestrator
-
-            settings = self._settings
-            self._orchestrator = await AgentOrchestrator.from_settings(settings)
+            client = await self._get_victor_client()
+            agent = await client.initialize()
+            if hasattr(agent, "get_orchestrator"):
+                self._orchestrator = agent.get_orchestrator()
+            else:
+                self._orchestrator = agent
 
         return self._orchestrator
+
+    async def _get_victor_client(self) -> Any:
+        """Get or create the framework-managed client for API conversation access."""
+        if self._victor_client is None:
+            if self._orchestrator is not None:
+                self._victor_client = _LegacyOrchestratorClientAdapter(self._orchestrator)
+            else:
+                self._victor_client = self._session_runner.create_client(self._session_config)
+                await self._session_runner.initialize_client(self._victor_client)
+
+        return self._victor_client
+
+    async def update_session_config(self, session_config: "SessionConfig") -> None:
+        """Replace runtime session config and reset cached runtime owners."""
+        from victor.framework.session_runner import create_victor_client
+
+        self._session_config = session_config
+        self._session_runner = type(self._session_runner)(
+            self._settings,
+            self._session_config,
+            client_factory=partial(create_victor_client, container=self._container),
+        )
+        if self._victor_client is not None:
+            try:
+                await self._victor_client.close()
+            except Exception:
+                logger.debug("Failed to close VictorClient during config switch", exc_info=True)
+            self._victor_client = None
+        if self._orchestrator is not None:
+            try:
+                await self._orchestrator.graceful_shutdown()
+            except Exception:
+                logger.debug(
+                    "Failed to shutdown orchestrator during config switch",
+                    exc_info=True,
+                )
+            self._orchestrator = None
+
+    async def reset_conversation(self) -> None:
+        """Reset conversation history using VictorClient (service layer)."""
+        client = await self._get_victor_client()
+        await client.reset_conversation()
+
+    async def get_conversation_messages(
+        self, limit: Optional[int] = None, role: Optional[str] = None
+    ) -> List[Any]:
+        """Get conversation messages using VictorClient (service layer).
+
+        Args:
+            limit: Maximum number of messages to return
+            role: Optional filter by message role
+
+        Returns:
+            List of message objects
+        """
+        client = await self._get_victor_client()
+        return await client.get_messages(limit=limit, role=role)
 
     async def _record_rl_feedback(self) -> None:
         """Record RL feedback for the current session."""
@@ -703,14 +852,25 @@ class VictorFastAPIServer:
                 await ws.send_json({"type": "error", "message": "No messages"})
                 return
 
-            orchestrator = await self._get_orchestrator()
+            client = await self._get_victor_client()
 
             try:
-                async for chunk in orchestrator.stream_chat(messages[-1].get("content", "")):
-                    if chunk.get("type") == "content":
-                        await ws.send_json({"type": "content", "content": chunk["content"]})
-                    elif chunk.get("type") == "tool_call":
-                        await ws.send_json({"type": "tool_call", "tool_call": chunk["tool_call"]})
+                async for chunk in client.stream_chat(messages[-1].get("content", "")):
+                    content = getattr(chunk, "content", "")
+                    metadata = getattr(chunk, "metadata", {}) or {}
+                    if content:
+                        await ws.send_json({"type": "content", "content": content})
+                    elif "tool_start" in metadata:
+                        await ws.send_json(
+                            {"type": "tool_call", "tool_call": metadata["tool_start"]}
+                        )
+                    elif "tool_result" in metadata:
+                        await ws.send_json(
+                            {
+                                "type": "tool_result",
+                                "tool_result": metadata["tool_result"],
+                            }
+                        )
 
                 await ws.send_json({"type": "done"})
             except Exception as e:
@@ -723,7 +883,8 @@ class VictorFastAPIServer:
             api_key = data.get("api_key", "")
             if api_key and self.api_keys:
                 matched = next(
-                    (k for k in self.api_keys if secrets.compare_digest(k, api_key)), None
+                    (k for k in self.api_keys if secrets.compare_digest(k, api_key)),
+                    None,
                 )
                 if matched:
                     if not hasattr(ws, "state"):

@@ -9,8 +9,6 @@ Descriptions are truncated for brevity. Use `victor tools list` for full details
 | `batch` | Unified batch processing tool for multi-file operations. Performs parallel batch operations on multiple files including search, replace,... |
 | `cache` | Unified cache management tool for Victor's tiered caching system. Actions: - stats: Get cache statistics and performance metrics -... |
 | `cicd` | Unified CI/CD tool for pipeline management. Performs CI/CD operations including generating configurations, validating pipelines, and... |
-| `commit_msg` | Generate an AI-powered commit message from staged changes. Analyzes the staged diff and generates a conventional commit message using... |
-| `conflicts` | Analyze merge conflicts and provide resolution guidance. Detects files with merge conflicts (marked as UU in git status) and provides... |
 | `db` | Unified database tool for SQL operations. Supports SQLite, PostgreSQL, MySQL, SQL Server. Actions: - connect: Connect to a database -... |
 | `deps` | Python dependency management: list, outdated, security, generate, update, tree, check. Actions: list (packages), outdated, security... |
 | `docker` | Unified Docker operations for container and image management. Provides a single interface for all Docker operations, mirroring the... |
@@ -19,7 +17,7 @@ Descriptions are truncated for brevity. Use `victor tools list` for full details
 | `edit` | Edit files atomically with undo. REQUIRED: 'ops' parameter with operation list. IMPORTANT: You MUST provide the 'ops' parameter.... |
 | `extract` | Extract code block into a new function. Extracts selected lines of code into a new function, analyzing variables to determine parameters... |
 | `find` | Find files by name pattern (like Unix find -name). Searches recursively through the directory tree to locate files matching the given... |
-| `git` | Unified git operations: status, diff, stage, commit, log, branch. Operations: status, diff (staged=True for staged), stage (files or... |
+| `git` | Unified git operations: status, diff, stage, commit, log, branch, commit_msg, conflicts. Operations: status, diff (staged=True for staged), stage (files or... |
 | `graph` | [GRAPH] Query codebase STRUCTURE for relationships, impact, and importance. Uses the code graph built from AST analysis for structural... |
 | `grep` | Find code by CONCEPT or TEXT when you DON'T know exact location/name. Use this tool for exploration when you need to discover where... |
 | `http` | Unified HTTP operations for requests and API testing. Modes: - "request": Standard HTTP request (default) - "test": API testing with... |
@@ -49,8 +47,7 @@ Descriptions are truncated for brevity. Use `victor tools list` for full details
 | `sandbox` | Unified sandbox operations for code execution in isolated Docker container. Operations: - "execute": Run Python code in the sandbox -... |
 | `scaffold` | Unified project scaffolding tool. Performs scaffolding operations including creating projects from templates, listing available... |
 | `scan` | Comprehensive security scanning for code analysis. Performs security scans including secret detection, dependency vulnerability checks,... |
-| `shell` | Run shell command with safety checks. Returns stdout/stderr/return_code. |
-| `shell_readonly` | Execute readonly shell commands for exploration (pwd, ls, cat, grep, git status, etc). This tool only allows safe, readonly commands... |
+| `shell` | Run shell command with safety checks. Returns stdout/stderr/return_code. Supports readonly=True for safe exploration commands (pwd, ls, cat, grep, git status, etc). |
 | `slack` | Perform operations on Slack. |
 | `symbol` | [AST-AWARE] Get FULL CODE of a function/class definition in a specific file. Returns the complete code block (not just a reference). Use... |
 | `teams` | Perform operations on Microsoft Teams. |

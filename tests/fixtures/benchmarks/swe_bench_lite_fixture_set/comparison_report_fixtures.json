@@ -1,0 +1,22 @@
+{
+  "benchmark": "swe-bench-lite",
+  "timestamp": "2026-05-08T00:00:00",
+  "checksum_algorithm": "sha256",
+  "artifact_count": 1,
+  "artifacts": [
+    {
+      "framework": "victor",
+      "model": "fixture-model-swe-lite",
+      "artifact_path": "",
+      "source": "SWE-bench Lite Fixture A",
+      "prompt_candidate_hash": "",
+      "section_name": "",
+      "dataset_metadata": {
+        "source_name": "SWE-bench Lite Fixture A"
+      },
+      "bundled_artifact_path": "comparison_report_fixtures/01_victor_fixture-model-swe-lite.json",
+      "bundled_artifact_size_bytes": 388,
+      "bundled_artifact_sha256": "7dee491953a26f44ca615745af25cdafe8cfae6b5bb52d404b1ec0d9b7549042"
+    }
+  ]
+}

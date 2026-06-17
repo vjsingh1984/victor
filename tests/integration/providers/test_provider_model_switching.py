@@ -203,7 +203,9 @@ class TestProviderSwitchingIntegration:
             mock_registry.create.return_value = mock_provider2
 
             with patch.object(
-                orchestrator.settings, "get_provider_settings", return_value=custom_settings
+                orchestrator.settings,
+                "get_provider_settings",
+                return_value=custom_settings,
             ):
                 success = await orchestrator.switch_provider("mock2", "model")
 

@@ -12,28 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Unified Event System for Victor.
+"""Event System for Victor.
 
 This package provides:
-1. Unified event taxonomy for consistent event types
-2. Protocol-based backends for distributed messaging
-3. Specialized buses for observability and agent communication
+1. Protocol-based backends for distributed messaging
+2. Specialized buses for observability and agent communication
 
 Key Components:
-- UnifiedEventType: Hierarchical enum of all event types
 - IEventBackend: Protocol for swappable backends (Kafka, SQS, RabbitMQ, etc.)
 - ObservabilityBus: High-throughput telemetry (lossy OK)
 - AgentMessageBus: Reliable cross-agent communication
-
-Usage - Event Taxonomy:
-    from victor.core.events import (
-        UnifiedEventType,
-        map_workflow_event,
-        get_events_by_category,
-    )
-
-    event_type = UnifiedEventType.WORKFLOW_NODE_START
-    print(event_type.category)  # "workflow"
 
 Usage - Protocol-Based Backends:
     from victor.core.events import (
@@ -63,26 +51,10 @@ Backend Types:
 See Also:
     - victor.core.events.protocols: Protocol definitions
     - victor.core.events.backends: Backend implementations
-    - victor.core.events.taxonomy: Event type taxonomy
-"""
 
-from victor.core.events.taxonomy import (
-    # Core enum
-    UnifiedEventType,
-    # Mapping functions
-    map_workflow_event,
-    map_event_category,
-    map_framework_event,
-    map_tool_event,
-    map_agent_event,
-    map_system_event,
-    # Utility functions
-    get_all_categories,
-    get_events_by_category,
-    is_valid_event_type,
-    # Deprecation helpers
-    emit_deprecation_warning,
-)
+Note:
+    The canonical event type system is victor.framework.events.EventType.
+"""
 
 # Protocol-based event system
 from victor.core.events.protocols import (
@@ -133,7 +105,6 @@ except ImportError:
 # Adapters for bridging with existing systems
 from victor.core.events.adapter import (
     victor_event_to_event as victor_event_to_event_simple,
-    event_to_victor_event as event_to_victor_event_simple,
     EventBusAdapter,
     TeamMessageBusAdapter,
 )
@@ -145,7 +116,6 @@ from victor.core.events.adapter import (
 # Sync wrappers for gradual migration
 from victor.core.events.sync_wrapper import (
     SyncEventWrapper,
-    SyncObservabilityBus,
     SyncEventHandler,
 )
 from victor.core.events.emit_helper import (
@@ -157,23 +127,9 @@ from victor.core.events.emit_helper import (
     start_emit_sync_metrics_reporter,
     stop_emit_sync_metrics_reporter,
 )
+from victor.core.events.taxonomy import EventTaxonomyRegistry
 
 __all__ = [
-    # Taxonomy - Core enum
-    "UnifiedEventType",
-    # Taxonomy - Mapping functions
-    "map_workflow_event",
-    "map_event_category",
-    "map_framework_event",
-    "map_tool_event",
-    "map_agent_event",
-    "map_system_event",
-    # Taxonomy - Utility functions
-    "get_all_categories",
-    "get_events_by_category",
-    "is_valid_event_type",
-    # Taxonomy - Deprecation helpers
-    "emit_deprecation_warning",
     # Protocol-based - Core types
     "MessagingEvent",
     "SubscriptionHandle",
@@ -205,14 +161,15 @@ __all__ = [
     "register_lightweight_backends",
     # Adapters for bridging (simple versions)
     "victor_event_to_event_simple",
-    "event_to_victor_event_simple",
     "EventBusAdapter",
     "TeamMessageBusAdapter",
     # Migration utilities removed (migration complete)
     # Sync wrappers for gradual migration
     "SyncEventWrapper",
-    "SyncObservabilityBus",
     "SyncEventHandler",
+    # Sync emit helper APIs
+    # Event taxonomy
+    "EventTaxonomyRegistry",
     # Sync emit helper APIs
     "emit_event_sync",
     "get_emit_sync_stats",

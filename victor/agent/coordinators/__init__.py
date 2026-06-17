@@ -14,133 +14,285 @@
 
 """Coordinator package for Victor agentic AI framework.
 
-This package contains coordinator classes that extract and consolidate
-specific coordination responsibilities from the AgentOrchestrator:
+This package provides state-passed coordinators for specialized functionality.
+The deprecated service-first coordinators (chat, tool, session) have been removed.
 
-- ChatCoordinator: Chat and streaming chat operations
-- SessionCoordinator: Session lifecycle, checkpoints, memory context
-- ToolCoordinator: Tool selection, budgeting, access control, and execution
-- MetricsCoordinator: Metrics collection and reporting
-- ProviderCoordinator: Provider management and switching
-- ConversationCoordinator: Message history, turn tracking, context management
-- SafetyCoordinator: Safety rule enforcement and operation blocking
+Preferred surfaces:
+- ``victor.agent.services`` for service-owned chat, tool, and session flows
+- ``victor.agent.services.stage_transition_runtime`` and
+  ``victor.agent.services.stage_transition_strategies`` for service-owned
+  stage-transition batching runtime
+- ``victor.agent.coordinators.ExplorationStatePassedCoordinator`` for exploration
+- ``victor.agent.coordinators.CoordinationStatePassedCoordinator`` for
+  coordination recommendations
+- ``victor.agent.coordinators.SystemPromptStatePassedCoordinator`` for system prompts
+- ``victor.agent.coordinators.SafetyStatePassedCoordinator`` for safety
 
-Design Philosophy:
-------------------
-Each coordinator follows the Single Responsibility Principle (SRP) and
-provides a focused, testable interface for its domain. Coordinators are
-designed to work with existing components and provide a clean API for
-the orchestrator to delegate to.
-
-Phase 2: DIP Compliance Protocols
--------------------------------
-The protocols module provides protocol definitions for Dependency
-Inversion Principle (DIP) compliance:
-- CacheProvider: Protocol for caching operations
-- EventEmitter: Protocol for event emission
-- ConfigProvider: Protocol for configuration access
+Note: ToolCoordinator, ChatCoordinator, SessionCoordinator have been removed.
+Use ToolService, ChatService, SessionService instead.
+StageTransitionCoordinator and its strategies remain available here only as
+compatibility re-export paths. SDK-owned safety and conversation exports remain
+available here only as deprecated compatibility shims; new code should import
+them from ``victor_contracts`` directly.
 """
 
-from victor.agent.coordinators.tool_coordinator import (
-    ToolCoordinator,
-    ToolCoordinatorConfig,
-    TaskContext,
-    IToolCoordinator,
-    create_tool_coordinator,
-)
-from victor.agent.coordinators.tool_observability import ToolObservabilityHandler
-from victor.agent.coordinators.tool_retry import ToolRetryExecutor
-from victor.agent.coordinators.chat_coordinator import ChatCoordinator
-from victor.agent.coordinators.chat_protocols import (
-    ChatContextProtocol,
-    ChatOrchestratorProtocol,
-    ProviderContextProtocol,
-    ToolContextProtocol,
-)
-from victor.agent.coordinators.session_coordinator import (
-    SessionCoordinator,
-    SessionInfo,
-    create_session_coordinator,
-)
-from victor.agent.coordinators.planning_coordinator import (
-    PlanningCoordinator,
-    PlanningConfig,
-    PlanningMode,
-    PlanningResult,
+from __future__ import annotations
+
+import importlib
+import warnings
+from typing import Any
+
+_SUBMODULE_MAP: dict[str, str] = {
+    # Runtime coordinators from services
+    "ExplorationCoordinator": "services.exploration_runtime",
+    "ExplorationResult": "services.exploration_runtime",
+    "MetricsCoordinator": "services.metrics_service",
+    "create_metrics_coordinator": "services.metrics_service",
+    "PlanningCoordinator": "services.planning_runtime",
+    "PlanningConfig": "services.planning_runtime",
+    "PlanningMode": "services.planning_runtime",
+    "PlanningResult": "services.planning_runtime",
+    # SDK-owned compatibility / extension surfaces
+    "SafetyCoordinator": "victor_contracts.safety",
+    "SafetyRule": "victor_contracts.safety",
+    "SafetyCheckResult": "victor_contracts.safety",
+    "SafetyStats": "victor_contracts.safety",
+    "SafetyAction": "victor_contracts.safety",
+    "SafetyCategory": "victor_contracts.safety",
+    "ConversationCoordinator": "victor_contracts.conversation",
+    "TurnType": "victor_contracts.conversation",
+    "ConversationTurn": "victor_contracts.conversation",
+    "ConversationStats": "victor_contracts.conversation",
+    "ConversationContext": "victor_contracts.conversation",
+}
+
+_MODULE_MEMBERS = {
+    "exploration_state_passed": [
+        "ExplorationStatePassedCoordinator",
+    ],
+    "coordination_state_passed": [
+        "CoordinationStatePassedCoordinator",
+    ],
+    # NOTE: tool_coordinator, tool_observability, tool_retry removed
+    # These now import directly from victor.agent.services for backward compatibility
+    # See __getattr__ below for service-level re-exports
+    # NOTE: chat_coordinator, sync_chat_coordinator, streaming_chat_coordinator,
+    # unified_chat_coordinator removed as deprecated shims.
+    # These now import directly from victor.agent.services.chat_compat for backward compatibility.
+    # See __getattr__ below for service-level re-exports.
+    "chat_protocols": [
+        "ChatContextProtocol",
+        "ChatOrchestratorProtocol",
+        "ProviderContextProtocol",
+        "ToolContextProtocol",
+    ],
+    "protocols": [
+        "CacheProvider",
+        "CacheEventType",
+        "EventEmitter",
+        "ConfigProvider",
+        "NoOpCacheProvider",
+        "NoOpEventEmitter",
+        "DictConfigProvider",
+    ],
+    "system_prompt_state_passed": [
+        "SystemPromptStatePassedCoordinator",
+    ],
+    "safety_state_passed": [
+        "SafetyStatePassedCoordinator",
+    ],
+    # Stage transition coordination compatibility wrappers over services
+    "stage_transition_coordinator": [
+        "StageTransitionCoordinator",
+        "TransitionDecision",
+        "TransitionResult",
+        "TurnContext",
+    ],
+    "transition_strategies": [
+        "TransitionStrategyProtocol",
+        "HeuristicOnlyTransitionStrategy",
+        "EdgeModelTransitionStrategy",
+        "HybridTransitionStrategy",
+        "create_transition_strategy",
+    ],
+    # NOTE: exploration_coordinator, metrics_coordinator, safety_coordinator,
+    # planning_coordinator, session_coordinator, turn_executor, and the former
+    # system_prompt_coordinator compatibility wrapper were removed as
+    # deprecated shims.
+    # These now import directly from services for backward compatibility.
+    # See __getattr__ below for service-level re-exports.
+}
+
+for _module_name, _exported_names in _MODULE_MEMBERS.items():
+    for _exported_name in _exported_names:
+        _SUBMODULE_MAP[_exported_name] = _module_name
+
+__all__ = list(_SUBMODULE_MAP.keys())
+
+_DEPRECATED_EXPORTS = {
+    "ChatContextProtocol": (
+        "victor.agent.coordinators.ChatContextProtocol is deprecated compatibility "
+        "surface. Prefer ChatServiceProtocol and service-owned runtime boundaries "
+        "from victor.agent.services. Will be removed in v0.10.0."
+    ),
+    "ChatOrchestratorProtocol": (
+        "victor.agent.coordinators.ChatOrchestratorProtocol is deprecated "
+        "compatibility surface. Prefer ChatServiceProtocol and service-owned "
+        "runtime boundaries from victor.agent.services. Will be removed in v0.10.0."
+    ),
+    "ProviderContextProtocol": (
+        "victor.agent.coordinators.ProviderContextProtocol is deprecated "
+        "compatibility surface. Prefer ProviderServiceProtocol and service-owned "
+        "runtime boundaries from victor.agent.services. Will be removed in v0.10.0."
+    ),
+    "ToolContextProtocol": (
+        "victor.agent.coordinators.ToolContextProtocol is deprecated compatibility "
+        "surface. Prefer ToolServiceProtocol and service-owned runtime boundaries "
+        "from victor.agent.services. Will be removed in v0.10.0."
+    ),
+}
+
+_SDK_SAFETY_EXPORTS = frozenset(
+    {
+        "SafetyCoordinator",
+        "SafetyRule",
+        "SafetyCheckResult",
+        "SafetyStats",
+        "SafetyAction",
+        "SafetyCategory",
+    }
 )
 
-# Phase 2: DIP Compliance Protocols
-from victor.agent.coordinators.protocols import (
-    CacheProvider,
-    CacheEventType,
-    EventEmitter,
-    ConfigProvider,
-    NoOpCacheProvider,
-    NoOpEventEmitter,
-    DictConfigProvider,
+_SDK_CONVERSATION_EXPORTS = frozenset(
+    {
+        "ConversationCoordinator",
+        "TurnType",
+        "ConversationTurn",
+        "ConversationStats",
+        "ConversationContext",
+    }
 )
 
-# Phase 2: New Coordinators for SOLID compliance
-from victor.agent.coordinators.conversation_coordinator import (
-    ConversationCoordinator,
-    TurnType,
-    ConversationTurn,
-    ConversationStats,
-    ConversationContext,
-)
-from victor.agent.coordinators.safety_coordinator import (
-    SafetyCoordinator,
-    SafetyRule,
-    SafetyCheckResult,
-    SafetyStats,
-    SafetyAction,
-    SafetyCategory,
-)
-from victor.agent.coordinators.metrics_coordinator import MetricsCoordinator
-from victor.agent.coordinators.system_prompt_coordinator import SystemPromptCoordinator
 
-__all__ = [
-    "ChatCoordinator",
-    "ChatContextProtocol",
-    "ChatOrchestratorProtocol",
-    "ProviderContextProtocol",
-    "ToolContextProtocol",
-    "SessionCoordinator",
-    "SessionInfo",
-    "create_session_coordinator",
-    "ToolCoordinator",
-    "ToolCoordinatorConfig",
-    "TaskContext",
-    "IToolCoordinator",
-    "create_tool_coordinator",
-    "PlanningCoordinator",
-    "PlanningConfig",
-    "PlanningMode",
-    "PlanningResult",
-    # Phase 2: DIP Compliance Protocols
-    "CacheProvider",
-    "CacheEventType",
-    "EventEmitter",
-    "ConfigProvider",
-    "NoOpCacheProvider",
-    "NoOpEventEmitter",
-    "DictConfigProvider",
-    # Phase 2: New Coordinators for SOLID compliance
-    "ConversationCoordinator",
-    "TurnType",
-    "ConversationTurn",
-    "ConversationStats",
-    "ConversationContext",
-    "SafetyCoordinator",
-    "SafetyRule",
-    "SafetyCheckResult",
-    "SafetyStats",
-    "SafetyAction",
-    "SafetyCategory",
-    "MetricsCoordinator",
-    # E1 M3: Extracted from ToolCoordinator
-    "ToolObservabilityHandler",
-    "ToolRetryExecutor",
-    # Phase 6: System prompt business logic extraction
-    "SystemPromptCoordinator",
-]
+def _get_deprecation_warning(name: str) -> str | None:
+    """Return the deprecation warning message for a compatibility export."""
+    if name in _DEPRECATED_EXPORTS:
+        return _DEPRECATED_EXPORTS[name]
+
+    if name == "SafetyCoordinator":
+        return (
+            "victor.agent.coordinators.SafetyCoordinator is deprecated SDK "
+            "compatibility surface. Prefer victor_contracts.safety.SafetyCoordinator "
+            "for extensions or SafetyStatePassedCoordinator for agent runtime "
+            "policy seams. Will be removed in v0.10.0."
+        )
+    if name in _SDK_SAFETY_EXPORTS:
+        return (
+            f"victor.agent.coordinators.{name} is deprecated SDK compatibility "
+            f"surface. Prefer victor_contracts.safety.{name} directly. Will be removed in v0.10.0."
+        )
+    if name == "ConversationCoordinator":
+        return (
+            "victor.agent.coordinators.ConversationCoordinator is deprecated SDK "
+            "compatibility surface. Prefer victor_contracts.conversation."
+            "ConversationCoordinator directly. Will be removed in v0.10.0."
+        )
+    if name in _SDK_CONVERSATION_EXPORTS:
+        return (
+            f"victor.agent.coordinators.{name} is deprecated SDK compatibility "
+            f"surface. Prefer victor_contracts.conversation.{name} directly. Will be removed in v0.10.0."
+        )
+
+    return None
+
+
+def __getattr__(name: str) -> Any:
+    """Resolve coordinator exports lazily and warn on deprecated shims.
+
+    For deleted coordinator shims: re-exports from services or SDK.
+    For chat_protocols: imports from services.protocols.chat_runtime.
+    For other coordinators: imports from coordinators.{module_name}.
+    """
+    # Service-level re-exports for coordinators
+    if name in {
+        # Runtime coordinators from services
+        "ExplorationCoordinator",
+        "ExplorationResult",
+        "MetricsCoordinator",
+        "create_metrics_coordinator",
+        "SafetyCoordinator",
+        "SafetyRule",
+        "SafetyCheckResult",
+        "SafetyStats",
+        "SafetyAction",
+        "SafetyCategory",
+        "PlanningCoordinator",
+        "PlanningConfig",
+        "PlanningMode",
+        "PlanningResult",
+        # SDK-based coordinators
+        "ConversationCoordinator",
+        "TurnType",
+        "ConversationTurn",
+        "ConversationStats",
+        "ConversationContext",
+    }:
+        # Import from appropriate service module
+        if name in {"ExplorationCoordinator", "ExplorationResult"}:
+            module = importlib.import_module("victor.agent.services.exploration_runtime")
+        elif name in {"MetricsCoordinator", "create_metrics_coordinator"}:
+            module = importlib.import_module("victor.agent.services.metrics_service")
+        elif name in {
+            "SafetyCoordinator",
+            "SafetyRule",
+            "SafetyCheckResult",
+            "SafetyStats",
+            "SafetyAction",
+            "SafetyCategory",
+        }:
+            module = importlib.import_module("victor_contracts.safety")
+        elif name in {
+            "PlanningCoordinator",
+            "PlanningConfig",
+            "PlanningMode",
+            "PlanningResult",
+        }:
+            module = importlib.import_module("victor.agent.services.planning_runtime")
+        elif name in {
+            "ConversationCoordinator",
+            "TurnType",
+            "ConversationTurn",
+            "ConversationStats",
+            "ConversationContext",
+        }:
+            module = importlib.import_module("victor_contracts.conversation")
+
+        value = getattr(module, name)
+        warning = _get_deprecation_warning(name)
+        if warning is not None:
+            warnings.warn(warning, DeprecationWarning, stacklevel=2)
+        globals()[name] = value
+        return value
+
+    # Original coordinator imports
+    if name in _SUBMODULE_MAP:
+        if _SUBMODULE_MAP[name] == "chat_protocols":
+            module = importlib.import_module("victor.agent.services.protocols.chat_runtime")
+        else:
+            module = importlib.import_module(f"victor.agent.coordinators.{_SUBMODULE_MAP[name]}")
+        value = getattr(module, name)
+        warning = _get_deprecation_warning(name)
+        if warning is not None:
+            warnings.warn(
+                warning,
+                DeprecationWarning,
+                stacklevel=2,
+            )
+        globals()[name] = value
+        return value
+    raise AttributeError(f"module 'victor.agent.coordinators' has no attribute {name!r}")
+
+
+def __dir__() -> list[str]:
+    """Return the lazily exported coordinator surface."""
+    return sorted(list(globals().keys()) + __all__)

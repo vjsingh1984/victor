@@ -236,16 +236,16 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
                     status_code=503,
                 )
 
-            import sqlite3
-
-            db_path = coordinator.db_path
-            conn = sqlite3.connect(str(db_path))
-            cursor = conn.cursor()
-            cursor.execute("DELETE FROM model_selector_q_values")
-            cursor.execute("DELETE FROM model_selector_task_q_values")
-            cursor.execute("DELETE FROM model_selector_state")
-            conn.commit()
-            conn.close()
+            if hasattr(coordinator, "_ensure_db_connection"):
+                coordinator._ensure_db_connection()
+            cursor = coordinator.db.cursor()
+            try:
+                cursor.execute("DELETE FROM model_selector_q_values")
+                cursor.execute("DELETE FROM model_selector_task_q_values")
+                cursor.execute("DELETE FROM model_selector_state")
+                coordinator.db.commit()
+            finally:
+                cursor.close()
 
             coordinator._learners.pop("model_selector", None)
             learner = coordinator.get_learner("model_selector")

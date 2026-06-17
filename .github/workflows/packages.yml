@@ -3,8 +3,27 @@ name: Packages CI
 on:
   push:
     branches: [main, develop]
+    paths:
+      - '.github/workflows/packages.yml'
+      - 'victor/**'
+      - 'victor-contracts/**'
+      - 'pyproject.toml'
+      - 'requirements*.txt'
+      - 'MANIFEST.in'
+      - 'VERSION'
   pull_request:
     branches: [main, develop]
+    paths:
+      - '.github/workflows/packages.yml'
+      - 'victor/**'
+      - 'victor-contracts/**'
+      - 'pyproject.toml'
+      - 'requirements*.txt'
+      - 'MANIFEST.in'
+      - 'VERSION'
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -24,9 +43,9 @@ jobs:
       - name: Check version consistency
         run: python scripts/check_version_sync.py
 
-  # Build and test victor-sdk first (victor-ai depends on it)
+  # Build and test victor-contracts first (victor-ai depends on it)
   build-sdk:
-    name: Build victor-sdk
+    name: Build victor-contracts
     runs-on: ubuntu-latest
     needs: version-check
     steps:
@@ -40,15 +59,15 @@ jobs:
       - name: Install build tools
         run: pip install build wheel
 
-      - name: Build victor-sdk
-        working-directory: victor-sdk
+      - name: Build victor-contracts
+        working-directory: victor-contracts
         run: python -m build
 
       - name: Upload SDK artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: victor-sdk-dist
-          path: victor-sdk/dist/
+          name: victor-contracts-dist
+          path: victor-contracts/dist/
 
   # Test package in isolation
   test-packages:
@@ -71,16 +90,16 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: pip
 
-      - name: Download and install victor-sdk wheel
+      - name: Download and install victor-contracts wheel
         uses: actions/download-artifact@v4
         with:
-          name: victor-sdk-dist
+          name: victor-contracts-dist
           path: sdk-dist/
 
-      - name: Install victor-sdk from local wheel
+      - name: Install victor-contracts from local wheel
         run: |
           pip install sdk-dist/*.whl
-          python -c "from victor_sdk import __version__; print(f'victor-sdk {__version__} installed from local wheel')"
+          python -c "from victor_contracts import __version__; print(f'victor-contracts {__version__} installed from local wheel')"
 
       - name: Install package dependencies
         run: |
@@ -151,13 +170,13 @@ jobs:
           name: victor-ai-dist
           path: dist/
 
-      - name: Download victor-sdk artifact
+      - name: Download victor-contracts artifact
         uses: actions/download-artifact@v4
         with:
-          name: victor-sdk-dist
+          name: victor-contracts-dist
           path: sdk-dist/
 
-      - name: Install victor-sdk from built wheel
+      - name: Install victor-contracts from built wheel
         run: pip install sdk-dist/*.whl
 
       - name: Install package from built wheel

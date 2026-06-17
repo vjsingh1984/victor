@@ -134,7 +134,9 @@ def test_unknown_vertical_returns_empty_provider(monkeypatch) -> None:
     assert isinstance(provider, EmptyToolDependencyProvider)
 
 
-def test_known_vertical_returns_empty_provider_when_resource_lookup_fails(monkeypatch) -> None:
+def test_known_vertical_returns_empty_provider_when_resource_lookup_fails(
+    monkeypatch,
+) -> None:
     """Known verticals should degrade to EmptyToolDependencyProvider on lookup failure."""
     monkeypatch.setattr(loader_mod, "entry_points", lambda group: [])
     monkeypatch.setattr(loader_mod, "import_module_with_fallback", lambda _: (None, None))

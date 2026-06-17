@@ -43,13 +43,13 @@ if TYPE_CHECKING:
     from victor.framework.graph import CompiledGraph
     from victor.framework.workflow_engine import WorkflowExecutionResult, WorkflowEvent
     from victor.workflows.graph_dsl import WorkflowGraph
-    from victor.workflows.graph_compiler import CompilerConfig
     from victor.workflows.node_runners import NodeRunnerRegistry
+    from victor.workflows.unified_compiler import UnifiedWorkflowCompiler
 
 logger = logging.getLogger(__name__)
 
 
-class GraphExecutionCoordinator:
+class GraphTurnExecutor:
     """Coordinator for StateGraph/CompiledGraph execution.
 
     Handles all aspects of graph-based workflow execution including:
@@ -63,7 +63,7 @@ class GraphExecutionCoordinator:
     object with a .state attribute or a raw state dictionary.
 
     Example:
-        coordinator = GraphExecutionCoordinator()
+        coordinator = GraphTurnExecutor()
 
         # Execute a compiled graph
         result = await coordinator.execute(
@@ -86,6 +86,7 @@ class GraphExecutionCoordinator:
             runner_registry: Optional NodeRunnerRegistry for unified execution
         """
         self._runner_registry = runner_registry
+        self._unified_compilers: Dict[bool, "UnifiedWorkflowCompiler"] = {}
 
     def set_runner_registry(self, registry: "NodeRunnerRegistry") -> None:
         """Set the NodeRunner registry for unified execution.
@@ -94,6 +95,20 @@ class GraphExecutionCoordinator:
             registry: NodeRunnerRegistry with configured runners
         """
         self._runner_registry = registry
+        self._unified_compilers = {}
+
+    def _get_unified_compiler(self, *, use_node_runners: bool) -> "UnifiedWorkflowCompiler":
+        """Get or create a canonical unified compiler for graph execution."""
+        compiler = self._unified_compilers.get(use_node_runners)
+        if compiler is None:
+            from victor.workflows.unified_compiler import UnifiedWorkflowCompiler
+
+            compiler = UnifiedWorkflowCompiler(
+                runner_registry=self._runner_registry if use_node_runners else None,
+                enable_caching=False,
+            )
+            self._unified_compilers[use_node_runners] = compiler
+        return compiler
 
     async def execute(
         self,
@@ -241,24 +256,12 @@ class GraphExecutionCoordinator:
             WorkflowExecutionResult with final state and metadata
         """
         from victor.framework.workflow_engine import WorkflowExecutionResult
-        from victor.workflows.graph_compiler import (
-            WorkflowGraphCompiler,
-            CompilerConfig,
-        )
 
         start_time = time.time()
 
         try:
-            # Configure compiler
-            compiler_config = CompilerConfig(
-                use_node_runners=use_node_runners and self._runner_registry is not None,
-                runner_registry=self._runner_registry,
-                validate_before_compile=True,
-            )
-
-            # Compile WorkflowGraph to CompiledGraph
-            compiler = WorkflowGraphCompiler(compiler_config)
-            compiled = compiler.compile(graph)
+            compiler = self._get_unified_compiler(use_node_runners=use_node_runners)
+            compiled = compiler.compile_graph(graph)
 
             # Execute via CompiledGraph.invoke()
             result = await compiled.invoke(initial_state or {})
@@ -314,14 +317,14 @@ class GraphExecutionCoordinator:
             WorkflowExecutionResult with final state and metadata
         """
         from victor.framework.workflow_engine import WorkflowExecutionResult
-        from victor.workflows.graph_compiler import WorkflowDefinitionCompiler
 
         start_time = time.time()
 
         try:
-            # Compile WorkflowDefinition to CompiledGraph
-            compiler = WorkflowDefinitionCompiler(self._runner_registry)
-            compiled = compiler.compile(workflow)
+            compiler = self._get_unified_compiler(
+                use_node_runners=self._runner_registry is not None
+            )
+            compiled = compiler.compile_definition(workflow)
 
             # Execute via CompiledGraph.invoke()
             result = await compiled.invoke(initial_state or {})
@@ -357,4 +360,4 @@ class GraphExecutionCoordinator:
             )
 
 
-__all__ = ["GraphExecutionCoordinator"]
+__all__ = ["GraphTurnExecutor"]

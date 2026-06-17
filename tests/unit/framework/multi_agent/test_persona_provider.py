@@ -239,7 +239,10 @@ class TestFrameworkPersonaProviderRegistration:
 
     def test_register_multiple_versions_same_persona(self, sample_persona):
         """Should register multiple versions of the same persona."""
-        from victor.framework.multi_agent.personas import CommunicationStyle, ExpertiseLevel
+        from victor.framework.multi_agent.personas import (
+            CommunicationStyle,
+            ExpertiseLevel,
+        )
 
         provider = FrameworkPersonaProvider()
 
@@ -304,7 +307,12 @@ class TestSemVerValidation:
         """Should accept SemVer with pre-release identifiers."""
         provider = FrameworkPersonaProvider()
 
-        valid_versions = ["1.0.0-alpha", "2.0.0-beta.1", "1.0.0-rc.1", "3.0.0-alpha.1.beta.2"]
+        valid_versions = [
+            "1.0.0-alpha",
+            "2.0.0-beta.1",
+            "1.0.0-rc.1",
+            "3.0.0-alpha.1.beta.2",
+        ]
 
         for version in valid_versions:
             provider.register_persona(
@@ -458,7 +466,10 @@ class TestFrameworkPersonaProviderRetrieval:
     @pytest.fixture
     def populated_provider(self, sample_persona) -> FrameworkPersonaProvider:
         """Create a provider with registered personas."""
-        from victor.framework.multi_agent.personas import CommunicationStyle, ExpertiseLevel
+        from victor.framework.multi_agent.personas import (
+            CommunicationStyle,
+            ExpertiseLevel,
+        )
 
         provider = FrameworkPersonaProvider()
 

@@ -47,6 +47,12 @@ def test_create_graph_store_memory():
     assert isinstance(store, MemoryGraphStore)
 
 
+def test_create_graph_store_backend_alias_takes_priority(tmp_path: Path):
+    db_path = tmp_path / "graph.db"
+    store = create_graph_store("memory", db_path, backend="sqlite")
+    assert isinstance(store, SqliteGraphStore)
+
+
 @pytest.mark.skipif(DuckDBGraphStore is None or not DUCKDB_AVAILABLE, reason="duckdb not installed")
 def test_create_graph_store_duckdb(tmp_path: Path):
     db_path = tmp_path / "graph.db"

@@ -18,6 +18,7 @@ import os
 from pathlib import Path
 from unittest.mock import patch, mock_open, MagicMock
 
+import pytest
 from pydantic import SecretStr
 
 from victor.config.settings import (
@@ -146,18 +147,33 @@ class TestProfileConfig:
 class TestSettings:
     """Tests for Settings class."""
 
+    @pytest.fixture(autouse=True)
+    def _bypass_account_manager(self, tmp_path):
+        """Force get_provider_settings to use legacy ProviderConfigRegistry.
+
+        On developer machines ~/.victor/config.yaml exists, causing
+        AccountManager to return a different dict shape than the legacy
+        path these tests exercise.
+        """
+        fake_config = tmp_path / "nonexistent_config.yaml"
+        with patch("victor.config.accounts.get_account_manager") as mock_get_am:
+            mock_am = MagicMock()
+            mock_am.config_path = fake_config  # .exists() → False
+            mock_get_am.return_value = mock_am
+            yield
+
     def test_settings_defaults(self):
         """Test Settings with default values."""
         settings = Settings()
 
         # Note: default_provider is "ollama" in Settings class
-        assert settings.default_provider == "ollama"
-        assert settings.default_model == "qwen3-coder:30b"
-        assert settings.default_temperature == 0.7
-        assert settings.default_max_tokens == 4096
+        assert settings.provider.default_provider == "ollama"
+        assert settings.provider.default_model == "qwen3.5:27b-q4_K_M"
+        assert settings.provider.default_temperature == 0.7
+        assert settings.provider.default_max_tokens == 4096
         assert settings.log_level == "INFO"
         assert settings.airgapped_mode is False
-        assert settings.stream_responses is True
+        assert settings.ui.stream_responses is True
         assert settings.event_queue_maxsize == 10000
         assert settings.event_queue_overflow_policy == "drop_newest"
         assert settings.event_queue_overflow_block_timeout_ms == 50.0
@@ -172,8 +188,8 @@ class TestSettings:
         assert settings.extension_loader_pressure_cooldown_seconds == 5.0
         assert settings.extension_loader_metrics_reporter_enabled is False
         assert settings.extension_loader_metrics_reporter_interval_seconds == 60.0
-        assert settings.generic_result_cache_enabled is False
-        assert settings.http_connection_pool_enabled is False
+        assert settings.tools.generic_result_cache_enabled is False
+        assert settings.cache.http_connection_pool_enabled is False
         assert settings.framework_preload_enabled is True  # Enabled by default for performance
         assert settings.framework_private_fallback_strict_mode is False
         assert settings.framework_protocol_fallback_strict_mode is False
@@ -257,20 +273,20 @@ class TestSettings:
             Settings(extension_loader_metrics_reporter_interval_seconds=0)
 
     def test_settings_runtime_infra_validation(self):
-        """Runtime infra thresholds must be valid."""
+        """Runtime infra thresholds must be valid (fields live in the cache nested group)."""
         import pytest
 
         with pytest.raises(ValueError, match="http_connection_pool_max_connections must be >= 1"):
-            Settings(http_connection_pool_max_connections=0)
+            Settings(cache={"http_connection_pool_max_connections": 0})
 
         with pytest.raises(
             ValueError,
             match="http_connection_pool_max_connections_per_host must be >= 1",
         ):
-            Settings(http_connection_pool_max_connections_per_host=0)
+            Settings(cache={"http_connection_pool_max_connections_per_host": 0})
 
         with pytest.raises(ValueError, match="http_connection_pool_total_timeout must be > 0"):
-            Settings(http_connection_pool_total_timeout=0)
+            Settings(cache={"http_connection_pool_total_timeout": 0})
 
     def test_get_config_dir(self):
         """Test getting config directory uses GLOBAL_VICTOR_DIR."""
@@ -293,7 +309,9 @@ class TestSettings:
 
             # Mock the model selection to return a predictable value
             with patch.object(
-                Settings, "_choose_default_lmstudio_model", return_value="qwen2.5-coder:7b"
+                Settings,
+                "_choose_default_lmstudio_model",
+                return_value="qwen2.5-coder:7b",
             ):
                 profiles = Settings.load_profiles()
 
@@ -571,12 +589,10 @@ providers:
             server_session_secret="session-secret",
         )
 
-        assert isinstance(settings.server_api_key, SecretStr)
-        assert settings.server_api_key.get_secret_value() == "server-token"
-        assert isinstance(settings.server_session_secret, SecretStr)
-        assert settings.server_session_secret.get_secret_value() == "session-secret"
-        assert settings.security.server_api_key.get_secret_value() == "server-token"
-        assert settings.security.server_session_secret.get_secret_value() == "session-secret"
+        assert isinstance(settings.server.server_api_key, SecretStr)
+        assert settings.server.server_api_key.get_secret_value() == "server-token"
+        assert isinstance(settings.server.server_session_secret, SecretStr)
+        assert settings.server.server_session_secret.get_secret_value() == "session-secret"
 
 
 class TestLoadSettings:
@@ -588,7 +604,7 @@ class TestLoadSettings:
 
         assert isinstance(settings, Settings)
         # Note: default_provider is "ollama" in Settings class
-        assert settings.default_provider == "ollama"
+        assert settings.provider.default_provider == "ollama"
 
 
 class TestToolSelectionValidation:
@@ -731,7 +747,7 @@ class TestSettingsExtra:
     def test_settings_semantic_tool_selection(self):
         """Test semantic tool selection settings."""
         settings = Settings(use_semantic_tool_selection=True)
-        assert settings.use_semantic_tool_selection is True
+        assert settings.tool_selection.use_semantic_tool_selection is True
 
     def test_settings_airgapped_mode(self):
         """Test airgapped mode settings."""
@@ -739,15 +755,15 @@ class TestSettingsExtra:
         assert settings.airgapped_mode is True
 
     def test_settings_tool_cache_settings(self):
-        """Test tool cache settings."""
+        """Test tool cache settings — stored in tools nested group."""
         settings = Settings(
             tool_cache_enabled=True,
             tool_cache_ttl=600,
         )
-        assert settings.tool_cache_enabled is True
-        assert settings.tool_cache_ttl == 600
+        assert settings.tools.tool_cache_enabled is True
+        assert settings.tools.tool_cache_ttl == 600
 
     def test_settings_analytics_disabled(self):
-        """Test analytics disabled setting."""
+        """Test analytics disabled setting (analytics_enabled lives in analytics nested group)."""
         settings = Settings(analytics_enabled=False)
-        assert settings.analytics_enabled is False
+        assert settings.analytics.analytics_enabled is False

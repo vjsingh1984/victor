@@ -19,6 +19,9 @@ as the single source of truth. See test_metadata_registry.py for keyword-based
 selection tests.
 """
 
+from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
+
 from victor.agent.tool_selection import (
     get_critical_tools,
     get_tools_from_message,
@@ -143,6 +146,52 @@ class TestToolSelectionStats:
         result = stats.to_dict()
         assert isinstance(result, dict)
         assert result["semantic_selections"] == 1
+
+
+class TestToolSelectorRuntimeIntelligence:
+    """Tests for canonical runtime-intelligence integration in ToolSelector."""
+
+    def test_edge_filter_prefers_runtime_intelligence(self):
+        """Tool filtering should use runtime intelligence before container lookups."""
+        from victor.agent.tool_selection import ToolSelector
+
+        registry = MagicMock()
+        registry.list_tools.return_value = []
+        runtime_intelligence = MagicMock()
+        selector = ToolSelector(tools=registry, runtime_intelligence=runtime_intelligence)
+        selector._get_core_tools_cached = MagicMock(return_value={"read", "ls"})
+        tools = [
+            SimpleNamespace(name="read"),
+            SimpleNamespace(name="ls"),
+            SimpleNamespace(name="edit"),
+            SimpleNamespace(name="grep"),
+        ]
+
+        with (
+            patch(
+                "victor.agent.tool_selection.get_container",
+                side_effect=AssertionError("container path should not be used"),
+            ),
+            patch(
+                "victor.agent.edge_model.select_tools_with_edge_model",
+                return_value=["edit"],
+            ) as mock_select,
+        ):
+            filtered = selector._apply_edge_model_filter(
+                tools,
+                user_message="fix the auth bug",
+                stage=None,
+            )
+
+        assert [tool.name for tool in filtered] == ["read", "ls", "edit"]
+        mock_select.assert_called_once_with(
+            service=runtime_intelligence,
+            user_message="fix the auth bug",
+            available_tools=["read", "ls", "edit", "grep"],
+            stage="initial",
+            recent_tools=None,
+            max_tools=6,
+        )
 
 
 class TestSelectToolsByKeywords:

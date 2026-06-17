@@ -392,7 +392,7 @@ class StreamingProtocol(Protocol):
 
 
 @runtime_checkable
-class OrchestratorProtocol(
+class FrameworkOrchestratorProtocol(
     ConversationStateProtocol,
     ProviderProtocol,
     ToolsProtocol,
@@ -423,8 +423,12 @@ class OrchestratorProtocol(
     - Core modules: Use victor.core.protocols.OrchestratorProtocol for minimal interface
     - SubAgents: Use SubAgentContext for ISP-compliant minimal interface
 
+    Note: Renamed from OrchestratorProtocol to avoid name collision with
+    victor.core.protocols.OrchestratorProtocol. Use FrameworkOrchestratorProtocol
+    when importing from victor.framework.protocols.
+
     Usage:
-        async def run_agent(orch: OrchestratorProtocol, prompt: str):
+        async def run_agent(orch: FrameworkOrchestratorProtocol, prompt: str):
             print(f"Provider: {orch.current_provider}")
             print(f"Stage: {orch.get_stage()}")
 
@@ -834,7 +838,7 @@ def verify_protocol_conformance(obj: Any, protocol: type) -> Tuple[bool, List[st
         Tuple of (conforms: bool, missing: List[str])
 
     Example:
-        conforms, missing = verify_protocol_conformance(orch, OrchestratorProtocol)
+        conforms, missing = verify_protocol_conformance(orch, FrameworkOrchestratorProtocol)
         if not conforms:
             raise TypeError(f"Missing protocol methods: {missing}")
     """
@@ -853,6 +857,106 @@ def verify_protocol_conformance(obj: Any, protocol: type) -> Tuple[bool, List[st
                 missing.append(attr)
 
     return len(missing) == 0, missing
+
+
+# =============================================================================
+# Capability Registry Role Protocols (ISP decomposition)
+# =============================================================================
+# CapabilityRegistryProtocol is preserved unchanged for backward compatibility.
+# These three focused protocols let callers declare only the surface they need.
+
+
+@runtime_checkable
+class CapabilityDiscoveryProtocol(Protocol):
+    """Read-only enumeration of registered capabilities.
+
+    Use this protocol when code only needs to check whether a capability
+    exists or enumerate the capability registry — no value reads or mutations.
+    """
+
+    def get_capabilities(self) -> Dict[str, OrchestratorCapability]: ...
+
+    def has_capability(
+        self,
+        name: str,
+        min_version: Optional[str] = None,
+    ) -> bool: ...
+
+    def get_capability(self, name: str) -> Optional[OrchestratorCapability]: ...
+
+    def get_capability_version(self, name: str) -> Optional[str]: ...
+
+    def get_capabilities_by_type(
+        self, capability_type: CapabilityType
+    ) -> Dict[str, OrchestratorCapability]: ...
+
+
+@runtime_checkable
+class CapabilityReadProtocol(Protocol):
+    """Reads the current value associated with a named capability.
+
+    Use this protocol when code only needs to retrieve the value behind a
+    capability (e.g., reading the middleware chain or safety checker object).
+    """
+
+    def get_capability_value(self, name: str) -> Any: ...
+
+
+@runtime_checkable
+class CapabilityMutationProtocol(Protocol):
+    """Invokes (writes/triggers) a named capability.
+
+    Use this protocol when code only needs to invoke a capability setter,
+    with optional minimum-version enforcement.
+    """
+
+    def invoke_capability(
+        self,
+        name: str,
+        *args: Any,
+        min_version: Optional[str] = None,
+        **kwargs: Any,
+    ) -> Any: ...
+
+
+# =============================================================================
+# Domain Keywords Provider Protocol (OCP extension point)
+# =============================================================================
+
+
+@runtime_checkable
+class DomainKeywordsProviderProtocol(Protocol):
+    """Contributes domain-specific keyword lists for topic-switch detection.
+
+    Verticals or plugins can implement this protocol and register it via
+    ``PluginContext.register_domain_keyword_provider(provider)`` to extend
+    the adaptive compaction system with domain-specific vocabulary without
+    modifying core framework code.
+
+    The provider's keywords are merged with the built-in defaults at
+    ``AdaptiveCompactionThreshold`` construction time. If a domain key
+    collides with a built-in, the provider's keywords win.
+
+    Example::
+
+        class SwiftKeywordsProvider:
+            def get_domain_keywords(self) -> Dict[str, List[str]]:
+                return {"swift": ["swift", "swiftui", "xcode", "cocoa", "objc"]}
+
+            def get_provider_name(self) -> str:
+                return "swift-keywords"
+
+        # In VictorPlugin.register():
+        context.register_domain_keyword_provider(SwiftKeywordsProvider())
+    """
+
+    def get_domain_keywords(self) -> Dict[str, List[str]]:
+        """Return a dict mapping domain names to keyword lists."""
+        ...
+
+    def get_provider_name(self) -> str:
+        """Return a short identifier for logging and debug purposes."""
+        ...
 
 
 # =============================================================================

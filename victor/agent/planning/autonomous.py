@@ -42,13 +42,13 @@ Example Usage:
 
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 import time
 import uuid
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
+from typing import TYPE_CHECKING, Callable, List, Optional
 
+from victor.agent.prompt_pipeline import prompt_overlay_runtime_overrides
 from victor.agent.planning.base import (
     ExecutionPlan,
     PlanResult,
@@ -56,9 +56,9 @@ from victor.agent.planning.base import (
     StepResult,
     StepStatus,
     StepType,
+    get_step_allowed_tools,
 )
 from victor.agent.planning.readable_schema import (
-    ReadableTaskPlan,
     TaskComplexity,
     generate_task_plan as generate_readable_plan,
 )
@@ -104,6 +104,25 @@ Guidelines:
 """
 
 
+RESEARCH_STEP_SYSTEM_PROMPT = """You are executing a research step in a plan. Focus on gathering information without making changes.
+
+IMPORTANT - Use these tools for research:
+1) Use the 'grep' tool for pattern searching - specify the path using the 'path' parameter
+2) Use the 'code_search' tool for semantic code queries
+3) Use the 'read' tool for reading file contents
+4) Use 'graph' tool for codebase structure queries
+
+CRITICAL: DO NOT use shell with compound commands like 'cd /path && grep pattern'. Instead use:
+- grep tool with 'path' parameter set to the directory
+- code_search for semantic queries
+- read tool for specific files
+
+Example:
+- WRONG: shell('cd /project && grep -r pattern')
+- RIGHT: grep(pattern='pattern', path='/project')
+"""
+
+
 class AutonomousPlanner:
     """Autonomous planner for goal-oriented execution.
 
@@ -140,8 +159,68 @@ class AutonomousPlanner:
         logger.info("AutonomousPlanner initialized")
 
     def _default_approval(self, message: str) -> bool:
-        """Default approval callback (always returns False for safety)."""
-        logger.warning(f"Step requires approval but no callback set: {message[:100]}...")
+        """Default approval callback with intelligent defaults.
+
+        Auto-approves research and planning steps, requires approval for
+        implementation and deployment steps. This can be overridden by setting
+        a custom approval_callback.
+        """
+        # Import here to avoid circular dependency
+
+        # Try to infer step type from message
+        message_lower = message.lower()
+
+        # Auto-approve research and analysis steps
+        research_keywords = [
+            "research",
+            "analyze",
+            "investigate",
+            "explore",
+            "review",
+            "document",
+        ]
+        if any(keyword in message_lower for keyword in research_keywords):
+            logger.info(f"Auto-approving research step: {message[:80]}...")
+            return True
+
+        # Auto-approve research, planning, and read-only steps
+        safe_keywords = [
+            "research",
+            "test",
+            "git",
+            "plan",
+            "design",
+            "architecture",
+            "schema",
+            "structure",
+            "review",
+            "doc",
+            "analyze",
+            "verify",
+            "check",
+        ]
+        if any(keyword in message_lower for keyword in safe_keywords):
+            logger.info(f"Auto-approving safe step: {message[:80]}...")
+            return True
+
+        # Require approval for implementation and deployment
+        impl_keywords = [
+            "implement",
+            "write",
+            "create",
+            "modify",
+            "delete",
+            "deploy",
+            "migrate",
+            "change",
+            "refactor",
+        ]
+        if any(keyword in message_lower for keyword in impl_keywords):
+            logger.warning(f"Step requires approval (implementation/deployment): {message[:80]}...")
+            return False
+
+        # Default: require approval for unknown step types
+        logger.warning(f"Step requires approval (unknown type): {message[:80]}...")
         return False
 
     async def plan_for_goal(
@@ -284,21 +363,18 @@ class AutonomousPlanner:
 
     async def _generate_plan_json(self, prompt: str) -> str:
         """Call LLM to generate plan JSON."""
-        # Store original system prompt
-        original_prompt = getattr(self.orchestrator, "_system_prompt_override", None)
+        return await self._chat_with_scoped_system_prompt(prompt, PLANNING_SYSTEM_PROMPT)
 
-        try:
-            # Use planning system prompt
-            self.orchestrator.set_system_prompt(PLANNING_SYSTEM_PROMPT)
-
-            # Call the orchestrator
-            response = await self.orchestrator.chat(prompt)
-            return response.content if hasattr(response, "content") else str(response)
-
-        finally:
-            # Restore original prompt
-            if original_prompt:
-                self.orchestrator.set_system_prompt(original_prompt)
+    async def _chat_with_scoped_system_prompt(self, prompt: str, system_prompt: str) -> str:
+        """Call the orchestrator with a per-turn system prompt override."""
+        response = await self.orchestrator.chat(
+            prompt,
+            runtime_context_overrides=prompt_overlay_runtime_overrides(
+                "planner.plan_generation",
+                system_prompt,
+            ),
+        )
+        return response.content if hasattr(response, "content") else str(response)
 
     def _parse_plan_json(self, goal: str, json_str: str) -> ExecutionPlan:
         """Parse plan JSON into ExecutionPlan."""
@@ -333,6 +409,7 @@ class AutonomousPlanner:
                     estimated_tool_calls=step_data.get("estimated_tool_calls", 10),
                     requires_approval=step_data.get("requires_approval", False),
                     sub_agent_role=step_data.get("sub_agent_role"),
+                    allowed_tools=step_data.get("allowed_tools", step_data.get("tools", [])),
                 )
                 steps.append(step)
 
@@ -443,11 +520,16 @@ class AutonomousPlanner:
 
             # Check approval
             if step.requires_approval and not auto_approve:
-                if not self.approval_callback(f"Execute step: {step.description}?"):
+                # Use the approval callback (defaults to intelligent auto-approve for research)
+                approved = self.approval_callback(f"Execute step: {step.description}?")
+                if not approved:
+                    logger.info(f"Step {step.id} blocked: {step.description[:60]}...")
                     step.status = StepStatus.BLOCKED
                     if progress_callback:
                         progress_callback(step, StepStatus.BLOCKED)
                     continue
+                else:
+                    logger.info(f"Step {step.id} approved: {step.description[:60]}...")
 
             # Execute step (delegate to sub-agent if appropriate)
             step.status = StepStatus.IN_PROGRESS
@@ -479,7 +561,7 @@ class AutonomousPlanner:
         progress_callback: Optional[Callable[[PlanStep, StepStatus], None]],
     ) -> None:
         """Execute plan steps in parallel using sub-agents."""
-        from victor.agent.subagents import SubAgentTask, SubAgentRole
+        from victor.agent.subagents import SubAgentTask
 
         while not plan.is_complete() and not plan.is_failed():
             ready_steps = plan.get_ready_steps()
@@ -592,6 +674,7 @@ class AutonomousPlanner:
                 role=role,
                 task=step.description,
                 tool_budget=step.estimated_tool_calls,
+                allowed_tools=get_step_allowed_tools(step),
             )
             return StepResult(
                 success=sub_result.success,
@@ -614,18 +697,28 @@ class AutonomousPlanner:
         tool_calls_before = getattr(self.orchestrator, "tool_calls_used", 0)
 
         try:
-            # Build step prompt
+            # Build step prompt with tool usage guidance
             prompt = self._build_step_prompt(step)
 
             # Execute via orchestrator
-            response = await self.orchestrator.chat(prompt)
+            chat_kwargs = {}
+            if step.step_type == StepType.RESEARCH:
+                chat_kwargs["runtime_context_overrides"] = prompt_overlay_runtime_overrides(
+                    "planner.research_step",
+                    RESEARCH_STEP_SYSTEM_PROMPT,
+                )
+            response = await self.orchestrator.chat(prompt, **chat_kwargs)
             output = response.content if hasattr(response, "content") else str(response)
+            response_metadata = getattr(response, "metadata", None) or {}
+            loop_success = response_metadata.get("agentic_loop_success")
+            loop_error = response_metadata.get("agentic_loop_error")
 
             tool_calls = getattr(self.orchestrator, "tool_calls_used", 0) - tool_calls_before
 
             return StepResult(
-                success=True,
+                success=loop_success is not False,
                 output=output[:1000],  # Truncate long outputs
+                error=loop_error if loop_success is False else None,
                 tool_calls_used=tool_calls,
                 duration_seconds=time.time() - start_time,
             )
@@ -656,7 +749,14 @@ class AutonomousPlanner:
             )
 
         type_instructions = {
-            StepType.RESEARCH: "Focus on reading and understanding. Do not make changes.",
+            StepType.RESEARCH: (
+                "Focus on reading and understanding. Do not make changes. "
+                "Use these tools for research: "
+                "1) 'grep' tool for pattern searching (specify path in 'path' parameter, not 'cd && grep'), "
+                "2) 'code_search' tool for semantic code queries, "
+                "3) 'read' tool for reading file contents. "
+                "DO NOT use shell with compound commands like 'cd X && grep Y' - use grep with 'path' parameter directly."
+            ),
             StepType.PLANNING: "Create a detailed plan or specification.",
             StepType.IMPLEMENTATION: "Implement the required code changes.",
             StepType.TESTING: "Write and run tests to verify correctness.",

@@ -293,7 +293,9 @@ class TestHealthChecks:
                 return True
 
         container.register(
-            IHealthyService, lambda c: CountingHealthyService(), ServiceLifetime.SINGLETON
+            IHealthyService,
+            lambda c: CountingHealthyService(),
+            ServiceLifetime.SINGLETON,
         )
 
         # First call creates instance

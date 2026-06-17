@@ -87,6 +87,33 @@ class EventType(str, Enum):
     """User-defined custom event. Use metadata['custom_type'] for sub-typing."""
 
 
+class EventSeverity(str, Enum):
+    """Severity levels for events and validation issues.
+
+    Severity levels indicate the importance or impact of events and issues:
+    - Debug: Detailed diagnostic information for development
+    - Info: General informational messages
+    - Warning: Something that warrants attention but isn't critical
+    - Error: An error that prevents normal operation
+    - Critical: A serious error that requires immediate attention
+    """
+
+    DEBUG = "debug"
+    """Detailed diagnostic information for development."""
+
+    INFO = "info"
+    """General informational messages."""
+
+    WARNING = "warning"
+    """Something that warrants attention but isn't critical."""
+
+    ERROR = "error"
+    """An error that prevents normal operation."""
+
+    CRITICAL = "critical"
+    """A serious error that requires immediate attention."""
+
+
 @dataclass
 class AgentExecutionEvent:
     """An observable event from agent execution.
@@ -182,6 +209,11 @@ class AgentExecutionEvent:
     def is_custom_event(self) -> bool:
         """Check if this is a custom user-defined event."""
         return self.type == EventType.CUSTOM
+
+    @property
+    def event_type(self) -> str:
+        """String alias for callers that use event_type naming."""
+        return self.type.value
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for serialization."""

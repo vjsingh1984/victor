@@ -21,7 +21,7 @@ This package provides the runtime infrastructure for Victor verticals:
 - ``StageDefinition``: stage definitions for conversation flow
 
 New external vertical packages should generally be authored against
-``victor_sdk.VerticalBase`` and published through ``victor.plugins``. Core then
+``victor_contracts.VerticalBase`` and published through ``victor.plugins``. Core then
 adapts SDK-pure definitions into runtime verticals on demand.
 
 Phase 2.3 SRP Compliance:
@@ -227,7 +227,7 @@ def _discover_external_verticals() -> None:
         my_vertical = "my_package:plugin"
 
     The plugin then calls ``context.register_vertical(...)`` with vertical
-    definitions that satisfy the Victor SDK or runtime contract.
+    definitions that satisfy the Victor Contracts or runtime contract.
     """
     try:
         # Primary path: use VerticalLoader so runtime discovery has a single

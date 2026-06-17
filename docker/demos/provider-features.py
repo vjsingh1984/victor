@@ -32,7 +32,8 @@ async def wait_for_ollama(max_retries=30, delay=2):
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.get(
-                    f"{os.getenv('OLLAMA_HOST', 'http://ollama:11434')}/api/tags", timeout=5.0
+                    f"{os.getenv('OLLAMA_HOST', 'http://ollama:11434')}/api/tags",
+                    timeout=5.0,
                 )
                 if response.status_code == 200:
                     console.print("[green]✓ Ollama is ready![/green]")
@@ -112,7 +113,10 @@ async def demo_streaming():
     provider = OllamaProvider(base_url=os.getenv("OLLAMA_HOST", "http://ollama:11434"))
 
     messages = [
-        Message(role="user", content="List 5 benefits of using AI coding assistants. Be concise.")
+        Message(
+            role="user",
+            content="List 5 benefits of using AI coding assistants. Be concise.",
+        )
     ]
 
     console.print("\n[bold]Prompt:[/bold]", messages[0].content)
@@ -136,7 +140,10 @@ async def demo_streaming():
 async def demo_multi_turn():
     """Demo 4: Multi-turn conversation."""
     console.print(
-        Panel.fit("[bold cyan]Demo 4: Multi-Turn Conversation[/bold cyan]", border_style="cyan")
+        Panel.fit(
+            "[bold cyan]Demo 4: Multi-Turn Conversation[/bold cyan]",
+            border_style="cyan",
+        )
     )
 
     provider = OllamaProvider(base_url=os.getenv("OLLAMA_HOST", "http://ollama:11434"))

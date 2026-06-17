@@ -68,7 +68,11 @@ from victor.teams.types import (
 )
 
 # Import protocols from canonical location to avoid circular dependencies
-from victor.protocols.team import ITeamMember, ITeamCoordinator
+from victor.protocols.team import (
+    IDelegateFollowUpCoordinator,
+    ITeamMember,
+    ITeamCoordinator,
+)
 
 # =============================================================================
 # Agent Capability Enum (defined locally, not part of teams.types)
@@ -148,7 +152,7 @@ class IAgentRole(Protocol):
                 default_factory=lambda: {AgentCapability.READ, AgentCapability.SEARCH}
             )
             allowed_tools: Set[str] = field(
-                default_factory=lambda: {"read_file", "grep", "semantic_search"}
+                default_factory=lambda: {"read", "grep", "semantic_search"}
             )
             tool_budget: int = 20
 
@@ -268,4 +272,5 @@ __all__ = [
     "IAgentPersona",
     "ITeamMember",
     "ITeamCoordinator",
+    "IDelegateFollowUpCoordinator",
 ]

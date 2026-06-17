@@ -9,16 +9,18 @@ Covers:
 
 import pytest
 import json
+from dataclasses import dataclass
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from victor.tools.base import (
     BaseTool,
     ToolResult,
     ToolParameter,
-    ToolRegistry,
     CostTier,
     Priority,
 )
+from victor.tools.decorators import tool
+from victor.tools.registry import ToolRegistry
 
 
 class TestToolParameter:
@@ -42,14 +44,20 @@ class TestToolParameter:
     def test_tool_parameter_required(self):
         """Test tool parameter required flag."""
         param = ToolParameter(
-            name="required_param", type="string", description="Required parameter", required=True
+            name="required_param",
+            type="string",
+            description="Required parameter",
+            required=True,
         )
         assert param.required is True
 
     def test_tool_parameter_not_required(self):
         """Test tool parameter not required."""
         param = ToolParameter(
-            name="optional_param", type="string", description="Optional parameter", required=False
+            name="optional_param",
+            type="string",
+            description="Optional parameter",
+            required=False,
         )
         assert param.required is False
 
@@ -79,7 +87,10 @@ class TestToolParameter:
     def test_tool_parameter_to_schema(self):
         """Test converting tool parameter to JSON schema."""
         param = ToolParameter(
-            name="test_param", type="string", description="Test parameter", required=True
+            name="test_param",
+            type="string",
+            description="Test parameter",
+            required=True,
         )
         # Tool parameters should be convertible to schema format
         assert param.name == "test_param"
@@ -325,6 +336,27 @@ class TestToolRegistry:
         )
         assert isinstance(tools, (list, dict))
 
+    def test_tool_registry_filters_unavailable_tools_from_listings(self):
+        """Unavailable tools should be hidden from selection and schemas."""
+        registry = ToolRegistry()
+        availability = {"ready": False}
+
+        @tool(name="conditional_tool", availability_check=lambda: availability["ready"])
+        async def conditional_tool():
+            return "ok"
+
+        registry.register(conditional_tool)
+
+        assert registry.list_tools() == []
+        assert registry.get_tool_schemas() == []
+
+        availability["ready"] = True
+
+        assert [tool.name for tool in registry.list_tools()] == ["conditional_tool"]
+        assert [schema["function"]["name"] for schema in registry.get_tool_schemas()] == [
+            "conditional_tool"
+        ]
+
     def test_tool_registry_unregister_tool(self):
         """Test unregistering a tool."""
         registry = ToolRegistry()
@@ -446,7 +478,11 @@ class TestConvertParametersToSchema:
         """Test conversion with empty parameters list."""
         schema = BaseTool.convert_parameters_to_schema([])
         # additionalProperties: False rejects hallucinated arguments
-        assert schema == {"type": "object", "properties": {}, "additionalProperties": False}
+        assert schema == {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": False,
+        }
 
     def test_single_required_parameter(self):
         """Test conversion with single required parameter."""
@@ -767,13 +803,6 @@ class TestToolMetadata:
 class TestSemanticToolSelector:
     """Tests for SemanticToolSelector."""
 
-    def test_build_use_case_text_returns_empty(self):
-        """Test _build_use_case_text returns empty string (legacy method)."""
-        from victor.tools.semantic_selector import SemanticToolSelector
-
-        result = SemanticToolSelector._build_use_case_text("any_tool")
-        assert result == ""
-
     def test_cost_tier_warnings_defined(self):
         """Test COST_TIER_WARNINGS are defined."""
         from victor.tools.semantic_selector import COST_TIER_WARNINGS
@@ -872,6 +901,51 @@ class TestToolDecorators:
 
         # The decorator wraps the function and is callable
         assert callable(test_decorated_fn)
+
+    def test_tool_decorator_propagates_timeout_to_tool_instance(self):
+        """Decorator timeout must reach ToolExecutor via timeout_seconds."""
+        from victor.tools.decorators import tool
+
+        @tool(name="slow_semantic_tool", timeout=123.0)
+        async def slow_semantic_tool(query: str) -> dict:
+            """Execute a slow semantic lookup."""
+            return {"query": query}
+
+        tool_instance = slow_semantic_tool.Tool
+
+        assert tool_instance.timeout_seconds == 123.0
+        assert tool_instance.timeout == 123.0
+
+    def test_tool_decorator_handles_structured_parameter_types_in_schema(self):
+        """Dataclass-style structured parameters should become object schema entries."""
+        from victor.tools.decorators import tool
+
+        @dataclass
+        class SearchFilters:
+            file_pattern: str | None = None
+            top_k: int = 5
+            tags: list[str] | None = None
+
+        @tool(name="structured_param_tool")
+        async def structured_param_tool(filters: SearchFilters | None = None) -> dict:
+            return {"filters": filters}
+
+        params = structured_param_tool.Tool.parameters
+        filters_schema = params["properties"]["filters"]
+
+        assert filters_schema["type"] == "object"
+        assert "file_pattern" in filters_schema["properties"]
+        assert filters_schema["properties"]["top_k"] == {"type": "integer"}
+        assert params["properties"]["filters"]["properties"]["file_pattern"]["type"] == "string"
+
+    def test_code_search_filters_schema_is_object(self):
+        """`code_search` filters should be typed as an object, not a string."""
+        from victor.tools.code_search_tool import code_search
+
+        filters_schema = code_search.Tool.parameters["properties"].get("filters")
+        assert filters_schema is not None
+        assert filters_schema["type"] == "object"
+        assert "file_pattern" in filters_schema["properties"]
 
 
 # =============================================================================

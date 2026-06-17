@@ -26,9 +26,43 @@ The Coding vertical uses the following tools from `victor.tools.tool_names`:
 | `ls` | List directory contents |
 | `grep` | Keyword-based code search |
 | `code_search` | Semantic code search using embeddings |
+| `lsp` | Language-server diagnostics, definitions, references, hover, and related code intelligence |
+| `symbol` | Targeted symbol lookup for functions, classes, and other named definitions |
+| `refs` | Reference lookup for a known symbol or identifier |
+| `project_overview` | Structure-aware project and directory overview before opening files |
 | `overview` | Generate codebase overview and structure |
 | `graph` | Code graph analysis (PageRank, dependencies) |
 | `shell` | Execute shell commands for builds, tests, etc. |
+
+## Default Code-Intelligence Workflow
+
+Victor's default coding modes (`plan`, `build`, `review`, and `delegate`) are
+code-intelligence-first. When the agent attempts to read a whole source file before narrowing
+the target, the runtime steers that call through structure-aware tools first:
+
+- Use `lsp(action="diagnostics", file_path=...)` to find concrete error or warning ranges.
+- Use `symbol(file_path=..., symbol_name=...)` when the target symbol is known.
+- Use `refs(symbol_name=..., search_path=...)` when references are the fastest way to find call sites.
+- Use `project_overview(path=..., max_depth=...)` when the target file or symbol is still ambiguous.
+
+After diagnostics, symbol lookup, references, or project overview produce a line or file hint,
+follow-up broad reads are narrowed to a small `read(path, offset, limit)` range. Full-file reads
+remain available for non-code files, explicitly targeted ranges, and advanced workflows that opt
+into broader framework behavior.
+
+## Default Coding-Agent Modes
+
+`victor chat --mode` exposes a narrow coding-agent surface by default:
+
+- `plan`: inspect the repository, narrow the target, and produce an implementation plan.
+- `build`: make code changes, run focused validation, and report the result.
+- `review`: inspect changes or architecture for defects, risks, and missing tests.
+- `delegate`: route parallel coding work through workspace-isolated team execution and follow-up contracts.
+
+`explore` remains available as an advanced opt-in compatibility mode for broader repository
+discovery. Workflow DSL execution and delegate follow-up contract injection are also explicit
+opt-ins through `victor workflow` or `victor chat --workflow ...`, not part of the default coding
+mode surface.
 
 ## Available Workflows
 

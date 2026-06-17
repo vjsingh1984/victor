@@ -1,3 +1,3 @@
-# Backwards compatibility redirect
-# This module has been moved to victor.observability.analytics.streaming_metrics
+"""Backward-compatible streaming metrics exports."""
+
 from victor.observability.analytics.streaming_metrics import *  # noqa: F403

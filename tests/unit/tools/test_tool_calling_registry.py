@@ -12,7 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for tool calling adapter registry."""
+"""Tests for tool calling adapter registry.
+
+Architecture:
+    Most providers use OpenAI-compatible tool calling format.
+    Only 3 providers need dedicated adapters (Anthropic, Google, Bedrock)
+    due to genuinely different API formats. 2 local providers (Ollama,
+    LMStudio) keep theirs for text-based fallback parsing.
+
+    Provider-specific adapters for OpenAI-compatible providers (DeepSeek,
+    Azure, vLLM) are opt-in via VICTOR_USE_PROVIDER_SPECIFIC_ADAPTERS=true.
+"""
+
+import os
+from unittest.mock import patch
 
 from victor.agent.tool_calling.registry import ToolCallingAdapterRegistry
 from victor.agent.tool_calling.base import BaseToolCallingAdapter
@@ -63,7 +76,7 @@ class TestToolCallingAdapterRegistry:
         assert "myprovider" in ToolCallingAdapterRegistry._adapters
 
     def test_get_adapter_anthropic(self):
-        """Test getting Anthropic adapter."""
+        """Test getting Anthropic adapter (non-OpenAI format, always dedicated)."""
         adapter = ToolCallingAdapterRegistry.get_adapter("anthropic", model="claude-3")
         assert isinstance(adapter, AnthropicToolCallingAdapter)
 
@@ -73,47 +86,63 @@ class TestToolCallingAdapterRegistry:
         assert isinstance(adapter, OpenAIToolCallingAdapter)
 
     def test_get_adapter_ollama(self):
-        """Test getting Ollama adapter."""
+        """Test getting Ollama adapter (local, needs fallback parsing)."""
         adapter = ToolCallingAdapterRegistry.get_adapter("ollama", model="llama3.1:8b")
         assert isinstance(adapter, OllamaToolCallingAdapter)
 
     def test_get_adapter_lmstudio(self):
-        """Test getting LMStudio adapter (dedicated adapter)."""
+        """Test getting LMStudio adapter (local, needs fallback parsing)."""
         adapter = ToolCallingAdapterRegistry.get_adapter("lmstudio", model="local-model")
         assert isinstance(adapter, LMStudioToolCallingAdapter)
         assert adapter.provider_name == "lmstudio"
 
-    def test_get_adapter_vllm(self):
-        """Test getting vLLM adapter (OpenAI-compatible)."""
+    def test_get_adapter_vllm_default(self):
+        """Test vLLM uses OpenAI adapter by default."""
         adapter = ToolCallingAdapterRegistry.get_adapter("vllm", model="local-model")
-        assert isinstance(adapter, OpenAICompatToolCallingAdapter)
-        assert adapter.provider_name == "vllm"
+        assert isinstance(adapter, OpenAIToolCallingAdapter)
+
+    def test_get_adapter_vllm_specific(self):
+        """Test vLLM uses dedicated adapter when opt-in."""
+        with patch.dict(os.environ, {"VICTOR_USE_PROVIDER_SPECIFIC_ADAPTERS": "true"}):
+            adapter = ToolCallingAdapterRegistry.get_adapter("vllm", model="local-model")
+            assert isinstance(adapter, OpenAICompatToolCallingAdapter)
+            assert adapter.provider_name == "vllm"
 
     def test_get_adapter_google(self):
-        """Test getting Google adapter uses dedicated GoogleToolCallingAdapter."""
+        """Test getting Google adapter (non-OpenAI format, always dedicated)."""
         adapter = ToolCallingAdapterRegistry.get_adapter("google", model="gemini-pro")
         assert isinstance(adapter, GoogleToolCallingAdapter)
 
     def test_get_adapter_xai(self):
-        """Test getting xAI adapter uses OpenAI format (covers lines 116-117)."""
+        """Test xAI uses OpenAI adapter (OpenAI-compatible format)."""
         adapter = ToolCallingAdapterRegistry.get_adapter("xai", model="grok-1")
         assert isinstance(adapter, OpenAIToolCallingAdapter)
 
-    def test_get_adapter_deepseek(self):
-        """Test getting DeepSeek adapter uses dedicated adapter."""
+    def test_get_adapter_deepseek_default(self):
+        """Test DeepSeek uses OpenAI adapter by default."""
         adapter = ToolCallingAdapterRegistry.get_adapter("deepseek", model="deepseek-chat")
-        assert isinstance(adapter, DeepSeekToolCallingAdapter)
+        assert isinstance(adapter, OpenAIToolCallingAdapter)
+
+    def test_get_adapter_deepseek_specific(self):
+        """Test DeepSeek uses dedicated adapter when opt-in."""
+        with patch.dict(os.environ, {"VICTOR_USE_PROVIDER_SPECIFIC_ADAPTERS": "true"}):
+            adapter = ToolCallingAdapterRegistry.get_adapter("deepseek", model="deepseek-chat")
+            assert isinstance(adapter, DeepSeekToolCallingAdapter)
 
     def test_get_adapter_cerebras(self):
-        """Test getting Cerebras adapter uses OpenAI format."""
+        """Test Cerebras uses OpenAI adapter."""
         adapter = ToolCallingAdapterRegistry.get_adapter("cerebras", model="gpt-oss-120b")
         assert isinstance(adapter, OpenAIToolCallingAdapter)
 
+    def test_get_adapter_zai(self):
+        """Test Z.AI uses OpenAI adapter."""
+        adapter = ToolCallingAdapterRegistry.get_adapter("zai", model="glm-5.1")
+        assert isinstance(adapter, OpenAIToolCallingAdapter)
+
     def test_get_adapter_unknown_provider(self):
-        """Test unknown provider falls back to OpenAI-compatible."""
+        """Test unknown provider defaults to OpenAI adapter."""
         adapter = ToolCallingAdapterRegistry.get_adapter("unknown_provider", model="some-model")
-        assert isinstance(adapter, OpenAICompatToolCallingAdapter)
-        assert adapter.provider_name == "unknown_provider"
+        assert isinstance(adapter, OpenAIToolCallingAdapter)
 
     def test_get_adapter_case_insensitive(self):
         """Test get_adapter is case-insensitive."""
@@ -127,22 +156,20 @@ class TestToolCallingAdapterRegistry:
             "ollama", model="llama3.1:8b", config=config
         )
         assert isinstance(adapter, OllamaToolCallingAdapter)
-        # Config is passed during construction
 
     def test_list_providers(self):
-        """Test listing registered providers."""
+        """Test listing registered providers (non-OpenAI + local only)."""
         providers = ToolCallingAdapterRegistry.list_providers()
+        # Default adapters are only for non-OpenAI and local providers
         assert "anthropic" in providers
-        assert "openai" in providers
+        assert "google" in providers
+        assert "bedrock" in providers
         assert "ollama" in providers
         assert "lmstudio" in providers
-        assert "vllm" in providers
-        assert "deepseek" in providers
 
     def test_is_registered_true(self):
         """Test is_registered returns True for registered providers."""
         assert ToolCallingAdapterRegistry.is_registered("anthropic") is True
-        assert ToolCallingAdapterRegistry.is_registered("openai") is True
         assert ToolCallingAdapterRegistry.is_registered("ollama") is True
 
     def test_is_registered_false(self):
@@ -155,33 +182,27 @@ class TestToolCallingAdapterRegistry:
         assert ToolCallingAdapterRegistry.is_registered("Ollama") is True
 
     def test_is_registered_lazy_init(self):
-        """Test is_registered triggers lazy initialization (covers line 143)."""
-        # Clear the registry completely
+        """Test is_registered triggers lazy initialization."""
         ToolCallingAdapterRegistry._adapters = {}
-
-        # Call is_registered - should trigger lazy init
         result = ToolCallingAdapterRegistry.is_registered("ollama")
-
-        # Should return True after lazy init
         assert result is True
-        # Adapters should now be populated
         assert len(ToolCallingAdapterRegistry._adapters) > 0
 
     def test_default_adapters_populated(self):
         """Test default adapters are populated on first get_adapter call."""
-        # Clear registry
         ToolCallingAdapterRegistry._adapters = {}
-
-        # Make a call
         ToolCallingAdapterRegistry.get_adapter("ollama")
 
-        # Check defaults are populated
+        # Only non-OpenAI and local providers are in the default registry
         assert "anthropic" in ToolCallingAdapterRegistry._adapters
-        assert "openai" in ToolCallingAdapterRegistry._adapters
+        assert "google" in ToolCallingAdapterRegistry._adapters
+        assert "bedrock" in ToolCallingAdapterRegistry._adapters
         assert "ollama" in ToolCallingAdapterRegistry._adapters
         assert "lmstudio" in ToolCallingAdapterRegistry._adapters
-        assert "vllm" in ToolCallingAdapterRegistry._adapters
-        assert "deepseek" in ToolCallingAdapterRegistry._adapters
+        # OpenAI-compatible providers are NOT in the registry — they use
+        # OpenAIToolCallingAdapter by default via the fallback path
+        assert "openai" not in ToolCallingAdapterRegistry._adapters
+        assert "deepseek" not in ToolCallingAdapterRegistry._adapters
 
 
 class TestToolCallingAdapterRegistryEdgeCases:
@@ -220,10 +241,11 @@ class TestToolCallingAdapterRegistryEdgeCases:
         assert isinstance(adapter, AnthropicToolCallingAdapter)
 
     def test_multiple_unknown_providers(self):
-        """Test multiple unknown providers get unique adapters."""
+        """Test multiple unknown providers all get OpenAI adapter."""
         adapter1 = ToolCallingAdapterRegistry.get_adapter("provider_a", model="model1")
         adapter2 = ToolCallingAdapterRegistry.get_adapter("provider_b", model="model2")
 
-        assert adapter1.provider_name == "provider_a"
-        assert adapter2.provider_name == "provider_b"
+        # Both unknown providers get OpenAI adapter
+        assert isinstance(adapter1, OpenAIToolCallingAdapter)
+        assert isinstance(adapter2, OpenAIToolCallingAdapter)
         assert adapter1 is not adapter2

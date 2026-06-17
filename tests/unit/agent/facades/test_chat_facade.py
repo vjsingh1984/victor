@@ -15,6 +15,7 @@
 """Tests for ChatFacade domain facade."""
 
 import pytest
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 from victor.agent.facades.chat_facade import ChatFacade
@@ -150,6 +151,68 @@ class TestChatFacadeProperties:
         new_compactor = MagicMock(name="new_compactor")
         facade.context_compactor = new_compactor
         assert facade.context_compactor is new_compactor
+
+    def test_runtime_state_host_keeps_chat_runtime_state_live(self):
+        """ChatFacade should reflect canonical mutable chat runtime state."""
+        runtime_state_host = SimpleNamespace(
+            _memory_session_id="runtime-session",
+            _conversation_embedding_store=MagicMock(name="runtime_embedding"),
+            _system_prompt="runtime prompt",
+            _context_compactor=MagicMock(name="runtime_compactor"),
+        )
+        facade = ChatFacade(
+            conversation=MagicMock(name="conversation"),
+            conversation_controller=MagicMock(name="controller"),
+            conversation_state=MagicMock(name="state"),
+            memory_session_id="stale-session",
+            embedding_store=MagicMock(name="stale_embedding"),
+            system_prompt="stale prompt",
+            context_compactor=MagicMock(name="stale_compactor"),
+            runtime_state_host=runtime_state_host,
+        )
+
+        assert facade.memory_session_id == "runtime-session"
+        assert facade.embedding_store is runtime_state_host._conversation_embedding_store
+        assert facade.system_prompt == "runtime prompt"
+        assert facade.context_compactor is runtime_state_host._context_compactor
+
+        runtime_state_host._memory_session_id = "updated-session"
+        runtime_state_host._conversation_embedding_store = MagicMock(name="updated_embedding")
+        runtime_state_host._system_prompt = "updated prompt"
+        runtime_state_host._context_compactor = MagicMock(name="updated_compactor")
+
+        assert facade.memory_session_id == "updated-session"
+        assert facade.embedding_store is runtime_state_host._conversation_embedding_store
+        assert facade.system_prompt == "updated prompt"
+        assert facade.context_compactor is runtime_state_host._context_compactor
+
+    def test_runtime_state_host_setters_update_canonical_chat_state(self):
+        """ChatFacade compatibility setters should write through to runtime state."""
+        runtime_state_host = SimpleNamespace(
+            _memory_session_id="runtime-session",
+            _conversation_embedding_store=MagicMock(name="runtime_embedding"),
+            _system_prompt="runtime prompt",
+            _context_compactor=MagicMock(name="runtime_compactor"),
+        )
+        facade = ChatFacade(
+            conversation=MagicMock(name="conversation"),
+            conversation_controller=MagicMock(name="controller"),
+            conversation_state=MagicMock(name="state"),
+            system_prompt="stale prompt",
+            embedding_store=MagicMock(name="stale_embedding"),
+            context_compactor=MagicMock(name="stale_compactor"),
+            runtime_state_host=runtime_state_host,
+        )
+        new_store = MagicMock(name="new_embedding")
+        new_compactor = MagicMock(name="new_compactor")
+
+        facade.system_prompt = "new prompt"
+        facade.embedding_store = new_store
+        facade.context_compactor = new_compactor
+
+        assert runtime_state_host._system_prompt == "new prompt"
+        assert runtime_state_host._conversation_embedding_store is new_store
+        assert runtime_state_host._context_compactor is new_compactor
 
 
 class TestChatFacadeProtocolConformance:

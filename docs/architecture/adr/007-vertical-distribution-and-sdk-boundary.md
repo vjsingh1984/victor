@@ -1,4 +1,4 @@
-# ADR 007: Vertical Distribution Model and SDK Boundary
+# ADR 007: Vertical Distribution Model and Contracts Boundary
 
 ## Metadata
 
@@ -16,7 +16,7 @@ Victor currently operates with a mixed vertical architecture:
 2. The import resolver still prefers external wheel namespaces such as
    `victor_coding`, `victor_research`, and `victor_devops` before falling back to
    bundled contrib modules.
-3. `victor-sdk` documents a zero-runtime-dependency vertical model, but current
+3. `victor-contracts` documents a zero-runtime-dependency vertical model, but current
    bundled verticals and the external vertical example still import framework/core
    implementation modules.
 4. `victor.core.verticals.base.VerticalBase` still includes runtime creation logic
@@ -25,7 +25,7 @@ Victor currently operates with a mixed vertical architecture:
 This creates architectural ambiguity in four places:
 
 - **Source of truth ambiguity**: bundled contrib code vs. external wheel code
-- **Contract ambiguity**: SDK-only authoring vs. framework-coupled authoring
+- **Contract ambiguity**: contract-only authoring vs. framework-coupled authoring
 - **Packaging ambiguity**: bundled-by-default vs. independently released verticals
 - **Runtime ambiguity**: declarative vertical definition vs. host-runtime-aware plugins
 
@@ -34,12 +34,12 @@ it difficult to add guardrails such as forbidden-import checks or packaging CI.
 
 ## Decision
 
-Victor should target an **SDK-first extracted vertical architecture** with a single
+Victor should target an **contract-first extracted vertical architecture** with a single
 authoritative implementation source for each vertical.
 
 The target model is:
 
-1. **`victor-sdk` owns stable contracts** for vertical definitions.
+1. **`victor-contracts` owns stable contracts** for vertical definitions.
    This includes base protocols, shared types, canonical tool identifiers,
    capability identifiers, and serializable vertical definition structures.
 2. **`victor-ai` owns runtime orchestration only**.
@@ -49,7 +49,7 @@ The target model is:
    Bundled contrib copies must not coexist as peer implementations once extraction is
    complete. During transition, bundled contrib code may remain only as compatibility
    shims or temporary migration adapters.
-4. **Vertical definition code must be SDK-only**.
+4. **Vertical definition code must be contract-only**.
    Definition-layer modules such as `assistant.py` and package templates must not
    import `victor.framework`, `victor.core.verticals`, or framework tool registries.
 5. **Runtime add-ons are separated from definition contracts**.
@@ -61,7 +61,7 @@ The target model is:
    factory/adapter layer.
 
 Until this ADR is accepted, the working assumption for planning and documentation is
-SDK-first extraction, but no breaking packaging removals should be made without an
+contract-first extraction, but no breaking packaging removals should be made without an
 explicit acceptance step.
 
 ## Rationale
@@ -70,7 +70,7 @@ explicit acceptance step.
 
 - It resolves the current split-brain problem between bundled contrib modules and
   external package discovery paths.
-- It aligns the implementation with `victor-sdk`'s published contract and examples.
+- It aligns the implementation with `victor-contracts`'s published contract and examples.
 - It makes dependency direction explicit: vertical definitions depend on the SDK,
   while the runtime depends on definitions and adapters.
 - It gives the project a clean place to enforce import-boundary checks and packaging
@@ -94,7 +94,7 @@ explicit acceptance step.
 
 - **Positive**:
   - The architecture gets a single target state instead of competing narratives.
-  - `victor-sdk` can become the actual public authoring surface, not just a partial one.
+  - `victor-contracts` can become the actual public authoring surface, not just a partial one.
   - Future work on tool names, capabilities, examples, and templates can converge on
     one contract.
 - **Negative**:
@@ -118,7 +118,7 @@ High-level phases:
 1. Publish the architecture decision and transition rules.
 2. Complete the SDK contract surface.
 3. Move runtime creation and runtime-heavy helpers behind host-owned adapters.
-4. Migrate definition-layer vertical modules to SDK-only imports.
+4. Migrate definition-layer vertical modules to contract-only imports.
 5. Converge packaging on one authoritative implementation per vertical.
 6. Add guardrails, smoke tests, and compatibility checks.
 
@@ -126,7 +126,7 @@ High-level phases:
 
 ### 1. Keep bundled contrib verticals as the permanent end state
 
-Rejected for this ADR because it does not match the current SDK-first ecosystem
+Rejected for this ADR because it does not match the current contract-first ecosystem
 story and leaves the import resolver, examples, and external package management in
 an incoherent state unless extraction-oriented paths are removed.
 
@@ -146,7 +146,7 @@ bundling vs. extraction.
 - `pyproject.toml`
 - `victor/core/verticals/base.py`
 - `victor/core/verticals/import_resolver.py`
-- `victor-sdk/README.md`
+- `victor-contracts/README.md`
 - `examples/external_vertical/src/victor_security/assistant.py`
 - `docs/roadmap/vertical-platform-convergence-plan.md`
 

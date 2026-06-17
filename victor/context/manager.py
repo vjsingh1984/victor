@@ -24,7 +24,6 @@ This module handles:
 
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
-import tiktoken
 
 from pydantic import BaseModel, Field
 
@@ -82,7 +81,7 @@ class ProjectContextLoader:
     """Manages conversation context and token budgeting.
 
     Features:
-    - Accurate token counting using tiktoken
+    - Native-accelerated token counting with Python fallback
     - Automatic pruning when approaching limits
     - Smart file selection based on relevance
     - Message prioritization
@@ -112,12 +111,9 @@ class ProjectContextLoader:
         self.pruning_strategy = pruning_strategy
         self.prune_threshold = prune_threshold
 
-        # Initialize token encoder
-        try:
-            self.encoder = tiktoken.encoding_for_model(model)
-        except KeyError:
-            # Fallback to cl100k_base for unknown models
-            self.encoder = tiktoken.get_encoding("cl100k_base")
+        # Kept for backwards compatibility with callers that access ``encoder``.
+        # Actual token counting is delegated to the shared native tokenizer shim.
+        self.encoder = None
 
         # Context window
         self.context = ContextWindow(max_tokens=max_tokens, reserved_tokens=reserved_tokens)
@@ -128,13 +124,22 @@ class ProjectContextLoader:
         Args:
             text: Text to count
 
+        Uses the shared native tokenizer wrapper, which prefers Rust,
+        then falls back to tiktoken, then word-based estimation.
+
         Returns:
             Number of tokens
         """
-        return len(self.encoder.encode(text))
+        from victor.processing.native.tokenizer import count_tokens
+
+        return count_tokens(text)
 
     def add_message(
-        self, role: str, content: str, priority: int = 5, metadata: Optional[Dict[str, Any]] = None
+        self,
+        role: str,
+        content: str,
+        priority: int = 5,
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> None:
         """Add a message to context.
 
@@ -147,7 +152,11 @@ class ProjectContextLoader:
         tokens = self.count_tokens(content)
 
         message = Message(
-            role=role, content=content, tokens=tokens, priority=priority, metadata=metadata or {}
+            role=role,
+            content=content,
+            tokens=tokens,
+            priority=priority,
+            metadata=metadata or {},
         )
 
         self.context.messages.append(message)

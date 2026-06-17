@@ -20,7 +20,8 @@ a single interface.
 
 This facade wraps already-initialized components from the orchestrator,
 providing a coherent grouping without changing initialization ordering.
-The orchestrator delegates property access through this facade.
+The orchestrator delegates property access through this facade. It does not own
+resilience behavior.
 """
 
 from __future__ import annotations
@@ -51,6 +52,7 @@ class ResilienceFacade:
         - background_tasks: Set of background asyncio tasks
         - cancel_event: Cancellation event for streaming
         - is_streaming: Whether currently streaming
+        - runtime_state_host: Canonical runtime owner for mutable resilience state
     """
 
     def __init__(
@@ -67,6 +69,7 @@ class ResilienceFacade:
         background_tasks: Optional[Set[asyncio.Task]] = None,
         cancel_event: Optional[asyncio.Event] = None,
         is_streaming: bool = False,
+        runtime_state_host: Optional[Any] = None,
     ) -> None:
         self._resilience_runtime = resilience_runtime
         self._recovery_handler = recovery_handler
@@ -79,6 +82,7 @@ class ResilienceFacade:
         self._background_tasks = background_tasks if background_tasks is not None else set()
         self._cancel_event = cancel_event
         self._is_streaming = is_streaming
+        self._runtime_state_host = runtime_state_host
 
         logger.debug(
             "ResilienceFacade initialized (recovery=%s, rl=%s, code=%s)",
@@ -99,21 +103,37 @@ class ResilienceFacade:
     @property
     def recovery_handler(self) -> Optional[Any]:
         """Optional recovery handler for model failure recovery."""
+        if self._runtime_state_host is not None:
+            return getattr(
+                self._runtime_state_host,
+                "_recovery_handler",
+                self._recovery_handler,
+            )
         return self._recovery_handler
 
     @recovery_handler.setter
     def recovery_handler(self, value: Any) -> None:
         """Update the recovery handler."""
+        if self._runtime_state_host is not None:
+            self._runtime_state_host._recovery_handler = value
         self._recovery_handler = value
 
     @property
     def recovery_integration(self) -> Optional[Any]:
         """Recovery integration submodule."""
+        if self._runtime_state_host is not None:
+            return getattr(
+                self._runtime_state_host,
+                "_recovery_integration",
+                self._recovery_integration,
+            )
         return self._recovery_integration
 
     @recovery_integration.setter
     def recovery_integration(self, value: Any) -> None:
         """Update the recovery integration."""
+        if self._runtime_state_host is not None:
+            self._runtime_state_host._recovery_integration = value
         self._recovery_integration = value
 
     @property
@@ -149,19 +169,27 @@ class ResilienceFacade:
     @property
     def cancel_event(self) -> Optional[asyncio.Event]:
         """Cancellation event for streaming."""
+        if self._runtime_state_host is not None:
+            return getattr(self._runtime_state_host, "_cancel_event", self._cancel_event)
         return self._cancel_event
 
     @cancel_event.setter
     def cancel_event(self, value: Optional[asyncio.Event]) -> None:
         """Update the cancellation event."""
+        if self._runtime_state_host is not None:
+            self._runtime_state_host._cancel_event = value
         self._cancel_event = value
 
     @property
     def is_streaming(self) -> bool:
         """Whether currently streaming."""
+        if self._runtime_state_host is not None:
+            return getattr(self._runtime_state_host, "_is_streaming", self._is_streaming)
         return self._is_streaming
 
     @is_streaming.setter
     def is_streaming(self, value: bool) -> None:
         """Update the streaming flag."""
+        if self._runtime_state_host is not None:
+            self._runtime_state_host._is_streaming = value
         self._is_streaming = value

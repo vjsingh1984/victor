@@ -434,7 +434,10 @@ class TestComplianceAction:
             "report_period_days": 30,
             "violations": 3,
             "violation_details": [
-                {"violation_type": "missing_encryption", "message": "PHI not encrypted"},
+                {
+                    "violation_type": "missing_encryption",
+                    "message": "PHI not encrypted",
+                },
             ],
         }
 

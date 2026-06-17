@@ -105,7 +105,7 @@ class NodeMetrics:
             "execution_count": self.execution_count,
             "total_duration": self.total_duration,
             "avg_duration": self.avg_duration,
-            "min_duration": self.min_duration if self.min_duration != float("inf") else 0.0,
+            "min_duration": (self.min_duration if self.min_duration != float("inf") else 0.0),
             "max_duration": self.max_duration,
             "success_count": self.success_count,
             "failure_count": self.failure_count,
@@ -834,7 +834,15 @@ class WorkflowMetricsCollector:
 
             # Load tool metrics
             for row in cursor.execute("SELECT * FROM tool_metrics"):
-                _, workflow_id, tool_name, call_count, total_duration, error_count, last_used = row
+                (
+                    _,
+                    workflow_id,
+                    tool_name,
+                    call_count,
+                    total_duration,
+                    error_count,
+                    last_used,
+                ) = row
 
                 if workflow_id in self._workflows:
                     tool_metrics = ToolUsageMetrics(tool_name=tool_name)

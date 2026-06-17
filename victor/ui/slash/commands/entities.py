@@ -141,10 +141,10 @@ class EntitiesCommand(BaseSlashCommand):
                 return
 
             # Filter by type if specified
-            type_filter = None
+            _type_filter = None  # noqa: F841 - Will be used when async context is available
             if args:
                 try:
-                    type_filter = EntityType(args[0].lower())
+                    _type_filter = EntityType(args[0].lower())
                 except ValueError:
                     ctx.console.print(f"[red]Unknown entity type:[/] {args[0]}")
                     return

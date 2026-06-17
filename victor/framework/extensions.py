@@ -14,7 +14,7 @@
 
 """Stable compatibility API surface for framework-owned extension helpers.
 
-New external verticals should prefer ``victor_sdk`` for definition-layer
+New external verticals should prefer ``victor_contracts`` for definition-layer
 contracts such as ``VerticalBase``, ``StageDefinition``, ``VerticalConfig``,
 and ``register_vertical``. This module remains as a stable compatibility
 surface for framework-owned helpers and older external packages that still
@@ -26,7 +26,7 @@ and may break without notice.
 
 Usage:
     from victor.framework.extensions import SafetyCoordinator, WorkflowExecutor
-    from victor_sdk import StageDefinition, VerticalBase, register_vertical
+    from victor_contracts import StageDefinition, VerticalBase, register_vertical
 """
 
 from __future__ import annotations
@@ -110,9 +110,15 @@ __all__ = [
     "VerticalConfig",  # noqa: F822
     "VerticalExtensions",  # noqa: F822
     # Tool dependency types
+    "BaseToolDependencyProvider",  # noqa: F822
     "ToolDependencyConfig",  # noqa: F822
     "ToolDependency",  # noqa: F822
+    "YAMLToolDependencyProvider",  # noqa: F822
+    "load_tool_dependency_yaml",  # noqa: F822
     "create_vertical_tool_dependency_provider",  # noqa: F822
+    "TieredToolConfig",  # noqa: F822
+    "TaskTypeHint",  # noqa: F822
+    "ToolDependencyLoader",  # noqa: F822
     # Safety pattern types
     "SafetyExtensionProtocol",  # noqa: F822
     "SafetyPattern",  # noqa: F822
@@ -133,18 +139,18 @@ def __getattr__(name: str):
     """Lazy imports to avoid circular dependencies and unnecessary loading."""
     _LAZY_IMPORTS = {
         # Safety
-        "SafetyCoordinator": "victor.agent.coordinators.safety_coordinator",
-        "SafetyAction": "victor.agent.coordinators.safety_coordinator",
-        "SafetyCategory": "victor.agent.coordinators.safety_coordinator",
-        "SafetyRule": "victor.agent.coordinators.safety_coordinator",
+        "SafetyCoordinator": "victor_contracts.safety",
+        "SafetyAction": "victor_contracts.safety",
+        "SafetyCategory": "victor_contracts.safety",
+        "SafetyRule": "victor_contracts.safety",
         # Conversation
-        "ConversationCoordinator": "victor.agent.coordinators.conversation_coordinator",
-        "ConversationStats": "victor.agent.coordinators.conversation_coordinator",
-        "ConversationTurn": "victor.agent.coordinators.conversation_coordinator",
-        "TurnType": "victor.agent.coordinators.conversation_coordinator",
+        "ConversationCoordinator": "victor_contracts.conversation",
+        "ConversationStats": "victor_contracts.conversation",
+        "ConversationTurn": "victor_contracts.conversation",
+        "TurnType": "victor_contracts.conversation",
         # Workflow execution
         "WorkflowExecutor": "victor.workflows.executor",
-        "WorkflowContext": "victor.workflows.executor",
+        "WorkflowContext": "victor.workflows.context",
         "NodeResult": "victor.workflows.executor",
         "ExecutorNodeStatus": "victor.workflows.executor",
         "register_compute_handler": "victor.workflows.executor",
@@ -202,15 +208,21 @@ def __getattr__(name: str):
         # Provider access
         "ProviderRegistry": "victor.providers.registry",
         # Vertical registration and definition-layer types
-        "register_vertical": "victor_sdk",
-        "VerticalBase": "victor_sdk",
-        "StageDefinition": "victor_sdk",
-        "VerticalConfig": "victor_sdk",
-        "VerticalExtensions": "victor_sdk",
+        "register_vertical": "victor_contracts",
+        "VerticalBase": "victor_contracts",
+        "StageDefinition": "victor_contracts",
+        "VerticalConfig": "victor_contracts",
+        "VerticalExtensions": "victor_contracts",
         # Tool dependency types
+        "BaseToolDependencyProvider": "victor.core.tool_dependency_base",
         "ToolDependencyConfig": "victor.core.tool_dependency_base",
         "ToolDependency": "victor.core.tool_types",
+        "YAMLToolDependencyProvider": "victor.core.tool_dependency_loader",
+        "load_tool_dependency_yaml": "victor.core.tool_dependency_loader",
         "create_vertical_tool_dependency_provider": "victor.core.tool_dependency_loader",
+        "TieredToolConfig": "victor.core.verticals.protocols",
+        "TaskTypeHint": "victor.core.vertical_types",
+        "ToolDependencyLoader": "victor.core.tool_dependency_loader",
         # Safety pattern types
         "SafetyExtensionProtocol": "victor.core.verticals.protocols",
         "SafetyPattern": "victor.core.verticals.protocols",

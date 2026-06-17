@@ -14,13 +14,18 @@
 
 """Domain facades for orchestrator decomposition.
 
-Each facade encapsulates a coherent domain within the agent orchestration
-layer (Chat, Tool, Provider, Session, Metrics, Resilience, Workflow,
-Orchestration), grouping related components behind a single interface.
+These facades are grouping, property-access, and compatibility surfaces for the
+agent runtime. They may expose already-initialized components behind a coherent
+domain boundary, but they must not become behavior-owning runtime layers.
 
-The AgentOrchestrator delegates to these facades rather than managing
-individual components directly, reducing its responsibility to thin
-cross-domain coordination.
+The AgentOrchestrator delegates property access through these facades rather
+than managing individual references directly.
+
+``OrchestrationFacade`` is the canonical migration boundary for runtime-facing
+callers:
+- service-first surfaces: ``chat_service``, ``tool_service``, ``session_service``
+- state-passed surfaces: ``exploration_state_passed``,
+  ``system_prompt_state_passed``, ``safety_state_passed``
 """
 
 from victor.agent.facades.chat_facade import ChatFacade

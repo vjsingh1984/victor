@@ -158,7 +158,10 @@ class DecompositionStrategy(BaseQueryEnhancementStrategy):
                 technique=self.technique,
                 sub_queries=sub_queries,
                 confidence=0.8 if llm_response else 0.6,
-                metadata={"domain": context.domain, "sub_query_count": len(sub_queries)},
+                metadata={
+                    "domain": context.domain,
+                    "sub_query_count": len(sub_queries),
+                },
             )
 
         # No decomposition possible

@@ -43,7 +43,11 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
+from victor.agent.prompt_section_registry import register_prompt_contributor_sections
 from victor.core.vertical_types import TaskTypeHint
+from victor.core.verticals.protocols.prompt_provider import (
+    collect_prompt_section_contributions,
+)
 
 
 @dataclass
@@ -118,16 +122,16 @@ class PromptExtensions:
         Returns:
             Combined system prompt text
         """
+        register_prompt_contributor_sections(self.prompt_contributors)
         sections: List[str] = []
         sorted_contributors = sorted(
             self.prompt_contributors,
             key=lambda c: c.get_priority() if hasattr(c, "get_priority") else 50,
         )
         for contributor in sorted_contributors:
-            if hasattr(contributor, "get_system_prompt_section"):
-                section = contributor.get_system_prompt_section()
-                if section:
-                    sections.append(section)
+            for contribution in collect_prompt_section_contributions(contributor):
+                if contribution.text:
+                    sections.append(contribution.text)
         return "\n\n".join(sections)
 
     def get_grounding_rules(self) -> str:

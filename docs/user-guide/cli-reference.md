@@ -6,13 +6,14 @@ Complete reference for all Victor CLI commands.
 
 | Command | Description |
 |---------|-------------|
-| `victor` | Start TUI mode (interactive) |
+| `victor` | Start interactive CLI chat mode |
 | `victor chat` | Start CLI chat mode |
 | `victor init` | Initialize Victor in current directory |
 | `victor serve` | Start HTTP API server |
 | `victor mcp` | Run as MCP server |
 | `victor keys` | Manage API keys |
 | `victor providers list` | List available providers |
+| `victor capabilities` | Inspect shared tools, teams, workflows, and recommendations |
 | `victor profiles` | Manage provider profiles |
 | `victor tools` | Manage and list tools |
 | `victor models` | Manage Ollama models |
@@ -30,12 +31,13 @@ Complete reference for all Victor CLI commands.
 
 ### victor (default)
 
-Start Victor in TUI (Terminal User Interface) mode.
+Start Victor in interactive CLI chat mode.
 
 ```bash
-victor                              # TUI mode with default profile
-victor --profile local              # TUI with specific profile
-victor --provider anthropic         # TUI with specific provider
+victor                              # CLI mode with default profile
+victor --profile local              # CLI with specific profile
+victor --provider anthropic         # CLI with specific provider
+victor --mode plan                  # CLI in planning mode
 ```
 
 **Options:**
@@ -45,6 +47,7 @@ victor --provider anthropic         # TUI with specific provider
 | `--profile, -p` | Use a saved profile |
 | `--provider` | Override provider |
 | `--model, -m` | Override model |
+| `--mode` | Agent mode: build, plan, review, delegate, explore |
 | `--airgapped` | Enable air-gapped mode (local only) |
 | `--version` | Show version |
 | `--help` | Show help |
@@ -57,7 +60,6 @@ Start an interactive chat session in CLI mode.
 
 ```bash
 victor chat                         # Default provider/model
-victor chat --no-tui                # CLI mode (non-interactive)
 victor chat --provider anthropic --model claude-sonnet-4-5
 victor chat --stream                # Enable streaming (default)
 victor chat --mode plan             # Start in planning mode
@@ -70,9 +72,8 @@ victor chat --mode plan             # Start in planning mode
 | `--profile, -p` | Use a saved profile |
 | `--provider` | LLM provider (anthropic, openai, ollama, etc.) |
 | `--model, -m` | Model name |
-| `--no-tui` | Disable TUI, use CLI mode |
 | `--stream/--no-stream` | Enable/disable streaming |
-| `--mode` | Agent mode: build, plan, explore |
+| `--mode` | Agent mode: build, plan, review, delegate, explore |
 | `--tool-budget` | Override tool call budget |
 | `--resume, -r` | Resume session by ID |
 | `--log-level` | Set logging level |
@@ -153,8 +154,36 @@ victor serve --reload               # Auto-reload on changes
 |----------|--------|-------------|
 | `/chat` | POST | Send a message |
 | `/capabilities` | GET | List available tools |
+| `/capabilities/recommend` | GET | Recommend teams/workflows from shared catalogs |
 | `/health` | GET | Health check |
 | `/providers` | GET | List providers |
+
+---
+
+### victor capabilities
+
+Inspect shared capability catalogs and ask the framework recommendation engine for
+the best team/workflow matches for a task.
+
+```bash
+victor capabilities
+victor capabilities --vertical coding
+victor capabilities recommend feature high
+victor capabilities recommend feature high --mode build --vertical coding --json
+```
+
+**Examples:**
+
+```bash
+# Show all discovered capability catalogs
+victor capabilities
+
+# Restrict inspection to one vertical
+victor capabilities --vertical coding
+
+# Ask for framework-backed coordination suggestions
+victor capabilities recommend feature high --mode build
+```
 
 ---
 
@@ -269,6 +298,9 @@ victor profiles create fast --provider groqcloud --model llama3-70b
 victor profiles delete old-profile
 victor profiles set-default local
 ```
+
+`victor profile ...` remains as a compatibility alias, but new scripts and
+documentation should use `victor profiles ...`.
 
 **Subcommands:**
 
@@ -652,7 +684,7 @@ victor vertical create security --description "Security analysis"
 | `list` | List verticals |
 | `search <query>` | Search verticals |
 | `info <name>` | Show vertical info |
-| `create <name>` | Create a new SDK-first vertical scaffold |
+| `create <name>` | Create a new contract-first vertical scaffold |
 
 **List Filters:**
 
@@ -708,7 +740,7 @@ These options are available for most commands:
 
 ## See Also
 
-- [TUI Mode Guide](./tui-mode.md) - Interactive TUI interface
+- [CLI Mode Guide](./cli-reference.md) - Interactive prompt-toolkit CLI interface
 - [Tool Catalog](../reference/tools/catalog.md) - Available tools
 - [Provider Reference](../reference/providers/) - Provider details
 - [Workflow DSL](../guides/workflow-development/dsl.md) - Workflow syntax

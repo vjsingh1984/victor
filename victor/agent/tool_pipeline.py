@@ -34,12 +34,15 @@ import asyncio
 import ast
 import json
 import logging
+import os
+from pathlib import Path
 import re
 import threading
 import time
+import traceback
 from collections import OrderedDict
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
+from typing import Any, Callable, Dict, List, Mapping, Optional, Set, TYPE_CHECKING
 
 from victor.agent.argument_normalizer import ArgumentNormalizer, NormalizationStrategy
 from victor.agent.tool_executor import ToolExecutor, ToolExecutionResult
@@ -56,15 +59,19 @@ from victor.agent.output_aggregator import (
     OutputAggregator,
     AggregationState,
 )
+from victor.core.errors import ErrorInfo, ErrorCategory, ErrorSeverity
 from victor.agent.synthesis_checkpoint import (
-    SynthesisCheckpoint,
     CompositeSynthesisCheckpoint,
-    CheckpointResult,
     get_checkpoint_for_complexity,
 )
+from victor.agent.file_state import capture_file_state, normalize_file_path
 from victor.config.tool_selection_defaults import (
     ToolPipelineDefaults,
     IdempotentTools,
+)
+from victor.tools.core_tool_aliases import (
+    canonicalize_core_tool_name,
+    normalize_model_tool_name,
 )
 
 # Import native compute_signature for 10-20x faster signature generation
@@ -78,7 +85,7 @@ except ImportError:
 
 if TYPE_CHECKING:
     from victor.agent.search_router import SearchRouter
-    from victor.tools.base import ToolRegistry
+    from victor.tools.registry import ToolRegistry
     from victor.storage.cache.tool_cache import ToolCache
     from victor.agent.code_correction_middleware import CodeCorrectionMiddleware
     from victor.agent.signature_store import SignatureStore
@@ -107,7 +114,8 @@ class ToolPipelineConfig:
     code_correction_auto_fix: bool = True
 
     # Per-tool-call timeout for serial execution path
-    per_tool_timeout_seconds: float = 30.0
+    # Increased from 30 to 60 seconds for semantic search (code_search, etc.)
+    per_tool_timeout_seconds: float = 60.0
 
     # Parallel execution settings
     enable_parallel_execution: bool = True
@@ -133,6 +141,17 @@ class ToolPipelineConfig:
     # Enables intelligent caching based on semantic similarity, reducing redundant tool calls
     enable_semantic_caching: bool = True
 
+    # Cross-turn dedup: cache results for "effectively idempotent" tools
+    # (web_search, grep_search, http_request, git) across turns within a session.
+    enable_cross_turn_dedup: bool = True
+    cross_turn_dedup_ttl: float = 300.0  # seconds
+
+    # Navigation hint loop detection settings
+    # Prevents infinite loops when navigation hints keep rewriting to same region
+    navigation_hint_max_uses: int = 3
+    navigation_hint_ttl_seconds: float = 600.0
+    navigation_hint_loop_threshold: int = 3
+
 
 # Tools that are safe to cache (read-only, deterministic for same arguments)
 # Include both lowercase and capitalized variants for tool name normalization
@@ -144,11 +163,25 @@ IDEMPOTENT_TOOLS = IdempotentTools.IDEMPOTENT_TOOLS | frozenset(
         "Grep",
         "Graph",
         "Glob",
-        "read_file",  # Alternative name for 'read'
-        "list_directory",  # Alternative name for 'ls'
         "code_search",  # Semantic code search alias
         "semantic_code_search",
         "refs",  # Reference lookup
+    }
+)
+
+# Cross-turn dedup: tools that are "effectively idempotent" within a session
+# window even though they may be classified as non-idempotent. These produce
+# the same result for identical args within a short time window (e.g., 5 min),
+# making re-execution wasteful. Separate from IDEMPOTENT_TOOLS to allow
+# a shorter TTL and explicit opt-in.
+CROSS_TURN_DEDUP_TOOLS = frozenset(
+    {
+        "web_search",
+        "web_fetch",
+        "http_request",
+        "grep_search",
+        "plan_files",
+        "git",  # git status/log/diff are read-only
     }
 )
 
@@ -179,6 +212,35 @@ GRAPH_TOOL_ARGUMENTS = frozenset(
         "include_refs",
     }
 )
+
+CODE_INTELLIGENCE_FIRST_MODES = frozenset({"plan", "build", "review", "delegate", "explore"})
+CODE_FILE_EXTENSIONS = frozenset(
+    {
+        ".py",
+        ".pyi",
+        ".js",
+        ".jsx",
+        ".ts",
+        ".tsx",
+        ".java",
+        ".go",
+        ".rs",
+        ".c",
+        ".cc",
+        ".cpp",
+        ".cxx",
+        ".h",
+        ".hpp",
+        ".cs",
+        ".rb",
+        ".php",
+        ".swift",
+        ".kt",
+        ".scala",
+    }
+)
+TARGETED_READ_LINE_CONTEXT = 40
+TARGETED_READ_LINE_LIMIT = 120
 
 
 class ToolRateLimiter:
@@ -416,10 +478,234 @@ class ToolCallResult:
     normalization_applied: Optional[str] = None
     skipped: bool = False
     skip_reason: Optional[str] = None
+    outcome_kind: Optional[str] = None
+    block_source: Optional[str] = None
+    retryable: Optional[bool] = None
+    user_message: Optional[str] = None
 
     # Code correction tracking
     code_corrected: bool = False
     code_validation_errors: Optional[List[str]] = None
+
+    # OpenAI-compatible tool_call_id — links response to assistant's tool_calls[].id
+    tool_call_id: Optional[str] = None
+
+    # Structured error information with traceback and metadata
+    error_info: Optional["ErrorInfo"] = None
+
+
+def _build_skip_result(
+    *,
+    tool_name: str,
+    arguments: Dict[str, Any],
+    success: bool,
+    skip_reason: str,
+    outcome_kind: str,
+    block_source: str,
+    retryable: bool,
+    user_message: Optional[str] = None,
+    result: Any = None,
+    error: Optional[str] = None,
+    execution_time_ms: float = 0.0,
+    cached: bool = False,
+    normalization_applied: Optional[str] = None,
+    tool_call_id: Optional[str] = None,
+) -> ToolCallResult:
+    """Create a skipped tool-call result with structured block metadata."""
+    return ToolCallResult(
+        tool_name=tool_name,
+        arguments=arguments,
+        success=success,
+        result=result,
+        error=error,
+        execution_time_ms=execution_time_ms,
+        cached=cached,
+        normalization_applied=normalization_applied,
+        skipped=True,
+        skip_reason=skip_reason,
+        outcome_kind=outcome_kind,
+        block_source=block_source,
+        retryable=retryable,
+        user_message=user_message or error or skip_reason,
+        tool_call_id=tool_call_id,
+    )
+
+
+def _format_tool_command_value(value: Any) -> str:
+    """Serialize a tool argument value for compact follow-up guidance."""
+    if isinstance(value, str):
+        return json.dumps(value)
+    return repr(value)
+
+
+def _build_tool_follow_up_command(tool_name: str, arguments: Dict[str, Any]) -> str:
+    """Build a compact tool command example for recovery suggestions."""
+    serialized_args = ", ".join(
+        f"{key}={_format_tool_command_value(value)}"
+        for key, value in arguments.items()
+        if value is not None
+    )
+    return f"{tool_name}({serialized_args})"
+
+
+def _build_follow_up_suggestion(
+    tool_name: str,
+    arguments: Dict[str, Any],
+    description: str,
+) -> Dict[str, Any]:
+    """Create a normalized follow-up suggestion payload."""
+    return {
+        "tool": tool_name,
+        "command": _build_tool_follow_up_command(tool_name, arguments),
+        "arguments": arguments,
+        "description": description,
+        "reason": description,
+    }
+
+
+def _build_redundant_call_recovery(tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+    """Build actionable recovery guidance for redundant tool calls."""
+    canonical_name = canonicalize_core_tool_name(tool_name.lower())
+    scope_path = str(arguments.get("path") or arguments.get("search_path") or ".")
+    query = arguments.get("query") or arguments.get("pattern")
+    symbol_name = arguments.get("symbol_name")
+    suggestions: List[Dict[str, Any]] = []
+
+    if canonical_name in {"code_search", "semantic_code_search", "grep"}:
+        suggestions.append(
+            _build_follow_up_suggestion(
+                "overview",
+                {"path": scope_path, "max_depth": 2},
+                "Inspect the surrounding project structure instead of repeating the same search.",
+            )
+        )
+        if query:
+            suggestions.append(
+                _build_follow_up_suggestion(
+                    "graph",
+                    {
+                        "mode": "search",
+                        "query": str(query),
+                        "path": scope_path,
+                        "top_k": 5,
+                    },
+                    f'Search the graph index for "{query}" instead of repeating the same text search.',
+                )
+            )
+        else:
+            suggestions.append(
+                _build_follow_up_suggestion(
+                    "graph",
+                    {"mode": "overview", "path": scope_path, "top_k": 5},
+                    "Use the graph overview to find the next module or symbol to inspect.",
+                )
+            )
+        message = (
+            f"[The same {_build_tool_follow_up_command(tool_name, arguments)} was already tried "
+            "recently and is unlikely to return new information. Do not repeat the same search "
+            "with identical arguments. Change the query or mode, narrow or broaden the path, or "
+            "switch to structure-aware tools such as overview(...) or graph(...).]"
+        )
+    elif canonical_name == "refs":
+        if symbol_name:
+            suggestions.append(
+                _build_follow_up_suggestion(
+                    "graph",
+                    {"mode": "callers|callees", "node": str(symbol_name), "depth": 2},
+                    f'Explore call relationships for "{symbol_name}" instead of repeating refs().',
+                )
+            )
+            suggestions.append(
+                _build_follow_up_suggestion(
+                    "code_search",
+                    {
+                        "query": str(symbol_name),
+                        "path": scope_path,
+                        "mode": "text",
+                        "k": 5,
+                    },
+                    f'Search textually for "{symbol_name}" to find concrete files to read next.',
+                )
+            )
+        else:
+            suggestions.append(
+                _build_follow_up_suggestion(
+                    "overview",
+                    {"path": scope_path, "max_depth": 2},
+                    "Inspect the project structure to choose a more specific symbol target.",
+                )
+            )
+        message = (
+            f"[The same {_build_tool_follow_up_command(tool_name, arguments)} was already tried "
+            "recently and is unlikely to reveal new references. Do not repeat the same refs() "
+            "scan with identical arguments. Inspect the symbol through graph relationships or "
+            "switch to a more targeted search to identify a concrete file to read.]"
+        )
+    else:
+        suggestions.append(
+            _build_follow_up_suggestion(
+                "overview",
+                {"path": scope_path, "max_depth": 2},
+                "Inspect the nearby project structure before choosing a different tool or scope.",
+            )
+        )
+        suggestions.append(
+            _build_follow_up_suggestion(
+                "graph",
+                {"mode": "overview", "path": scope_path, "top_k": 5},
+                "Use the graph overview to identify a higher-value next step.",
+            )
+        )
+        message = (
+            f"[{_build_tool_follow_up_command(tool_name, arguments)} overlaps with a recent call "
+            "and was skipped. Do not repeat the same tool with identical arguments. Change the "
+            "scope or switch to a different discovery tool.]"
+        )
+
+    return {
+        "success": False,
+        "error": message,
+        "metadata": {"follow_up_suggestions": suggestions[:2]},
+    }
+
+
+def _build_repeated_failure_recovery(tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+    """Build recovery guidance for a call that already failed with the same arguments."""
+    recovery = _build_redundant_call_recovery(tool_name, arguments)
+    original_error = recovery.get("error", "")
+    repeated_message = (
+        f"[{_build_tool_follow_up_command(tool_name, arguments)} already failed earlier in this "
+        "session with the same arguments. Do not repeat the same failing call. Change the path, "
+        "query, or tool choice before retrying.]"
+    )
+    if original_error:
+        repeated_message = f"{repeated_message}\n{original_error}"
+    return {
+        "success": False,
+        "error": repeated_message,
+        "metadata": recovery.get("metadata", {}),
+    }
+
+
+def _has_informative_skip_payload(call_result: "ToolCallResult") -> bool:
+    """Return True when a skipped call still gave the model actionable information."""
+    if not getattr(call_result, "skipped", False):
+        return False
+
+    output = getattr(call_result, "result", None)
+    if isinstance(output, str):
+        return bool(output.strip())
+    if isinstance(output, dict):
+        return bool(
+            output
+            and (
+                output.get("error")
+                or output.get("result") is not None
+                or output.get("metadata")
+                or output.get("success") is False
+            )
+        )
+    return output is not None
 
 
 @dataclass
@@ -496,7 +782,8 @@ class ToolPipeline:
             tool_cache: Optional cache for tool results
             argument_normalizer: Optional argument normalizer
             code_correction_middleware: Optional middleware for code validation/fixing
-            signature_store: Optional persistent storage for failed signatures (cross-session learning)
+            signature_store: Optional persistent storage for failed
+                signatures (cross-session learning)
             on_tool_start: Callback when tool execution starts
             on_tool_complete: Callback when tool execution completes
             deduplication_tracker: Optional tracker for detecting redundant tool calls
@@ -522,6 +809,10 @@ class ToolPipeline:
         self.on_tool_complete = on_tool_complete
         self.on_tool_event = on_tool_event
 
+        # Spin detection: track whether last batch had all calls blocked
+        self.last_batch_all_skipped: bool = False
+        self.last_batch_effectively_blocked: bool = False
+
         # Output aggregation and synthesis checkpoints
         self._output_aggregator: Optional[OutputAggregator] = None
         self._synthesis_checkpoint: Optional[CompositeSynthesisCheckpoint] = None
@@ -541,6 +832,9 @@ class ToolPipeline:
         # When signature_store is provided, it's used for persistent cross-session tracking
         self._failed_signatures: Set[tuple] = set()
         self._executed_tools: List[str] = []
+        self._recent_code_navigation_hints: Dict[str, Dict[str, Any]] = {}
+        self._last_code_navigation_tool: Optional[str] = None
+        self._failed_path_redirects: Dict[str, str] = {}
 
         # Analytics
         self._tool_stats: Dict[str, Dict[str, Any]] = {}
@@ -560,9 +854,42 @@ class ToolPipeline:
         # Batch-level deduplication tracking
         self._batch_dedup_count = 0  # Total duplicates skipped
 
+        # Cross-turn dedup cache for "effectively idempotent" tools
+        # Uses the same LRU structure but covers tools outside IDEMPOTENT_TOOLS
+        # (web_search, http_request, grep_search, etc.) with configurable TTL.
+        self._cross_turn_enabled = self.config.enable_cross_turn_dedup
+        self._cross_turn_cache: LRUToolCache = LRUToolCache(
+            max_size=30,
+            ttl_seconds=self.config.cross_turn_dedup_ttl,
+        )
+        self._cross_turn_hits = 0
+
         # File read timestamp tracking for deduplication (prompting loop fix)
         # Prevents re-reading identical files within TTL window
         self._read_file_timestamps: Dict[str, float] = {}
+        self._read_file_paths: Dict[str, str] = {}
+        self._read_file_snapshots: Dict[str, Any] = {}
+
+        # Observability: pre-execution intent logging (LogAct-inspired)
+        self._observability_bus: Optional[Any] = None
+        self._trace_enricher: Optional[Any] = None
+
+        # Credit assignment: automatic tool-level credit tracking (FEP-0001 Phase 3)
+        self._credit_tracking_service: Optional[Any] = None
+
+        # Online tool reputation: mid-turn credit feedback (updates per tool call)
+        self._tool_reputation: Optional[Any] = None
+        try:
+            from victor.framework.rl.tool_reputation import ToolReputationTracker
+
+            self._tool_reputation = ToolReputationTracker()
+        except ImportError:
+            pass
+
+    @property
+    def credit_tracking_service(self) -> Any:
+        """Credit tracking service (if enabled). None otherwise."""
+        return self._credit_tracking_service
 
     @property
     def calls_used(self) -> int:
@@ -575,9 +902,34 @@ class ToolPipeline:
         return max(0, self.config.tool_budget - self._calls_used)
 
     @property
+    def tool_budget(self) -> int:
+        """Configured maximum tool budget for the current turn."""
+        return self.config.tool_budget
+
+    @property
     def executed_tools(self) -> List[str]:
         """List of executed tool names."""
         return list(self._executed_tools)
+
+    def set_tool_budget(self, budget: int) -> None:
+        """Update the configured tool budget limit."""
+        if budget < 0:
+            raise ValueError(f"Tool budget must be non-negative: {budget}")
+        self.config.tool_budget = budget
+        if self._output_aggregator is not None and hasattr(self._output_aggregator, "_max_results"):
+            self._output_aggregator._max_results = budget
+
+    def start_new_turn(self) -> None:
+        """Reset per-turn budget counters while preserving caches and learned state."""
+        self._calls_used = 0
+        self.last_batch_all_skipped = False
+        self.last_batch_effectively_blocked = False
+
+    def consume_budget(self, amount: int = 1) -> None:
+        """Record externally executed tool usage against the shared turn budget."""
+        if amount < 0:
+            raise ValueError(f"Cannot consume negative tool budget: {amount}")
+        self._calls_used += amount
 
     @property
     def parallel_executor(self) -> ParallelToolExecutor:
@@ -608,6 +960,8 @@ class ToolPipeline:
         self._calls_used = 0
         self._failed_signatures.clear()
         self._executed_tools.clear()
+        self._recent_code_navigation_hints.clear()
+        self._last_code_navigation_tool = None
         # Clear idempotent cache (new session may have different file contents)
         self._idempotent_cache.clear()
         self._cache_hits = 0
@@ -643,9 +997,26 @@ class ToolPipeline:
         """
         if not name or not isinstance(name, str):
             return False
-        if len(name) > self.config.max_tool_name_length:
+        normalized = normalize_model_tool_name(name)
+        if not normalized or name != normalized:
             return False
-        return bool(self.VALID_TOOL_NAME_PATTERN.match(name))
+        if len(normalized) > self.config.max_tool_name_length:
+            return False
+        return bool(self.VALID_TOOL_NAME_PATTERN.match(normalized))
+
+    def _normalize_valid_tool_name(self, name: str) -> Optional[str]:
+        """Normalize provider-emitted names and validate the canonical format."""
+        raw_name = str(name or "").strip()
+        if "-" in raw_name or "." in raw_name:
+            return None
+        normalized = normalize_model_tool_name(raw_name)
+        if not normalized:
+            return None
+        if len(normalized) > self.config.max_tool_name_length:
+            return None
+        if not self.VALID_TOOL_NAME_PATTERN.match(normalized):
+            return None
+        return normalized
 
     def _normalize_arguments(
         self, tool_name: str, arguments: Any, context: Optional[Dict[str, Any]] = None
@@ -747,14 +1118,99 @@ class ToolPipeline:
 
         return routed_tool_name, routed_args, changed
 
+    @staticmethod
+    def _coerce_bool_like(value: Any) -> Any:
+        """Coerce common boolean-like strings for tool parameters."""
+        if isinstance(value, str):
+            lowered = value.strip().lower()
+            if lowered in {"true", "1", "yes", "on"}:
+                return True
+            if lowered in {"false", "0", "no", "off"}:
+                return False
+        return value
+
+    def _apply_shell_policy(
+        self,
+        tool_name: str,
+        arguments: Dict[str, Any],
+        context: Optional[Dict[str, Any]] = None,
+    ) -> tuple[Dict[str, Any], bool]:
+        """Apply the single-shell readonly policy.
+
+        The runtime now exposes a single ``shell`` tool and defaults it to
+        ``readonly=True`` unless the caller explicitly opts out. On read-only
+        or display-only turns, ``readonly`` is pinned back to True.
+        """
+        if tool_name != "shell":
+            return arguments, False
+
+        from victor.agent.action_authorizer import ActionIntent
+
+        adjusted = dict(arguments)
+        changed = False
+
+        readonly = adjusted.get("readonly")
+        if readonly is None:
+            adjusted["readonly"] = True
+            changed = True
+        else:
+            coerced = self._coerce_bool_like(readonly)
+            if coerced is not readonly:
+                adjusted["readonly"] = coerced
+                changed = True
+
+        raw_intent = (context or {}).get("current_intent")
+        intent: Optional[ActionIntent] = None
+        if isinstance(raw_intent, ActionIntent):
+            intent = raw_intent
+        elif isinstance(raw_intent, str):
+            try:
+                intent = ActionIntent(raw_intent)
+            except ValueError:
+                intent = None
+
+        if (
+            intent in {ActionIntent.DISPLAY_ONLY, ActionIntent.READ_ONLY}
+            and adjusted.get("readonly") is not True
+        ):
+            adjusted["readonly"] = True
+            changed = True
+            logger.info("Pinned shell readonly=True due to %s intent", intent.value)
+
+        # For WRITE_ALLOWED intent, detect obvious write patterns and default to False
+        # This reduces the LLM's burden for common file write operations
+        if intent == ActionIntent.WRITE_ALLOWED and readonly is None:
+            cmd = str(adjusted.get("cmd", ""))
+            # Detect write operations: redirection (excluding /dev/null), tee, sed -i
+            has_write_pattern = (
+                ">" in cmd
+                and ">/dev/null" not in cmd
+                and "2>/dev/null" not in cmd
+                or ">>" in cmd
+                or "tee" in cmd
+                or (cmd.startswith("sed") and "-i" in cmd)
+            )
+            if has_write_pattern:
+                adjusted["readonly"] = False
+                changed = True
+                logger.info("Set shell readonly=False for WRITE_ALLOWED intent with write pattern")
+
+        return adjusted, changed
+
     def _normalize_tool_call(
         self, tool_name: str, arguments: Any, context: Optional[Dict[str, Any]] = None
     ) -> tuple[str, Dict[str, Any], NormalizationStrategy]:
         """Normalize a full tool call, including search-routing adjustments."""
         normalized_args, strategy = self._normalize_arguments(tool_name, arguments, context=context)
-        normalized_tool_name, normalized_args, changed = self._apply_search_routing(
+        normalized_args, readonly_changed = self._apply_shell_policy(
+            tool_name,
+            normalized_args,
+            context=context,
+        )
+        normalized_tool_name, normalized_args, search_changed = self._apply_search_routing(
             tool_name, normalized_args
         )
+        changed = readonly_changed or search_changed
         if changed and strategy == NormalizationStrategy.DIRECT:
             strategy = NormalizationStrategy.MANUAL_REPAIR
         return normalized_tool_name, normalized_args, strategy
@@ -785,6 +1241,118 @@ class ToolPipeline:
         except Exception:
             args_str = str(args)
         return f"{tool_name}:{args_str}"
+
+    @staticmethod
+    def _path_arg_key(args: Dict[str, Any]) -> Optional[str]:
+        """Return the first recognized path-like argument key."""
+        for key in ("path", "file_path", "file", "filename"):
+            if key in args and args.get(key):
+                return key
+        return None
+
+    @staticmethod
+    def _extract_suggested_paths(error: Optional[str]) -> List[str]:
+        """Extract Did-you-mean path suggestions from filesystem errors."""
+        if not error:
+            return []
+        suggestions = re.findall(r"^\s*-\s+(.+?)\s*$", error, re.MULTILINE)
+        if suggestions:
+            return [suggestion.strip() for suggestion in suggestions if suggestion.strip()]
+        inline = re.search(r"Did you mean:\s*(.+)", error)
+        if not inline:
+            return []
+        return [candidate.strip() for candidate in inline.group(1).split(",") if candidate.strip()]
+
+    @classmethod
+    def _choose_path_redirect(
+        cls,
+        original_path: str,
+        suggestions: List[str],
+        tool_name: str,
+    ) -> Optional[str]:
+        """Choose the best safe read redirect from a suggestion list."""
+        if not original_path or not suggestions:
+            return None
+        canonical_tool = canonicalize_core_tool_name(tool_name.lower())
+        if canonical_tool != "read":
+            return None
+
+        normalized_original = original_path.rstrip("/").replace("\\", "/")
+        base_path, _ = os.path.splitext(normalized_original)
+        file_suggestions = [candidate for candidate in suggestions if not candidate.endswith("/")]
+        package_file_matches = [
+            candidate
+            for candidate in file_suggestions
+            if candidate.replace("\\", "/").startswith(f"{base_path}/")
+        ]
+        if package_file_matches:
+            return package_file_matches[0]
+        if file_suggestions:
+            return file_suggestions[0]
+        return suggestions[0]
+
+    def _record_path_redirect_from_error(
+        self,
+        tool_name: str,
+        args: Dict[str, Any],
+        error: Optional[str],
+    ) -> None:
+        """Remember read(path=bad) -> read(path=suggested) after filesystem errors."""
+        path_key = self._path_arg_key(args)
+        if path_key is None:
+            return
+        original_path = str(args.get(path_key) or "")
+        redirect = self._choose_path_redirect(
+            original_path,
+            self._extract_suggested_paths(error),
+            tool_name,
+        )
+        if not redirect or redirect == original_path:
+            return
+        self._failed_path_redirects[original_path] = redirect
+        logger.info(
+            "[Pipeline] Recorded path redirect for %s: %s -> %s",
+            tool_name,
+            original_path,
+            redirect,
+        )
+
+    def _apply_path_redirect(
+        self,
+        tool_name: str,
+        args: Dict[str, Any],
+    ) -> Optional[Dict[str, Any]]:
+        """Return rewritten args when a prior read failure supplied a better path."""
+        if canonicalize_core_tool_name(tool_name.lower()) != "read":
+            return None
+        path_key = self._path_arg_key(args)
+        if path_key is None:
+            return None
+        original_path = str(args.get(path_key) or "")
+        redirect = self._failed_path_redirects.get(original_path)
+        if not redirect:
+            return None
+        rewritten = dict(args)
+        rewritten[path_key] = redirect
+        return rewritten
+
+    def _generate_tool_call_id(self, tool_name: str) -> str:
+        """Generate a deterministic tool_call_id if one isn't provided.
+
+        Uses tool name + timestamp to create a unique ID that's consistent
+        for the same tool call within a session.
+
+        Args:
+            tool_name: Name of the tool being called
+
+        Returns:
+            A 16-character hex string tool_call_id
+        """
+        import hashlib
+
+        timestamp = int(time.time() * 1000)
+        hash_input = f"{tool_name}_{timestamp}"
+        return hashlib.md5(hash_input.encode()).hexdigest()[:16]
 
     def is_known_failure(self, tool_name: str, args: Dict[str, Any]) -> bool:
         """Check if a tool call is known to fail.
@@ -979,6 +1547,53 @@ class ToolPipeline:
 
         return len(to_remove)
 
+    def _invalidate_post_edit_freshness_state(
+        self,
+        file_path: str,
+        *,
+        context: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, int]:
+        """Invalidate freshness-sensitive state after a successful edit/write."""
+        summary = {
+            "idempotent_cache_entries": self.invalidate_file_cache(file_path),
+            "search_index_roots": 0,
+            "dedup_tracker_calls": 0,
+        }
+
+        if self.semantic_cache is not None:
+            self.semantic_cache.invalidate(file_path)
+
+        try:
+            from victor.tools.code_search_tool import mark_index_cache_stale_for_path
+
+            summary["search_index_roots"] = mark_index_cache_stale_for_path(
+                file_path,
+                exec_ctx=context,
+            )
+        except Exception as exc:
+            logger.debug("Failed to mark code_search index stale for %s: %s", file_path, exc)
+
+        tracker = self.deduplication_tracker
+        invalidate_tracker = getattr(tracker, "invalidate_for_modified_path", None)
+        if callable(invalidate_tracker):
+            try:
+                summary["dedup_tracker_calls"] = int(invalidate_tracker(file_path) or 0)
+            except Exception as exc:
+                logger.debug(
+                    "Failed to invalidate deduplication tracker for %s: %s",
+                    file_path,
+                    exc,
+                )
+
+        logger.debug(
+            "Post-edit freshness invalidation for %s: cache=%d index_roots=%d dedup_calls=%d",
+            file_path,
+            summary["idempotent_cache_entries"],
+            summary["search_index_roots"],
+            summary["dedup_tracker_calls"],
+        )
+        return summary
+
     def get_cache_stats(self) -> Dict[str, Any]:
         """Get cache statistics.
 
@@ -995,6 +1610,8 @@ class ToolPipeline:
                 else 0.0
             ),
             "batch_dedup_count": self._batch_dedup_count,
+            "cross_turn_hits": self._cross_turn_hits,
+            "cross_turn_cache_size": len(self._cross_turn_cache),
         }
         # Include semantic cache stats if available
         if self.semantic_cache is not None:
@@ -1016,22 +1633,539 @@ class ToolPipeline:
         if file_path not in self._read_file_timestamps:
             return False
         age = time.monotonic() - self._read_file_timestamps[file_path]
-        return age < max_age_seconds
+        if age >= max_age_seconds:
+            return False
 
-    def record_file_read(self, file_path: str) -> None:
+        current_path = self._read_file_paths.get(file_path, file_path)
+        previous_snapshot = self._read_file_snapshots.get(file_path)
+        current_snapshot = capture_file_state(current_path)
+        if previous_snapshot is None and current_snapshot is None:
+            return True
+        if previous_snapshot is None or current_snapshot is None:
+            return False
+        return previous_snapshot == current_snapshot
+
+    @staticmethod
+    def _normalize_mode_name(context: Optional[Dict[str, Any]]) -> Optional[str]:
+        """Return the normalized current mode name from execution context."""
+        if not isinstance(context, dict):
+            return None
+        for key in ("mode", "current_mode", "active_mode"):
+            value = context.get(key)
+            if value is None:
+                continue
+            text = str(value).strip().lower()
+            if text:
+                return text
+        return None
+
+    @staticmethod
+    def _looks_like_code_file(file_path: Optional[str]) -> bool:
+        """Return True when the path looks like a source file."""
+        if not isinstance(file_path, str) or not file_path.strip():
+            return False
+        return Path(file_path).suffix.lower() in CODE_FILE_EXTENSIONS
+
+    @staticmethod
+    def _coerce_optional_int(value: Any) -> Optional[int]:
+        """Best-effort integer coercion for tool arguments."""
+        if value in (None, ""):
+            return None
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return None
+
+    def _tool_is_enabled(self, tool_name: str) -> bool:
+        """Best-effort tool availability check for guidance generation."""
+        try:
+            return bool(self.tools.is_tool_enabled(tool_name))
+        except Exception:
+            return False
+
+    def _has_structure_aware_navigation(self) -> bool:
+        """Return True once the session has already narrowed via structure-aware tools."""
+        return any(
+            canonicalize_core_tool_name(tool_name.lower())
+            in {
+                "symbol",
+                "refs",
+                "lsp",
+                "code_search",
+                "semantic_code_search",
+                "graph",
+                "project_overview",
+                "dependency_graph",
+            }
+            for tool_name in self._executed_tools
+        )
+
+    def _should_steer_broad_code_read(
+        self,
+        *,
+        file_path: Optional[str],
+        offset: Any,
+        limit: Any,
+        context: Optional[Dict[str, Any]],
+    ) -> bool:
+        """Return True when a broad code read should be steered to code intelligence first."""
+        if not self._looks_like_code_file(file_path):
+            return False
+        mode_name = self._normalize_mode_name(context)
+        if mode_name not in CODE_INTELLIGENCE_FIRST_MODES:
+            return False
+        if self._has_structure_aware_navigation():
+            return False
+        start_offset = self._coerce_optional_int(offset)
+        max_lines = self._coerce_optional_int(limit)
+        if start_offset not in (None, 0):
+            return False
+        if max_lines is not None and max_lines < 400:
+            return False
+        return any(
+            self._tool_is_enabled(tool_name)
+            for tool_name in ("project_overview", "lsp", "symbol", "refs")
+        )
+
+    def _build_broad_code_read_recovery(self, file_path: str) -> Dict[str, Any]:
+        """Build actionable next steps for whole-file code reads in analysis modes."""
+        parent_path = str(Path(file_path).parent or ".")
+        suggestions: List[Dict[str, Any]] = []
+        if self._tool_is_enabled("project_overview"):
+            suggestions.append(
+                _build_follow_up_suggestion(
+                    "project_overview",
+                    {"path": parent_path, "max_depth": 2},
+                    "Inspect the nearby project structure before opening the whole file.",
+                )
+            )
+        if self._tool_is_enabled("lsp"):
+            suggestions.append(
+                _build_follow_up_suggestion(
+                    "lsp",
+                    {"action": "diagnostics", "file_path": file_path},
+                    "Use diagnostics to identify the exact hotspot before reading the full file.",
+                )
+            )
+        if self._tool_is_enabled("symbol"):
+            suggestions.append(
+                _build_follow_up_suggestion(
+                    "symbol",
+                    {"file_path": file_path, "symbol_name": "<target_symbol>"},
+                    "Open the specific function or class definition once you know the target symbol.",
+                )
+            )
+        message = (
+            f"[You are attempting a broad full-file read of '{file_path}' before narrowing the "
+            "target. Do not start with a broad read(path=...) on a whole code file in default "
+            "coding modes. First use structure-aware navigation such as "
+            "project_overview(...), lsp(action='diagnostics', ...), symbol(...), or refs(...) "
+            "to identify the exact symbol or range, then read only the relevant section.]"
+        )
+        return {
+            "success": False,
+            "error": message,
+            "metadata": {"follow_up_suggestions": suggestions[:3]},
+        }
+
+    @classmethod
+    def _extract_target_symbol_hint(cls, context: Optional[Dict[str, Any]]) -> Optional[str]:
+        """Best-effort extraction of a target symbol from execution context."""
+        if not isinstance(context, dict):
+            return None
+        for key in ("target_symbol", "symbol_name", "focus_symbol", "current_symbol"):
+            raw_value = context.get(key)
+            if raw_value is None:
+                continue
+            value = str(raw_value).strip()
+            if value:
+                return value
+        return None
+
+    def _select_broad_code_read_rewrite(
+        self,
+        file_path: str,
+        *,
+        context: Optional[Dict[str, Any]] = None,
+        exclude_tools: Optional[set[str]] = None,
+    ) -> Optional[tuple[str, Dict[str, Any]]]:
+        """Choose a safe structure-aware replacement for a broad code-file read."""
+        excluded = {canonicalize_core_tool_name(name.lower()) for name in (exclude_tools or set())}
+        symbol_hint = self._extract_target_symbol_hint(context)
+        if symbol_hint is not None and "symbol" not in excluded and self._tool_is_enabled("symbol"):
+            return (
+                "symbol",
+                {
+                    "file_path": file_path,
+                    "symbol_name": symbol_hint,
+                },
+            )
+        if symbol_hint is not None and "refs" not in excluded and self._tool_is_enabled("refs"):
+            return (
+                "refs",
+                {
+                    "symbol_name": symbol_hint,
+                    "search_path": str(Path(file_path).parent or "."),
+                },
+            )
+        if "lsp" not in excluded and self._tool_is_enabled("lsp"):
+            return (
+                "lsp",
+                {
+                    "action": "diagnostics",
+                    "file_path": file_path,
+                },
+            )
+        if "project_overview" not in excluded and self._tool_is_enabled("project_overview"):
+            return (
+                "project_overview",
+                {
+                    "path": str(Path(file_path).parent or "."),
+                    "max_depth": 2,
+                },
+            )
+        return None
+
+    @staticmethod
+    def _extract_tool_result_items(result: Any, *keys: str) -> List[Any]:
+        """Return a flattened list of candidate items from a tool result payload."""
+        if isinstance(result, Mapping):
+            items: List[Any] = []
+            for key in keys:
+                value = result.get(key)
+                if isinstance(value, list):
+                    items.extend(value)
+                elif value not in (None, ""):
+                    items.append(value)
+            return items
+        if isinstance(result, list):
+            return list(result)
+        if result not in (None, ""):
+            return [result]
+        return []
+
+    @staticmethod
+    def _coerce_line_reference(value: Any) -> Optional[Dict[str, Any]]:
+        """Parse a best-effort file/line hint from code-intelligence output."""
+        if isinstance(value, str):
+            match = re.match(r"^(?P<path>.+?):(?P<line>\d+)(?::\d+)?$", value.strip())
+            if not match:
+                return None
+            file_path = match.group("path").strip()
+            line_number = ToolPipeline._coerce_optional_int(match.group("line"))
+            if not file_path or line_number is None:
+                return None
+            return {"file_path": file_path, "line": line_number}
+        if isinstance(value, Mapping):
+            file_path = (
+                value.get("file_path") or value.get("path") or value.get("file") or value.get("uri")
+            )
+            if not isinstance(file_path, str) or not file_path.strip():
+                return None
+            line_number = ToolPipeline._coerce_optional_int(
+                value.get("line")
+                or value.get("line_number")
+                or value.get("start_line")
+                or value.get("row")
+            )
+            if line_number is None:
+                line_number = ToolPipeline._coerce_lsp_range_line(value)
+            return {
+                "file_path": file_path.strip(),
+                "line": line_number,
+            }
+        return None
+
+    @staticmethod
+    def _coerce_lsp_range_line(value: Any) -> Optional[int]:
+        """Extract a 1-indexed line number from standard LSP position/range payloads."""
+        if not isinstance(value, Mapping):
+            return None
+
+        def _position_line(position: Any) -> Optional[int]:
+            if not isinstance(position, Mapping):
+                return None
+            raw_line = position.get("line")
+            line_number = ToolPipeline._coerce_optional_int(raw_line)
+            if line_number is None:
+                return None
+            return line_number + 1
+
+        for range_key in ("range", "selectionRange", "selection_range"):
+            range_value = value.get(range_key)
+            if not isinstance(range_value, Mapping):
+                continue
+            line_number = _position_line(range_value.get("start"))
+            if line_number is not None:
+                return line_number
+
+        for position_key in ("position", "start"):
+            line_number = _position_line(value.get(position_key))
+            if line_number is not None:
+                return line_number
+
+        return None
+
+    def _record_code_navigation_hints(
+        self,
+        tool_name: str,
+        arguments: Mapping[str, Any],
+        result: Any,
+    ) -> None:
+        """Persist recent structure-aware hints for later broad-read narrowing."""
+        canonical_tool = canonicalize_core_tool_name(tool_name.lower())
+        if canonical_tool not in {"project_overview", "refs", "lsp", "symbol"}:
+            return
+
+        hints: List[Dict[str, Any]] = []
+        if canonical_tool == "project_overview":
+            for item in self._extract_tool_result_items(result, "entries", "files", "results"):
+                if isinstance(item, Mapping):
+                    file_path = item.get("path") or item.get("file_path") or item.get("file")
+                    if isinstance(file_path, str) and file_path.strip():
+                        hints.append({"file_path": file_path.strip(), "line": None})
+        elif canonical_tool == "refs":
+            for item in self._extract_tool_result_items(
+                result,
+                "references",
+                "refs",
+                "matches",
+                "locations",
+                "results",
+            ):
+                hint = self._coerce_line_reference(item)
+                if hint is not None:
+                    hints.append(hint)
+        elif canonical_tool == "lsp":
+            file_path = arguments.get("file_path") or arguments.get("path")
+            if isinstance(file_path, str) and file_path.strip():
+                for item in self._extract_tool_result_items(result, "diagnostics", "results"):
+                    line_hint = (
+                        self._coerce_optional_int(item.get("line"))
+                        if isinstance(item, Mapping)
+                        else None
+                    )
+                    if line_hint is None:
+                        line_hint = self._coerce_lsp_range_line(item)
+                    hint = self._coerce_line_reference(item) or {
+                        "file_path": file_path.strip(),
+                        "line": line_hint,
+                    }
+                    hints.append(hint)
+        elif canonical_tool == "symbol":
+            file_path = arguments.get("file_path") or arguments.get("path")
+            if isinstance(file_path, str) and file_path.strip():
+                line_hint: Optional[int] = None
+                symbol_items = self._extract_tool_result_items(
+                    result,
+                    "matches",
+                    "definitions",
+                    "locations",
+                    "results",
+                    "symbols",
+                )
+                for item in symbol_items:
+                    parsed_hint = self._coerce_line_reference(item)
+                    if parsed_hint is not None and parsed_hint.get("line") is not None:
+                        line_hint = parsed_hint["line"]
+                        break
+                hints.append({"file_path": file_path.strip(), "line": line_hint})
+
+        if not hints:
+            return
+
+        self._last_code_navigation_tool = canonical_tool
+        for hint in hints:
+            file_path = hint.get("file_path")
+            if not isinstance(file_path, str) or not file_path.strip():
+                continue
+            normalized_file_path = normalize_file_path(file_path) or file_path
+            self._recent_code_navigation_hints[normalized_file_path] = {
+                "source_tool": canonical_tool,
+                "file_path": file_path.strip(),
+                "line": self._coerce_optional_int(hint.get("line")),
+                "use_count": 0,
+                "created_at": time.monotonic(),
+                "last_result_hash": None,
+            }
+
+    def _select_follow_up_code_read_rewrite(
+        self,
+        file_path: str,
+        *,
+        offset: Optional[int] = None,
+        limit: Optional[int] = None,
+        context: Optional[Dict[str, Any]] = None,
+    ) -> Optional[tuple[str, Dict[str, Any], str]]:
+        """Reuse recent navigation hints to keep narrowing later broad reads.
+
+        Args:
+            file_path: The file path to read
+            offset: Explicit offset from the agent (if provided, hints are ignored)
+            limit: Explicit limit from the agent (if provided, hints are ignored)
+            context: Optional context dictionary
+
+        Returns:
+            None if no rewrite should be applied, or a tuple of (tool_name, arguments, steering_message)
+        """
+        # If agent provided explicit offset/limit, respect them and don't rewrite
+        if offset is not None or limit is not None:
+            return None
+
+        normalized_file_path = normalize_file_path(file_path) or file_path
+        recent_hint = self._recent_code_navigation_hints.get(normalized_file_path)
+        if recent_hint is not None:
+            # Check if hint has expired (TTL)
+            hint_age = time.monotonic() - recent_hint.get("created_at", 0)
+            if hint_age > self.config.navigation_hint_ttl_seconds:
+                logger.debug(
+                    "[Pipeline] Navigation hint for %s expired (age=%.1fs > ttl=%.1fs)",
+                    normalized_file_path,
+                    hint_age,
+                    self.config.navigation_hint_ttl_seconds,
+                )
+                del self._recent_code_navigation_hints[normalized_file_path]
+                return None
+
+            # Check if hint has been used too many times
+            use_count = recent_hint.get("use_count", 0)
+            if use_count >= self.config.navigation_hint_max_uses:
+                logger.debug(
+                    "[Pipeline] Navigation hint for %s exhausted (use_count=%d >= max=%d)",
+                    normalized_file_path,
+                    use_count,
+                    self.config.navigation_hint_max_uses,
+                )
+                del self._recent_code_navigation_hints[normalized_file_path]
+                return None
+
+            line_number = self._coerce_optional_int(recent_hint.get("line"))
+            if line_number is not None:
+                # Increment use count
+                recent_hint["use_count"] = use_count + 1
+
+                calculated_offset = max(line_number - TARGETED_READ_LINE_CONTEXT, 0)
+                return (
+                    "read",
+                    {
+                        "path": file_path,
+                        "offset": calculated_offset,
+                        "limit": TARGETED_READ_LINE_LIMIT,
+                    },
+                    (
+                        f"Narrowed broad read(path=...) on '{file_path}' to the region around "
+                        f"line {line_number} from recent {recent_hint.get('source_tool')} output "
+                        f"(use #{recent_hint['use_count']}/{self.config.navigation_hint_max_uses})."
+                    ),
+                )
+
+        symbol_hint = self._extract_target_symbol_hint(context)
+        if (
+            symbol_hint is not None
+            and self._last_code_navigation_tool == "project_overview"
+            and self._tool_is_enabled("symbol")
+        ):
+            return (
+                "symbol",
+                {
+                    "file_path": file_path,
+                    "symbol_name": symbol_hint,
+                },
+                (
+                    f"Continued narrowing broad read(path=...) on '{file_path}' after recent "
+                    f"project_overview(...) by routing to symbol(symbol_name={symbol_hint!r})."
+                ),
+            )
+        return None
+
+    @staticmethod
+    def _mapping_field_is_empty(result: Mapping[str, Any], *keys: str) -> bool:
+        """Return True when none of the candidate keys contain meaningful data."""
+        present = False
+        for key in keys:
+            if key not in result:
+                continue
+            present = True
+            value = result.get(key)
+            if value not in (None, [], (), {}, ""):
+                return False
+        return present or not bool(result)
+
+    def _get_low_signal_broad_read_rewrite_reason(
+        self,
+        *,
+        tool_name: str,
+        result: Any,
+    ) -> Optional[str]:
+        """Return a human-readable reason when a rewrite result is too weak to stop."""
+        canonical_tool = canonicalize_core_tool_name(tool_name.lower())
+        if not isinstance(result, Mapping):
+            return None
+        if canonical_tool == "lsp":
+            diagnostics = result.get("diagnostics")
+            if diagnostics in (None, [], ()) and self._tool_is_enabled("project_overview"):
+                return "LSP diagnostics were empty"
+            return None
+        if canonical_tool == "symbol":
+            if self._mapping_field_is_empty(
+                result,
+                "matches",
+                "definitions",
+                "locations",
+                "results",
+                "symbols",
+            ) and self._tool_is_enabled("refs"):
+                return "Symbol lookup was empty"
+            return None
+        if canonical_tool == "refs":
+            if self._mapping_field_is_empty(
+                result,
+                "references",
+                "refs",
+                "matches",
+                "locations",
+                "results",
+            ) and self._tool_is_enabled("project_overview"):
+                return "Reference lookup was empty"
+            return None
+        return None
+
+    def record_file_read(self, read_key: str, file_path: Optional[str] = None) -> None:
         """Record that a file was read.
 
         Updates the timestamp for deduplication tracking.
 
         Args:
-            file_path: Path of the file that was read
+            read_key: Deduplication key for the file read, including offset/limit
+            file_path: Actual file path associated with the read key
         """
         # Evict oldest entries if at capacity (prevent unbounded growth)
         if len(self._read_file_timestamps) >= 2000:
             oldest_key = next(iter(self._read_file_timestamps))
             del self._read_file_timestamps[oldest_key]
-        self._read_file_timestamps[file_path] = time.monotonic()
-        logger.debug(f"Recorded file read: {file_path}")
+            self._read_file_paths.pop(oldest_key, None)
+            self._read_file_snapshots.pop(oldest_key, None)
+        self._read_file_timestamps[read_key] = time.monotonic()
+        actual_path = file_path or read_key
+        self._read_file_paths[read_key] = actual_path
+        self._read_file_snapshots[read_key] = capture_file_state(actual_path)
+        logger.debug(f"Recorded file read: {read_key}")
+
+    def _clear_read_tracking_for_file(self, file_path: str) -> None:
+        """Clear read-tracking entries for a file after it changes."""
+        normalized_target = normalize_file_path(file_path)
+        if not normalized_target:
+            return
+
+        stale_keys = [
+            read_key
+            for read_key, tracked_path in self._read_file_paths.items()
+            if normalize_file_path(tracked_path) == normalized_target
+        ]
+        for read_key in stale_keys:
+            self._read_file_timestamps.pop(read_key, None)
+            self._read_file_paths.pop(read_key, None)
+            self._read_file_snapshots.pop(read_key, None)
 
     def deduplicate_tool_calls(
         self,
@@ -1120,8 +2254,43 @@ class ToolPipeline:
         # Build tool history for synthesis checkpoint
         tool_history: List[Dict[str, Any]] = []
 
-        for tool_call in unique_calls:
-            call_result = await self._execute_single_call(tool_call, context)
+        unique_calls_iter = list(unique_calls)
+        for unique_call_idx, tool_call in enumerate(unique_calls_iter):
+            # Capture tool_call_id BEFORE execution so it's set even if the call fails
+            tc_id = tool_call.get("id") if isinstance(tool_call, dict) else None
+
+            # Handle pre-invalidated tool calls (hallucinated names marked by coordinator)
+            if isinstance(tool_call, dict) and tool_call.get("_invalid"):
+                tool_name = tool_call.get("name", "unknown")
+                # Generate tool_call_id if not provided
+                if tc_id is None:
+                    tc_id = self._generate_tool_call_id(tool_name)
+                call_result = _build_skip_result(
+                    tool_name=tool_name,
+                    arguments={},
+                    success=False,
+                    error=tool_call.get("_error", "Unknown tool"),
+                    skip_reason=tool_call.get("_error"),
+                    outcome_kind="invalid_tool_name",
+                    block_source="tool_validation",
+                    retryable=False,
+                    tool_call_id=tc_id,
+                )
+            else:
+                call_result = await self._execute_single_call(tool_call, context)
+            # Propagate tool_call_id from provider's tool_calls[].id per OpenAI spec.
+            # Only auto-generate an ID for executed calls — internally-skipped calls
+            # without a provider ID have no corresponding tool_call entry, so they
+            # must NOT get an ID (process_tool_results would otherwise emit a spurious
+            # tool response for them, double-counting executed_tools).
+            if tc_id is not None:
+                call_result.tool_call_id = tc_id
+            elif not call_result.skipped:
+                tool_name = (
+                    tool_call.get("name", "unknown") if isinstance(tool_call, dict) else "unknown"
+                )
+                tc_id = self._generate_tool_call_id(tool_name)
+                call_result.tool_call_id = tc_id
             result.results.append(call_result)
 
             # Store result by signature for duplicate resolution (only for dict items)
@@ -1155,7 +2324,7 @@ class ToolPipeline:
                     "tool": tool_name,
                     "args": raw_args,
                     "success": call_result.success,
-                    "result": str(call_result.result)[:500] if call_result.result else "",
+                    "result": (str(call_result.result)[:500] if call_result.result else ""),
                     "error": call_result.error,
                 }
             )
@@ -1170,15 +2339,43 @@ class ToolPipeline:
             # Check if budget exhausted
             if self._calls_used >= self.config.tool_budget:
                 result.budget_exhausted = True
-                # Skip remaining calls
+                # Emit skip results for remaining unprocessed calls so that
+                # _ensure_tool_response_coverage can match every provider-assigned
+                # tool_call_id and doesn't log a spurious coverage-gap ERROR.
+                for remaining_call in unique_calls_iter[unique_call_idx + 1 :]:
+                    rem_tc_id = (
+                        remaining_call.get("id") if isinstance(remaining_call, dict) else None
+                    )
+                    rem_name = (
+                        remaining_call.get("name", "unknown")
+                        if isinstance(remaining_call, dict)
+                        else "unknown"
+                    )
+                    skip = _build_skip_result(
+                        tool_name=rem_name,
+                        arguments={},
+                        success=False,
+                        skip_reason="Tool budget exhausted — call not executed",
+                        outcome_kind="budget_exhausted",
+                        block_source="tool_budget",
+                        retryable=True,
+                        user_message="The tool budget was exhausted before this call could be executed.",
+                        tool_call_id=rem_tc_id,
+                    )
+                    result.results.append(skip)
+                    result.skipped_calls += 1
                 break
 
         # Add skipped results for duplicates (reuse first occurrence's result)
         for original_idx, signature in duplicate_info:
             if signature in results_by_signature:
                 original_result = results_by_signature[signature]
-                # Create a copy marked as from deduplication
-                dup_result = ToolCallResult(
+                # Use the provider-given ID for the duplicate call if available.
+                # If the provider gave no ID, leave it None — process_tool_results
+                # will then skip the entry (no tool_call to respond to per OpenAI spec).
+                dup_call = tool_calls[original_idx] if original_idx < len(tool_calls) else {}
+                dup_tc_id = dup_call.get("id") if isinstance(dup_call, dict) else None
+                dup_result = _build_skip_result(
                     tool_name=original_result.tool_name,
                     arguments=original_result.arguments,
                     success=original_result.success,
@@ -1186,11 +2383,56 @@ class ToolPipeline:
                     error=original_result.error,
                     execution_time_ms=0.0,  # Deduplicated, no execution time
                     cached=True,  # Mark as effectively cached
-                    skipped=True,
                     skip_reason="Deduplicated (duplicate call in batch)",
+                    outcome_kind="duplicate_in_batch",
+                    block_source="batch_deduplication",
+                    retryable=True,
+                    user_message=(
+                        "This tool call duplicated another call in the same batch, so the "
+                        "existing result was reused."
+                    ),
+                    tool_call_id=dup_tc_id,
                 )
                 result.results.append(dup_result)
                 result.skipped_calls += 1
+
+        # Track whether ALL tool calls in this batch were skipped.
+        # Some skipped batches still return actionable recovery content and should
+        # not count as a hard blocked turn for spin detection.
+        self.last_batch_all_skipped = len(result.results) > 0 and all(
+            getattr(r, "skipped", False) for r in result.results
+        )
+        self.last_batch_effectively_blocked = self.last_batch_all_skipped and not any(
+            _has_informative_skip_payload(r) for r in result.results
+        )
+        if self.last_batch_all_skipped:
+            # Collect actual skip reasons for accurate logging
+            skip_reasons = []
+            block_sources = []
+            for r in result.results:
+                reason = getattr(r, "skip_reason", None)
+                source = getattr(r, "block_source", None)
+                if reason:
+                    skip_reasons.append(reason)
+                if source:
+                    block_sources.append(source)
+
+            # Build informative log message
+            if skip_reasons:
+                # Count unique reasons
+                from collections import Counter
+
+                reason_counts = Counter(skip_reasons)
+                reason_summary = ", ".join(f"{r} ({c})" for r, c in reason_counts.items())
+                logger.info(
+                    f"[pipeline] All {len(result.results)} tool calls in batch were "
+                    f"skipped: {reason_summary}"
+                )
+            else:
+                logger.info(
+                    f"[pipeline] All {len(result.results)} tool calls in batch were "
+                    f"skipped/blocked"
+                )
 
         # Check synthesis checkpoint
         if self._synthesis_checkpoint and tool_history:
@@ -1198,6 +2440,9 @@ class ToolPipeline:
                 "elapsed_time": context.get("elapsed_time", 0),
                 "timeout": context.get("timeout", 180),
                 "task_type": context.get("task_type", "unknown"),
+                "unified_task_tracker": context.get(
+                    "unified_task_tracker"
+                ),  # Phase 3: Pass UnifiedTaskTracker
             }
             checkpoint_result = self._synthesis_checkpoint.check(tool_history, task_context)
             if checkpoint_result.should_synthesize:
@@ -1231,12 +2476,10 @@ class ToolPipeline:
         context: Optional[Dict[str, Any]] = None,
         force_parallel: bool = False,
     ) -> PipelineExecutionResult:
-        """Execute tool calls with parallelization when beneficial.
+        """[POTENTIALLY OBSOLETE] Execute tool calls with parallelization.
 
-        Automatically decides whether to use parallel execution based on:
-        - Number of tool calls (>1 for parallel)
-        - Tool categories (read-only tools can parallelize)
-        - Configuration settings
+        Note: The main execute_tool_calls() method now handles internal
+        parallelization via AsyncToolExecutor. This method may be removed.
 
         Args:
             tool_calls: List of tool call requests
@@ -1263,17 +2506,20 @@ class ToolPipeline:
         skipped_results = []
 
         for tc in tool_calls:
-            tool_name = tc.get("name", "")
+            raw_tool_name = tc.get("name", "")
+            tool_name = self._normalize_valid_tool_name(raw_tool_name)
 
             # Quick validation checks
-            if not tool_name or not self.is_valid_tool_name(tool_name):
+            if not tool_name:
                 skipped_results.append(
-                    ToolCallResult(
-                        tool_name=tool_name or "unknown",
+                    _build_skip_result(
+                        tool_name=str(raw_tool_name or "unknown"),
                         arguments={},
                         success=False,
-                        skipped=True,
-                        skip_reason=f"Invalid tool name: {tool_name}",
+                        skip_reason=f"Invalid tool name: {raw_tool_name}",
+                        outcome_kind="invalid_tool_name",
+                        block_source="validation",
+                        retryable=False,
                     )
                 )
                 continue
@@ -1285,12 +2531,14 @@ class ToolPipeline:
 
             if not self.tools.is_tool_enabled(tool_name):
                 skipped_results.append(
-                    ToolCallResult(
+                    _build_skip_result(
                         tool_name=tool_name,
                         arguments=normalized_args,
                         success=False,
-                        skipped=True,
                         skip_reason=f"Unknown or disabled tool: {tool_name}",
+                        outcome_kind="tool_unavailable",
+                        block_source="tool_registry",
+                        retryable=False,
                     )
                 )
                 continue
@@ -1300,12 +2548,18 @@ class ToolPipeline:
                 signature = self._get_call_signature(tool_name, normalized_args)
                 if signature in self._failed_signatures:
                     skipped_results.append(
-                        ToolCallResult(
+                        _build_skip_result(
                             tool_name=tool_name,
                             arguments=normalized_args,
                             success=False,
-                            skipped=True,
                             skip_reason="Repeated failing call with same arguments",
+                            outcome_kind="repeated_failure",
+                            block_source="failed_signature_tracker",
+                            retryable=True,
+                            user_message=(
+                                "This exact tool call already failed recently. Change the "
+                                "arguments or choose a different tool."
+                            ),
                         )
                     )
                     continue
@@ -1367,6 +2621,39 @@ class ToolPipeline:
 
         return result
 
+    def _emit_tool_intent(self, tool_name: str, arguments: Dict[str, Any]) -> None:
+        """Emit pre-execution intent event (LogAct-inspired).
+
+        Records tool intent BEFORE execution, enabling future voting/gating.
+        Uses ObservabilityBus for event emission.
+        """
+        bus = getattr(self, "_observability_bus", None)
+        if bus is None:
+            return
+
+        import hashlib
+
+        args_str = str(sorted(arguments.items())) if arguments else ""
+        args_hash = hashlib.md5(args_str.encode()).hexdigest()[:12]
+
+        reasoning = ""
+        enricher = getattr(self, "_trace_enricher", None)
+        if enricher:
+            reasoning = getattr(enricher, "_pending_reasoning", "") or ""
+
+        try:
+            bus.emit_sync(
+                "tool.intent",
+                {
+                    "tool_name": tool_name,
+                    "arguments_hash": args_hash,
+                    "reasoning_before": reasoning[:500],
+                    "timestamp": time.time(),
+                },
+            )
+        except Exception:
+            pass  # Intent logging is non-critical
+
     async def _execute_single_call(
         self,
         tool_call: Dict[str, Any],
@@ -1383,34 +2670,41 @@ class ToolPipeline:
         """
         # Validate structure
         if not isinstance(tool_call, dict):
-            return ToolCallResult(
+            return _build_skip_result(
                 tool_name="unknown",
                 arguments={},
                 success=False,
-                skipped=True,
                 skip_reason="Invalid tool call structure (not a dict)",
+                outcome_kind="invalid_tool_call",
+                block_source="validation",
+                retryable=False,
             )
 
-        tool_name = tool_call.get("name", "")
+        raw_tool_name = tool_call.get("name", "")
+        tool_name = self._normalize_valid_tool_name(raw_tool_name)
         raw_args = tool_call.get("arguments", {})
 
         # Validate tool name
-        if not tool_name:
-            return ToolCallResult(
+        if not raw_tool_name:
+            return _build_skip_result(
                 tool_name="unknown",
                 arguments={},
                 success=False,
-                skipped=True,
                 skip_reason="Tool call missing name",
+                outcome_kind="missing_tool_name",
+                block_source="validation",
+                retryable=False,
             )
 
-        if not self.is_valid_tool_name(tool_name):
-            return ToolCallResult(
-                tool_name=tool_name,
+        if not tool_name:
+            return _build_skip_result(
+                tool_name=str(raw_tool_name),
                 arguments={},
                 success=False,
-                skipped=True,
-                skip_reason=f"Invalid tool name format: {tool_name}",
+                skip_reason=f"Invalid tool name format: {raw_tool_name}",
+                outcome_kind="invalid_tool_name",
+                block_source="validation",
+                retryable=False,
             )
 
         # Check if tool exists
@@ -1419,39 +2713,60 @@ class ToolPipeline:
         )
 
         if not self.tools.is_tool_enabled(tool_name):
-            return ToolCallResult(
+            return _build_skip_result(
                 tool_name=tool_name,
                 arguments=normalized_args,
                 success=False,
-                skipped=True,
                 skip_reason=f"Unknown or disabled tool: {tool_name}",
+                outcome_kind="tool_unavailable",
+                block_source="tool_registry",
+                retryable=False,
             )
+
+        redirected_args = self._apply_path_redirect(tool_name, normalized_args)
+        if redirected_args is not None:
+            original_path = normalized_args.get(self._path_arg_key(normalized_args) or "path")
+            redirected_path = redirected_args.get(self._path_arg_key(redirected_args) or "path")
+            logger.info(
+                "[Pipeline] Rewriting %s path from previous suggestion: %s -> %s",
+                tool_name,
+                original_path,
+                redirected_path,
+            )
+            normalized_args = redirected_args
+            if strategy == NormalizationStrategy.DIRECT:
+                strategy = NormalizationStrategy.MANUAL_REPAIR
 
         # Check permission policy (if configured)
         if self._permission_policy is not None:
             decision = self._permission_policy.authorize(tool_name, normalized_args)
             if not decision.allowed and not decision.needs_prompt:
-                return ToolCallResult(
+                return _build_skip_result(
                     tool_name=tool_name,
                     arguments=normalized_args,
                     success=False,
-                    skipped=True,
                     skip_reason=f"Permission denied: {decision.reason}",
+                    outcome_kind="permission_denied",
+                    block_source="permission_policy",
+                    retryable=False,
                 )
             # needs_prompt tools are allowed through — the UI layer
             # handles escalation prompting before reaching the pipeline.
 
         # Check budget
         if self._calls_used >= self.config.tool_budget:
-            return ToolCallResult(
+            return _build_skip_result(
                 tool_name=tool_name,
                 arguments=normalized_args,
                 success=False,
-                skipped=True,
                 skip_reason="Tool budget exhausted",
+                outcome_kind="budget_exhausted",
+                block_source="tool_budget",
+                retryable=False,
             )
 
         normalization_applied = None if strategy == NormalizationStrategy.DIRECT else strategy.value
+        steering_user_message: Optional[str] = None
 
         # Check idempotent cache for read-only tools
         # This prevents DeepSeek/Ollama from re-reading the same file multiple times
@@ -1472,6 +2787,31 @@ class ToolPipeline:
                 except Exception as e:
                     logger.warning(f"on_tool_complete callback failed: {e}")
             return cached_result
+
+        # Cross-turn dedup: cache "effectively idempotent" tools (web_search, etc.)
+        # These produce identical results for identical args within a session window.
+        if self._cross_turn_enabled and tool_name in CROSS_TURN_DEDUP_TOOLS:
+            signature = self._get_call_signature(tool_name, normalized_args)
+            cross_cached = self._cross_turn_cache.get(signature)
+            if cross_cached is not None:
+                self._cross_turn_hits += 1
+                logger.info(
+                    "[Pipeline] Cross-turn dedup hit for %s (hits=%d)",
+                    tool_name,
+                    self._cross_turn_hits,
+                )
+                self._executed_tools.append(tool_name)
+                if self.on_tool_start:
+                    try:
+                        self.on_tool_start(tool_name, normalized_args)
+                    except Exception as e:
+                        logger.warning(f"on_tool_start callback failed: {e}")
+                if self.on_tool_complete:
+                    try:
+                        self.on_tool_complete(cross_cached)
+                    except Exception as e:
+                        logger.warning(f"on_tool_complete callback failed: {e}")
+                return cross_cached
 
         # Check semantic cache (FAISS-based with mtime invalidation)
         # This catches similar-but-not-identical queries that would return same results
@@ -1508,23 +2848,115 @@ class ToolPipeline:
 
         # Session-level file read dedup - prevents re-reading files even if cache was cleared
         # This is a fallback for the prompting loop fix when idempotent cache doesn't match
-        if tool_name.lower() in ("read", "read_file"):
+        # NOTE: Only dedup reads of the EXACT same file+args within a short window.
+        # Do NOT block re-reads after the file has been edited (agent needs to verify).
+        # Allow re-reads with different offset/limit (reading different sections).
+        canonical_core_tool = canonicalize_core_tool_name(tool_name.lower())
+
+        if canonical_core_tool == "read":
             file_path = normalized_args.get("path") or normalized_args.get("file_path")
-            if file_path and self._is_duplicate_read(file_path):
+            offset = normalized_args.get("offset")
+            limit = normalized_args.get("limit")
+            if self._should_steer_broad_code_read(
+                file_path=file_path,
+                offset=offset,
+                limit=limit,
+                context=context,
+            ):
+                rewrite = self._select_broad_code_read_rewrite(
+                    str(file_path),
+                    context=context,
+                )
+                if rewrite is None:
+                    logger.info(
+                        "[Pipeline] Steering broad code read of %s toward structure-aware guidance",
+                        file_path,
+                    )
+                    return _build_skip_result(
+                        tool_name=tool_name,
+                        arguments=normalized_args,
+                        success=True,
+                        result=self._build_broad_code_read_recovery(str(file_path)),
+                        skip_reason="Broad code-file read before structure-aware navigation",
+                        outcome_kind="broad_code_read",
+                        block_source="code_intelligence_first",
+                        retryable=True,
+                        user_message=(
+                            f"Use symbol, refs, diagnostics, or project overview before reading "
+                            f"all of '{file_path}'."
+                        ),
+                        normalization_applied=normalization_applied,
+                    )
+                tool_name, normalized_args = rewrite
+                canonical_core_tool = canonicalize_core_tool_name(tool_name.lower())
+                steering_user_message = (
+                    f"Steered broad read(path=...) on '{file_path}' to "
+                    f"{tool_name}({', '.join(f'{key}={_format_tool_command_value(value)}' for key, value in normalized_args.items())})."
+                )
                 logger.info(
-                    f"[Pipeline] Skipping duplicate read of {file_path} "
-                    "(file was read recently in this session)"
+                    "[Pipeline] Rewriting broad code read of %s to %s",
+                    file_path,
+                    tool_name,
                 )
-                return ToolCallResult(
-                    tool_name=tool_name,
-                    arguments=normalized_args,
-                    success=True,  # Mark as success but indicate it was cached
-                    result=f"[File '{file_path}' was already read in this session - "
-                    "content unchanged. See previous read result.]",
-                    skipped=True,
-                    skip_reason="Duplicate file read within session",
-                    normalization_applied=normalization_applied,
+            else:
+                # Check if agent explicitly provided offset/limit in the original call
+                # (not just defaults from argument normalization). ``raw_args`` may be
+                # None when a tool call arrives without an arguments object; treat that
+                # as "no explicit offset/limit" rather than crashing.
+                raw_args_map = raw_args if isinstance(raw_args, dict) else {}
+                explicit_offset = "offset" in raw_args_map
+                explicit_limit = "limit" in raw_args_map
+                follow_up_rewrite = (
+                    self._select_follow_up_code_read_rewrite(
+                        str(file_path),
+                        offset=offset if explicit_offset else None,
+                        limit=limit if explicit_limit else None,
+                        context=context,
+                    )
+                    if isinstance(file_path, str) and file_path.strip()
+                    else None
                 )
+                if follow_up_rewrite is not None:
+                    tool_name, normalized_args, steering_user_message = follow_up_rewrite
+                    canonical_core_tool = canonicalize_core_tool_name(tool_name.lower())
+                    logger.info(
+                        "[Pipeline] Rewriting broad code read of %s using recent navigation %s",
+                        file_path,
+                        tool_name,
+                    )
+                # Only dedup exact same file+offset+limit reads
+                dedup_key = f"{file_path}:{offset}:{limit}" if file_path else None
+                if follow_up_rewrite is None and dedup_key and self._is_duplicate_read(dedup_key):
+                    logger.info(
+                        f"[Pipeline] Skipping duplicate read of {file_path} "
+                        "(file was read recently in this session)"
+                    )
+                    return _build_skip_result(
+                        tool_name=tool_name,
+                        arguments=normalized_args,
+                        success=True,  # Mark as success but indicate it was cached
+                        result=(
+                            f"[File '{file_path}' was already read in this session and "
+                            "content is unchanged. Do not repeat the same read(path, offset, limit). "
+                            "Use a different offset/limit, read a different file, or switch tools "
+                            "such as symbol, refs, lsp, code_search, graph, or project_overview.]"
+                        ),
+                        skip_reason="Duplicate file read within session",
+                        outcome_kind="duplicate_read",
+                        block_source="session_read_dedup",
+                        retryable=True,
+                        user_message=(
+                            f"File '{file_path}' was already read with the same offset/limit. "
+                            "Choose a different range, file, or tool."
+                        ),
+                        normalization_applied=normalization_applied,
+                    )
+
+        # Invalidate read cache for files that were just edited/written
+        if canonical_core_tool in {"edit", "write"}:
+            edited_path = normalized_args.get("path") or normalized_args.get("file_path")
+            if edited_path:
+                self._clear_read_tracking_for_file(edited_path)
 
         # Code correction middleware - validate and fix code arguments
         code_corrected = False
@@ -1567,12 +2999,26 @@ class ToolPipeline:
         if self.config.enable_failed_signature_tracking:
             signature = self._get_call_signature(tool_name, normalized_args)
             if signature in self._failed_signatures:
-                return ToolCallResult(
+                logger.info(
+                    "[Pipeline] Skipping repeated failing call: %s(%s)",
+                    tool_name,
+                    normalized_args,
+                )
+                recovery_result = _build_repeated_failure_recovery(tool_name, normalized_args)
+                return _build_skip_result(
                     tool_name=tool_name,
                     arguments=normalized_args,
                     success=False,
-                    skipped=True,
+                    result=recovery_result,
+                    error=recovery_result.get("error"),
                     skip_reason="Repeated failing call with same arguments",
+                    outcome_kind="repeated_failure",
+                    block_source="failed_signature_tracker",
+                    retryable=True,
+                    user_message=(
+                        "This exact tool call already failed recently. Use the recovery "
+                        "guidance or try different arguments."
+                    ),
                     normalization_applied=normalization_applied,
                 )
 
@@ -1584,12 +3030,21 @@ class ToolPipeline:
                         f"[Pipeline] Skipping redundant tool call: {tool_name} "
                         f"(semantic overlap with recent calls)"
                     )
-                    return ToolCallResult(
+                    recovery_result = _build_redundant_call_recovery(tool_name, normalized_args)
+                    return _build_skip_result(
                         tool_name=tool_name,
                         arguments=normalized_args,
-                        success=False,
-                        skipped=True,
+                        success=True,
+                        result=recovery_result,
+                        error=recovery_result.get("error"),
                         skip_reason="Redundant call (semantic overlap with recent operations)",
+                        outcome_kind="redundant_call",
+                        block_source="semantic_deduplication",
+                        retryable=True,
+                        user_message=(
+                            "This tool call overlaps with recent work. Use the suggested next "
+                            "step instead of repeating it unchanged."
+                        ),
                         normalization_applied=normalization_applied,
                     )
             except (ValueError, TypeError) as e:
@@ -1608,12 +3063,15 @@ class ToolPipeline:
                         f"[Pipeline] Tool '{tool_name}' blocked by middleware: "
                         f"{before_result.error_message}"
                     )
-                    return ToolCallResult(
+                    return _build_skip_result(
                         tool_name=tool_name,
                         arguments=normalized_args,
                         success=False,
-                        skipped=True,
                         skip_reason=f"Blocked by middleware: {before_result.error_message}",
+                        outcome_kind="middleware_blocked",
+                        block_source="middleware_chain",
+                        retryable=True,
+                        user_message=before_result.error_message,
                         normalization_applied=normalization_applied,
                     )
                 # Apply any argument modifications from middleware
@@ -1624,6 +3082,9 @@ class ToolPipeline:
             except AttributeError as e:
                 logger.debug(f"Middleware chain not properly configured: {e}")
 
+        # Emit pre-execution intent event (LogAct-inspired)
+        self._emit_tool_intent(tool_name, normalized_args)
+
         # Notify start
         if self.on_tool_start:
             try:
@@ -1632,6 +3093,12 @@ class ToolPipeline:
                 logger.warning(f"on_tool_start callback failed: {e}")
 
         # Execute with per-tool timeout
+        # Log tool call sent to LLM
+        logger.debug(
+            "[ToolCall→LLM] Executing tool=%s args=%s",
+            tool_name,
+            json.dumps(normalized_args, default=str)[:500],
+        )
         start_time = time.monotonic()
         try:
             exec_result = await asyncio.wait_for(
@@ -1640,18 +3107,74 @@ class ToolPipeline:
                     arguments=normalized_args,
                     context=context,
                 ),
-                timeout=self.config.per_tool_timeout_seconds,
+                timeout=self._get_tool_timeout(tool_name),
             )
         except asyncio.TimeoutError:
+            effective_timeout = self._get_tool_timeout(tool_name)
+            tb_str = traceback.format_exc()
+
+            # Build user-friendly error message with command details
+            if tool_name == "shell" and "cmd" in normalized_args:
+                cmd = normalized_args.get("cmd", "unknown command")
+                error_msg = f"Command timed out after {effective_timeout}s: {cmd}"
+                suggestion = (
+                    "The command may be hung or waiting for input.\n"
+                    "Try: Run the command manually to check if it's interactive, "
+                    "increase the per-tool timeout setting, or use a non-interactive alternative."
+                )
+            else:
+                error_msg = f"Tool '{tool_name}' timed out after {effective_timeout}s"
+                suggestion = (
+                    f"The tool execution exceeded the time limit of {effective_timeout}s.\n"
+                    "Try: Increase the per-tool timeout setting or simplify the operation."
+                )
+
+            # Log technical details for debugging (hidden from user)
             logger.warning(
-                f"[Pipeline] Tool '{tool_name}' timed out after "
-                f"{self.config.per_tool_timeout_seconds}s"
+                f"[Pipeline] Tool '{tool_name}' timed out after {effective_timeout}s",
+                exc_info=False,  # Don't log full traceback to reduce noise
             )
+
             exec_result = ToolExecutionResult(
                 tool_name=tool_name,
                 success=False,
                 result=None,
-                error=f"Tool execution timed out after {self.config.per_tool_timeout_seconds}s",
+                error=error_msg,
+                error_info=ErrorInfo(
+                    message=error_msg,
+                    category=ErrorCategory.TOOL_TIMEOUT,
+                    severity=ErrorSeverity.WARNING,
+                    correlation_id=f"timeout_{tool_name}_{int(time.time())}",
+                    traceback=tb_str[-2000:],  # Last 2000 chars
+                    details={
+                        "tool_name": tool_name,
+                        "timeout_seconds": effective_timeout,
+                        "arguments": normalized_args,
+                        "suggestion": suggestion,
+                    },
+                ),
+            )
+        except Exception as e:
+            tb_str = traceback.format_exc()
+            logger.error(f"[Pipeline] Tool '{tool_name}' execution failed: {e}", exc_info=True)
+            exec_result = ToolExecutionResult(
+                tool_name=tool_name,
+                success=False,
+                result=None,
+                error=str(e),
+                error_info=ErrorInfo(
+                    message=f"Tool '{tool_name}' execution failed: {str(e)}",
+                    category=ErrorCategory.TOOL_EXECUTION,
+                    severity=ErrorSeverity.ERROR,
+                    correlation_id=f"error_{tool_name}_{int(time.time())}",
+                    traceback=tb_str[-2000:],  # Last 2000 chars
+                    details={
+                        "tool_name": tool_name,
+                        "exception_type": type(e).__name__,
+                        "arguments": normalized_args,
+                    },
+                    original_exception=str(e),
+                ),
             )
         execution_time_ms = (time.monotonic() - start_time) * 1000
 
@@ -1668,42 +3191,142 @@ class ToolPipeline:
             error=exec_result.error,
             execution_time_ms=execution_time_ms,
             normalization_applied=normalization_applied,
+            user_message=steering_user_message,
             code_corrected=code_corrected,
             code_validation_errors=code_validation_errors,
+            error_info=exec_result.error_info,  # Preserve structured error info
+        )
+
+        low_signal_reason = None
+        if steering_user_message is not None and exec_result.success:
+            low_signal_reason = self._get_low_signal_broad_read_rewrite_reason(
+                tool_name=tool_name,
+                result=exec_result.result,
+            )
+        if low_signal_reason is not None:
+            raw_file_path = normalized_args.get("file_path") or normalized_args.get("path")
+            file_path = str(raw_file_path).strip() if raw_file_path is not None else ""
+            if file_path:
+                fallback_rewrite = self._select_broad_code_read_rewrite(
+                    file_path,
+                    context=context,
+                    exclude_tools={tool_name},
+                )
+                if fallback_rewrite is not None and fallback_rewrite[0] != tool_name:
+                    fallback_tool_name, fallback_args = fallback_rewrite
+                    logger.info(
+                        "[Pipeline] Retrying low-signal broad read rewrite from %s to %s",
+                        tool_name,
+                        fallback_tool_name,
+                    )
+                    recovered_exec_result = await asyncio.wait_for(
+                        self.executor.execute(
+                            tool_name=fallback_tool_name,
+                            arguments=fallback_args,
+                            context=context,
+                        ),
+                        timeout=self._get_tool_timeout(fallback_tool_name),
+                    )
+                    if recovered_exec_result.success:
+                        tool_name = fallback_tool_name
+                        normalized_args = fallback_args
+                        exec_result = recovered_exec_result
+                        call_result = ToolCallResult(
+                            tool_name=fallback_tool_name,
+                            arguments=fallback_args,
+                            success=recovered_exec_result.success,
+                            result=recovered_exec_result.result,
+                            error=recovered_exec_result.error,
+                            execution_time_ms=((time.monotonic() - start_time) * 1000),
+                            normalization_applied=normalization_applied,
+                            user_message=(
+                                f"{steering_user_message} {low_signal_reason}, so the "
+                                f"pipeline narrowed further with {fallback_tool_name}."
+                            ),
+                            code_corrected=code_corrected,
+                            code_validation_errors=code_validation_errors,
+                            error_info=recovered_exec_result.error_info,
+                        )
+
+        # Log tool result returned to LLM
+        result_preview = str(exec_result.result)[:500] if exec_result.result else "(empty)"
+        logger.debug(
+            "[ToolResult→LLM] tool=%s success=%s time=%.0fms result_preview=%s",
+            tool_name,
+            exec_result.success,
+            execution_time_ms,
+            result_preview,
         )
 
         # Attempt error recovery fallback on failure
         if not exec_result.success and exec_result.error:
+            self._record_path_redirect_from_error(tool_name, normalized_args, exec_result.error)
             try:
-                from victor.agent.error_recovery import recover_from_error, RecoveryAction
+                from victor.agent.error_recovery import (
+                    recover_from_error,
+                    RecoveryAction,
+                )
 
                 recovery = recover_from_error(
                     Exception(exec_result.error), tool_name, normalized_args
                 )
-                if recovery.action == RecoveryAction.FALLBACK_TOOL and recovery.fallback_tool:
+                recovery_tool_name = tool_name
+                recovery_args = normalized_args
+
+                if (
+                    recovery.action
+                    in {
+                        RecoveryAction.RETRY_WITH_INFERRED,
+                        RecoveryAction.RETRY_WITH_DEFAULTS,
+                    }
+                    and recovery.modified_args
+                ):
+                    recovery_args = recovery.modified_args
+                    logger.info(
+                        "[Pipeline] Retrying %s with recovered arguments: %s",
+                        tool_name,
+                        recovery_args,
+                    )
+                elif recovery.action == RecoveryAction.FALLBACK_TOOL and recovery.fallback_tool:
                     fallback_name = recovery.fallback_tool
                     if self.tools.is_tool_enabled(fallback_name):
-                        logger.info(f"[Pipeline] Falling back from {tool_name} to {fallback_name}")
-                        try:
-                            fb_result = await asyncio.wait_for(
-                                self.executor.execute(
-                                    tool_name=fallback_name,
-                                    arguments=normalized_args,
-                                    context=context,
-                                ),
-                                timeout=self.config.per_tool_timeout_seconds,
-                            )
-                        except asyncio.TimeoutError:
-                            fb_result = None
-                        if fb_result is not None and fb_result.success:
-                            call_result = ToolCallResult(
-                                tool_name=fallback_name,
-                                arguments=normalized_args,
-                                success=fb_result.success,
-                                result=fb_result.result,
-                                error=fb_result.error,
-                                execution_time_ms=((time.monotonic() - start_time) * 1000),
-                            )
+                        recovery_tool_name = fallback_name
+                        logger.info(
+                            "[Pipeline] Falling back from %s to %s",
+                            tool_name,
+                            fallback_name,
+                        )
+
+                if recovery_tool_name != tool_name or recovery_args is not normalized_args:
+                    try:
+                        recovered_exec_result = await asyncio.wait_for(
+                            self.executor.execute(
+                                tool_name=recovery_tool_name,
+                                arguments=recovery_args,
+                                context=context,
+                            ),
+                            timeout=self._get_tool_timeout(recovery_tool_name),
+                        )
+                    except asyncio.TimeoutError:
+                        recovered_exec_result = None
+
+                    if recovered_exec_result is not None and recovered_exec_result.success:
+                        tool_name = recovery_tool_name
+                        normalized_args = recovery_args
+                        exec_result = recovered_exec_result
+                        call_result = ToolCallResult(
+                            tool_name=recovery_tool_name,
+                            arguments=recovery_args,
+                            success=recovered_exec_result.success,
+                            result=recovered_exec_result.result,
+                            error=recovered_exec_result.error,
+                            execution_time_ms=((time.monotonic() - start_time) * 1000),
+                            normalization_applied=normalization_applied,
+                            user_message=steering_user_message,
+                            code_corrected=code_corrected,
+                            code_validation_errors=code_validation_errors,
+                            error_info=recovered_exec_result.error_info,
+                        )
             except Exception as e:
                 logger.debug(f"[Pipeline] Error recovery fallback failed: {e}")
 
@@ -1759,10 +3382,18 @@ class ToolPipeline:
 
         # Record file read for deduplication (prompting loop fix)
         # Include capitalized variants for tool name normalization
-        if call_result.success and tool_name.lower() in ("read", "read_file"):
+        if call_result.success:
+            self._record_code_navigation_hints(
+                call_result.tool_name,
+                call_result.arguments,
+                call_result.result,
+            )
+        if call_result.success and canonical_core_tool == "read":
             file_path = normalized_args.get("path") or normalized_args.get("file_path")
             if file_path:
-                self.record_file_read(file_path)
+                offset = normalized_args.get("offset")
+                limit = normalized_args.get("limit")
+                self.record_file_read(f"{file_path}:{offset}:{limit}", file_path=file_path)
 
         # Track failed signatures
         if not exec_result.success and self.config.enable_failed_signature_tracking:
@@ -1772,6 +3403,21 @@ class ToolPipeline:
         # Cache successful results for idempotent tools
         if call_result.success:
             self.cache_result(tool_name, normalized_args, call_result)
+
+            # Cross-turn dedup: cache results for effectively-idempotent tools
+            if self._cross_turn_enabled and tool_name in CROSS_TURN_DEDUP_TOOLS:
+                signature = self._get_call_signature(tool_name, normalized_args)
+                dedup_result = ToolCallResult(
+                    tool_name=call_result.tool_name,
+                    arguments=call_result.arguments,
+                    success=call_result.success,
+                    result=call_result.result,
+                    error=call_result.error,
+                    execution_time_ms=0.0,
+                    cached=True,
+                    normalization_applied=call_result.normalization_applied,
+                )
+                self._cross_turn_cache.set(signature, dedup_result)
 
             # Store in semantic cache (FAISS-based with mtime tracking)
             if self.config.enable_semantic_caching and self.semantic_cache is not None:
@@ -1790,14 +3436,13 @@ class ToolPipeline:
                     logger.debug(f"Semantic cache store failed (data error): {e}")
 
         # Invalidate caches when files are modified (write/edit tools)
-        if call_result.success and tool_name.lower() in ("write", "edit"):
+        if call_result.success and canonicalize_core_tool_name(tool_name.lower()) in (
+            "write",
+            "edit",
+        ):
             file_path = normalized_args.get("path") or normalized_args.get("file_path")
             if file_path:
-                # Invalidate idempotent cache
-                self.invalidate_file_cache(file_path)
-                # Invalidate semantic cache
-                if self.semantic_cache is not None:
-                    self.semantic_cache.invalidate(file_path)
+                self._invalidate_post_edit_freshness_state(file_path, context=context)
                 logger.debug(f"Invalidated caches for modified file: {file_path}")
 
         # Record successful tool call in deduplication tracker
@@ -1832,6 +3477,33 @@ class ToolPipeline:
                 )
             except Exception:
                 logger.debug("on_tool_event fallback emission failed", exc_info=True)
+
+        # Record tool result for credit assignment (FEP-0001 Phase 3)
+        if self._credit_tracking_service is not None:
+            try:
+                self._credit_tracking_service.record_tool_result(
+                    tool_name=call_result.tool_name,
+                    success=call_result.success,
+                    execution_time_ms=call_result.execution_time_ms,
+                    error=call_result.error,
+                    arguments=call_result.arguments,
+                    agent_id=context.get("agent_id", "default"),
+                    team_id=context.get("team_id"),
+                    session_id=context.get("session_id"),
+                )
+            except Exception:
+                pass  # Credit tracking is non-critical
+
+        # Update online tool reputation (mid-turn feedback)
+        if self._tool_reputation is not None:
+            try:
+                self._tool_reputation.record(
+                    tool_name=call_result.tool_name,
+                    success=call_result.success,
+                    duration_ms=call_result.execution_time_ms,
+                )
+            except Exception:
+                pass  # Reputation tracking is non-critical
 
         return call_result
 
@@ -1870,6 +3542,35 @@ class ToolPipeline:
             "remaining": self.calls_remaining,
             "tools": dict(self._tool_stats),
         }
+
+    def _get_tool_timeout(self, tool_name: str) -> float:
+        """Get effective timeout for a tool, preferring per-tool override.
+
+        Resolution order:
+        1. Per-tool timeout from @tool(timeout=N) decorator (_tool_timeout attribute)
+        2. Per-tool timeout from ToolDefinition.timeout / timeout_seconds
+        3. Pipeline default (config.per_tool_timeout_seconds)
+        """
+        try:
+            tool_func = self.executor.get_tool_function(tool_name)
+            if tool_func:
+                # Check raw function attribute (set by @tool decorator)
+                if hasattr(tool_func, "_tool_timeout"):
+                    per_tool = tool_func._tool_timeout
+                    if isinstance(per_tool, (int, float)) and per_tool > 0:
+                        return float(per_tool)
+                # Check ToolDefinition object (wrapped by registry)
+                if hasattr(tool_func, "timeout"):
+                    per_tool = tool_func.timeout
+                    if isinstance(per_tool, (int, float)) and per_tool > 0:
+                        return float(per_tool)
+                if hasattr(tool_func, "timeout_seconds"):
+                    per_tool = tool_func.timeout_seconds
+                    if isinstance(per_tool, (int, float)) and per_tool > 0:
+                        return float(per_tool)
+        except Exception:
+            pass
+        return self.config.per_tool_timeout_seconds
 
     def clear_failed_signatures(self) -> None:
         """Clear the failed signature cache."""

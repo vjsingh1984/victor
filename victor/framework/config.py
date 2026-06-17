@@ -1,31 +1,48 @@
 """Simplified configuration for the Victor framework API.
 
-For most use cases, you don't need this module - use Agent.create()
-keyword arguments instead. AgentConfig is for advanced configurations
-that go beyond the simple API.
+.. deprecated::
+    AgentConfig is deprecated. For simple cases, use Agent.create()
+    keyword arguments directly. For advanced multi-mode configuration,
+    use UnifiedAgentConfig from victor.framework.config.
+
+    Migration guide:
+    - Simple: agent = await Agent.create(tool_budget=100)
+    - Advanced: from victor.framework.config import UnifiedAgentConfig
+               config = UnifiedAgentConfig(mode="foreground", tool_budget=100)
+               agent = await factory.create_agent(config=config)
 
 Example:
     # Simple use case - no config needed
     agent = await Agent.create(provider="anthropic")
 
-    # Advanced use case
-    config = AgentConfig(
+    # Advanced use case with UnifiedAgentConfig
+    from victor.framework.config import UnifiedAgentConfig
+    config = UnifiedAgentConfig(
+        mode="foreground",
         tool_budget=100,
-        max_iterations=50,
         enable_semantic_search=True,
     )
-    agent = await Agent.create(config=config)
+    agent = await factory.create_agent(config=config)
 """
 
 from __future__ import annotations
 
+import warnings as _warnings
+
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional
+from typing import Any, Callable, Dict, Optional
+
+from victor.agent.config import UnifiedAgentConfig
 
 
 @dataclass
 class AgentConfig:
     """Advanced configuration options for agents.
+
+    .. deprecated::
+        Use UnifiedAgentConfig from victor.framework.config for advanced
+        multi-mode configuration. For simple foreground agents, use
+        Agent.create() keyword arguments directly.
 
     This class provides fine-grained control over agent behavior.
     For simple use cases, prefer Agent.create() keyword arguments.
@@ -47,10 +64,12 @@ class AgentConfig:
         extra: Additional settings passed through to Settings
 
     Example:
-        config = AgentConfig(
+        # Deprecated - use UnifiedAgentConfig instead
+        from victor.framework.config import UnifiedAgentConfig
+        config = UnifiedAgentConfig(
+            mode="foreground",
             tool_budget=100,
             enable_semantic_search=True,
-            extra={"custom_setting": "value"}
         )
     """
 
@@ -81,6 +100,16 @@ class AgentConfig:
 
     # Additional settings (pass-through to Settings)
     extra: Dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self):
+        """Emit deprecation warning on instantiation."""
+        _warnings.warn(
+            "AgentConfig is deprecated. Use UnifiedAgentConfig from "
+            "victor.framework.config for advanced configuration, or Agent.create() "
+            "keyword arguments for simple cases. This will be removed in v0.10.0.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
     def to_settings_dict(self) -> Dict[str, Any]:
         """Convert to Settings-compatible dictionary.
@@ -180,7 +209,7 @@ Migration:
 from typing import TYPE_CHECKING, List
 
 if TYPE_CHECKING:
-    from victor.framework.graph import CheckpointerProtocol
+    from victor.framework.graph_checkpoint import CheckpointerProtocol
 
 
 @dataclass
@@ -199,6 +228,15 @@ class ExecutionConfig:
     max_iterations: int = 25
     timeout: Optional[float] = None
     recursion_limit: int = 100
+
+    def __post_init__(self) -> None:
+        """Validate execution configuration limits."""
+        if self.max_iterations < 1:
+            raise ValueError(f"max_iterations must be >= 1, got {self.max_iterations}")
+        if self.timeout is not None and self.timeout < 0.1:
+            raise ValueError(f"timeout must be >= 0.1, got {self.timeout}")
+        if self.recursion_limit < 1:
+            raise ValueError(f"recursion_limit must be >= 1, got {self.recursion_limit}")
 
 
 @dataclass
@@ -250,6 +288,10 @@ class PerformanceConfig:
         use_copy_on_write: Enable copy-on-write state optimization
             (None = use settings default, True = enable, False = disable)
         enable_state_caching: Enable state caching (default: True)
+        parallel_state_merge_strategy: Fan-out merge policy for parallel branch
+            writes. ``"strict"`` is the default to fail fast on conflicts.
+        custom_state_merger: Optional custom fan-out merger used when
+            ``parallel_state_merge_strategy="custom"``.
 
     Example:
         config = PerformanceConfig(use_copy_on_write=True)
@@ -257,6 +299,10 @@ class PerformanceConfig:
 
     use_copy_on_write: Optional[bool] = None  # None = use settings default
     enable_state_caching: bool = True
+    parallel_state_merge_strategy: str = "strict"
+    custom_state_merger: Optional[
+        Callable[[Dict[str, Any], list[Dict[str, Any]]], Dict[str, Any]]
+    ] = None
 
 
 @dataclass
@@ -281,6 +327,44 @@ class ObservabilityConfig:
 
 
 @dataclass
+class ValidationConfig:
+    """State validation configuration for StateGraph.
+
+    Controls runtime validation of state objects against their schema.
+    Provides LangGraph-compatible validation behavior.
+
+    Attributes:
+        enabled: Whether to validate state at runtime
+        strict: Raise exception immediately on validation errors (vs. collect and continue)
+        validate_on_entry: Validate input state before graph execution
+        validate_after_nodes: Validate state after each node execution
+        log_errors: Log validation errors even when not raising
+
+    Example:
+        # Strict validation for production
+        config = ValidationConfig(
+            enabled=True,
+            strict=True,
+            validate_on_entry=True,
+            validate_after_nodes=True
+        )
+
+        # Lenient validation for development
+        config = ValidationConfig(
+            enabled=True,
+            strict=False,
+            validate_after_nodes=False
+        )
+    """
+
+    enabled: bool = False  # Validation disabled by default (backward compatibility)
+    strict: bool = False  # Don't raise on errors (log only)
+    validate_on_entry: bool = True  # Validate input state
+    validate_after_nodes: bool = True  # Validate after each node
+    log_errors: bool = True  # Log errors even when not raising
+
+
+@dataclass
 class GraphConfig:
     """Facade config that composes focused configs.
 
@@ -293,12 +377,14 @@ class GraphConfig:
         interrupt: Interrupt behavior configuration
         performance: Performance optimization configuration
         observability: Observability and eventing configuration
+        validation: State validation configuration
 
     Example:
         # Use focused configs (ISP compliant)
         config = GraphConfig(
             execution=ExecutionConfig(max_iterations=50),
-            observability=ObservabilityConfig(emit_events=True)
+            observability=ObservabilityConfig(emit_events=True),
+            validation=ValidationConfig(enabled=True)
         )
 
         # Migrate from legacy format
@@ -310,6 +396,7 @@ class GraphConfig:
     interrupt: InterruptConfig = field(default_factory=InterruptConfig)
     performance: PerformanceConfig = field(default_factory=PerformanceConfig)
     observability: ObservabilityConfig = field(default_factory=ObservabilityConfig)
+    validation: ValidationConfig = field(default_factory=ValidationConfig)
 
     @classmethod
     def from_legacy(cls, **kwargs) -> "GraphConfig":
@@ -359,6 +446,11 @@ class GraphConfig:
             performance=PerformanceConfig(
                 use_copy_on_write=kwargs.get("use_copy_on_write"),
                 enable_state_caching=True,  # Default for legacy migration
+                parallel_state_merge_strategy=kwargs.get(
+                    "parallel_state_merge_strategy",
+                    "strict",
+                ),
+                custom_state_merger=kwargs.get("custom_state_merger"),
             ),
             observability=ObservabilityConfig(
                 emit_events=kwargs.get("emit_events", True),
@@ -381,6 +473,8 @@ class GraphConfig:
             "interrupt_before": self.interrupt.interrupt_before,
             "interrupt_after": self.interrupt.interrupt_after,
             "use_copy_on_write": self.performance.use_copy_on_write,
+            "parallel_state_merge_strategy": self.performance.parallel_state_merge_strategy,
+            "custom_state_merger": self.performance.custom_state_merger,
             "emit_events": self.observability.emit_events,
             "graph_id": self.observability.graph_id,
         }
@@ -462,9 +556,22 @@ class SafetyConfig:
 
         Returns:
             SafetyConfig instance
+
+        Raises:
+            ValueError: If level is not a valid SafetyLevel
         """
+        level_value = config.get("level", "medium")
+        try:
+            # Case-insensitive lookup
+            level = SafetyLevel(level_value.lower())
+        except (ValueError, KeyError, AttributeError) as e:
+            raise ValueError(
+                f"Invalid safety level: {level_value}. Must be one of "
+                f"{[level.value for level in SafetyLevel]}"
+            ) from e
+
         return cls(
-            level=SafetyLevel(config.get("level", "medium")),
+            level=level,
             require_confirmation=config.get("require_confirmation", False),
             blocked_operations=config.get("blocked_operations", []),
             audit_log=config.get("audit_log", True),
@@ -790,13 +897,19 @@ class SafetyEnforcer:
                         # HIGH level - always block (unless overridden by config)
                         if rule.allow_override and self.config.level == SafetyLevel.LOW:
                             continue  # Allow due to override
-                        return False, f"Blocked by safety rule: {rule.name} - {rule.description}"
+                        return (
+                            False,
+                            f"Blocked by safety rule: {rule.name} - {rule.description}",
+                        )
 
                     elif rule.level == SafetyLevel.MEDIUM:
                         # MEDIUM level - block unless config is LOW
                         if self.config.level == SafetyLevel.LOW:
                             continue  # Warn only, don't block
-                        return False, f"Blocked by safety rule: {rule.name} - {rule.description}"
+                        return (
+                            False,
+                            f"Blocked by safety rule: {rule.name} - {rule.description}",
+                        )
 
                     elif rule.level == SafetyLevel.LOW:
                         # LOW level - warn but don't block (unless config is HIGH)
@@ -841,6 +954,7 @@ class SafetyEnforcer:
 # Update __all__ to include new classes
 __all__ = [
     # Agent configuration
+    "UnifiedAgentConfig",
     "AgentConfig",
     # Graph configuration
     "ExecutionConfig",

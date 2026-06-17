@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import gzip
 import hashlib
+import inspect
 import json
 import logging
 import os
@@ -30,8 +31,10 @@ import shutil
 import threading
 import uuid
 from datetime import datetime, timezone
+from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Pattern
+from typing import Any, Dict, List, Optional, Pattern, Set
+from uuid import UUID
 
 logger = logging.getLogger(__name__)
 
@@ -42,13 +45,21 @@ class PIIScrubber:
     # Patterns for common PII
     PATTERNS: List[tuple[str, Pattern, str]] = [
         # Email addresses
-        ("email", re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"), "[EMAIL]"),
+        (
+            "email",
+            re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"),
+            "[EMAIL]",
+        ),
         # API keys (common formats)
         ("api_key", re.compile(r"\b(sk-[a-zA-Z0-9]{20,})\b"), "[API_KEY]"),
         ("api_key", re.compile(r"\b(xai-[a-zA-Z0-9]{20,})\b"), "[API_KEY]"),
         ("api_key", re.compile(r"\b(AIza[a-zA-Z0-9_-]{35})\b"), "[API_KEY]"),
         # Bearer tokens
-        ("token", re.compile(r"\b(Bearer\s+[a-zA-Z0-9._-]+)\b", re.I), "[BEARER_TOKEN]"),
+        (
+            "token",
+            re.compile(r"\b(Bearer\s+[a-zA-Z0-9._-]+)\b", re.I),
+            "[BEARER_TOKEN]",
+        ),
         # Home directory paths
         ("path", re.compile(r"/Users/[a-zA-Z0-9_-]+"), "/Users/[USER]"),
         ("path", re.compile(r"/home/[a-zA-Z0-9_-]+"), "/home/[USER]"),
@@ -122,24 +133,41 @@ class PIIScrubber:
         Returns:
             Scrubbed dictionary
         """
-        result = {}
-        for key, value in data.items():
-            if isinstance(value, str):
-                result[key] = self.scrub(value)
-            elif isinstance(value, dict):
-                result[key] = self.scrub_dict(value)
-            elif isinstance(value, list):
-                result[key] = [
-                    (
-                        self.scrub_dict(v)
-                        if isinstance(v, dict)
-                        else self.scrub(v) if isinstance(v, str) else v
-                    )
-                    for v in value
-                ]
-            else:
-                result[key] = value
-        return result
+        return self._scrub_mapping(data, seen=set())
+
+    def _scrub_mapping(self, data: Dict[str, Any], seen: Set[int]) -> Dict[str, Any]:
+        """Scrub a mapping while breaking recursive references."""
+        obj_id = id(data)
+        if obj_id in seen:
+            return {"__recursive_ref__": "dict"}
+
+        seen.add(obj_id)
+        try:
+            return {key: self._scrub_value(value, seen) for key, value in data.items()}
+        finally:
+            seen.discard(obj_id)
+
+    def _scrub_sequence(self, data: List[Any], seen: Set[int]) -> List[Any]:
+        """Scrub a sequence while breaking recursive references."""
+        obj_id = id(data)
+        if obj_id in seen:
+            return ["<recursive_ref:list>"]
+
+        seen.add(obj_id)
+        try:
+            return [self._scrub_value(value, seen) for value in data]
+        finally:
+            seen.discard(obj_id)
+
+    def _scrub_value(self, value: Any, seen: Set[int]) -> Any:
+        """Scrub an arbitrary nested value."""
+        if isinstance(value, str):
+            return self.scrub(value)
+        if isinstance(value, dict):
+            return self._scrub_mapping(value, seen)
+        if isinstance(value, list):
+            return self._scrub_sequence(value, seen)
+        return value
 
 
 class LogRotator:
@@ -311,6 +339,7 @@ class EnhancedUsageLogger:
         max_log_size: int = 10 * 1024 * 1024,  # 10 MB
         backup_count: int = 5,
         compress_rotated: bool = True,
+        sampling_filter: Optional[Any] = None,
     ):
         """Initialize enhanced usage logger.
 
@@ -323,11 +352,15 @@ class EnhancedUsageLogger:
             max_log_size: Maximum log file size before rotation
             backup_count: Number of backup files to keep
             compress_rotated: Whether to compress rotated files
+            sampling_filter: Optional SemanticSamplingFilter for noise reduction.
         """
         self._enabled = enabled
         self._log_file = Path(log_file).expanduser()
         self.session_id = str(uuid.uuid4())
         self._lock = threading.Lock()
+        self._sampling_filter = sampling_filter
+        # Backward compat: UsageLogger used self._logger
+        self._logger = logger
 
         # Initialize components
         self._scrubber = PIIScrubber() if scrub_pii else None
@@ -360,6 +393,97 @@ class EnhancedUsageLogger:
         """Returns True if logging is enabled."""
         return self._enabled
 
+    def _sanitize_log_data(self, data: Any) -> Any:
+        """Sanitize log data to remove non-serializable objects.
+
+        Args:
+            data: Data to sanitize (can be dict, list, or primitive)
+
+        Returns:
+            Sanitized data safe for JSON serialization
+        """
+        return self._sanitize_log_data_inner(data, seen=set(), depth=0)
+
+    def _sanitize_log_data_inner(self, data: Any, seen: Set[int], depth: int) -> Any:
+        """Recursively sanitize log data while breaking cycles safely."""
+        from datetime import date, time
+        from types import CoroutineType, MappingProxyType
+
+        if data is None or isinstance(data, (str, int, float, bool)):
+            return data
+
+        if isinstance(data, (Path, UUID)):
+            return str(data)
+
+        if isinstance(data, (datetime, date, time)):
+            return data.isoformat()
+
+        if isinstance(data, bytes):
+            return data.decode("utf-8", errors="replace")
+
+        if isinstance(data, Enum):
+            return self._sanitize_log_data_inner(data.value, seen, depth + 1)
+
+        if isinstance(data, CoroutineType):
+            return "<coroutine>"
+        if inspect.isgenerator(data):
+            return "<generator>"
+        if inspect.isasyncgen(data):
+            return "<async_generator>"
+        if inspect.isroutine(data):
+            return f"<callable:{getattr(data, '__name__', type(data).__name__)}>"
+        if inspect.ismodule(data):
+            return f"<module:{getattr(data, '__name__', type(data).__name__)}>"
+
+        if depth >= 20:
+            return f"<max_depth:{type(data).__name__}>"
+
+        track_identity = isinstance(
+            data, (dict, MappingProxyType, list, tuple, set, frozenset)
+        ) or hasattr(data, "__dict__")
+        obj_id = id(data)
+        if track_identity:
+            if obj_id in seen:
+                return f"<recursive_ref:{type(data).__name__}>"
+            seen.add(obj_id)
+
+        try:
+            if isinstance(data, dict) or isinstance(data, MappingProxyType):
+                sanitized: Dict[Any, Any] = {}
+                for key, value in dict(data).items():
+                    safe_key = (
+                        key if isinstance(key, (str, int, float, bool)) or key is None else str(key)
+                    )
+                    sanitized[safe_key] = self._sanitize_log_data_inner(value, seen, depth + 1)
+                return sanitized
+
+            if isinstance(data, (list, tuple)):
+                return [self._sanitize_log_data_inner(item, seen, depth + 1) for item in data]
+
+            if isinstance(data, (set, frozenset)):
+                return [self._sanitize_log_data_inner(item, seen, depth + 1) for item in data]
+
+            if hasattr(data, "model_dump") and callable(data.model_dump):
+                return self._sanitize_log_data_inner(data.model_dump(), seen, depth + 1)
+
+            if hasattr(data, "dict") and callable(data.dict):
+                return self._sanitize_log_data_inner(data.dict(), seen, depth + 1)
+
+            if hasattr(data, "__dict__"):
+                attrs = {
+                    key: self._sanitize_log_data_inner(value, seen, depth + 1)
+                    for key, value in vars(data).items()
+                    if not key.startswith("__")
+                }
+                if attrs:
+                    return {"__class__": type(data).__name__, **attrs}
+                return repr(data)
+
+            return repr(data)
+        finally:
+            if track_identity:
+                seen.discard(obj_id)
+
     def log_event(self, event_type: str, data: Dict[str, Any]) -> None:
         """Log a usage event.
 
@@ -370,21 +494,28 @@ class EnhancedUsageLogger:
         if not self._enabled:
             return
 
-        # Check for rotation
-        self._rotator.rotate()
-
-        # Scrub PII if enabled
-        if self._scrubber:
-            data = self._scrubber.scrub_dict(data)
-
-        log_entry = {
-            "session_id": self.session_id,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "event_type": event_type,
-            "data": data,
-        }
+        # Semantic sampling: drop noise events before disk I/O
+        if self._sampling_filter and not self._sampling_filter.should_emit(event_type, data):
+            return
 
         try:
+            # Check for rotation
+            self._rotator.rotate()
+
+            # Scrub PII if enabled
+            if self._scrubber:
+                data = self._scrubber.scrub_dict(data)
+
+            # Sanitize data to remove non-serializable objects (coroutines, generators, etc.)
+            sanitized_data = self._sanitize_log_data(data)
+
+            log_entry = {
+                "session_id": self.session_id,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "event_type": event_type,
+                "data": sanitized_data,
+            }
+
             log_line = json.dumps(log_entry)
 
             # Encrypt if enabled
@@ -490,10 +621,5 @@ def create_usage_logger(
     Returns:
         Logger instance
     """
-    if enhanced:
-        return EnhancedUsageLogger(log_file=log_file, enabled=enabled, **kwargs)
-
-    # Fall back to basic logger
-    from victor.observability.analytics.logger import UsageLogger
-
-    return UsageLogger(log_file=log_file, enabled=enabled)
+    # EnhancedUsageLogger is the canonical implementation (UsageLogger is now an alias)
+    return EnhancedUsageLogger(log_file=log_file, enabled=enabled, **kwargs)

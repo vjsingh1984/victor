@@ -112,6 +112,9 @@ class ClientConnection:
     correlation_id: Optional[str] = None
     connected_at: float = field(default_factory=time.time)
     last_activity: float = field(default_factory=time.time)
+    sender_queue: Optional[asyncio.Queue[Optional[str]]] = None
+    sender_task: Optional[asyncio.Task[None]] = None
+    consecutive_send_failures: int = 0
 
     def is_subscribed(self, event_type: str) -> bool:
         """Check if client is subscribed to event type."""
@@ -159,9 +162,12 @@ class EventBroadcaster:
         self._broadcast_task: Optional[asyncio.Task] = None
         self._loop: Optional[asyncio.AbstractEventLoop] = None
         self._dispatch_latency_ms_window: deque[float] = deque(maxlen=2000)
+        self._client_send_attempt_count = 0
         self._client_send_success_count = 0
         self._client_send_failure_count = 0
         self._events_dispatched_count = 0
+        self._max_consecutive_send_failures = 3
+        self._max_send_retries = 1
         self._delivery_success_slo = 0.999
         self._dispatch_latency_p95_slo_ms = 200.0
         self._last_slo_breach_log_ts = 0.0
@@ -174,6 +180,7 @@ class EventBroadcaster:
         current_loop = asyncio.get_running_loop()
 
         if self._loop is not None and self._loop is not current_loop:
+            self._cancel_client_sender_tasks()
             if self._broadcast_task is not None and not self._broadcast_task.done():
                 self._broadcast_task.cancel()
             # Client send callables and queue waiters are loop-bound. Reset the
@@ -182,6 +189,8 @@ class EventBroadcaster:
             self._event_queue = asyncio.Queue()
             self._broadcast_task = None
             self._running = False
+
+        self._drain_event_queue()
 
         self._loop = current_loop
 
@@ -233,6 +242,8 @@ class EventBroadcaster:
                 logger.debug(
                     "Skipping await for EventBroadcaster task bound to a different event loop"
                 )
+        self._cancel_client_sender_tasks()
+        self._drain_event_queue()
         logger.info("EventBroadcaster stopped")
 
     def add_client(
@@ -249,13 +260,23 @@ class EventBroadcaster:
             subscriptions=subscriptions or {"*"},
             correlation_id=correlation_id,
         )
+        if self._running:
+            self._ensure_client_sender(client_id)
         logger.info(f"Client connected: {client_id}")
 
     def remove_client(self, client_id: str) -> None:
         """Remove a disconnected client."""
-        if client_id in self._clients:
-            del self._clients[client_id]
-            logger.info(f"Client disconnected: {client_id}")
+        client = self._clients.pop(client_id, None)
+        if client is None:
+            return
+        if client.sender_queue is not None:
+            try:
+                client.sender_queue.put_nowait(None)
+            except asyncio.QueueFull:
+                pass
+        if client.sender_task is not None and not client.sender_task.done():
+            client.sender_task.cancel()
+        logger.info(f"Client disconnected: {client_id}")
 
     def update_subscriptions(
         self,
@@ -335,18 +356,40 @@ class EventBroadcaster:
         event_json = event.to_json()
         disconnected = []
 
-        for client_id, client in self._clients.items():
+        running_loop = None
+        try:
+            running_loop = asyncio.get_running_loop()
+        except RuntimeError:
+            running_loop = None
+
+        for client_id, client in list(self._clients.items()):
             if client.accepts(event):
+                self._client_send_attempt_count += 1
+
+                if self._running and self._loop is not None and self._loop is running_loop:
+                    queue = self._ensure_client_sender(client_id)
+                    if queue is not None:
+                        try:
+                            queue.put_nowait(event_json)
+                            continue
+                        except asyncio.QueueFull:
+                            logger.warning(f"Client queue full for {client_id}")
+                            self._client_send_failure_count += 1
+                            disconnected.append(client_id)
+                            continue
+
                 try:
-                    send_result = client.send(event_json)
-                    if inspect.isawaitable(send_result):
-                        await asyncio.wait_for(send_result, timeout=5.0)
-                    client.last_activity = time.time()
-                    self._client_send_success_count += 1
+                    delivered = await self._deliver_to_client(client_id, event_json)
+                    if not delivered and client.consecutive_send_failures >= (
+                        self._max_consecutive_send_failures
+                    ):
+                        disconnected.append(client_id)
                 except Exception as e:
                     logger.warning(f"Failed to send to {client_id}: {e}")
                     self._client_send_failure_count += 1
-                    disconnected.append(client_id)
+                    client.consecutive_send_failures += 1
+                    if client.consecutive_send_failures >= self._max_consecutive_send_failures:
+                        disconnected.append(client_id)
 
         # Remove disconnected clients
         for client_id in disconnected:
@@ -357,18 +400,120 @@ class EventBroadcaster:
         self._dispatch_latency_ms_window.append(dispatch_latency_ms)
         self._maybe_log_slo_breaches()
 
+    def _ensure_client_sender(
+        self,
+        client_id: str,
+    ) -> Optional[asyncio.Queue[Optional[str]]]:
+        """Ensure a client has a dedicated send queue/task for ordered async delivery."""
+        client = self._clients.get(client_id)
+        if client is None:
+            return None
+        if self._loop is None:
+            return None
+        if client.sender_queue is not None and client.sender_task is not None:
+            if not client.sender_task.done():
+                return client.sender_queue
+        client.sender_queue = asyncio.Queue()
+        client.sender_task = self._loop.create_task(self._client_sender_loop(client_id))
+        return client.sender_queue
+
+    async def _client_sender_loop(self, client_id: str) -> None:
+        """Drain one client's queue sequentially to preserve event ordering."""
+        client = self._clients.get(client_id)
+        if client is None or client.sender_queue is None:
+            return
+        queue = client.sender_queue
+        while True:
+            payload = await queue.get()
+            if payload is None:
+                queue.task_done()
+                break
+
+            current_client = self._clients.get(client_id)
+            if current_client is None:
+                queue.task_done()
+                break
+
+            try:
+                delivered = await self._deliver_to_client(client_id, payload)
+                if (
+                    not delivered
+                    and current_client.consecutive_send_failures
+                    >= self._max_consecutive_send_failures
+                ):
+                    self.remove_client(client_id)
+                    queue.task_done()
+                    break
+            finally:
+                if client_id in self._clients:
+                    queue.task_done()
+
+    async def _deliver_to_client(self, client_id: str, payload: str) -> bool:
+        """Send one payload to a client with a small bounded retry budget."""
+        client = self._clients.get(client_id)
+        if client is None:
+            return False
+
+        last_error: Optional[Exception] = None
+        for attempt in range(self._max_send_retries + 1):
+            try:
+                send_result = client.send(payload)
+                if inspect.isawaitable(send_result):
+                    await asyncio.wait_for(send_result, timeout=5.0)
+                client.last_activity = time.time()
+                client.consecutive_send_failures = 0
+                self._client_send_success_count += 1
+                return True
+            except Exception as e:
+                last_error = e
+                if attempt < self._max_send_retries:
+                    logger.debug(
+                        "Retrying send to %s after transient failure (%s/%s): %s",
+                        client_id,
+                        attempt + 1,
+                        self._max_send_retries,
+                        e,
+                    )
+                    continue
+
+        logger.warning(f"Failed to send to {client_id}: {last_error}")
+        self._client_send_failure_count += 1
+        client.consecutive_send_failures += 1
+        return False
+
+    def _cancel_client_sender_tasks(self) -> None:
+        """Cancel all active per-client sender tasks."""
+        for client in self._clients.values():
+            if client.sender_queue is not None:
+                try:
+                    client.sender_queue.put_nowait(None)
+                except asyncio.QueueFull:
+                    pass
+            if client.sender_task is not None and not client.sender_task.done():
+                client.sender_task.cancel()
+            client.sender_task = None
+            client.sender_queue = None
+            client.consecutive_send_failures = 0
+
+    def _drain_event_queue(self) -> None:
+        """Drop any queued events from a previous run to avoid stale delivery/latency."""
+        while True:
+            try:
+                self._event_queue.get_nowait()
+            except asyncio.QueueEmpty:
+                break
+
     def get_reliability_dashboard(self) -> Dict[str, Any]:
         """Get event-bridge reliability metrics and SLO status."""
-        total_send_attempts = self._client_send_success_count + self._client_send_failure_count
-        delivery_success_rate = (
-            self._client_send_success_count / total_send_attempts if total_send_attempts else 1.0
-        )
+        total_send_attempts = self._client_send_attempt_count
+        send_successes = max(0, total_send_attempts - self._client_send_failure_count)
+        delivery_success_rate = send_successes / total_send_attempts if total_send_attempts else 1.0
         dispatch_latency_p95_ms = self._percentile(self._dispatch_latency_ms_window, 95.0)
 
         return {
             "events_dispatched": self._events_dispatched_count,
             "total_send_attempts": total_send_attempts,
-            "send_successes": self._client_send_success_count,
+            "send_successes": send_successes,
             "send_failures": self._client_send_failure_count,
             "delivery_success_rate": delivery_success_rate,
             "dispatch_latency_p95_ms": dispatch_latency_p95_ms,
@@ -479,7 +624,7 @@ class WebSocketEventHandler:
                 self._broadcaster.update_subscriptions(
                     client_id,
                     subscriptions,
-                    correlation_id=correlation_id if isinstance(correlation_id, str) else None,
+                    correlation_id=(correlation_id if isinstance(correlation_id, str) else None),
                 )
 
             elif msg_type == "unsubscribe":
@@ -640,7 +785,12 @@ class EventBusAdapter:
 
         # Wait for any pending async operations to complete
         if self._pending_async_tasks:
-            pending = list(self._pending_async_tasks)
+            current_task = asyncio.current_task()
+            pending = [
+                task
+                for task in self._pending_async_tasks
+                if task is not current_task and not task.done()
+            ]
             if pending:
                 # Wait up to 5 seconds for pending tasks
                 try:

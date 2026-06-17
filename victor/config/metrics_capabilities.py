@@ -96,7 +96,12 @@ class ProviderMetricsCapabilities:
             Dict with input_cost, output_cost, cache_cost, total_cost
         """
         if not self.cost_enabled:
-            return {"input_cost": 0.0, "output_cost": 0.0, "cache_cost": 0.0, "total_cost": 0.0}
+            return {
+                "input_cost": 0.0,
+                "output_cost": 0.0,
+                "cache_cost": 0.0,
+                "total_cost": 0.0,
+            }
 
         input_cost = (prompt_tokens / 1_000_000) * self.input_cost_per_mtok
         output_cost = (completion_tokens / 1_000_000) * self.output_cost_per_mtok

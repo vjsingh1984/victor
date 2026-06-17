@@ -53,11 +53,12 @@ def benchmark_task_to_framework_task(
     task_type = _infer_task_type(benchmark_task)
 
     # Build context dictionary
+    benchmark_type = getattr(benchmark_task, "benchmark_type", None) or getattr(
+        benchmark_task, "benchmark", None
+    )
     context: Dict[str, Any] = {
         "task_id": benchmark_task.task_id,
-        "benchmark_type": (
-            benchmark_task.benchmark_type.value if benchmark_task.benchmark_type else None
-        ),
+        "benchmark_type": (benchmark_type.value if benchmark_type is not None else None),
     }
 
     if include_context:
@@ -74,8 +75,9 @@ def benchmark_task_to_framework_task(
 
     # Build list of relevant files if available
     files: List[str] = []
-    if benchmark_task.context_files:
-        files.extend(benchmark_task.context_files)
+    context_files = getattr(benchmark_task, "context_files", None)
+    if context_files:
+        files.extend(context_files)
 
     # Determine tool budget based on complexity
     tool_budget = _estimate_tool_budget(benchmark_task)
@@ -122,6 +124,19 @@ def framework_result_to_benchmark_result(
 
     # Extract metrics from framework result
     metadata = framework_result.metadata or {}
+    task_report = (
+        metadata.get("task_report") if isinstance(metadata.get("task_report"), dict) else {}
+    )
+    total_cost_usd = task_report.get("total_cost_usd") if task_report else None
+    cost_usd_micros = metadata.get("cost_usd_micros")
+    if cost_usd_micros in (None, 0) and total_cost_usd is not None:
+        try:
+            cost_usd_micros = int(float(total_cost_usd) * 1_000_000)
+        except (TypeError, ValueError):
+            cost_usd_micros = 0
+    result_metadata = dict(metadata)
+    if task_report:
+        result_metadata["task_report"] = dict(task_report)
 
     return EvalTaskResult(
         task_id=task_id,
@@ -129,21 +144,44 @@ def framework_result_to_benchmark_result(
         generated_code=framework_result.content,
         tests_passed=tests_passed,
         tests_total=tests_total,
-        tests_failed=(tests_total - tests_passed) if tests_passed and tests_total else None,
+        tests_failed=((tests_total - tests_passed) if tests_passed and tests_total else None),
         tokens_used=metadata.get("tokens_used", 0),
         tokens_input=metadata.get("tokens_input", 0),
         tokens_output=metadata.get("tokens_output", 0),
-        tool_calls=len(framework_result.tool_calls) if framework_result.tool_calls else 0,
-        turns=metadata.get("turns", 0),
+        cached_tokens=metadata.get(
+            "cached_tokens",
+            task_report.get("cache_read_tokens", 0) if task_report else 0,
+        ),
+        reasoning_tokens=metadata.get("reasoning_tokens", 0),
+        cost_usd_micros=cost_usd_micros or 0,
+        tool_calls=(len(framework_result.tool_calls) if framework_result.tool_calls else 0),
+        turns=metadata.get(
+            "turns",
+            task_report.get("request_count", 0) if task_report else 0,
+        ),
         error_message=framework_result.error,
+        metadata=result_metadata,
     )
 
 
 def _infer_task_type(benchmark_task: BenchmarkTask) -> FrameworkTaskType:
-    """Infer FrameworkTaskType from benchmark task characteristics."""
+    """Infer FrameworkTaskType from benchmark task characteristics.
+
+    If ``benchmark_task.task_type_hint`` is set, it is resolved first so
+    that non-coding benchmarks can bypass keyword inference entirely.
+    """
+    # 1. Check explicit hint from the benchmark task
+    hint = getattr(benchmark_task, "task_type_hint", None)
+    if hint:
+        hint_upper = hint.strip().upper()
+        try:
+            return FrameworkTaskType[hint_upper]
+        except KeyError:
+            pass  # fall through to keyword inference
+
+    # 2. Keyword-based inference (original logic)
     prompt_lower = benchmark_task.prompt.lower()
 
-    # Check for explicit task type indicators
     if any(word in prompt_lower for word in ["fix", "bug", "error", "issue", "patch"]):
         return FrameworkTaskType.EDIT
     elif any(word in prompt_lower for word in ["add", "implement", "create", "new"]):

@@ -25,7 +25,7 @@ Tests the context management module including:
 """
 
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 from dataclasses import dataclass
 
 from victor.agent.context_manager import (
@@ -33,7 +33,7 @@ from victor.agent.context_manager import (
     ContextManagerConfig,
     create_context_manager,
 )
-from victor.agent.conversation_controller import ContextMetrics
+from victor.agent.conversation.controller import ContextMetrics
 
 
 class TestContextManagerConfig:
@@ -654,6 +654,120 @@ class TestContextManagerCompaction:
         assert result is not None
         assert "10 messages" in result.content
         assert "50,000 chars freed" in result.content
+
+    def test_handle_compaction_prefers_context_service_before_legacy_compactor(
+        self, config, mock_controller
+    ):
+        """Sync compaction should use ContextService before legacy compactor."""
+        context_service = MagicMock()
+        context_service.get_compaction_recommendation.return_value = {"should_compact": True}
+        context_service.compact_context.return_value = 4
+        mock_compactor = MagicMock()
+
+        manager = ContextManager(
+            config=config,
+            provider_name="anthropic",
+            model="claude-sonnet-4-20250514",
+            conversation_controller=mock_controller,
+            context_compactor=mock_compactor,
+            context_service=context_service,
+        )
+
+        result = manager.handle_compaction("test query")
+
+        assert result is not None
+        assert "4 messages" in result.content
+        assert "ContextService" in result.content
+        context_service.get_compaction_recommendation.assert_called_once()
+        context_service.compact_context.assert_called_once_with(
+            strategy="tiered",
+            min_messages=6,
+        )
+        mock_compactor.check_and_compact.assert_not_called()
+        mock_controller.inject_compaction_context.assert_called_once()
+
+    def test_handle_compaction_uses_context_service_noop_decision(self, config, mock_controller):
+        """ContextService no-op decisions should not fall through to legacy compactor."""
+        context_service = MagicMock()
+        context_service.get_compaction_recommendation.return_value = {"should_compact": False}
+        context_service.compact_context.return_value = 0
+        mock_compactor = MagicMock()
+
+        manager = ContextManager(
+            config=config,
+            provider_name="anthropic",
+            model="claude-sonnet-4-20250514",
+            conversation_controller=mock_controller,
+            context_compactor=mock_compactor,
+            context_service=context_service,
+        )
+
+        result = manager.handle_compaction("test query")
+
+        assert result is None
+        context_service.get_compaction_recommendation.assert_called_once()
+        context_service.compact_context.assert_not_called()
+        mock_compactor.check_and_compact.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_handle_compaction_async_prefers_context_service_before_legacy_compactor(
+        self, config, mock_controller
+    ):
+        """Async compaction should use ContextService before legacy compactor."""
+        context_service = MagicMock()
+        context_service.get_compaction_recommendation.return_value = {"should_compact": True}
+        context_service.compact_context = AsyncMock(return_value=4)
+        mock_compactor = MagicMock()
+        mock_compactor.check_and_compact_async = AsyncMock()
+
+        manager = ContextManager(
+            config=config,
+            provider_name="anthropic",
+            model="claude-sonnet-4-20250514",
+            conversation_controller=mock_controller,
+            context_compactor=mock_compactor,
+            context_service=context_service,
+        )
+
+        result = await manager.handle_compaction_async("test query")
+
+        assert result is not None
+        assert "4 messages" in result.content
+        assert "ContextService" in result.content
+        context_service.get_compaction_recommendation.assert_called_once()
+        context_service.compact_context.assert_awaited_once_with(
+            strategy="tiered",
+            min_messages=6,
+        )
+        mock_compactor.check_and_compact_async.assert_not_called()
+        mock_controller.inject_compaction_context.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_handle_compaction_async_uses_context_service_noop_decision(
+        self, config, mock_controller
+    ):
+        """ContextService no-op decisions should not fall through to legacy compactor."""
+        context_service = MagicMock()
+        context_service.get_compaction_recommendation.return_value = {"should_compact": False}
+        context_service.compact_context = AsyncMock(return_value=0)
+        mock_compactor = MagicMock()
+        mock_compactor.check_and_compact_async = AsyncMock()
+
+        manager = ContextManager(
+            config=config,
+            provider_name="anthropic",
+            model="claude-sonnet-4-20250514",
+            conversation_controller=mock_controller,
+            context_compactor=mock_compactor,
+            context_service=context_service,
+        )
+
+        result = await manager.handle_compaction_async("test query")
+
+        assert result is None
+        context_service.get_compaction_recommendation.assert_called_once()
+        context_service.compact_context.assert_not_called()
+        mock_compactor.check_and_compact_async.assert_not_called()
 
 
 class TestContextManagerMetrics:

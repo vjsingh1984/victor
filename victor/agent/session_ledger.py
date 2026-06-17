@@ -29,7 +29,11 @@ from collections import deque
 from dataclasses import dataclass, field
 from typing import Any, Deque, Dict, List, Optional
 
-from victor.config.orchestrator_constants import SessionLedgerConfig, SESSION_LEDGER_CONFIG
+from victor.config.orchestrator_constants import (
+    SessionLedgerConfig,
+    SESSION_LEDGER_CONFIG,
+)
+from victor.tools.core_tool_aliases import canonicalize_core_tool_name
 
 logger = logging.getLogger(__name__)
 
@@ -165,10 +169,10 @@ class SessionLedger:
         self, tool_name: str, args: Dict[str, Any], result: str, turn_index: int
     ) -> None:
         """Parse tool results to extract file reads and modifications."""
-        tool_lower = tool_name.lower()
+        tool_lower = canonicalize_core_tool_name(tool_name.lower())
 
         # Read-type tools
-        if tool_lower in ("read", "cat", "read_file"):
+        if tool_lower in ("read", "cat"):
             path = args.get("path", args.get("file_path", ""))
             if path:
                 # Extract first meaningful line as summary
@@ -185,7 +189,7 @@ class SessionLedger:
                 self.record_file_read(path, summary, turn_index)
 
         # Write/edit type tools
-        elif tool_lower in ("write", "edit", "write_file", "create_file"):
+        elif tool_lower in ("write", "edit"):
             path = args.get("path", args.get("file_path", ""))
             if path:
                 summary = f"Modified via {tool_lower}"
@@ -196,7 +200,7 @@ class SessionLedger:
         # Also check for TOOL_OUTPUT markers in result
         if result:
             for match in TOOL_OUTPUT_PATTERN.finditer(result):
-                matched_tool = match.group(1)
+                matched_tool = canonicalize_core_tool_name(match.group(1).lower())
                 matched_path = match.group(2) or ""
                 if matched_tool in ("read", "cat") and matched_path:
                     if matched_path not in self._files_read:

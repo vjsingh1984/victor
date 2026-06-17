@@ -197,6 +197,13 @@ class TestSafetyLayer:
         assert allowed is False
         assert "sandbox" in reason.lower()
 
+    def test_sandbox_mode_blocks_shell_alias(self):
+        """Legacy shell aliases should still be blocked via canonical matching."""
+        layer = SafetyLayer(sandbox_mode=True)
+        allowed, reason = layer.check("execute_bash", None)
+        assert allowed is False
+        assert "sandbox" in reason.lower()
+
     def test_non_sandbox_allows_dangerous(self):
         """Test non-sandbox mode allows dangerous tools."""
         layer = SafetyLayer(sandbox_mode=False)
@@ -436,6 +443,19 @@ class TestIntentLayer:
         context = ToolAccessContext(intent=intent)
 
         allowed, reason = layer.check("read_file", context)
+        assert allowed is True
+
+    def test_allows_shell_for_explicit_readonly_sqlite_request(self):
+        """Explicit readonly shell requests should survive intent filtering."""
+        layer = IntentLayer()
+        intent = MagicMock()
+        intent.name = "READ_ONLY"
+        context = ToolAccessContext(
+            intent=intent,
+            user_message="use shell tool with sqlite commands to inspect generations",
+        )
+
+        allowed, reason = layer.check("shell", context)
         assert allowed is True
 
 
@@ -750,6 +770,27 @@ class TestStageLayerExtended:
         allowed, reason = layer.check("special_write", context)
         assert allowed is True
         assert "preserved" in reason.lower()
+
+    def test_explicit_readonly_shell_request_allowed_in_exploration(self):
+        """Readonly shell requests should stay available during exploration stages."""
+        layer = StageLayer()
+        mock_controller = MagicMock()
+        mock_controller.config.allow_all_tools = False
+        layer.set_mode_controller(mock_controller)
+
+        mock_stage = MagicMock()
+        mock_stage.name = "INITIAL"
+        intent = MagicMock()
+        intent.name = "READ_ONLY"
+        context = ToolAccessContext(
+            conversation_stage=mock_stage,
+            intent=intent,
+            user_message="use shell with sqlite3 to inspect prompt generations",
+        )
+
+        allowed, reason = layer.check("shell", context)
+        assert allowed is True
+        assert "readonly shell request" in reason.lower()
 
 
 # =============================================================================

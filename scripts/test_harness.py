@@ -737,7 +737,10 @@ Examples:
     )
 
     parser.add_argument(
-        "--provider", type=str, default="ollama", help="Provider to use (default: ollama)"
+        "--provider",
+        type=str,
+        default="ollama",
+        help="Provider to use (default: ollama)",
     )
     parser.add_argument("--model", type=str, default="qwen3-coder:30b", help="Model to use")
 

@@ -39,9 +39,50 @@ from victor.core.vertical_types import TieredToolConfig
 @pytest.fixture(autouse=True)
 def reset_registry():
     """Reset the singleton before and after each test."""
+    from victor.core.vertical_types import TieredToolTemplate
+
     ToolTierRegistry.reset_instance()
+    TieredToolTemplate._registered_verticals.clear()
     yield
+    TieredToolTemplate._registered_verticals.clear()
     ToolTierRegistry.reset_instance()
+
+
+@pytest.fixture()
+def seeded_registry():
+    """Seed the registry with standard verticals for tests that need them.
+
+    After the legacy _LEGACY_CORES removal, verticals must register
+    dynamically via register_vertical_tools(). This fixture provides
+    the same data for backward-compatible tests.
+    """
+    from victor.core.vertical_types import TieredToolTemplate
+
+    TieredToolTemplate.register_vertical_tools(
+        "coding",
+        core_tools={"edit", "write", "shell", "git", "search", "overview"},
+        readonly_for_analysis=False,
+    )
+    TieredToolTemplate.register_vertical_tools(
+        "research",
+        core_tools={"web_search", "web_fetch", "overview"},
+        readonly_for_analysis=True,
+    )
+    TieredToolTemplate.register_vertical_tools(
+        "devops",
+        core_tools={"shell", "git", "docker", "overview"},
+        readonly_for_analysis=False,
+    )
+    TieredToolTemplate.register_vertical_tools(
+        "data_analysis",
+        core_tools={"shell", "write", "overview"},
+        readonly_for_analysis=False,
+    )
+    TieredToolTemplate.register_vertical_tools(
+        "rag",
+        core_tools={"rag_search", "rag_query", "rag_list", "rag_stats", "rag_delete"},
+        readonly_for_analysis=True,
+    )
 
 
 class TestToolTierRegistrySingleton:
@@ -81,8 +122,8 @@ class TestToolTierRegistryDefaults:
         assert "ls" in base_config.mandatory
         assert "grep" in base_config.mandatory
 
-    def test_coding_tier_registered_by_default(self):
-        """Coding tier should be registered on initialization."""
+    def test_coding_tier_registered_after_vertical_activation(self, seeded_registry):
+        """Coding tier available after vertical registers its tools."""
         registry = ToolTierRegistry.get_instance()
         assert registry.has("coding")
 
@@ -91,8 +132,8 @@ class TestToolTierRegistryDefaults:
         assert "edit" in coding_config.vertical_core
         assert "write" in coding_config.vertical_core
 
-    def test_research_tier_registered_by_default(self):
-        """Research tier should be registered on initialization."""
+    def test_research_tier_registered_after_vertical_activation(self, seeded_registry):
+        """Research tier available after vertical registers its tools."""
         registry = ToolTierRegistry.get_instance()
         assert registry.has("research")
 
@@ -201,7 +242,7 @@ class TestToolTierRegistryRetrieval:
         assert entry.metadata == {"key": "value"}
         assert entry.version == "2.0.0"
 
-    def test_list_all_returns_all_names(self):
+    def test_list_all_returns_all_names(self, seeded_registry):
         """list_all() returns all registered tier names."""
         registry = ToolTierRegistry.get_instance()
         names = registry.list_all()
@@ -286,7 +327,7 @@ class TestToolTierRegistryInheritance:
 class TestToolTierRegistryExtension:
     """Test tier extension functionality."""
 
-    def test_extend_adds_tools(self):
+    def test_extend_adds_tools(self, seeded_registry):
         """extend() adds tools to base config."""
         registry = ToolTierRegistry.get_instance()
 
@@ -312,7 +353,7 @@ class TestToolTierRegistryExtension:
         assert "new_mandatory" in extended.mandatory
         assert "read" in extended.mandatory  # Original still present
 
-    def test_extend_overrides_readonly_setting(self):
+    def test_extend_overrides_readonly_setting(self, seeded_registry):
         """extend() can override readonly_only_for_analysis."""
         registry = ToolTierRegistry.get_instance()
 
@@ -333,7 +374,7 @@ class TestToolTierRegistryExtension:
 class TestToolTierRegistryValidation:
     """Test tier validation."""
 
-    def test_validate_returns_empty_for_valid_tier(self):
+    def test_validate_returns_empty_for_valid_tier(self, seeded_registry):
         """validate_tier() returns empty list for valid tier."""
         registry = ToolTierRegistry.get_instance()
         errors = registry.validate_tier("coding")
@@ -383,7 +424,7 @@ class TestToolTierRegistryThreadSafety:
         for i in range(20):
             assert registry.has(f"thread_tier_{i}")
 
-    def test_concurrent_reads(self):
+    def test_concurrent_reads(self, seeded_registry):
         """Concurrent reads are thread-safe."""
         registry = ToolTierRegistry.get_instance()
         results = []
@@ -431,7 +472,7 @@ class TestToolTierRegistrySerialization:
         assert d["description"] == "Test entry"
         assert d["metadata"] == {"key": "value"}
 
-    def test_registry_to_dict(self):
+    def test_registry_to_dict(self, seeded_registry):
         """ToolTierRegistry.to_dict() serializes all entries."""
         registry = ToolTierRegistry.get_instance()
         d = registry.to_dict()

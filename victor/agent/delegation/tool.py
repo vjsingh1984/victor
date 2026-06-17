@@ -37,6 +37,7 @@ Example (from agent's perspective):
 from __future__ import annotations
 
 import logging
+import re
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from victor.tools.base import BaseTool, CostTier, ToolResult
@@ -155,6 +156,25 @@ Returns the result from the delegated agent. By default, waits for completion.""
         self.parent_agent_id = parent_agent_id
         self.parent_goal = parent_goal
 
+    def sanitize_task(self, task: str) -> str:
+        """Sanitize the task description to remove leaking thinking blocks.
+
+        Args:
+            task: Raw task string from the LLM
+
+        Returns:
+            Sanitized task string
+        """
+        # Remove common thinking blocks/tags
+        # 1. <thinking>...</thinking> anywhere in the string
+        task = re.sub(r"<thinking>.*?</thinking>", "", task, flags=re.DOTALL)
+        # 2. [<thinking>] or [Thinking: ...] anywhere; strip optional preceding em/en-dash
+        task = re.sub(r"(\s*[—–]\s*)?\[(?:<|)(?:thinking|Thinking)[^\]]*\]", "", task)
+        # 3. Trailing CJK tokens (hallucinated characters like 武功)
+        task = re.sub(r"[\u4e00-\u9fff]+\s*$", "", task)
+
+        return task.strip()
+
     async def execute(
         self,
         task: str,
@@ -177,6 +197,7 @@ Returns the result from the delegated agent. By default, waits for completion.""
         Returns:
             ToolResult with delegation outcome
         """
+        task = self.sanitize_task(task)
         logger.info(f"Delegating to {role}: {task[:50]}...")
 
         # Create delegation request

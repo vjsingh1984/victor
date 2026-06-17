@@ -41,12 +41,16 @@ class TestAgentMode:
         assert AgentMode.BUILD.value == "build"
         assert AgentMode.PLAN.value == "plan"
         assert AgentMode.EXPLORE.value == "explore"
+        assert AgentMode.REVIEW.value == "review"
+        assert AgentMode.DELEGATE.value == "delegate"
 
     def test_mode_from_string(self):
         """Test creating modes from strings."""
         assert AgentMode("build") == AgentMode.BUILD
         assert AgentMode("plan") == AgentMode.PLAN
         assert AgentMode("explore") == AgentMode.EXPLORE
+        assert AgentMode("review") == AgentMode.REVIEW
+        assert AgentMode("delegate") == AgentMode.DELEGATE
 
     def test_invalid_mode_raises(self):
         """Test that invalid mode name raises ValueError."""
@@ -74,18 +78,25 @@ class TestModeConfig:
         assert config.allow_all_tools is False
         assert config.require_write_confirmation is True
         assert config.verbose_planning is True
-        # Should disallow bash/git modifications (but sandbox edits allowed)
-        assert "bash" in config.disallowed_tools
+        # Should disallow shell/git modifications (but sandbox edits allowed)
+        assert "shell" in config.disallowed_tools
         assert "git_commit" in config.disallowed_tools
         # Should allow read operations and sandbox editing
-        assert "read_file" in config.allowed_tools
+        assert "read" in config.allowed_tools
         assert "code_search" in config.allowed_tools
-        assert "write_file" in config.allowed_tools  # Sandbox edits allowed
+        assert "symbol" in config.allowed_tools
+        assert "refs" in config.allowed_tools
+        assert "lsp" in config.allowed_tools
+        assert "write" in config.allowed_tools  # Sandbox edits allowed
+        assert "edit" in config.allowed_tools
         # Should have sandbox configuration
         assert config.sandbox_dir == ".victor/sandbox"
         assert config.allow_sandbox_edits is True
         # Should have high exploration multiplier for plan mode (like Claude Code)
         assert config.exploration_multiplier == 10.0
+        assert config.tool_priorities["read"] == 1.2
+        assert config.tool_priorities["lsp"] > 1.0
+        assert "Prefer structure-aware navigation first" in config.system_prompt_addition
 
     def test_explore_mode_config(self):
         """Test EXPLORE mode configuration."""
@@ -94,17 +105,58 @@ class TestModeConfig:
         assert config.name == "Explore"
         assert config.allow_all_tools is False
         assert config.require_write_confirmation is True
-        # Should disallow bash and edit_files (but sandbox notes allowed)
-        assert "bash" in config.disallowed_tools
-        assert "edit_files" in config.disallowed_tools
+        # Should disallow shell and edit (but sandbox notes allowed)
+        assert "shell" in config.disallowed_tools
+        assert "edit" in config.disallowed_tools
         # Should allow read operations and sandbox notes
-        assert "read_file" in config.allowed_tools
-        assert "write_file" in config.allowed_tools  # Sandbox notes allowed
+        assert "read" in config.allowed_tools
+        assert "symbol" in config.allowed_tools
+        assert "refs" in config.allowed_tools
+        assert "lsp" in config.allowed_tools
+        assert "write" in config.allowed_tools  # Sandbox notes allowed
         # Should have sandbox configuration
         assert config.sandbox_dir == ".victor/sandbox"
         assert config.allow_sandbox_edits is True
         # Should have very high exploration multiplier for explore mode (like Claude Code)
         assert config.exploration_multiplier == 20.0
+        assert config.tool_priorities["symbol"] > 1.0
+
+    def test_review_mode_config(self):
+        """Test REVIEW mode configuration."""
+        config = MODE_CONFIGS[AgentMode.REVIEW]
+
+        assert config.name == "Review"
+        assert config.allow_all_tools is False
+        assert config.require_write_confirmation is True
+        assert "code_review" in config.allowed_tools
+        assert "symbol" in config.allowed_tools
+        assert "refs" in config.allowed_tools
+        assert "lsp" in config.allowed_tools
+        assert "edit" in config.disallowed_tools
+        assert "git_commit" in config.disallowed_tools
+        assert config.sandbox_dir == ".victor/sandbox"
+        assert config.allow_sandbox_edits is True
+        assert config.tool_priorities["code_review"] > 1.0
+        assert "Findings-first" in config.system_prompt_addition
+
+    def test_delegate_mode_config(self):
+        """Test DELEGATE mode configuration."""
+        config = MODE_CONFIGS[AgentMode.DELEGATE]
+
+        assert config.name == "Delegate"
+        assert config.allow_all_tools is False
+        assert config.require_write_confirmation is True
+        assert "plan_files" in config.allowed_tools
+        assert "symbol" in config.allowed_tools
+        assert "refs" in config.allowed_tools
+        assert "lsp" in config.allowed_tools
+        assert "edit" in config.allowed_tools
+        assert "shell" in config.disallowed_tools
+        assert "git_commit" in config.disallowed_tools
+        assert config.sandbox_dir == ".victor/sandbox"
+        assert config.allow_sandbox_edits is True
+        assert config.tool_priorities["plan_files"] > 1.0
+        assert "worktree isolation" in config.system_prompt_addition
 
 
 class TestAgentModeController:
@@ -117,8 +169,8 @@ class TestAgentModeController:
     def test_custom_initial_mode(self):
         """Test creating manager with different initial mode."""
         reset_mode_controller()
-        manager = AgentModeController(initial_mode=AgentMode.PLAN)
-        assert manager.current_mode == AgentMode.PLAN
+        manager = AgentModeController(initial_mode=AgentMode.REVIEW)
+        assert manager.current_mode == AgentMode.REVIEW
 
     def test_switch_mode(self, manager):
         """Test switching modes."""
@@ -141,12 +193,12 @@ class TestAgentModeController:
     def test_mode_history(self, manager):
         """Test that mode history is tracked."""
         manager.switch_mode(AgentMode.PLAN)
-        manager.switch_mode(AgentMode.EXPLORE)
+        manager.switch_mode(AgentMode.REVIEW)
 
         assert len(manager._mode_history) == 3
         assert manager._mode_history[0] == AgentMode.BUILD
         assert manager._mode_history[1] == AgentMode.PLAN
-        assert manager._mode_history[2] == AgentMode.EXPLORE
+        assert manager._mode_history[2] == AgentMode.REVIEW
 
     def test_previous_mode(self, manager):
         """Test returning to previous mode."""
@@ -176,26 +228,26 @@ class TestToolAllowance:
 
     def test_build_mode_allows_all_tools(self, manager):
         """Test that BUILD mode allows all tools."""
-        assert manager.is_tool_allowed("write_file")
-        assert manager.is_tool_allowed("edit_files")
-        assert manager.is_tool_allowed("bash")
-        assert manager.is_tool_allowed("read_file")
+        assert manager.is_tool_allowed("write")
+        assert manager.is_tool_allowed("edit")
+        assert manager.is_tool_allowed("shell")
+        assert manager.is_tool_allowed("read")
 
     def test_plan_mode_restricts_tools(self, manager):
         """Test that PLAN mode restricts modification tools but allows sandbox edits."""
         manager.switch_mode(AgentMode.PLAN)
 
         # Should allow read tools
-        assert manager.is_tool_allowed("read_file")
+        assert manager.is_tool_allowed("read")
         assert manager.is_tool_allowed("code_search")
         assert manager.is_tool_allowed("git_status")
 
-        # Should allow sandbox edits (write_file and edit_files are in allowed_tools)
-        assert manager.is_tool_allowed("write_file")  # Sandbox edits allowed
-        assert manager.is_tool_allowed("edit_files")  # Sandbox edits allowed
+        # Should allow sandbox edits
+        assert manager.is_tool_allowed("write")
+        assert manager.is_tool_allowed("edit")
 
-        # Should disallow bash and git modifications
-        assert not manager.is_tool_allowed("bash")
+        # Should disallow shell and git modifications
+        assert not manager.is_tool_allowed("shell")
         assert not manager.is_tool_allowed("git_commit")
 
     def test_explore_mode_restricts_tools(self, manager):
@@ -203,16 +255,16 @@ class TestToolAllowance:
         manager.switch_mode(AgentMode.EXPLORE)
 
         # Should allow read tools
-        assert manager.is_tool_allowed("read_file")
-        assert manager.is_tool_allowed("list_directory")
+        assert manager.is_tool_allowed("read")
+        assert manager.is_tool_allowed("ls")
         assert manager.is_tool_allowed("web_search")
 
-        # Should allow sandbox notes (write_file is in allowed_tools)
-        assert manager.is_tool_allowed("write_file")  # Sandbox notes allowed
+        # Should allow sandbox notes
+        assert manager.is_tool_allowed("write")
 
-        # Should disallow bash and edit_files
-        assert not manager.is_tool_allowed("bash")
-        assert not manager.is_tool_allowed("edit_files")  # Only notes, no edits
+        # Should disallow shell and edit
+        assert not manager.is_tool_allowed("shell")
+        assert not manager.is_tool_allowed("edit")
 
 
 class TestToolPriority:
@@ -220,8 +272,8 @@ class TestToolPriority:
 
     def test_build_mode_priorities(self, manager):
         """Test tool priorities in BUILD mode."""
-        # edit_files should have higher priority
-        assert manager.get_tool_priority("edit_files") > 1.0
+        # edit should have higher priority
+        assert manager.get_tool_priority("edit") > 1.0
         # Unknown tool should have default priority
         assert manager.get_tool_priority("unknown_tool") == 1.0
 
@@ -281,11 +333,13 @@ class TestModeStatus:
         """Test getting list of modes."""
         modes = manager.get_mode_list()
 
-        assert len(modes) == 3  # BUILD, PLAN, EXPLORE
+        assert len(modes) == 5  # BUILD, PLAN, REVIEW, DELEGATE, EXPLORE
 
         mode_names = [m["mode"] for m in modes]
         assert "build" in mode_names
         assert "plan" in mode_names
+        assert "review" in mode_names
+        assert "delegate" in mode_names
         assert "explore" in mode_names
 
         # Check current mode is marked

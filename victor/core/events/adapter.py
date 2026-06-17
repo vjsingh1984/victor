@@ -43,7 +43,11 @@ from typing import TYPE_CHECKING, Callable, Optional
 from victor.core.events.protocols import MessagingEvent, DeliveryGuarantee
 
 if TYPE_CHECKING:
-    from victor.core.events import ObservabilityBus as EventBus, VictorEvent, EventCategory
+    from victor.core.events import (
+        ObservabilityBus as EventBus,
+        VictorEvent,
+        EventCategory,
+    )
     from victor.core.events.backends import ObservabilityBus, AgentMessageBus
     from victor.agent.teams.communication import TeamMessageBus
 
@@ -68,19 +72,6 @@ def victor_event_to_event(victor_event: "VictorEvent") -> MessagingEvent:
         correlation_id=victor_event.trace_id,
         delivery_guarantee=DeliveryGuarantee.AT_MOST_ONCE,
     )
-
-
-def event_to_victor_event(event: MessagingEvent) -> None:
-    """Convert MessagingEvent (protocol-based) to VictorEvent (legacy).
-
-    NOTE: VictorEvent has been removed. This function is kept for
-    backward compatibility but is no longer functional.
-
-    TODO: Remove this function once all migration is complete.
-    """
-    # VictorEvent, EventCategory, EventPriority removed - use canonical MessagingEvent
-    # This conversion is no longer needed as we've migrated to MessagingEvent
-    pass
 
 
 class EventBusAdapter:
@@ -238,7 +229,6 @@ class TeamMessageBusAdapter:
 
 __all__ = [
     "victor_event_to_event",
-    "event_to_victor_event",
     "EventBusAdapter",
     "TeamMessageBusAdapter",
 ]

@@ -255,10 +255,12 @@ class SessionCostTracker:
                 "total": self.total_cost,
             },
             "averages": {
-                "tokens_per_request": self.total_tokens / request_count if request_count > 0 else 0,
-                "cost_per_request": self.total_cost / request_count if request_count > 0 else 0,
+                "tokens_per_request": (
+                    self.total_tokens / request_count if request_count > 0 else 0
+                ),
+                "cost_per_request": (self.total_cost / request_count if request_count > 0 else 0),
             },
-            "cost_enabled": self._capabilities.cost_enabled if self._capabilities else False,
+            "cost_enabled": (self._capabilities.cost_enabled if self._capabilities else False),
         }
 
     def get_formatted_summary(self) -> str:

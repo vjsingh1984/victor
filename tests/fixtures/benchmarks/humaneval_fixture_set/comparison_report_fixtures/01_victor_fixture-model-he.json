@@ -1,0 +1,21 @@
+{
+  "benchmark": "humaneval",
+  "model": "fixture-model-he",
+  "dataset_metadata": {
+    "source_name": "HumanEval Fixture A"
+  },
+  "metrics": {
+    "total_tasks": 1,
+    "passed": 1,
+    "failed": 0,
+    "errors": 0,
+    "timeouts": 0,
+    "pass_rate": 1.0
+  },
+  "task_results": [
+    {
+      "task_id": "humaneval-fixture-1",
+      "status": "passed"
+    }
+  ]
+}

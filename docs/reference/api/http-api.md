@@ -8,7 +8,7 @@ The HTTP API provides language-agnostic access to Victor's features through a RE
 
 **Start server**:
 ```bash
-victor serve --port 8080
+victor serve --port 8080 --profile default --mode build
 ```
 
 **Base URL**: `http://localhost:8080/api/v1`
@@ -61,6 +61,45 @@ data: {"type":"token","content":"Write"}
 data: {"type":"token","content":" a"}
 data: {"type":"token","content":" REST"}
 data: {"type":"end","request_id":"req-123"}
+```
+
+### Capability Recommendations
+
+```bash
+curl "http://localhost:8080/api/v1/capabilities/recommend?task_type=feature&complexity=high&mode=build&vertical=coding"
+```
+
+**Response**:
+```json
+{
+  "task_type": "feature",
+  "complexity": "high",
+  "mode": "build",
+  "vertical": "coding",
+  "count": 1,
+  "recommendations": [
+    {
+      "vertical": "coding",
+      "action": "auto_spawn",
+      "primary_team": {
+        "team_name": "feature_team",
+        "confidence": 0.8,
+        "reason": "Task type 'feature' matches pattern 'feature'",
+        "formation": "parallel",
+        "suggested_budget": null,
+        "role_distribution": {},
+        "source": "hybrid-rule"
+      },
+      "primary_workflow": {
+        "workflow_name": "feature_implementation",
+        "confidence": 0.8,
+        "reason": "Task type 'feature' matches workflow pattern",
+        "trigger_condition": null,
+        "estimated_steps": null
+      }
+    }
+  ]
+}
 ```
 
 ---
@@ -162,6 +201,105 @@ data: {"type":"end","request_id":"req-123","timestamp":"2025-01-07T10:30:05Z"}
 - `tool_call`: Tool execution started
 - `tool_result`: Tool execution result
 - `end`: Stream ended
+
+### Runtime Configuration
+
+These endpoints let IDEs and external clients discover and switch the same
+runtime state used by the CLI instead of relying on static preset lists.
+
+#### GET /api/v1/config/effective
+
+Return the effective profile, provider/model override, mode, and available
+profiles/modes for the current server session.
+
+```bash
+curl http://localhost:8080/api/v1/config/effective
+```
+
+#### GET /api/v1/profiles
+
+List profiles from `~/.victor/profiles.yaml`.
+
+```bash
+curl http://localhost:8080/api/v1/profiles
+```
+
+#### GET /api/v1/modes
+
+List supported workflow modes: `build`, `plan`, `review`, `delegate`, and
+`explore`.
+
+```bash
+curl http://localhost:8080/api/v1/modes
+```
+
+#### POST /api/v1/profile/switch
+
+Switch the active profile for subsequent chat requests and clear any explicit
+provider/model override.
+
+```bash
+curl -X POST http://localhost:8080/api/v1/profile/switch \
+  -H "Content-Type: application/json" \
+  -d '{"profile":"local"}'
+```
+
+#### POST /api/v1/model/switch
+
+Override the active provider/model without changing the selected profile.
+
+```bash
+curl -X POST http://localhost:8080/api/v1/model/switch \
+  -H "Content-Type: application/json" \
+  -d '{"provider":"anthropic","model":"claude-sonnet-4-20250514"}'
+```
+
+#### POST /api/v1/mode/switch
+
+Switch workflow mode for subsequent requests.
+
+```bash
+curl -X POST http://localhost:8080/api/v1/mode/switch \
+  -H "Content-Type: application/json" \
+  -d '{"mode":"review"}'
+```
+
+### GET /api/v1/capabilities/recommend
+
+Recommend teams and workflows from the shared framework coordination catalogs.
+
+**Query Parameters**:
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `task_type` | string | Yes | Task type or short task label |
+| `complexity` | string | Yes | Complexity level such as `low`, `medium`, or `high` |
+| `mode` | string | No | Coordination mode. Defaults to `build` |
+| `vertical` | string | No | Restrict recommendations to one vertical |
+
+**Example**:
+```bash
+curl "http://localhost:8080/api/v1/capabilities/recommend?task_type=feature&complexity=high&mode=build"
+```
+
+**Response** (200 OK):
+```json
+{
+  "task_type": "feature",
+  "complexity": "high",
+  "mode": "build",
+  "vertical": null,
+  "count": 2,
+  "recommendations": [
+    {
+      "vertical": "coding",
+      "action": "auto_spawn",
+      "primary_team": {"team_name": "feature_team"},
+      "primary_workflow": {"workflow_name": "feature_implementation"}
+    }
+  ]
+}
+```
 
 ### POST /api/v1/conversations
 

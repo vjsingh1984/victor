@@ -156,7 +156,7 @@ class TestTeamMember:
 
         assert member.is_leader is True
         assert member.max_concurrent_tasks == 5
-        assert member.tool_access == ["read_file", "write_file"]
+        assert member.tool_access == ["read", "write"]
 
     def test_name_property(self, sample_persona):
         """name property should return persona name."""
@@ -645,7 +645,7 @@ class TestTeamSpecSerialization:
         assert data["members"][0]["role_in_team"] == "worker"
         assert data["members"][0]["is_leader"] is True
         assert data["members"][0]["max_concurrent_tasks"] == 3
-        assert data["members"][0]["tool_access"] == ["read_file"]
+        assert data["members"][0]["tool_access"] == ["read"]
         assert data["members"][0]["persona"]["name"] == "Agent"
 
 

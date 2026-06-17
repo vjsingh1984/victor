@@ -73,7 +73,15 @@ class SchemaValidator:
     """
 
     # Valid node types
-    VALID_NODE_TYPES = {"agent", "compute", "condition", "parallel", "transform", "team", "hitl"}
+    VALID_NODE_TYPES = {
+        "agent",
+        "compute",
+        "condition",
+        "parallel",
+        "transform",
+        "team",
+        "hitl",
+    }
 
     # Valid agent roles
     VALID_AGENT_ROLES = {
@@ -87,7 +95,13 @@ class SchemaValidator:
     }
 
     # Valid team formations
-    VALID_TEAM_FORMATIONS = {"sequential", "parallel", "hierarchical", "pipeline", "consensus"}
+    VALID_TEAM_FORMATIONS = {
+        "sequential",
+        "parallel",
+        "hierarchical",
+        "pipeline",
+        "consensus",
+    }
 
     # Valid join strategies
     VALID_JOIN_STRATEGIES = {"all", "any", "merge"}
@@ -667,7 +681,10 @@ class GraphStructureValidator:
         return errors
 
     def _check_edge_references(
-        self, graph: Dict[str, List[str]], nodes: List[Dict[str, Any]], edges: List[Dict[str, Any]]
+        self,
+        graph: Dict[str, List[str]],
+        nodes: List[Dict[str, Any]],
+        edges: List[Dict[str, Any]],
     ) -> List[WorkflowValidationError]:
         """Check edge references exist."""
         errors = []
@@ -1217,7 +1234,9 @@ class WorkflowValidator:
         self.schema_validator = SchemaValidator(strict_mode=strict_mode)
         self.structure_validator = GraphStructureValidator()
         self.semantic_validator = SemanticValidator(
-            tool_registry=tool_registry, handler_registry=handler_registry, strict_mode=strict_mode
+            tool_registry=tool_registry,
+            handler_registry=handler_registry,
+            strict_mode=strict_mode,
         )
         self.security_validator = SecurityValidator(airgapped_mode=airgapped_mode)
 

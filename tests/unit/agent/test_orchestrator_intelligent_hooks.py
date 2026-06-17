@@ -62,7 +62,7 @@ class TestOrchestratorIntelligentHooks:
     def mock_settings(self):
         """Create mock settings with intelligent pipeline enabled."""
         settings = MagicMock()
-        settings.intelligent_pipeline_enabled = True
+        settings.runtime_intelligence_enabled = True
         settings.intelligent_quality_scoring = True
         settings.intelligent_mode_learning = True
         settings.intelligent_prompt_optimization = True
@@ -77,7 +77,7 @@ class TestOrchestratorIntelligentHooks:
         settings.temperature = 0.7
         settings.max_tokens = 2048
         settings.log_level = "WARNING"
-        settings.tool_call_budget = 50
+        settings.tools.tool_call_budget = 50
         return settings
 
     @pytest.fixture
@@ -116,15 +116,15 @@ class TestOrchestratorIntelligentHooks:
 
     def test_prepare_intelligent_request_returns_none_when_disabled(self, mock_settings):
         """Should return None when intelligent pipeline is disabled."""
-        mock_settings.intelligent_pipeline_enabled = False
+        mock_settings.runtime_intelligence_enabled = False
 
         # Create a minimal mock orchestrator
         orchestrator = MagicMock()
-        orchestrator._intelligent_pipeline_enabled = False
-        orchestrator._intelligent_integration = None
+        orchestrator._runtime_intelligence_enabled = False
+        orchestrator._runtime_intelligence_integration = None
 
         # Access the property should return None
-        assert orchestrator._intelligent_integration is None
+        assert orchestrator._runtime_intelligence_integration is None
 
     def test_prepare_intelligent_request_handles_exceptions(self):
         """Should handle exceptions gracefully in prepare_request."""
@@ -204,41 +204,41 @@ class TestOrchestratorIntelligentHooks:
 
 
 class TestOrchestratorIntegrationProperty:
-    """Tests for the intelligent_integration property accessor."""
+    """Tests for the runtime_intelligence_integration property accessor."""
 
     def test_property_returns_none_when_disabled(self):
         """Property should return None when feature is disabled."""
         orchestrator = MagicMock()
-        orchestrator._intelligent_pipeline_enabled = False
-        orchestrator._intelligent_integration = None
+        orchestrator._runtime_intelligence_enabled = False
+        orchestrator._runtime_intelligence_integration = None
 
         # Simulating the property behavior
-        if not orchestrator._intelligent_pipeline_enabled:
+        if not orchestrator._runtime_intelligence_enabled:
             result = None
         else:
-            result = orchestrator._intelligent_integration
+            result = orchestrator._runtime_intelligence_integration
 
         assert result is None
 
     def test_property_lazy_initializes(self):
         """Property should lazy initialize on first access."""
         orchestrator = MagicMock()
-        orchestrator._intelligent_pipeline_enabled = True
-        orchestrator._intelligent_integration = None
+        orchestrator._runtime_intelligence_enabled = True
+        orchestrator._runtime_intelligence_integration = None
 
         # First access triggers initialization
         # In real code, this would create the integration
-        assert orchestrator._intelligent_integration is None  # Before init
+        assert orchestrator._runtime_intelligence_integration is None  # Before init
 
     def test_property_returns_cached_instance(self):
         """Property should return cached instance on subsequent calls."""
         integration = MagicMock()
         orchestrator = MagicMock()
-        orchestrator._intelligent_pipeline_enabled = True
-        orchestrator._intelligent_integration = integration
+        orchestrator._runtime_intelligence_enabled = True
+        orchestrator._runtime_intelligence_integration = integration
 
         # Should return the cached instance
-        assert orchestrator._intelligent_integration is integration
+        assert orchestrator._runtime_intelligence_integration is integration
 
 
 class TestHookIntegration:
@@ -300,28 +300,29 @@ class TestConfigurationSettings:
     """Tests for configuration settings in settings.py."""
 
     def test_intelligent_settings_exist(self):
-        """Verify all intelligent pipeline settings exist in Settings."""
+        """Verify all intelligent pipeline settings exist in Settings.pipeline."""
         from victor.config.settings import Settings
 
-        # Get default field values
         settings = Settings()
+        pipeline = settings.pipeline
 
-        # These should all exist with defaults
-        assert hasattr(settings, "intelligent_pipeline_enabled")
-        assert hasattr(settings, "intelligent_quality_scoring")
-        assert hasattr(settings, "intelligent_mode_learning")
-        assert hasattr(settings, "intelligent_prompt_optimization")
-        assert hasattr(settings, "intelligent_grounding_verification")
-        assert hasattr(settings, "intelligent_min_quality_threshold")
-        assert hasattr(settings, "intelligent_grounding_threshold")
+        # These should all exist with defaults under the pipeline group
+        assert hasattr(pipeline, "runtime_intelligence_enabled")
+        assert hasattr(pipeline, "intelligent_quality_scoring")
+        assert hasattr(pipeline, "intelligent_mode_learning")
+        assert hasattr(pipeline, "intelligent_prompt_optimization")
+        assert hasattr(pipeline, "intelligent_grounding_verification")
+        assert hasattr(pipeline, "intelligent_min_quality_threshold")
+        assert hasattr(pipeline, "intelligent_grounding_threshold")
 
     def test_intelligent_settings_defaults(self):
         """Verify default values for intelligent pipeline settings."""
         from victor.config.settings import Settings
 
         settings = Settings()
+        pipeline = settings.pipeline
 
-        assert settings.intelligent_pipeline_enabled is True
-        assert settings.intelligent_quality_scoring is True
-        assert settings.intelligent_min_quality_threshold == 0.5
-        assert settings.intelligent_grounding_threshold == 0.7
+        assert pipeline.runtime_intelligence_enabled is True
+        assert pipeline.intelligent_quality_scoring is True
+        assert pipeline.intelligent_min_quality_threshold == 0.5
+        assert pipeline.intelligent_grounding_threshold == 0.7

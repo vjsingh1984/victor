@@ -51,6 +51,7 @@ For `VerticalBase.create_agent()` and legacy config-only vertical activation shi
 
 - `v0.7.0` target date: `2026-06-30`
 - `v0.8.0` target date: `2026-12-31`
+- `v0.9.0` target date: `2027-03-31`
 
 ## Source Of Truth
 

@@ -22,6 +22,7 @@ Protocols:
     IAgent: Base agent protocol
     ITeamMember: Team member protocol
     ITeamCoordinator: Base coordinator protocol
+    IDelegateFollowUpCoordinator: Delegate follow-up execution capability
     IObservableCoordinator: Observability capabilities
     IRLCoordinator: RL integration capabilities
     IMessageBusProvider: Message bus provider
@@ -43,6 +44,7 @@ from typing import (
     Callable,
     Dict,
     List,
+    Mapping,
     Optional,
     Protocol,
     runtime_checkable,
@@ -181,6 +183,39 @@ class ITeamCoordinator(Protocol):
 
         Returns:
             List of responses from members
+        """
+        ...
+
+
+@runtime_checkable
+class IDelegateFollowUpCoordinator(Protocol):
+    """Optional protocol for coordinators that resume delegate follow-up flows."""
+
+    async def execute_follow_up_request(self, request: Mapping[str, Any]) -> Dict[str, Any]:
+        """Execute a task-plus-context follow-up request.
+
+        Args:
+            request: Follow-up request envelope with task and context
+
+        Returns:
+            Result dictionary from team execution
+        """
+        ...
+
+    async def execute_follow_up_contract(
+        self,
+        contract: Mapping[str, Any],
+        *,
+        step_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Execute a delegate follow-up contract.
+
+        Args:
+            contract: Follow-up contract emitted by delegate-mode execution
+            step_id: Optional step selector override
+
+        Returns:
+            Result dictionary from team execution
         """
         ...
 

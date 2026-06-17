@@ -46,6 +46,7 @@ import time
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional, Set
 
+from victor.agent.runtime.naming import build_display_name, generate_agent_id
 from victor.agent.subagents.base import (
     SubAgent,
     SubAgentConfig,
@@ -55,8 +56,10 @@ from victor.agent.subagents.base import (
 
 if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
+    from victor.agent.services.context_lifecycle_service import ContextLifecycleService
     from victor.agent.subagents.protocols import RoleToolProvider
     from victor.providers.base import StreamChunk
+    from victor.workflows.definition import ConstraintsProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -120,7 +123,7 @@ ROLE_DEFAULT_BUDGETS: Dict[SubAgentRole, int] = {
     SubAgentRole.TESTER: 20,
 }
 
-# Default context limits for each role
+# Default context limits for each role (chars, used when provider context unknown)
 ROLE_DEFAULT_CONTEXT: Dict[SubAgentRole, int] = {
     SubAgentRole.RESEARCHER: 50000,
     SubAgentRole.PLANNER: 30000,
@@ -128,6 +131,60 @@ ROLE_DEFAULT_CONTEXT: Dict[SubAgentRole, int] = {
     SubAgentRole.REVIEWER: 40000,
     SubAgentRole.TESTER: 50000,
 }
+
+# Role context fractions — percentage of model's context window per role
+ROLE_CONTEXT_FRACTIONS: Dict[SubAgentRole, float] = {
+    SubAgentRole.RESEARCHER: 0.25,
+    SubAgentRole.PLANNER: 0.15,
+    SubAgentRole.EXECUTOR: 0.50,
+    SubAgentRole.REVIEWER: 0.20,
+    SubAgentRole.TESTER: 0.25,
+}
+
+
+def get_context_for_role(
+    role: SubAgentRole,
+    provider: str = "ollama",
+    model: Optional[str] = None,
+) -> int:
+    """Calculate context limit for a subagent role based on provider capabilities.
+
+    Queries provider_context_limits.yaml for the model's actual context window,
+    then allocates a fraction based on role. Falls back to ROLE_DEFAULT_CONTEXT
+    if provider limits are unavailable.
+
+    Args:
+        role: SubAgent role
+        provider: Provider name (e.g., "ollama", "deepseek", "anthropic")
+        model: Optional model name for model-specific limits
+
+    Returns:
+        Context limit in characters
+    """
+    try:
+        from victor.config.config_loaders import get_provider_limits
+
+        limits = get_provider_limits(provider, model)
+        model_context_tokens = limits.effective_context
+        model_context_chars = model_context_tokens * 4  # ~4 chars/token
+
+        fraction = ROLE_CONTEXT_FRACTIONS.get(role, 0.25)
+        scaled = int(model_context_chars * fraction)
+
+        # Cap at 200K chars to prevent memory issues
+        result = min(scaled, 200000)
+
+        logger.debug(
+            "Context for %s: %d chars (model=%d tokens, fraction=%.0f%%)",
+            role.value,
+            result,
+            model_context_tokens,
+            fraction * 100,
+        )
+        return result
+
+    except Exception:
+        return ROLE_DEFAULT_CONTEXT.get(role, 50000)
 
 
 @dataclass
@@ -149,6 +206,14 @@ class SubAgentTask:
     tool_budget: Optional[int] = None
     allowed_tools: Optional[List[str]] = None
     context_limit: Optional[int] = None
+    member_id: Optional[str] = None
+    agent_id: Optional[str] = None
+    display_name: Optional[str] = None
+    team_id: Optional[str] = None
+    plan_id: Optional[str] = None
+    plan_step_id: Optional[str] = None
+    parent_session_id: Optional[str] = None
+    child_session_id: Optional[str] = None
 
 
 @dataclass
@@ -205,6 +270,7 @@ class SubAgentOrchestrator:
         parent_orchestrator: "AgentOrchestrator",
         role_provider: Optional["RoleToolProvider"] = None,
         vertical: Optional[str] = None,
+        context_lifecycle: Optional["ContextLifecycleService"] = None,
     ):
         """Initialize sub-agent orchestrator.
 
@@ -220,6 +286,11 @@ class SubAgentOrchestrator:
         self.active_subagents: Set[SubAgent] = set()
         self._role_provider = role_provider or get_role_tool_provider()
         self._vertical = vertical
+        self._context_lifecycle = context_lifecycle or getattr(
+            parent_orchestrator,
+            "_context_lifecycle_service",
+            None,
+        )
 
         logger.info(
             f"SubAgentOrchestrator initialized"
@@ -236,6 +307,20 @@ class SubAgentOrchestrator:
         can_spawn_subagents: bool = False,
         timeout_seconds: int = 300,
         disable_embeddings: bool = False,
+        constraints: Optional["ConstraintsProtocol"] = None,
+        member_id: Optional[str] = None,
+        agent_id: Optional[str] = None,
+        display_name: Optional[str] = None,
+        team_id: Optional[str] = None,
+        plan_id: Optional[str] = None,
+        plan_step_id: Optional[str] = None,
+        parent_session_id: Optional[str] = None,
+        child_session_id: Optional[str] = None,
+        result_summary_max_chars: Optional[int] = None,
+        provider: Optional[str] = None,
+        model: Optional[str] = None,
+        temperature: Optional[float] = None,
+        reasoning_effort: Optional[str] = None,
     ) -> SubAgentResult:
         """Spawn a sub-agent to execute a task.
 
@@ -251,6 +336,15 @@ class SubAgentOrchestrator:
             can_spawn_subagents: Whether sub-agent can spawn children
             timeout_seconds: Maximum execution time
             disable_embeddings: Disable codebase embeddings (workflow service mode)
+            constraints: Optional task constraints for write policy activation
+            provider: Optional provider name override for heterogeneous teams
+                (e.g. "openai", "anthropic"). None inherits the parent provider.
+            model: Optional model override paired with ``provider``.
+            temperature: Optional per-member sampling temperature override
+                (None inherits the parent's temperature).
+            reasoning_effort: Optional per-member reasoning effort ("low"/
+                "medium"/"high") for reasoning-capable models (None inherits/omits;
+                forwarded only to providers/models that support it).
 
         Returns:
             SubAgentResult with execution outcome
@@ -263,6 +357,19 @@ class SubAgentOrchestrator:
             if result.success:
                 print(result.summary)
         """
+        # Activate constraints if provided
+        if constraints:
+            from victor.agent.constraint_activation_service import (
+                get_constraint_activator,
+            )
+
+            activator = get_constraint_activator()
+            result = activator.activate_constraints(constraints, self._vertical)
+            if not result.success:
+                logger.warning(f"SubAgent constraint activation failed: {result.error}")
+            else:
+                logger.debug(f"SubAgent constraints activated for role: {role.value}")
+
         # Apply role-specific defaults using the role provider (OCP-compliant)
         role_name = role.value if hasattr(role, "value") else str(role)
 
@@ -273,9 +380,25 @@ class SubAgentOrchestrator:
             effective_tools = self._role_provider.get_tools_for_role(role_name, self._vertical)
 
         effective_budget = tool_budget or self._role_provider.get_budget_for_role(role_name)
-        effective_context = context_limit or self._role_provider.get_context_limit_for_role(
-            role_name
-        )
+        effective_agent_id = agent_id or generate_agent_id(role_name)
+        effective_display_name = display_name or build_display_name(role_name, task=task)
+        if context_limit:
+            effective_context = context_limit
+        else:
+            # Try provider-aware context sizing first, fallback to role defaults
+            provider_name = getattr(self.parent, "provider_name", "ollama")
+            model_name = getattr(self.parent, "model", None)
+            effective_context = get_context_for_role(role, provider_name, model_name)
+
+        # Heterogeneous execution: resolve a per-member provider override when
+        # requested (cross-vendor teams). Fail-open — inherit the parent provider
+        # on any resolution error so a misconfigured override never blocks the run.
+        provider_override = None
+        model_override = None
+        if provider:
+            provider_override = await self._resolve_override_provider(provider, model)
+            if provider_override is not None:
+                model_override = model
 
         # Create configuration
         config = SubAgentConfig(
@@ -287,10 +410,23 @@ class SubAgentOrchestrator:
             can_spawn_subagents=can_spawn_subagents,
             timeout_seconds=timeout_seconds,
             disable_embeddings=disable_embeddings,
+            member_id=member_id,
+            agent_id=effective_agent_id,
+            display_name=effective_display_name,
+            team_id=team_id,
+            plan_id=plan_id,
+            plan_step_id=plan_step_id,
+            parent_session_id=parent_session_id,
+            child_session_id=child_session_id,
+            result_summary_max_chars=result_summary_max_chars,
+            provider_override=provider_override,
+            model_override=model_override,
+            temperature_override=temperature,
+            reasoning_effort_override=reasoning_effort,
         )
 
         # Create and execute sub-agent
-        subagent = SubAgent(config, self.parent)
+        subagent = SubAgent(config, self.parent, context_lifecycle=self._context_lifecycle)
         self.active_subagents.add(subagent)
 
         try:
@@ -298,10 +434,11 @@ class SubAgentOrchestrator:
                 subagent.execute(),
                 timeout=timeout_seconds,
             )
+            self._attach_identity_metadata(result, config)
             return result
         except asyncio.TimeoutError:
             logger.warning(f"{role.value} sub-agent timed out after {timeout_seconds}s")
-            return SubAgentResult(
+            timeout_result = SubAgentResult(
                 success=False,
                 summary=f"Sub-agent timed out after {timeout_seconds} seconds",
                 details={"role": role.value, "task": task[:200]},
@@ -310,8 +447,68 @@ class SubAgentOrchestrator:
                 duration_seconds=float(timeout_seconds),
                 error=f"Timeout after {timeout_seconds}s",
             )
+            self._attach_identity_metadata(timeout_result, config)
+            return timeout_result
         finally:
             self.active_subagents.discard(subagent)
+            # Deactivate constraints after spawn completes
+            if constraints:
+                from victor.agent.constraint_activation_service import (
+                    get_constraint_activator,
+                )
+
+                activator = get_constraint_activator()
+                activator.deactivate_constraints()
+                logger.debug(f"SubAgent constraints deactivated for role: {role.value}")
+
+    async def _resolve_override_provider(
+        self, provider: str, model: Optional[str]
+    ) -> Optional[Any]:
+        """Resolve a provider instance for a per-member override (fail-open).
+
+        Builds a managed provider for ``provider``/``model`` via the shared
+        factory, resolving the API key the same way the main provider does.
+        Returns None on any failure so the caller inherits the parent provider
+        rather than blocking the run.
+
+        Args:
+            provider: Provider name (e.g. "openai", "anthropic").
+            model: Optional model id; falls back to the provider's default.
+
+        Returns:
+            A provider instance, or None to inherit the parent provider.
+        """
+        try:
+            from victor.config.api_keys import get_api_key
+            from victor.providers.factory import ManagedProviderFactory
+
+            effective_model = model or getattr(self.parent, "model", None) or ""
+            api_key = get_api_key(provider)
+            return await ManagedProviderFactory.create(
+                provider_name=provider,
+                model=effective_model,
+                api_key=api_key,
+            )
+        except Exception as exc:
+            logger.warning(
+                "Per-member provider override '%s' could not be resolved (%s); "
+                "inheriting parent provider.",
+                provider,
+                exc,
+            )
+            return None
+
+    @staticmethod
+    def _attach_identity_metadata(result: SubAgentResult, config: SubAgentConfig) -> None:
+        """Attach stable team/session identity metadata to a sub-agent result."""
+        result.details.setdefault("member_id", config.member_id)
+        result.details.setdefault("agent_id", config.agent_id)
+        result.details.setdefault("display_name", config.display_name)
+        result.details.setdefault("team_id", config.team_id)
+        result.details.setdefault("plan_id", config.plan_id)
+        result.details.setdefault("plan_step_id", config.plan_step_id)
+        result.details.setdefault("parent_session_id", config.parent_session_id)
+        result.details.setdefault("child_session_id", config.child_session_id)
 
     async def fan_out(
         self,
@@ -351,6 +548,14 @@ class SubAgentOrchestrator:
                     tool_budget=task.tool_budget,
                     allowed_tools=task.allowed_tools,
                     context_limit=task.context_limit,
+                    member_id=task.member_id,
+                    agent_id=task.agent_id,
+                    display_name=task.display_name,
+                    team_id=task.team_id,
+                    plan_id=task.plan_id,
+                    plan_step_id=task.plan_step_id,
+                    parent_session_id=task.parent_session_id,
+                    child_session_id=task.child_session_id,
                 )
 
         logger.info(
@@ -496,7 +701,10 @@ class SubAgentOrchestrator:
 
         except Exception as e:
             error_msg = f"{type(e).__name__}: {str(e)}"
-            logger.error(f"{role.value} sub-agent stream spawn failed: {error_msg}", exc_info=True)
+            logger.error(
+                f"{role.value} sub-agent stream spawn failed: {error_msg}",
+                exc_info=True,
+            )
             yield StreamChunk(
                 content="",
                 is_final=True,

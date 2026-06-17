@@ -141,7 +141,29 @@ class VictorError(Exception):
         return result
 
 
-class ProviderError(VictorError):
+class AgentError(VictorError):
+    """Base for errors surfaced through the Agent public API.
+
+    Adds the recoverable attribute so framework callers can distinguish
+    transient failures (retry) from permanent ones (abort).
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        recoverable: bool = True,
+        details: Optional[Dict[str, Any]] = None,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(message, details=details, **kwargs)
+        self.recoverable = recoverable
+
+    def __str__(self) -> str:
+        return super().__str__()
+
+
+class ProviderError(AgentError):
     """Errors related to LLM providers."""
 
     def __init__(
@@ -163,6 +185,19 @@ class ProviderError(VictorError):
         self.raw_error = raw_error
         if status_code is not None:
             self.details["status_code"] = status_code
+
+    def __str__(self) -> str:
+        details = []
+        if self.provider:
+            details.append(f"provider={self.provider}")
+        if self.model:
+            details.append(f"model={self.model}")
+        if self.status_code is not None:
+            details.append(f"status_code={self.status_code}")
+
+        if not details:
+            return super().__str__()
+        return f"{super().__str__()} ({', '.join(details)})"
 
 
 class ProviderConnectionError(ProviderError):
@@ -299,18 +334,25 @@ class ProviderInvalidResponseError(ProviderError):
             self.details["response_keys"] = list(response_data.keys())[:10]
 
 
-class ToolError(VictorError):
+class ToolError(AgentError):
     """Errors related to tool execution."""
 
     def __init__(
         self,
         message: str,
         tool_name: Optional[str] = None,
+        arguments: Optional[Dict[str, Any]] = None,
         **kwargs: Any,
     ):
         super().__init__(message, **kwargs)
         self.tool_name = tool_name
+        self.arguments = arguments or {}
         self.details["tool_name"] = tool_name
+
+    def __str__(self) -> str:
+        if not self.tool_name:
+            return super().__str__()
+        return f"{super().__str__()} (tool={self.tool_name})"
 
 
 class ToolNotFoundError(ToolError):
@@ -389,22 +431,38 @@ class ToolTimeoutError(ToolError):
         self.details["timeout"] = timeout
 
 
-class ConfigurationError(VictorError):
+class ConfigurationError(AgentError):
     """Configuration-related errors."""
 
     def __init__(
         self,
         message: str,
         config_key: Optional[str] = None,
+        invalid_fields: Optional[List[str]] = None,
         **kwargs: Any,
     ):
+        kwargs.setdefault("recoverable", False)
         super().__init__(
             message,
             category=ErrorCategory.CONFIG_INVALID,
             **kwargs,
         )
         self.config_key = config_key
+        self.invalid_fields = invalid_fields or []
         self.details["config_key"] = config_key
+        if self.invalid_fields:
+            self.details["invalid_fields"] = self.invalid_fields
+
+    def __str__(self) -> str:
+        details = []
+        if self.config_key:
+            details.append(f"config_key={self.config_key}")
+        if self.invalid_fields:
+            details.append(f"invalid_fields={', '.join(self.invalid_fields)}")
+
+        if not details:
+            return super().__str__()
+        return f"{super().__str__()} ({'; '.join(details)})"
 
 
 class ValidationError(VictorError):
@@ -540,6 +598,67 @@ class ExtensionLoadError(VictorError):
         if original_error:
             self.details["original_error_type"] = type(original_error).__name__
             self.details["original_error_message"] = str(original_error)
+
+
+class BudgetExhaustedError(AgentError):
+    """Tool call budget has been exhausted."""
+
+    def __init__(
+        self,
+        message: str = "Tool call budget exhausted",
+        *,
+        budget: int,
+        used: int,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(
+            message,
+            recoverable=False,
+            category=ErrorCategory.RESOURCE_EXHAUSTED,
+            **kwargs,
+        )
+        self.budget = budget
+        self.used = used
+        self.details["budget"] = budget
+        self.details["used"] = used
+
+    def __str__(self) -> str:
+        return f"{self.message} ({self.used}/{self.budget} calls used)"
+
+
+class CancellationError(AgentError):
+    """Operation was cancelled by the user or timeout."""
+
+    def __init__(self, message: str = "Operation cancelled", **kwargs: Any) -> None:
+        super().__init__(message, recoverable=False, **kwargs)
+
+
+class StateTransitionError(AgentError):
+    """Invalid state transition attempted in a state machine."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        from_state: str,
+        to_state: str,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(message, recoverable=False, **kwargs)
+        self.from_state = from_state
+        self.to_state = to_state
+        self.details["from_state"] = from_state
+        self.details["to_state"] = to_state
+
+    def __str__(self) -> str:
+        return f"{self.message} ({self.from_state} -> {self.to_state})"
+
+
+class EdgeResolutionError(AgentError):
+    """No conditional edge matched the current StateGraph state."""
+
+    def __init__(self, message: str, **kwargs: Any) -> None:
+        super().__init__(message, recoverable=False, **kwargs)
 
 
 # =============================================================================
@@ -679,7 +798,10 @@ class ErrorHandler:
         """Categorize a standard exception and provide recovery hint."""
         # File errors
         if isinstance(exception, (FileNotFoundError, builtins_FileNotFoundError)):
-            return ErrorCategory.FILE_NOT_FOUND, "Check if the file exists and path is correct."
+            return (
+                ErrorCategory.FILE_NOT_FOUND,
+                "Check if the file exists and path is correct.",
+            )
 
         if isinstance(exception, PermissionError):
             return ErrorCategory.FILE_PERMISSION, "Check file permissions."
@@ -693,7 +815,10 @@ class ErrorHandler:
             return ErrorCategory.VALIDATION_ERROR, "Check input values and types."
 
         if isinstance(exception, KeyError):
-            return ErrorCategory.CONFIG_MISSING, "Check that required configuration is set."
+            return (
+                ErrorCategory.CONFIG_MISSING,
+                "Check that required configuration is set.",
+            )
 
         # Default
         return ErrorCategory.UNKNOWN, None
@@ -779,6 +904,45 @@ builtins_FileNotFoundError = (
 T = TypeVar("T")
 
 
+def _handle_error_impl(
+    e: Exception,
+    handler: ErrorHandler,
+    func_name: str,
+    args_count: int,
+    category: ErrorCategory,
+    recovery_hint: Optional[str],
+    reraise: bool,
+    default_return: Optional[Any],
+) -> Any:
+    """Shared error handling logic for sync and async decorators.
+
+    Args:
+        e: The exception to handle
+        handler: ErrorHandler instance
+        func_name: Name of the function that raised the error
+        args_count: Number of arguments passed to the function
+        category: Error category for logging
+        recovery_hint: Recovery hint to include in error
+        reraise: Whether to reraise the exception after logging
+        default_return: Value to return on error (if not reraising)
+
+    Returns:
+        default_return if not reraising
+
+    Raises:
+        VictorError: If reraise is True
+    """
+    error_info = handler.handle(e, context={"function": func_name, "args_count": args_count})
+    if reraise:
+        raise VictorError(
+            str(e),
+            category=category,
+            recovery_hint=recovery_hint or error_info.recovery_hint,
+            cause=e,
+        ) from e
+    return default_return  # type: ignore
+
+
 def handle_errors(
     category: ErrorCategory = ErrorCategory.UNKNOWN,
     recovery_hint: Optional[str] = None,
@@ -808,17 +972,16 @@ def handle_errors(
             except VictorError:
                 raise  # Don't wrap VictorError
             except Exception as e:
-                error_info = handler.handle(
-                    e, context={"function": func.__name__, "args_count": len(args)}
+                return _handle_error_impl(
+                    e,
+                    handler,
+                    func.__name__,
+                    len(args),
+                    category,
+                    recovery_hint,
+                    reraise,
+                    default_return,
                 )
-                if reraise:
-                    raise VictorError(
-                        str(e),
-                        category=category,
-                        recovery_hint=recovery_hint or error_info.recovery_hint,
-                        cause=e,
-                    ) from e
-                return default_return  # type: ignore
 
         return wrapper
 
@@ -842,17 +1005,16 @@ def handle_errors_async(
             except VictorError:
                 raise
             except Exception as e:
-                error_info = handler.handle(
-                    e, context={"function": func.__name__, "args_count": len(args)}
+                return _handle_error_impl(
+                    e,
+                    handler,
+                    func.__name__,
+                    len(args),
+                    category,
+                    recovery_hint,
+                    reraise,
+                    default_return,
                 )
-                if reraise:
-                    raise VictorError(
-                        str(e),
-                        category=category,
-                        recovery_hint=recovery_hint or error_info.recovery_hint,
-                        cause=e,
-                    ) from e
-                return default_return  # type: ignore
 
         return wrapper  # type: ignore
 

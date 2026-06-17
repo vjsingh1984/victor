@@ -56,7 +56,10 @@ from typing import Any, Dict, List, Literal, Optional, Union, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from victor.framework.config import AgentConfig
-    from victor.agent.subagents.base import SubAgentConfig, SubAgentRole
+    from victor.agent.subagents.base import SubAgentConfig
+
+
+FrameworkCompatibleAgentConfig = Union["AgentConfig", "UnifiedAgentConfig"]
 
 
 class AgentMode(str, Enum):
@@ -71,6 +74,20 @@ class AgentMode(str, Enum):
     FOREGROUND = "foreground"
     BACKGROUND = "background"
     TEAM_MEMBER = "team_member"
+
+
+class ExecutionModeType(str, Enum):
+    """Execution mode type for background agents.
+
+    Defines the execution strategy for background tasks:
+    - BUILD: Direct code generation and modification
+    - PLAN: Create implementation plans without executing
+    - EXPLORE: Understand and analyze codebase
+    """
+
+    BUILD = "build"  # Direct code generation and modification
+    PLAN = "plan"  # Create implementation plans without executing
+    EXPLORE = "explore"  # Understand and analyze codebase
 
 
 @dataclass
@@ -131,7 +148,7 @@ class UnifiedAgentConfig:
     # Mode Selection
     # ==========================================================================
 
-    mode: Literal["foreground", "background", "team_member"] = "foreground"
+    mode: AgentMode = AgentMode.FOREGROUND
 
     # ==========================================================================
     # Common Configuration (All Modes)
@@ -182,7 +199,7 @@ class UnifiedAgentConfig:
     # ==========================================================================
 
     task: Optional[str] = None
-    mode_type: Literal["build", "plan", "explore"] = "build"
+    mode_type: ExecutionModeType = ExecutionModeType.BUILD
     websocket: bool = False
     timeout_seconds: int = 300
 
@@ -353,7 +370,7 @@ class UnifiedAgentConfig:
     def background(
         cls,
         task: str,
-        mode_type: Literal["build", "plan", "explore"] = "build",
+        mode_type: ExecutionModeType = ExecutionModeType.BUILD,
         tool_budget: int = 100,
         websocket: bool = False,
         **kwargs: Any,
@@ -458,7 +475,29 @@ class UnifiedAgentConfig:
         )
 
 
+def normalize_agent_config(
+    config: Optional[FrameworkCompatibleAgentConfig],
+) -> Optional[FrameworkCompatibleAgentConfig]:
+    """Convert legacy AgentConfig instances to UnifiedAgentConfig.
+
+    Framework entry points still accept the deprecated AgentConfig surface for
+    backward compatibility. Internally, prefer UnifiedAgentConfig so presets and
+    settings overlays flow through one canonical config representation.
+    """
+    if config is None or isinstance(config, UnifiedAgentConfig):
+        return config
+
+    from victor.framework.config import AgentConfig
+
+    if isinstance(config, AgentConfig):
+        return UnifiedAgentConfig.from_agent_config(config)
+
+    return config
+
+
 __all__ = [
     "UnifiedAgentConfig",
     "AgentMode",
+    "FrameworkCompatibleAgentConfig",
+    "normalize_agent_config",
 ]

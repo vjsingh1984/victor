@@ -536,7 +536,11 @@ class ExperimentTracker:
                     if "==" in line:
                         package, version = line.split("==", 1)
                         env_info["dependencies"][package] = version
-        except (subprocess.SubprocessError, FileNotFoundError, subprocess.TimeoutExpired):
+        except (
+            subprocess.SubprocessError,
+            FileNotFoundError,
+            subprocess.TimeoutExpired,
+        ):
             # pip not available or timeout
             pass
 

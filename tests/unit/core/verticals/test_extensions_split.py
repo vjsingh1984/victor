@@ -25,6 +25,11 @@ VerticalExtensions class:
 import pytest
 from unittest.mock import MagicMock, AsyncMock
 
+from victor.agent import prompt_section_registry as registry_module
+from victor.agent.prompt_section_registry import (
+    UnifiedSectionRegistry,
+    _initialize_default_sections,
+)
 from victor.core.verticals.extensions import (
     ToolExtensions,
     PromptExtensions,
@@ -33,6 +38,7 @@ from victor.core.verticals.extensions import (
 )
 from victor.core.tool_types import ToolDependency
 from victor.security.safety.types import SafetyPattern
+from victor.core.verticals.protocols.prompt_provider import PromptSectionContribution
 
 
 class TestToolExtensions:
@@ -200,6 +206,35 @@ class TestPromptExtensions:
 
         assert "Section 1" in combined
         assert "Section 2" in combined
+
+    def test_named_prompt_sections_are_registered_and_rendered(self, monkeypatch):
+        """Named contributor sections should feed the registry and combined prompt text."""
+
+        fresh_registry = UnifiedSectionRegistry()
+        _initialize_default_sections(fresh_registry)
+        monkeypatch.setattr(registry_module, "_registry", fresh_registry)
+
+        class _Contributor:
+            def get_priority(self) -> int:
+                return 25
+
+            def get_prompt_section_contributions(self):
+                return [
+                    PromptSectionContribution(
+                        name="VERTICAL_SECURITY_GUIDANCE",
+                        text="Audit auth boundaries before edits.",
+                        aliases={"security_guidance"},
+                        category="context",
+                        evolvable=True,
+                        priority=25,
+                    )
+                ]
+
+        ext = PromptExtensions(prompt_contributors=[_Contributor()])
+        combined = ext.get_combined_system_prompt_sections()
+
+        assert "Audit auth boundaries before edits." in combined
+        assert fresh_registry.get("VERTICAL_SECURITY_GUIDANCE") is not None
 
     def test_has_enrichment(self):
         """Test enrichment strategy presence check."""

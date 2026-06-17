@@ -617,7 +617,9 @@ class TestQualityScore:
             provider="openai",
             dimension_scores={
                 ProtocolQualityDimension.CLARITY: DimensionScore(
-                    dimension=ProtocolQualityDimension.CLARITY, score=0.9, reason="Good structure"
+                    dimension=ProtocolQualityDimension.CLARITY,
+                    score=0.9,
+                    reason="Good structure",
                 )
             },
             feedback="Good response",

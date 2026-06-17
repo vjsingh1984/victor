@@ -18,7 +18,7 @@ import asyncio
 
 import pytest
 
-from victor.core.async_utils import run_sync, run_sync_in_thread
+from victor.core.async_utils import run_blocking, run_sync, run_sync_in_thread
 
 
 async def _sample_value() -> str:
@@ -53,3 +53,38 @@ def test_run_sync_in_thread_supports_timeouts():
 
     with pytest.raises(TimeoutError, match="Async operation timed out"):
         run_sync_in_thread(_slow_value(), timeout=0.01)
+
+
+@pytest.mark.asyncio
+async def test_run_blocking_offloads_sync_function():
+    """run_blocking should run sync functions without blocking the event loop."""
+    import time
+
+    def blocking_work():
+        time.sleep(0.01)
+        return "done"
+
+    result = await run_blocking(blocking_work)
+    assert result == "done"
+
+
+@pytest.mark.asyncio
+async def test_run_blocking_passes_args_and_kwargs():
+    """run_blocking should forward positional and keyword arguments."""
+
+    def add(a, b, offset=0):
+        return a + b + offset
+
+    result = await run_blocking(add, 3, 4, offset=10)
+    assert result == 17
+
+
+@pytest.mark.asyncio
+async def test_run_blocking_propagates_exceptions():
+    """run_blocking should propagate exceptions from the sync function."""
+
+    def fail():
+        raise ValueError("sync error")
+
+    with pytest.raises(ValueError, match="sync error"):
+        await run_blocking(fail)

@@ -306,6 +306,25 @@ class TestCapabilityEndpoint:
             data = response.json()
             assert isinstance(data, dict)
 
+    def test_capabilities_recommend_endpoint_exists(self, test_client):
+        """Test that /capabilities/recommend endpoint exists."""
+        response = test_client.get(
+            "/capabilities/recommend",
+            params={"task_type": "feature", "complexity": "high"},
+        )
+        assert response.status_code in [200, 500]
+
+    def test_capabilities_recommend_returns_json(self, test_client):
+        """Test that /capabilities/recommend returns JSON."""
+        response = test_client.get(
+            "/capabilities/recommend",
+            params={"task_type": "feature", "complexity": "high"},
+        )
+        if response.status_code == 200:
+            data = response.json()
+            assert isinstance(data, dict)
+            assert "recommendations" in data
+
 
 # =============================================================================
 # Local-only comprehensive tests

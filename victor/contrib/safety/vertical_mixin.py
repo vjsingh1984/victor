@@ -23,7 +23,7 @@ from __future__ import annotations
 
 from typing import List, Optional
 
-from victor.agent.coordinators.safety_coordinator import (
+from victor_contracts.safety import (
     SafetyAction,
     SafetyCategory,
     SafetyRule,

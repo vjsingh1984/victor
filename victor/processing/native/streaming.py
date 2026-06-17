@@ -12,11 +12,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Streaming filter, thinking token detection, and circular thinking detection."""
+"""Streaming filter, thinking token detection, and circular thinking detection.
+
+Native Dispatch Pattern Conventions:
+=====================================
+This module follows the victor.processing.native dispatch pattern:
+
+1. if _NATIVE_AVAILABLE: - Standard pattern for stable functions
+   Use when the native function is guaranteed to exist in all versions.
+
+2. if _NATIVE_AVAILABLE and hasattr(_native, "func"): - Version guard pattern
+   Use when the native function may not exist in older/newer versions of
+   the native library (e.g., newly added features or renamed functions).
+
+3. from victor.processing.native._base import _NATIVE_AVAILABLE, _native
+   Always import both the flag and the module reference from _base.py.
+"""
 
 from __future__ import annotations
 
-from victor.processing.native._base import _native
+from victor.processing.native._base import _NATIVE_AVAILABLE, _native
 
 # =============================================================================
 # STREAMING FILTER (Thinking Token Detection)
@@ -66,9 +81,8 @@ def strip_thinking_tokens(content: str) -> str:
     Returns:
         Content with thinking tokens removed
     """
-    native = _native
-    if native is not None:
-        return native.strip_thinking_tokens(content)
+    if _NATIVE_AVAILABLE:
+        return _native.strip_thinking_tokens(content)
 
     # Pure Python fallback
     result = content
@@ -86,9 +100,8 @@ def contains_thinking_tokens(content: str) -> bool:
     Returns:
         True if thinking tokens are present
     """
-    native = _native
-    if native is not None:
-        return native.contains_thinking_tokens(content)
+    if _NATIVE_AVAILABLE:
+        return _native.contains_thinking_tokens(content)
 
     # Pure Python fallback
     return any(pattern in content for pattern in _ALL_THINKING_PATTERNS)
@@ -103,9 +116,8 @@ def find_thinking_tokens(content: str) -> list[tuple[int, int, int]]:
     Returns:
         List of (start, end, pattern_index) tuples
     """
-    native = _native
-    if native is not None:
-        return native.find_thinking_tokens(content)
+    if _NATIVE_AVAILABLE:
+        return _native.find_thinking_tokens(content)
 
     # Pure Python fallback
     results = []
@@ -131,9 +143,8 @@ def extract_thinking_content(content: str) -> tuple[str, str]:
     Returns:
         Tuple of (main_content, thinking_content)
     """
-    native = _native
-    if native is not None:
-        return native.extract_thinking_content(content)
+    if _NATIVE_AVAILABLE:
+        return _native.extract_thinking_content(content)
 
     # Pure Python fallback
     main_content = []
@@ -184,7 +195,7 @@ def extract_thinking_content(content: str) -> tuple[str, str]:
 StreamingFilter = None
 StreamingChunkResult = StreamingChunkResultFallback
 
-if _native is not None:
+if _NATIVE_AVAILABLE:
     StreamingFilter = _native.StreamingFilter
     StreamingChunkResult = _native.StreamingChunkResult
 else:
@@ -242,9 +253,8 @@ def detect_circular_phrases(text: str) -> bool:
     Returns:
         True if circular phrases are detected
     """
-    native = _native
-    if native is not None:
-        return native.detect_circular_phrases(text)
+    if _NATIVE_AVAILABLE:
+        return _native.detect_circular_phrases(text)
 
     # Pure Python fallback
     text_lower = text.lower()
@@ -260,9 +270,8 @@ def count_circular_patterns(text: str) -> int:
     Returns:
         Number of circular pattern matches
     """
-    native = _native
-    if native is not None:
-        return native.count_circular_patterns(text)
+    if _NATIVE_AVAILABLE:
+        return _native.count_circular_patterns(text)
 
     # Pure Python fallback
     text_lower = text.lower()
@@ -287,9 +296,8 @@ def find_circular_patterns(text: str) -> list[tuple[int, int, str]]:
     Returns:
         List of (start, end, matched_text) tuples
     """
-    native = _native
-    if native is not None:
-        return native.find_circular_patterns(text)
+    if _NATIVE_AVAILABLE:
+        return _native.find_circular_patterns(text)
 
     # Pure Python fallback
     text_lower = text.lower()
@@ -311,6 +319,6 @@ def find_circular_patterns(text: str) -> list[tuple[int, int, str]]:
 ThinkingDetector = None
 PatternAnalysis = None
 
-if _native is not None:
+if _NATIVE_AVAILABLE:
     ThinkingDetector = _native.ThinkingDetector
     PatternAnalysis = _native.PatternAnalysis

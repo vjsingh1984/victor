@@ -69,6 +69,15 @@ from .complexity import (
     is_action_task,
     is_analysis_task,
 )
+from .direct_response import (
+    DirectResponseClassification,
+    DirectResponseOutputState,
+    classify_direct_response_prompt,
+    extract_exact_response_literal,
+    has_codebase_context,
+    is_direct_response_prompt,
+    normalize_direct_response_output,
+)
 
 __all__ = [
     # Core task types
@@ -95,4 +104,11 @@ __all__ = [
     "get_budget_for_task",
     "is_action_task",
     "is_analysis_task",
+    "DirectResponseClassification",
+    "DirectResponseOutputState",
+    "classify_direct_response_prompt",
+    "extract_exact_response_literal",
+    "has_codebase_context",
+    "is_direct_response_prompt",
+    "normalize_direct_response_output",
 ]

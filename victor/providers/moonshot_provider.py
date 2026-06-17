@@ -300,7 +300,9 @@ class MoonshotProvider(BaseProvider):
                         try:
                             chunk_data = json.loads(data_str)
                             chunk = self._parse_stream_chunk(
-                                chunk_data, accumulated_tool_calls, accumulated_reasoning
+                                chunk_data,
+                                accumulated_tool_calls,
+                                accumulated_reasoning,
                             )
                             if chunk.content:
                                 accumulated_content += chunk.content

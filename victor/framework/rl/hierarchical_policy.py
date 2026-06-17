@@ -252,9 +252,9 @@ class HierarchicalPolicy(BaseLearner):
             )
 
         # Epsilon-greedy selection
-        if random.random() < self.epsilon:
+        if self._rng.random() < self.epsilon:
             # Explore: random selection
-            selected = random.choice(available_names)
+            selected = self._rng.choice(available_names)
             reason = "Exploration (random)"
         else:
             # Exploit: select best Q-value

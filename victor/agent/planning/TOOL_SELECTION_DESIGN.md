@@ -97,7 +97,7 @@ STEP_TOOL_MAPPING: Dict[str, Set[str]] = {
     # Analyze needs exploration tools
     "analyze": {
         "read", "grep", "code_search", "overview",
-        "analyze", "shell_readonly",
+        "analyze", "shell",
     },
 
     # Doc needs reading + minimal writing
@@ -398,7 +398,7 @@ step_tool_mapping:
       - read
     optional_tools:
       - grep
-      - shell_readonly
+      - shell
     excluded_tools:
       - write
       - edit

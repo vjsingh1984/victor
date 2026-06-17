@@ -332,7 +332,9 @@ class TestProviderSwitching:
 
         # Mock health check to pass
         with patch.object(
-            manager._provider_switcher._health_monitor, "check_health", return_value=True
+            manager._provider_switcher._health_monitor,
+            "check_health",
+            return_value=True,
         ):
             result = await manager.switch_provider("openai", "gpt-4-turbo")
 
@@ -542,7 +544,9 @@ class TestSwitchHistory:
 
         # Mock health check to pass
         with patch.object(
-            manager._provider_switcher._health_monitor, "check_health", return_value=True
+            manager._provider_switcher._health_monitor,
+            "check_health",
+            return_value=True,
         ):
             await manager.switch_provider("openai", "gpt-4")
 
@@ -601,7 +605,9 @@ class TestSwitchCallbacks:
 
         # Mock health check to pass
         with patch.object(
-            manager._provider_switcher._health_monitor, "check_health", return_value=True
+            manager._provider_switcher._health_monitor,
+            "check_health",
+            return_value=True,
         ):
             await manager.switch_provider("openai", "gpt-4")
 

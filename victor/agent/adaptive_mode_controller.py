@@ -66,21 +66,16 @@ import json
 import logging
 import math
 import random
-import sqlite3
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from victor.config.orchestrator_constants import BUDGET_LIMITS
 from victor.core.schema import Tables
 
 logger = logging.getLogger(__name__)
-
-# Table names from centralized schema
-_Q_TABLE = Tables.RL_MODE_Q
-_HISTORY_TABLE = Tables.RL_MODE_HISTORY
-_TASK_TABLE = Tables.RL_MODE_TASK
 
 
 class AdaptiveAgentMode(Enum):
@@ -104,6 +99,24 @@ class AdaptiveAgentMode(Enum):
 
 # Backward compatibility alias
 AgentMode = AdaptiveAgentMode
+
+
+class RatioLevel(str, Enum):
+    """Discretized ratio bucket for adaptive mode state."""
+
+    LOW = "low"  # < 0.25
+    MID_LOW = "mid_low"  # 0.25-0.5
+    MID_HIGH = "mid_high"  # 0.5-0.75
+    HIGH = "high"  # > 0.75
+
+
+class QualityLevel(str, Enum):
+    """Discretized quality score bucket."""
+
+    POOR = "poor"  # < 0.4
+    FAIR = "fair"  # 0.4-0.6
+    GOOD = "good"  # 0.6-0.8
+    EXCELLENT = "excellent"  # > 0.8
 
 
 class TransitionTrigger(Enum):
@@ -141,29 +154,29 @@ class ModeState:
         quality_bucket = self._discretize_quality(self.quality_score)
         grounding_bucket = self._discretize_quality(self.grounding_score)
 
-        return f"{self.mode.value}:{self.task_type}:{tool_ratio}:{iter_ratio}:{quality_bucket}:{grounding_bucket}"
+        return f"{self.mode.value}:{self.task_type}:{tool_ratio.value}:{iter_ratio.value}:{quality_bucket.value}:{grounding_bucket.value}"
 
-    def _discretize_ratio(self, ratio: float) -> str:
+    def _discretize_ratio(self, ratio: float) -> RatioLevel:
         """Discretize a ratio to buckets."""
         if ratio < 0.25:
-            return "low"
+            return RatioLevel.LOW
         elif ratio < 0.5:
-            return "mid_low"
+            return RatioLevel.MID_LOW
         elif ratio < 0.75:
-            return "mid_high"
+            return RatioLevel.MID_HIGH
         else:
-            return "high"
+            return RatioLevel.HIGH
 
-    def _discretize_quality(self, score: float) -> str:
+    def _discretize_quality(self, score: float) -> QualityLevel:
         """Discretize quality score."""
         if score < 0.4:
-            return "poor"
+            return QualityLevel.POOR
         elif score < 0.6:
-            return "fair"
+            return QualityLevel.FAIR
         elif score < 0.8:
-            return "good"
+            return QualityLevel.GOOD
         else:
-            return "excellent"
+            return QualityLevel.EXCELLENT
 
 
 @dataclass
@@ -212,84 +225,35 @@ class QLearningStore:
         """Initialize the Q-learning store.
 
         Args:
-            project_path: Path to project root. If None, uses current directory.
+            project_path: Ignored - RL data is stored in global database for cross-project learning.
         """
-        from victor.core.database import get_project_database
+        from victor.core.database import DatabaseManager
 
-        self._db = get_project_database(project_path)
+        self._db = DatabaseManager()
         self.db_path = self._db.db_path
-        self._initialized = False
 
         # Q-learning parameters
         self.learning_rate = 0.1
         self.discount_factor = 0.9
         self.exploration_rate = 0.1  # Epsilon for epsilon-greedy
 
-    def _ensure_initialized(self) -> None:
-        """Ensure database tables exist (handled by ProjectDatabaseManager)."""
-        if self._initialized:
-            return
+        self._ensure_tables()
 
-        # Tables are created by ProjectDatabaseManager via Schema.get_project_schemas()
-        # Just verify they exist
+    def _ensure_tables(self) -> None:
+        """Migrate legacy private RL tables into unified schema (idempotent)."""
+        from victor.framework.rl.migration import RLTableMigrator
+
         conn = self._db.get_connection()
-
-        # Create tables if not present (legacy fallback)
-        conn.execute(f"""
-            CREATE TABLE IF NOT EXISTS {_Q_TABLE} (
-                state_key TEXT NOT NULL,
-                action_key TEXT NOT NULL,
-                q_value REAL NOT NULL DEFAULT 0.0,
-                visit_count INTEGER NOT NULL DEFAULT 0,
-                last_updated TEXT NOT NULL,
-                PRIMARY KEY (state_key, action_key)
-            )
-        """)
-
-        conn.execute(f"""
-            CREATE TABLE IF NOT EXISTS {_HISTORY_TABLE} (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                profile_name TEXT NOT NULL,
-                from_mode TEXT NOT NULL,
-                to_mode TEXT NOT NULL,
-                trigger TEXT NOT NULL,
-                state_key TEXT NOT NULL,
-                action_key TEXT NOT NULL,
-                reward REAL,
-                timestamp TEXT NOT NULL
-            )
-        """)
-
-        conn.execute(f"""
-            CREATE TABLE IF NOT EXISTS {_TASK_TABLE} (
-                task_type TEXT PRIMARY KEY,
-                optimal_tool_budget INTEGER DEFAULT 10,
-                avg_quality_score REAL DEFAULT 0.5,
-                avg_completion_rate REAL DEFAULT 0.5,
-                sample_count INTEGER DEFAULT 0,
-                last_updated TEXT NOT NULL
-            )
-        """)
-
-        conn.execute(f"""
-            CREATE INDEX IF NOT EXISTS idx_{_Q_TABLE}_state ON {_Q_TABLE}(state_key)
-        """)
-
-        conn.execute(f"""
-            CREATE INDEX IF NOT EXISTS idx_{_HISTORY_TABLE}_profile
-            ON {_HISTORY_TABLE}(profile_name, timestamp)
-        """)
-        conn.commit()
-
-        self._initialized = True
+        RLTableMigrator(conn).run_if_needed(
+            "mode_transition", RLTableMigrator.migrate_mode_transition
+        )
 
     def get_q_value(self, state_key: str, action_key: str) -> float:
         """Get Q-value for a state-action pair."""
-        self._ensure_initialized()
-
         conn = self._db.get_connection()
         row = conn.execute(
-            f"SELECT q_value FROM {_Q_TABLE} WHERE state_key = ? AND action_key = ?",
+            f"SELECT q_value FROM {Tables.RL_Q_VALUE} "
+            f"WHERE learner_id = 'mode_transition' AND state_key = ? AND action_key = ?",
             (state_key, action_key),
         ).fetchone()
 
@@ -297,15 +261,14 @@ class QLearningStore:
 
     def get_all_actions(self, state_key: str) -> Dict[str, float]:
         """Get all Q-values for a state."""
-        self._ensure_initialized()
-
         conn = self._db.get_connection()
-        conn.row_factory = sqlite3.Row
         rows = conn.execute(
-            f"SELECT action_key, q_value FROM {_Q_TABLE} WHERE state_key = ?", (state_key,)
+            f"SELECT action_key, q_value FROM {Tables.RL_Q_VALUE} "
+            f"WHERE learner_id = 'mode_transition' AND state_key = ?",
+            (state_key,),
         ).fetchall()
 
-        return {row["action_key"]: row["q_value"] for row in rows}
+        return {row[0]: row[1] for row in rows}
 
     def update_q_value(
         self,
@@ -321,10 +284,16 @@ class QLearningStore:
         Returns:
             New Q-value
         """
-        self._ensure_initialized()
+        conn = self._db.get_connection()
 
-        # Get current Q-value
-        current_q = self.get_q_value(state_key, action_key)
+        # Get current Q-value and visit count
+        row = conn.execute(
+            f"SELECT q_value, visit_count FROM {Tables.RL_Q_VALUE} "
+            f"WHERE learner_id = 'mode_transition' AND state_key = ? AND action_key = ?",
+            (state_key, action_key),
+        ).fetchone()
+        current_q = row[0] if row else 0.0
+        visit_count = row[1] if row else 0
 
         # Get max Q-value for next state (if provided)
         max_next_q = 0.0
@@ -338,25 +307,12 @@ class QLearningStore:
             reward + self.discount_factor * max_next_q - current_q
         )
 
-        # Store updated Q-value
-        conn = self._db.get_connection()
+        now = datetime.now().isoformat()
         conn.execute(
-            f"""
-            INSERT INTO {_Q_TABLE} (state_key, action_key, q_value, visit_count, last_updated)
-            VALUES (?, ?, ?, 1, ?)
-            ON CONFLICT(state_key, action_key) DO UPDATE SET
-                q_value = ?,
-                visit_count = visit_count + 1,
-                last_updated = ?
-        """,
-            (
-                state_key,
-                action_key,
-                new_q,
-                datetime.now().isoformat(),
-                new_q,
-                datetime.now().isoformat(),
-            ),
+            f"INSERT OR REPLACE INTO {Tables.RL_Q_VALUE} "
+            f"(learner_id, state_key, action_key, q_value, visit_count, last_updated) "
+            f"VALUES ('mode_transition', ?, ?, ?, ?, ?)",
+            (state_key, action_key, new_q, visit_count + 1, now),
         )
         conn.commit()
 
@@ -373,23 +329,23 @@ class QLearningStore:
         reward: Optional[float] = None,
     ) -> None:
         """Record a transition for analysis."""
-        self._ensure_initialized()
-
         conn = self._db.get_connection()
         conn.execute(
-            f"""
-            INSERT INTO {_HISTORY_TABLE}
-            (profile_name, from_mode, to_mode, trigger, state_key, action_key, reward, timestamp)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """,
+            f"INSERT INTO {Tables.RL_TRANSITION} "
+            f"(learner_id, from_state, to_state, action, reward, metadata, created_at) "
+            f"VALUES ('mode_transition', ?, ?, ?, ?, ?, ?)",
             (
-                profile_name,
                 from_mode.value,
                 to_mode.value,
-                trigger.value,
-                state_key,
                 action_key,
                 reward,
+                json.dumps(
+                    {
+                        "trigger": trigger.value,
+                        "state_key": state_key,
+                        "profile_name": profile_name,
+                    }
+                ),
                 datetime.now().isoformat(),
             ),
         )
@@ -419,40 +375,34 @@ class QLearningStore:
             tool_budget_total: Total budget that was available
             budget_exhausted: Whether budget was exhausted
         """
-        self._ensure_initialized()
-
         conn = self._db.get_connection()
-        # Get current stats
-        row = conn.execute(
-            f"SELECT * FROM {_TASK_TABLE} WHERE task_type = ?", (task_type,)
-        ).fetchone()
 
-        if row:
-            current_budget = row[1]
-            current_quality = row[2]
-            current_completion = row[3]
-            count = row[4] + 1
+        # Load current stats from rl_task_stat (multi-row per task_type)
+        rows = conn.execute(
+            f"SELECT stat_key, stat_value, sample_count FROM {Tables.RL_TASK_STAT} "
+            f"WHERE learner_id = 'mode_transition' AND task_type = ?",
+            (task_type,),
+        ).fetchall()
+
+        if rows:
+            stat_map = {r[0]: r[1] for r in rows}
+            count = int(rows[0][2]) + 1  # sample_count lives on each row; take from first
+            current_budget = int(stat_map.get("optimal_tool_budget", 10))
+            current_quality = float(stat_map.get("avg_quality_score", 0.5))
+            current_completion = float(stat_map.get("avg_completion_rate", 0.5))
 
             # Outcome-aware budget adjustment
-            # Use smaller alpha for stability, larger for learning from failures
-            base_alpha = 0.05  # Slower learning for stability
+            base_alpha = 0.05
 
             if completed and quality_score >= 0.7:
-                # SUCCESS: Task completed well
                 if tool_budget_used < current_budget * 0.5:
-                    # Very efficient - gradually decrease budget
-                    # But never drop below what was actually used + buffer
                     target_budget = max(tool_budget_used + 3, current_budget - 2)
                     new_budget = int((1 - base_alpha) * current_budget + base_alpha * target_budget)
                 else:
-                    # Normal completion - keep budget stable, slight move toward usage
-                    alpha = base_alpha * 0.5  # Even slower for stable scenarios
+                    alpha = base_alpha * 0.5
                     new_budget = int((1 - alpha) * current_budget + alpha * tool_budget_used)
             else:
-                # FAILURE or low quality
                 if budget_exhausted:
-                    # Budget was exhausted AND failed - strong signal to increase
-                    # Increase by 20% or at least 5, capped at reasonable max
                     increase = max(5, int(current_budget * 0.2))
                     new_budget = min(current_budget + increase, 100)
                     logger.debug(
@@ -460,56 +410,35 @@ class QLearningStore:
                         f"{current_budget} -> {new_budget}"
                     )
                 elif quality_score < 0.5:
-                    # Low quality - moderate increase
                     increase = max(2, int(current_budget * 0.1))
                     new_budget = min(current_budget + increase, 100)
                 else:
-                    # Partial success - slight increase
                     new_budget = min(current_budget + 1, 100)
 
-            # Ensure budget stays within reasonable bounds
-            # Floor: minimum viable budget for the task type
             min_budget = self._get_min_budget_for_task(task_type)
             new_budget = max(min_budget, new_budget)
 
-            # Update quality and completion rate with standard EMA
             alpha = 0.1
             new_quality = (1 - alpha) * current_quality + alpha * quality_score
             completion_rate = (1 - alpha) * current_completion + alpha * (1.0 if completed else 0.0)
         else:
-            # First sample - initialize with reasonable defaults
             count = 1
-            # Don't just use what was used; start with a reasonable baseline
             new_budget = max(tool_budget_used + 5, self._get_min_budget_for_task(task_type))
             new_quality = quality_score
             completion_rate = 1.0 if completed else 0.0
 
-        conn.execute(
-            f"""
-            INSERT INTO {_TASK_TABLE}
-            (task_type, optimal_tool_budget, avg_quality_score, avg_completion_rate, sample_count, last_updated)
-            VALUES (?, ?, ?, ?, ?, ?)
-            ON CONFLICT(task_type) DO UPDATE SET
-                optimal_tool_budget = ?,
-                avg_quality_score = ?,
-                avg_completion_rate = ?,
-                sample_count = ?,
-                last_updated = ?
-        """,
-            (
-                task_type,
-                new_budget,
-                new_quality,
-                completion_rate,
-                count,
-                datetime.now().isoformat(),
-                new_budget,
-                new_quality,
-                completion_rate,
-                count,
-                datetime.now().isoformat(),
-            ),
-        )
+        now = datetime.now().isoformat()
+        for stat_key, stat_value in (
+            ("optimal_tool_budget", float(new_budget)),
+            ("avg_quality_score", new_quality),
+            ("avg_completion_rate", completion_rate),
+        ):
+            conn.execute(
+                f"INSERT OR REPLACE INTO {Tables.RL_TASK_STAT} "
+                f"(learner_id, task_type, stat_key, stat_value, sample_count, updated_at) "
+                f"VALUES ('mode_transition', ?, ?, ?, ?, ?)",
+                (task_type, stat_key, stat_value, count, now),
+            )
         conn.commit()
 
     def _get_min_budget_for_task(self, task_type: str) -> int:
@@ -534,31 +463,25 @@ class QLearningStore:
 
     def get_task_stats(self, task_type: str) -> Dict[str, Any]:
         """Get statistics for a task type."""
-        self._ensure_initialized()
-
         conn = self._db.get_connection()
-        conn.row_factory = sqlite3.Row
-        row = conn.execute(
-            f"SELECT * FROM {_TASK_TABLE} WHERE task_type = ?", (task_type,)
-        ).fetchone()
+        rows = conn.execute(
+            f"SELECT stat_key, stat_value, sample_count FROM {Tables.RL_TASK_STAT} "
+            f"WHERE learner_id = 'mode_transition' AND task_type = ?",
+            (task_type,),
+        ).fetchall()
 
-        if row:
-            return {
-                "task_type": row["task_type"],
-                "optimal_tool_budget": row["optimal_tool_budget"],
-                "avg_quality_score": row["avg_quality_score"],
-                "avg_completion_rate": row["avg_completion_rate"],
-                "sample_count": row["sample_count"],
-            }
-
-        # Default values
-        return {
+        result: Dict[str, Any] = {
             "task_type": task_type,
             "optimal_tool_budget": 10,
             "avg_quality_score": 0.5,
             "avg_completion_rate": 0.5,
             "sample_count": 0,
         }
+        for stat_key, stat_value, sample_count in rows:
+            if stat_key in result:
+                result[stat_key] = stat_value
+            result["sample_count"] = sample_count
+        return result
 
 
 class AdaptiveModeController:
@@ -579,18 +502,24 @@ class AdaptiveModeController:
         AgentMode.COMPLETE: [],
     }
 
-    # Default tool budgets by task type
+    # Default tool budgets by task type.
+    #
+    # Aligned with BUDGET_LIMITS / COMPLEXITY_BUDGETS so the RL-recommended budget
+    # path cannot collapse a real task to a handful of calls. These are the *defaults*
+    # consulted by get_optimal_tool_budget() before any learned override; previously
+    # they were tiny vestigial values (analyze=8, analysis_deep=15) that contradicted
+    # the framework-wide generous-exploration policy and could prematurely stop tasks.
     DEFAULT_TOOL_BUDGETS = {
-        "code_generation": 3,
-        "create_simple": 2,
-        "create": 5,
-        "edit": 5,
-        "search": 6,
-        "action": 10,
-        "analysis_deep": 15,
-        "analyze": 8,
-        "design": 20,
-        "general": 8,
+        "code_generation": BUDGET_LIMITS.simple_task,  # 20
+        "create_simple": BUDGET_LIMITS.simple_task,  # 20
+        "create": BUDGET_LIMITS.medium_task,  # 50
+        "edit": BUDGET_LIMITS.medium_task,  # 50
+        "search": BUDGET_LIMITS.medium_task,  # 50
+        "action": BUDGET_LIMITS.action_task,  # 200
+        "analysis_deep": BUDGET_LIMITS.analysis_task,  # 500
+        "analyze": BUDGET_LIMITS.complex_task,  # 100
+        "design": BUDGET_LIMITS.complex_task,  # 100
+        "general": BUDGET_LIMITS.medium_task,  # 50
     }
 
     # Provider-aware iteration thresholds for loop detection
@@ -1080,7 +1009,7 @@ class AdaptiveModeController:
                 model=self._model_name or "unknown",
                 success=success,
                 quality_score=quality_score,
-                task_type=self._current_state.task_type if self._current_state else "general",
+                task_type=(self._current_state.task_type if self._current_state else "general"),
                 metadata={
                     "from_mode": from_mode,
                     "to_mode": to_mode,

@@ -14,10 +14,17 @@
 
 """Plugin marketplace registry for discovery and search.
 
-Provides a local registry of known plugins that can be searched
-and installed via ``victor plugin search`` and ``victor plugin install``.
+Provides a registry of known plugins that can be searched and installed
+via ``victor plugin search`` and ``victor plugin install``.
 
-The registry can be extended with remote sources in the future.
+Discovery sources (in priority order):
+1. Entry points: ``victor.marketplace`` group (installed packages self-register)
+2. Fallback: Built-in list for packages that haven't added entry points yet
+
+Verticals register marketplace metadata via pyproject.toml::
+
+    [project.entry-points."victor.marketplace"]
+    victor-coding = "victor_coding:MARKETPLACE_ENTRY"
 """
 
 from __future__ import annotations
@@ -27,9 +34,56 @@ from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
-# Built-in marketplace entries. External developers can contribute by
-# adding entries here or by hosting a remote registry.
-_MARKETPLACE_ENTRIES: List[Dict[str, str]] = [
+# Cache for discovered entries
+_cached_entries: Optional[List[Dict[str, str]]] = None
+
+
+def _discover_entries() -> List[Dict[str, str]]:
+    """Discover marketplace entries from entry points + fallback.
+
+    Entry-point group: ``victor.marketplace``
+    Each entry point should resolve to a dict with keys:
+        name, description, source, source_type, install_cmd, category
+    """
+    global _cached_entries
+    if _cached_entries is not None:
+        return _cached_entries
+
+    entries: List[Dict[str, str]] = []
+    seen_names: set = set()
+
+    # 1. Entry-point discovery (installed packages self-register)
+    try:
+        from importlib.metadata import entry_points
+
+        eps = entry_points()
+        marketplace_eps = eps.get("victor.marketplace", []) if isinstance(eps, dict) else eps
+        if not isinstance(eps, dict):
+            marketplace_eps = [ep for ep in eps if ep.group == "victor.marketplace"]
+
+        for ep in marketplace_eps:
+            try:
+                entry = ep.load()
+                if isinstance(entry, dict) and "name" in entry:
+                    entries.append(entry)
+                    seen_names.add(entry["name"])
+            except Exception as e:
+                logger.debug("Failed to load marketplace entry %s: %s", ep.name, e)
+    except Exception as e:
+        logger.debug("Entry point discovery failed: %s", e)
+
+    # 2. Fallback for packages without entry points
+    for entry in _FALLBACK_ENTRIES:
+        if entry["name"] not in seen_names:
+            entries.append(entry)
+
+    _cached_entries = entries
+    return entries
+
+
+# Fallback entries for verticals that haven't added victor.marketplace entry points.
+# As verticals add entry points, they self-register and these become unnecessary.
+_FALLBACK_ENTRIES: List[Dict[str, str]] = [
     {
         "name": "victor-coding",
         "description": "Coding assistant vertical with LSP, git, refactoring, and testing tools",
@@ -97,7 +151,7 @@ def search_marketplace(
     query_lower = query.lower()
     results = []
 
-    for entry in _MARKETPLACE_ENTRIES:
+    for entry in _discover_entries():
         if category and entry.get("category") != category:
             continue
 
@@ -122,11 +176,12 @@ def list_marketplace(
     Returns:
         All marketplace entries, optionally filtered.
     """
+    entries = _discover_entries()
     if category:
-        return [e for e in _MARKETPLACE_ENTRIES if e.get("category") == category]
-    return list(_MARKETPLACE_ENTRIES)
+        return [e for e in entries if e.get("category") == category]
+    return list(entries)
 
 
 def get_categories() -> List[str]:
     """Return unique categories in the marketplace."""
-    return sorted({e.get("category", "") for e in _MARKETPLACE_ENTRIES if e.get("category")})
+    return sorted({e.get("category", "") for e in _discover_entries() if e.get("category")})

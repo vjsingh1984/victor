@@ -201,6 +201,15 @@ suite('VictorClient Test Suite', () => {
         }
     });
 
+    test('switchProfile should accept a profile name', async () => {
+        try {
+            await client.switchProfile('default');
+        } catch (error) {
+            // Expected when server is not running
+            assert.ok(error instanceof VictorError);
+        }
+    });
+
     // URL Construction tests
     suite('URL Construction', () => {
         test('Should construct correct endpoint URLs', () => {

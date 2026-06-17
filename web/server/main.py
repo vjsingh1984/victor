@@ -126,7 +126,9 @@ def _parse_session_token(token: str) -> Optional[Tuple[str, int]]:
         decoded = base64.urlsafe_b64decode(token.encode()).decode()
         session_id, issued_at_str, signature = decoded.split(":")
         expected_sig = hmac.new(
-            SESSION_SECRET.encode(), f"{session_id}:{issued_at_str}".encode(), hashlib.sha256
+            SESSION_SECRET.encode(),
+            f"{session_id}:{issued_at_str}".encode(),
+            hashlib.sha256,
         ).hexdigest()
         if not hmac.compare_digest(signature, expected_sig):
             return None
@@ -212,7 +214,8 @@ def _render_drawio_svg(source: str, timeout: Optional[int] = None) -> str:
             return fout.read()
     except FileNotFoundError:
         raise HTTPException(
-            status_code=500, detail="drawio CLI not found. Please install draw.io desktop/CLI."
+            status_code=500,
+            detail="drawio CLI not found. Please install draw.io desktop/CLI.",
         ) from None
     except subprocess.CalledProcessError as exc:
         raise HTTPException(
@@ -222,7 +225,8 @@ def _render_drawio_svg(source: str, timeout: Optional[int] = None) -> str:
 
 @app.post("/render/plantuml")
 async def render_plantuml(
-    payload: str = Body(..., media_type="text/plain"), _: None = Depends(_require_api_key)
+    payload: str = Body(..., media_type="text/plain"),
+    _: None = Depends(_require_api_key),
 ) -> Response:
     svg = await _render_with_limits(_render_plantuml_svg, payload)
     return Response(content=svg, media_type="image/svg+xml")
@@ -230,7 +234,8 @@ async def render_plantuml(
 
 @app.post("/render/mermaid")
 async def render_mermaid(
-    payload: str = Body(..., media_type="text/plain"), _: None = Depends(_require_api_key)
+    payload: str = Body(..., media_type="text/plain"),
+    _: None = Depends(_require_api_key),
 ) -> Response:
     svg = await _render_with_limits(_render_mermaid_svg, payload)
     return Response(content=svg, media_type="image/svg+xml")
@@ -238,7 +243,8 @@ async def render_mermaid(
 
 @app.post("/render/drawio")
 async def render_drawio(
-    payload: str = Body(..., media_type="text/plain"), _: None = Depends(_require_api_key)
+    payload: str = Body(..., media_type="text/plain"),
+    _: None = Depends(_require_api_key),
 ) -> Response:
     svg = await _render_with_limits(_render_drawio_svg, payload)
     return Response(content=svg, media_type="image/svg+xml")
@@ -322,14 +328,16 @@ async def render_graphviz(
     Query param 'engine' can be: dot (default), neato, fdp, circo, twopi, sfdp
     """
     svg = await _render_with_limits(
-        lambda text, timeout=RENDER_TIMEOUT: _render_graphviz_svg(text, engine, timeout), payload
+        lambda text, timeout=RENDER_TIMEOUT: _render_graphviz_svg(text, engine, timeout),
+        payload,
     )
     return Response(content=svg, media_type="image/svg+xml")
 
 
 @app.post("/render/d2")
 async def render_d2(
-    payload: str = Body(..., media_type="text/plain"), _: None = Depends(_require_api_key)
+    payload: str = Body(..., media_type="text/plain"),
+    _: None = Depends(_require_api_key),
 ) -> Response:
     """Render D2 diagram to SVG."""
     svg = await _render_with_limits(_render_d2_svg, payload)
@@ -649,7 +657,8 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
 
                 except Exception as e:
                     logger.error(
-                        f"Session {session_id}: Error during agent response: {e}", exc_info=True
+                        f"Session {session_id}: Error during agent response: {e}",
+                        exc_info=True,
                     )
                     await websocket.send_text(
                         f"[error] An error occurred while processing your request: {str(e)}"

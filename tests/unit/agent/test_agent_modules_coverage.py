@@ -11,7 +11,11 @@ Focuses on modules that are 90%+ covered and just need a few more tests:
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from victor.agent.error_recovery import ErrorRecoveryHandler, RecoveryResult, RecoveryAction
+from victor.agent.error_recovery import (
+    ErrorRecoveryHandler,
+    RecoveryResult,
+    RecoveryAction,
+)
 from victor.agent.output_deduplicator import OutputDeduplicator, StreamingDeduplicator
 from victor.providers.base import StreamChunk
 

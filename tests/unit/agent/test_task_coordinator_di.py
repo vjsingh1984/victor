@@ -21,7 +21,7 @@ import pytest
 from unittest.mock import Mock, MagicMock
 
 from victor.agent.service_provider import OrchestratorServiceProvider
-from victor.agent.protocols import TaskCoordinatorProtocol
+from victor.agent.services.protocols import TaskRuntimeProtocol
 from victor.config.settings import Settings
 
 
@@ -32,7 +32,7 @@ def mock_settings():
     # Recovery settings
     settings.recovery_blocked_consecutive_threshold = 4
     settings.recovery_blocked_total_threshold = 6
-    settings.tool_call_budget_warning_threshold = 250
+    settings.tools.tool_call_budget_warning_threshold = 250
     settings.max_consecutive_tool_calls = 8
     settings.use_recovery_handler = False
     settings.enable_context_compaction = False
@@ -41,7 +41,7 @@ def mock_settings():
     settings.recovery_timeout = 30.0
     # Tool settings
     settings.tool_timeout = 30.0
-    settings.tool_call_budget = 300
+    settings.tools.tool_call_budget = 300
     settings.tool_budget = 15
     settings.tool_selection_strategy = "hybrid"
     settings.semantic_weight = 0.7
@@ -101,18 +101,18 @@ class TestTaskCoordinatorDI:
     """Tests for TaskCoordinator DI resolution."""
 
     def test_task_coordinator_protocol_registered(self, service_provider):
-        """Test that TaskCoordinatorProtocol is registered in DI container."""
+        """Test that TaskRuntimeProtocol is registered in DI container."""
         container = service_provider.container
 
         # Check that protocol is registered
-        assert container.is_registered(TaskCoordinatorProtocol)
+        assert container.is_registered(TaskRuntimeProtocol)
 
     def test_task_coordinator_can_be_resolved(self, service_provider):
         """Test that TaskCoordinator can be resolved from DI container."""
         container = service_provider.container
 
         # Resolve TaskCoordinator
-        task_coordinator = container.get(TaskCoordinatorProtocol)
+        task_coordinator = container.get(TaskRuntimeProtocol)
 
         # Verify it's not None and has expected attributes
         assert task_coordinator is not None
@@ -126,8 +126,8 @@ class TestTaskCoordinatorDI:
         container = service_provider.container
 
         # Resolve TaskCoordinator twice
-        instance1 = container.get(TaskCoordinatorProtocol)
-        instance2 = container.get(TaskCoordinatorProtocol)
+        instance1 = container.get(TaskRuntimeProtocol)
+        instance2 = container.get(TaskRuntimeProtocol)
 
         # Verify they are the same instance (SINGLETON)
         assert instance1 is instance2
@@ -137,7 +137,7 @@ class TestTaskCoordinatorDI:
         container = service_provider.container
 
         # Resolve TaskCoordinator
-        task_coordinator = container.get(TaskCoordinatorProtocol)
+        task_coordinator = container.get(TaskRuntimeProtocol)
 
         # Verify required dependencies are injected
         assert task_coordinator.task_analyzer is not None
@@ -149,7 +149,7 @@ class TestTaskCoordinatorDI:
         """Test that TaskCoordinator methods are callable."""
         container = service_provider.container
 
-        task_coordinator = container.get(TaskCoordinatorProtocol)
+        task_coordinator = container.get(TaskRuntimeProtocol)
 
         # Verify key methods are callable
         assert callable(task_coordinator.prepare_task)
@@ -221,7 +221,7 @@ class TestTaskCoordinatorDIIntegration:
         assert container.is_registered(SystemPromptBuilderProtocol)
 
         # Verify TaskCoordinator can be resolved (which depends on above)
-        task_coordinator = container.get(TaskCoordinatorProtocol)
+        task_coordinator = container.get(TaskRuntimeProtocol)
         assert task_coordinator is not None
 
     def test_task_coordinator_with_all_dependencies(self, service_provider):
@@ -229,7 +229,7 @@ class TestTaskCoordinatorDIIntegration:
         container = service_provider.container
 
         # Resolve TaskCoordinator
-        task_coordinator = container.get(TaskCoordinatorProtocol)
+        task_coordinator = container.get(TaskRuntimeProtocol)
 
         # Verify all expected attributes exist
         expected_attrs = [

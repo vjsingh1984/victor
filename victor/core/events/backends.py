@@ -300,13 +300,21 @@ class InMemoryEventBackend:
         config: Optional[BackendConfig] = None,
         *,
         queue_maxsize: int = 10000,
+        drop_alert_threshold: int = 100,
+        drop_alert_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
     ) -> None:
         """Initialize the in-memory backend.
 
         Args:
             config: Optional backend configuration
             queue_maxsize: Maximum queue size (0 for unbounded)
+            drop_alert_threshold: Fire drop alert after this many cumulative drops.
+            drop_alert_callback: Optional callable invoked when threshold is crossed.
         """
+        self._drop_alert_threshold = drop_alert_threshold
+        self._drop_alert_callback = drop_alert_callback
+        self._per_topic_drop_counts: Dict[str, int] = {}
+        self._last_alert_total_drops: int = 0
         self._config = config or BackendConfig()
         extra = self._config.extra if isinstance(self._config.extra, dict) else {}
         configured_queue_maxsize = extra.get("queue_maxsize", queue_maxsize)
@@ -507,6 +515,35 @@ class InMemoryEventBackend:
         with self._publish_stats_lock:
             self._publish_stats[key] = self._publish_stats.get(key, 0) + delta
 
+    def _fire_drop_alert_if_needed(self, topic: str, drop_kind: str) -> None:
+        """Track per-topic drops and fire the alert callback when threshold is crossed.
+
+        Dampened: only one alert fires per threshold increment to prevent spam.
+        Safe to call from the publish hot-path (no I/O; lock held only briefly).
+        """
+        alert_payload: Optional[Dict[str, Any]] = None
+        with self._publish_stats_lock:
+            self._per_topic_drop_counts[topic] = self._per_topic_drop_counts.get(topic, 0) + 1
+            total = self._publish_stats.get("dropped_newest", 0) + self._publish_stats.get(
+                "dropped_oldest", 0
+            )
+            delta = total - self._last_alert_total_drops
+            if delta >= self._drop_alert_threshold and self._drop_alert_callback is not None:
+                self._last_alert_total_drops = total
+                alert_payload = {
+                    "total_drops": total,
+                    "per_topic_drops": dict(self._per_topic_drop_counts),
+                    "overflow_policy": str(self._queue_overflow_policy),
+                    "queue_depth": self._event_queue.qsize(),
+                    "queue_maxsize": self._queue_maxsize,
+                    "drop_kind": drop_kind,
+                }
+        if alert_payload is not None:
+            try:
+                self._drop_alert_callback(alert_payload)  # type: ignore[misc]
+            except Exception as exc:
+                logger.debug("Drop alert callback raised: %s", exc)
+
     def _update_max_queue_depth(self) -> None:
         """Update max queue depth watermark."""
         depth = self.get_queue_depth()
@@ -591,6 +628,7 @@ class InMemoryEventBackend:
                 try:
                     oldest = self._event_queue.get_nowait()
                     self._increment_publish_stat("dropped_oldest")
+                    self._fire_drop_alert_if_needed(oldest.topic, "drop_oldest")
                     self._write_to_durable_sink(oldest, "drop_oldest")
                 except asyncio.QueueEmpty:
                     oldest = None
@@ -602,6 +640,7 @@ class InMemoryEventBackend:
                     return True
                 except asyncio.QueueFull:
                     self._increment_publish_stat("dropped_newest")
+                    self._fire_drop_alert_if_needed(event.topic, "drop_newest_after_drop_oldest")
                     self._write_to_durable_sink(event, "drop_newest_after_drop_oldest")
                     logger.warning(
                         "Event queue remained full after drop_oldest policy, dropping event: %s",
@@ -619,6 +658,7 @@ class InMemoryEventBackend:
                     return True
                 except asyncio.TimeoutError:
                     self._increment_publish_stat("blocked_timeout")
+                    self._fire_drop_alert_if_needed(event.topic, "block_timeout")
                     self._write_to_durable_sink(event, "block_timeout")
                     logger.warning(
                         "Event queue full (block timeout %.1fms), dropping event: %s",
@@ -629,6 +669,7 @@ class InMemoryEventBackend:
 
             # Default: drop newest event (AT_MOST_ONCE semantics)
             self._increment_publish_stat("dropped_newest")
+            self._fire_drop_alert_if_needed(event.topic, "drop_newest")
             self._write_to_durable_sink(event, "drop_newest")
             logger.warning("Event queue full, dropping event: %s", event.topic)
             return False
@@ -794,6 +835,7 @@ class InMemoryEventBackend:
         """Get queue overflow policy and pressure/drop counters."""
         with self._publish_stats_lock:
             stats = dict(self._publish_stats)
+            per_topic = dict(self._per_topic_drop_counts)
         return {
             "queue_depth": self.get_queue_depth(),
             "queue_maxsize": self._queue_maxsize,
@@ -801,6 +843,7 @@ class InMemoryEventBackend:
             "block_timeout_ms": self._queue_overflow_block_timeout_ms,
             "topic_overflow_policies": dict(self._queue_overflow_topic_policies),
             "topic_block_timeout_ms": dict(self._queue_overflow_topic_block_timeout_ms),
+            "per_topic_drops": per_topic,
             "stats": stats,
         }
 
@@ -1045,6 +1088,9 @@ class ObservabilityBus:
             []
         )  # (exporter, handler) awaiting subscription
 
+        # Track background tasks for proper cleanup (prevents pytest hangs)
+        self._background_tasks: Set[asyncio.Task] = set()
+
     @property
     def backend(self) -> IEventBackend:
         """Get underlying backend."""
@@ -1059,6 +1105,22 @@ class ObservabilityBus:
             except Exception as e:
                 logger.debug("Failed to get backend pressure stats: %s", e)
         return {}
+
+    def register_drop_alert_handler(
+        self,
+        handler: Callable[[Dict[str, Any]], None],
+        *,
+        threshold: int = 100,
+    ) -> None:
+        """Wire a drop-alert callback into the underlying backend.
+
+        No-op when the backend does not support per-topic drop tracking
+        (e.g. distributed backends that do not expose drop counters).
+        """
+        backend = self._backend
+        if hasattr(backend, "_drop_alert_callback"):
+            backend._drop_alert_callback = handler
+            backend._drop_alert_threshold = threshold
 
     async def connect(self) -> None:
         """Connect the backend."""
@@ -1241,6 +1303,25 @@ class ObservabilityBus:
             )
         )
 
+    def emit_lifecycle_event(
+        self,
+        event_name: str,
+        data: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """Emit a lifecycle event (fire-and-forget).
+
+        Convenience method for graph/workflow lifecycle events
+        (graph_started, node_start, node_end, graph_completed).
+        """
+        from victor.core.events.emit_helper import emit_event_sync
+
+        emit_event_sync(
+            self,
+            f"lifecycle.{event_name}",
+            data or {},
+            source="observability",
+        )
+
     def emit_metric(
         self,
         metric_name: str,
@@ -1251,6 +1332,7 @@ class ObservabilityBus:
         """Emit a metric event (fire-and-forget).
 
         Convenience method that wraps emit() for metric data.
+        Safely handles both async and sync calling contexts.
 
         Args:
             metric_name: Name of the metric (e.g., "latency", "token_count").
@@ -1260,7 +1342,16 @@ class ObservabilityBus:
         """
         import asyncio
 
-        asyncio.create_task(
+        try:
+            # Check if there's a running event loop
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            # No running event loop - skip emission in sync context
+            # This prevents "coroutine was never awaited" warnings
+            return
+
+        # Create and track the background task for proper cleanup
+        task = loop.create_task(
             self.emit(
                 topic=f"metric.{metric_name}",
                 data={
@@ -1272,6 +1363,20 @@ class ObservabilityBus:
                 source="observability",
             )
         )
+        # Track task for cleanup (prevents pytest hangs)
+        self._background_tasks.add(task)
+        task.add_done_callback(self._background_tasks.discard)
+
+    async def cleanup_background_tasks(self) -> None:
+        """Clean up all pending background tasks.
+
+        Waits for all fire-and-forget tasks to complete.
+        Call this before shutting down the bus to prevent task leaks.
+        """
+        if self._background_tasks:
+            # Wait for all tasks with timeout to prevent hanging
+            await asyncio.wait(self._background_tasks, timeout=5.0)
+            self._background_tasks.clear()
 
 
 class AgentMessageBus:
@@ -1508,7 +1613,9 @@ def get_observability_bus() -> ObservabilityBus:
                     settings, "event_emit_sync_metrics_interval_seconds", 60.0
                 ),
                 topic=getattr(
-                    settings, "event_emit_sync_metrics_topic", "core.events.emit_sync.metrics"
+                    settings,
+                    "event_emit_sync_metrics_topic",
+                    "core.events.emit_sync.metrics",
                 ),
                 reset_after_emit=getattr(
                     settings, "event_emit_sync_metrics_reset_after_emit", False

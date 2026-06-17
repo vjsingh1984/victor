@@ -42,7 +42,7 @@ class PresentationProtocol(Protocol):
     allowing the agent layer to remain independent of UI implementation details.
 
     Implementations:
-        - EmojiPresentationAdapter: Delegates to victor.ui.emoji module
+        - EmojiPresentationAdapter: Uses the UI-free core symbol registry
         - NullPresentationAdapter: Returns plain text (for testing/headless)
 
     Attributes:

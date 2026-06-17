@@ -29,7 +29,7 @@ from victor.agent.resilience import (
     AgentRetryConfig,
     RetryHandler,
 )
-from victor.providers.circuit_breaker import CircuitState
+from victor.core.circuit_breaker import CircuitState
 
 
 class TestCircuitBreaker:

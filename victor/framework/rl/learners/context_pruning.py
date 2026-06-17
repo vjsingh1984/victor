@@ -37,6 +37,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from victor.framework.rl.base import BaseLearner, RLOutcome, RLRecommendation
 from victor.core.schema import Tables
+from victor.framework.rl.migration import RLTableMigrator
 
 logger = logging.getLogger(__name__)
 
@@ -142,37 +143,19 @@ class ContextPruningLearner(BaseLearner):
         self.discount_factor = discount_factor
 
     def _ensure_tables(self) -> None:
-        """Create tables for context pruning stats."""
-        cursor = self.db.cursor()
+        """Migrate legacy per-learner tables to unified RL tables."""
+        RLTableMigrator(self.db).run_if_needed(self.name, RLTableMigrator.migrate_context_pruning)
 
-        # Q-values table: state-action pairs
-        cursor.execute(f"""
-            CREATE TABLE IF NOT EXISTS {Tables.RL_CONTEXT_PRUNING} (
-                state_key TEXT NOT NULL,
-                action TEXT NOT NULL,
-                q_value REAL DEFAULT 0.0,
-                visit_count INTEGER DEFAULT 0,
-                success_count INTEGER DEFAULT 0,
-                total_tokens_saved INTEGER DEFAULT 0,
-                avg_token_savings REAL DEFAULT 0.0,
-                last_updated TEXT,
-                PRIMARY KEY (state_key, action)
-            )
-            """)
+    def _compute_reward(self, outcome: Any) -> float:
+        """Compute reward from a standard RLOutcome.
 
-        # Stats table: overall pruning statistics
-        cursor.execute(f"""
-            CREATE TABLE IF NOT EXISTS {Tables.RL_CONTEXT_PRUNING}_stats (
-                provider_type TEXT PRIMARY KEY,
-                total_decisions INTEGER DEFAULT 0,
-                total_tokens_saved INTEGER DEFAULT 0,
-                avg_success_rate REAL DEFAULT 0.0,
-                best_action TEXT,
-                last_updated TEXT
-            )
-            """)
-
-        self.db.commit()
+        ContextPruningLearner primarily uses its own ``record_outcome()``
+        with domain-specific arguments.  This method provides the
+        ``BaseLearner`` abstract contract for the generic path.
+        """
+        success = getattr(outcome, "success", False)
+        quality = getattr(outcome, "quality_score", 0.5)
+        return (0.6 * (1.0 if success else -0.5)) + (0.4 * quality)
 
     def _discretize_state(
         self,
@@ -238,24 +221,29 @@ class ContextPruningLearner(BaseLearner):
 
         cursor = self.db.cursor()
 
-        # Get Q-values and visit counts for all actions in this state
+        # Get Q-values and visit counts for all actions in this state from rl_q_value
         cursor.execute(
             f"""
-            SELECT action, q_value, visit_count, success_count
-            FROM {Tables.RL_CONTEXT_PRUNING}
-            WHERE state_key = ?
+            SELECT action_key, q_value, visit_count
+            FROM {Tables.RL_Q_VALUE}
+            WHERE learner_id = ? AND state_key = ?
             """,
-            (state_key,),
+            (self.name, state_key),
         )
         rows = cursor.fetchall()
 
-        # Build action stats dict
+        # Build action stats dict (success_count estimated from q_value proportionally)
         action_stats = {}
         for row in rows:
-            action_stats[row[0]] = {
-                "q_value": row[1],
-                "visits": row[2],
-                "successes": row[3],
+            row_dict = dict(row)
+            visits = row_dict["visit_count"]
+            q_val = row_dict["q_value"]
+            # Estimate successes from q_value (scaled 0-100) and visit count
+            successes = max(0, int((q_val / 100.0) * visits))
+            action_stats[row_dict["action_key"]] = {
+                "q_value": q_val,
+                "visits": visits,
+                "successes": successes,
             }
 
         # Thompson Sampling: sample from Beta distribution for each action
@@ -275,7 +263,7 @@ class ContextPruningLearner(BaseLearner):
             beta = self.PRIOR_BETA + stats["visits"] - stats["successes"]
 
             # Sample from Beta distribution
-            sample = random.betavariate(alpha, max(1, beta))
+            sample = self._rng.betavariate(alpha, max(1, beta))
 
             # Weight by Q-value if we have enough samples
             if stats["visits"] >= self.MIN_SAMPLES_FOR_CONFIDENCE:
@@ -295,8 +283,10 @@ class ContextPruningLearner(BaseLearner):
         confidence = min(1.0, total_visits / (self.MIN_SAMPLES_FOR_CONFIDENCE * len(self.ACTIONS)))
 
         return RLRecommendation(
-            action=best_action.value,
+            value=best_action.value,
             confidence=confidence,
+            reason=f"Thompson Sampling selected {best_action.value} (sample={best_sample:.3f})",
+            sample_size=total_visits,
             metadata={
                 "state_key": state_key,
                 "config": {
@@ -343,51 +333,48 @@ class ContextPruningLearner(BaseLearner):
         cursor = self.db.cursor()
         now = datetime.now(timezone.utc).isoformat()
 
-        # Update Q-value using Q-learning update rule
+        # Read existing Q-value for this state-action pair
+        existing = cursor.execute(
+            f"SELECT q_value, visit_count FROM {Tables.RL_Q_VALUE}"
+            f" WHERE learner_id = ? AND state_key = ? AND action_key = ?",
+            (self.name, state_key, action),
+        ).fetchone()
+
+        if existing:
+            old_q = dict(existing)["q_value"]
+            visit_count = dict(existing)["visit_count"] + 1
+            new_q = old_q + self.learning_rate * (reward - old_q)
+        else:
+            new_q = reward
+            visit_count = 1
+
+        # Write updated Q-value to rl_q_value
         cursor.execute(
             f"""
-            INSERT INTO {Tables.RL_CONTEXT_PRUNING}
-                (state_key, action, q_value, visit_count, success_count,
-                 total_tokens_saved, avg_token_savings, last_updated)
-            VALUES (?, ?, ?, 1, ?, ?, ?, ?)
-            ON CONFLICT(state_key, action) DO UPDATE SET
-                q_value = q_value + ? * (? - q_value),
-                visit_count = visit_count + 1,
-                success_count = success_count + ?,
-                total_tokens_saved = total_tokens_saved + ?,
-                avg_token_savings = (total_tokens_saved + ?) / (visit_count + 1),
-                last_updated = ?
+            INSERT OR REPLACE INTO {Tables.RL_Q_VALUE}
+            (learner_id, state_key, action_key, q_value, visit_count, last_updated)
+            VALUES (?, ?, ?, ?, ?, ?)
             """,
-            (
-                state_key,
-                action,
-                reward,
-                1 if task_success else 0,
-                tokens_saved,
-                float(tokens_saved),
-                now,
-                self.learning_rate,
-                reward,
-                1 if task_success else 0,
-                tokens_saved,
-                tokens_saved,
-                now,
-            ),
+            (self.name, state_key, action, new_q, visit_count, now),
         )
 
-        # Update provider stats
-        cursor.execute(
-            f"""
-            INSERT INTO {Tables.RL_CONTEXT_PRUNING}_stats
-                (provider_type, total_decisions, total_tokens_saved, last_updated)
-            VALUES (?, 1, ?, ?)
-            ON CONFLICT(provider_type) DO UPDATE SET
-                total_decisions = total_decisions + 1,
-                total_tokens_saved = total_tokens_saved + ?,
-                last_updated = ?
-            """,
-            (provider_type, tokens_saved, now, tokens_saved, now),
-        )
+        # Update provider-level stats in rl_task_stat
+        for stat_key, delta in (
+            ("total_decisions", 1.0),
+            ("total_tokens_saved", float(tokens_saved)),
+        ):
+            cursor.execute(
+                f"""
+                INSERT INTO {Tables.RL_TASK_STAT}
+                (learner_id, task_type, stat_key, stat_value, sample_count, updated_at)
+                VALUES (?, ?, ?, ?, 1, ?)
+                ON CONFLICT(learner_id, task_type, stat_key) DO UPDATE SET
+                    stat_value = stat_value + ?,
+                    sample_count = sample_count + 1,
+                    updated_at = excluded.updated_at
+                """,
+                (self.name, provider_type, stat_key, delta, now, delta),
+            )
 
         self.db.commit()
         logger.debug(
@@ -406,43 +393,54 @@ class ContextPruningLearner(BaseLearner):
         """
         cursor = self.db.cursor()
 
-        # Get per-action stats
+        # Get per-action stats from rl_q_value
         if provider_type:
             cursor.execute(
                 f"""
-                SELECT action, SUM(visit_count), AVG(q_value), SUM(success_count)
-                FROM {Tables.RL_CONTEXT_PRUNING}
-                WHERE state_key LIKE ?
-                GROUP BY action
+                SELECT action_key, SUM(visit_count), AVG(q_value)
+                FROM {Tables.RL_Q_VALUE}
+                WHERE learner_id = ? AND state_key LIKE ?
+                GROUP BY action_key
                 """,
-                (f"{provider_type}:%",),
+                (self.name, f"{provider_type}:%"),
             )
         else:
-            cursor.execute(f"""
-                SELECT action, SUM(visit_count), AVG(q_value), SUM(success_count)
-                FROM {Tables.RL_CONTEXT_PRUNING}
-                GROUP BY action
-                """)
+            cursor.execute(
+                f"""
+                SELECT action_key, SUM(visit_count), AVG(q_value)
+                FROM {Tables.RL_Q_VALUE}
+                WHERE learner_id = ?
+                GROUP BY action_key
+                """,
+                (self.name,),
+            )
 
         action_stats = {}
         for row in cursor.fetchall():
-            visits = row[1] or 0
-            action_stats[row[0]] = {
+            row_dict = dict(row)
+            visits = row_dict["SUM(visit_count)"] or 0
+            avg_q = row_dict["AVG(q_value)"] or 0.0
+            action_stats[row_dict["action_key"]] = {
                 "visits": visits,
-                "avg_q_value": row[2] or 0.0,
-                "success_rate": (row[3] or 0) / max(1, visits),
+                "avg_q_value": avg_q,
+                "success_rate": max(0.0, avg_q / 100.0),
             }
 
-        # Get overall stats
-        cursor.execute(f"""
-            SELECT SUM(total_decisions), SUM(total_tokens_saved)
-            FROM {Tables.RL_CONTEXT_PRUNING}_stats
-            """)
-        row = cursor.fetchone()
+        # Get overall stats from rl_task_stat
+        cursor.execute(
+            f"""
+            SELECT stat_key, SUM(stat_value)
+            FROM {Tables.RL_TASK_STAT}
+            WHERE learner_id = ? AND stat_key IN ('total_decisions', 'total_tokens_saved')
+            GROUP BY stat_key
+            """,
+            (self.name,),
+        )
+        totals = {dict(r)["stat_key"]: dict(r)["SUM(stat_value)"] for r in cursor.fetchall()}
 
         return {
-            "total_decisions": row[0] or 0 if row else 0,
-            "total_tokens_saved": row[1] or 0 if row else 0,
+            "total_decisions": int(totals.get("total_decisions", 0) or 0),
+            "total_tokens_saved": int(totals.get("total_tokens_saved", 0) or 0),
             "action_stats": action_stats,
             "best_action": max(
                 action_stats.items(),
@@ -454,7 +452,7 @@ class ContextPruningLearner(BaseLearner):
     def reset(self) -> None:
         """Reset learner state (clear Q-values)."""
         cursor = self.db.cursor()
-        cursor.execute(f"DELETE FROM {Tables.RL_CONTEXT_PRUNING}")
-        cursor.execute(f"DELETE FROM {Tables.RL_CONTEXT_PRUNING}_stats")
+        cursor.execute(f"DELETE FROM {Tables.RL_Q_VALUE} WHERE learner_id = ?", (self.name,))
+        cursor.execute(f"DELETE FROM {Tables.RL_TASK_STAT} WHERE learner_id = ?", (self.name,))
         self.db.commit()
         logger.info("Context pruning learner reset")

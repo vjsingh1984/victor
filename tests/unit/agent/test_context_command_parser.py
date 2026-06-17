@@ -364,8 +364,18 @@ class TestProblemsResolver:
         """Test with diagnostics."""
         context = {
             "diagnostics": [
-                {"severity": "error", "file": "foo.py", "line": 10, "message": "Syntax error"},
-                {"severity": "warning", "file": "bar.py", "line": 5, "message": "Unused variable"},
+                {
+                    "severity": "error",
+                    "file": "foo.py",
+                    "line": 10,
+                    "message": "Syntax error",
+                },
+                {
+                    "severity": "warning",
+                    "file": "bar.py",
+                    "line": 5,
+                    "message": "Unused variable",
+                },
             ]
         }
         item = await resolver.resolve("", context)

@@ -1,7 +1,7 @@
-"""Unified session management for CLI, TUI, and one-shot modes.
+"""Unified session management for CLI and one-shot modes.
 
 This module provides a unified interface for session management,
-eliminating divergence between CLI and TUI session handling.
+eliminating divergence between interactive and one-shot session handling.
 
 SOLID Principles Applied:
 - Single Responsibility: Each class handles one aspect of session management
@@ -30,7 +30,6 @@ class SessionMode(Enum):
 
     INTERACTIVE = "interactive"
     ONESHOT = "oneshot"
-    TUI = "tui"
 
 
 @dataclass
@@ -97,7 +96,7 @@ class ISessionHandler(ABC):
 
     Defines the contract for session lifecycle management.
     Concrete implementations can provide different behaviors
-    for CLI, TUI, and one-shot modes.
+    for CLI and one-shot modes.
     """
 
     @abstractmethod
@@ -306,50 +305,6 @@ class InteractiveSessionHandler(BaseSessionHandler):
         raise NotImplementedError("Subclasses must implement _get_user_input")
 
 
-class TUISessionHandler(BaseSessionHandler):
-    """Handler for TUI sessions.
-
-    TUI sessions have rich UI components, visual feedback,
-    and enhanced interactivity.
-    """
-
-    def __init__(self):
-        """Initialize TUI handler."""
-        super().__init__()
-
-    async def start_tui(
-        self,
-        config: SessionConfig,
-        agent: Optional[AgentOrchestrator] = None,
-    ) -> None:
-        """Start the TUI interface.
-
-        Args:
-            config: Session configuration
-            agent: Optional pre-configured agent (for external initialization)
-        """
-        if agent is None:
-            agent = await self.initialize(config)
-
-        metrics = SessionMetrics()
-
-        try:
-            # Import TUI here to avoid circular imports
-            from victor.ui.tui import VictorTUI
-
-            tui_app = VictorTUI(
-                agent=agent,
-                provider=config.provider,
-                model=config.model,
-                stream=True,
-                settings=config.profile,  # This would be settings object, need to fix
-            )
-            await tui_app.run_async()
-
-        finally:
-            await self.cleanup(agent, metrics)
-
-
 __all__ = [
     "SessionMode",
     "SessionConfig",
@@ -358,5 +313,4 @@ __all__ = [
     "BaseSessionHandler",
     "OneshotSessionHandler",
     "InteractiveSessionHandler",
-    "TUISessionHandler",
 ]

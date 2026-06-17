@@ -26,7 +26,9 @@ Features:
 - Concurrent agent limit
 
 Usage:
-    manager = BackgroundAgentManager(orchestrator, max_concurrent=4)
+    from victor.agent.services.protocols import ChatServiceProtocol
+
+    manager = BackgroundAgentManager(orchestrator, chat_service, max_concurrent=4)
 
     # Start a background agent
     agent_id = await manager.start_agent(
@@ -52,6 +54,7 @@ from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Set
 
 from victor.core.async_utils import run_sync
+from victor.agent.services.protocols import ChatServiceProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -158,6 +161,7 @@ class BackgroundAgentManager:
     def __init__(
         self,
         orchestrator: Any,
+        chat_service: ChatServiceProtocol,
         max_concurrent: int = 4,
         event_callback: Optional[EventCallback] = None,
         factory: Optional[Any] = None,
@@ -166,12 +170,14 @@ class BackgroundAgentManager:
 
         Args:
             orchestrator: The AgentOrchestrator instance (shared by all agents)
+            chat_service: The ChatService for streaming responses
             max_concurrent: Maximum concurrent agents (default: 4)
             event_callback: Callback for broadcasting events
             factory: Optional OrchestratorFactory for unified agent creation
                     (recommended for consistency with Phase 4 architecture)
         """
         self._orchestrator = orchestrator
+        self._chat_service = chat_service
         self._factory = factory  # Store factory for unified creation
         self._max_concurrent = max_concurrent
         self._event_callback = event_callback
@@ -191,6 +197,7 @@ class BackgroundAgentManager:
     def from_factory(
         cls,
         factory: Any,
+        chat_service: ChatServiceProtocol,
         max_concurrent: int = 4,
         event_callback: Optional[EventCallback] = None,
     ) -> "BackgroundAgentManager":
@@ -200,6 +207,7 @@ class BackgroundAgentManager:
 
         Args:
             factory: OrchestratorFactory instance
+            chat_service: The ChatService for streaming responses
             max_concurrent: Maximum concurrent agents
             event_callback: Callback for broadcasting events
 
@@ -212,7 +220,7 @@ class BackgroundAgentManager:
 
             settings = load_settings()
             factory = OrchestratorFactory(settings, provider, model)
-            manager = BackgroundAgentManager.from_factory(factory)
+            manager = BackgroundAgentManager.from_factory(factory, chat_service)
         """
         # Create orchestrator using factory (this is the unified creation path)
         orchestrator = run_sync(factory.create_agent(mode="foreground"))
@@ -220,6 +228,7 @@ class BackgroundAgentManager:
         # Return manager with factory stored for consistency
         return cls(
             orchestrator=orchestrator,
+            chat_service=chat_service,
             max_concurrent=max_concurrent,
             event_callback=event_callback,
             factory=factory,  # Store factory for future use
@@ -431,7 +440,7 @@ class BackgroundAgentManager:
             response_chunks = []
             tool_call_count = 0
 
-            async for chunk in self._orchestrator.stream_chat(agent.task):
+            async for chunk in self._chat_service.stream_chat(agent.task):
                 if agent._cancelled:
                     break
 
@@ -536,6 +545,7 @@ def get_agent_manager() -> Optional[BackgroundAgentManager]:
 
 def init_agent_manager(
     orchestrator: Any,
+    chat_service: ChatServiceProtocol,
     max_concurrent: int = 4,
     event_callback: Optional[EventCallback] = None,
 ) -> BackgroundAgentManager:
@@ -543,6 +553,7 @@ def init_agent_manager(
 
     Args:
         orchestrator: The AgentOrchestrator instance
+        chat_service: The ChatService for streaming responses
         max_concurrent: Maximum concurrent agents
         event_callback: Callback for broadcasting events
 
@@ -552,6 +563,7 @@ def init_agent_manager(
     global _agent_manager
     _agent_manager = BackgroundAgentManager(
         orchestrator=orchestrator,
+        chat_service=chat_service,
         max_concurrent=max_concurrent,
         event_callback=event_callback,
     )

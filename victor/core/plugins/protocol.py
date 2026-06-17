@@ -23,7 +23,7 @@ from __future__ import annotations
 from typing import Any, Dict, Optional, Protocol, runtime_checkable
 
 import typer
-from victor_sdk import PluginContext, VictorPlugin as SdkVictorPlugin
+from victor_contracts import PluginContext, VictorPlugin as SdkVictorPlugin
 
 
 @runtime_checkable

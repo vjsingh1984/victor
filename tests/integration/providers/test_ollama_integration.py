@@ -37,7 +37,8 @@ def _check_ollama_available():
 
 
 pytestmark = pytest.mark.skipif(
-    not _check_ollama_available(), reason="Ollama server not available at localhost:11434"
+    not _check_ollama_available(),
+    reason="Ollama server not available at localhost:11434",
 )
 
 # These imports are intentionally after pytestmark to avoid loading if Ollama unavailable

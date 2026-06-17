@@ -99,7 +99,7 @@ class ToolMetadata:
     stages: List[str] = field(default_factory=list)
     mandatory_keywords: List[str] = field(default_factory=list)
     task_types: List[str] = field(default_factory=list)
-    progress_params: List[str] = field(default_factory=list)
+    signature_params: List[str] = field(default_factory=list)
     cost_tier: Optional[str] = None
 
     @classmethod
@@ -125,7 +125,7 @@ class ToolMetadata:
             stages=getattr(tool, "stages", []),
             mandatory_keywords=getattr(tool, "mandatory_keywords", []),
             task_types=getattr(tool, "task_types", []),
-            progress_params=getattr(tool, "progress_params", []),
+            signature_params=getattr(tool, "signature_params", []),
             cost_tier=getattr(tool, "cost_tier", None),
         )
 
@@ -210,7 +210,7 @@ class AgentInfo:
     mcp_client: Optional[Any] = None
     codebase_index: Optional[Any] = None
     conversation_state: Optional[Any] = None
-    intelligent_integration: Optional[Any] = None
+    runtime_intelligence_integration: Optional[Any] = None
 
     @classmethod
     def from_agent(cls, agent: Any) -> AgentInfo:
@@ -220,7 +220,11 @@ class AgentInfo:
             mcp_client=getattr(agent, "mcp_client", None),
             codebase_index=getattr(agent, "codebase_index", None),
             conversation_state=getattr(agent, "conversation_state", None),
-            intelligent_integration=getattr(agent, "intelligent_integration", None),
+            runtime_intelligence_integration=getattr(
+                agent,
+                "runtime_intelligence_integration",
+                None,
+            ),
         )
 
 

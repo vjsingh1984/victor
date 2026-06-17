@@ -74,6 +74,33 @@ def streaming_executor(mock_orchestrator) -> StreamingWorkflowExecutor:
     return StreamingWorkflowExecutor(mock_orchestrator)
 
 
+def test_constructor_uses_runtime_executor_factory(mock_orchestrator) -> None:
+    runtime = MagicMock()
+    runtime.default_timeout = 42.0
+    runtime.sub_agents = MagicMock()
+
+    with patch(
+        "victor.workflows.streaming_executor.create_legacy_workflow_executor",
+        return_value=runtime,
+    ) as factory:
+        executor = StreamingWorkflowExecutor(
+            mock_orchestrator,
+            max_parallel=7,
+            default_timeout=42.0,
+        )
+
+    factory.assert_called_once_with(
+        mock_orchestrator,
+        max_parallel=7,
+        default_timeout=42.0,
+        checkpointer=None,
+        cache=None,
+        cache_config=None,
+    )
+    assert executor.sub_agents is runtime.sub_agents
+    assert executor.default_timeout == 42.0
+
+
 class TestWorkflowEventType:
     """Tests for WorkflowEventType enum."""
 

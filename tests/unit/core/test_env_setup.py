@@ -240,7 +240,10 @@ class TestEnvironmentSetup:
                         mock_run.return_value = MagicMock(stdout="v18.0.0")
 
                         result = await setup.setup_environment(project_dir)
-                        assert result.language in (Language.JAVASCRIPT, Language.TYPESCRIPT)
+                        assert result.language in (
+                            Language.JAVASCRIPT,
+                            Language.TYPESCRIPT,
+                        )
 
     @pytest.mark.asyncio
     async def test_setup_go_project(self):
@@ -325,7 +328,7 @@ class TestValidateEnvironment:
     def test_validate_go(self):
         """Test validating Go environment."""
         with patch("shutil.which") as mock_which:
-            mock_which.side_effect = lambda cmd: "/usr/local/go/bin/go" if cmd == "go" else None
+            mock_which.side_effect = lambda cmd: ("/usr/local/go/bin/go" if cmd == "go" else None)
 
             result = validate_environment(Language.GO)
             assert result["go"] is True

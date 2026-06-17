@@ -63,7 +63,7 @@ class TestRecordToolUsage:
 
             # Check that the sequence tracker was updated
             assert len(selector._sequence_tracker._history) == 1
-            assert selector._sequence_tracker._history[0] == "read_file"
+            assert selector._sequence_tracker._history[0] == "read"
 
     def test_record_tool_usage_records_success(self):
         """Test that success/failure is recorded correctly."""

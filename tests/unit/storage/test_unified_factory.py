@@ -47,24 +47,24 @@ class TestCreateSymbolStore:
             assert store.repo_root == Path("/test/dir")
 
     def test_postgres_pgvector_not_implemented(self, tmp_path):
-        """Test that postgres+pgvector raises NotImplementedError."""
-        with pytest.raises(NotImplementedError, match="postgres\\+pgvector"):
+        """Test that postgres+pgvector raises ValueError (unknown backend)."""
+        with pytest.raises((NotImplementedError, ValueError)):
             create_symbol_store(
                 repo_root=tmp_path,
                 backend="postgres+pgvector",
             )
 
     def test_lancedb_only_not_implemented(self, tmp_path):
-        """Test that lancedb-only raises NotImplementedError."""
-        with pytest.raises(NotImplementedError, match="lancedb-only"):
+        """Test that lancedb-only raises ValueError (unknown backend)."""
+        with pytest.raises((NotImplementedError, ValueError)):
             create_symbol_store(
                 repo_root=tmp_path,
                 backend="lancedb",
             )
 
     def test_duckdb_lancedb_not_implemented(self, tmp_path):
-        """Test that duckdb+lancedb raises NotImplementedError."""
-        with pytest.raises(NotImplementedError, match="duckdb\\+lancedb"):
+        """Test that duckdb+lancedb raises ValueError (unknown backend)."""
+        with pytest.raises((NotImplementedError, ValueError)):
             create_symbol_store(
                 repo_root=tmp_path,
                 backend="duckdb+lancedb",

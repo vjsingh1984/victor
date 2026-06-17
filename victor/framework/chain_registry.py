@@ -70,9 +70,10 @@ from __future__ import annotations
 
 import logging
 import threading
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from functools import wraps
-from typing import Any, Callable, Dict, List, Optional, TypeVar
+from typing import Any, Callable, Dict, Generator, List, Optional, Set, TypeVar
 
 F = TypeVar("F", bound=Callable[..., Any])
 
@@ -180,6 +181,12 @@ class ChainRegistry:
         self._factories: Dict[str, Callable[[], Any]] = {}
         self._metadata: Dict[str, ChainMetadata] = {}
         self._lock = threading.RLock()
+        # Batch update support for efficient bulk registration
+        self._batch_depth: int = 0
+        self._batch_dirty: bool = False
+        # Inverted indexes for O(1) discovery
+        self._tag_index: Dict[str, Set[str]] = {}  # tag -> {keys}
+        self._vertical_index: Dict[str, Set[str]] = {}  # vertical -> {keys}
 
     @classmethod
     def get_instance(cls) -> "ChainRegistry":
@@ -204,6 +211,59 @@ class ChainRegistry:
         """
         with cls._class_lock:
             cls._instance = None
+
+    @contextmanager
+    def batch_update(self) -> Generator[None, None, None]:
+        """Batch multiple chain mutations with reduced lock overhead.
+
+        Use when registering many chains at once (e.g., during startup
+        or vertical activation) to avoid repeated lock acquisition.
+
+        Example:
+            with registry.batch_update():
+                registry.register("chain1", chain1, vertical="test")
+                registry.register("chain2", chain2, vertical="test")
+                registry.register("chain3", chain3, vertical="test")
+            # Single lock acquisition for all operations
+        """
+        with self._lock:
+            self._batch_depth += 1
+            try:
+                yield
+            finally:
+                self._batch_depth -= 1
+                if self._batch_depth == 0:
+                    self._batch_dirty = False
+
+    def _update_indexes(self, key: str, metadata: ChainMetadata) -> None:
+        """Update inverted indexes for a chain.
+
+        Args:
+            key: The chain key in the registry
+            metadata: The ChainMetadata to index
+        """
+        # Index by tags
+        for tag in metadata.tags:
+            if tag not in self._tag_index:
+                self._tag_index[tag] = set()
+            self._tag_index[tag].add(key)
+
+        # Index by vertical
+        if metadata.vertical:
+            if metadata.vertical not in self._vertical_index:
+                self._vertical_index[metadata.vertical] = set()
+            self._vertical_index[metadata.vertical].add(key)
+
+    def _remove_from_indexes(self, key: str) -> None:
+        """Remove a chain key from all inverted indexes."""
+        for index in (self._tag_index, self._vertical_index):
+            empty_entries = []
+            for index_key, keys in index.items():
+                keys.discard(key)
+                if not keys:
+                    empty_entries.append(index_key)
+            for index_key in empty_entries:
+                del index[index_key]
 
     def register(
         self,
@@ -233,13 +293,15 @@ class ChainRegistry:
         """
         key = f"{vertical}:{name}" if vertical else name
 
-        with self._lock:
+        # Use conditional lock: only acquire if not in batch mode
+        if self._batch_depth > 0:
+            self._batch_dirty = True
             if key in self._chains and not replace:
                 logger.warning(f"Chain '{key}' already registered, skipping")
                 return
-
+            self._remove_from_indexes(key)
             self._chains[key] = chain
-            self._metadata[key] = ChainMetadata(
+            metadata = ChainMetadata(
                 name=name,
                 vertical=vertical,
                 description=description,
@@ -248,7 +310,28 @@ class ChainRegistry:
                 tags=tags or [],
                 is_factory=False,
             )
-            logger.debug(f"Registered chain: {key}")
+            self._metadata[key] = metadata
+            self._update_indexes(key, metadata)
+        else:
+            with self._lock:
+                if key in self._chains and not replace:
+                    logger.warning(f"Chain '{key}' already registered, skipping")
+                    return
+
+                self._remove_from_indexes(key)
+                self._chains[key] = chain
+                metadata = ChainMetadata(
+                    name=name,
+                    vertical=vertical,
+                    description=description,
+                    input_type=input_type,
+                    output_type=output_type,
+                    tags=tags or [],
+                    is_factory=False,
+                )
+                self._metadata[key] = metadata
+                self._update_indexes(key, metadata)
+        logger.debug(f"Registered chain: {key}")
 
     def register_factory(
         self,
@@ -300,8 +383,9 @@ class ChainRegistry:
                 logger.warning(f"Chain/factory '{key}' already registered, skipping")
                 return
 
+            self._remove_from_indexes(key)
             self._factories[key] = factory
-            self._metadata[key] = ChainMetadata(
+            metadata = ChainMetadata(
                 name=name,
                 vertical=vertical,
                 description=description,
@@ -311,6 +395,8 @@ class ChainRegistry:
                 is_factory=True,
                 version=version,
             )
+            self._metadata[key] = metadata
+            self._update_indexes(key, metadata)
             logger.debug(f"Registered chain factory: {key}")
 
     def create(self, name: str, vertical: Optional[str] = None) -> Optional[Any]:
@@ -395,6 +481,7 @@ class ChainRegistry:
                 found = True
             if key in self._metadata:
                 del self._metadata[key]
+            self._remove_from_indexes(key)
 
             if found:
                 logger.debug(f"Unregistered chain: {key}")
@@ -460,8 +547,8 @@ class ChainRegistry:
         """
         with self._lock:
             if vertical:
-                prefix = f"{vertical}:"
-                return [m for k, m in self._metadata.items() if k.startswith(prefix)]
+                keys = self._vertical_index.get(vertical, set())
+                return [self._metadata[k] for k in keys if k in self._metadata]
             return list(self._metadata.values())
 
     def find_by_vertical(self, vertical: str) -> Dict[str, Any]:
@@ -473,9 +560,9 @@ class ChainRegistry:
         Returns:
             Dict mapping full names to chain objects
         """
-        prefix = f"{vertical}:"
         with self._lock:
-            return {k: v for k, v in self._chains.items() if k.startswith(prefix)}
+            keys = self._vertical_index.get(vertical, set())
+            return {k: self._chains[k] for k in keys if k in self._chains}
 
     def find_by_tag(self, tag: str) -> Dict[str, Any]:
         """Find chains with a specific tag.
@@ -487,7 +574,8 @@ class ChainRegistry:
             Dict mapping names to chain objects
         """
         with self._lock:
-            return {k: self._chains[k] for k, m in self._metadata.items() if tag in m.tags}
+            keys = self._tag_index.get(tag, set())
+            return {k: self._chains[k] for k in keys if k in self._chains}
 
     def find_by_tags(self, tags: List[str], match_all: bool = False) -> Dict[str, Any]:
         """Find chains matching multiple tags.
@@ -499,18 +587,28 @@ class ChainRegistry:
         Returns:
             Dict mapping names to chain objects
         """
-        tag_set = set(tags)
         with self._lock:
-            results = {}
-            for key, metadata in self._metadata.items():
-                entry_tags = set(metadata.tags)
-                if match_all:
-                    if tag_set.issubset(entry_tags):
-                        results[key] = self._chains[key]
-                else:
-                    if tag_set & entry_tags:
-                        results[key] = self._chains[key]
-            return results
+            if not tags:
+                return self._chains.copy()
+
+            if match_all:
+                # Find keys that have all tags (intersection)
+                keys = None
+                for tag in tags:
+                    tag_keys = self._tag_index.get(tag, set())
+                    if keys is None:
+                        keys = tag_keys.copy()
+                    else:
+                        keys &= tag_keys
+                        if not keys:  # Early exit if no match
+                            return {}
+                return {k: self._chains[k] for k in (keys or set()) if k in self._chains}
+            else:
+                # Find keys that have any tag (union)
+                keys = set()
+                for tag in tags:
+                    keys.update(self._tag_index.get(tag, set()))
+                return {k: self._chains[k] for k in keys if k in self._chains}
 
     def clear(self) -> None:
         """Clear all registered chains and factories (for testing)."""
@@ -518,6 +616,8 @@ class ChainRegistry:
             self._chains.clear()
             self._factories.clear()
             self._metadata.clear()
+            self._tag_index.clear()
+            self._vertical_index.clear()
             logger.debug("Cleared chain registry")
 
     def to_dict(self) -> Dict[str, Any]:

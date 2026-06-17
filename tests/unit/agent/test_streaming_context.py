@@ -107,10 +107,18 @@ class TestStreamingChatContext:
         """should_force_completion returns True when blocked attempts exceed threshold."""
         ctx = StreamingChatContext(
             user_message="test",
-            consecutive_blocked_attempts=3,
-            max_blocked_before_force=3,
+            consecutive_blocked_attempts=4,
+            max_blocked_before_force=4,
         )
         assert ctx.should_force_completion() is True
+
+    def test_should_not_force_completion_after_three_blocked_attempts_by_default(self):
+        """Default blocked threshold should still allow recovery after three attempts."""
+        ctx = StreamingChatContext(
+            user_message="test",
+            consecutive_blocked_attempts=3,
+        )
+        assert ctx.should_force_completion() is False
 
     def test_should_force_completion_false(self):
         """should_force_completion returns False when no conditions met."""
@@ -119,19 +127,28 @@ class TestStreamingChatContext:
 
     def test_record_blocked_attempt_below_threshold(self):
         """record_blocked_attempt returns False when below threshold."""
-        ctx = StreamingChatContext(user_message="test", max_blocked_before_force=3)
+        ctx = StreamingChatContext(user_message="test")
         assert ctx.record_blocked_attempt() is False
         assert ctx.consecutive_blocked_attempts == 1
+
+    def test_record_blocked_attempt_three_times_still_below_default_threshold(self):
+        """Default blocked threshold should trigger on the fourth attempt, not the third."""
+        ctx = StreamingChatContext(
+            user_message="test",
+            consecutive_blocked_attempts=2,
+        )
+        assert ctx.record_blocked_attempt() is False
+        assert ctx.consecutive_blocked_attempts == 3
 
     def test_record_blocked_attempt_at_threshold(self):
         """record_blocked_attempt returns True when reaching threshold."""
         ctx = StreamingChatContext(
             user_message="test",
-            consecutive_blocked_attempts=2,
-            max_blocked_before_force=3,
+            consecutive_blocked_attempts=3,
+            max_blocked_before_force=4,
         )
         assert ctx.record_blocked_attempt() is True
-        assert ctx.consecutive_blocked_attempts == 3
+        assert ctx.consecutive_blocked_attempts == 4
 
     def test_reset_blocked_attempts(self):
         """reset_blocked_attempts clears the counter."""
@@ -167,6 +184,60 @@ class TestStreamingChatContext:
         assert "cache_read_input_tokens" in ctx.cumulative_usage
         assert ctx.cumulative_usage["prompt_tokens"] == 0
 
+    def test_topology_fields_default_to_empty_or_none(self):
+        """Topology-related streaming state starts with neutral defaults."""
+        ctx = StreamingChatContext(user_message="test")
+
+        assert ctx.runtime_context_overrides == {}
+        assert ctx.provider_kwargs == {}
+        assert ctx.topology_input is None
+        assert ctx.topology_decision is None
+        assert ctx.topology_plan is None
+        assert ctx.structured_routing_policy is None
+        assert ctx.topology_events == []
+        assert ctx.degradation_events == []
+        assert ctx.recovery_events == []
+        assert ctx.runtime_override_snapshot is None
+
+    def test_continuation_ledger_renders_intent_plan_and_resume_context(self):
+        """Continuation ledger should preserve task, plan, and resume context."""
+        ctx = StreamingChatContext(user_message="inspect runtime")
+        ctx.set_task_intent("Investigate the runtime convergence path")
+        ctx.extend_plan_steps(["Read orchestrator", "Check compaction behavior"])
+        ctx.resume_summary = "2 tool call(s) used; previous turn ended before completion"
+        ctx.resume_recent_tools = ["read", "edit"]
+        ctx.resume_recent_resources = ["victor/agent/orchestrator.py"]
+        ctx.record_intent_event("tool_intent", "planned read (path=victor/agent/orchestrator.py)")
+
+        ledger = ctx.build_continuation_ledger()
+
+        assert "Intent:" in ledger
+        assert "Plan:" in ledger
+        assert "Resume:" in ledger
+        assert "Recent tools:" in ledger
+        assert "Recent files:" in ledger
+        assert "Recent actions:" in ledger
+
+    def test_record_compaction_event_updates_context_state(self):
+        """Compaction event helper should update recovery state and ledger."""
+        ctx = StreamingChatContext(user_message="inspect runtime", total_iterations=3)
+
+        ctx.record_compaction_event(
+            summary="Removed stale tool chatter",
+            messages_removed=12,
+            strategy="hybrid",
+            reason="pre_tool_output",
+            policy_reason="tool_output_exceeds_remaining_budget",
+        )
+
+        assert ctx.compaction_occurred is True
+        assert ctx.last_compaction_turn == 3
+        assert ctx.compaction_message_removed_count == 12
+        assert ctx.last_compaction_strategy == "hybrid"
+        assert ctx.last_compaction_reason == "pre_tool_output"
+        assert ctx.last_compaction_policy_reason == "tool_output_exceeds_remaining_budget"
+        assert ctx.intent_log[-1]["kind"] == "compaction"
+
 
 class TestCreateStreamContext:
     """Tests for create_stream_context factory function."""
@@ -196,6 +267,11 @@ class TestCreateStreamContext:
         """Factory handles None tool budget."""
         ctx = create_stream_context("test", tool_budget=None)
         assert ctx.complexity_tool_budget is None
+
+    def test_blocked_threshold_override(self):
+        """Factory accepts blocked-attempt threshold override."""
+        ctx = create_stream_context("test", max_blocked_before_force=7)
+        assert ctx.max_blocked_before_force == 7
 
 
 class TestStreamingChatContextTaskTypes:

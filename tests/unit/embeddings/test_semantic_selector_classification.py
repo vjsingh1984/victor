@@ -243,7 +243,10 @@ class TestClassificationAwareSelection:
     @pytest.fixture
     def mock_classification_result(self):
         """Create mock classification result."""
-        from victor.agent.unified_classifier import ClassifierTaskType, ClassificationResult
+        from victor.agent.unified_classifier import (
+            ClassifierTaskType,
+            ClassificationResult,
+        )
 
         return ClassificationResult(
             task_type=ClassifierTaskType.ANALYSIS,
@@ -304,7 +307,10 @@ class TestClassificationAwareSelection:
     @pytest.mark.asyncio
     async def test_high_confidence_stricter_selection(self, selector, mock_tools):
         """Test that high confidence leads to stricter selection."""
-        from victor.agent.unified_classifier import ClassifierTaskType, ClassificationResult
+        from victor.agent.unified_classifier import (
+            ClassifierTaskType,
+            ClassificationResult,
+        )
 
         result = ClassificationResult(
             task_type=ClassifierTaskType.ANALYSIS,
@@ -329,7 +335,10 @@ class TestClassificationAwareSelection:
     @pytest.mark.asyncio
     async def test_low_confidence_broader_selection(self, selector, mock_tools):
         """Test that low confidence leads to broader selection."""
-        from victor.agent.unified_classifier import ClassifierTaskType, ClassificationResult
+        from victor.agent.unified_classifier import (
+            ClassifierTaskType,
+            ClassificationResult,
+        )
 
         result = ClassificationResult(
             task_type=ClassifierTaskType.DEFAULT,

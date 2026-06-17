@@ -37,7 +37,7 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set
 
 if TYPE_CHECKING:
     # Team member dependencies
-    from victor.agent.subagents.base import SubAgentRole
+    from victor.core.shared_types import SubAgentRole
     from victor.agent.protocols import UnifiedMemoryCoordinatorProtocol
     from victor.agent.presentation import PresentationProtocol
 
@@ -55,6 +55,7 @@ class TeamFormation(str, Enum):
         HIERARCHICAL: Manager delegates to workers, synthesizes results
         PIPELINE: Output of one member feeds into the next
         CONSENSUS: All members must agree (multiple rounds if needed)
+        REFLECTION: Generator → critic → refine loop with early-exit on satisfaction
     """
 
     SEQUENTIAL = "sequential"
@@ -62,6 +63,7 @@ class TeamFormation(str, Enum):
     HIERARCHICAL = "hierarchical"
     PIPELINE = "pipeline"
     CONSENSUS = "consensus"
+    REFLECTION = "reflection"
 
 
 class MessageType(str, Enum):
@@ -389,6 +391,17 @@ class TeamMember:
     cache: bool = True
     verbose: bool = False
     max_iterations: Optional[int] = None
+    # Heterogeneous execution: per-member provider/model/temperature override
+    # (None = inherit the team orchestrator's settings).
+    provider: Optional[str] = None
+    model: Optional[str] = None
+    temperature: Optional[float] = None
+    # Per-member reasoning effort ("low"/"medium"/"high") for reasoning-capable
+    # models. None inherits/omits; forwarded only where the provider supports it.
+    reasoning_effort: Optional[str] = None
+    # Formation role binding for context-driven formations (e.g. "generator"/
+    # "critic" for REFLECTION). None = bound positionally.
+    formation_role: Optional[str] = None
     # Memory coordinator for persistent memory across tasks
     memory_coordinator: Optional["UnifiedMemoryCoordinatorProtocol"] = field(
         default=None, repr=False, compare=False
@@ -653,7 +666,7 @@ class TeamMember:
             "personality": self.personality,
             "max_delegation_depth": self.max_delegation_depth,
             "memory": self.memory,
-            "memory_config": self.memory_config.to_dict() if self.memory_config else None,
+            "memory_config": (self.memory_config.to_dict() if self.memory_config else None),
             "cache": self.cache,
             "verbose": self.verbose,
             "max_iterations": self.max_iterations,
@@ -758,7 +771,7 @@ class TeamConfig:
                     "personality": m.personality,
                     "max_delegation_depth": m.max_delegation_depth,
                     "memory": m.memory,
-                    "memory_config": m.memory_config.to_dict() if m.memory_config else None,
+                    "memory_config": (m.memory_config.to_dict() if m.memory_config else None),
                     "cache": m.cache,
                     "verbose": m.verbose,
                     "max_iterations": m.max_iterations,

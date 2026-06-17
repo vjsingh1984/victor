@@ -23,10 +23,13 @@ Executors:
 - TransformNodeExecutor: Handles transform nodes (state transformations)
 - ParallelNodeExecutor: Handles parallel nodes (concurrent execution)
 - ConditionNodeExecutor: Handles condition nodes (branching logic)
-- TeamNodeExecutor: Handles team nodes (ad-hoc multi-agent teams)
+- TeamStepExecutor: Handles declarative team steps (ad-hoc multi-agent teams)
 - HITLNodeExecutor: Handles HITL nodes (resume-time metadata + result recording)
 - Registry helpers: Support plugin/application registration of custom node types
 """
+
+import warnings
+from typing import Any
 
 from victor.workflows.executors.factory import NodeExecutorFactory
 from victor.workflows.executors.registry import (
@@ -36,9 +39,39 @@ from victor.workflows.executors.registry import (
     get_workflow_node_executor_registry,
     register_workflow_node_executor,
 )
+from victor.workflows.executors.team import TeamStepExecutor
+
+_DEPRECATED_ALIAS_MAP = {
+    "TeamNodeExecutor": TeamStepExecutor,
+}
+_TEAM_NODE_REMOVAL_VERSION = "v0.9.0"
+_TEAM_NODE_REMOVAL_DATE = "2027-03-31"
+
+
+def __getattr__(name: str) -> Any:
+    if name in _DEPRECATED_ALIAS_MAP:
+        warnings.warn(
+            f"{name} is deprecated; use "
+            f"{_DEPRECATED_ALIAS_MAP[name].__name__} instead. "
+            f"This compatibility alias remains supported through "
+            f"{_TEAM_NODE_REMOVAL_VERSION} ({_TEAM_NODE_REMOVAL_DATE}) and "
+            "will be removed after that milestone. "
+            "See docs/architecture/migration.md for migration guidance.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return _DEPRECATED_ALIAS_MAP[name]
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def __dir__() -> list[str]:
+    return sorted(set(globals()) | set(_DEPRECATED_ALIAS_MAP))
+
 
 __all__ = [
     "NodeExecutorFactory",
+    "TeamStepExecutor",
+    "TeamNodeExecutor",
     "WorkflowNodeExecutorRegistration",
     "WorkflowNodeExecutorRegistry",
     "clear_registered_workflow_node_executors",

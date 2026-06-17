@@ -512,7 +512,12 @@ class TestRefinementIntegration:
                     "role": "developer",  # Invalid
                     "tool_budget": 1000,  # Out of range
                 },
-                {"id": "orphan", "type": "agent", "role": "executor", "goal": "Orphan task"},
+                {
+                    "id": "orphan",
+                    "type": "agent",
+                    "role": "executor",
+                    "goal": "Orphan task",
+                },
             ],
             "edges": [{"source": "agent1", "target": "__end__"}],
             "entry_point": "agent1",

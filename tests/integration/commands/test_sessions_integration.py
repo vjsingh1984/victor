@@ -22,7 +22,8 @@ from pathlib import Path
 import tempfile
 import shutil
 
-from victor.agent.sqlite_session_persistence import SQLiteSessionPersistence
+from victor.agent.conversation.store import ConversationStore
+from victor.agent.conversation.types import ConversationMessage, MessageRole
 from victor.config.settings import get_project_paths
 
 
@@ -35,7 +36,7 @@ def strip_ansi(text: str) -> str:
 @pytest.fixture
 def project_db_path():
     """Get project database path."""
-    return get_project_paths().project_root / ".victor" / "project.db"
+    return get_project_paths().project_db
 
 
 @pytest.fixture
@@ -73,6 +74,15 @@ class TestSessionsCLIIntegration:
     """Integration tests for sessions CLI command."""
 
     @pytest.mark.integration
+    def test_project_db_path_uses_isolated_integration_victor_dir(
+        self,
+        project_db_path,
+        isolated_integration_project_victor_dir,
+    ):
+        """Integration tests should not touch the repo-local project database."""
+        assert project_db_path == isolated_integration_project_victor_dir / "project.db"
+
+    @pytest.mark.integration
     def test_sessions_list_command(self, backup_db):
         """Test victor sessions list command with real database."""
         from typer.testing import CliRunner
@@ -80,24 +90,27 @@ class TestSessionsCLIIntegration:
 
         runner = CliRunner()
 
-        # Create sample sessions
-        persistence = SQLiteSessionPersistence()
-        persistence.save_session(
-            conversation={"messages": [{"role": "user", "content": "Test"}]},
+        # Create sample session
+        store = ConversationStore()
+        session = store.create_session(
             model="claude-sonnet-4-20250514",
             provider="anthropic",
             profile="default",
-            title="Integration Test Session",
         )
+        store.add_message(
+            session.session_id,
+            MessageRole.USER,
+            "Test",
+        )
+        session_id = session.session_id
 
         # Test list command
         result = runner.invoke(sessions_app, ["list"])
         assert result.exit_code == 0
-        # Rich table rendering may wrap and ellipsize long titles.
         rendered = strip_ansi(result.stdout)
-        assert "Integr" in rendered
-        assert "Test" in rendered
-        assert "Session" in rendered
+        assert session_id in rendered
+        assert "Saved Sessions (last 1)" in rendered
+        assert "Total: 1 session(s)" in rendered
 
     @pytest.mark.integration
     def test_sessions_show_command(self, backup_db):
@@ -108,34 +121,42 @@ class TestSessionsCLIIntegration:
         runner = CliRunner()
 
         # Create sample session
-        persistence = SQLiteSessionPersistence()
-        session_id = persistence.save_session(
-            conversation={"messages": [{"role": "user", "content": "Test"}]},
+        store = ConversationStore()
+        session = store.create_session(
             model="claude-sonnet-4-20250514",
             provider="anthropic",
             profile="default",
-            title="Show Test",
         )
+        store.add_message(
+            session.session_id,
+            MessageRole.USER,
+            "Test",
+        )
+        session_id = session.session_id
 
         # Test show command
         result = runner.invoke(sessions_app, ["show", session_id])
         assert result.exit_code == 0
-        assert "Show Test" in result.stdout
+        # Note: ConversationStore doesn't have title, so we check for session_id instead
         assert session_id in result.stdout
 
     @pytest.mark.integration
     def test_parallel_sessions_workflow(self, backup_db):
         """Test parallel session creation and retrieval."""
-        persistence = SQLiteSessionPersistence()
+        store = ConversationStore()
 
         # Create session 1
-        session_id_1 = persistence.save_session(
-            conversation={"messages": [{"role": "user", "content": "DevOps task"}]},
+        session_1 = store.create_session(
             model="ollama:qwen2.5-coder:7b",
             provider="ollama",
             profile="default",
-            title="CI/CD Pipeline",
         )
+        store.add_message(
+            session_1.session_id,
+            MessageRole.USER,
+            "DevOps task",
+        )
+        session_id_1 = session_1.session_id
 
         # Small delay to ensure different timestamp for unique ID
         import time
@@ -143,13 +164,17 @@ class TestSessionsCLIIntegration:
         time.sleep(0.01)
 
         # Create session 2
-        session_id_2 = persistence.save_session(
-            conversation={"messages": [{"role": "user", "content": "Testing task"}]},
+        session_2 = store.create_session(
             model="gpt-4",
             provider="openai",
             profile="default",
-            title="Unit Tests",
         )
+        store.add_message(
+            session_2.session_id,
+            MessageRole.USER,
+            "Testing task",
+        )
+        session_id_2 = session_2.session_id
 
         # Verify both sessions exist and have different IDs
         assert (
@@ -157,13 +182,13 @@ class TestSessionsCLIIntegration:
         ), f"Session IDs should be unique but got: {session_id_1} == {session_id_2}"
 
         # Load both sessions
-        session_1 = persistence.load_session(session_id_1)
-        session_2 = persistence.load_session(session_id_2)
+        loaded_session_1 = store.get_session(session_id_1)
+        loaded_session_2 = store.get_session(session_id_2)
 
-        assert session_1 is not None
-        assert session_2 is not None
-        assert session_1["metadata"]["title"] == "CI/CD Pipeline"
-        assert session_2["metadata"]["title"] == "Unit Tests"
+        assert loaded_session_1 is not None
+        assert loaded_session_2 is not None
+        assert loaded_session_1.model == "ollama:qwen2.5-coder:7b"
+        assert loaded_session_2.model == "gpt-4"
 
     @pytest.mark.integration
     def test_session_id_parsing(self):
@@ -211,13 +236,16 @@ class TestChatSessionFlagsIntegration:
         runner = CliRunner()
 
         # Create multiple sample sessions
-        persistence = SQLiteSessionPersistence()
-        persistence.save_session(
-            conversation={"messages": [{"role": "user", "content": "Test 1"}]},
+        store = ConversationStore()
+        session_1 = store.create_session(
             model="claude-sonnet-4-20250514",
             provider="anthropic",
             profile="default",
-            title="Test Session 1",
+        )
+        store.add_message(
+            session_1.session_id,
+            MessageRole.USER,
+            "Test 1",
         )
 
         # Small delay to ensure different timestamp
@@ -225,26 +253,32 @@ class TestChatSessionFlagsIntegration:
 
         time.sleep(0.01)
 
-        persistence.save_session(
-            conversation={"messages": [{"role": "user", "content": "Test 2"}]},
+        session_2 = store.create_session(
             model="gpt-4",
             provider="openai",
             profile="default",
-            title="Test Session 2",
+        )
+        store.add_message(
+            session_2.session_id,
+            MessageRole.USER,
+            "Test 2",
         )
 
         time.sleep(0.01)
 
-        persistence.save_session(
-            conversation={"messages": [{"role": "user", "content": "Test 3"}]},
+        session_3 = store.create_session(
             model="claude-sonnet-4-20250514",
             provider="anthropic",
             profile="default",
-            title="Test Session 3",
+        )
+        store.add_message(
+            session_3.session_id,
+            MessageRole.USER,
+            "Test 3",
         )
 
         # Verify sessions exist
-        sessions_before = persistence.list_sessions(limit=100)
+        sessions_before = store.list_sessions(limit=100)
         assert len(sessions_before) >= 3
 
         # Clear all sessions with --yes flag
@@ -255,7 +289,7 @@ class TestChatSessionFlagsIntegration:
         assert "session(s) from database" in clean_output
 
         # Verify all sessions are deleted
-        sessions_after = persistence.list_sessions(limit=100)
+        sessions_after = store.list_sessions(limit=100)
         assert len(sessions_after) == 0
 
     @pytest.mark.integration
@@ -267,46 +301,85 @@ class TestChatSessionFlagsIntegration:
         runner = CliRunner()
 
         # Create sessions with specific prefixes
-        persistence = SQLiteSessionPersistence()
+        store = ConversationStore()
 
-        # Create a session with a predictable prefix (session IDs are auto-generated)
-        # We'll create sessions and then match by their actual IDs
-        session_id_1 = persistence.save_session(
-            conversation={"messages": [{"role": "user", "content": "DevOps task"}]},
+        # Create 3 sessions to increase chance of finding a unique prefix
+        session_1 = store.create_session(
             model="ollama:qwen2.5-coder:7b",
             provider="ollama",
             profile="default",
-            title="CI/CD Pipeline",
         )
+        store.add_message(
+            session_1.session_id,
+            MessageRole.USER,
+            "DevOps task",
+        )
+        session_id_1 = session_1.session_id
 
         # Small delay to ensure different timestamp
         import time
 
-        time.sleep(0.01)
+        time.sleep(0.05)  # Increased delay
 
-        session_id_2 = persistence.save_session(
-            conversation={"messages": [{"role": "user", "content": "Testing task"}]},
+        session_2 = store.create_session(
             model="gpt-4",
             provider="openai",
             profile="default",
-            title="Unit Tests",
         )
+        store.add_message(
+            session_2.session_id,
+            MessageRole.USER,
+            "Testing task",
+        )
+        session_id_2 = session_2.session_id
 
-        # Verify both sessions exist
-        assert persistence.load_session(session_id_1) is not None
-        assert persistence.load_session(session_id_2) is not None
+        time.sleep(0.05)
+
+        session_3 = store.create_session(
+            model="claude-sonnet-4-20250514",
+            provider="anthropic",
+            profile="default",
+        )
+        store.add_message(
+            session_3.session_id,
+            MessageRole.USER,
+            "Third task",
+        )
+        session_id_3 = session_3.session_id
+
+        # Verify all sessions exist
+        assert store.get_session(session_id_1) is not None
+        assert store.get_session(session_id_2) is not None
+        assert store.get_session(session_id_3) is not None
 
         # Find a unique prefix that matches only session_id_1
-        # Start with a longer prefix and make sure it doesn't match session_id_2
-        for prefix_len in range(12, 6, -1):  # Try 12, 11, 10, 9, 8, 7
-            prefix = session_id_1[:prefix_len]
-            if not session_id_2.startswith(prefix):
+        # Check against both session_id_2 and session_id_3
+        prefix = None
+        for prefix_len in range(15, 6, -1):  # Try longer prefixes first
+            candidate_prefix = session_id_1[:prefix_len]
+            if not session_id_2.startswith(candidate_prefix) and not session_id_3.startswith(
+                candidate_prefix
+            ):
+                prefix = candidate_prefix
                 break  # Found a unique prefix
-        else:
-            # If no unique prefix found, skip this test
-            pytest.skip("Could not find unique prefix for test")
 
-        assert len(prefix) >= 6, "Prefix should be at least 6 characters"
+        if not prefix or len(prefix) < 6:
+            # If no unique prefix found, skip this test
+            pytest.skip(
+                f"Could not find unique prefix for test. session_id_1={session_id_1[:20]}, session_id_2={session_id_2[:20]}, session_id_3={session_id_3[:20]}"
+            )
+
+        # Verify that the prefix actually matches session_id_1
+        assert session_id_1.startswith(
+            prefix
+        ), f"Prefix {prefix} should match session_id_1 {session_id_1}"
+        # Verify that the prefix doesn't match other sessions
+        assert not session_id_2.startswith(
+            prefix
+        ), f"Prefix {prefix} should NOT match session_id_2 {session_id_2}"
+        assert not session_id_3.startswith(
+            prefix
+        ), f"Prefix {prefix} should NOT match session_id_3 {session_id_3}"
 
         # Clear sessions matching prefix
         result = runner.invoke(sessions_app, ["clear", prefix, "--yes"])
@@ -314,11 +387,15 @@ class TestChatSessionFlagsIntegration:
         assert "Cleared" in result.stdout
         assert f"matching prefix '{prefix}'" in result.stdout
 
-        # Verify session with matching prefix is deleted
-        assert persistence.load_session(session_id_1) is None
+        # Create a new store instance to avoid stale cache issues
+        store_after_clear = ConversationStore()
 
-        # Verify other session still exists
-        assert persistence.load_session(session_id_2) is not None
+        # Verify session with matching prefix is deleted
+        assert store_after_clear.get_session(session_id_1) is None
+
+        # Verify other sessions still exist
+        assert store_after_clear.get_session(session_id_2) is not None
+        assert store_after_clear.get_session(session_id_3) is not None
 
     @pytest.mark.integration
     def test_sessions_clear_prefix_too_short(self, backup_db):
@@ -357,13 +434,13 @@ class TestChatSessionFlagsIntegration:
         runner = CliRunner()
 
         # Ensure database is empty by clearing all sessions
-        persistence = SQLiteSessionPersistence()
-        all_sessions = persistence.list_sessions(limit=10000)
+        store = ConversationStore()
+        all_sessions = store.list_sessions(limit=10000)
         for session in all_sessions:
-            persistence.delete_session(session["session_id"])
+            store.delete_session(session.session_id)
 
         # Verify database is now empty
-        sessions = persistence.list_sessions(limit=100)
+        sessions = store.list_sessions(limit=100)
         assert len(sessions) == 0
 
         # Try to clear empty database
@@ -380,30 +457,32 @@ class TestChatSessionFlagsIntegration:
         runner = CliRunner()
 
         # Create more than 10 sessions to test --all flag
-        persistence = SQLiteSessionPersistence()
+        store = ConversationStore()
         import time
 
         for i in range(15):
-            persistence.save_session(
-                conversation={"messages": [{"role": "user", "content": f"Test {i}"}]},
+            session = store.create_session(
                 model="claude-sonnet-4-20250514",
                 provider="anthropic",
                 profile="default",
-                title=f"Session {i}",
+            )
+            store.add_message(
+                session.session_id,
+                MessageRole.USER,
+                f"Test {i}",
             )
             time.sleep(0.01)  # Ensure unique timestamps
 
         # List with default limit (should show 10)
         result_default = runner.invoke(sessions_app, ["list"])
         assert result_default.exit_code == 0
-        # Count occurrences of session IDs in output
-        session_count = result_default.stdout.count("Session ")
-        # Should show around 10 sessions (default limit)
-        assert session_count <= 15  # At most 15
+        rendered_default = strip_ansi(result_default.stdout)
+        assert "Saved Sessions (last 10)" in rendered_default
+        assert "Total: 10 session(s)" in rendered_default
 
         # List with --all flag (should show all 15)
         result_all = runner.invoke(sessions_app, ["list", "--all"])
         assert result_all.exit_code == 0
-        # Check that it shows more sessions than default
-        all_session_count = result_all.stdout.count("Session ")
-        assert all_session_count >= 15  # All sessions should be shown
+        rendered_all = strip_ansi(result_all.stdout)
+        assert "Saved Sessions (last 15)" in rendered_all
+        assert "Total: 15 session(s)" in rendered_all

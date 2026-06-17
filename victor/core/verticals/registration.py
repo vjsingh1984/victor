@@ -14,7 +14,7 @@
 
 """Compatibility wrapper around the SDK vertical registration contract.
 
-The canonical definition-layer decorator now lives in ``victor_sdk``.
+The canonical definition-layer decorator now lives in ``victor_contracts``.
 This module remains for in-repo and incremental migration compatibility while
 preserving the extra runtime side effects core expects:
 
@@ -28,14 +28,14 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Callable, Optional, Type
 
-from victor_sdk.verticals.registration import (
+from victor_contracts.verticals.registration import (
     ExtensionDependency,
     get_vertical_manifest as sdk_get_vertical_manifest,
     register_vertical as sdk_register_vertical,
 )
 
 if TYPE_CHECKING:
-    from victor_sdk.verticals.manifest import ExtensionManifest
+    from victor_contracts.verticals.manifest import ExtensionManifest
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +43,7 @@ logger = logging.getLogger(__name__)
 def register_vertical(*args, **kwargs) -> Callable[[Type], Type]:
     """Decorate a vertical using the SDK contract and add core runtime registration.
 
-    This is a compatibility wrapper over ``victor_sdk.register_vertical``.
+    This is a compatibility wrapper over ``victor_contracts.register_vertical``.
     """
 
     sdk_decorator = sdk_register_vertical(*args, **kwargs)
@@ -57,7 +57,9 @@ def register_vertical(*args, **kwargs) -> Callable[[Type], Type]:
 
             VerticalRegistry.register(decorated)
             logger.debug(
-                "Registered vertical '%s' (%s)", getattr(decorated, "name", None), decorated
+                "Registered vertical '%s' (%s)",
+                getattr(decorated, "name", None),
+                decorated,
             )
         except ImportError:
             logger.debug(
@@ -67,7 +69,9 @@ def register_vertical(*args, **kwargs) -> Callable[[Type], Type]:
 
         if manifest is not None:
             try:
-                from victor.core.verticals.config_registry import VerticalBehaviorConfigRegistry
+                from victor.core.verticals.config_registry import (
+                    VerticalBehaviorConfigRegistry,
+                )
 
                 behavior_config = VerticalBehaviorConfigRegistry.from_manifest(manifest)
                 VerticalBehaviorConfigRegistry.register(manifest.name, behavior_config)

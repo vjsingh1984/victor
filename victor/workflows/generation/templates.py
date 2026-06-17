@@ -253,7 +253,9 @@ class TemplateLibrary:
         return schema
 
     def list_templates(
-        self, vertical: Optional[str] = None, template_type: Optional[TemplateType] = None
+        self,
+        vertical: Optional[str] = None,
+        template_type: Optional[TemplateType] = None,
     ) -> List[WorkflowTemplate]:
         """List available templates.
 

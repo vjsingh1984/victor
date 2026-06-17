@@ -36,14 +36,34 @@ Usage:
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from abc import abstractmethod
-from typing import Dict, Protocol, runtime_checkable
+from typing import Any, Dict, List, Protocol, runtime_checkable
 
 from victor.core.vertical_types import TaskTypeHint
 
 # =============================================================================
 # Prompt Contributor Protocol
 # =============================================================================
+
+
+@dataclass(frozen=True)
+class PromptSectionContribution:
+    """Named system-prompt section contributed by a vertical.
+
+    This is the canonical contributor-owned metadata shape for prompt sections
+    that should participate in section registries and, optionally, prompt
+    optimization.
+    """
+
+    name: str
+    text: str
+    aliases: set[str] = field(default_factory=set)
+    category: str = "context"
+    evolvable: bool = False
+    required: bool = False
+    priority: int = 50
+    default_strategies: tuple[str, ...] = ()
 
 
 @runtime_checkable
@@ -105,7 +125,46 @@ class PromptContributorProtocol(Protocol):
         return 50
 
 
+def collect_prompt_section_contributions(
+    contributor: Any,
+) -> List[PromptSectionContribution]:
+    """Normalize contributor-owned prompt sections into a named metadata shape."""
+    named_sections = getattr(contributor, "get_prompt_section_contributions", None)
+    if callable(named_sections):
+        try:
+            contributions = named_sections()
+        except Exception:
+            contributions = []
+        normalized = [c for c in (contributions or []) if getattr(c, "text", "").strip()]
+        if normalized:
+            return normalized
+
+    section_getter = getattr(contributor, "get_system_prompt_section", None)
+    if not callable(section_getter):
+        return []
+
+    text = str(section_getter() or "").strip()
+    if not text:
+        return []
+
+    contributor_name = type(contributor).__name__.strip("_") or type(contributor).__name__
+    canonical_name = f"VERTICAL_{contributor_name.upper()}"
+    return [
+        PromptSectionContribution(
+            name=canonical_name,
+            text=text,
+            aliases={f"vertical_{contributor_name.lower()}"},
+            category="context",
+            evolvable=False,
+            required=False,
+            priority=getattr(contributor, "get_priority", lambda: 50)(),
+        )
+    ]
+
+
 __all__ = [
+    "PromptSectionContribution",
+    "collect_prompt_section_contributions",
     "PromptContributorProtocol",
     "TaskTypeHint",
 ]

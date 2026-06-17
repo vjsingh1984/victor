@@ -26,6 +26,8 @@ export interface ServerConfig {
     pythonPath?: string;
     victorPath?: string;
     fallbackPorts?: number[];
+    profile?: string;
+    mode?: string;
 }
 
 export enum ServerStatus {
@@ -303,7 +305,9 @@ export class ServerManager {
             'serve',
             '--host', this.config.host,
             '--port', availablePort.toString(),
-            '--log-level', 'INFO'
+            '--log-level', 'INFO',
+            '--profile', this.config.profile || 'default',
+            '--mode', this.config.mode || 'build'
         ];
 
         try {
@@ -704,7 +708,9 @@ export function createServerManager(): ServerManager {
         serverUrl: config.get('serverUrl') || undefined,
         pythonPath,
         victorPath: config.get('victorPath'),
-        fallbackPorts: config.get('fallbackPorts', DEFAULT_FALLBACK_PORTS)
+        fallbackPorts: config.get('fallbackPorts', DEFAULT_FALLBACK_PORTS),
+        profile: config.get('profile', 'default'),
+        mode: config.get('mode', 'build')
     });
 }
 

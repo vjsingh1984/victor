@@ -15,6 +15,7 @@
 """Tests for ProviderFacade domain facade."""
 
 import pytest
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 from victor.agent.facades.provider_facade import ProviderFacade
@@ -38,8 +39,7 @@ class TestProviderFacadeInit:
             thinking=True,
             provider_manager=manager,
             provider_runtime=MagicMock(),
-            provider_coordinator=MagicMock(),
-            provider_switch_coordinator=MagicMock(),
+            provider_service=MagicMock(),
         )
 
         assert facade.provider is provider
@@ -69,8 +69,7 @@ class TestProviderFacadeInit:
         assert facade.thinking is False
         assert facade.provider_manager is manager
         assert facade.provider_runtime is None
-        assert facade.provider_coordinator is None
-        assert facade.provider_switch_coordinator is None
+        assert facade._provider_service is None
 
 
 class TestProviderFacadeProperties:
@@ -88,8 +87,7 @@ class TestProviderFacadeProperties:
             thinking=False,
             provider_manager=MagicMock(name="manager"),
             provider_runtime=MagicMock(name="runtime"),
-            provider_coordinator=MagicMock(name="coordinator"),
-            provider_switch_coordinator=MagicMock(name="switch"),
+            provider_service=MagicMock(name="service"),
         )
 
     def test_provider_property(self, facade):
@@ -141,6 +139,80 @@ class TestProviderFacadeProperties:
         """Thinking setter updates the thinking mode flag."""
         facade.thinking = True
         assert facade.thinking is True
+
+    def test_runtime_state_host_keeps_provider_configuration_live(self):
+        """ProviderFacade should reflect canonical provider config from the runtime host."""
+        provider = MagicMock(name="provider")
+        manager = MagicMock(name="manager")
+        runtime_state_host = SimpleNamespace(
+            provider=provider,
+            model="runtime-model",
+            provider_name="runtime-provider",
+            temperature=0.4,
+            max_tokens=8192,
+            thinking=True,
+        )
+        facade = ProviderFacade(
+            provider=MagicMock(name="stale_provider"),
+            model="stale-model",
+            provider_name="stale-provider",
+            temperature=0.1,
+            max_tokens=1024,
+            thinking=False,
+            provider_manager=manager,
+            runtime_state_host=runtime_state_host,
+        )
+
+        assert facade.provider is provider
+        assert facade.model == "runtime-model"
+        assert facade.provider_name == "runtime-provider"
+        assert facade.temperature == 0.4
+        assert facade.max_tokens == 8192
+        assert facade.thinking is True
+
+        runtime_state_host.model = "updated-model"
+        runtime_state_host.provider_name = "updated-provider"
+        runtime_state_host.temperature = 0.9
+        runtime_state_host.max_tokens = 4096
+        runtime_state_host.thinking = False
+
+        assert facade.model == "updated-model"
+        assert facade.provider_name == "updated-provider"
+        assert facade.temperature == 0.9
+        assert facade.max_tokens == 4096
+        assert facade.thinking is False
+
+    def test_runtime_state_host_setters_update_canonical_provider_config(self):
+        """Compatibility setters should write through to the canonical runtime host."""
+        runtime_state_host = SimpleNamespace(
+            provider=MagicMock(name="provider"),
+            model="runtime-model",
+            provider_name="runtime-provider",
+            temperature=0.4,
+            max_tokens=8192,
+            thinking=True,
+        )
+        facade = ProviderFacade(
+            provider=MagicMock(name="stale_provider"),
+            model="stale-model",
+            provider_manager=MagicMock(name="manager"),
+            runtime_state_host=runtime_state_host,
+        )
+        new_provider = MagicMock(name="new_provider")
+
+        facade.provider = new_provider
+        facade.model = "new-model"
+        facade.provider_name = "new-provider"
+        facade.temperature = 0.2
+        facade.max_tokens = 2048
+        facade.thinking = False
+
+        assert runtime_state_host.provider is new_provider
+        assert runtime_state_host.model == "new-model"
+        assert runtime_state_host.provider_name == "new-provider"
+        assert runtime_state_host.temperature == 0.2
+        assert runtime_state_host.max_tokens == 2048
+        assert runtime_state_host.thinking is False
 
 
 class TestProviderFacadeProtocolConformance:

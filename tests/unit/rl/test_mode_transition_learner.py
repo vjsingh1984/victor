@@ -25,7 +25,10 @@ from unittest.mock import patch
 
 from victor.framework.rl.base import RLOutcome
 from victor.framework.rl.coordinator import RLCoordinator
-from victor.framework.rl.learners.mode_transition import ModeTransitionLearner, AgentMode
+from victor.framework.rl.learners.mode_transition import (
+    ModeTransitionLearner,
+    AgentMode,
+)
 from victor.core.database import reset_database, get_database
 from victor.core.schema import Tables
 
@@ -88,7 +91,8 @@ def _get_q_value_from_db(
     """Helper to retrieve Q-value and visit count from the database."""
     cursor = coordinator.db.cursor()
     cursor.execute(
-        f"SELECT q_value, visit_count FROM {Tables.RL_MODE_Q} WHERE state_key = ? AND action_key = ?",
+        f"SELECT q_value, visit_count FROM {Tables.RL_Q_VALUE} "
+        f"WHERE learner_id = 'mode_transition' AND state_key = ? AND action_key = ?",
         (state_key, action_key),
     )
     row = cursor.fetchone()
@@ -107,15 +111,15 @@ class TestModeTransitionLearner:
 
         cursor = learner.db.cursor()
         cursor.execute(
-            f"SELECT name FROM sqlite_master WHERE type='table' AND name='{Tables.RL_MODE_Q}';"
+            f"SELECT name FROM sqlite_master WHERE type='table' AND name='{Tables.RL_Q_VALUE}';"
         )
         assert cursor.fetchone() is not None
         cursor.execute(
-            f"SELECT name FROM sqlite_master WHERE type='table' AND name='{Tables.RL_MODE_TASK}';"
+            f"SELECT name FROM sqlite_master WHERE type='table' AND name='{Tables.RL_TASK_STAT}';"
         )
         assert cursor.fetchone() is not None
         cursor.execute(
-            f"SELECT name FROM sqlite_master WHERE type='table' AND name='{Tables.RL_MODE_HISTORY}';"
+            f"SELECT name FROM sqlite_master WHERE type='table' AND name='{Tables.RL_TRANSITION}';"
         )
         assert cursor.fetchone() is not None
 
@@ -246,16 +250,15 @@ class TestModeTransitionLearner:
 
     def test_get_recommendation_exploration(self, learner: ModeTransitionLearner) -> None:
         """Test get_recommendation can explore with high epsilon."""
-        import random
-
         state_key = "explore:analysis:low:low:fair:fair"
 
         _record_transition_outcome(learner, state_key=state_key, action_key="plan:0")
         _record_transition_outcome(learner, state_key=state_key, action_key="build:0")
 
-        # Force exploration
+        # Force exploration (epsilon=1.0 always explores; control the learner's
+        # injectable RNG rather than the stdlib global).
         learner.epsilon = 1.0
-        with patch.object(random, "random", return_value=0.5):
+        with patch.object(learner._rng, "random", return_value=0.5):
             rec = learner.get_recommendation(state_key, "", "analysis")
 
         assert rec is not None
@@ -370,14 +373,13 @@ class TestModeTransitionLearner:
         )
 
         cursor = coordinator.db.cursor()
-        cursor.execute(f"SELECT * FROM {Tables.RL_MODE_HISTORY}")
+        cursor.execute(f"SELECT * FROM {Tables.RL_TRANSITION} WHERE learner_id = 'mode_transition'")
         rows = cursor.fetchall()
 
         assert len(rows) == 1
         row = dict(rows[0])
-        assert row["from_mode"] == "explore"
-        assert row["to_mode"] == "plan"
-        assert row["task_type"] == "analysis"
+        assert row["from_state"] == "explore"
+        assert row["to_state"] == "plan"
 
     def test_no_data_returns_baseline(self, learner: ModeTransitionLearner) -> None:
         """Test that unknown state returns baseline recommendation."""

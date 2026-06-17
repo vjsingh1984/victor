@@ -118,8 +118,7 @@ async def main():
     print("  • Query refinement suggestions")
 
     print("\n\n📚 Example with AI (requires provider):")
-    print(
-        """
+    print("""
 # In agent conversation:
 User: "What are the latest developments in AI coding assistants?"
 
@@ -151,8 +150,7 @@ Sources:
 - GitHub Blog: "The Future of Code Assistance" (url)
 
 Would you like me to dig deeper into any specific area?
-"""
-    )
+""")
 
     print("\n\n🔍 Search Tips:")
     print("  • Use specific queries for better results")

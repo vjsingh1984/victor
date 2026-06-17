@@ -30,7 +30,7 @@ Usage:
 
     # Record tool execution
     analytics.record_tool_execution(
-        tool_name="read_file",
+        tool_name="read",
         success=True,
         execution_time_ms=150,
         error_type=None,
@@ -38,7 +38,7 @@ Usage:
     )
 
     # Get optimization insights
-    insights = analytics.get_tool_insights("read_file")
+    insights = analytics.get_tool_insights("read")
     # Returns: {"success_rate": 0.95, "avg_execution_ms": 120, ...}
 
     # Export metrics for dashboard
@@ -200,6 +200,7 @@ class UsageAnalytics:
         error_type: Optional[str] = None,
         context_tokens: int = 0,
         query_hash: Optional[str] = None,
+        error: Optional[Any] = None,
     ) -> None:
         """Record a tool execution for analytics.
 
@@ -210,7 +211,11 @@ class UsageAnalytics:
             error_type: Error type if failed (e.g., "ValueError", "Timeout")
             context_tokens: Number of context tokens at time of call
             query_hash: Hash of the query (for pattern detection)
+            error: Backward-compatible alias for ``error_type``
         """
+        if error_type is None and error is not None:
+            error_type = error if isinstance(error, str) else type(error).__name__
+
         record = ToolExecutionRecord(
             timestamp=time.time(),
             success=success,
@@ -637,6 +642,8 @@ class UsageAnalytics:
 
             agg = self._tool_aggregates[tool_name]
             insights = dict(agg)
+            if "execution_count" not in insights:
+                insights["execution_count"] = agg.get("total_executions", 0)
 
             # Add recommendations
             recommendations = []
@@ -751,6 +758,53 @@ class UsageAnalytics:
                 "avg_tokens_per_session": avg_tokens,
                 "avg_session_duration_seconds": avg_duration,
             }
+
+    def persist_to_rl_database(self, repo_id: Optional[str] = None) -> bool:
+        """Persist the current session summary to the RL outcomes database.
+
+        Bridges in-memory UsageAnalytics data into the RL framework so that
+        MetaLearningCoordinator can query historical trends without re-implementing
+        session aggregation.
+
+        Args:
+            repo_id: Optional repository identifier for isolation
+
+        Returns:
+            True if persisted successfully, False if nothing to persist or error
+        """
+        summary = self.get_session_summary()
+        if summary.get("status") == "no_sessions":
+            return False
+
+        try:
+            from victor.agent.services.rl_runtime import get_rl_coordinator
+            from victor.framework.rl.base import RLOutcome
+            import json
+
+            coord = get_rl_coordinator()
+            if repo_id:
+                coord.set_repo_context(repo_id)
+
+            outcome = RLOutcome(
+                provider="usage_analytics",
+                model="aggregation",
+                task_type="session_summary",
+                success=True,
+                quality_score=None,
+                metadata={
+                    "feedback_source": "auto",
+                    "session_summary": json.dumps(summary),
+                    "total_sessions": summary.get("total_sessions", 0),
+                    "avg_turns_per_session": summary.get("avg_turns_per_session", 0.0),
+                    "avg_tool_calls_per_session": summary.get("avg_tool_calls_per_session", 0.0),
+                },
+                vertical="general",
+            )
+            coord.record_outcome("tool_selector", outcome)
+            return True
+        except Exception as e:
+            logger.debug("UsageAnalytics: persist_to_rl_database failed: %s", e)
+            return False
 
     def get_optimization_recommendations(self) -> List[Dict[str, Any]]:
         """Get actionable optimization recommendations.

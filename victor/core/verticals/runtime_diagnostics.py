@@ -23,7 +23,9 @@ from victor.core.verticals.vertical_loader import VerticalLoader, get_vertical_l
 from victor.framework.entry_point_loader import get_entry_point_loader_stats
 
 
-def get_vertical_runtime_diagnostics(loader: Optional[VerticalLoader] = None) -> Dict[str, Any]:
+def get_vertical_runtime_diagnostics(
+    loader: Optional[VerticalLoader] = None,
+) -> Dict[str, Any]:
     """Return a consolidated runtime diagnostics snapshot for vertical integration.
 
     Note: tool_dependency_loader is imported lazily to avoid circular import
@@ -43,7 +45,9 @@ def get_vertical_runtime_diagnostics(loader: Optional[VerticalLoader] = None) ->
         loader_stats = {"error": str(exc)}
 
     try:
-        from victor.core.tool_dependency_loader import get_tool_dependency_resolution_stats
+        from victor.core.tool_dependency_loader import (
+            get_tool_dependency_resolution_stats,
+        )
 
         tool_dependency_stats = get_tool_dependency_resolution_stats()
     except Exception as exc:

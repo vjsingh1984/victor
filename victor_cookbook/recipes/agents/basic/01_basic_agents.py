@@ -32,9 +32,7 @@ async def text_summarization(text: str, max_words: int = 50):
     from victor import Agent
 
     agent = Agent.create(temperature=0.3)
-    result = await agent.run(
-        f"Summarize this in {max_words} words or less:\n\n{text}"
-    )
+    result = await agent.run(f"Summarize this in {max_words} words or less:\n\n{text}")
     return result
 
 
@@ -43,9 +41,7 @@ async def text_translation(text: str, target_language: str = "Spanish"):
     from victor import Agent
 
     agent = Agent.create(temperature=0.2)
-    result = await agent.run(
-        f"Translate this to {target_language}:\n\n{text}"
-    )
+    result = await agent.run(f"Translate this to {target_language}:\n\n{text}")
     return result
 
 
@@ -55,8 +51,7 @@ async def creative_writing(topic: str = "a futuristic city"):
 
     agent = Agent.create(temperature=0.9)
     result = await agent.run(
-        f"Write a creative short story about {topic}. "
-        "Make it vivid and imaginative."
+        f"Write a creative short story about {topic}. " "Make it vivid and imaginative."
     )
     return result
 
@@ -91,8 +86,7 @@ async def concept_explanation(concept: str, audience: str = "beginner"):
 
     agent = Agent.create(temperature=0.4)
     result = await agent.run(
-        f"Explain '{concept}' to a {audience}.\n\n"
-        "Use simple language and relatable examples."
+        f"Explain '{concept}' to a {audience}.\n\n" "Use simple language and relatable examples."
     )
     return result
 
@@ -140,8 +134,7 @@ async def comparison(item_a: str, item_b: str):
 
     agent = Agent.create(temperature=0.4)
     result = await agent.run(
-        f"Compare {item_a} vs {item_b}.\n\n"
-        "Include similarities, differences, and use cases."
+        f"Compare {item_a} vs {item_b}.\n\n" "Include similarities, differences, and use cases."
     )
     return result
 
@@ -164,8 +157,7 @@ async def title_generation(content: str):
 
     agent = Agent.create(temperature=0.5)
     result = await agent.run(
-        f"Generate 5 catchy titles for:\n\n{content}\n\n"
-        "Make them engaging and relevant."
+        f"Generate 5 catchy titles for:\n\n{content}\n\n" "Make them engaging and relevant."
     )
     return result
 
@@ -284,11 +276,11 @@ async def main():
     for recipe_func, recipe_name in recipes:
         print(f"\n{'='*60}")
         print(f"Recipe: {recipe_name}")
-        print('='*60)
+        print("=" * 60)
 
         try:
             result = await recipe_func()
-            if hasattr(result, 'content'):
+            if hasattr(result, "content"):
                 print(result.content[:200] + "...")
             else:
                 print(result)
@@ -298,4 +290,5 @@ async def main():
 
 if __name__ == "__main__":
     import asyncio
+
     asyncio.run(main())

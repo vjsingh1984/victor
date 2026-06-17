@@ -83,7 +83,7 @@ class QueryEnhancementRegistry:
             Strategy instance or None if not registered
         """
         if technique not in self._strategies:
-            logger.warning(f"No strategy registered for {technique.value}")
+            logger.debug("No strategy registered for %s", technique.value)
             return None
 
         # For simplicity, always create new instance if provider/model specified
@@ -137,8 +137,12 @@ def _register_default_strategies(registry: QueryEnhancementRegistry) -> None:
         registry: Registry to populate
     """
     from victor.core.query_enhancement.strategies.rewrite import RewriteStrategy
-    from victor.core.query_enhancement.strategies.decomposition import DecompositionStrategy
-    from victor.core.query_enhancement.strategies.entity_expand import EntityExpandStrategy
+    from victor.core.query_enhancement.strategies.decomposition import (
+        DecompositionStrategy,
+    )
+    from victor.core.query_enhancement.strategies.entity_expand import (
+        EntityExpandStrategy,
+    )
 
     registry.register(EnhancementTechnique.REWRITE, RewriteStrategy)
     registry.register(EnhancementTechnique.DECOMPOSITION, DecompositionStrategy)

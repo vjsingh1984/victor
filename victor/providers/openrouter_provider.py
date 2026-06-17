@@ -203,6 +203,22 @@ class OpenRouterProvider(BaseProvider):
     def supports_streaming(self) -> bool:
         return True
 
+    def supports_prompt_caching(self) -> bool:
+        """OpenRouter passes through provider caching discounts (25-90% off)."""
+        return True
+
+    def supports_kv_prefix_caching(self) -> bool:
+        """OpenRouter routes to providers that support KV prefix caching."""
+        return True
+
+    def context_window(self, model: Optional[str] = None) -> int:
+        from victor.providers.context_windows import OPENROUTER_DEFAULT
+
+        # OpenRouter routes to many upstream providers — without per-route
+        # introspection we use a generous default that triggers session-lock
+        # for typical models. Override is feasible but not on the hot path.
+        return OPENROUTER_DEFAULT
+
     async def chat(
         self,
         messages: List[Message],
@@ -288,7 +304,7 @@ class OpenRouterProvider(BaseProvider):
                     if data_str.strip() == "[DONE]":
                         yield StreamChunk(
                             content="",
-                            tool_calls=accumulated_tool_calls if accumulated_tool_calls else None,
+                            tool_calls=(accumulated_tool_calls if accumulated_tool_calls else None),
                             stop_reason="stop",
                             is_final=True,
                         )

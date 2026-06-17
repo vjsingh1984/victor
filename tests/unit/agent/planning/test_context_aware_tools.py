@@ -16,7 +16,7 @@
 
 import pytest
 
-from victor.agent.conversation_state import ConversationStage
+from victor.agent.conversation.state_machine import ConversationStage
 from victor.agent.planning.readable_schema import ReadableTaskPlan, TaskComplexity
 from victor.agent.planning.tool_selection import (
     COMPLEXITY_TOOL_LIMITS,

@@ -69,7 +69,9 @@ try:
     )
     from opentelemetry.sdk.resources import Resource, SERVICE_NAME
     from opentelemetry.trace import Status, StatusCode, Span
-    from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
+    from opentelemetry.trace.propagation.tracecontext import (
+        TraceContextTextMapPropagator,
+    )
 
     _OTEL_AVAILABLE = True
 except ImportError:

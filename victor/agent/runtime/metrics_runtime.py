@@ -73,7 +73,7 @@ def create_metrics_runtime_components(
     )
 
     def _build_metrics_coordinator() -> Any:
-        from victor.agent.coordinators.metrics_coordinator import MetricsCoordinator
+        from victor.agent.services.metrics_service import MetricsCoordinator
 
         return MetricsCoordinator(
             metrics_collector=metrics_collector.get_instance(),

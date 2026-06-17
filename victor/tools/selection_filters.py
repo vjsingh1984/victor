@@ -42,14 +42,6 @@ WEB_KEYWORDS: List[str] = ["search", "web", "online", "lookup", "http", "https"]
 # Small model indicators (for limiting tools)
 SMALL_MODEL_INDICATORS: List[str] = [":0.5b", ":1.5b", ":3b"]
 
-# Default thresholds for semantic selection
-DEFAULT_THRESHOLD: float = 0.18
-DEFAULT_MAX_TOOLS: int = 10
-MIN_THRESHOLD: float = 0.10
-MAX_THRESHOLD: float = 0.40
-MIN_TOOLS: int = 5
-MAX_TOOLS: int = 15
-
 
 # ============================================================================
 # Pure Filtering Functions

@@ -98,7 +98,7 @@ class TestProviderCircuitBreakerIntegration:
     def test_circuit_breaker_registered(self):
         """Test that circuit breaker is registered in global registry."""
         provider = MockProvider(use_circuit_breaker=True)
-        breaker = CircuitBreakerRegistry.get(f"provider_{provider.__class__.__name__}")
+        breaker = CircuitBreakerRegistry.get(provider.circuit_breaker.name)
         assert breaker is provider.circuit_breaker
 
     @pytest.mark.asyncio
@@ -199,20 +199,20 @@ class TestProviderCircuitBreakerIntegration:
         assert provider.get_circuit_breaker_stats() is None
 
 
-class TestCircuitBreakerSharedAcrossInstances:
-    """Tests for circuit breaker sharing across provider instances."""
+class TestCircuitBreakerScopedPerInstance:
+    """Tests for circuit breaker isolation across provider instances."""
 
-    def test_same_provider_type_shares_breaker(self):
-        """Test that same provider type shares circuit breaker via registry."""
+    def test_same_provider_type_gets_distinct_breakers(self):
+        """Fresh provider instances should not inherit breaker state."""
         provider1 = MockProvider(use_circuit_breaker=True)
         provider2 = MockProvider(use_circuit_breaker=True)
 
-        # Both should get the same breaker from registry
-        assert provider1.circuit_breaker is provider2.circuit_breaker
+        assert provider1.circuit_breaker is not provider2.circuit_breaker
+        assert provider1.circuit_breaker.name != provider2.circuit_breaker.name
 
     @pytest.mark.asyncio
-    async def test_failure_in_one_affects_other(self):
-        """Test that failures in one instance affect the shared breaker."""
+    async def test_failure_in_one_does_not_affect_other(self):
+        """Failures in one provider instance should not poison another."""
         provider1 = MockProvider(
             use_circuit_breaker=True,
             circuit_breaker_failure_threshold=2,
@@ -227,5 +227,5 @@ class TestCircuitBreakerSharedAcrossInstances:
             with pytest.raises(ValueError):
                 await provider1.chat(messages, model="test")
 
-        # Provider2 should also see open circuit
-        assert provider2.is_circuit_open()
+        assert provider1.is_circuit_open()
+        assert not provider2.is_circuit_open()

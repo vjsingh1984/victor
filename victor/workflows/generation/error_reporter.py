@@ -380,7 +380,9 @@ class ErrorReporter:
         return json.dumps(result.to_dict(), indent=indent)
 
     def markdown_report(
-        self, result: WorkflowGenerationValidationResult, include_suggestions: bool = True
+        self,
+        result: WorkflowGenerationValidationResult,
+        include_suggestions: bool = True,
     ) -> str:
         """Generate Markdown report for documentation.
 
@@ -502,9 +504,12 @@ class ErrorReporter:
         lines.append("-" * 40)
 
         for error in node_errors:
-            severity_emoji = {"critical": "🚨", "error": "❌", "warning": "⚠️", "info": "ℹ️"}.get(
-                error.severity.value, ""
-            )
+            severity_emoji = {
+                "critical": "🚨",
+                "error": "❌",
+                "warning": "⚠️",
+                "info": "ℹ️",
+            }.get(error.severity.value, "")
 
             lines.append(f"{severity_emoji} [{error.severity.value.upper()}] {error.message}")
             if error.suggestion:

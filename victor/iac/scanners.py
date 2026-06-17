@@ -451,7 +451,12 @@ class KubernetesScanner(IaCScannerProtocol):
 
             # Pod Security
             spec = props.get("spec", {})
-            if resource.resource_type in ["Deployment", "Pod", "DaemonSet", "StatefulSet"]:
+            if resource.resource_type in [
+                "Deployment",
+                "Pod",
+                "DaemonSet",
+                "StatefulSet",
+            ]:
                 pod_spec = spec
                 if "template" in spec:
                     pod_spec = spec.get("template", {}).get("spec", {})

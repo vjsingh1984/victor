@@ -202,7 +202,11 @@ class FEPManager:
             modified_pattern = r"^modified:\s*\d{4}-\d{2}-\d{2}"
             new_modified_line = f"modified: {today}"
             new_content = re.sub(
-                modified_pattern, new_modified_line, new_content, count=1, flags=re.MULTILINE
+                modified_pattern,
+                new_modified_line,
+                new_content,
+                count=1,
+                flags=re.MULTILINE,
             )
 
             # Write back

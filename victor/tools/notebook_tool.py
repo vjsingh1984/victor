@@ -55,27 +55,6 @@ class NotebookCellType(Enum):
 
 
 @dataclass
-class NotebookEditInput:
-    """Input parameters for a notebook edit operation.
-
-    Args:
-        notebook_path: Path to the .ipynb file.
-        edit_mode: The edit operation to perform.
-        cell_type: Cell type for insert operations.
-        cell_id: Optional cell id string to locate the target cell.
-        cell_index: Optional zero-based cell index to locate the target cell.
-        new_source: New cell content for replace/insert operations.
-    """
-
-    notebook_path: str
-    edit_mode: NotebookEditMode = NotebookEditMode.REPLACE
-    cell_type: NotebookCellType = NotebookCellType.CODE
-    cell_id: Optional[str] = None
-    cell_index: Optional[int] = None
-    new_source: Optional[str] = None
-
-
-@dataclass
 class NotebookEditResult:
     """Result of a notebook edit operation.
 
@@ -213,7 +192,14 @@ def _write_notebook(path: Path, notebook: Dict[str, Any]) -> None:
     task_types=["action"],
     keywords=["notebook", "jupyter", "ipynb", "cell", "edit notebook"],
 )
-async def notebook_edit(input_data: NotebookEditInput) -> NotebookEditResult:
+async def notebook_edit(
+    notebook_path: str,
+    edit_mode: NotebookEditMode = NotebookEditMode.REPLACE,
+    cell_type: NotebookCellType = NotebookCellType.CODE,
+    cell_id: Optional[str] = None,
+    cell_index: Optional[int] = None,
+    new_source: Optional[str] = None,
+) -> NotebookEditResult:
     """Edit a Jupyter notebook at the cell level.
 
     Supports three modes:
@@ -224,12 +210,17 @@ async def notebook_edit(input_data: NotebookEditInput) -> NotebookEditResult:
     * **DELETE** -- remove a cell at a given position.
 
     Args:
-        input_data: Parameters describing the desired edit.
+        notebook_path: Path to the .ipynb file.
+        edit_mode: The edit operation to perform (replace, insert, delete).
+        cell_type: Cell type for insert operations (code or markdown).
+        cell_id: Optional cell id string to locate the target cell.
+        cell_index: Optional zero-based cell index to locate the target cell.
+        new_source: New cell content for replace/insert operations.
 
     Returns:
         A :class:`NotebookEditResult` describing the outcome.
     """
-    path = Path(input_data.notebook_path).expanduser().resolve()
+    path = Path(notebook_path).expanduser().resolve()
 
     try:
         notebook = _read_notebook(path)
@@ -240,11 +231,11 @@ async def notebook_edit(input_data: NotebookEditInput) -> NotebookEditResult:
     cells: List[Dict[str, Any]] = notebook["cells"]
     original_count = len(cells)
 
-    mode = input_data.edit_mode
+    mode = edit_mode
 
     # --- REPLACE ---
     if mode == NotebookEditMode.REPLACE:
-        if input_data.new_source is None:
+        if new_source is None:
             return NotebookEditResult(
                 success=False,
                 message="new_source is required for REPLACE mode",
@@ -252,7 +243,7 @@ async def notebook_edit(input_data: NotebookEditInput) -> NotebookEditResult:
                 new_cell_count=original_count,
             )
         try:
-            idx = _resolve_cell_index(cells, input_data.cell_id, input_data.cell_index)
+            idx = _resolve_cell_index(cells, cell_id, cell_index)
         except ValueError as exc:
             return NotebookEditResult(
                 success=False,
@@ -261,7 +252,7 @@ async def notebook_edit(input_data: NotebookEditInput) -> NotebookEditResult:
                 new_cell_count=original_count,
             )
 
-        cells[idx]["source"] = input_data.new_source.splitlines(keepends=True)
+        cells[idx]["source"] = new_source.splitlines(keepends=True)
         # Clear stale outputs for code cells after content change.
         if cells[idx].get("cell_type") == "code":
             cells[idx]["execution_count"] = None
@@ -278,7 +269,7 @@ async def notebook_edit(input_data: NotebookEditInput) -> NotebookEditResult:
 
     # --- INSERT ---
     if mode == NotebookEditMode.INSERT:
-        if input_data.new_source is None:
+        if new_source is None:
             return NotebookEditResult(
                 success=False,
                 message="new_source is required for INSERT mode",
@@ -288,9 +279,9 @@ async def notebook_edit(input_data: NotebookEditInput) -> NotebookEditResult:
 
         # Determine insertion index.  If neither cell_id nor cell_index is
         # given, append to the end.
-        if input_data.cell_id is not None or input_data.cell_index is not None:
+        if cell_id is not None or cell_index is not None:
             try:
-                insert_idx = _resolve_cell_index(cells, input_data.cell_id, input_data.cell_index)
+                insert_idx = _resolve_cell_index(cells, cell_id, cell_index)
             except ValueError as exc:
                 return NotebookEditResult(
                     success=False,
@@ -301,17 +292,20 @@ async def notebook_edit(input_data: NotebookEditInput) -> NotebookEditResult:
         else:
             insert_idx = len(cells)
 
-        new_cell = _make_cell(input_data.cell_type, input_data.new_source)
+        new_cell = _make_cell(cell_type, new_source)
         cells.insert(insert_idx, new_cell)
 
         _write_notebook(path, notebook)
         new_count = len(cells)
         logger.info(
-            "Inserted %s cell at index %d in %s", input_data.cell_type.value, insert_idx, path
+            "Inserted %s cell at index %d in %s",
+            cell_type.value,
+            insert_idx,
+            path,
         )
         return NotebookEditResult(
             success=True,
-            message=f"Inserted {input_data.cell_type.value} cell at index {insert_idx}",
+            message=f"Inserted {cell_type.value} cell at index {insert_idx}",
             original_cell_count=original_count,
             new_cell_count=new_count,
         )
@@ -326,7 +320,7 @@ async def notebook_edit(input_data: NotebookEditInput) -> NotebookEditResult:
                 new_cell_count=0,
             )
         try:
-            idx = _resolve_cell_index(cells, input_data.cell_id, input_data.cell_index)
+            idx = _resolve_cell_index(cells, cell_id, cell_index)
         except ValueError as exc:
             return NotebookEditResult(
                 success=False,

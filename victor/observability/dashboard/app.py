@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import time
 from datetime import datetime
 from pathlib import Path
@@ -49,7 +50,7 @@ from textual.widgets import (
 from textual.reactive import reactive
 from textual import work
 
-# TODO: Migrate
+logger = logging.getLogger(__name__)
 
 
 class EventStats(Static):
@@ -603,7 +604,6 @@ class ToolExecutionView(DataTable):
 
         # Count lifecycle.chunk.tool_start events as tool executions
         # For tool.* events, only count end events for stats
-        # TODO: Migrate
         if event.topic == "lifecycle.chunk.tool_start":
             stats["calls"] += 1
             stats["successes"] += 1  # Assume success for start events
@@ -655,7 +655,10 @@ class VerticalTraceView(ScrollableContainer):
     """View showing vertical integration traces."""
 
     def compose(self) -> ComposeResult:
-        yield Static("[dim]Vertical integration traces will appear here...[/]", id="trace-content")
+        yield Static(
+            "[dim]Vertical integration traces will appear here...[/]",
+            id="trace-content",
+        )
 
     def add_vertical_event(self, event: MessagingEvent) -> None:
         """Add a vertical integration event (prepends for newest first)."""
@@ -691,7 +694,10 @@ class JSONLBrowser(ScrollableContainer):
         self._events: List[MessagingEvent] = []
 
     def compose(self) -> ComposeResult:
-        yield Static("[dim]Load a JSONL file to browse historical events...[/]", id="jsonl-content")
+        yield Static(
+            "[dim]Load a JSONL file to browse historical events...[/]",
+            id="jsonl-content",
+        )
         yield DataTable(id="jsonl-table")
 
     def on_mount(self) -> None:
@@ -719,29 +725,29 @@ class JSONLBrowser(ScrollableContainer):
             return 0
 
         try:
-            with open(path, "r") as f:
+            with open(path, "r", encoding="utf-8") as f:
                 for line in f:
                     line = line.strip()
-                    if line:
-                        try:
-                            # VictorEvent removed - migrate to Event.from_dict()
-                            # TODO: Parse Event from JSON data properly
-                            # For now, just validate JSON
-                            json.loads(line)
-                            # Skip this event for now
-                            continue
-                        except (json.JSONDecodeError, KeyError, ValueError):
-                            continue
+                    if not line:
+                        continue
+
+                    try:
+                        # Parse event using MessagingEvent.from_dict()
+                        data = json.loads(line)
+                        event = MessagingEvent.from_dict(data)
+                        self._events.append(event)
+
+                    except (json.JSONDecodeError, KeyError, ValueError) as e:
+                        logger.debug(f"Failed to parse event: {e}")
+                        continue
 
             # Update display
-            # TODO: Migrate
             content.update(f"[green]Loaded {len(self._events)} events from {path.name}[/]")
             table.display = True
             table.clear()
 
-            # Iterate in reverse to show newest events first
-            for event in reversed(self._events[-100:]):  # Show last 100 events, newest first
-                # TODO: Migrate
+            # Show last 100 events, newest first
+            for event in reversed(self._events[-100:]):
                 timestamp = event.datetime.strftime("%Y-%m-%d %H:%M:%S")
                 category = event.category
                 session = (event.correlation_id or "")[:8]
@@ -911,7 +917,14 @@ class ToolCallHistoryView(TimeOrderedTableView):
             )
 
         # Default fallback for other tool events
-        return (timestamp, data.get("tool_name", "unknown"), event_name, "N/A", "N/A", "")
+        return (
+            timestamp,
+            data.get("tool_name", "unknown"),
+            event_name,
+            "N/A",
+            "N/A",
+            "",
+        )
 
 
 class StateTransitionView(TimeOrderedTableView):
@@ -1228,7 +1241,6 @@ class ObservabilityDashboard(App):
             with TabPane("History", id="tab-history"):
                 yield JSONLBrowser(id="jsonl-browser")
             # New debugging tabs
-            # TODO: Migrate
             with TabPane("Execution", id="tab-execution"):
                 yield ExecutionTraceView(id="execution-trace-view")
             with TabPane("Tool Calls", id="tab-tool-calls"):
@@ -1253,12 +1265,10 @@ class ObservabilityDashboard(App):
         logger.info(f"[Dashboard] ObservabilityBus acquired: {type(self._event_bus).__name__}")
 
         # Subscribe to EventBus
-        # TODO: Migrate
         self._subscribe_to_events()
 
         # Get ALL widget references FIRST before loading events
         # This ensures _process_event() can access all views
-        # TODO: Migrate
         self._stats = self.query_one("#stats-bar", EventStats)
         self._event_log = self.query_one("#event-log", EventLogView)
         self._event_table = self.query_one("#event-table", EventTableView)
@@ -1266,7 +1276,6 @@ class ObservabilityDashboard(App):
         self._vertical_view = self.query_one("#vertical-view", VerticalTraceView)
         self._jsonl_browser = self.query_one("#jsonl-browser", JSONLBrowser)
         # New debugging views
-        # TODO: Migrate
         self._execution_trace_view = self.query_one("#execution-trace-view", ExecutionTraceView)
         self._tool_call_history_view = self.query_one(
             "#tool-call-history-view", ToolCallHistoryView
@@ -1280,14 +1289,12 @@ class ObservabilityDashboard(App):
 
         # Check if using JSONL backend - if so, load historical events
         # For in-memory backend, we only see events published after dashboard starts
-        # TODO: Migrate
         self._jsonl_path = Path(os.path.expanduser("~/.victor/metrics/victor.jsonl"))
         self._last_position = 0
         self._event_counter = 0
 
         # Load historical events after widgets are fully rendered
         # Use call_later to ensure widgets have their size calculated
-        # TODO: Migrate
         self.call_later(self._setup_event_source)
 
     def on_unmount(self) -> None:
@@ -1334,7 +1341,15 @@ class ObservabilityDashboard(App):
 
         # Subscribe to all event patterns using canonical event system
         # The canonical system uses pattern-based subscriptions (e.g., "tool.*")
-        patterns = ["tool.*", "state.*", "model.*", "error.*", "lifecycle.*", "metric.*", "trace.*"]
+        patterns = [
+            "tool.*",
+            "state.*",
+            "model.*",
+            "error.*",
+            "lifecycle.*",
+            "metric.*",
+            "trace.*",
+        ]
 
         async def do_subscribe():
             """Perform async subscription to ObservabilityBus."""
@@ -1418,7 +1433,6 @@ class ObservabilityDashboard(App):
         self._poll_jsonl_file()
 
         # Load last 100 events
-        # TODO: Migrate
         if not self._jsonl_path.exists():
             logger.warning(f"[Dashboard] JSONL file does not exist: {self._jsonl_path}")
             return
@@ -1428,7 +1442,6 @@ class ObservabilityDashboard(App):
                 all_lines = f.readlines()
 
             # Take last 100 lines and reverse for newest-first display
-            # TODO: Migrate
             lines_to_process = all_lines[-100:] if len(all_lines) > 100 else all_lines
             lines_to_process = lines_to_process[::-1]  # Reverse to show newest first
 
@@ -1447,7 +1460,6 @@ class ObservabilityDashboard(App):
                     self._process_event(event)
 
             # Update position to end of file
-            # TODO: Migrate
             self._last_position = self._jsonl_path.stat().st_size
             logger.info(
                 f"[Dashboard] Loaded {self._event_counter} events, file position: {self._last_position}"
@@ -1479,7 +1491,6 @@ class ObservabilityDashboard(App):
                 # Check if file has new content
                 if current_size > self._last_position:
                     # Read new content
-                    # TODO: Migrate
                     with open(self._jsonl_path, "r", encoding="utf-8") as f:
                         f.seek(self._last_position)
                         new_lines = f.readlines()
@@ -1503,7 +1514,6 @@ class ObservabilityDashboard(App):
                             self._process_event(event)
 
                 # Poll every 1 second
-                # TODO: Migrate
                 await asyncio.sleep(1.0)
 
             except Exception as e:
@@ -1567,7 +1577,6 @@ class ObservabilityDashboard(App):
 
         try:
             # Update stats
-            # TODO: Migrate
             self._stats.increment(event.category)
         except Exception as e:
             logger.error(
@@ -1576,7 +1585,6 @@ class ObservabilityDashboard(App):
 
         try:
             # Add to views
-            # TODO: Migrate
             self._event_log.add_event(event)
         except Exception as e:
             logger.error(
@@ -1592,18 +1600,15 @@ class ObservabilityDashboard(App):
 
         try:
             # Handle specific event types
-            # TODO: Migrate
             if event.topic.startswith("tool."):
                 self._tool_view.add_tool_event(event)
                 # Update debugging views
-                # TODO: Migrate
                 self._tool_call_history_view.add_tool_call_event(event)
                 self._performance_metrics_view.update_from_tool_event(event)
             elif event.topic.startswith("vertical."):
                 self._vertical_view.add_vertical_event(event)
             elif event.topic.startswith("lifecycle."):
                 # Update execution trace view
-                # TODO: Migrate
                 self._execution_trace_view.add_span_event(event)
                 self._performance_metrics_view.update_from_span_event(event)
                 # Also route chunk tool events to tool view
@@ -1611,7 +1616,6 @@ class ObservabilityDashboard(App):
                     self._tool_view.add_tool_event(event)
             elif event.topic.startswith("state."):
                 # Update state transition view
-                # TODO: Migrate
                 self._state_transition_view.add_state_event(event)
                 self._performance_metrics_view.update_from_state_event(event)
         except Exception as e:
@@ -1620,7 +1624,6 @@ class ObservabilityDashboard(App):
             )
 
         # Explicitly refresh display to show new events
-        # TODO: Migrate
         try:
             self._event_log.refresh()
             self._event_table.refresh()
@@ -1666,24 +1669,19 @@ class ObservabilityDashboard(App):
         self._stats.error_events = 0
 
         # Clear event log
-        # TODO: Migrate
         self._event_log.clear()
 
         # Clear table
-        # TODO: Migrate
         self._event_table.clear()
 
         # Clear tool view
-        # TODO: Migrate
         self._tool_view.clear()
         self._tool_view._tool_stats.clear()
 
         # Clear vertical trace view
-        # TODO: Migrate
         self._vertical_view.clear()
 
         # Clear debugging views
-        # TODO: Migrate
         self._execution_trace_view.clear()
         self._execution_trace_view._spans.clear()
 

@@ -88,3 +88,16 @@ class KeywordMatcher:
                     matches.append(tool_name)
                     break
         return matches
+
+    def remove_tool(self, name: str) -> None:
+        """Remove a tool from all keyword indexes."""
+        keywords = self._tool_keywords.pop(name, [])
+        self._mandatory_keywords.pop(name, None)
+        for kw in keywords:
+            kw_lower = kw.lower()
+            tool_names = self._keyword_index.get(kw_lower)
+            if tool_names is None:
+                continue
+            tool_names.discard(name)
+            if not tool_names:
+                self._keyword_index.pop(kw_lower, None)

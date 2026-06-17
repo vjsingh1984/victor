@@ -10,6 +10,7 @@ from victor.agent.task_completion import (
     CompletionConfidence,
     TaskCompletionDetector,
 )
+from victor.core.completion_markers import FILE_DONE_MARKER, TASK_DONE_MARKER
 
 
 def _make_decision_service(
@@ -39,8 +40,15 @@ class TestTaskCompletionWithoutService:
 
     def test_active_signal_still_high(self):
         detector = TaskCompletionDetector()
-        detector.analyze_response("**DONE**: Task complete")
+        detector.analyze_response(f"{FILE_DONE_MARKER} Created cache.py")
         assert detector.get_completion_confidence() == CompletionConfidence.HIGH
+
+    def test_plain_done_no_longer_triggers_active_completion(self):
+        detector = TaskCompletionDetector()
+        detector.analyze_response("DONE: Task complete")
+
+        assert detector.get_completion_confidence() != CompletionConfidence.HIGH
+        assert detector._state.active_signal_detected is False
 
     def test_passive_signal_still_low(self):
         detector = TaskCompletionDetector()
@@ -52,9 +60,43 @@ class TestTaskCompletionWithoutService:
         detector.analyze_response("Let me think about this")
         assert detector.get_completion_confidence() == CompletionConfidence.NONE
 
+    def test_framework_completion_signal_reused_for_structured_code_output(self):
+        detector = TaskCompletionDetector()
+        detector.analyze_intent("Create a cache_manager.py file")
+
+        detector.analyze_response(
+            "Here is the implementation:\n\n```python\nclass CacheManager:\n    pass\n```"
+        )
+
+        assert detector._last_framework_signal is not None
+        assert detector._last_framework_signal.has_complete_code is True
+        assert detector.get_completion_confidence() == CompletionConfidence.LOW
+
+    def test_framework_continuation_signal_detected_for_contextual_phrase(self):
+        detector = TaskCompletionDetector()
+        detector.analyze_intent("Analyze the architecture")
+
+        detector.analyze_response("Let me know if you'd like me to compare more tradeoffs.")
+
+        assert detector._state.continuation_requests >= 1
+
 
 class TestTaskCompletionWithLLMService:
     """Test LLM augmentation in task completion detection."""
+
+    def test_runtime_intelligence_delegates_completion_decision(self):
+        """RuntimeIntelligenceService is preferred over direct decision service wiring."""
+        runtime_intelligence = MagicMock()
+        runtime_intelligence.decide_sync.return_value = DecisionResult(
+            decision_type=DecisionType.TASK_COMPLETION,
+            result=TaskCompletionDecision(is_complete=True, confidence=0.9, phase="done"),
+            source="llm",
+            confidence=0.9,
+        )
+        detector = TaskCompletionDetector(runtime_intelligence=runtime_intelligence)
+
+        assert detector.get_completion_confidence() == CompletionConfidence.MEDIUM
+        runtime_intelligence.decide_sync.assert_called_once()
 
     def test_llm_upgrades_none_to_medium(self):
         """When heuristic is NONE but LLM says complete, upgrades to MEDIUM."""
@@ -83,7 +125,7 @@ class TestTaskCompletionWithLLMService:
         """LLM is never consulted when heuristic confidence is HIGH."""
         service = _make_decision_service()
         detector = TaskCompletionDetector(decision_service=service)
-        detector.analyze_response("**DONE**: Task is complete")
+        detector.analyze_response(f"{TASK_DONE_MARKER} Task is complete")
 
         result = detector.get_completion_confidence()
         assert result == CompletionConfidence.HIGH
@@ -124,7 +166,7 @@ class TestTaskCompletionWithLLMService:
         service = _make_decision_service()
         detector = TaskCompletionDetector(decision_service=service)
 
-        detector.analyze_response("**DONE**: Implementation complete")
+        detector.analyze_response(f"{TASK_DONE_MARKER} Implementation complete")
 
         # Active signal was detected, LLM should NOT be called
         # (the analyze_response returns early on active signal)

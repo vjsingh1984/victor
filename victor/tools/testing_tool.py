@@ -19,6 +19,7 @@ from typing import Optional, Dict, Any, List
 from victor.tools.base import AccessMode, DangerLevel, Priority
 from victor.tools.decorators import tool
 from victor.tools.subprocess_executor import run_command_async, CommandErrorType
+from victor.tools.formatters import format_test_results
 
 
 @tool(
@@ -123,14 +124,27 @@ def _summarize_report(report: Dict[str, Any]) -> Dict[str, Any]:
                     }
                 )
 
+    # Build summary dictionary
+    result_summary = {
+        "total_tests": total,
+        "passed": passed,
+        "failed": failed_count,
+        "skipped": summary.get("skipped", 0),
+        "xfailed": summary.get("xfailed", 0),
+        "xpassed": summary.get("xpassed", 0),
+    }
+
+    # Use unified formatter system
+    formatted_result = format_test_results(
+        {
+            "summary": result_summary,
+            "failures": failures,
+        }
+    )
+
     return {
-        "summary": {
-            "total_tests": total,
-            "passed": passed,
-            "failed": failed_count,
-            "skipped": summary.get("skipped", 0),
-            "xfailed": summary.get("xfailed", 0),
-            "xpassed": summary.get("xpassed", 0),
-        },
+        "summary": result_summary,
         "failures": failures,
+        "formatted_summary": formatted_result.content,  # Rich-formatted for console
+        "contains_markup": formatted_result.contains_markup,
     }

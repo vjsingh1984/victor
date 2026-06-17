@@ -7,7 +7,9 @@
 #   make build        # Build distribution packages
 #   make release      # Create a release (requires version)
 
-.PHONY: help install install-dev test test-definition-boundaries lint check-repo-hygiene format clean build build-binary docker release sync-version check-version
+.PHONY: help install install-dev test test-definition-boundaries lint check-repo-hygiene check-extracted-vertical-boundaries format clean build build-binary docker release sync-version check-version
+
+PYTEST_TIMEOUT_ARG := $(shell pytest --help 2>/dev/null | grep -q -- "--timeout" && echo --timeout=120)
 
 # Default target
 help:
@@ -21,6 +23,7 @@ help:
 	@echo "  make test-definition-boundaries  Run SDK-definition import guardrails"
 	@echo "  make lint          Run linters"
 	@echo "  make check-repo-hygiene  Validate workflow/link/metadata drift guards"
+	@echo "  make check-extracted-vertical-boundaries  Audit extracted plugin repos when present"
 	@echo "  make format        Format code"
 	@echo "  make clean         Clean build artifacts"
 	@echo ""
@@ -31,7 +34,7 @@ help:
 	@echo "  make release       Create a release (VERSION=x.y.z required)"
 	@echo ""
 	@echo "Versioning:"
-	@echo "  make check-version Verify victor-ai/victor-sdk versions are in sync"
+	@echo "  make check-version Verify victor-ai/victor-contracts versions are in sync"
 	@echo "  make sync-version  Sync all package versions from VERSION file"
 	@echo ""
 	@echo "Utilities:"
@@ -52,11 +55,11 @@ install-dev:
 	pre-commit install || true
 
 test:
-	pytest tests/unit -v --tb=short --timeout=120
+	pytest tests/unit -v --tb=short $(PYTEST_TIMEOUT_ARG)
 
 test-definition-boundaries:
-	@echo "Definition import boundaries enforced by SDK contract tests"
-	pytest tests/unit/sdk -q 2>/dev/null || echo "No SDK boundary tests found"
+	@echo "Definition import boundaries enforced by contract boundary tests"
+	pytest tests/unit/contracts -q
 
 test-all:
 	pytest -v --tb=short
@@ -78,6 +81,9 @@ lint:
 
 check-repo-hygiene:
 	python scripts/ci/repo_hygiene_check.py
+
+check-extracted-vertical-boundaries:
+	python scripts/ci/check_extracted_vertical_boundaries.py
 
 format:
 	black victor tests
@@ -133,7 +139,7 @@ sync-version:  ## Sync all package versions from VERSION files
 sync-version-ai:  ## Sync victor-ai version only
 	python scripts/sync_version.py --ai
 
-sync-version-sdk:  ## Sync victor-sdk version only
+sync-version-sdk:  ## Sync victor-contracts version only
 	python scripts/sync_version.py --sdk
 
 check-version:  ## Verify all package versions are consistent
@@ -155,18 +161,18 @@ endif
 	@echo "Release v$(VERSION) created!"
 	@echo "Run 'git push && git push --tags' to trigger the release workflow"
 
-# Release victor-sdk independently (requires VERSION)
+# Release victor-contracts independently (requires VERSION)
 release-sdk:
 ifndef VERSION
 	$(error VERSION is required. Usage: make release-sdk VERSION=0.7.0)
 endif
-	@echo "Creating victor-sdk release sdk-v$(VERSION)..."
-	echo "$(VERSION)" > victor-sdk/VERSION
+	@echo "Creating victor-contracts release sdk-v$(VERSION)..."
+	echo "$(VERSION)" > victor-contracts/VERSION
 	python scripts/sync_version.py --sdk
 	python scripts/check_version_sync.py
-	git add victor-sdk/VERSION victor-sdk/pyproject.toml pyproject.toml
-	git commit -m "release: victor-sdk v$(VERSION)"
-	git tag -a "sdk-v$(VERSION)" -m "Release victor-sdk v$(VERSION)"
+	git add victor-contracts/VERSION victor-contracts/pyproject.toml pyproject.toml
+	git commit -m "release: victor-contracts v$(VERSION)"
+	git tag -a "sdk-v$(VERSION)" -m "Release victor-contracts v$(VERSION)"
 	@echo ""
 	@echo "SDK release sdk-v$(VERSION) created!"
 	@echo "Run 'git push && git push --tags' to trigger the SDK release workflow"

@@ -62,6 +62,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
+from victor.core.constants import DEFAULT_VERTICAL
 
 if TYPE_CHECKING:
     from victor.framework.rl.coordinator import RLCoordinator
@@ -131,6 +132,37 @@ class RLEventType(str, Enum):
     PROMPT_USED = "prompt_used"
     """Prompt template was used. Triggers: prompt_template"""
 
+    # Prompt optimization
+    GEPA_EVOLUTION = "gepa_evolution"
+    """GEPA prompt evolution cycle completed. Triggers: prompt_optimizer"""
+
+
+# Register domain event mapping with canonical EventType taxonomy
+def _register_rl_event_taxonomy() -> None:
+    try:
+        from victor.core.events.taxonomy import EventTaxonomyRegistry
+        from victor.framework.events import EventType
+
+        EventTaxonomyRegistry.register_domain(
+            "rl",
+            RLEventType,
+            {
+                RLEventType.TOOL_EXECUTED: EventType.TOOL_RESULT,
+                RLEventType.TOOL_SELECTED: EventType.TOOL_CALL,
+                RLEventType.MODE_TRANSITION: EventType.STAGE_CHANGE,
+                RLEventType.GROUNDING_CHECK: EventType.PROGRESS,
+                RLEventType.QUALITY_ASSESSED: EventType.PROGRESS,
+                RLEventType.WORKFLOW_COMPLETED: EventType.STREAM_END,
+                RLEventType.TEAM_COMPLETED: EventType.MILESTONE,
+                RLEventType.GEPA_EVOLUTION: EventType.MILESTONE,
+            },
+        )
+    except ImportError:
+        pass
+
+
+_register_rl_event_taxonomy()
+
 
 @dataclass
 class RLEvent:
@@ -146,7 +178,7 @@ class RLEvent:
     provider: Optional[str] = None
     model: Optional[str] = None
     task_type: Optional[str] = None
-    vertical: str = "coding"
+    vertical: str = DEFAULT_VERTICAL
 
     # Outcome data
     success: Optional[bool] = None
@@ -359,7 +391,7 @@ class RLHookRegistry:
             model=event.model or "",
             task_type=event.task_type or "general",
             success=event.success if event.success is not None else True,
-            quality_score=event.quality_score if event.quality_score is not None else 0.5,
+            quality_score=(event.quality_score if event.quality_score is not None else 0.5),
             metadata={
                 "event_type": event.type.value,
                 "tool_name": event.tool_name,

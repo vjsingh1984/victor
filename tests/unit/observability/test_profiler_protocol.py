@@ -16,7 +16,7 @@
 
 from pathlib import Path
 
-from victor.profiler.protocol import (
+from victor.observability.profiler.protocol import (
     Benchmark,
     BenchmarkSuite,
     CallGraphNode,

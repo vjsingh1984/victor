@@ -368,6 +368,50 @@ class TestPersonaRegistryFind:
 
         assert len(personas) == 2  # Both have senior and coding
 
+    def test_registry_replacement_updates_indexes(self):
+        """Replacing a persona should remove stale indexed lookup entries."""
+        registry = PersonaRegistry()
+        original = PersonaSpec(
+            name="persona",
+            role="Old Role",
+            expertise=["legacy"],
+            tags=["old"],
+        )
+        replacement = PersonaSpec(
+            name="persona",
+            role="New Role",
+            expertise=["modern"],
+            tags=["new"],
+        )
+
+        registry.register("persona", original, vertical="coding")
+        registry.register("persona", replacement, vertical="coding", replace=True)
+
+        assert registry.find_by_tag("old") == []
+        assert registry.find_by_expertise("legacy") == []
+        assert registry.find_by_role("Old Role") == []
+        assert registry.find_by_tag("new") == [replacement]
+        assert registry.find_by_expertise("modern") == [replacement]
+        assert registry.find_by_vertical("coding") == [replacement]
+
+    def test_registry_unregister_clears_index_entries(self):
+        """Unregistering a persona should remove all indexed lookup entries."""
+        registry = PersonaRegistry()
+        spec = PersonaSpec(
+            name="persona",
+            role="Indexed Role",
+            expertise=["python"],
+            tags=["review"],
+        )
+
+        registry.register("persona", spec, vertical="coding")
+        assert registry.unregister("persona", vertical="coding") is True
+
+        assert registry.find_by_tag("review") == []
+        assert registry.find_by_expertise("python") == []
+        assert registry.find_by_role("Indexed Role") == []
+        assert registry.find_by_vertical("coding") == []
+
 
 # =============================================================================
 # PersonaRegistry Bulk Operations Tests

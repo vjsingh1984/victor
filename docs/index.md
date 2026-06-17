@@ -1,177 +1,186 @@
-<div align="center">
+# Victor AI Framework — Documentation
 
-# Victor Documentation
+> **Contract-first, service-first agentic AI framework** for building agents that reason,
+> call tools, execute DAG workflows, and coordinate multi-agent teams across 24+ LLM providers.
 
-**Open-source agentic AI framework. Build, orchestrate, and evaluate AI agents across 24 providers.**
-
-[![PyPI version](https://badge.fury.io/py/victor-ai.svg)](https://pypi.org/project/victor-ai/)
-[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Tests](https://github.com/vjsingh1984/victor/actions/workflows/test.yml/badge.svg)](https://github.com/vjsingh1984/victor/actions/workflows/test.yml)
-
-</div>
-
----
-
-## Welcome! 👋
-
-Victor is an open-source agentic AI framework supporting **24 LLM providers** with **34 tool modules** across **9 domain verticals**. Whether you need local development with Ollama, cloud capabilities with Claude/GPT, or enterprise deployments with Azure/AWS, Victor provides a unified interface with powerful features like multi-agent teams, stateful workflows, event sourcing, semantic codebase search, and air-gapped mode support.
-
-## What is Victor?
-
-Victor is an **agentic AI framework** that gives you the freedom to choose between local and cloud LLM providers through a single, consistent CLI/TUI interface. Built with extensibility in mind, Victor's vertical architecture lets you specialize workflows for coding, DevOps, RAG, data analysis, research, security, IaC, classification, and benchmarking tasks.
-
-### Key Highlights
-
-- 🌐 **24 LLM Providers** - Switch between Anthropic, OpenAI, Google, Azure, AWS Bedrock, Vertex, Ollama, LM Studio, vLLM, and more
-- 🛠️ **33 Tool Modules** - Across 9 domain verticals (Coding, DevOps, RAG, Data Analysis, Research, Security, IaC, Classification, Benchmark)
-- 🔄 **YAML-First Workflows** - Define multi-step automation with StateGraph DSL and checkpointing
-- 🔒 **Air-Gapped Mode** - Full functionality with local models for secure, offline environments
-- 🔍 **Semantic Codebase Search** - Context-aware code understanding with Tree-sitter and embeddings
-- 🤖 **Multi-Agent Teams** - Coordinate specialized agents for complex tasks
-- 🔌 **MCP Protocol Support** - Model Context Protocol for IDE integration
-- ⚡ **Provider Switching** - Change models mid-conversation without losing context
-
-## Quick Navigation
-
-### 🚀 Getting Started
-New to Victor? Start here!
-
-- **[Installation](getting-started/installation.md)** - Install Victor via pip, pipx, or Docker
-- **[Quick Start](getting-started/quickstart.md)** - Get up and running in 5 minutes
-- **[Configuration](getting-started/configuration.md)** - Configure providers, profiles, and settings
-- **[First Run](getting-started/first-run.md)** - Initialize your Victor environment
-
-### 📖 User Guide
-Master Victor's features and capabilities.
-
-- **[CLI Commands](reference/cli-commands.md)** - Complete command reference
-- **[User Guide Index](user-guide/index.md)** - Comprehensive user documentation
-- **[Providers](user-guide/providers.md)** - LLM provider configuration and comparison
-- **[Tools](user-guide/tools.md)** - Available tools and usage examples
-- **[Workflows](user-guide/workflows.md)** - Create and manage YAML workflows
-- **[TUI Mode](user-guide/tui-mode.md)** - Terminal user interface guide
-- **[Session Management](user-guide/session-management.md)** - Manage conversation sessions
-- **[Troubleshooting](user-guide/troubleshooting.md)** - Common issues and solutions
-
-### 📚 Tutorials
-Learn by doing with hands-on tutorials.
-
-- **[Build a Custom Tool](tutorials/build-custom-tool.md)** - Create your own tools
-- **[Create a Workflow](tutorials/create-workflow.md)** - Design multi-step automation
-- **[Integrate a Provider](tutorials/integrate-provider.md)** - Add a new LLM provider
-
-### 🔧 Reference
-In-depth technical documentation.
-
-- **[Configuration Options](reference/configuration-options.md)** - Complete settings reference
-- **[Environment Variables](reference/environment-variables.md)** - All environment variables
-- **[CLI Commands](reference/cli-commands.md)** - Command-line interface reference
-- **[API Reference](api-reference/)** - Python API documentation
-  - [Protocols](api-reference/protocols.md) - Core protocol definitions
-  - [Providers](api-reference/providers.md) - Provider API
-  - [Tools](api-reference/tools.md) - Tool API
-  - [Workflows](api-reference/workflows.md) - Workflow API
-
-### 🏗️ Development
-Contributor and architect documentation.
-
-- **[Development Setup](development/setup.md)** - Development environment setup
-- **[Code Style](development/code-style.md)** - Coding standards and conventions
-- **[Testing](development/testing.md)** - Testing strategy and guidelines
-- **[Architecture Overview](architecture/overview.md)** - System architecture and design
-- **[Extending Victor](development/index.md)** - Plugin development and extensions
-  - [Plugins](development/extending/plugins.md) - Build plugins
-  - [Verticals](development/extending/verticals.md) - Create domain verticals
-- **[Releasing](development/releasing/publishing.md)** - Release and publishing process
-
-### 🎯 Verticals
-Domain-specific documentation.
-
-- **[Coding](verticals/coding.md)** - AST analysis, code review, test generation
-- **[DevOps](verticals/devops.md)** - CI/CD, Docker, Terraform, infrastructure
-- **[RAG](verticals/rag.md)** - Document ingestion, vector search, retrieval
-- **[Data Analysis](verticals/data-analysis.md)** - Pandas, visualization, statistics
-- **[Research](verticals/research.md)** - Web search, citations, synthesis
-- **[Security](verticals/security.md)** - Vulnerability scanning, audit, compliance
-- **[IaC](verticals/iac.md)** - Infrastructure as Code management
-- **[Classification](verticals/classification.md)** - Text/data classification pipelines
-- **[Benchmark](verticals/benchmark.md)** - Agent evaluation and benchmarking
-
-## Project Information
-
-### Version
-**Current Version:** v0.5.4 (see [CHANGELOG](../CHANGELOG.md))
-
-### Links
-- **[GitHub Repository](https://github.com/vjsingh1984/victor)** - Source code and issues
-- **[PyPI Package](https://pypi.org/project/victor-ai/)** - Install via pip
-- **[Contributing Guide](../CONTRIBUTING.md)** - How to contribute
-- **[Code of Conduct](../CODE_OF_CONDUCT.md)** - Community guidelines
-- **[Security Policy](../SECURITY.md)** - Security reporting and policies
-
-### License
-Apache License 2.0 - see [LICENSE](../LICENSE) for details.
+**Version**: 0.7.0 | **License**: Apache-2.0 | **Python**: 3.10+
 
 ---
 
 ## Quick Start
 
-### Choose Your Path
-
 ```bash
-# Local model (privacy, offline, free tier)
-pipx install victor-ai
-ollama pull qwen2.5-coder:7b
-victor chat "Hello"
-
-# Cloud model (max capability)
-pipx install victor-ai
-export ANTHROPIC_API_KEY=sk-...
-victor chat --provider anthropic
-
-# Docker (isolated environment)
-docker pull ghcr.io/vjsingh1984/victor:latest
-docker run -it -v ~/.victor:/root/.victor ghcr.io/vjsingh1984/victor:latest
+pip install victor-ai
+export ANTHROPIC_API_KEY=...
+victor chat "Explain this codebase"
 ```
-
-### Architecture Overview
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    CLIENTS                                       │
-│  CLI/TUI  │  VS Code (HTTP)  │  MCP Server  │  API Server       │
-└─────────────────────────┬───────────────────────────────────────┘
-                          ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                 AGENT ORCHESTRATOR (Facade)                      │
-│  Delegates to: ConversationController, ToolPipeline,            │
-│  StreamingController, ProviderManager, ToolRegistrar            │
-└─────────────────────────┬───────────────────────────────────────┘
-                          ▼
-┌───────────┬─────────────┬───────────────┬───────────────────────┐
-│ PROVIDERS │   TOOLS     │  WORKFLOWS    │  VERTICALS            │
-│  22       │   33        │  StateGraph   │  9 domains: Coding,   │
-│           │  modules    │  + YAML       │  DevOps, RAG, + 6 more│
-└───────────┴─────────────┴───────────────┴───────────────────────┘
-```
-
-### Key Concepts
-
-- **Provider Agnosticism** - Switch between 24 LLM providers seamlessly
-- **Vertical Architecture** - Self-contained domains with specialized tools
-- **YAML Workflows** - Declarative workflow definitions with Python escape hatches
-- **StateGraph DSL** - LangGraph-compatible workflow API for complex automation
-- **Multi-Agent Coordination** - Team formations with specialized roles
-- **SOLID Compliance** - Clean architecture following SOLID principles
-
-## Support & Community
-
-- **Documentation** - You are here! Explore the sections above
-- **GitHub Issues** - [Report bugs or request features](https://github.com/vjsingh1984/victor/issues)
-- **Discussions** - [Join community discussions](https://github.com/vjsingh1984/victor/discussions)
-- **Contributing** - See [Contributing Guide](../CONTRIBUTING.md) for details
 
 ---
 
-**Built with ❤️ by the Victor community**
+## Architecture at a Glance
+
+```mermaid
+flowchart TB
+    subgraph Clients["CLIENT LAYER"]
+        CLI["CLI / TUI"]
+        API["HTTP API"]
+        MCP["MCP Server"]
+        VSC["VS Code"]
+    end
+    subgraph Framework["FRAMEWORK LAYER"]
+        Agent["Agent API"]
+        SG["StateGraph"]
+        WE["WorkflowEngine"]
+        Tools["Tool Registry"]
+    end
+    subgraph Services["SERVICE LAYER (6 canonical)"]
+        CS["ChatService"]
+        TS["ToolService"]
+        SS["SessionService"]
+        CX["ContextService"]
+        PS["ProviderService"]
+        RS["RecoveryService"]
+    end
+    subgraph Runtime["RUNTIME"]
+        ORC["AgentOrchestrator (Facade)"]
+        AL["AgenticLoop"]
+        TP["ToolPipeline"]
+    end
+    subgraph Providers["PROVIDERS (24+)"]
+        Prov["Anthropic, OpenAI, Gemini, Ollama, Bedrock + 19"]
+    end
+    subgraph ToolModules["TOOLS (34 modules)"]
+        T1["Filesystem, Git, Shell, Web, Docker, Verification"]
+    end
+    subgraph Storage["STORAGE"]
+        GDB["Global DB ~/.victor/victor.db"]
+        PDB["Project DB ./.victor/project.db"]
+    end
+    Clients --> Framework --> Runtime --> Services
+    Services --> Providers
+    Services --> ToolModules
+    Runtime --> Storage
+```
+
+**Start here** → [System Architecture](architecture.md) for the full picture.
+
+---
+
+## Documentation Map
+
+### Core Documents (Start Here)
+
+| Document | Description |
+|----------|-------------|
+| **[System Architecture](architecture.md)** | **Single source of truth** — layers, services, providers, tools, state, extensions, diagrams |
+| **[Features](features.md)** | Complete feature catalog grounded in implementation |
+| **[Roadmap](roadmap.md)** | 90-day priorities, directional horizons, tech debt register |
+| **[Tech Stack](tech-stack.md)** | Technology choices, dependency map, technical debt |
+
+### Architecture Deep-Dives
+
+| Document | Description |
+|----------|-------------|
+| [Orchestrator Decomposition](architecture/orchestrator_decomposition.md) | Facade pattern, 6 services, 23 coordinators, 10 boundary modules |
+| [SDK Boundary](architecture/CONTRACTS_BOUNDARY.md) | Plugin/vertical/extension contracts and import rules |
+| [State-Passed Architecture](architecture/state-passed-architecture.md) | Coordinator patterns, ContextSnapshot, CoordinatorResult |
+| [Streaming Pipeline](architecture/streaming-pipeline.md) | Streaming execution pipeline design |
+| [Smart Routing](architecture/smart_routing.md) | Provider routing and selection |
+| [Edge Provider Strategy](architecture/edge-provider-tool-strategy.md) | Edge model decisions |
+| [ADR Index](architecture/adr/) | Architecture Decision Records |
+
+### User Guides
+
+| Document | Description |
+|----------|-------------|
+| [CLI Reference](user-guide/cli-reference.md) | All `victor` CLI commands and flags |
+| [Workflows](user-guide/workflows.md) | StateGraph and YAML workflow DSL |
+| [Providers](user-guide/providers.md) | Provider configuration and switching |
+| [Tools](user-guide/tools.md) | Built-in tool modules and usage |
+| [Session Management](user-guide/session-management.md) | Sessions, context, state scopes |
+| [Troubleshooting](user-guide/troubleshooting.md) | Common issues and solutions |
+
+### Developer Guides
+
+| Document | Description |
+|----------|-------------|
+| [Development Setup](development/setup.md) | Install, venv, pre-commit, editor config |
+| [Testing Strategy](development/testing.md) | Unit/integration/benchmark, autouse fixtures |
+| [Code Style](development/code-style.md) | Black, ruff, mypy, line length 100 |
+| [Service Guide](development/SERVICE_GUIDE.md) | Service layer development patterns |
+| [Deprecation Policy](development/deprecation-policy.md) | How deprecations are managed |
+| [PR Workflow](development/PR_WORKFLOW.md) | Branch hygiene, commit conventions, review process |
+| [FEP Process](FEP_PROCESS.md) | Framework Enhancement Proposal workflow |
+| [Plugin Development](development/extending/plugins.md) | Creating Victor plugins |
+| [Vertical Development](development/extending/verticals.md) | Building domain verticals |
+
+### API Reference
+
+| Document | Description |
+|----------|-------------|
+| [Providers API](api-reference/providers.md) | Provider adapter interface |
+| [Tools API](api-reference/tools.md) | Tool registration and execution |
+| [Workflows API](api-reference/workflows.md) | Workflow compiler and executor |
+| [Protocols](api-reference/protocols.md) | Core protocols and interfaces |
+
+### Configuration Reference
+
+| Document | Description |
+|----------|-------------|
+| [Settings Reference](reference/settings-reference.md) | All 26+ config groups |
+| [Configuration Options](reference/configuration-options.md) | Detailed config options |
+| [Environment Variables](reference/environment-variables.md) | All env vars |
+| [Provider Comparison](reference/providers-comparison.md) | Feature matrix for 24+ providers |
+| [CLI Commands](reference/cli-commands.md) | CLI command reference |
+| [Skills](reference/skills.md) | Skill registry and YAML definitions |
+| [Embeddings](reference/embeddings.md) | Embedding backends and configuration |
+
+### Verticals
+
+| Document | Description |
+|----------|-------------|
+| [Coding](verticals/coding.md) | Code review, editing, test generation |
+| [DevOps](verticals/devops.md) | Infrastructure, CI/CD, containers |
+| [RAG](verticals/rag.md) | Retrieval, ingestion, search |
+| [Data Analysis](verticals/data-analysis.md) | Dataframes, statistics, visualization |
+| [Research](verticals/research.md) | Source research, synthesis |
+| [API Reference](verticals/api_reference.md) | Vertical API reference |
+
+### Tutorials
+
+| Document | Description |
+|----------|-------------|
+| [Build Custom Tool](tutorials/build-custom-tool.md) | Step-by-step tool creation |
+| [Create Workflow](tutorials/create-workflow.md) | Workflow DSL tutorial |
+| [Integrate Provider](tutorials/integrate-provider.md) | Provider adapter tutorial |
+
+### Guides
+
+| Document | Description |
+|----------|-------------|
+| [Observability](guides/observability/) | Monitoring and tracing |
+| [MCP Server](guides/VICTOR_AS_MCP_SERVER.md) | Using Victor as MCP server |
+| [Task Completion](guides/task_completion.md) | Task fulfillment detection |
+| [Workflows](guides/WORKFLOW_SCHEDULER.md) | Workflow scheduler guide |
+
+---
+
+## Document Governance
+
+| Priority | Document | Role |
+|----------|----------|------|
+| **Canonical** | `docs/architecture.md` | System architecture (single source of truth) |
+| **Canonical** | `docs/features.md` | Feature catalog |
+| **Canonical** | `docs/roadmap.md` | Roadmap and tech debt |
+| **Canonical** | `docs/tech-stack.md` | Technology stack |
+| **Canonical** | `VISION.md` | Product vision |
+| **Redirect** | `ARCHITECTURE.md` | Points to `docs/architecture.md` |
+| **Redirect** | `roadmap.md` | Points to `docs/roadmap.md` |
+| **Superseded** | `docs/diagrams/` | Inline diagrams in master docs preferred |
+
+---
+
+## Contributing
+
+See [Development Setup](development/setup.md) and [PR Workflow](development/PR_WORKFLOW.md).
+All contributions require conventional commits and pass `make lint && make test`.

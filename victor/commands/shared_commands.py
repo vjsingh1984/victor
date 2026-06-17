@@ -15,7 +15,7 @@
 """Shared Command Definitions.
 
 Provides a unified command interface that works across all clients:
-- CLI/TUI (Python)
+- CLI (Python)
 - VS Code Extension (TypeScript)
 - MCP Clients
 
@@ -270,7 +270,7 @@ SHARED_COMMANDS: List[CommandDefinition] = [
                 type=ParameterType.CHOICE,
                 description="Agent mode",
                 required=True,
-                choices=["build", "plan", "explore", "chat"],
+                choices=["build", "plan", "review", "delegate", "explore", "chat"],
             ),
         ],
         examples=["/mode build", "/mode explore"],
@@ -288,6 +288,20 @@ SHARED_COMMANDS: List[CommandDefinition] = [
         category=CommandCategory.MODE,
         aliases=["p"],
         examples=["/plan"],
+    ),
+    CommandDefinition(
+        name="review",
+        description="Switch to review mode (diagnostics and findings)",
+        category=CommandCategory.MODE,
+        aliases=["r"],
+        examples=["/review"],
+    ),
+    CommandDefinition(
+        name="delegate",
+        description="Switch to delegate mode (parallel work planning)",
+        category=CommandCategory.MODE,
+        aliases=["d"],
+        examples=["/delegate"],
     ),
     CommandDefinition(
         name="explore",

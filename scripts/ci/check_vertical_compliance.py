@@ -28,8 +28,13 @@ COMPLIANCE_LEVELS = {
     "Basic": {"tool_dependencies", "safety"},
     "Standard": {"tool_dependencies", "safety", "mode_config", "middleware"},
     "Full": {
-        "tool_dependencies", "safety", "mode_config", "middleware",
-        "workflows", "teams", "service_provider",
+        "tool_dependencies",
+        "safety",
+        "mode_config",
+        "middleware",
+        "workflows",
+        "teams",
+        "service_provider",
     },
 }
 
@@ -87,13 +92,15 @@ def main() -> int:
             api_ver = "?"
             provides_str = f"(manifest unavailable: {exc})"
 
-        rows.append({
-            "name": name,
-            "version": version,
-            "api_version": api_ver,
-            "level": level,
-            "provides": provides_str,
-        })
+        rows.append(
+            {
+                "name": name,
+                "version": version,
+                "api_version": api_ver,
+                "level": level,
+                "provides": provides_str,
+            }
+        )
 
     # Output markdown table
     print("## Vertical Compliance Report")

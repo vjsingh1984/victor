@@ -15,7 +15,9 @@
 """Specialized RL learners for different parameter types."""
 
 from victor.framework.rl.learners.context_pruning import ContextPruningLearner
-from victor.framework.rl.learners.continuation_patience import ContinuationPatienceLearner
+from victor.framework.rl.learners.continuation_patience import (
+    ContinuationPatienceLearner,
+)
 from victor.framework.rl.learners.continuation_prompts import ContinuationPromptLearner
 from victor.framework.rl.learners.cross_vertical import CrossVerticalLearner
 from victor.framework.rl.learners.model_selector import ModelSelectorLearner

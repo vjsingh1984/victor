@@ -185,7 +185,7 @@ class AdaptiveFormation(BaseFormationStrategy):
         """
         # Initialize formation if needed
         if self._current_formation is None:
-            self._select_initial_formation(task)
+            self._select_initial_formation(task, context)
 
         # Track execution
         start_time = time.time()
@@ -272,12 +272,24 @@ class AdaptiveFormation(BaseFormationStrategy):
                 )
             ]
 
-    def _select_initial_formation(self, task: AgentMessage) -> None:
+    def _select_initial_formation(self, task: AgentMessage, context: TeamContext) -> None:
         """Select initial formation based on task characteristics.
 
         Args:
             task: Task message to analyze
+            context: Team context containing optional formation hints
         """
+        formation_hint = self._resolve_initial_formation_hint(context)
+        if formation_hint:
+            if formation_hint in self.formation_cycle:
+                self._formation_index = self.formation_cycle.index(formation_hint)
+                self._load_formation()
+                return
+
+            self._current_formation_name = formation_hint
+            self._current_formation = self._create_formation(formation_hint)
+            return
+
         # Use task length/complexity to select initial formation
         task_size = len(task.content)
 
@@ -292,6 +304,14 @@ class AdaptiveFormation(BaseFormationStrategy):
             self._formation_index = 0  # sequential
 
         self._load_formation()
+
+    @staticmethod
+    def _resolve_initial_formation_hint(context: TeamContext) -> Optional[str]:
+        """Resolve explicit formation override from shared context or metadata."""
+        raw_hint = context.get("initial_formation_hint") or context.get("formation_hint")
+        if not raw_hint:
+            return None
+        return str(raw_hint).strip().lower()
 
     def _load_formation(self) -> None:
         """Load the formation at current index in cycle."""

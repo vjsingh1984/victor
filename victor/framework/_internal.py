@@ -22,17 +22,22 @@ Phase 4 - Agent Creation Unification:
 
 from __future__ import annotations
 
+import logging
 import os
 from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional, Type, Union
 
+from victor.agent.config import FrameworkCompatibleAgentConfig, normalize_agent_config
+from victor.core.completion_markers import strip_active_completion_markers
 from victor.framework.event_registry import EventTarget, get_event_registry
 from victor.framework.events import (
     AgentExecutionEvent,
     EventType,
     error_event,
+    milestone_event,
     stream_end_event,
     stream_start_event,
 )
+from victor.framework.task import DirectResponseOutputState
 from victor.framework.tools import ToolSet
 from victor.framework.protocols import ObservabilityPortProtocol
 
@@ -42,9 +47,32 @@ from victor.framework.capability_runtime import (
     invoke_capability as _invoke_capability,
 )
 
+logger = logging.getLogger(__name__)
+
 if TYPE_CHECKING:
-    from victor.framework.config import AgentConfig
     from victor.core.verticals.base import VerticalBase
+
+
+def _sanitize_stream_error_message(error: Exception) -> str:
+    """Return a bounded error string suitable for streaming UI surfaces."""
+    response = getattr(error, "response", None)
+    status_code = getattr(response, "status_code", None)
+    response_text = getattr(response, "text", None)
+    raw_message = response_text if isinstance(response_text, str) and response_text else str(error)
+    message = raw_message.strip() or f"{type(error).__name__}: {error!r}"
+    lowered = message.lower()
+
+    if "<html" in lowered or "<body" in lowered or "<!doctype html" in lowered:
+        status = f" (HTTP {status_code})" if isinstance(status_code, int) else ""
+        return (
+            "Provider returned an HTML authentication page"
+            f"{status}. Credentials may be expired, missing, or not accepted by the endpoint."
+        )
+
+    max_len = 1000
+    if len(message) > max_len:
+        return f"{message[:max_len].rstrip()}..."
+    return message
 
 
 async def create_orchestrator_from_options(
@@ -57,7 +85,7 @@ async def create_orchestrator_from_options(
     airgapped: bool,
     profile: Optional[str],
     workspace: Optional[str],
-    config: Optional["AgentConfig"],
+    config: Optional[FrameworkCompatibleAgentConfig],
     system_prompt: Optional[str] = None,
     enable_observability: bool = True,
     session_id: Optional[str] = None,
@@ -101,6 +129,8 @@ async def create_orchestrator_from_options(
     # Load settings
     settings = load_settings()
 
+    config = normalize_agent_config(config)
+
     # Apply config overrides
     if config:
         for key, value in config.to_settings_dict().items():
@@ -109,7 +139,7 @@ async def create_orchestrator_from_options(
 
     # Apply airgapped mode
     if airgapped:
-        settings.airgapped_mode = True
+        settings.security.airgapped_mode = True
 
     if getattr(settings, "framework_private_fallback_strict_mode", False):
         os.environ.setdefault("VICTOR_STRICT_FRAMEWORK_PRIVATE_FALLBACKS", "1")
@@ -131,7 +161,7 @@ async def create_orchestrator_from_options(
     # Create OrchestratorFactory with provider
     provider_class = ProviderRegistry.get(provider)
     provider_instance = provider_class(
-        model=model or settings.default_model,
+        model=model or settings.provider.default_model,
         temperature=temperature,
         max_tokens=max_tokens,
     )
@@ -139,7 +169,7 @@ async def create_orchestrator_from_options(
     factory = OrchestratorFactory(
         settings=settings,
         provider=provider_instance,
-        model=model or settings.default_model,
+        model=model or settings.provider.default_model,
         temperature=temperature,
         max_tokens=max_tokens,
         profile_name=profile or "default",
@@ -151,7 +181,7 @@ async def create_orchestrator_from_options(
     agent = await factory.create_agent(
         mode="foreground",
         provider=provider,
-        model=model or settings.default_model,
+        model=model or settings.provider.default_model,
         tools=tools,
         airgapped=airgapped,
         vertical=vertical,
@@ -217,6 +247,16 @@ def setup_observability_integration(
 
     # Wire into orchestrator
     integration.wire_orchestrator(orchestrator)
+
+    # Wire provider resilience notifications to the same bus so dashboard
+    # and other subscribers see fallback events.  Follows the same pattern
+    # as CircuitBreakerRegistry.wire_observability().
+    try:
+        from victor.providers.resilience import ResilientProvider
+
+        ResilientProvider.wire_observability(integration.event_bus)
+    except Exception:
+        pass  # Non-critical — resilience works without observability
 
     # Ensure reference is stored through public observability ports.
     if isinstance(orchestrator, ObservabilityPortProtocol):
@@ -309,6 +349,8 @@ def configure_tools(
 async def stream_with_events(
     orchestrator: Any,
     prompt: str,
+    *,
+    response_prompt: Optional[str] = None,
 ) -> AsyncIterator[AgentExecutionEvent]:
     """Stream orchestrator response as framework AgentExecutionEvents.
 
@@ -317,12 +359,15 @@ async def stream_with_events(
 
     Args:
         orchestrator: AgentOrchestrator instance
-        prompt: User prompt
+        prompt: Prompt sent to the runtime
+        response_prompt: Original user prompt for output normalization
 
     Yields:
         AgentExecutionEvent objects representing agent actions
     """
     registry = get_event_registry()
+    output_state = DirectResponseOutputState(response_prompt or prompt)
+    saw_content_event = False
 
     # Emit stream start
     yield stream_start_event()
@@ -331,6 +376,10 @@ async def stream_with_events(
         async for chunk in orchestrator.stream_chat(prompt):
             metadata = getattr(chunk, "metadata", None)
             chunk_metadata = metadata if isinstance(metadata, dict) else {}
+
+            status_message = chunk_metadata.get("status") or chunk_metadata.get("status_update")
+            if status_message:
+                yield milestone_event(str(status_message), metadata=chunk_metadata)
 
             reasoning_content = chunk_metadata.get("reasoning_content")
             if reasoning_content:
@@ -341,8 +390,12 @@ async def stream_with_events(
                     metadata=chunk_metadata,
                 )
 
-            content = getattr(chunk, "content", "")
+            content = output_state.consume_stream_content(
+                getattr(chunk, "content", ""),
+                metadata=chunk_metadata,
+            )
             if content:
+                saw_content_event = True
                 yield registry.from_external(
                     {"content": content},
                     "content",
@@ -392,12 +445,33 @@ async def stream_with_events(
                     metadata=chunk_metadata,
                 )
 
+        final_content, final_metadata = output_state.flush_stream_content()
+        if final_content:
+            saw_content_event = True
+            yield registry.from_external(
+                {"content": final_content},
+                "content",
+                EventTarget.STREAM_CHUNK,
+                metadata=final_metadata,
+            )
+        elif not saw_content_event:
+            fallback_content = _get_stream_completion_fallback(orchestrator, output_state)
+            if fallback_content:
+                yield registry.from_external(
+                    {"content": fallback_content},
+                    "content",
+                    EventTarget.STREAM_CHUNK,
+                    metadata={"source": "completion_summary_fallback"},
+                )
+
         # Emit stream end
         yield stream_end_event(success=True)
 
     except Exception as e:
-        yield error_event(str(e), recoverable=False)
-        yield stream_end_event(success=False, error=str(e))
+        error_message = _sanitize_stream_error_message(e)
+        logger.exception("stream_with_events failed: %s", error_message)
+        yield error_event(error_message, recoverable=False)
+        yield stream_end_event(success=False, error=error_message)
 
 
 def format_context_message(context: Dict[str, Any]) -> Optional[str]:
@@ -432,6 +506,20 @@ def format_context_message(context: Dict[str, Any]) -> Optional[str]:
             parts.append(f"{key}: {value}")
 
     return "\n".join(parts) if parts else None
+
+
+def _get_stream_completion_fallback(
+    orchestrator: Any,
+    output_state: DirectResponseOutputState,
+) -> str:
+    """Return a best-effort terminal content fallback for swallowed streams."""
+    detector = getattr(orchestrator, "_task_completion_detector", None)
+    state = getattr(detector, "_state", None) if detector is not None else None
+    last_summary = getattr(state, "last_summary", "") if state is not None else ""
+    normalized = strip_active_completion_markers(last_summary or "").strip()
+    if not normalized:
+        return ""
+    return output_state.normalize_final_response(normalized).strip()
 
 
 def collect_tool_calls(events: List[AgentExecutionEvent]) -> List[Dict[str, Any]]:

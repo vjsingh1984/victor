@@ -37,7 +37,7 @@ class TestPythonCallExtractor:
 
         assert result.success
         assert len(result.tool_calls) == 1
-        assert result.tool_calls[0].name == "read_file"
+        assert result.tool_calls[0].name == "read"
         assert result.tool_calls[0].arguments == {"path": "foo.py"}
 
     def test_simple_double_quoted_arg(self):
@@ -48,7 +48,7 @@ class TestPythonCallExtractor:
         assert result.success
         assert len(result.tool_calls) == 1
         assert result.tool_calls[0].name == "shell"
-        assert result.tool_calls[0].arguments == {"command": "ls -la"}
+        assert result.tool_calls[0].arguments == {"cmd": "ls -la"}
 
     def test_multiple_arguments(self):
         """Test extraction with multiple arguments."""
@@ -59,9 +59,9 @@ class TestPythonCallExtractor:
         assert len(result.tool_calls) == 1
         tc = result.tool_calls[0]
         assert tc.name == "edit"
-        assert tc.arguments["file_path"] == "/path/to/file"
-        assert tc.arguments["old_string"] == "foo"
-        assert tc.arguments["new_string"] == "bar"
+        assert tc.arguments["path"] == "/path/to/file"
+        assert tc.arguments["old_str"] == "foo"
+        assert tc.arguments["new_str"] == "bar"
 
     def test_numeric_argument(self):
         """Test extraction with numeric argument."""
@@ -100,6 +100,14 @@ class TestPythonCallExtractor:
         assert result.success
         assert len(result.tool_calls) == 1
         assert result.tool_calls[0].name == "read"
+
+    def test_valid_tool_names_require_exact_match(self):
+        """Explicit valid names should disable generic tool-name heuristics."""
+        content = "get_paper(path='paper.py') and read(path='foo.py')"
+        result = self.extractor.extract_from_text(content, valid_tool_names={"read"})
+
+        assert result.success
+        assert [tool_call.name for tool_call in result.tool_calls] == ["read"]
 
     def test_strict_mode(self):
         """Test strict mode only extracts known tools."""
@@ -172,7 +180,7 @@ class TestPythonCallExtractorEdgeCases:
         result = self.extractor.extract_from_text(content)
 
         assert result.success
-        assert result.tool_calls[0].arguments["command"] == "echo 'hello world'"
+        assert result.tool_calls[0].arguments["cmd"] == "echo 'hello world'"
 
     def test_path_with_spaces(self):
         """Test path with spaces."""
@@ -207,7 +215,7 @@ line3')"""
         result = self.extractor.extract_from_text(content)
 
         assert result.success
-        assert result.tool_calls[0].name == "read_file"
+        assert result.tool_calls[0].name == "read"
 
     def test_no_arguments(self):
         """Test function call with no arguments."""
@@ -230,13 +238,61 @@ line3')"""
         assert "print" not in names
         assert "len" not in names
 
+    def test_function_signature_is_ignored_without_parse_warning(self):
+        """Typed Python signatures should not be treated like tool calls."""
+        content = "def get_paper(self, arxiv_id: str) -> Paper | None:\n    pass"
+        result = self.extractor.extract_from_text(content, valid_tool_names={"read", "write"})
+
+        assert not result.success
+        assert result.tool_calls == []
+        assert result.warnings == []
+
+    def test_placeholder_identifiers_are_not_parsed_as_literal_arguments(self):
+        """Fallback parsing must reject unresolved identifiers copied from code snippets."""
+        content = "code_search(query=query, top_k=fetch_k, category=category, min_score=min_s)"
+        result = self.extractor.extract_from_text(content, valid_tool_names={"code_search"})
+
+        assert not result.success
+        assert result.tool_calls == []
+        assert result.warnings
+
+    def test_explanatory_inline_graph_examples_are_ignored_without_warnings(self):
+        """Narrative citations like Source: graph(...) should not trigger tool parsing."""
+        content = "Source: graph(mode=overview) and graph(mode=stats)"
+        result = self.extractor.extract_from_text(content, valid_tool_names={"graph"})
+
+        assert not result.success
+        assert result.tool_calls == []
+        assert result.warnings == []
+
+    def test_inline_helper_calls_in_explanatory_prose_are_ignored(self):
+        """Implementation notes should not turn helper() mentions into tool calls."""
+        content = "_load_graph() calls _get_or_build_index() from code_search_tool"
+        result = self.extractor.extract_from_text(content)
+
+        assert not result.success
+        assert result.tool_calls == []
+        assert result.warnings == []
+
+    def test_malformed_imperative_tool_call_still_emits_warning(self):
+        """Malformed tool-intent text should still surface a parse warning."""
+        content = "I'll use graph: graph(mode=overview)"
+        result = self.extractor.extract_from_text(content, valid_tool_names={"graph"})
+
+        assert not result.success
+        assert result.tool_calls == []
+        assert result.warnings
+
 
 class TestFallbackParsingMixinIntegration:
     """Tests for FallbackParsingMixin integration with text extraction."""
 
     def test_parse_python_call_from_content(self):
         """Test the mixin method for Python call parsing."""
-        from victor.agent.tool_calling.base import FallbackParsingMixin, ToolCallParseResult
+        from victor.agent.tool_calling.base import (
+            FallbackParsingMixin,
+            ToolCallParseResult,
+        )
 
         # Create a class that uses the mixin
         class TestMixin(FallbackParsingMixin):
@@ -268,6 +324,23 @@ class TestFallbackParsingMixinIntegration:
 
         assert result.tool_calls
         assert result.tool_calls[0].name == "read"
+
+    def test_parse_from_content_ignores_explanatory_graph_examples(self):
+        """Fallback parsing should not treat analytical citations as tool requests."""
+        from victor.agent.tool_calling.base import FallbackParsingMixin
+
+        class TestMixin(FallbackParsingMixin):
+            pass
+
+        mixin = TestMixin()
+        result = mixin.parse_from_content(
+            "Source: graph(mode=overview) and graph(mode=stats)",
+            valid_tool_names={"graph"},
+        )
+
+        assert result.tool_calls == []
+        assert result.warnings == []
+        assert "Source: graph(mode=overview)" in result.remaining_content
 
     def test_openai_adapter_fallback(self):
         """Test that OpenAI adapter falls back to content parsing."""

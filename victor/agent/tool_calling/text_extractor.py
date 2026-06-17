@@ -18,9 +18,9 @@ Many open-weight models hosted on OpenAI-compatible providers (Cerebras, Groq,
 Together, etc.) sometimes output tool calls as Python-like function calls in text
 instead of proper structured JSON tool_calls. For example:
 
-    read_file(path='victor/agent/orchestrator.py')
-    shell(command="ls -la")
-    edit(file_path="/path/to/file", old_string="foo", new_string="bar")
+    read(path='victor/agent/orchestrator.py')
+    shell(cmd="ls -la")
+    edit(path="/path/to/file", old_str="foo", new_str="bar")
 
 This module provides extraction logic to parse these text-based calls into
 structured tool call format that Victor can execute.
@@ -35,8 +35,8 @@ Usage:
 
     extractor = PythonCallExtractor()
     result = extractor.extract_from_text(
-        "I'll read the file: read_file(path='foo.py')",
-        valid_tool_names={"read_file", "write_file", "shell"}
+        "I'll read the file: read(path='foo.py')",
+        valid_tool_names={"read", "write", "shell"}
     )
     if result.tool_calls:
         for tc in result.tool_calls:
@@ -49,7 +49,19 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
+from victor.tools.core_tool_aliases import canonicalize_core_tool_name
+
 logger = logging.getLogger(__name__)
+
+_TOOL_INTENT_PREFIX_RE = re.compile(
+    r"""
+    (?:
+        \b(?:let\ me|i(?:'| wi)?ll|use|call|invoke|run|execute|try|check|inspect)\b
+        .*[:\-]\s*
+    )$
+    """,
+    re.IGNORECASE | re.VERBOSE,
+)
 
 
 @dataclass
@@ -188,7 +200,10 @@ class PythonCallExtractor:
             known_tools: Set of known/valid tool names. If None, uses defaults.
             strict_mode: If True, only extract calls for known tools.
         """
-        self._known_tools = known_tools or KNOWN_TOOL_PATTERNS
+        self._known_tools = {
+            canonicalize_core_tool_name(tool_name)
+            for tool_name in (known_tools or KNOWN_TOOL_PATTERNS)
+        }
         self._strict_mode = strict_mode
 
     def extract_from_text(
@@ -209,10 +224,12 @@ class PythonCallExtractor:
         if not content or not content.strip():
             return ExtractionResult(remaining_content=content)
 
-        # Combine known tools with valid names for filtering
-        filter_names = valid_tool_names or self._known_tools
-        if valid_tool_names:
-            filter_names = filter_names | self._known_tools
+        # Explicit valid_tool_names disables generic name heuristics.
+        filter_names = (
+            {canonicalize_core_tool_name(name) for name in valid_tool_names}
+            if valid_tool_names
+            else set(self._known_tools)
+        )
 
         tool_calls: List[ExtractedToolCall] = []
         warnings: List[str] = []
@@ -221,30 +238,50 @@ class PythonCallExtractor:
         # Try simple pattern first
         for match in PYTHON_CALL_PATTERN.finditer(content):
             name = match.group("name")
+            canonical_name = canonicalize_core_tool_name(name)
             args_str = match.group("args")
+            intent_context = self._has_tool_intent_context(content, match.start(), match.end())
+
+            if self._is_definition_context(content, match.start()):
+                continue
 
             # Filter by known/valid tool names
-            if self._strict_mode and name not in filter_names:
+            if self._strict_mode and canonical_name not in filter_names:
                 continue
 
             # Skip if name doesn't look like a tool
-            if not self._is_likely_tool_name(name, filter_names):
+            if not self._is_likely_tool_name(
+                canonical_name,
+                filter_names,
+                exact_match_required=valid_tool_names is not None,
+            ):
                 continue
 
             # Parse arguments
-            parsed_args, parse_warning = self._parse_arguments(args_str)
+            parsed_args, parse_warning = self._parse_arguments(
+                args_str,
+                log_warning=intent_context,
+            )
             if parse_warning:
-                warnings.append(f"{name}: {parse_warning}")
+                if intent_context:
+                    warnings.append(f"{name}: {parse_warning}")
                 # Still try to use partial results
                 if not parsed_args:
                     continue
 
+            parsed_args = self._canonicalize_arguments(canonical_name, parsed_args)
+
+            # Ignore incidental zero-arg references embedded in prose such as
+            # implementation notes like "_helper()" or headings like "tool()".
+            if not parsed_args and not intent_context:
+                continue
+
             # Calculate confidence based on various factors
-            confidence = self._calculate_confidence(name, parsed_args, filter_names)
+            confidence = self._calculate_confidence(canonical_name, parsed_args, filter_names)
 
             tool_calls.append(
                 ExtractedToolCall(
-                    name=name,
+                    name=canonical_name,
                     arguments=parsed_args,
                     raw_text=match.group(0),
                     start_pos=match.start(),
@@ -270,22 +307,67 @@ class PythonCallExtractor:
             warnings=warnings,
         )
 
-    def _is_likely_tool_name(self, name: str, valid_names: Set[str]) -> bool:
+    def _is_definition_context(self, content: str, start_pos: int) -> bool:
+        """Return True when a match occurs inside a Python definition header."""
+        line_start = content.rfind("\n", 0, start_pos) + 1
+        prefix = content[line_start:start_pos].strip()
+        return prefix.endswith("def") or prefix.endswith("async def") or prefix.endswith("class")
+
+    def _has_tool_intent_context(self, content: str, start_pos: int, end_pos: int) -> bool:
+        """Return True when text around a match looks like an actual tool request."""
+        line_start = content.rfind("\n", 0, start_pos) + 1
+        line_end = content.find("\n", end_pos)
+        if line_end == -1:
+            line_end = len(content)
+
+        before = content[line_start:start_pos]
+        after = content[end_pos:line_end]
+        stripped_before = before.strip()
+        stripped_after = after.strip()
+
+        # Ignore inline code spans and markdown examples.
+        if before.count("`") % 2 == 1:
+            return False
+
+        # Bare tool call on its own line, optionally under a bullet.
+        if not stripped_before:
+            return not stripped_after
+        if re.fullmatch(r"(?:[-*+]|\d+\.)", stripped_before):
+            return not stripped_after
+
+        # Imperative lead-ins like "Let me use:" or "I'll run:".
+        if _TOOL_INTENT_PREFIX_RE.search(stripped_before):
+            return True
+
+        return False
+
+    def _is_likely_tool_name(
+        self,
+        name: str,
+        valid_names: Set[str],
+        exact_match_required: bool = False,
+    ) -> bool:
         """Check if a name is likely a tool name.
 
         Args:
             name: Function name to check
             valid_names: Set of valid tool names
+            exact_match_required: When True, only exact valid_names matches count.
 
         Returns:
             True if name looks like a tool name
         """
+        canonical_name = canonicalize_core_tool_name(name)
+
         # Direct match
-        if name in valid_names:
+        if canonical_name in valid_names:
             return True
 
+        if exact_match_required:
+            return False
+
         # Check against known patterns
-        if name in self._known_tools:
+        if canonical_name in self._known_tools:
             return True
 
         # Heuristics for tool-like names
@@ -353,7 +435,47 @@ class PythonCallExtractor:
 
         return False
 
-    def _parse_arguments(self, args_str: str) -> Tuple[Dict[str, Any], Optional[str]]:
+    def _canonicalize_arguments(self, tool_name: str, args: Dict[str, Any]) -> Dict[str, Any]:
+        """Normalize extracted arguments onto the compact canonical core-tool surface."""
+        if not args:
+            return args
+
+        normalized = dict(args)
+
+        if tool_name == "shell":
+            if "command" in normalized and "cmd" not in normalized:
+                normalized["cmd"] = normalized.pop("command")
+            if "arg_0" in normalized and "cmd" not in normalized and len(normalized) == 1:
+                normalized["cmd"] = normalized.pop("arg_0")
+        elif tool_name in {"read", "write", "ls"}:
+            for alias in ("file_path", "filename", "file", "directory", "dir"):
+                if alias in normalized and "path" not in normalized:
+                    normalized["path"] = normalized.pop(alias)
+            if "arg_0" in normalized and "path" not in normalized and len(normalized) == 1:
+                normalized["path"] = normalized.pop("arg_0")
+        elif tool_name == "edit":
+            if "file_path" in normalized and "path" not in normalized:
+                normalized["path"] = normalized.pop("file_path")
+            if "old_string" in normalized and "old_str" not in normalized:
+                normalized["old_str"] = normalized.pop("old_string")
+            if "new_string" in normalized and "new_str" not in normalized:
+                normalized["new_str"] = normalized.pop("new_string")
+            if "operations" in normalized and "ops" not in normalized:
+                normalized["ops"] = normalized.pop("operations")
+        elif tool_name in {"grep", "search", "code_search"}:
+            if "pattern" in normalized and "query" not in normalized:
+                normalized["query"] = normalized.pop("pattern")
+            if "arg_0" in normalized and "query" not in normalized and len(normalized) == 1:
+                normalized["query"] = normalized.pop("arg_0")
+
+        return normalized
+
+    def _parse_arguments(
+        self,
+        args_str: str,
+        *,
+        log_warning: bool = True,
+    ) -> Tuple[Dict[str, Any], Optional[str]]:
         """Parse Python-style keyword arguments from a string.
 
         Handles formats like:
@@ -395,7 +517,7 @@ class PythonCallExtractor:
             pass  # Fall through to regex parsing
 
         # Method 2: Regex-based parsing (fallback)
-        return self._parse_arguments_regex(args_str)
+        return self._parse_arguments_regex(args_str, log_warning=log_warning)
 
     def _ast_to_value(self, node: ast.AST) -> Any:
         """Convert AST node to Python value.
@@ -407,12 +529,6 @@ class PythonCallExtractor:
             Python value (str, int, float, bool, None, list, dict)
         """
         if isinstance(node, ast.Constant):
-            return node.value
-        elif isinstance(node, ast.Str):  # Python 3.7 compat
-            return node.s
-        elif isinstance(node, ast.Num):  # Python 3.7 compat
-            return node.n
-        elif isinstance(node, ast.NameConstant):  # Python 3.7 compat
             return node.value
         elif isinstance(node, ast.List):
             return [self._ast_to_value(elt) for elt in node.elts]
@@ -429,15 +545,19 @@ class PythonCallExtractor:
                 return False
             elif node.id == "None":
                 return None
-            return node.id  # Return as string
+            raise ValueError(f"Non-literal identifier: {node.id}")
         elif isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.USub):
             # Handle negative numbers
             return -self._ast_to_value(node.operand)
         else:
-            # Unknown node type - return string representation
-            return ast.dump(node)
+            raise ValueError(f"Unsupported AST node: {type(node).__name__}")
 
-    def _parse_arguments_regex(self, args_str: str) -> Tuple[Dict[str, Any], Optional[str]]:
+    def _parse_arguments_regex(
+        self,
+        args_str: str,
+        *,
+        log_warning: bool = True,
+    ) -> Tuple[Dict[str, Any], Optional[str]]:
         """Parse arguments using regex (fallback method).
 
         Args:
@@ -459,7 +579,6 @@ class PythonCallExtractor:
                 |"([^"]*)"      # Double-quoted string
                 |(\d+\.?\d*)    # Number
                 |(True|False|None)  # Boolean/None
-                |(\w+)          # Unquoted identifier
             )
             """,
             re.VERBOSE,
@@ -478,8 +597,6 @@ class PythonCallExtractor:
             elif match.group(5) is not None:
                 bool_str = match.group(5)
                 value = {"True": True, "False": False, "None": None}.get(bool_str)
-            elif match.group(6) is not None:
-                value = match.group(6)
             else:
                 continue
 
@@ -487,6 +604,19 @@ class PythonCallExtractor:
 
         if not args_dict and args_str.strip():
             warning = f"Could not parse arguments: {args_str[:50]}..."
+            warning += "\n\nExpected format: concrete literal keyword arguments"
+            warning += "\nExample: read(path='/path/to/file.py', retries=3)"
+            warning += (
+                "\nDo NOT use: function signatures, type hints, placeholder variables, "
+                "or unresolved identifiers"
+            )
+
+            if log_warning:
+                logger.warning(warning)
+
+                # Log for debugging
+                logger.debug(f"Failed parse - original args_str: {args_str}")
+                logger.debug("Attempted parse methods: regex, ast")
 
         return args_dict, warning
 
@@ -521,7 +651,7 @@ class PythonCallExtractor:
             confidence += 0.1
 
         # Boost for common argument names
-        common_args = {"path", "file_path", "command", "content", "query", "pattern"}
+        common_args = {"path", "cmd", "content", "query", "old_str", "new_str", "ops"}
         if any(arg in common_args for arg in args.keys()):
             confidence += 0.1
 

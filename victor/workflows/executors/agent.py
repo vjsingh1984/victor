@@ -128,7 +128,24 @@ class AgentNodeExecutor:
         # Step 4: Map role to SubAgentRole enum
         role = self._map_role_to_enum(node.role)
 
-        # Step 5: Spawn sub-agent via SubAgentOrchestrator
+        # Step 5: Activate constraints before spawning sub-agent
+        from victor.agent.constraint_activation_service import get_constraint_activator
+
+        activator = get_constraint_activator()
+        constraints = getattr(node, "constraints", None)
+        vertical = getattr(node, "vertical", "coding")
+
+        if constraints:
+            result = activator.activate_constraints(
+                constraints=constraints,
+                vertical=vertical,
+            )
+            if not result.success:
+                logger.error(f"Constraint activation failed for node '{node.id}': {result.error}")
+            else:
+                logger.debug(f"Constraints activated for node '{node.id}'")
+
+        # Step 6: Spawn sub-agent via SubAgentOrchestrator
         sub_orchestrator = SubAgentOrchestrator(orchestrator)
 
         try:
@@ -137,7 +154,7 @@ class AgentNodeExecutor:
                 task=goal,
                 tool_budget=node.tool_budget,
                 allowed_tools=node.allowed_tools,
-                timeout_seconds=int(node.timeout_seconds) if node.timeout_seconds else 300,
+                timeout_seconds=(int(node.timeout_seconds) if node.timeout_seconds else 300),
                 disable_embeddings=getattr(node, "disable_embeddings", False),
             )
         except Exception as e:
@@ -155,12 +172,17 @@ class AgentNodeExecutor:
                 duration_seconds=time.time() - start_time,
             )
             return state
+        finally:
+            # Step 7: Always deactivate constraints after execution
+            if constraints:
+                activator.deactivate_constraints()
+                logger.debug(f"Constraints deactivated for node '{node.id}'")
 
-        # Step 6: Store result in state
+        # Step 8: Store result in state
         output_key = node.output_key or node.id
         state[output_key] = result
 
-        # Track node result for observability
+        # Step 9: Track node result for observability
         if "_node_results" not in state:
             state["_node_results"] = {}
 
@@ -226,7 +248,7 @@ class AgentNodeExecutor:
         Raises:
             ValueError: If role is not recognized
         """
-        from victor.agent.subagents.roles import SubAgentRole
+        from victor.core.shared_types import SubAgentRole
 
         role_map = {
             "researcher": SubAgentRole.RESEARCHER,

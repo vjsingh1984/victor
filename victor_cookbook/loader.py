@@ -64,8 +64,7 @@ class RecipeLoader:
             raise FileNotFoundError(f"Recipe not found: {category}/{recipe_name}")
 
         spec = importlib.util.spec_from_file_location(
-            f"victor_cookbook.recipes.{category}.{recipe_name}",
-            recipe_path
+            f"victor_cookbook.recipes.{category}.{recipe_name}", recipe_path
         )
 
         module = importlib.util.module_from_spec(spec)
@@ -104,9 +103,9 @@ class RecipeLoader:
 
                 # Search in name, description, tags
                 if (
-                    query_lower in metadata["name"].lower() or
-                    query_lower in metadata["description"].lower() or
-                    any(query_lower in tag.lower() for tag in metadata["tags"])
+                    query_lower in metadata["name"].lower()
+                    or query_lower in metadata["description"].lower()
+                    or any(query_lower in tag.lower() for tag in metadata["tags"])
                 ):
                     results.append(metadata)
 

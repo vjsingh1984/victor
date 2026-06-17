@@ -138,6 +138,40 @@ for v_result in result.validation_results:
 | `test_pass_rate` | Tasks where tests pass after changes |
 | `avg_tool_calls` | Average tool invocations per task |
 
+## Publication Bundles
+
+Use checked-in fixture corpora to publish reproducible comparison artifacts:
+
+```bash
+victor benchmark fixture-benchmarks --benchmark swe-bench --verify \
+  --bundle-output published_fixtures
+```
+
+Use saved real benchmark run artifacts when publishing stable run outputs:
+
+```bash
+victor benchmark stable-runs --benchmark swe-bench \
+  --victor-results runs/swe-bench-real-run.json \
+  --bundle-output published_real_runs
+```
+
+Each benchmark bundle contains:
+
+- `comparison_report_fixtures.json`: portable manifest for `victor benchmark compare`
+- `stable_run_summary.json`: public KPI sidecar with issue-fix success, review bug-catch availability, tokens-to-merge, time-to-first-edit, and cost-per-accepted-patch fields
+- copied fixture-set artifacts with SHA-256 integrity metadata
+
+The publication catalogs at `fixture_benchmark_publication_catalog.json` and
+`stable_run_publication_catalog.json` link each benchmark to its combined manifest and stable-run
+summary. Both catalog roots can be passed back to `victor benchmark compare --victor-publication-root`.
+
+Saved comparison reports also preserve policy-effect fields so benchmark runs can separate model
+quality from runtime behavior:
+
+- Code-intelligence coverage and pass-rate delta.
+- Workspace-policy coverage and pass-rate delta.
+- Workspace materialization, dry-run, auto-merge, cleanup-disabled, and diagnostic rates.
+
 ## CLI Usage
 
 ```bash
@@ -179,10 +213,16 @@ victor/evaluation/
 │   └── swebench.py          # SWE-bench runner
 ├── code_generation_harness.py  # Provider-only benchmark runner
 ├── agentic_harness.py       # Tool-enabled benchmark runner
+├── planning_feedback.py     # Planning policy extraction and aggregation
 ├── code_quality.py          # Lint and quality analysis
 ├── pass_at_k.py             # Pass@k calculation
 └── analyzers.py             # Analyzer registry
 ```
+
+Planning feedback is emitted from the agentic loop as `planning_events`, then
+aggregated into benchmark summaries and experiment-memory analysis through
+`aggregate_planning_feedback()`, `summarize_planning_feedback()`, and
+`extract_planning_events()`.
 
 ## Key Learnings from Benchmarking
 

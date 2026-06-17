@@ -224,7 +224,8 @@ def create_session(user_id: int) -> str:
         editor.start_transaction("Attempt problematic changes")
 
         editor.add_modify(
-            path=str(tmpdir / "auth.py"), new_content="# This change will be rolled back\n"
+            path=str(tmpdir / "auth.py"),
+            new_content="# This change will be rolled back\n",
         )
 
         # Simulate manual rollback (in practice, this happens automatically on errors)
@@ -346,7 +347,8 @@ def test_hash_password():
         editor.start_transaction("Rename utils to helpers")
 
         editor.add_rename(
-            old_path=str(tmpdir / "auth_utils.py"), new_path=str(tmpdir / "auth_helpers.py")
+            old_path=str(tmpdir / "auth_utils.py"),
+            new_path=str(tmpdir / "auth_helpers.py"),
         )
 
         editor.preview_diff()

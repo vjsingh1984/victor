@@ -90,12 +90,14 @@ def _get_q_value_from_db(
     cursor = coordinator.db.cursor()
     if task_type:
         cursor.execute(
-            f"SELECT q_value, selection_count FROM {Tables.RL_TOOL_TASK} WHERE tool_name = ? AND task_type = ?",
+            f"SELECT q_value, visit_count FROM {Tables.RL_Q_VALUE} "
+            f"WHERE learner_id = 'tool_selector' AND state_key = ? AND action_key = ?",
             (tool_name, task_type),
         )
     else:
         cursor.execute(
-            f"SELECT q_value, selection_count FROM {Tables.RL_TOOL_Q} WHERE tool_name = ?",
+            f"SELECT q_value, visit_count FROM {Tables.RL_Q_VALUE} "
+            f"WHERE learner_id = 'tool_selector' AND state_key = ? AND action_key = 'select'",
             (tool_name,),
         )
     row = cursor.fetchone()
@@ -113,15 +115,15 @@ class TestToolSelectorLearner:
 
         cursor = learner.db.cursor()
         cursor.execute(
-            f"SELECT name FROM sqlite_master WHERE type='table' AND name='{Tables.RL_TOOL_Q}';"
+            f"SELECT name FROM sqlite_master WHERE type='table' AND name='{Tables.RL_Q_VALUE}';"
         )
         assert cursor.fetchone() is not None
         cursor.execute(
-            f"SELECT name FROM sqlite_master WHERE type='table' AND name='{Tables.RL_TOOL_TASK}';"
+            f"SELECT name FROM sqlite_master WHERE type='table' AND name='{Tables.RL_TASK_STAT}';"
         )
         assert cursor.fetchone() is not None
         cursor.execute(
-            f"SELECT name FROM sqlite_master WHERE type='table' AND name='{Tables.RL_TOOL_OUTCOME}';"
+            f"SELECT name FROM sqlite_master WHERE type='table' AND name='{Tables.RL_TRANSITION}';"
         )
         assert cursor.fetchone() is not None
 
@@ -272,24 +274,31 @@ class TestToolSelectorLearner:
 
     def test_should_explore(self, learner: ToolSelectorLearner) -> None:
         """Test exploration probability."""
-        # With ε=0.1, should explore ~10% of the time
-        import random
-
-        # Mock random to test both paths
-        with patch.object(random, "random", return_value=0.05):
+        # With ε=0.1, should explore ~10% of the time. Control the learner's
+        # injectable RNG (self._rng) directly rather than patching the stdlib
+        # global random module.
+        with patch.object(learner._rng, "random", return_value=0.05):
             assert learner.should_explore() is True  # 0.05 < 0.1
 
-        with patch.object(random, "random", return_value=0.15):
+        with patch.object(learner._rng, "random", return_value=0.15):
             assert learner.should_explore() is False  # 0.15 > 0.1
 
     def test_blended_q_value(self, learner: ToolSelectorLearner) -> None:
         """Test blended Q-value calculation (70% task-specific + 30% global)."""
         # Record outcomes for same tool with different task types
         _record_tool_outcome(
-            learner, tool_name="edit", task_type="action", success=True, quality_score=1.0
+            learner,
+            tool_name="edit",
+            task_type="action",
+            success=True,
+            quality_score=1.0,
         )
         _record_tool_outcome(
-            learner, tool_name="edit", task_type="analysis", success=False, quality_score=0.0
+            learner,
+            tool_name="edit",
+            task_type="analysis",
+            success=False,
+            quality_score=0.0,
         )
 
         # Blended value should be weighted mix

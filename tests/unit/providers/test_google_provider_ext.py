@@ -799,7 +799,10 @@ class TestCleanSchemaForGemini:
 
     def test_removes_default_field(self, google_provider):
         """Test removes 'default' field from schema."""
-        schema = {"type": "object", "properties": {"path": {"type": "string", "default": "/tmp"}}}
+        schema = {
+            "type": "object",
+            "properties": {"path": {"type": "string", "default": "/tmp"}},
+        }
 
         result = google_provider._clean_schema_for_gemini(schema)
 
@@ -817,7 +820,10 @@ class TestCleanSchemaForGemini:
 
     def test_removes_schema_field(self, google_provider):
         """Test removes '$schema' field."""
-        schema = {"$schema": "http://json-schema.org/draft-07/schema#", "type": "object"}
+        schema = {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "type": "object",
+        }
 
         result = google_provider._clean_schema_for_gemini(schema)
 
@@ -853,7 +859,10 @@ class TestCleanSchemaForGemini:
         """Test cleaning schemas with list values."""
         schema = {
             "type": "array",
-            "items": [{"type": "string", "default": "x"}, {"type": "number", "examples": [1, 2]}],
+            "items": [
+                {"type": "string", "default": "x"},
+                {"type": "number", "examples": [1, 2]},
+            ],
         }
 
         result = google_provider._clean_schema_for_gemini(schema)

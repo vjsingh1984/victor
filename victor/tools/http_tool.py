@@ -23,6 +23,7 @@ Features:
 - Performance metrics
 """
 
+import json
 import time
 from typing import Any, Dict, Optional
 
@@ -30,6 +31,50 @@ import httpx
 
 from victor.tools.base import AccessMode, CostTier, DangerLevel, Priority
 from victor.tools.decorators import tool
+from victor.tools.formatters import format_http_response
+
+
+def _safe_response_headers(response: Any) -> Dict[str, Any]:
+    """Return response headers as a plain dict, tolerating lightweight mocks."""
+    headers = getattr(response, "headers", None)
+    if headers is None:
+        return {}
+    try:
+        return dict(headers)
+    except Exception:
+        return {}
+
+
+def _safe_response_status(response: Any) -> str:
+    """Return a best-effort reason/status string for a response-like object."""
+    reason = getattr(response, "reason_phrase", None)
+    if isinstance(reason, str) and reason:
+        return reason
+    return str(getattr(response, "status_code", ""))
+
+
+def _safe_response_body(response: Any, response_json: Any) -> Any:
+    """Return parsed JSON or a safe text fallback for a response-like object."""
+    if response_json is not None:
+        return response_json
+    text = getattr(response, "text", "")
+    if isinstance(text, str):
+        return text[:1000]
+    return ""
+
+
+def _normalize_response_json(payload: Any) -> Any:
+    """Return payload only when it behaves like real JSON data.
+
+    Test doubles often expose a ``.json()`` method that returns another mock.
+    That should not be treated as parsed JSON because downstream formatters may
+    try to serialize it.
+    """
+    try:
+        json.dumps(payload)
+    except (TypeError, ValueError):
+        return None
+    return payload
 
 
 async def _make_request(
@@ -68,7 +113,7 @@ async def _make_request(
 
     # Parse response
     try:
-        response_json = response.json()
+        response_json = _normalize_response_json(response.json())
     except (ValueError, TypeError, AttributeError):
         response_json = None
 
@@ -96,15 +141,34 @@ async def _http_request(
         method, url, headers, params, json_body, data, auth, follow_redirects, timeout
     )
     response = result["response"]
+    response_headers = _safe_response_headers(response)
+    response_status = _safe_response_status(response)
+    response_body = _safe_response_body(response, result["response_json"])
+
+    # Build response data
+    response_data = {
+        "success": True,
+        "status_code": response.status_code,
+        "status": response_status,
+        "headers": response_headers,
+        "body": response_body,
+        "duration_ms": int(result["duration"] * 1000),
+        "url": str(response.url),
+    }
+
+    # Use unified formatter system
+    formatted_result = format_http_response(response_data)
 
     return {
         "success": True,
         "status_code": response.status_code,
-        "status": response.reason_phrase,
-        "headers": dict(response.headers),
-        "body": result["response_json"] if result["response_json"] else response.text[:1000],
+        "status": response_status,
+        "headers": response_headers,
+        "body": response_body,
         "duration_ms": int(result["duration"] * 1000),
         "url": str(response.url),
+        "formatted_output": formatted_result.content,
+        "contains_markup": formatted_result.contains_markup,
     }
 
 
@@ -176,7 +240,7 @@ async def http(
     timeout: int = 30,
     expected_status: Optional[int] = None,
 ) -> Dict[str, Any]:
-    """Unified HTTP operations for requests and API testing.
+    """Send HTTP requests (GET/POST/PUT/DELETE) and inspect responses.
 
     Modes:
     - "request": Standard HTTP request (default)
@@ -223,7 +287,15 @@ async def http(
     try:
         if mode_lower == "request":
             return await _http_request(
-                method, url, headers, params, json, data, auth, follow_redirects, timeout
+                method,
+                url,
+                headers,
+                params,
+                json,
+                data,
+                auth,
+                follow_redirects,
+                timeout,
             )
         elif mode_lower == "test":
             return await _http_test(
@@ -239,7 +311,10 @@ async def http(
                 expected_status,
             )
         else:
-            return {"success": False, "error": f"Unknown mode '{mode}'. Use 'request' or 'test'."}
+            return {
+                "success": False,
+                "error": f"Unknown mode '{mode}'. Use 'request' or 'test'.",
+            }
 
     except httpx.TimeoutException:
         return {"success": False, "error": f"Request timed out after {timeout} seconds"}

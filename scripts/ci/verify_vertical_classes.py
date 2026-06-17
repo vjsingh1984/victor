@@ -3,7 +3,7 @@
 
 This script is used by CI to validate external vertical examples and packages
 directly from the repository checkout. It supports both flat and `src/`
-package layouts and accepts SDK-pure verticals by adapting them through the
+package layouts and accepts contract-pure verticals by adapting them through the
 core runtime bridge.
 """
 
@@ -16,7 +16,9 @@ from pathlib import Path
 import sys
 from typing import Iterator
 
-from victor_sdk.verticals.protocols.base import VerticalBase as SdkVerticalBase
+from victor_contracts.verticals.protocols.base import (
+    VerticalBase as ContractVerticalBase,
+)
 
 if sys.version_info >= (3, 11):
     import tomllib
@@ -91,8 +93,8 @@ def verify_vertical_class(vertical_dir: Path) -> VerifiedVerticalClass:
     with prepend_sys_path(import_roots):
         module = importlib.import_module(module_name)
         cls = getattr(module, class_name)
-        if not isinstance(cls, type) or not issubclass(cls, SdkVerticalBase):
-            raise TypeError(f"{class_name} does not inherit from victor_sdk.VerticalBase")
+        if not isinstance(cls, type) or not issubclass(cls, ContractVerticalBase):
+            raise TypeError(f"{class_name} does not inherit from victor_contracts.VerticalBase")
 
         instance_name: str | None = None
         instantiate_error: str | None = None
@@ -106,7 +108,7 @@ def verify_vertical_class(vertical_dir: Path) -> VerifiedVerticalClass:
         vertical_dir=vertical_dir,
         module_name=module_name,
         class_name=class_name,
-        base_class_name=SdkVerticalBase.__name__,
+        base_class_name=ContractVerticalBase.__name__,
         instance_name=instance_name,
         instantiate_error=instantiate_error,
     )
@@ -153,7 +155,7 @@ def main(argv: list[str] | None = None) -> int:
         print("Ensure the class specified in victor-vertical.toml:")
         print("  1. Exists at the specified module path")
         print("  2. Can be imported from the package layout")
-        print("  3. Inherits from victor_sdk.VerticalBase")
+        print("  3. Inherits from victor_contracts.VerticalBase")
         return 1
 
     return 0

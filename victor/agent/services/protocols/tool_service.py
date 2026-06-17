@@ -24,14 +24,19 @@ from typing import (
     TYPE_CHECKING,
     Any,
     AsyncIterator,
+    Awaitable,
+    Callable,
     Dict,
     List,
     Optional,
     Protocol,
+    Set,
+    Tuple,
     runtime_checkable,
 )
 
 if TYPE_CHECKING:
+    from victor.agent.services.tool_service import ToolResultContext
     from victor.tools.base import ToolResult
 
 
@@ -71,13 +76,11 @@ class ToolSelectionContext(Protocol):
 
 @runtime_checkable
 class ToolServiceProtocol(Protocol):
-    """Protocol for tool operations service.
+    """[CANONICAL] Protocol for tool operations service.
 
-    Handles:
-    - Intelligent tool selection based on context
-    - Tool execution with validation and error handling
-    - Tool budget management and tracking
-    - Tool usage analytics
+    This protocol represents the target architecture for tool operations,
+    replacing the facade-driven Coordinator pattern with a state-passed
+    Service pattern.
 
     This protocol follows the Interface Segregation Principle (ISP)
     by focusing only on tool-related operations.
@@ -176,10 +179,10 @@ class ToolServiceProtocol(Protocol):
         ...
 
     def get_tool_budget(self) -> int:
-        """Get the remaining tool budget.
+        """Get the remaining executable tool budget for the current turn.
 
-        The tool budget limits the number of tool calls per session
-        to prevent infinite loops and excessive API usage.
+        The executable budget limits the number of tool calls inside the
+        current prompt/turn to prevent loops and excessive API usage.
 
         Returns:
             Number of remaining tool calls allowed
@@ -222,12 +225,144 @@ class ToolServiceProtocol(Protocol):
         ...
 
     def reset_tool_budget(self) -> None:
-        """Reset the tool budget to initial limit.
+        """Fully reset the tool budget to its initial limit.
 
         Useful for:
         - Starting new sessions
         - Testing and development
-        - Recovery from budget exhaustion
+        - Explicit recovery from budget exhaustion
+        """
+        ...
+
+    def process_tool_results(
+        self,
+        pipeline_result: Any,
+        ctx: "ToolResultContext",
+    ) -> List[Dict[str, Any]]:
+        """Process tool execution results.
+
+        Handles state mutations, analytics, failure detection,
+        conversation injection, and error display.
+
+        Args:
+            pipeline_result: Result from ToolPipeline.execute_tool_calls
+            ctx: Context carrying mutable state and callbacks
+
+        Returns:
+            List of result dicts with name, success, elapsed, error, etc.
+        """
+        ...
+
+    def get_available_tools(self) -> Set[str]:
+        """Get all registered tool names."""
+        ...
+
+    def get_enabled_tools(self) -> Set[str]:
+        """Get currently enabled tool names for the session."""
+        ...
+
+    def set_enabled_tools(self, tools: Set[str]) -> None:
+        """Set which tools are enabled for the session."""
+        ...
+
+    def is_tool_enabled(self, tool_name: str) -> bool:
+        """Check whether a tool is enabled for the current session."""
+        ...
+
+    def resolve_tool_alias(self, tool_name: str) -> str:
+        """Resolve a tool alias to its canonical runtime name."""
+        ...
+
+    def parse_and_validate_tool_calls(
+        self,
+        tool_calls: Optional[List[Dict[str, Any]]],
+        full_content: str,
+        tool_adapter: Any,
+    ) -> Tuple[Optional[List[Dict[str, Any]]], str]:
+        """Parse, validate, normalize, and filter tool calls from model output."""
+        ...
+
+    async def execute_tool_with_retry(
+        self,
+        tool_name: str,
+        tool_args: Dict[str, Any],
+        context: Dict[str, Any],
+        tool_executor: Optional[Callable[..., Awaitable[Any]]] = None,
+        cache: Optional[Any] = None,
+        on_success: Optional[Callable[[str, Dict[str, Any], Any], None]] = None,
+        retry_config: Optional[Dict[str, Any]] = None,
+    ) -> Tuple[Optional[Any], bool, Optional[str]]:
+        """Execute a tool with retry logic and exponential backoff."""
+        ...
+
+    def normalize_tool_arguments(
+        self,
+        tool_args: Dict[str, Any],
+        tool_name: str,
+    ) -> Tuple[Dict[str, Any], Any]:
+        """Normalize raw tool arguments before execution."""
+        ...
+
+    def build_tool_access_context(self) -> Any:
+        """Build access-control context for tool gating decisions."""
+        ...
+
+    def validate_tool_call(
+        self,
+        tool_call: Any,
+        sanitizer: Any,
+        is_tool_enabled_fn: Optional[Callable[[str], bool]] = None,
+    ) -> Any:
+        """Validate one tool call and return a compatibility validation result."""
+        ...
+
+    def normalize_arguments_full(
+        self,
+        tool_name: str,
+        original_name: str,
+        raw_args: Any,
+        argument_normalizer: Any,
+        tool_adapter: Any,
+        failed_signatures: Optional[Set[Tuple[str, str]]] = None,
+    ) -> Any:
+        """Normalize arguments using parser repair, adapter defaults, and dedup metadata."""
+        ...
+
+    def on_tool_complete(
+        self,
+        result: Any,
+        metrics_collector: Optional[Any] = None,
+        *,
+        read_files_session: Optional[Set[str]] = None,
+        required_files: Optional[List[str]] = None,
+        required_outputs: Optional[List[str]] = None,
+        nudge_sent_flag: Optional[List[bool]] = None,
+        add_message: Optional[Callable[[str, str], None]] = None,
+        observability: Optional[Any] = None,
+        iteration_count: int = 0,
+        tool_name: Optional[str] = None,
+        elapsed: float = 0.0,
+        session_id: Optional[str] = None,
+    ) -> None:
+        """Notify the service that a tool execution has completed.
+
+        Used by CallbackCoordinator and legacy coordinator shims to record
+        tool completion metrics, nudges, and observability events without
+        requiring ToolCoordinator to remain the canonical owner.
+
+        Args:
+            result: The tool execution result
+            metrics_collector: Optional metrics collector for the full completion flow
+            read_files_session: Mutable set of read files for synthesis nudges
+            required_files: Files required to complete the current task
+            required_outputs: Outputs still required from the current task
+            nudge_sent_flag: Mutable one-item flag tracking synthesis nudges
+            add_message: Optional message injection callback
+            observability: Optional observability integration
+            iteration_count: Current iteration/tool-call count
+            tool_name: Optional explicit tool name for narrow observability hooks
+            elapsed: Elapsed wall-clock seconds for the execution
+            session_id: Optional session identifier for metrics
         """
         ...
 

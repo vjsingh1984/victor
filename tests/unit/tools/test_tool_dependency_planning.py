@@ -41,15 +41,16 @@ class _DummyProvider(BaseProvider):
 
 
 def _orch():
-    return AgentOrchestrator(
-        Settings(
-            analytics_enabled=False,
-            tool_selection_strategy="keyword",
-            tool_cache_enabled=False,
-        ),
-        _DummyProvider(),
-        "dummy",
-    )
+    with patch("victor.core.bootstrap_services.bootstrap_new_services"):
+        return AgentOrchestrator(
+            Settings(
+                analytics_enabled=False,
+                tool_selection_strategy="keyword",
+                tool_cache_enabled=False,
+            ),
+            _DummyProvider(),
+            "dummy",
+        )
 
 
 def test_core_tools_always_selected():
@@ -131,7 +132,13 @@ def test_docs_keyword_matching_with_mock_registry():
 def test_registry_keyword_lookup():
     """Test that ToolMetadataRegistry correctly looks up tools by keywords."""
     from victor.tools.metadata_registry import ToolMetadataRegistry, ToolMetadataEntry
-    from victor.tools.base import Priority, AccessMode, DangerLevel, CostTier, ExecutionCategory
+    from victor.tools.base import (
+        Priority,
+        AccessMode,
+        DangerLevel,
+        CostTier,
+        ExecutionCategory,
+    )
 
     # Create a mock tool with keywords
     mock_tool = MagicMock()
@@ -150,6 +157,7 @@ def test_registry_keyword_lookup():
     mock_tool.task_types = []
     mock_tool.progress_params = []
     mock_tool.execution_category = ExecutionCategory.READ_ONLY
+    mock_tool.get_metadata.return_value = None
 
     registry = ToolMetadataRegistry()
     registry.register(mock_tool)
@@ -162,7 +170,13 @@ def test_registry_keyword_lookup():
 def test_registry_keyword_lookup_case_insensitive():
     """Test that keyword lookup is case-insensitive."""
     from victor.tools.metadata_registry import ToolMetadataRegistry
-    from victor.tools.base import Priority, AccessMode, DangerLevel, CostTier, ExecutionCategory
+    from victor.tools.base import (
+        Priority,
+        AccessMode,
+        DangerLevel,
+        CostTier,
+        ExecutionCategory,
+    )
 
     mock_tool = MagicMock()
     mock_tool.name = "review_tool"
@@ -180,6 +194,9 @@ def test_registry_keyword_lookup_case_insensitive():
     mock_tool.task_types = []
     mock_tool.progress_params = []
     mock_tool.execution_category = ExecutionCategory.READ_ONLY
+    # ToolMetadataEntry.from_tool() calls get_metadata(); return None so direct
+    # attributes (priority, access_mode, etc.) are used instead of a mock object.
+    mock_tool.get_metadata.return_value = None
 
     registry = ToolMetadataRegistry()
     registry.register(mock_tool)

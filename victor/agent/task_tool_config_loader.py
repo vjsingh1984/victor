@@ -25,11 +25,44 @@ from typing import Any, Dict, List, Optional, cast
 
 import yaml
 
+from victor.tools.tool_names import get_canonical_name
+
 logger = logging.getLogger(__name__)
 
 
 # Default path to task tool config
 DEFAULT_CONFIG_PATH = Path(__file__).parent.parent / "config" / "task_tool_config.yaml"
+
+
+def _normalize_tool_list(tools: Any) -> list[str]:
+    """Normalize configured tool lists to canonical runtime names."""
+    if not isinstance(tools, list):
+        return []
+    return [get_canonical_name(tool) if isinstance(tool, str) else tool for tool in tools]
+
+
+def _normalize_task_tool_config(config: Dict[str, Any]) -> Dict[str, Any]:
+    """Normalize task-type tool names after loading config."""
+    task_types = config.get("task_types", {})
+    if not isinstance(task_types, dict):
+        return {"task_types": {}}
+
+    normalized: Dict[str, Any] = {"task_types": {}}
+    for task_name, task_data in task_types.items():
+        if not isinstance(task_data, dict):
+            continue
+        task_copy = dict(task_data)
+        task_copy["required_tools"] = _normalize_tool_list(task_data.get("required_tools", []))
+
+        raw_stage_tools = task_data.get("stage_tools", {})
+        normalized_stage_tools = {}
+        if isinstance(raw_stage_tools, dict):
+            for stage_name, stage_tools in raw_stage_tools.items():
+                normalized_stage_tools[stage_name] = _normalize_tool_list(stage_tools)
+        task_copy["stage_tools"] = normalized_stage_tools
+        normalized["task_types"][task_name] = task_copy
+
+    return normalized
 
 
 class TaskToolConfigLoader:
@@ -47,27 +80,27 @@ class TaskToolConfigLoader:
             "edit": {
                 "max_exploration_iterations": 8,  # Increased from 3 - edits often need context
                 "force_action_after_target_read": True,
-                "required_tools": ["edit_files", "read_file"],
+                "required_tools": ["edit", "read"],
                 "stage_tools": {
-                    "initial": ["list_directory", "code_search"],
-                    "reading": ["read_file", "code_search"],
-                    "executing": ["edit_files", "read_file"],
-                    "verifying": ["read_file", "run_tests"],
+                    "initial": ["ls", "code_search"],
+                    "reading": ["read", "code_search"],
+                    "executing": ["edit", "read"],
+                    "verifying": ["read", "run_tests"],
                 },
                 "force_action_hints": {
-                    "after_target_read": "Use edit_files to make the change.",
+                    "after_target_read": "Use edit to make the change.",
                     "max_iterations": "Please make the change or explain blockers.",
                 },
             },
             "search": {
                 "max_exploration_iterations": 8,
                 "force_action_after_target_read": False,
-                "required_tools": ["code_search", "read_file"],
+                "required_tools": ["code_search", "read"],
                 "stage_tools": {
-                    "initial": ["list_directory", "code_search"],
-                    "reading": ["read_file", "code_search"],
-                    "executing": ["read_file"],
-                    "verifying": ["read_file"],
+                    "initial": ["ls", "code_search"],
+                    "reading": ["read", "code_search"],
+                    "executing": ["read"],
+                    "verifying": ["read"],
                 },
                 "force_action_hints": {
                     "max_iterations": "Please summarize your findings.",
@@ -76,12 +109,12 @@ class TaskToolConfigLoader:
             "create": {
                 "max_exploration_iterations": 8,  # Increased from 3 - creates often need context
                 "force_action_after_target_read": False,
-                "required_tools": ["write_file"],
+                "required_tools": ["write"],
                 "stage_tools": {
-                    "initial": ["list_directory", "read_file"],
-                    "reading": ["read_file"],
-                    "executing": ["write_file", "edit_files"],
-                    "verifying": ["read_file", "run_tests"],
+                    "initial": ["ls", "read"],
+                    "reading": ["read"],
+                    "executing": ["write", "edit"],
+                    "verifying": ["read", "run_tests"],
                 },
                 "force_action_hints": {
                     "max_iterations": "Please create the file.",
@@ -91,27 +124,27 @@ class TaskToolConfigLoader:
                 "max_exploration_iterations": 1,
                 "force_action_after_target_read": False,
                 "skip_exploration": True,
-                "required_tools": ["write_file"],
+                "required_tools": ["write"],
                 "stage_tools": {
-                    "initial": ["write_file"],
+                    "initial": ["write"],
                     "reading": [],
-                    "executing": ["write_file"],
-                    "verifying": ["read_file"],
+                    "executing": ["write"],
+                    "verifying": ["read"],
                 },
                 "force_action_hints": {
-                    "immediate": "Create the code directly using write_file.",
+                    "immediate": "Create the code directly using write.",
                     "max_iterations": "Please create the file now.",
                 },
             },
             "analyze": {
                 "max_exploration_iterations": 20,
                 "force_action_after_target_read": False,
-                "required_tools": ["read_file", "execute_bash"],
+                "required_tools": ["read", "shell"],
                 "stage_tools": {
-                    "initial": ["list_directory", "code_search"],
-                    "reading": ["read_file", "code_search"],
-                    "executing": ["execute_bash"],
-                    "verifying": ["read_file"],
+                    "initial": ["ls", "code_search"],
+                    "reading": ["read", "code_search"],
+                    "executing": ["shell"],
+                    "verifying": ["read"],
                 },
                 "force_action_hints": {
                     "max_iterations": "Please summarize your analysis.",
@@ -123,17 +156,17 @@ class TaskToolConfigLoader:
                 "max_exploration_iterations": 20,
                 "force_action_after_target_read": False,
                 "needs_tools": True,  # Design tasks NEED tools to explore the codebase
-                "required_tools": ["list_directory", "read_file", "code_search"],
+                "required_tools": ["ls", "read", "code_search"],
                 "stage_tools": {
                     "initial": [
-                        "list_directory",
+                        "ls",
                         "code_search",
-                        "read_file",
+                        "read",
                         "get_project_overview",
                     ],
-                    "reading": ["read_file", "code_search", "list_directory"],
+                    "reading": ["read", "code_search", "ls"],
                     "executing": [],
-                    "verifying": ["read_file"],
+                    "verifying": ["read"],
                 },
                 "force_action_hints": {
                     "max_iterations": "Please summarize the architecture and provide your recommendations.",
@@ -142,12 +175,12 @@ class TaskToolConfigLoader:
             "general": {
                 "max_exploration_iterations": 15,
                 "force_action_after_target_read": False,
-                "required_tools": ["read_file", "list_directory"],
+                "required_tools": ["read", "ls"],
                 "stage_tools": {
-                    "initial": ["list_directory", "code_search", "read_file"],
-                    "reading": ["read_file", "code_search"],
-                    "executing": ["edit_files", "write_file"],
-                    "verifying": ["read_file", "run_tests"],
+                    "initial": ["ls", "code_search", "read"],
+                    "reading": ["read", "code_search"],
+                    "executing": ["edit", "write"],
+                    "verifying": ["read", "run_tests"],
                 },
                 "force_action_hints": {
                     "max_iterations": "Please complete the task.",
@@ -177,14 +210,14 @@ class TaskToolConfigLoader:
         try:
             if self._config_path.exists():
                 with open(self._config_path) as f:
-                    self._config = yaml.safe_load(f)
+                    self._config = _normalize_task_tool_config(yaml.safe_load(f) or {})
                     logger.debug(f"Loaded task tool config from {self._config_path}")
             else:
                 logger.warning(f"Task tool config not found at {self._config_path}, using defaults")
-                self._config = self.DEFAULT_CONFIG
+                self._config = _normalize_task_tool_config(self.DEFAULT_CONFIG)
         except Exception as e:
             logger.error(f"Failed to load task tool config: {e}")
-            self._config = self.DEFAULT_CONFIG
+            self._config = _normalize_task_tool_config(self.DEFAULT_CONFIG)
 
         return self._config
 

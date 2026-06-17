@@ -73,7 +73,8 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Set
 
 from victor.providers.base import BaseProvider, ToolDefinition
-from victor.tools.base import ToolRegistry, CostTier
+from victor.tools.enums import CostTier
+from victor.tools.registry import ToolRegistry
 
 # Import specialized components (lazy to avoid circular imports)
 # These are imported at runtime in methods that use them
@@ -235,7 +236,10 @@ class ToolRegistrar:
     def _get_catalog_loader(self) -> Any:
         """Get or create the catalog loader component."""
         if self._catalog_loader is None:
-            from victor.agent.tool_catalog_loader import ToolCatalogLoader, ToolCatalogConfig
+            from victor.agent.tool_catalog_loader import (
+                ToolCatalogLoader,
+                ToolCatalogConfig,
+            )
 
             self._catalog_loader = ToolCatalogLoader(
                 registry=self.tools,
@@ -281,7 +285,10 @@ class ToolRegistrar:
     def _get_graph_builder(self) -> Any:
         """Get or create the graph builder component."""
         if self._graph_builder is None:
-            from victor.agent.tool_graph_builder import ToolGraphBuilder, ToolGraphConfig
+            from victor.agent.tool_graph_builder import (
+                ToolGraphBuilder,
+                ToolGraphConfig,
+            )
 
             self._graph_builder = ToolGraphBuilder(
                 registry=self.tools,
@@ -455,6 +462,27 @@ class ToolRegistrar:
         logger.debug(f"Registered {registered_count} tools from shared registry")
         return registered_count
 
+    def register_default_tools(self) -> int:
+        """Register default tool surfaces via the canonical registrar API.
+
+        Performs the split-phase bootstrap used by the orchestrator/runtime:
+        provider setup, dynamic tool registration, and optional MCP
+        integration. This preserves the current initialization order while
+        moving bootstrap callers off private registrar methods.
+
+        Returns:
+            Total number of tools registered by this phase
+        """
+        self._setup_providers()
+
+        registered_count = self._register_dynamic_tools()
+        total_registered = registered_count
+
+        if self.config.enable_mcp or getattr(self.settings, "use_mcp_tools", False):
+            total_registered += self._setup_mcp_integration()
+
+        return total_registered
+
     def _load_tool_configurations(self) -> None:
         """Load tool configurations from profiles.yaml.
 
@@ -576,55 +604,32 @@ class ToolRegistrar:
         except Exception as e:
             logger.warning(f"Failed to load tool configurations: {e}")
 
-    def _initialize_plugins(self) -> int:
-        """Initialize and load tool plugins.
+    def _load_plugin_tools(self) -> int:
+        """Discover, load, and register plugin tools using PluginLoader component.
+
+        Delegates to PluginLoader for plugin management (SRP compliance).
 
         Returns:
             Number of plugin tools registered
         """
         try:
-            from victor.tools.plugin_registry import ToolPluginRegistry
-            from victor.config.settings import get_project_paths
+            plugin_loader = self._get_plugin_loader()
+            result = plugin_loader.load()
 
-            # Use centralized path for plugins directory
-            plugin_dirs = [get_project_paths().global_plugins_dir]
-            plugin_dirs.extend(self.config.plugin_dirs)
+            # Store plugin_manager for backward compatibility
+            # TODO: Remove self.plugin_manager attribute once callers migrate to PluginLoader
+            self.plugin_manager = plugin_loader._plugin_manager
 
-            plugin_config = getattr(self.settings, "plugin_config", {})
-
-            self.plugin_manager = ToolPluginRegistry(
-                plugin_dirs=plugin_dirs,
-                config=plugin_config,
-            )
-
-            # Disable specified plugins
-            for plugin_name in self.config.disabled_plugins:
-                self.plugin_manager.disable_plugin(plugin_name)
-
-            # Discover and load plugins from directories
-            loaded_count = self.plugin_manager.discover_and_load()
-
-            # Load plugins from packages
-            for package_name in self.config.plugin_packages:
-                plugin = self.plugin_manager.load_plugin_from_package(package_name)
-                if plugin:
-                    self.plugin_manager.register_plugin(plugin)
-
-            # Register plugin tools
-            tool_count = 0
-            if loaded_count > 0 or self.plugin_manager.loaded_plugins:
-                tool_count = self.plugin_manager.register_tools(self.tools)
-                logger.info(
-                    f"Plugins loaded: {len(self.plugin_manager.loaded_plugins)} plugins, "
-                    f"{tool_count} tools"
-                )
-
-            return tool_count
+            return result.tools_registered
 
         except Exception as e:
             logger.warning(f"Failed to initialize plugin system: {e}")
             self.plugin_manager = None
             return 0
+
+    def initialize_plugins(self) -> int:
+        """Initialize plugin tools via the canonical registrar API."""
+        return self._load_plugin_tools()
 
     def _setup_mcp_integration(self) -> int:
         """Set up MCP integration using registry or legacy client.

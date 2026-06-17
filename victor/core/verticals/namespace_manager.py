@@ -234,7 +234,10 @@ class PluginNamespaceManager:
                 (name, NAMESPACES.get(name, NamespaceConfig(name=name)))
                 for name in available_namespaces
             ],
-            key=lambda x: (-x[1].priority, x[0]),  # Sort by priority desc, then name asc
+            key=lambda x: (
+                -x[1].priority,
+                x[0],
+            ),  # Sort by priority desc, then name asc
         )
 
         for namespace, config in namespace_configs:

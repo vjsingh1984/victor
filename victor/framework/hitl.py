@@ -69,6 +69,11 @@ from typing import (
     Tuple,
 )
 
+from victor.framework.execution_checkpoint import (
+    ApprovalState,
+    normalize_execution_checkpoint_context,
+)
+
 
 class ApprovalStatus(str, Enum):
     """Status of an approval request.
@@ -247,9 +252,10 @@ class HITLController:
             HITLCheckpoint ID for resuming later
         """
         checkpoint_id = f"cp_{uuid.uuid4().hex}"
+        checkpoint_context = normalize_execution_checkpoint_context(context)
         checkpoint = HITLCheckpoint(
             id=checkpoint_id,
-            context=context or {},
+            context=checkpoint_context,
         )
         self._checkpoints[checkpoint_id] = checkpoint
         self._paused = True
@@ -328,7 +334,7 @@ class HITLController:
             id=request_id,
             title=title,
             description=description,
-            context=context or {},
+            context=normalize_execution_checkpoint_context(context),
             timeout_seconds=timeout_seconds,
         )
         self._requests[request_id] = request
@@ -389,15 +395,20 @@ class HITLController:
             raise ValueError(f"Invalid request ID: {request_id}")
 
         request = self._requests[request_id]
+        status = ApprovalStatus.APPROVED if approved else ApprovalStatus.REJECTED
+        approval_state = ApprovalState.APPROVED if approved else ApprovalState.REJECTED
 
         # Create updated request (dataclass is not mutable by default in this style)
         updated = ApprovalRequest(
             id=request.id,
             title=request.title,
             description=request.description,
-            context=request.context,
+            context=normalize_execution_checkpoint_context(
+                request.context,
+                approval_state=approval_state,
+            ),
             timeout_seconds=request.timeout_seconds,
-            status=ApprovalStatus.APPROVED if approved else ApprovalStatus.REJECTED,
+            status=status,
             response=response,
             responder=responder,
             created_at=request.created_at,
@@ -490,7 +501,10 @@ class HITLController:
             id=request.id,
             title=request.title,
             description=request.description,
-            context=request.context,
+            context=normalize_execution_checkpoint_context(
+                request.context,
+                approval_state=_approval_status_to_checkpoint_state(status),
+            ),
             timeout_seconds=request.timeout_seconds,
             status=status,
             response=response,
@@ -552,6 +566,16 @@ class HITLController:
             callback: Function called with ApprovalRequest on creation
         """
         self._on_approval_request_callbacks.append(callback)
+
+
+def _approval_status_to_checkpoint_state(
+    status: ApprovalStatus,
+) -> Optional[ApprovalState]:
+    if status == ApprovalStatus.APPROVED:
+        return ApprovalState.APPROVED
+    if status == ApprovalStatus.REJECTED:
+        return ApprovalState.REJECTED
+    return None
 
 
 __all__ = [

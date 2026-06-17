@@ -370,7 +370,7 @@ class ServiceRegistry:
                 "state": entry.handle.state.name if entry.handle else "PENDING",
                 "host": entry.handle.host if entry.handle else None,
                 "ports": entry.handle.ports if entry.handle else {},
-                "started_at": entry.started_at.isoformat() if entry.started_at else None,
+                "started_at": (entry.started_at.isoformat() if entry.started_at else None),
                 "error": entry.error,
             }
             for name, entry in self._services.items()

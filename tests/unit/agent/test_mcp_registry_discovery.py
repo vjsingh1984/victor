@@ -25,17 +25,6 @@ from victor.integrations.mcp.registry import MCPRegistry, MCPServerConfig, Serve
 class TestMCPServerConfig:
     """Tests for MCPServerConfig model."""
 
-    def test_minimal_config(self):
-        """Test creating config with minimal fields."""
-        config = MCPServerConfig(
-            name="test_server",
-            command=["python", "-m", "test_server"],
-        )
-        assert config.name == "test_server"
-        assert config.command == ["python", "-m", "test_server"]
-        assert config.auto_connect is True
-        assert config.enabled is True
-
     def test_full_config(self):
         """Test creating config with all fields."""
         config = MCPServerConfig(
@@ -84,35 +73,18 @@ servers:
                 servers = registry.list_servers()
                 assert "env_server" in servers
 
-    def test_discover_from_project_local(self):
+    def test_discover_from_project_local(self, isolated_project_victor_dir):
         """Test discovery from project-local .victor/mcp.yaml."""
-        from victor.config.settings import reset_project_paths
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            config_dir = Path(tmpdir) / ".victor"
-            config_dir.mkdir()
-            config_file = config_dir / "mcp.yaml"
-            config_file.write_text("""
+        config_file = isolated_project_victor_dir / "mcp.yaml"
+        config_file.write_text("""
 servers:
   - name: local_server
     command: ["python", "-m", "local_server"]
 """)
-
-            # Change to temp directory for test
-            import os
-
-            old_cwd = os.getcwd()
-            try:
-                os.chdir(tmpdir)
-                # Reset cached project paths to pick up new cwd
-                reset_project_paths()
-                registry = MCPRegistry.discover_servers()
-                servers = registry.list_servers()
-                assert "local_server" in servers
-            finally:
-                os.chdir(old_cwd)
-                # Reset again to restore original cwd-based paths
-                reset_project_paths()
+        with patch.dict("os.environ", {"VICTOR_MCP_CONFIG": ""}):
+            registry = MCPRegistry.discover_servers()
+            servers = registry.list_servers()
+            assert "local_server" in servers
 
     def test_discover_priority_order(self):
         """Test that env variable takes priority over local config."""

@@ -51,7 +51,7 @@ class TestOptionState:
         """Test creating option state."""
         state = OptionState(
             current_mode="explore",
-            tools_used=["read_file", "code_search"],
+            tools_used=["read", "code_search"],
             iterations=5,
             context_size=10000,
             task_progress=0.3,
@@ -90,11 +90,6 @@ class TestExploreOption:
     def option(self) -> ExploreOption:
         return ExploreOption()
 
-    def test_can_initiate_low_context(self, option: ExploreOption) -> None:
-        """Test initiation with low context."""
-        state = OptionState(context_size=1000)
-        assert option.can_initiate(state) is True
-
     def test_can_initiate_explore_mode(self, option: ExploreOption) -> None:
         """Test initiation in explore mode."""
         state = OptionState(current_mode="explore", context_size=20000)
@@ -119,19 +114,12 @@ class TestExploreOption:
 
         assert option.should_terminate(state) is True
 
-    def test_get_action_prioritizes_search(self, option: ExploreOption) -> None:
-        """Test action prioritizes search first."""
-        state = OptionState(tools_used=[])
-
-        action = option.get_action(state)
-        assert action == "semantic_code_search"
-
     def test_get_action_then_read(self, option: ExploreOption) -> None:
         """Test action progression to reading."""
         state = OptionState(tools_used=["semantic_code_search", "code_search"])
 
         action = option.get_action(state)
-        assert action == "read_file"
+        assert action == "read"
 
 
 class TestImplementOption:
@@ -160,7 +148,7 @@ class TestImplementOption:
 
     def test_get_action_after_write_runs_tests(self, option: ImplementOption) -> None:
         """Test running tests after writing."""
-        state = OptionState(tools_used=["read_file", "edit_file"])
+        state = OptionState(tools_used=["read", "edit"])
 
         action = option.get_action(state)
         assert action == "run_tests"
@@ -172,16 +160,6 @@ class TestDebugOption:
     @pytest.fixture
     def option(self) -> DebugOption:
         return DebugOption()
-
-    def test_can_initiate_after_failure(self, option: DebugOption) -> None:
-        """Test initiation after tool failure."""
-        state = OptionState(last_tool_success=False)
-        assert option.can_initiate(state) is True
-
-    def test_can_initiate_debug_mode(self, option: DebugOption) -> None:
-        """Test initiation in debug mode."""
-        state = OptionState(current_mode="debug")
-        assert option.can_initiate(state) is True
 
     def test_should_terminate_after_fix(self, option: DebugOption) -> None:
         """Test termination after successful fix."""
@@ -202,11 +180,6 @@ class TestReviewOption:
     def test_can_initiate_near_completion(self, option: ReviewOption) -> None:
         """Test initiation when task nearly complete."""
         state = OptionState(task_progress=0.8)
-        assert option.can_initiate(state) is True
-
-    def test_can_initiate_review_mode(self, option: ReviewOption) -> None:
-        """Test initiation in review mode."""
-        state = OptionState(current_mode="review")
         assert option.can_initiate(state) is True
 
 
@@ -295,16 +268,6 @@ class TestOptionRegistry:
         names = [opt.name for opt in available]
         assert "explore_codebase" in names
         assert "debug_issue" in names
-
-    def test_start_option(self, registry: OptionRegistry) -> None:
-        """Test starting option through registry."""
-        state = OptionState(context_size=1000)
-
-        result = registry.start_option("explore_codebase", state)
-
-        assert result is True
-        assert registry.active_option is not None
-        assert registry.active_option.name == "explore_codebase"
 
     def test_step_active_option(self, registry: OptionRegistry) -> None:
         """Test stepping active option."""

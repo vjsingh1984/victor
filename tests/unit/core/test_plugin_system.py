@@ -45,14 +45,11 @@ class TestPluginSystem(unittest.TestCase):
         self.registry = PluginRegistry()
         # Reset singleton for testing if needed, or just use a fresh instance
 
-    @patch("victor.core.plugins.registry.get_entry_point_cache")
-    def test_plugin_discovery(self, mock_get_cache):
-        # Mock the EntryPointCache to return a Dict[str, str]
-        mock_cache = MagicMock()
-        mock_cache.get_entry_points.return_value = {
+    @patch("victor.core.plugins.registry.get_entry_point_values")
+    def test_plugin_discovery(self, mock_get_entry_point_values):
+        mock_get_entry_point_values.return_value = {
             "test_plugin": "mock_pkg:MockPlugin",
         }
-        mock_get_cache.return_value = mock_cache
 
         # Patch _load_plugin_from_value to return our MockPlugin instance
         with patch.object(
@@ -65,8 +62,7 @@ class TestPluginSystem(unittest.TestCase):
         self.assertEqual(len(plugins), 1)
         self.assertEqual(plugins[0].name, "test_plugin")
         # discover() scans victor.plugins
-        mock_cache.get_entry_points.assert_any_call("victor.plugins", force_refresh=True)
-        self.assertEqual(mock_cache.get_entry_points.call_count, 1)
+        mock_get_entry_point_values.assert_called_once_with("victor.plugins", force=True)
 
     def test_plugin_registration(self):
         container = ServiceContainer()

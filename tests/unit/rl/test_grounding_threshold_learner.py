@@ -76,13 +76,20 @@ def _get_beta_params_from_db(
 ) -> Tuple[float, float, int]:
     """Helper to retrieve Beta parameters from the database."""
     cursor = coordinator.db.cursor()
-    cursor.execute(
-        f"SELECT alpha, beta, sample_count FROM {Tables.RL_GROUNDING_PARAM} "
-        "WHERE context_key = ? AND threshold = ?",
-        (context_key, threshold),
-    )
-    row = cursor.fetchone()
-    return (row[0], row[1], row[2]) if row else (1.0, 1.0, 0)
+    alpha_key = f"alpha:{context_key}:{threshold}"
+    beta_key = f"beta:{context_key}:{threshold}"
+    rows = cursor.execute(
+        f"SELECT param_key, param_value, sample_count FROM {Tables.RL_PARAM} "
+        f"WHERE learner_id = 'grounding_threshold' AND param_key IN (?, ?)",
+        (alpha_key, beta_key),
+    ).fetchall()
+    if not rows:
+        return (1.0, 1.0, 0)
+    params = {r[0]: (r[1], r[2]) for r in rows}
+    alpha = params.get(alpha_key, (1.0, 0))[0]
+    beta = params.get(beta_key, (1.0, 0))[0]
+    sample_count = int(params.get(alpha_key, (1.0, 0))[1])
+    return (alpha, beta, sample_count)
 
 
 class TestGroundingThresholdLearner:
@@ -95,15 +102,15 @@ class TestGroundingThresholdLearner:
 
         cursor = learner.db.cursor()
         cursor.execute(
-            f"SELECT name FROM sqlite_master WHERE type='table' AND name='{Tables.RL_GROUNDING_PARAM}';"
+            f"SELECT name FROM sqlite_master WHERE type='table' AND name='{Tables.RL_PARAM}';"
         )
         assert cursor.fetchone() is not None
         cursor.execute(
-            f"SELECT name FROM sqlite_master WHERE type='table' AND name='{Tables.RL_GROUNDING_STAT}';"
+            f"SELECT name FROM sqlite_master WHERE type='table' AND name='{Tables.RL_TASK_STAT}';"
         )
         assert cursor.fetchone() is not None
         cursor.execute(
-            f"SELECT name FROM sqlite_master WHERE type='table' AND name='{Tables.RL_GROUNDING_HISTORY}';"
+            f"SELECT name FROM sqlite_master WHERE type='table' AND name='{Tables.RL_TRANSITION}';"
         )
         assert cursor.fetchone() is not None
 

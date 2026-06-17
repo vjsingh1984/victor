@@ -98,8 +98,8 @@ victor vertical create security --description "Security analysis"
 ```
 
 Or manually create in `victor/{vertical}/` with:
-- `__init__.py` - Package export for the SDK-first assistant definition
-- `assistant.py` - Vertical definition authored against `victor_sdk`
+- `__init__.py` - Package export for the contract-first assistant definition
+- `assistant.py` - Vertical definition authored against `victor_contracts`
 - optional runtime-side modules only if the host integration still needs them
 
 ## Key Patterns

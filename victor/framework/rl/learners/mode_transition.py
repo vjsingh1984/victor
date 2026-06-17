@@ -33,6 +33,7 @@ from enum import Enum
 from typing import Any, Dict, Optional, Tuple
 
 from victor.framework.rl.base import BaseLearner, RLOutcome, RLRecommendation
+from victor.framework.rl.migration import RLTableMigrator
 from victor.core.schema import Tables
 
 logger = logging.getLogger(__name__)
@@ -128,98 +129,46 @@ class ModeTransitionLearner(BaseLearner):
         self._load_state()
 
     def _ensure_tables(self) -> None:
-        """Create tables for mode transition learning."""
-        cursor = self.db.cursor()
-
-        # Q-values table (uses Tables constants)
-        cursor.execute(f"""
-            CREATE TABLE IF NOT EXISTS {Tables.RL_MODE_Q} (
-                state_key TEXT NOT NULL,
-                action_key TEXT NOT NULL,
-                q_value REAL NOT NULL DEFAULT 0.0,
-                visit_count INTEGER NOT NULL DEFAULT 0,
-                last_updated TEXT NOT NULL,
-                PRIMARY KEY (state_key, action_key)
-            )
-            """)
-
-        # Task-type statistics for budget optimization
-        cursor.execute(f"""
-            CREATE TABLE IF NOT EXISTS {Tables.RL_MODE_TASK} (
-                task_type TEXT PRIMARY KEY,
-                optimal_tool_budget INTEGER DEFAULT 10,
-                avg_quality_score REAL DEFAULT 0.5,
-                avg_completion_rate REAL DEFAULT 0.5,
-                sample_count INTEGER DEFAULT 0,
-                last_updated TEXT NOT NULL
-            )
-            """)
-
-        # Transition history for analysis
-        cursor.execute(f"""
-            CREATE TABLE IF NOT EXISTS {Tables.RL_MODE_HISTORY} (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                from_mode TEXT NOT NULL,
-                to_mode TEXT NOT NULL,
-                task_type TEXT NOT NULL,
-                state_key TEXT NOT NULL,
-                action_key TEXT NOT NULL,
-                reward REAL,
-                success INTEGER,
-                quality_score REAL,
-                timestamp TEXT NOT NULL
-            )
-            """)
-
-        # Indexes
-        cursor.execute(f"""
-            CREATE INDEX IF NOT EXISTS idx_mode_q_state
-            ON {Tables.RL_MODE_Q}(state_key)
-            """)
-        cursor.execute(f"""
-            CREATE INDEX IF NOT EXISTS idx_mode_history_task
-            ON {Tables.RL_MODE_HISTORY}(task_type, timestamp)
-            """)
-
-        self.db.commit()
-        logger.debug("RL: mode_transition tables ensured")
+        """Migrate legacy private tables into unified RL schema (idempotent)."""
+        RLTableMigrator(self.db).run_if_needed(self.name, RLTableMigrator.migrate_mode_transition)
 
     def _load_state(self) -> None:
-        """Load state from database."""
+        """Load state from unified rl_q_value and rl_task_stat tables."""
         cursor = self.db.cursor()
 
-        # Load Q-values
         try:
-            cursor.execute(f"SELECT * FROM {Tables.RL_MODE_Q}")
+            cursor.execute(
+                f"SELECT state_key, action_key, q_value, visit_count FROM {Tables.RL_Q_VALUE} "
+                f"WHERE learner_id = ?",
+                (self.name,),
+            )
             for row in cursor.fetchall():
-                row_dict = dict(row)
-                state_key = row_dict["state_key"]
-                action_key = row_dict["action_key"]
-
+                state_key, action_key, q_value, visit_count = row
                 if state_key not in self._q_values:
                     self._q_values[state_key] = {}
                     self._visit_counts[state_key] = {}
-
-                self._q_values[state_key][action_key] = row_dict["q_value"]
-                self._visit_counts[state_key][action_key] = row_dict["visit_count"]
-                self._total_transitions += row_dict["visit_count"]
-
+                self._q_values[state_key][action_key] = q_value
+                self._visit_counts[state_key][action_key] = visit_count
+                self._total_transitions += visit_count
         except Exception as e:
             logger.debug(f"RL: Could not load Q-values: {e}")
 
-        # Load task stats
         try:
-            cursor.execute(f"SELECT * FROM {Tables.RL_MODE_TASK}")
-            for row in cursor.fetchall():
-                row_dict = dict(row)
-                task_type = row_dict["task_type"]
-                self._task_stats[task_type] = {
-                    "optimal_tool_budget": row_dict["optimal_tool_budget"],
-                    "avg_quality_score": row_dict["avg_quality_score"],
-                    "avg_completion_rate": row_dict["avg_completion_rate"],
-                    "sample_count": row_dict["sample_count"],
-                }
-
+            cursor.execute(
+                f"SELECT task_type, stat_key, stat_value, sample_count FROM {Tables.RL_TASK_STAT} "
+                f"WHERE learner_id = ?",
+                (self.name,),
+            )
+            for task_type, stat_key, stat_value, sample_count in cursor.fetchall():
+                if task_type not in self._task_stats:
+                    self._task_stats[task_type] = {
+                        "optimal_tool_budget": 10,
+                        "avg_quality_score": 0.5,
+                        "avg_completion_rate": 0.5,
+                        "sample_count": 0,
+                    }
+                self._task_stats[task_type][stat_key] = stat_value
+                self._task_stats[task_type]["sample_count"] = sample_count
         except Exception as e:
             logger.debug(f"RL: Could not load task stats: {e}")
 
@@ -307,14 +256,15 @@ class ModeTransitionLearner(BaseLearner):
         cursor = self.db.cursor()
         timestamp = datetime.now().isoformat()
 
-        # Save Q-value
+        import json as _json
+
+        # Save Q-value to unified table
         cursor.execute(
-            f"""
-            INSERT OR REPLACE INTO {Tables.RL_MODE_Q}
-            (state_key, action_key, q_value, visit_count, last_updated)
-            VALUES (?, ?, ?, ?, ?)
-            """,
+            f"INSERT OR REPLACE INTO {Tables.RL_Q_VALUE} "
+            f"(learner_id, state_key, action_key, q_value, visit_count, last_updated) "
+            f"VALUES (?, ?, ?, ?, ?, ?)",
             (
+                self.name,
                 state_key,
                 action_key,
                 self._q_values[state_key][action_key],
@@ -323,24 +273,19 @@ class ModeTransitionLearner(BaseLearner):
             ),
         )
 
-        # Save transition history
+        # Save transition history to unified table
+        meta = _json.dumps(
+            {
+                "success": 1 if outcome.success else 0,
+                "quality_score": outcome.quality_score,
+                "task_type": task_type,
+            }
+        )
         cursor.execute(
-            f"""
-            INSERT INTO {Tables.RL_MODE_HISTORY}
-            (from_mode, to_mode, task_type, state_key, action_key, reward, success, quality_score, timestamp)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                from_mode,
-                to_mode,
-                task_type,
-                state_key,
-                action_key,
-                reward,
-                1 if outcome.success else 0,
-                outcome.quality_score,
-                timestamp,
-            ),
+            f"INSERT INTO {Tables.RL_TRANSITION} "
+            f"(learner_id, from_state, to_state, action, reward, metadata, created_at) "
+            f"VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (self.name, from_mode, to_mode, action_key, reward, meta, timestamp),
         )
 
         self.db.commit()
@@ -383,23 +328,27 @@ class ModeTransitionLearner(BaseLearner):
             # Failure: increase budget
             stats["optimal_tool_budget"] = min(stats["optimal_tool_budget"] + 2, 50)
 
-        # Save to database
+        # Save task stats to unified rl_task_stat table
         cursor = self.db.cursor()
-        cursor.execute(
-            f"""
-            INSERT OR REPLACE INTO {Tables.RL_MODE_TASK}
-            (task_type, optimal_tool_budget, avg_quality_score, avg_completion_rate, sample_count, last_updated)
-            VALUES (?, ?, ?, ?, ?, ?)
-            """,
-            (
-                task_type,
-                stats["optimal_tool_budget"],
-                stats["avg_quality_score"],
-                stats["avg_completion_rate"],
-                stats["sample_count"],
-                datetime.now().isoformat(),
-            ),
-        )
+        now = datetime.now().isoformat()
+        for stat_key in (
+            "optimal_tool_budget",
+            "avg_quality_score",
+            "avg_completion_rate",
+        ):
+            cursor.execute(
+                f"INSERT OR REPLACE INTO {Tables.RL_TASK_STAT} "
+                f"(learner_id, task_type, stat_key, stat_value, sample_count, updated_at) "
+                f"VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    self.name,
+                    task_type,
+                    stat_key,
+                    stats[stat_key],
+                    stats["sample_count"],
+                    now,
+                ),
+            )
         self.db.commit()
 
     def get_recommendation(
@@ -438,9 +387,9 @@ class ModeTransitionLearner(BaseLearner):
         # Epsilon-greedy: explore or exploit
         import random
 
-        if random.random() < self.epsilon:
+        if self._rng.random() < self.epsilon:
             # Exploration: random action
-            action = random.choice(list(actions.keys()))
+            action = self._rng.choice(list(actions.keys()))
             _q_value = actions[action]  # noqa: F841
             return RLRecommendation(
                 value=action,
@@ -497,7 +446,11 @@ class ModeTransitionLearner(BaseLearner):
         if rec is None:
             return ("explore:0", 0.0, 0.3)
 
-        return (rec.value, rec.value if isinstance(rec.value, float) else 0.0, rec.confidence)
+        return (
+            rec.value,
+            rec.value if isinstance(rec.value, float) else 0.0,
+            rec.confidence,
+        )
 
     def get_optimal_budget(self, task_type: str) -> int:
         """Get learned optimal tool budget for a task type.

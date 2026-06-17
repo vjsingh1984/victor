@@ -61,6 +61,8 @@ from victor.providers.base import (
 )
 from victor.providers.logging import ProviderLogger
 from victor.providers.openai_compat import (
+    extract_thinking_content as _extract_thinking_content,
+    extract_tool_calls_from_content as _extract_tool_calls_from_content,
     convert_messages_to_openai_format,
     convert_tools_to_openai_format,
     parse_openai_tool_calls,
@@ -99,119 +101,6 @@ def _model_supports_tools(model: str) -> bool:
     return any(pattern in model_lower for pattern in TOOL_CAPABLE_PATTERNS)
 
 
-def _extract_thinking_content(response: str) -> Tuple[str, str]:
-    """Extract thinking content from response.
-
-    Args:
-        response: Raw response text
-
-    Returns:
-        Tuple of (thinking_content, main_content)
-    """
-    think_pattern = r"<think>(.*?)</think>"
-    matches = re.findall(think_pattern, response, re.DOTALL | re.IGNORECASE)
-    thinking = "\n".join(matches) if matches else ""
-    content = re.sub(think_pattern, "", response, flags=re.DOTALL | re.IGNORECASE).strip()
-    return (thinking, content)
-
-
-def _extract_tool_calls_from_content(content: str) -> Tuple[List[Dict[str, Any]], str]:
-    """Extract tool calls from content when server doesn't parse them.
-
-    Handles cases where model outputs tool calls as JSON text.
-    Common formats:
-    - ```json\n{...}\n```
-    - <TOOL_OUTPUT>{...}</TOOL_OUTPUT>
-    - {"name": "...", "arguments": {...}}
-
-    Note: Must distinguish from task plan JSON which also has "name" but different structure.
-    Tool calls have "arguments" which are dict objects with tool-specific structure.
-
-    Args:
-        content: Response content that may contain tool calls
-
-    Returns:
-        Tuple of (parsed_tool_calls, remaining_content)
-    """
-    tool_calls = []
-    remaining = content
-
-    # Planning keywords to avoid false positives
-    planning_keywords = {"complexity", "steps", "desc", "duration"}
-
-    # Pattern 1: JSON code block with tool call
-    json_block_pattern = r"```json\s*\n?\s*(\{[^`]*\"name\"\s*:\s*\"[^\"]+\"[^`]*\})\s*\n?```"
-    matches = re.findall(json_block_pattern, content, re.DOTALL)
-    for match in matches:
-        try:
-            data = json.loads(match)
-            if "name" in data:
-                arguments = data.get("arguments", {})
-                # Only treat as tool call if arguments is a dict and doesn't look like planning JSON
-                if isinstance(arguments, dict) and not any(
-                    key in arguments for key in planning_keywords
-                ):
-                    tool_calls.append(
-                        {
-                            "id": f"fallback_{len(tool_calls)}",
-                            "name": data.get("name", ""),
-                            "arguments": arguments,
-                        }
-                    )
-                    remaining = remaining.replace(f"```json\n{match}\n```", "").strip()
-                    remaining = remaining.replace(f"```json{match}```", "").strip()
-        except json.JSONDecodeError:
-            pass
-
-    # Pattern 2: <TOOL_OUTPUT> tags
-    tool_output_pattern = r"<TOOL_OUTPUT>\s*(\{.*?\})\s*</TOOL_OUTPUT>"
-    matches = re.findall(tool_output_pattern, content, re.DOTALL)
-    for match in matches:
-        try:
-            data = json.loads(match)
-            if "name" in data:
-                arguments = data.get("arguments", {})
-                # Only treat as tool call if arguments is a dict and doesn't look like planning JSON
-                if isinstance(arguments, dict) and not any(
-                    key in arguments for key in planning_keywords
-                ):
-                    tool_calls.append(
-                        {
-                            "id": f"fallback_{len(tool_calls)}",
-                            "name": data.get("name", ""),
-                            "arguments": arguments,
-                        }
-                    )
-                    remaining = re.sub(
-                        r"<TOOL_OUTPUT>\s*" + re.escape(match) + r"\s*</TOOL_OUTPUT>", "", remaining
-                    )
-        except json.JSONDecodeError:
-            pass
-
-    # Pattern 3: Inline JSON (for simple cases)
-    if not tool_calls and content.strip().startswith("{") and "name" in content:
-        try:
-            data = json.loads(content.strip())
-            if "name" in data:
-                arguments = data.get("arguments", {})
-                # Only treat as tool call if arguments is a dict and doesn't look like planning JSON
-                if isinstance(arguments, dict) and not any(
-                    key in arguments for key in planning_keywords
-                ):
-                    tool_calls.append(
-                        {
-                            "id": "fallback_0",
-                            "name": data.get("name", ""),
-                            "arguments": arguments,
-                        }
-                    )
-                    remaining = ""
-        except json.JSONDecodeError:
-            pass
-
-    return tool_calls, remaining.strip()
-
-
 class LlamaCppProvider(BaseProvider):
     """Provider for llama.cpp server (CPU-optimized inference).
 
@@ -246,7 +135,11 @@ class LlamaCppProvider(BaseProvider):
         self._provider_logger = ProviderLogger("llamacpp", __name__)
 
         super().__init__(
-            api_key=api_key, base_url=base_url, timeout=timeout, max_retries=max_retries, **kwargs
+            api_key=api_key,
+            base_url=base_url,
+            timeout=timeout,
+            max_retries=max_retries,
+            **kwargs,
         )
         self.base_url = base_url or DEFAULT_LLAMACPP_URLS[0]
         self.timeout = timeout
@@ -338,6 +231,31 @@ class LlamaCppProvider(BaseProvider):
     def supports_streaming(self) -> bool:
         """llama.cpp supports streaming."""
         return True
+
+    def supports_prompt_caching(self) -> bool:
+        """llama.cpp has no API-level prompt caching (no billing discount)."""
+        return False
+
+    def supports_kv_prefix_caching(self) -> bool:
+        """llama.cpp natively reuses KV cache for matching prefixes."""
+        return True
+
+    def context_window(self, model: Optional[str] = None) -> int:
+        from victor.providers.context_windows import OLLAMA, LLAMACPP_DEFAULT, lookup
+
+        target = model or getattr(self, "_current_model", None)
+        return lookup(OLLAMA, target, LLAMACPP_DEFAULT)
+
+    def get_tool_output_format(self) -> Any:
+        """llama.cpp models parse XML tags in responses.
+
+        llama.cpp models have been trained on Victor's XML format
+        with <TOOL_OUTPUT> tags. This format ensures optimal tool
+        result parsing and cognition.
+        """
+        from victor.agent.format_strategies import XML_FORMAT
+
+        return XML_FORMAT
 
     async def list_models(self) -> List[Dict[str, Any]]:
         """List models loaded in llama.cpp server.

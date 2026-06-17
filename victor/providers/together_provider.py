@@ -185,6 +185,20 @@ class TogetherProvider(BaseProvider):
     def supports_streaming(self) -> bool:
         return True
 
+    def supports_prompt_caching(self) -> bool:
+        """Together AI has prompt caching always enabled."""
+        return True
+
+    def supports_kv_prefix_caching(self) -> bool:
+        """Together reuses KV cache for matching prompt prefixes."""
+        return True
+
+    def context_window(self, model: Optional[str] = None) -> int:
+        from victor.providers.context_windows import TOGETHER, TOGETHER_DEFAULT, lookup
+
+        target = model or getattr(self, "_current_model", None)
+        return lookup(TOGETHER, target, TOGETHER_DEFAULT)
+
     async def chat(
         self,
         messages: List[Message],
@@ -296,7 +310,7 @@ class TogetherProvider(BaseProvider):
                     if data_str.strip() == "[DONE]":
                         yield StreamChunk(
                             content="",
-                            tool_calls=accumulated_tool_calls if accumulated_tool_calls else None,
+                            tool_calls=(accumulated_tool_calls if accumulated_tool_calls else None),
                             stop_reason="stop",
                             is_final=True,
                         )

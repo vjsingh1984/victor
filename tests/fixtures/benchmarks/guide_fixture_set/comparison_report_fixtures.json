@@ -1,0 +1,36 @@
+{
+  "benchmark": "guide",
+  "timestamp": "2026-05-08T00:00:00",
+  "checksum_algorithm": "sha256",
+  "artifact_count": 2,
+  "artifacts": [
+    {
+      "framework": "victor",
+      "model": "fixture-model-a",
+      "artifact_path": "",
+      "source": "GUIDE Fixture A",
+      "prompt_candidate_hash": "",
+      "section_name": "",
+      "dataset_metadata": {
+        "source_name": "GUIDE Fixture A"
+      },
+      "bundled_artifact_path": "comparison_report_fixtures/01_victor_fixture-model-a.json",
+      "bundled_artifact_size_bytes": 354,
+      "bundled_artifact_sha256": "21e7b692c832f025026049feb1aeb53ad9888e50c6c57e57c2978befda7dcb32"
+    },
+    {
+      "framework": "victor",
+      "model": "fixture-model-b",
+      "artifact_path": "",
+      "source": "GUIDE Fixture B",
+      "prompt_candidate_hash": "",
+      "section_name": "",
+      "dataset_metadata": {
+        "source_name": "GUIDE Fixture B"
+      },
+      "bundled_artifact_path": "comparison_report_fixtures/02_victor_fixture-model-b.json",
+      "bundled_artifact_size_bytes": 354,
+      "bundled_artifact_sha256": "990800fe2abcadb6a0f71dc0f0ee590f249ed9cec031a201e5ad99d3a806b811"
+    }
+  ]
+}

@@ -935,6 +935,7 @@ class EntryPointCache:
         import time
 
         current_hash = self._get_env_hash()
+        should_refresh_registry = force_refresh
 
         with self._cache_lock:
             cached = self._memory_cache.get(group)
@@ -944,10 +945,11 @@ class EntryPointCache:
                 if cached.env_hash == current_hash and not cached.is_expired():
                     logger.debug(f"Cache hit for entry point group '{group}'")
                     return cached.entries.copy()
+                should_refresh_registry = True
 
         # Cache miss or invalid - scan entry points
         logger.debug(f"Scanning entry points for group '{group}'")
-        entries = self._scan_entry_points(group)
+        entries = self._scan_entry_points(group, force_refresh=should_refresh_registry)
 
         # Store in cache
         cached_entry = CachedEntryPoints(
@@ -966,11 +968,12 @@ class EntryPointCache:
 
         return entries.copy()
 
-    def _scan_entry_points(self, group: str) -> Dict[str, str]:
+    def _scan_entry_points(self, group: str, *, force_refresh: bool = False) -> Dict[str, str]:
         """Scan entry points for a group.
 
         Args:
             group: Entry point group name
+            force_refresh: Whether to invalidate the shared registry first
 
         Returns:
             Dictionary mapping names to module:attr strings
@@ -978,16 +981,9 @@ class EntryPointCache:
         entries = {}
 
         try:
-            # Use UnifiedEntryPointRegistry for single-pass lazy scanning
-            from victor.framework.entry_point_registry import get_entry_point_registry
+            from victor.framework.entry_point_registry import get_entry_point_values
 
-            registry = get_entry_point_registry()
-            group_obj = registry.get_group(group)
-
-            if group_obj:
-                for ep_name, (ep, _loaded) in group_obj.entry_points.items():
-                    # Store as "module:attr" format
-                    entries[ep_name] = f"{ep.value}"
+            entries = get_entry_point_values(group, force=force_refresh)
 
         except Exception as e:
             logger.warning(f"Failed to scan entry points for '{group}': {e}")
@@ -1028,14 +1024,23 @@ class EntryPointCache:
                 if group in self._memory_cache:
                     del self._memory_cache[group]
                     self._save_to_disk()
-                    return 1
-                return 0
+                    count = 1
+                else:
+                    count = 0
             else:
                 count = len(self._memory_cache)
                 self._memory_cache.clear()
                 self._env_hash = None  # Force re-compute
                 self._save_to_disk()
-                return count
+
+        try:
+            from victor.framework.entry_point_registry import get_entry_point_registry
+
+            get_entry_point_registry().invalidate()
+        except Exception as e:
+            logger.debug(f"Failed to invalidate shared entry point registry: {e}")
+
+        return count
 
     def invalidate_on_env_change(self) -> bool:
         """Check if environment changed and invalidate if so.

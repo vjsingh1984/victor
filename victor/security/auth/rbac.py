@@ -274,7 +274,7 @@ class RBACManager:
         enabled: bool = True,
         default_role: str = "viewer",
         allow_unknown_users: bool = True,
-        fail_open: bool = True,
+        fail_open: bool = False,
     ):
         """Initialize RBAC manager.
 
@@ -282,15 +282,13 @@ class RBACManager:
             enabled: If False, behaviour depends on fail_open
             default_role: Role assigned to unknown users
             allow_unknown_users: If True, unknown users get default role
-            fail_open: If True (default), disabled RBAC allows all access.
-                If False, disabled RBAC denies all access.
-                Default will change to False in Victor 1.0.
+            fail_open: If True, disabled RBAC allows all access.
+                If False (default), disabled RBAC denies all access.
         """
         self._enabled = enabled
         self._default_role_name = default_role
         self._allow_unknown_users = allow_unknown_users
         self._fail_open = fail_open
-        self._fail_open_warned = False
         self._lock = threading.RLock()
 
         # Initialize with predefined roles
@@ -398,16 +396,6 @@ class RBACManager:
         """
         if not self._enabled:
             if self._fail_open:
-                if not self._fail_open_warned:
-                    import warnings
-
-                    warnings.warn(
-                        "RBAC fail_open=True is deprecated. Default will change to "
-                        "False in Victor 1.0. Set fail_open explicitly.",
-                        DeprecationWarning,
-                        stacklevel=2,
-                    )
-                    self._fail_open_warned = True
                 return True
             logger.warning(
                 "RBAC disabled with fail_open=False; denying '%s' for '%s'",
@@ -449,16 +437,6 @@ class RBACManager:
         """
         if not self._enabled:
             if self._fail_open:
-                if not self._fail_open_warned:
-                    import warnings
-
-                    warnings.warn(
-                        "RBAC fail_open=True is deprecated. Default will change to "
-                        "False in Victor 1.0. Set fail_open explicitly.",
-                        DeprecationWarning,
-                        stacklevel=2,
-                    )
-                    self._fail_open_warned = True
                 return True
             logger.warning(
                 "RBAC disabled with fail_open=False; denying tool '%s' for '%s'",
@@ -503,16 +481,6 @@ class RBACManager:
         """
         if not self._enabled:
             if self._fail_open:
-                if not self._fail_open_warned:
-                    import warnings
-
-                    warnings.warn(
-                        "RBAC fail_open=True is deprecated. Default will change to "
-                        "False in Victor 1.0. Set fail_open explicitly.",
-                        DeprecationWarning,
-                        stacklevel=2,
-                    )
-                    self._fail_open_warned = True
                 return True
             logger.warning(
                 "RBAC disabled with fail_open=False; denying tool '%s' for current user",

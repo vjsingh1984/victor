@@ -35,12 +35,14 @@ Migration Path:
         from victor.tools.base import BaseTool
         from victor.tools.enums import CostTier, Priority
         from victor.tools.metadata import ToolMetadata
+        from victor.tools.metadata_registry import ToolMetadataRegistry
         from victor.tools.registry import ToolRegistry
 
 New structure:
 - victor/tools/base.py - BaseTool, ToolResult, and supporting classes
 - victor/tools/enums.py - All enum classes
-- victor/tools/metadata.py - ToolMetadata and ToolMetadataRegistry
+- victor/tools/metadata.py - ToolMetadata
+- victor/tools/metadata_registry.py - ToolMetadataRegistry
 - victor/tools/registry.py - ToolRegistry, Hook, HookError
 
 For migration examples, see: ``docs/MIGRATION_GUIDE.md``
@@ -65,11 +67,9 @@ from victor.tools.enums import (
     Priority,
 )
 
-# Re-export metadata classes from metadata.py
-from victor.tools.metadata import (
-    ToolMetadata,
-    ToolMetadataRegistry,
-)
+# Re-export metadata classes from canonical modules
+from victor.tools.metadata import ToolMetadata
+from victor.tools.metadata_registry import ToolMetadataRegistry
 
 # Re-export registry classes from registry.py
 from victor.tools.registry import (

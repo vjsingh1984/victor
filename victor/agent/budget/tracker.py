@@ -25,7 +25,12 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional
 
-from victor.agent.protocols import BudgetConfig, BudgetStatus, BudgetType, IBudgetTracker
+from victor.agent.protocols import (
+    BudgetConfig,
+    BudgetStatus,
+    BudgetType,
+    IBudgetTracker,
+)
 
 logger = logging.getLogger(__name__)
 

@@ -19,7 +19,8 @@ coordination components behind a single interface.
 
 This facade wraps already-initialized components from the orchestrator,
 providing a coherent grouping without changing initialization ordering.
-The orchestrator delegates property access through this facade.
+The orchestrator delegates property access through this facade. It does not own
+session behavior.
 """
 
 from __future__ import annotations
@@ -44,6 +45,7 @@ class SessionFacade:
         - lifecycle_manager: LifecycleManager for session boundaries
         - active_session_id: Active session identifier
         - memory_session_id: Session identifier for memory operations
+        - runtime_state_host: Canonical runtime owner for mutable session state
         - profile_name: Optional profile name for session tracking
         - checkpoint_manager: ConversationCheckpointManager for time-travel
     """
@@ -57,6 +59,7 @@ class SessionFacade:
         lifecycle_manager: Optional[Any] = None,
         active_session_id: Optional[str] = None,
         memory_session_id: Optional[str] = None,
+        runtime_state_host: Optional[Any] = None,
         profile_name: Optional[str] = None,
         checkpoint_manager: Optional[Any] = None,
     ) -> None:
@@ -66,6 +69,7 @@ class SessionFacade:
         self._lifecycle_manager = lifecycle_manager
         self._active_session_id = active_session_id
         self._memory_session_id = memory_session_id
+        self._runtime_state_host = runtime_state_host
         self._profile_name = profile_name
         self._checkpoint_manager = checkpoint_manager
 
@@ -93,11 +97,15 @@ class SessionFacade:
     @property
     def session_ledger(self) -> Any:
         """SessionLedger for append-only event log."""
+        if self._runtime_state_host is not None:
+            return getattr(self._runtime_state_host, "_session_ledger", self._session_ledger)
         return self._session_ledger
 
     @session_ledger.setter
     def session_ledger(self, value: Any) -> None:
         """Update the session ledger."""
+        if self._runtime_state_host is not None:
+            self._runtime_state_host._session_ledger = value
         self._session_ledger = value
 
     @property
@@ -108,21 +116,37 @@ class SessionFacade:
     @property
     def active_session_id(self) -> Optional[str]:
         """Active session identifier."""
+        if self._runtime_state_host is not None:
+            return getattr(
+                self._runtime_state_host,
+                "active_session_id",
+                self._active_session_id,
+            )
         return self._active_session_id
 
     @active_session_id.setter
     def active_session_id(self, value: Optional[str]) -> None:
         """Update the active session identifier."""
+        if self._runtime_state_host is not None:
+            self._runtime_state_host.active_session_id = value
         self._active_session_id = value
 
     @property
     def memory_session_id(self) -> Optional[str]:
         """Session identifier for memory operations."""
+        if self._runtime_state_host is not None:
+            return getattr(
+                self._runtime_state_host,
+                "_memory_session_id",
+                self._memory_session_id,
+            )
         return self._memory_session_id
 
     @memory_session_id.setter
     def memory_session_id(self, value: Optional[str]) -> None:
         """Update the memory session identifier."""
+        if self._runtime_state_host is not None:
+            self._runtime_state_host._memory_session_id = value
         self._memory_session_id = value
 
     @property

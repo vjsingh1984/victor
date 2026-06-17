@@ -78,7 +78,7 @@ def scaffold(name: str, output_dir: Path) -> Path:
         description = "Victor vertical for {vertical_name}"
         requires-python = ">=3.10"
         dependencies = [
-            "victor-sdk>=0.6.0",
+            "victor-contracts>=0.7.0",
         ]
 
         [project.entry-points."victor.plugins"]
@@ -95,7 +95,7 @@ def scaffold(name: str, output_dir: Path) -> Path:
         from typing import Optional
 
         import typer
-        from victor_sdk import PluginContext, VictorPlugin
+        from victor_contracts import PluginContext, VictorPlugin
 
         from {mod_name}.assistant import {class_name}Assistant
 
@@ -140,13 +140,13 @@ def scaffold(name: str, output_dir: Path) -> Path:
     create_file(
         src_dir / "assistant.py",
         f'''
-        """{class_name} Assistant - SDK-first vertical definition."""
+        """{class_name} Assistant - contract-first vertical definition."""
 
         from __future__ import annotations
 
         from typing import ClassVar
 
-        from victor_sdk import (
+        from victor_contracts import (
             CapabilityIds,
             CapabilityRequirement,
             StageDefinition,

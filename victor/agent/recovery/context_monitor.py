@@ -248,11 +248,17 @@ class ContextWindowMonitor:
         if health == ContextHealth.CRITICAL:
             # Check if growing quickly
             if self._is_growing_fast():
-                return True, f"Context critical and growing fast ({self._metrics.usage_ratio:.1%})"
+                return (
+                    True,
+                    f"Context critical and growing fast ({self._metrics.usage_ratio:.1%})",
+                )
             return True, f"Context critical ({self._metrics.usage_ratio:.1%})"
 
         if health == ContextHealth.WARNING and self._is_growing_fast():
-            return True, f"Context warning with rapid growth ({self._metrics.usage_ratio:.1%})"
+            return (
+                True,
+                f"Context warning with rapid growth ({self._metrics.usage_ratio:.1%})",
+            )
 
         return False, "Context healthy"
 

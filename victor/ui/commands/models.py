@@ -8,7 +8,7 @@ from rich.table import Table
 from victor.core.async_utils import run_sync
 from victor.config.settings import load_settings
 
-models_app = typer.Typer(name="models", help="List available models for a provider.")
+models_app = typer.Typer(name="model", help="List and manage models.")
 console = Console()
 logger = logging.getLogger(__name__)
 

@@ -72,13 +72,13 @@ class TestTaskTypeDefinition:
         assert defn.category == TaskCategory.MODIFICATION
         assert defn.hint == "[CUSTOM] A custom task type"
         assert defn.tool_budget == 25
-        assert defn.priority_tools == ["read_file", "edit_files"]
+        assert defn.priority_tools == ["read", "edit"]
         assert defn.max_iterations == 15
         assert defn.aliases == {"custom", "my_task"}
         assert defn.vertical == "my_vertical"
         assert defn.needs_tools is False
         assert defn.force_action_after_read is True
-        assert defn.stage_tools == {"initial": ["list_directory"]}
+        assert defn.stage_tools == {"initial": ["ls"]}
         assert defn.force_action_hints == {"max_iterations": "Complete the task"}
         assert defn.exploration_multiplier == 1.5
 
@@ -220,8 +220,8 @@ class TestTaskTypeRegistry:
         registry = TaskTypeRegistry.get_instance()
 
         tools = registry.get_priority_tools("edit")
-        assert "read_file" in tools
-        assert "edit_files" in tools
+        assert "read" in tools
+        assert "edit" in tools
 
         tools = registry.get_priority_tools("search")
         assert "code_search" in tools
@@ -360,7 +360,10 @@ class TestVerticalRegistration:
         registry.register_for_vertical(
             "devops",
             TaskTypeDefinition(
-                name="test1", category=TaskCategory.MODIFICATION, hint="", tool_budget=10
+                name="test1",
+                category=TaskCategory.MODIFICATION,
+                hint="",
+                tool_budget=10,
             ),
         )
         registry.register_for_vertical(
@@ -392,7 +395,7 @@ class TestVerticalRegistration:
         assert result.name == "test_task"
         assert result.hint == "[TEST] Test task"
         assert result.tool_budget == 15
-        assert result.priority_tools == ["execute_bash"]
+        assert result.priority_tools == ["shell"]
 
 
 class TestVerticalRegistrationHooks:

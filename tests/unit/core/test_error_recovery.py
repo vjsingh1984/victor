@@ -105,6 +105,34 @@ class TestMissingParameterHandler:
         assert result.action == RecoveryAction.RETRY_WITH_DEFAULTS
         assert result.modified_args["path"] == "."
 
+    def test_handle_recovers_wrapped_value_payload_for_write(self, handler):
+        """Wrapped write payloads should be recovered before default retries."""
+        error = Exception("Error: Missing required arguments: path, content")
+        result = handler.handle(
+            error,
+            "write",
+            {
+                "value": (
+                    '{"file_path":"victor/framework/graph_protocols.py",'
+                    '"text":"print(\\"hi\\")\\n"}'
+                )
+            },
+        )
+
+        assert result.action == RecoveryAction.RETRY_WITH_INFERRED
+        assert result.modified_args == {
+            "path": "victor/framework/graph_protocols.py",
+            "content": 'print("hi")\n',
+        }
+
+    def test_handle_skips_when_multi_param_error_has_unknown_values(self, handler):
+        """Multi-parameter missing errors should not retry with partial defaults."""
+        error = Exception("Error: Missing required arguments: path, content")
+        result = handler.handle(error, "write", {})
+
+        assert result.action == RecoveryAction.SKIP
+        assert "path, content" in result.user_message
+
     def test_handle_provides_default_for_limit(self, handler):
         """Test default value for 'limit' parameter."""
         error = Exception("'limit' is a required property")
@@ -269,6 +297,42 @@ class TestFileNotFoundHandler:
         # Should try variations
         assert result.action == RecoveryAction.RETRY_WITH_INFERRED
         assert "tried_variations" in result.metadata
+
+    def test_handle_prefers_package_file_suggestion_for_reads(self, handler):
+        """Read retries should prefer concrete package files over directory suggestions."""
+        error = Exception(
+            "File not found: victor/core/registry.py\n"
+            "Did you mean one of these?\n"
+            "  - victor/core/registry/\n"
+            "  - victor/core/registry/base.py\n"
+            "  - victor/core/registry_base.py"
+        )
+
+        result = handler.handle(error, "read", {"path": "victor/core/registry.py"})
+
+        assert result.action == RecoveryAction.RETRY_WITH_INFERRED
+        assert result.modified_args["path"] == "victor/core/registry/base.py"
+        assert result.metadata["suggested_paths"][0] == "victor/core/registry/"
+
+    def test_handle_uses_file_arg_key_when_retrying_suggestion(self, handler):
+        """Suggestion retries should preserve the original path argument key."""
+        error = Exception(
+            "File not found: setup.py\nDid you mean one of these?\n  - pyproject.toml"
+        )
+
+        result = handler.handle(error, "read", {"file": "setup.py"})
+
+        assert result.action == RecoveryAction.RETRY_WITH_INFERRED
+        assert result.modified_args["file"] == "pyproject.toml"
+
+    def test_handle_rejects_self_suggestion(self, handler):
+        """Recovery should not retry the same unresolved path."""
+        error = Exception("File not found: Cargo.toml\nDid you mean one of these?\n  - Cargo.toml")
+
+        result = handler.handle(error, "read", {"path": "Cargo.toml"})
+
+        assert result.action == RecoveryAction.SKIP
+        assert result.metadata["suggested_paths"] == ["Cargo.toml"]
 
     def test_get_path_variations_removes_leading_dot(self, handler):
         """Test path variation removes leading ./"""
@@ -464,6 +528,15 @@ class TestChainOfResponsibility:
         assert result.action == RecoveryAction.RETRY
         assert result.metadata.get("handler") == "NetworkErrorHandler"
 
+    def test_chain_handles_resource_budget_timeout_before_generic_network(self, chain):
+        """Budget timeouts should produce local timeout guidance, not permission/network recovery."""
+        error = Exception("graph mode 'overview' exceeded 90s budget")
+        result = chain.process(error, "graph", {"mode": "overview"})
+
+        assert result.action == RecoveryAction.SKIP
+        assert result.metadata.get("handler") == "ResourceBudgetTimeoutHandler"
+        assert result.metadata.get("error_kind") == "resource_budget_timeout"
+
     def test_chain_handles_file_not_found(self, chain):
         """Test chain handles file not found errors."""
         error = FileNotFoundError("test.py")
@@ -618,7 +691,10 @@ class TestDeepSeekScenario:
         error2 = FileNotFoundError("Symbol not found in .")
         result2 = chain.process(error2, "symbol", result1.modified_args)
         # Should try path variations or skip
-        assert result2.action in (RecoveryAction.RETRY_WITH_INFERRED, RecoveryAction.SKIP)
+        assert result2.action in (
+            RecoveryAction.RETRY_WITH_INFERRED,
+            RecoveryAction.SKIP,
+        )
 
         # Third error: tool not found (after all retries)
         error3 = Exception("Tool 'symbol' not found")

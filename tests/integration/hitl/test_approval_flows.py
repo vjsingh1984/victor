@@ -225,9 +225,17 @@ class TestCustomApprovalHandlers:
             risk_level = request.context.get("risk_level", "unknown")
 
             if risk_level == "low":
-                return ApprovalStatus.APPROVED, "Auto-approved (low risk)", "policy-engine"
+                return (
+                    ApprovalStatus.APPROVED,
+                    "Auto-approved (low risk)",
+                    "policy-engine",
+                )
             elif risk_level == "high":
-                return ApprovalStatus.REJECTED, "High risk requires manual review", "policy-engine"
+                return (
+                    ApprovalStatus.REJECTED,
+                    "High risk requires manual review",
+                    "policy-engine",
+                )
             else:
                 return ApprovalStatus.PENDING, None, None
 

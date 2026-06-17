@@ -423,7 +423,15 @@ def get_container_status() -> Dict[str, str]:
     """
     try:
         result = subprocess.run(
-            ["docker", "ps", "-a", "--filter", "name=mcp-", "--format", "{{.Names}}:{{.Status}}"],
+            [
+                "docker",
+                "ps",
+                "-a",
+                "--filter",
+                "name=mcp-",
+                "--format",
+                "{{.Names}}:{{.Status}}",
+            ],
             capture_output=True,
             text=True,
             timeout=10,
@@ -501,7 +509,14 @@ async def demo_multi_server_registry():
         servers.append(
             MCPServerConfig(
                 name="playwright",
-                command=["docker", "exec", "-i", "mcp-playwright", "node", "/app/dist/index.js"],
+                command=[
+                    "docker",
+                    "exec",
+                    "-i",
+                    "mcp-playwright",
+                    "node",
+                    "/app/dist/index.js",
+                ],
                 description="Playwright Browser Automation",
                 tags=["browser", "automation", "docker"],
             )
@@ -556,7 +571,11 @@ async def demo_multi_server_registry():
             if server_tools:
                 print(f"\n   [{server_name}]")
                 for tool in server_tools[:5]:  # Show first 5 per server
-                    desc = tool.description[:50] + "..." if len(tool.description) > 50 else tool.description
+                    desc = (
+                        tool.description[:50] + "..."
+                        if len(tool.description) > 50
+                        else tool.description
+                    )
                     print(f"   - {tool.name}: {desc}")
                 if len(server_tools) > 5:
                     print(f"   ... and {len(server_tools) - 5} more tools")
@@ -606,25 +625,20 @@ def show_integration_examples():
     print("Docker Compose MCP Integration Examples")
     print("=" * 70)
 
-    print(
-        """
+    print("""
 1. Docker Compose File (mcp-servers.yaml)
 -----------------------------------------
-"""
-    )
+""")
     print(DOCKER_COMPOSE_CONFIG[:1500] + "\n... (truncated)")
 
-    print(
-        """
+    print("""
 
 2. Victor MCP Configuration (~/.victor/mcp.yaml)
 ------------------------------------------------
-"""
-    )
+""")
     print(VICTOR_MCP_CONFIG[:1200] + "\n... (truncated)")
 
-    print(
-        """
+    print("""
 
 3. Quick Start Commands
 -----------------------
@@ -718,8 +732,7 @@ jobs:
 # - Using service mesh for inter-service communication
 # - Implementing proper health checks and scaling
 # - Using secrets management for credentials
-"""
-    )
+""")
 
 
 async def main():
@@ -818,7 +831,10 @@ Examples:
         else:
             print(f"   Config file not found: {compose_path}")
             print("   Trying to stop containers directly...")
-            subprocess.run(["docker", "stop", "mcp-aws-docs", "mcp-playwright", "mcp-aws-cdk"], capture_output=True)
+            subprocess.run(
+                ["docker", "stop", "mcp-aws-docs", "mcp-playwright", "mcp-aws-cdk"],
+                capture_output=True,
+            )
 
         print("\nCleanup complete!")
         return

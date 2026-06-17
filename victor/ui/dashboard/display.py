@@ -133,7 +133,7 @@ class MetricsDashboard:
         content = self._generate_content(data)
         return Panel(
             content,
-            title=f"[bold cyan]Victor Metrics Dashboard[/bold cyan]",
+            title="[bold cyan]Victor Metrics Dashboard[/bold cyan]",
             subtitle=f"[dim]{data.datetime.strftime('%Y-%m-%d %H:%M:%S')}[/dim]",
             border_style="cyan",
             box=box.ROUNDED,

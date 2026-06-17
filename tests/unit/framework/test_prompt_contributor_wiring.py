@@ -30,6 +30,7 @@ from victor.core.verticals.prompt_adapter import (
     create_prompt_adapter,
 )
 from victor.core.verticals.protocols import TaskTypeHint
+from victor.core.verticals.protocols.prompt_provider import PromptSectionContribution
 from victor.framework.step_handlers import PromptStepHandler
 
 # =============================================================================
@@ -99,6 +100,34 @@ class MockContributorProtocolFormat:
 
     def get_priority(self) -> int:
         return 40
+
+
+class MockContributorNamedSections:
+    """Contributor using the named prompt-section metadata path."""
+
+    def get_task_type_hints(self) -> Dict[str, TaskTypeHint]:
+        return {}
+
+    def get_system_prompt_section(self) -> str:
+        return ""
+
+    def get_prompt_section_contributions(self):
+        return [
+            PromptSectionContribution(
+                name="VERTICAL_REVIEW_GUIDANCE",
+                text="Prefer API-boundary review before deep implementation changes.",
+                aliases={"review_guidance"},
+                category="context",
+                evolvable=True,
+                priority=45,
+            )
+        ]
+
+    def get_grounding_rules(self) -> str:
+        return ""
+
+    def get_priority(self) -> int:
+        return 45
 
 
 class MockOrchestrator:
@@ -221,6 +250,15 @@ class TestPromptContributorAdapterWiring:
         assert hints["implement"].tool_budget == 10
         assert hints["implement"].priority_tools == ["write", "read", "test"]
 
+    def test_adapter_wrap_uses_named_prompt_sections(self):
+        """Adapter.wrap should preserve named contributor prompt text."""
+        adapter = PromptContributorAdapter.wrap(MockContributorNamedSections())
+
+        assert (
+            adapter.get_system_prompt_section()
+            == "Prefer API-boundary review before deep implementation changes."
+        )
+
     def test_adapter_from_dict_normalizes_formats(self):
         """Adapter.from_dict should normalize all hint formats."""
         mixed_hints = {
@@ -301,3 +339,28 @@ class TestPromptStepHandlerIntegration:
         assert len(context.prompt_sections) == 2
         assert "Legacy prompt section." in context.prompt_sections
         assert "Protocol-compliant section." in context.prompt_sections
+
+    def test_named_prompt_sections_are_collected(self):
+        """Named contributor sections should flow through the step handler."""
+        handler = PromptStepHandler()
+        orchestrator = MockOrchestrator()
+        context = create_vertical_context(name="test")
+        result = MagicMock()
+        result.prompt_hints_count = 0
+
+        handler.apply_contributors(orchestrator, [MockContributorNamedSections()], context, result)
+
+        assert context.prompt_sections == [
+            "Prefer API-boundary review before deep implementation changes."
+        ]
+
+    def test_composite_uses_named_prompt_sections(self):
+        """Composite contributors should combine named prompt sections too."""
+        composite = CompositePromptContributor(
+            [MockContributorNamedSections(), MockContributorLegacyFormat()]
+        )
+
+        rendered = composite.get_system_prompt_section()
+
+        assert "Prefer API-boundary review before deep implementation changes." in rendered
+        assert "Legacy prompt section." in rendered

@@ -13,7 +13,6 @@ from victor.agent.protocols import (
     ArgumentNormalizerProtocol,
     AutoCommitterProtocol,
     IBudgetManager,
-    ChunkGeneratorProtocol,
     CodeExecutionManagerProtocol,
     CompactionSummarizerProtocol,
     ComplexityClassifierProtocol,
@@ -22,45 +21,50 @@ from victor.agent.protocols import (
     ConversationStateMachineProtocol,
     DebugLoggerProtocol,
     HierarchicalCompactionProtocol,
-    IntentClassifierProtocol,
     IToolAccessController,
     MCPBridgeProtocol,
     MetricsCollectorProtocol,
     ModeControllerProtocol,
     ParallelExecutorProtocol,
-    PromptCoordinatorProtocol,
     ProjectContextProtocol,
     ProviderRegistryProtocol,
-    ReminderManagerProtocol,
     ResponseCompleterProtocol,
-    ResponseSanitizerProtocol,
-    RLCoordinatorProtocol,
     SafetyCheckerProtocol,
     SearchRouterProtocol,
     SemanticToolSelectorProtocol,
     SessionContextLinkerProtocol,
-    StateCoordinatorProtocol,
-    StreamingHandlerProtocol,
-    StreamingMetricsCollectorProtocol,
-    StreamingRecoveryCoordinatorProtocol,
     SystemPromptBuilderProtocol,
-    TaskCoordinatorProtocol,
     TaskTrackerProtocol,
     TaskTypeHinterProtocol,
     ToolCacheProtocol,
-    ToolCoordinatorProtocol,
     ToolDeduplicationTrackerProtocol,
     ToolExecutorProtocol,
     ToolOutputFormatterProtocol,
-    ToolPlannerProtocol,
     ToolSelectorProtocol,
     ToolSequenceTrackerProtocol,
     ToolDependencyGraphProtocol,
     ToolPluginRegistryProtocol,
     UnifiedMemoryCoordinatorProtocol,
+    ContextTemperatureClassifierProtocol,
     UsageAnalyticsProtocol,
     UsageLoggerProtocol,
     WorkflowRegistryProtocol,
+)
+from victor.agent.services.protocols import (
+    ChunkRuntimeProtocol,
+    CoordinationAdvisorRuntimeProtocol,
+    IntentClassifierProtocol,
+    PromptRuntimeProtocol,
+    RLLearningRuntimeProtocol,
+    ReminderManagerProtocol,
+    ResponseSanitizerProtocol,
+    StateRuntimeProtocol,
+    StreamingConfidenceMonitorProtocol,
+    StreamingHandlerProtocol,
+    StreamingMetricsCollectorProtocol,
+    StreamingRecoveryRuntimeProtocol,
+    TaskRuntimeProtocol,
+    ToolPlanningRuntimeProtocol,
 )
 
 # Backward-compatible aliases for renamed protocols
@@ -75,7 +79,6 @@ from victor.workflows.compiler_protocols import (
 )
 from victor.workflows.compiler.workflow_compiler_impl import WorkflowCompilerImpl
 from victor.workflows.compiled_executor import WorkflowExecutor
-from victor.workflows.execution_context import ExecutionContext
 from victor.workflows.orchestrator_pool import OrchestratorPool
 from victor.workflows.validator import WorkflowValidator
 
@@ -112,12 +115,17 @@ AGENT_SINGLETON_SPECS: List[ServiceSpec] = [
         "_create_reminder_manager",
         ServiceLifetime.SCOPED,
     ),
-    ServiceSpec(RLCoordinatorProtocol, "_create_rl_coordinator"),
+    ServiceSpec(RLLearningRuntimeProtocol, "_create_rl_coordinator"),
     ServiceSpec(SafetyCheckerProtocol, "_create_safety_checker"),
     ServiceSpec(AutoCommitterProtocol, "_create_auto_committer"),
     ServiceSpec(MCPBridgeProtocol, "_create_mcp_bridge"),
     ServiceSpec(ToolDependencyGraphProtocol, "_create_tool_dependency_graph"),
     ServiceSpec(ToolPluginRegistryProtocol, "_create_tool_plugin_registry"),
+    ServiceSpec(
+        ContextTemperatureClassifierProtocol,
+        "_create_context_temperature_classifier",
+        critical=False,
+    ),
     ServiceSpec(SemanticToolSelectorProtocol, "_create_semantic_tool_selector"),
     ServiceSpec(ProviderRegistryProtocol, "_create_provider_registry"),
     ServiceSpec(ConversationEmbeddingStoreProtocol, "_create_conversation_embedding_store"),
@@ -141,26 +149,29 @@ AGENT_SINGLETON_SPECS: List[ServiceSpec] = [
         "_create_streaming_handler",
         ServiceLifetime.SCOPED,
     ),
-    ServiceSpec(StreamingRecoveryCoordinatorProtocol, "_create_recovery_coordinator"),
-    ServiceSpec(ChunkGeneratorProtocol, "_create_chunk_generator"),
-    ServiceSpec(ToolPlannerProtocol, "_create_tool_planner"),
-    ServiceSpec(TaskCoordinatorProtocol, "_create_task_coordinator"),
+    ServiceSpec(
+        StreamingConfidenceMonitorProtocol,
+        "_create_confidence_monitor",
+        ServiceLifetime.SCOPED,
+        critical=False,
+    ),
+    ServiceSpec(StreamingRecoveryRuntimeProtocol, "_create_recovery_coordinator"),
+    ServiceSpec(ChunkRuntimeProtocol, "_create_chunk_generator"),
+    ServiceSpec(ToolPlanningRuntimeProtocol, "_create_tool_planner"),
+    ServiceSpec(TaskRuntimeProtocol, "_create_task_coordinator"),
+    ServiceSpec(CoordinationAdvisorRuntimeProtocol, "_create_coordination_advisor_runtime"),
     ServiceSpec(CompactionSummarizerProtocol, "_create_compaction_summarizer"),
     ServiceSpec(HierarchicalCompactionProtocol, "_create_hierarchical_compaction_manager"),
     ServiceSpec(SessionContextLinkerProtocol, "_create_session_context_linker"),
     ServiceSpec(
-        ToolCoordinatorProtocol,
-        "_create_tool_coordinator",
+        StateRuntimeProtocol,
+        "_create_state_runtime",
         ServiceLifetime.SCOPED,
+        pass_container=True,
     ),
     ServiceSpec(
-        StateCoordinatorProtocol,
-        "_create_state_coordinator",
-        ServiceLifetime.SCOPED,
-    ),
-    ServiceSpec(
-        PromptCoordinatorProtocol,
-        "_create_prompt_coordinator",
+        PromptRuntimeProtocol,
+        "_create_prompt_runtime",
         ServiceLifetime.SCOPED,
     ),
 ]
@@ -184,9 +195,15 @@ WORKFLOW_SCOPED_SPECS: List[ServiceSpec] = [
 ]
 
 WORKFLOW_TRANSIENT_SPECS: List[ServiceSpec] = [
-    ServiceSpec(WorkflowCompilerImpl, "_create_workflow_compiler_impl", ServiceLifetime.TRANSIENT),
     ServiceSpec(
-        WorkflowCompilerProtocol, "_create_workflow_compiler_impl", ServiceLifetime.TRANSIENT
+        WorkflowCompilerImpl,
+        "_create_workflow_compiler_impl",
+        ServiceLifetime.TRANSIENT,
+    ),
+    ServiceSpec(
+        WorkflowCompilerProtocol,
+        "_create_workflow_compiler_impl",
+        ServiceLifetime.TRANSIENT,
     ),
     ServiceSpec(WorkflowExecutor, "_create_workflow_executor", ServiceLifetime.TRANSIENT),
 ]

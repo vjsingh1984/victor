@@ -62,12 +62,12 @@ settings:
   # Tool Selection (Local Embeddings)
   use_semantic_tool_selection: true
   embedding_provider: sentence-transformers  # Local, offline
-  embedding_model: all-MiniLM-L6-v2  # 80MB, fast, good for 31 tools
+  embedding_model: BAAI/bge-small-en-v1.5  # 130MB, 384-dim, higher-accuracy local default
 
   # Codebase Search (Local Embeddings + Vector Store)
   codebase_vector_store: lancedb  # Local, disk-based, production-ready
   codebase_embedding_provider: sentence-transformers  # Local, offline
-  codebase_embedding_model: all-MiniLM-L12-v2  # 120MB, better quality for code
+  codebase_embedding_model: BAAI/bge-small-en-v1.5  # 130MB, 384-dim, reuse the benchmark-aligned default
   codebase_persist_directory: ~/.victor/embeddings/airgapped
   codebase_dimension: 384
   codebase_batch_size: 32
@@ -82,13 +82,13 @@ settings:
 # ========================================
 #
 # For Tool Selection (31 tools, need fast selection):
-#   - all-MiniLM-L6-v2 (RECOMMENDED)
-#     - 80MB, 384-dim, ~5ms per embedding
+#   - BAAI/bge-small-en-v1.5 (RECOMMENDED)
+#     - 130MB, 384-dim, higher retrieval accuracy
 #     - Perfect for tool selection
 #
-# For Codebase Search (10K-1M+ snippets, need quality):
-#   - all-MiniLM-L12-v2 (RECOMMENDED - default)
-#     - 120MB, 384-dim, ~8ms per embedding
+# For Codebase Search (10K-1M+ snippets, need consistent benchmark alignment):
+#   - BAAI/bge-small-en-v1.5 (RECOMMENDED - default)
+#     - 130MB, 384-dim, stronger semantic quality at the same dimensionality
 #     - Best balance of speed and quality
 #
 #   - all-mpnet-base-v2 (Higher quality, slower)

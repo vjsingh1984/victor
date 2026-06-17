@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Dict, List, Optional, Tuple
 
 import typer
 from rich.console import Console
@@ -8,30 +8,26 @@ from rich.table import Table
 from victor.core.async_utils import run_sync
 from victor.providers.registry import ProviderRegistry
 from victor.providers.health import ProviderHealthChecker
+from victor.ui.json_utils import create_json_option, print_json_data
 
-providers_app = typer.Typer(name="providers", help="List all available providers.")
+providers_app = typer.Typer(name="provider", help="List and manage providers.")
 console = Console()
-
-# Aliases map to their primary provider (for consolidation)
-PROVIDER_ALIASES = {
-    "grok": "xai",
-    "kimi": "moonshot",
-    "llama-cpp": "llamacpp",
-    "llama.cpp": "llamacpp",
-    "vertexai": "vertex",
-    "azure-openai": "azure",
-    "aws": "bedrock",
-    "hf": "huggingface",
-}
 
 
 @providers_app.callback(invoke_without_command=True)
-def providers_callback(ctx: typer.Context) -> None:
+def providers_callback(
+    ctx: typer.Context,
+    list_flag: bool = typer.Option(
+        False,
+        "--list",
+        help="List providers. Compatibility alias for 'victor provider list'.",
+    ),
+) -> None:
     """Handle providers command with optional subcommand.
 
     If no subcommand is provided, lists all available providers.
     """
-    if ctx.invoked_subcommand is None:
+    if list_flag or ctx.invoked_subcommand is None:
         # No subcommand provided, default to listing providers
         _list_providers_impl()
 
@@ -44,69 +40,129 @@ def list_providers() -> None:
 
 def _list_providers_impl() -> None:
     available_providers = ProviderRegistry.list_providers()
+    raw_aliases = ProviderRegistry.get_aliases()
+    aliases = raw_aliases if isinstance(raw_aliases, dict) else {}
+    configured_by_provider, default_provider = _load_configured_provider_summary()
 
-    # Provider info: (status, features, aliases)
+    # Build reverse mapping: primary provider -> list of aliases
+    primary_to_aliases: Dict[str, List[str]] = {}
+    primary_providers = set()
+    for provider in available_providers:
+        primary = aliases.get(provider, provider)
+        if not isinstance(primary, str) or not primary:
+            primary = provider
+        primary_providers.add(primary)
+        if provider != primary:
+            primary_to_aliases.setdefault(primary, []).append(provider)
+
+    if not primary_providers:
+        primary_providers = set(available_providers)
+
+    # Provider info: (status, features)
     provider_info = {
         # Tested and working providers
-        "ollama": ("✅ Ready", "Local models, Free, Tool calling", None),
-        "anthropic": ("✅ Ready", "Claude 3.5/4, Tool calling, Streaming", None),
-        "openai": ("✅ Ready", "GPT-4.1/4o/o1/o3, Function calling, Vision", None),
-        "google": ("✅ Ready", "Gemini 2.5, 1M context, Multimodal", None),
-        "xai": ("✅ Ready", "Grok, Real-time info, Vision", "grok"),
-        "lmstudio": ("✅ Ready", "Local models via LMStudio", None),
-        "vllm": ("✅ Ready", "High-throughput local inference", None),
-        "moonshot": ("✅ Ready", "Kimi K2, 256K context, Reasoning", "kimi"),
-        "deepseek": ("✅ Ready", "DeepSeek-V3, 128K, Cheap", None),
-        "groqcloud": ("✅ Ready", "Ultra-fast LPU, Free tier, Llama/GPT-OSS", None),
-        "cerebras": ("✅ Ready", "Ultra-fast inference, Free tier, Qwen/Llama", None),
+        "ollama": ("✅ Ready", "Local models, Free, Tool calling"),
+        "anthropic": ("✅ Ready", "Claude 3.5/4, Tool calling, Streaming"),
+        "openai": ("✅ Ready", "GPT-4.1/4o/o1/o3, Function calling, Vision"),
+        "google": ("✅ Ready", "Gemini 2.5, 1M context, Multimodal"),
+        "xai": ("✅ Ready", "Grok, Real-time info, Vision"),
+        "lmstudio": ("✅ Ready", "Local models via LMStudio"),
+        "vllm": ("✅ Ready", "High-throughput local inference"),
+        "moonshot": ("✅ Ready", "Kimi K2, 256K context, Reasoning"),
+        "deepseek": ("✅ Ready", "DeepSeek-V3, 128K, Cheap"),
+        "groqcloud": ("✅ Ready", "Ultra-fast LPU, Free tier, Llama/GPT-OSS"),
+        "cerebras": ("✅ Ready", "Ultra-fast inference, Free tier, Qwen/Llama"),
         # Local inference
-        "llamacpp": ("✅ Ready", "Local GGUF models, CPU/GPU", "llama-cpp, llama.cpp"),
+        "llamacpp": ("✅ Ready", "Local GGUF models, CPU/GPU"),
         # Tested providers
-        "mistral": ("✅ Ready", "Mistral Large/Codestral, 500K tokens/min free", None),
+        "mistral": ("✅ Ready", "Mistral Large/Codestral, 500K tokens/min free"),
         # Known but untested providers
-        "together": ("⚠️ Untested", "Together AI, $25 free credits", None),
-        "openrouter": ("✅ Ready", "Unified gateway, 350+ models, Free tier", None),
-        "fireworks": ("✅ Ready", "Fast inference, $1 free credits, Tool calling", None),
-        "zai": (
-            "✅ Ready",
-            "GLM-5/4.7, Coding Plan, Thinking mode, OpenAI-compat",
-            "zhipuai, zhipu",
-        ),
-        "qwen": (
-            "✅ Ready",
-            "Qwen3.5, OAuth + API-key, Coding Plan, OpenAI-compat",
-            "alibaba, dashscope",
-        ),
-        "huggingface": ("⚠️ Untested", "HuggingFace Inference API", "hf"),
-        "replicate": ("⚠️ Untested", "Replicate, Open models", None),
+        "together": ("⚠️ Untested", "Together AI, $25 free credits"),
+        "openrouter": ("✅ Ready", "Unified gateway, 350+ models, Free tier"),
+        "fireworks": ("✅ Ready", "Fast inference, $1 free credits, Tool calling"),
+        "zai": ("✅ Ready", "GLM-5/4.7, Coding Plan, Thinking mode, OpenAI-compat"),
+        "qwen": ("✅ Ready", "Qwen3.5, OAuth + API-key, Coding Plan, OpenAI-compat"),
+        "huggingface": ("⚠️ Untested", "HuggingFace Inference API"),
+        "replicate": ("⚠️ Untested", "Replicate, Open models"),
         # Enterprise providers (require setup)
-        "vertex": ("🏢 Enterprise", "Google Cloud Vertex AI", "vertexai"),
-        "azure": ("🏢 Enterprise", "Azure OpenAI Service", "azure-openai"),
-        "bedrock": ("🏢 Enterprise", "AWS Bedrock (Claude, Llama, Titan)", "aws"),
+        "vertex": ("🏢 Enterprise", "Google Cloud Vertex AI"),
+        "azure": ("🏢 Enterprise", "Azure OpenAI Service"),
+        "bedrock": ("🏢 Enterprise", "AWS Bedrock (Claude, Llama, Titan)"),
     }
 
     table = Table(title="Available Providers", show_header=True)
     table.add_column("Provider", style="cyan", no_wrap=True)
     table.add_column("Status", style="green")
+    table.add_column("Configured", style="yellow")
     table.add_column("Features")
     table.add_column("Aliases", style="dim")
 
-    # Filter out aliases, show only primary providers
-    primary_providers = [p for p in available_providers if p not in PROVIDER_ALIASES]
+    sorted_primary_providers = sorted(primary_providers)
 
-    for provider in sorted(primary_providers):
+    for provider in sorted_primary_providers:
         info = provider_info.get(provider)
         if info:
-            status, features, aliases = info
-            table.add_row(provider, status, features, aliases or "")
+            status, features = info
+            provider_aliases = primary_to_aliases.get(provider, [])
+            aliases_str = ", ".join(sorted(provider_aliases)) if provider_aliases else ""
+            table.add_row(
+                provider,
+                status,
+                _format_configured_provider(provider, configured_by_provider, default_provider),
+                features,
+                aliases_str,
+            )
         else:
-            table.add_row(provider, "❓ Unknown", "", "")
+            table.add_row(
+                provider,
+                "❓ Unknown",
+                _format_configured_provider(provider, configured_by_provider, default_provider),
+                "",
+                "",
+            )
 
     console.print(table)
-    console.print(
-        f"\n[dim]Total: {len(primary_providers)} providers ({len(available_providers) - len(primary_providers)} aliases hidden)[/]"
+    alias_count = sum(
+        1 for provider in available_providers if aliases.get(provider, provider) != provider
     )
-    console.print("[dim]Use 'victor profiles' to see configured profiles[/]")
+    console.print(
+        f"\n[dim]Total: {len(sorted_primary_providers)} providers ({alias_count} aliases hidden)[/]"
+    )
+    console.print("[dim]Configured accounts: ~/.victor/config.yaml via 'victor auth list'[/]")
+    console.print("[dim]Configured profiles: ~/.victor/profiles.yaml via 'victor profiles list'[/]")
+
+
+def _load_configured_provider_summary() -> Tuple[Dict[str, List[str]], Optional[str]]:
+    """Return configured account names grouped by provider plus default provider."""
+    try:
+        from victor.config.accounts import get_account_manager
+
+        manager = get_account_manager()
+        config = manager.load_config()
+        default_account = config.defaults.account
+        configured: Dict[str, List[str]] = {}
+        default_provider: Optional[str] = None
+        for account in config.list_accounts():
+            configured.setdefault(account.provider, []).append(account.name)
+            if account.name == default_account:
+                default_provider = account.provider
+        return configured, default_provider
+    except Exception:
+        return {}, None
+
+
+def _format_configured_provider(
+    provider: str,
+    configured_by_provider: Dict[str, List[str]],
+    default_provider: Optional[str],
+) -> str:
+    accounts = configured_by_provider.get(provider, [])
+    if not accounts:
+        return "[dim]—[/]"
+    marker = " ★" if provider == default_provider else ""
+    if len(accounts) == 1:
+        return f"{accounts[0]}{marker}"
+    return f"{len(accounts)} accounts{marker}"
 
 
 @providers_app.command("check")
@@ -117,7 +173,7 @@ def check_provider(
         False, "--connectivity", "-c", help="Perform connectivity test (slower)"
     ),
     timeout: float = typer.Option(5.0, help="Timeout for connectivity check (seconds)"),
-    json_output: bool = typer.Option(False, "--json", "-j", help="Output as JSON"),
+    json_output: bool = create_json_option(),
 ):
     """Check if a provider is properly configured.
 
@@ -154,9 +210,7 @@ async def _check_provider_async(
     )
 
     if json_output:
-        import json
-
-        console.print(json.dumps(result.to_dict(), indent=2))
+        print_json_data(result.to_dict())
         return
 
     # Display results in a nice format
@@ -295,7 +349,7 @@ async def _verify_provider_async(
 auth_app = typer.Typer(name="auth", help="Manage OAuth authentication for providers.")
 providers_app.add_typer(auth_app)
 
-OAUTH_SUPPORTED_PROVIDERS = ["openai", "qwen"]
+OAUTH_SUPPORTED_PROVIDERS = ["openai", "qwen", "google", "github-copilot"]
 
 
 @auth_app.command("login")
@@ -414,7 +468,7 @@ def auth_status(
             table.add_row(
                 prov,
                 "[yellow]Expired[/]",
-                cached.expires_at.strftime("%Y-%m-%d %H:%M UTC") if cached.expires_at else "",
+                (cached.expires_at.strftime("%Y-%m-%d %H:%M UTC") if cached.expires_at else ""),
                 "",
             )
         else:
@@ -422,7 +476,7 @@ def auth_status(
             table.add_row(
                 prov,
                 "[green]✓ Active[/]",
-                cached.expires_at.strftime("%Y-%m-%d %H:%M UTC") if cached.expires_at else "",
+                (cached.expires_at.strftime("%Y-%m-%d %H:%M UTC") if cached.expires_at else ""),
                 preview,
             )
 

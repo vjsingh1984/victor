@@ -55,9 +55,10 @@ from __future__ import annotations
 
 import logging
 import threading
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from functools import wraps
-from typing import Any, Callable, Dict, List, Optional, TypeVar
+from typing import Any, Callable, Dict, Generator, List, Optional, Set, TypeVar
 
 logger = logging.getLogger(__name__)
 
@@ -164,6 +165,14 @@ class PersonaRegistry:
         self._personas: Dict[str, PersonaSpec] = {}
         self._factories: Dict[str, Callable[[], PersonaSpec]] = {}
         self._lock = threading.RLock()
+        # Batch update support for efficient bulk registration
+        self._batch_depth: int = 0
+        self._batch_dirty: bool = False
+        # Inverted indexes for O(1) discovery
+        self._expertise_index: Dict[str, Set[str]] = {}  # expertise -> {keys}
+        self._tag_index: Dict[str, Set[str]] = {}  # tag -> {keys}
+        self._vertical_index: Dict[str, Set[str]] = {}  # vertical -> {keys}
+        self._roles_index: Dict[str, Set[str]] = {}  # role_lower -> {keys}
 
     @classmethod
     def get_instance(cls) -> "PersonaRegistry":
@@ -189,6 +198,76 @@ class PersonaRegistry:
         with cls._class_lock:
             cls._instance = None
 
+    @contextmanager
+    def batch_update(self) -> Generator[None, None, None]:
+        """Batch multiple persona mutations with reduced lock overhead.
+
+        Use when registering many personas at once (e.g., during startup
+        or vertical activation) to avoid repeated lock acquisition.
+
+        Example:
+            with registry.batch_update():
+                registry.register("persona1", spec1, vertical="test")
+                registry.register("persona2", spec2, vertical="test")
+                registry.register("persona3", spec3, vertical="test")
+            # Single lock acquisition for all operations
+        """
+        with self._lock:
+            self._batch_depth += 1
+            try:
+                yield
+            finally:
+                self._batch_depth -= 1
+                if self._batch_depth == 0:
+                    self._batch_dirty = False
+
+    def _update_indexes(self, key: str, persona: PersonaSpec) -> None:
+        """Update inverted indexes for a persona.
+
+        Args:
+            key: The persona key in the registry
+            persona: The PersonaSpec to index
+        """
+        # Index by expertise
+        for exp in persona.expertise:
+            if exp not in self._expertise_index:
+                self._expertise_index[exp] = set()
+            self._expertise_index[exp].add(key)
+
+        # Index by tags
+        for tag in persona.tags:
+            if tag not in self._tag_index:
+                self._tag_index[tag] = set()
+            self._tag_index[tag].add(key)
+
+        # Index by vertical
+        if persona.vertical:
+            if persona.vertical not in self._vertical_index:
+                self._vertical_index[persona.vertical] = set()
+            self._vertical_index[persona.vertical].add(key)
+
+        # Index by role (lowercase for case-insensitive search)
+        role_lower = persona.role.lower()
+        if role_lower not in self._roles_index:
+            self._roles_index[role_lower] = set()
+        self._roles_index[role_lower].add(key)
+
+    def _remove_from_indexes(self, key: str) -> None:
+        """Remove a persona key from all inverted indexes."""
+        for index in (
+            self._expertise_index,
+            self._tag_index,
+            self._vertical_index,
+            self._roles_index,
+        ):
+            empty_entries = []
+            for index_key, keys in index.items():
+                keys.discard(key)
+                if not keys:
+                    empty_entries.append(index_key)
+            for index_key in empty_entries:
+                del index[index_key]
+
     def register(
         self,
         name: str,
@@ -210,13 +289,25 @@ class PersonaRegistry:
         key = f"{vertical}:{name}" if vertical else name
         persona.vertical = vertical
 
-        with self._lock:
+        # Use conditional lock: only acquire if not in batch mode
+        if self._batch_depth > 0:
+            self._batch_dirty = True
             if key in self._personas and not replace:
                 logger.warning(f"Persona '{key}' already registered, skipping")
                 return
-
+            self._remove_from_indexes(key)
             self._personas[key] = persona
-            logger.debug(f"Registered persona: {key}")
+            self._update_indexes(key, persona)
+        else:
+            with self._lock:
+                if key in self._personas and not replace:
+                    logger.warning(f"Persona '{key}' already registered, skipping")
+                    return
+
+                self._remove_from_indexes(key)
+                self._personas[key] = persona
+                self._update_indexes(key, persona)
+        logger.debug(f"Registered persona: {key}")
 
     def register_factory(
         self,
@@ -323,6 +414,7 @@ class PersonaRegistry:
             if key in self._personas:
                 del self._personas[key]
                 found = True
+                self._remove_from_indexes(key)
             if key in self._factories:
                 del self._factories[key]
                 found = True
@@ -387,9 +479,9 @@ class PersonaRegistry:
         Returns:
             List of PersonaSpec objects from the vertical
         """
-        prefix = f"{vertical}:"
         with self._lock:
-            return [v for k, v in self._personas.items() if k.startswith(prefix)]
+            keys = self._vertical_index.get(vertical, set())
+            return [self._personas[k] for k in keys if k in self._personas]
 
     def find_by_expertise(self, expertise: str) -> List[PersonaSpec]:
         """Find personas with specific expertise.
@@ -401,7 +493,8 @@ class PersonaRegistry:
             List of PersonaSpec objects with matching expertise
         """
         with self._lock:
-            return [p for p in self._personas.values() if expertise in p.expertise]
+            keys = self._expertise_index.get(expertise, set())
+            return [self._personas[k] for k in keys if k in self._personas]
 
     def find_by_role(self, role: str) -> List[PersonaSpec]:
         """Find personas with a specific role.
@@ -414,6 +507,11 @@ class PersonaRegistry:
         """
         role_lower = role.lower()
         with self._lock:
+            # For exact match, use index; for substring, fall back to scan
+            if role_lower in self._roles_index:
+                keys = self._roles_index[role_lower]
+                return [self._personas[k] for k in keys if k in self._personas]
+            # Substring match fallback
             return [p for p in self._personas.values() if role_lower in p.role.lower()]
 
     def find_by_tag(self, tag: str) -> List[PersonaSpec]:
@@ -426,7 +524,8 @@ class PersonaRegistry:
             List of PersonaSpec objects with matching tag
         """
         with self._lock:
-            return [p for p in self._personas.values() if tag in p.tags]
+            keys = self._tag_index.get(tag, set())
+            return [self._personas[k] for k in keys if k in self._personas]
 
     def find_by_tags(self, tags: List[str], match_all: bool = False) -> List[PersonaSpec]:
         """Find personas matching multiple tags.
@@ -438,24 +537,38 @@ class PersonaRegistry:
         Returns:
             List of PersonaSpec objects matching the criteria
         """
-        tag_set = set(tags)
         with self._lock:
-            results = []
-            for persona in self._personas.values():
-                entry_tags = set(persona.tags)
-                if match_all:
-                    if tag_set.issubset(entry_tags):
-                        results.append(persona)
-                else:
-                    if tag_set & entry_tags:
-                        results.append(persona)
-            return results
+            if not tags:
+                return list(self._personas.values())
+
+            if match_all:
+                # Find keys that have all tags (intersection)
+                keys = None
+                for tag in tags:
+                    tag_keys = self._tag_index.get(tag, set())
+                    if keys is None:
+                        keys = tag_keys.copy()
+                    else:
+                        keys &= tag_keys
+                        if not keys:  # Early exit if no match
+                            return []
+                return [self._personas[k] for k in (keys or set()) if k in self._personas]
+            else:
+                # Find keys that have any tag (union)
+                keys = set()
+                for tag in tags:
+                    keys.update(self._tag_index.get(tag, set()))
+                return [self._personas[k] for k in keys if k in self._personas]
 
     def clear(self) -> None:
         """Clear all registered personas and factories (for testing)."""
         with self._lock:
             self._personas.clear()
             self._factories.clear()
+            self._expertise_index.clear()
+            self._tag_index.clear()
+            self._vertical_index.clear()
+            self._roles_index.clear()
             logger.debug("Cleared persona registry")
 
     def list_factories(self, vertical: Optional[str] = None) -> List[str]:

@@ -35,6 +35,7 @@ def test_get_native_version_handles_string_and_non_string_versions(monkeypatch) 
 
 def test_streaming_helpers_use_python_fallback_when_native_missing(monkeypatch) -> None:
     monkeypatch.setattr(streaming, "_native", None)
+    monkeypatch.setattr(streaming, "_NATIVE_AVAILABLE", False)
 
     content = "alpha<think>secret</think>omega"
 
@@ -59,6 +60,7 @@ def test_streaming_helpers_delegate_to_native_module_when_present(monkeypatch) -
         find_circular_patterns=lambda text: [(0, len(text), text)],
     )
     monkeypatch.setattr(streaming, "_native", native)
+    monkeypatch.setattr(streaming, "_NATIVE_AVAILABLE", True)
 
     assert streaming.strip_thinking_tokens("abc") == "native-strip:abc"
     assert streaming.contains_thinking_tokens("x") is True

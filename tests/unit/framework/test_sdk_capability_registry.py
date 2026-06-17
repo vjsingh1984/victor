@@ -7,7 +7,7 @@ from victor.framework.sdk_capability_registry import (
     resolve_capability_requirement,
     resolve_capability_requirements,
 )
-from victor_sdk.constants import CapabilityIds
+from victor_contracts.constants import CapabilityIds
 
 
 class LspCapableOrchestrator:

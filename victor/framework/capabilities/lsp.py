@@ -21,7 +21,10 @@ and LSPPoolProtocol defined in victor.framework.lsp_protocols.
 
 from typing import Any, Dict, List, Optional
 
-from victor.framework.capabilities.base import BaseCapabilityProvider, CapabilityMetadata
+from victor.framework.capabilities.base import (
+    BaseCapabilityProvider,
+    CapabilityMetadata,
+)
 from victor.framework.lsp_protocols import (
     LSPCompletionItem,
     LSPDiagnostic,

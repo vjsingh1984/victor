@@ -24,7 +24,7 @@ General purpose images including:
 
 ### `screenshots/`
 Application screenshots including:
-- TUI (Terminal UI) mode screenshots
+- Interactive CLI mode screenshots
 - CLI mode screenshots
 - Workflow examples
 - Feature demonstrations
@@ -77,7 +77,7 @@ Technical diagrams and architecture visuals including:
 ### Relative References
 ```markdown
 # From any docs/ file
-![Victor TUI](../assets/screenshots/tui-screenshot.png)
+![Victor CLI](../assets/screenshots/cli-screenshot.png)
 
 # From docs/getting-started/
 ![Victor Logo](../assets/images/victor-logo.png)
@@ -90,7 +90,7 @@ Technical diagrams and architecture visuals including:
 
 ### Using HTML for Custom Sizing
 ```markdown
-<img src="../assets/screenshots/tui-screenshot.png" alt="Victor TUI" width="600"/>
+<img src="../assets/screenshots/cli-screenshot.png" alt="Victor CLI" width="600"/>
 
 <img src="../assets/images/logo.png" alt="Victor Logo" width="128" height="128"/>
 ```
@@ -115,8 +115,8 @@ Use descriptive, lowercase names with hyphens separating words:
 - `banner-wide.png` - Header banner
 
 ### Screenshots
-- `tui-main-interface.png` - Primary TUI view
-- `tui-workflow-execution.png` - Specific feature
+- `cli-main-interface.png` - Primary CLI view
+- `cli-workflow-execution.png` - Specific feature
 - `cli-chat-mode.png` - CLI interface
 - `workflow-builder.png` - Workflow tooling
 
@@ -129,8 +129,8 @@ Use descriptive, lowercase names with hyphens separating words:
 ### Versioning
 For screenshots that change between versions:
 ```
-tui-main-interface-0.5.0.png
-tui-main-interface-0.6.0.png
+cli-main-interface-0.5.0.png
+cli-main-interface-0.6.0.png
 ```
 
 ## File Size Guidelines
@@ -177,7 +177,7 @@ The following placeholder assets are recommended (create when ready):
 - `victor-banner.png` (1200x200) - For landing page header
 - `victor-logo.png` (512x512) - Main logo for branding
 - `victor-logo-icon.png` (128x128) - Smaller icon version
-- `tui-screenshot.png` (1200x800) - TUI mode demonstration
+- `cli-screenshot.png` (1200x800) - CLI mode demonstration
 - `cli-screenshot.png` (1200x800) - CLI mode demonstration
 - `architecture-diagram.png` (1600x900) - High-level architecture overview
 - `workflow-diagram.png` (1600x900) - Workflow system visualization

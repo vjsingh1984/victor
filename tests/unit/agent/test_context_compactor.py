@@ -15,7 +15,8 @@
 """Tests for ContextCompactor."""
 
 import pytest
-from unittest.mock import MagicMock
+from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
 
 from victor.agent.context_compactor import (
     CompactionAction,
@@ -25,7 +26,7 @@ from victor.agent.context_compactor import (
     TruncationStrategy,
     create_context_compactor,
 )
-from victor.agent.conversation_controller import ContextMetrics
+from victor.agent.conversation.controller import ContextMetrics
 from victor.providers.base import Message
 
 
@@ -61,7 +62,10 @@ class TestCompactorConfig:
 
     def test_default_values(self):
         """Test default configuration values match orchestrator_constants."""
-        from victor.config.orchestrator_constants import CONTEXT_LIMITS, COMPACTION_CONFIG
+        from victor.config.orchestrator_constants import (
+            CONTEXT_LIMITS,
+            COMPACTION_CONFIG,
+        )
 
         config = CompactorConfig()
 
@@ -271,6 +275,50 @@ class TestCheckAndCompact:
 
         assert action.trigger == CompactionTrigger.MANUAL
         assert action.action_taken is True
+
+    def test_fallback_truncates_large_tool_outputs_when_no_messages_removed(self, mock_controller):
+        """Large tool outputs are still compacted when history is too short to prune."""
+        large_tool_output = "line\n" * 500
+        tool_message = Message(role="tool", content=large_tool_output, tool_call_id="call_1")
+        mock_controller.get_messages.return_value = [tool_message]
+        mock_controller.smart_compact_history.return_value = 0
+        mock_controller.get_context_metrics.side_effect = [
+            ContextMetrics(
+                char_count=len(large_tool_output),
+                estimated_tokens=1000,
+                message_count=2,
+                is_overflow_risk=False,
+                max_context_chars=len(large_tool_output),
+            ),
+            ContextMetrics(
+                char_count=len(large_tool_output),
+                estimated_tokens=1000,
+                message_count=2,
+                is_overflow_risk=False,
+                max_context_chars=len(large_tool_output),
+            ),
+            ContextMetrics(
+                char_count=1200,
+                estimated_tokens=300,
+                message_count=2,
+                is_overflow_risk=False,
+                max_context_chars=len(large_tool_output),
+            ),
+        ]
+        config = CompactorConfig(
+            proactive_threshold=0.5,
+            tool_result_max_chars=1000,
+            tool_result_max_lines=50,
+            enable_fast_pruning=False,
+        )
+        compactor = ContextCompactor(mock_controller, config)
+
+        action = compactor.check_and_compact()
+
+        assert action.action_taken is True
+        assert action.messages_removed == 0
+        assert action.truncations_applied == 1
+        assert len(tool_message.content) < len(large_tool_output)
 
     def test_statistics_updated(self, compactor, mock_controller):
         """Test that statistics are updated after compaction."""
@@ -725,7 +773,7 @@ class TestCheckAndCompactWithRL:
         # Create mock RL learner
         mock_learner = MagicMock()
         mock_recommendation = MagicMock()
-        mock_recommendation.action = "aggressive_compact"
+        mock_recommendation.value = "aggressive_compact"
         mock_recommendation.confidence = 0.9
         mock_recommendation.metadata = {
             "config": {
@@ -1502,6 +1550,54 @@ class TestFactoryFunctionAdvanced:
 
         assert compactor.pruning_learner is mock_learner
         assert compactor.provider_type == "cloud"
+
+    def test_create_context_compactor_with_runtime_intelligence(self, mock_controller):
+        """Test factory function preserves runtime-intelligence wiring."""
+        runtime_intelligence = MagicMock()
+
+        compactor = create_context_compactor(
+            controller=mock_controller,
+            runtime_intelligence=runtime_intelligence,
+        )
+
+        assert compactor._runtime_intelligence is runtime_intelligence
+
+
+class TestRuntimeIntelligenceCompaction:
+    """Tests for runtime-intelligence-backed compaction decisions."""
+
+    def test_maybe_summarize_turns_uses_runtime_intelligence(self):
+        """Compaction tier routing should go through runtime intelligence when present."""
+        from victor.agent.decisions.schemas import DecisionType
+        from victor.agent.services.protocols.decision_service import DecisionResult
+
+        controller = MagicMock()
+        controller.messages = [Message(role="system", content="System prompt")]
+        for i in range(18):
+            controller.messages.append(Message(role="user", content=f"User turn {i}"))
+            controller.messages.append(Message(role="assistant", content=f"Assistant turn {i}"))
+
+        runtime_intelligence = MagicMock()
+        runtime_intelligence.decide_sync.return_value = DecisionResult(
+            decision_type=DecisionType.COMPACTION,
+            result=SimpleNamespace(recommended_tier="edge"),
+            source="llm",
+            confidence=0.9,
+        )
+
+        compactor = ContextCompactor(
+            controller=controller,
+            runtime_intelligence=runtime_intelligence,
+        )
+        compactor._get_provider_for_tier = MagicMock(return_value=MagicMock())
+
+        with patch("victor.agent.llm_compaction_summarizer.LLMCompactionSummarizer") as mock_cls:
+            mock_cls.return_value.summarize.return_value = "summarized context"
+
+            action = compactor._maybe_summarize_turns()
+
+        assert action is not None
+        runtime_intelligence.decide_sync.assert_called_once()
 
 
 class TestEnsureAsyncState:

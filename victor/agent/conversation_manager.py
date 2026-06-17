@@ -53,12 +53,12 @@ import logging
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Set, TYPE_CHECKING
 
-from victor.agent.conversation_controller import (
+from victor.agent.conversation.controller import (
     ConversationController,
     ConversationConfig,
     ContextMetrics,
 )
-from victor.agent.conversation_state import ConversationStage
+from victor.agent.conversation.state_machine import ConversationStage
 from victor.agent.conversation import (
     MessageStore,
     ContextOverflowHandler,
@@ -67,7 +67,7 @@ from victor.agent.conversation import (
 )
 
 if TYPE_CHECKING:
-    from victor.agent.conversation_memory import ConversationStore, ConversationSession
+    from victor.agent.conversation.store import ConversationStore, ConversationSession
     from victor.agent.conversation_embedding_store import ConversationEmbeddingStore
     from victor.config.settings import Settings
     from victor.storage.embeddings.service import EmbeddingService
@@ -140,6 +140,7 @@ class ConversationManager:
         controller: Optional[ConversationController] = None,
         store: Optional["ConversationStore"] = None,
         embedding_service: Optional["EmbeddingService"] = None,
+        retrieval_gateway: Optional[Any] = None,
         session_id: Optional[str] = None,
     ):
         """Initialize ConversationManager using composition.
@@ -153,6 +154,7 @@ class ConversationManager:
             controller: Optional pre-configured ConversationController
             store: Optional pre-configured ConversationStore
             embedding_service: Optional embedding service for semantic features
+            retrieval_gateway: Optional RetrievalGateway for semantic search
             session_id: Optional session ID to recover/continue
         """
         self._settings = settings
@@ -201,6 +203,7 @@ class ConversationManager:
         self._store: Optional["ConversationStore"] = store
         self._embedding_store: Optional["ConversationEmbeddingStore"] = None
         self._embedding_service = embedding_service
+        self._retrieval_gateway = retrieval_gateway
         self._session_id = session_id
         self._session: Optional["ConversationSession"] = None
 
@@ -238,6 +241,14 @@ class ConversationManager:
         )
         self._session_id = self._session.session_id
         logger.info(f"Created new session: {self._session_id}")
+
+        # Ensure .victor/ subdirs exist including .victor/analysis/ for checkpoints
+        try:
+            from victor.config.settings import ProjectPaths
+
+            ProjectPaths().ensure_project_dirs()
+        except Exception:
+            pass
 
     # =========================================================================
     # MESSAGE MANAGEMENT
@@ -580,7 +591,9 @@ class ConversationManager:
             return True
 
         try:
-            from victor.agent.conversation_embedding_store import ConversationEmbeddingStore
+            from victor.agent.conversation_embedding_store import (
+                ConversationEmbeddingStore,
+            )
 
             # Get or create embedding service
             if self._embedding_service is None:
@@ -645,27 +658,46 @@ class ConversationManager:
             return []
 
         try:
+            gateway = self._get_retrieval_gateway()
+            if gateway is not None and self._session_id:
+                from victor.storage.retrieval.gateway import RetrievalRequest
+
+                items = await gateway.search(
+                    RetrievalRequest(
+                        query=query,
+                        session_id=self._session_id,
+                        limit=limit,
+                        min_similarity=min_similarity,
+                    )
+                )
+                return [
+                    {
+                        "message_id": item.message_id,
+                        "similarity": item.score,
+                        "source": item.source,
+                    }
+                    for item in items
+                ]
+
+            # Fallback: direct embedding store access
+            if not self._embedding_store:
+                return []
             results = await self._embedding_store.search_similar(
                 query=query,
                 session_id=self._session_id,
                 limit=limit,
                 min_similarity=min_similarity,
             )
-
-            # Fetch full message content from store if available
             if self._store:
-                enriched = []
-                for result in results:
-                    enriched.append(
-                        {
-                            "message_id": result.message_id,
-                            "session_id": result.session_id,
-                            "similarity": result.similarity,
-                            "timestamp": result.timestamp.isoformat() if result.timestamp else None,
-                        }
-                    )
-                return enriched
-
+                return [
+                    {
+                        "message_id": r.message_id,
+                        "session_id": r.session_id,
+                        "similarity": r.similarity,
+                        "timestamp": (r.timestamp.isoformat() if r.timestamp else None),
+                    }
+                    for r in results
+                ]
             return [
                 {
                     "message_id": r.message_id,
@@ -678,6 +710,10 @@ class ConversationManager:
         except Exception as e:
             logger.error(f"Semantic search failed: {e}")
             return []
+
+    def _get_retrieval_gateway(self):
+        """Get RetrievalGateway (injected via constructor or None)."""
+        return self._retrieval_gateway
 
     # =========================================================================
     # LIFECYCLE
@@ -759,7 +795,7 @@ def create_conversation_manager(
     store = None
     if enable_persistence:
         try:
-            from victor.agent.conversation_memory import ConversationStore
+            from victor.agent.conversation.store import ConversationStore
 
             store = ConversationStore()
         except Exception as e:

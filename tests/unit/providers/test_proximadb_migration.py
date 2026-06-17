@@ -134,7 +134,11 @@ class FakeProximaClient:
         properties: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         self.graph_nodes.append(
-            {"id": node_id, "labels": list(labels), "properties": dict(properties or {})}
+            {
+                "id": node_id,
+                "labels": list(labels),
+                "properties": dict(properties or {}),
+            }
         )
         return self.graph_nodes[-1]
 

@@ -13,13 +13,9 @@ async def aws_lambda_agent():
     """Deploy Victor agent as AWS Lambda function."""
     from victor import Agent
 
-    agent = Agent.create(
-        tools=["web_fetch"],
-        temperature=0.3
-    )
+    agent = Agent.create(tools=["web_fetch"], temperature=0.3)
 
-    result = await agent.run(
-        """Generate complete AWS Lambda deployment for Victor agent.
+    result = await agent.run("""Generate complete AWS Lambda deployment for Victor agent.
 
         Requirements:
         - Lambda handler for agent requests
@@ -34,8 +30,7 @@ async def aws_lambda_agent():
         2. requirements.txt for Lambda layer
         3. SAM template for deployment
         4. Deployment instructions
-        5. Testing examples"""
-    )
+        5. Testing examples""")
 
     return result.content
 
@@ -44,13 +39,9 @@ async def azure_functions_agent():
     """Deploy Victor agent as Azure Function."""
     from victor import Agent
 
-    agent = Agent.create(
-        tools=["web_fetch"],
-        temperature=0.3
-    )
+    agent = Agent.create(tools=["web_fetch"], temperature=0.3)
 
-    result = await agent.run(
-        """Generate Azure Functions deployment for Victor agent.
+    result = await agent.run("""Generate Azure Functions deployment for Victor agent.
 
         Requirements:
         - HTTP-triggered function
@@ -64,8 +55,7 @@ async def azure_functions_agent():
         2. host.json configuration
         3. requirements.txt
         4. Azure Resource Manager template
-        5. Deployment script"""
-    )
+        5. Deployment script""")
 
     return result.content
 
@@ -74,13 +64,9 @@ async def gcp_cloud_functions_agent():
     """Deploy Victor agent as Google Cloud Function."""
     from victor import Agent
 
-    agent = Agent.create(
-        tools=["web_fetch"],
-        temperature=0.3
-    )
+    agent = Agent.create(tools=["web_fetch"], temperature=0.3)
 
-    result = await agent.run(
-        """Generate Google Cloud Functions deployment for Victor agent.
+    result = await agent.run("""Generate Google Cloud Functions deployment for Victor agent.
 
         Requirements:
         - HTTP-triggered function (2nd gen)
@@ -93,8 +79,7 @@ async def gcp_cloud_functions_agent():
         2. requirements.txt
         3. gcloud deploy commands
         4. IAM configuration
-        5. Testing examples"""
-    )
+        5. Testing examples""")
 
     return result.content
 
@@ -103,13 +88,9 @@ async def aws_bedrock_agent():
     """Integrate with AWS Bedrock for LLM hosting."""
     from victor import Agent
 
-    agent = Agent.create(
-        tools=["web_fetch"],
-        temperature=0.3
-    )
+    agent = Agent.create(tools=["web_fetch"], temperature=0.3)
 
-    result = await agent.run(
-        """Generate Victor provider adapter for AWS Bedrock.
+    result = await agent.run("""Generate Victor provider adapter for AWS Bedrock.
 
         Support models:
         - Anthropic Claude (via Bedrock)
@@ -126,8 +107,7 @@ async def aws_bedrock_agent():
         Provide:
         1. Provider adapter class
         2. Configuration setup
-        3. Usage examples"""
-    )
+        3. Usage examples""")
 
     return result.content
 
@@ -136,13 +116,9 @@ async def azure_openai_agent():
     """Integrate with Azure OpenAI Service."""
     from victor import Agent
 
-    agent = Agent.create(
-        tools=["web_fetch"],
-        temperature=0.3
-    )
+    agent = Agent.create(tools=["web_fetch"], temperature=0.3)
 
-    result = await agent.run(
-        """Generate Victor provider adapter for Azure OpenAI.
+    result = await agent.run("""Generate Victor provider adapter for Azure OpenAI.
 
         Support models:
         - GPT-35-Turbo
@@ -159,8 +135,7 @@ async def azure_openai_agent():
         Provide:
         1. Provider adapter class
         2. Configuration examples
-        3. Authentication setup"""
-    )
+        3. Authentication setup""")
 
     return result.content
 
@@ -169,13 +144,9 @@ async def gcp_vertex_agent():
     """Integrate with Google Cloud Vertex AI."""
     from victor import Agent
 
-    agent = Agent.create(
-        tools=["web_fetch"],
-        temperature=0.3
-    )
+    agent = Agent.create(tools=["web_fetch"], temperature=0.3)
 
-    result = await agent.run(
-        """Generate Victor provider adapter for Google Cloud Vertex AI.
+    result = await agent.run("""Generate Victor provider adapter for Google Cloud Vertex AI.
 
         Support models:
         - Gemini Pro
@@ -192,8 +163,7 @@ async def gcp_vertex_agent():
         Provide:
         1. Provider adapter class
         2. Authentication setup
-        3. Usage examples"""
-    )
+        3. Usage examples""")
 
     return result.content
 
@@ -202,13 +172,9 @@ async def aws_sagemaker_agent():
     """Deploy and manage models with AWS SageMaker."""
     from victor import Agent
 
-    agent = Agent.create(
-        tools=["web_fetch"],
-        temperature=0.3
-    )
+    agent = Agent.create(tools=["web_fetch"], temperature=0.3)
 
-    result = await agent.run(
-        """Generate code for AWS SageMaker integration with Victor.
+    result = await agent.run("""Generate code for AWS SageMaker integration with Victor.
 
         Use cases:
         - Deploy custom models
@@ -220,8 +186,7 @@ async def aws_sagemaker_agent():
         1. SageMaker endpoint wrapper
         2. Model deployment code
         3. Inference client
-        4. Monitoring and autoscaling setup"""
-    )
+        4. Monitoring and autoscaling setup""")
 
     return result.content
 
@@ -230,13 +195,9 @@ async def aws_sqs_agent():
     """Process messages with AWS SQS and Victor agents."""
     from victor import Agent
 
-    agent = Agent.create(
-        tools=["web_fetch"],
-        temperature=0.3
-    )
+    agent = Agent.create(tools=["web_fetch"], temperature=0.3)
 
-    result = await agent.run(
-        """Generate SQS message processing system with Victor agents.
+    result = await agent.run("""Generate SQS message processing system with Victor agents.
 
         Features:
         - Poll SQS queue for messages
@@ -250,8 +211,7 @@ async def aws_sqs_agent():
         1. Message processor class
         2. Async SQS client wrapper
         3. Monitoring and logging
-        4. Deployment as container/ECS"""
-    )
+        4. Deployment as container/ECS""")
 
     return result.content
 
@@ -260,13 +220,9 @@ async def azure_event_grid_agent():
     """Process Azure Event Grid events with Victor."""
     from victor import Agent
 
-    agent = Agent.create(
-        tools=["web_fetch"],
-        temperature=0.3
-    )
+    agent = Agent.create(tools=["web_fetch"], temperature=0.3)
 
-    result = await agent.run(
-        """Generate Event Grid event processing with Victor agents.
+    result = await agent.run("""Generate Event Grid event processing with Victor agents.
 
         Event sources:
         - Blob storage
@@ -282,8 +238,7 @@ async def azure_event_grid_agent():
         Provide:
         1. Event handler function
         2. Event dispatcher
-        3. Configuration examples"""
-    )
+        3. Configuration examples""")
 
     return result.content
 
@@ -292,13 +247,9 @@ async def gcp_pubsub_agent():
     """Process Pub/Sub messages with Victor agents."""
     from victor import Agent
 
-    agent = Agent.create(
-        tools=["web_fetch"],
-        temperature=0.3
-    )
+    agent = Agent.create(tools=["web_fetch"], temperature=0.3)
 
-    result = await agent.run(
-        """Generate Cloud Pub/Sub processing with Victor agents.
+    result = await agent.run("""Generate Cloud Pub/Sub processing with Victor agents.
 
         Features:
         - Pull messages asynchronously
@@ -312,8 +263,7 @@ async def gcp_pubsub_agent():
         1. Subscriber implementation
         2. Message processor
         3. Error handling
-        4. Deployment guide"""
-    )
+        4. Deployment guide""")
 
     return result.content
 
@@ -322,13 +272,9 @@ async def aws_dynamodb_agent():
     """Store conversation state in DynamoDB."""
     from victor import Agent
 
-    agent = Agent.create(
-        tools=["web_fetch"],
-        temperature=0.3
-    )
+    agent = Agent.create(tools=["web_fetch"], temperature=0.3)
 
-    result = await agent.run(
-        """Generate DynamoDB integration for Victor state management.
+    result = await agent.run("""Generate DynamoDB integration for Victor state management.
 
         Features:
         - Store conversation history
@@ -341,8 +287,7 @@ async def aws_dynamodb_agent():
         1. DynamoDB storage adapter
         2. Table schema design
         3. Query patterns
-        4. Caching layer"""
-    )
+        4. Caching layer""")
 
     return result.content
 
@@ -351,13 +296,9 @@ async def azure_cosmosdb_agent():
     """Store state in Azure Cosmos DB."""
     from victor import Agent
 
-    agent = Agent.create(
-        tools=["web_fetch"],
-        temperature=0.3
-    )
+    agent = Agent.create(tools=["web_fetch"], temperature=0.3)
 
-    result = await agent.run(
-        """Generate Cosmos DB integration for Victor state management.
+    result = await agent.run("""Generate Cosmos DB integration for Victor state management.
 
         API: SQL (Core) API
 
@@ -372,8 +313,7 @@ async def azure_cosmosdb_agent():
         1. Cosmos DB client wrapper
         2. Container design
         3. Query patterns
-        4. Performance tips"""
-    )
+        4. Performance tips""")
 
     return result.content
 
@@ -382,13 +322,9 @@ async def gcp_firestore_agent():
     """Store state in Cloud Firestore."""
     from victor import Agent
 
-    agent = Agent.create(
-        tools=["web_fetch"],
-        temperature=0.3
-    )
+    agent = Agent.create(tools=["web_fetch"], temperature=0.3)
 
-    result = await agent.run(
-        """Generate Firestore integration for Victor state management.
+    result = await agent.run("""Generate Firestore integration for Victor state management.
 
         Features:
         - Document structure for conversations
@@ -401,8 +337,7 @@ async def gcp_firestore_agent():
         1. Firestore client wrapper
         2. Data model design
         3. Query patterns
-        4. Offline support"""
-    )
+        4. Offline support""")
 
     return result.content
 
@@ -418,4 +353,5 @@ async def demo_cloud_integrations():
 
 if __name__ == "__main__":
     import asyncio
+
     asyncio.run(demo_cloud_integrations())

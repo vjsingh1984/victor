@@ -81,7 +81,8 @@ QUESTION_PATTERNS: List[Tuple[re.Pattern, QuestionType, float]] = [
     ),
     (
         re.compile(
-            r"\bwould\s+you\s+like\s+(?:me\s+to|to)\s+(?:continue|proceed)\b", re.IGNORECASE
+            r"\bwould\s+you\s+like\s+(?:me\s+to|to)\s+(?:continue|proceed)\b",
+            re.IGNORECASE,
         ),
         QuestionType.CONTINUATION,
         0.95,
@@ -103,26 +104,32 @@ QUESTION_PATTERNS: List[Tuple[re.Pattern, QuestionType, float]] = [
     ),
     (
         re.compile(
-            r"\blet\s+me\s+know\s+(?:if|when)\s+(?:you(?:'re|\s+are)\s+)?ready\b", re.IGNORECASE
+            r"\blet\s+me\s+know\s+(?:if|when)\s+(?:you(?:'re|\s+are)\s+)?ready\b",
+            re.IGNORECASE,
         ),
         QuestionType.CONTINUATION,
         0.80,
     ),
     (
         re.compile(
-            r"\bany(?:thing)?\s+else\s+(?:you(?:'d|\s+would)\s+like|to\s+add)\?", re.IGNORECASE
+            r"\bany(?:thing)?\s+else\s+(?:you(?:'d|\s+would)\s+like|to\s+add)\?",
+            re.IGNORECASE,
         ),
         QuestionType.RHETORICAL,
         0.80,
     ),
     (
-        re.compile(r"\bdoes\s+(?:this|that)\s+(?:look|sound)\s+(?:good|right|ok)\?", re.IGNORECASE),
+        re.compile(
+            r"\bdoes\s+(?:this|that)\s+(?:look|sound)\s+(?:good|right|ok)\?",
+            re.IGNORECASE,
+        ),
         QuestionType.RHETORICAL,
         0.85,
     ),
     (
         re.compile(
-            r"\bis\s+(?:this|that)\s+what\s+you\s+(?:wanted|meant|had\s+in\s+mind)\?", re.IGNORECASE
+            r"\bis\s+(?:this|that)\s+what\s+you\s+(?:wanted|meant|had\s+in\s+mind)\?",
+            re.IGNORECASE,
         ),
         QuestionType.RHETORICAL,
         0.80,
@@ -140,20 +147,25 @@ QUESTION_PATTERNS: List[Tuple[re.Pattern, QuestionType, float]] = [
         0.85,
     ),
     (
-        re.compile(r"\bhow\s+(?:should|would)\s+you\s+like\s+(?:me|this|it)\s+to\b", re.IGNORECASE),
-        QuestionType.CLARIFICATION,
-        0.85,
-    ),
-    (
         re.compile(
-            r"\bwhere\s+(?:should|would)\s+(?:i|we)\s+(?:put|place|store|save)\b", re.IGNORECASE
+            r"\bhow\s+(?:should|would)\s+you\s+like\s+(?:me|this|it)\s+to\b",
+            re.IGNORECASE,
         ),
         QuestionType.CLARIFICATION,
         0.85,
     ),
     (
         re.compile(
-            r"\bdo\s+you\s+(?:prefer|want)\s+(?:me\s+to\s+use|to\s+use|using)\b", re.IGNORECASE
+            r"\bwhere\s+(?:should|would)\s+(?:i|we)\s+(?:put|place|store|save)\b",
+            re.IGNORECASE,
+        ),
+        QuestionType.CLARIFICATION,
+        0.85,
+    ),
+    (
+        re.compile(
+            r"\bdo\s+you\s+(?:prefer|want)\s+(?:me\s+to\s+use|to\s+use|using)\b",
+            re.IGNORECASE,
         ),
         QuestionType.CLARIFICATION,
         0.80,
@@ -184,7 +196,10 @@ QUESTION_PATTERNS: List[Tuple[re.Pattern, QuestionType, float]] = [
         0.90,
     ),
     (
-        re.compile(r"\bwhat(?:'s|\s+is)\s+(?:your|the)\s+(?:email|phone|contact)\b", re.IGNORECASE),
+        re.compile(
+            r"\bwhat(?:'s|\s+is)\s+(?:your|the)\s+(?:email|phone|contact)\b",
+            re.IGNORECASE,
+        ),
         QuestionType.INFORMATION,
         0.85,
     ),

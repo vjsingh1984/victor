@@ -16,7 +16,7 @@
 
 import time
 import pytest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, call
 
 from victor.agent.streaming.context import StreamingChatContext
 from victor.agent.streaming.handler import StreamingChatHandler
@@ -150,8 +150,8 @@ class TestCheckForceCompletion:
         """Returns result when blocked attempts exceed threshold."""
         ctx = StreamingChatContext(
             user_message="test",
-            consecutive_blocked_attempts=3,
-            max_blocked_before_force=3,
+            consecutive_blocked_attempts=4,
+            max_blocked_before_force=4,
         )
         result = handler.check_force_completion(ctx)
         assert result is not None
@@ -165,7 +165,7 @@ class TestHandleBlockedAttempts:
         ctx = StreamingChatContext(
             user_message="test",
             consecutive_blocked_attempts=1,
-            max_blocked_before_force=3,
+            max_blocked_before_force=4,
         )
         result = handler.handle_blocked_attempts(ctx)
         assert result is None
@@ -175,8 +175,8 @@ class TestHandleBlockedAttempts:
         """Returns result and resets counter at threshold."""
         ctx = StreamingChatContext(
             user_message="test",
-            consecutive_blocked_attempts=2,
-            max_blocked_before_force=3,
+            consecutive_blocked_attempts=3,
+            max_blocked_before_force=4,
         )
         result = handler.handle_blocked_attempts(ctx)
         assert result is not None
@@ -269,16 +269,19 @@ class TestProcessToolResults:
         assert tool_result_chunks[0].metadata["tool_result"]["success"] is False
         assert tool_result_chunks[0].metadata["tool_result"]["error"] == "file not found"
 
-    def test_includes_thinking_status(self, handler, basic_context):
-        """Includes thinking status chunk."""
+    def test_no_thinking_status_chunk(self, handler, basic_context):
+        """process_tool_results does not emit a separate Thinking status chunk.
+
+        The thinking indicator is handled by the pipeline/provider layer to
+        avoid duplication (providers like z.ai yield reasoning content directly).
+        """
         execution = ToolExecutionResult()
         execution.add_result("test_tool", success=True)
 
         chunks = handler.process_tool_results(execution, basic_context)
 
         status_chunks = [c for c in chunks if c.metadata and c.metadata.get("status")]
-        assert len(status_chunks) == 1
-        assert "Thinking" in status_chunks[0].metadata["status"]
+        assert len(status_chunks) == 0
 
     def test_preserves_follow_up_suggestions(self, handler, basic_context):
         """Preserves tool follow-up suggestions in tool_result metadata."""
@@ -395,7 +398,7 @@ class TestCheckNaturalCompletion:
         """Returns None - signal-based completion handles completion, not buffer/size heuristics.
 
         After Phase 5 cleanup, buffer/size heuristics were removed in favor of
-        TaskCompletionDetector's explicit signal-based completion (_DONE_, _TASK_DONE_, etc.).
+        TaskCompletionDetector's explicit rare-marker completion signaling.
         """
         ctx = StreamingChatContext(
             user_message="test",
@@ -565,6 +568,61 @@ class TestToolBudgetMethods:
         assert result is not None
         assert result.chunks
         assert "Approaching tool budget limit" in result.chunks[0].content
+
+    def test_check_tool_budget_warns_on_ratio_threshold(self, handler):
+        """Warn when the used/total ratio reaches the configured threshold."""
+        ctx = StreamingChatContext(
+            user_message="test",
+            tool_budget=10,
+            tool_calls_used=8,
+        )
+        result = handler.check_tool_budget(
+            ctx,
+            warning_threshold=250,
+            warning_pct=0.8,
+            warning_remaining=1,
+        )
+        assert result is not None
+        assert "2 remaining" in result.chunks[0].content
+
+    def test_check_tool_budget_warns_on_low_remaining(self, handler):
+        """Warn when only a few tool calls remain even if the absolute threshold is low."""
+        ctx = StreamingChatContext(
+            user_message="test",
+            tool_budget=40,
+            tool_calls_used=36,
+        )
+        result = handler.check_tool_budget(
+            ctx,
+            warning_threshold=250,
+            warning_pct=0.95,
+            warning_remaining=4,
+        )
+        assert result is not None
+        assert "4 remaining" in result.chunks[0].content
+
+    def test_check_tool_budget_warns_only_once_per_turn(self, handler):
+        """Repeated checks should not spam duplicate warnings."""
+        ctx = StreamingChatContext(
+            user_message="test",
+            tool_budget=10,
+            tool_calls_used=8,
+        )
+        first_result = handler.check_tool_budget(
+            ctx,
+            warning_threshold=250,
+            warning_pct=0.8,
+            warning_remaining=2,
+        )
+        second_result = handler.check_tool_budget(
+            ctx,
+            warning_threshold=250,
+            warning_pct=0.8,
+            warning_remaining=2,
+        )
+        assert first_result is not None
+        assert second_result is None
+        assert ctx.budget_warning_shown is True
 
     def test_check_tool_budget_exhausted_no_warning(self, handler):
         """No warning when budget exhausted (0 remaining)."""
@@ -764,10 +822,10 @@ class TestForceCompletionMessages:
         assert result is not None
         assert len(result.chunks) == 1
         assert "Research loop detected" in result.chunks[0].content
-        # Check system message was added
+        # Check user message was added (force completion uses "user" role)
         mock_message_adder.add_message.assert_called_once()
         call_args = mock_message_adder.add_message.call_args
-        assert call_args[0][0] == "system"
+        assert call_args[0][0] == "user"
         assert "SYNTHESIZE" in call_args[0][1]
 
     def test_handle_force_completion_exploration_limit(self, handler, mock_message_adder):
@@ -781,10 +839,10 @@ class TestForceCompletionMessages:
         assert result is not None
         assert len(result.chunks) == 1
         assert "exploration limit" in result.chunks[0].content
-        # Check system message was added
+        # Check user message was added (force completion uses "user" role)
         mock_message_adder.add_message.assert_called_once()
         call_args = mock_message_adder.add_message.call_args
-        assert call_args[0][0] == "system"
+        assert call_args[0][0] == "user"
         assert "FINAL COMPREHENSIVE ANSWER" in call_args[0][1]
 
 
@@ -1227,10 +1285,14 @@ class TestGenerateFilePreviewChunk:
 
 
 class TestGenerateEditPreviewChunk:
-    """Tests for generate_edit_preview_chunk method."""
+    """Tests for generate_edit_preview_chunk method.
 
-    def test_short_strings(self, handler):
-        """Short strings show in full."""
+    Diff format is unified-diff (proper `-`/`+` lines + `---`/`+++` headers)
+    so renderer can show real colored diffs to the user.
+    """
+
+    def test_short_strings_produce_unified_diff(self, handler):
+        """Short strings produce a unified diff with file headers + +/- lines."""
         chunk = handler.generate_edit_preview_chunk(
             old_string="old text",
             new_string="new text",
@@ -1238,29 +1300,42 @@ class TestGenerateEditPreviewChunk:
         )
 
         assert chunk is not None
-        assert "- old text..." in chunk.metadata["edit_preview"]
-        assert "+ new text..." in chunk.metadata["edit_preview"]
+        preview = chunk.metadata["edit_preview"]
+        assert "--- a/test.py" in preview or "--- a//test.py" in preview
+        assert "+++ b/test.py" in preview or "+++ b//test.py" in preview
+        assert "-old text" in preview
+        assert "+new text" in preview
         assert chunk.metadata["path"] == "/test.py"
 
-    def test_long_strings_truncated(self, handler):
-        """Long strings are truncated."""
-        old_string = "x" * 100
-        new_string = "y" * 100
+    def test_long_strings_capped(self, handler):
+        """Very long diffs are capped to max_diff_lines."""
+        old_string = "\n".join(f"old line {i}" for i in range(100))
+        new_string = "\n".join(f"new line {i}" for i in range(100))
         chunk = handler.generate_edit_preview_chunk(
-            old_string, new_string, "/test.py", max_preview_len=50
+            old_string, new_string, "/test.py", max_diff_lines=20
         )
 
         assert chunk is not None
-        assert len(chunk.metadata["edit_preview"]) < 250
+        preview = chunk.metadata["edit_preview"]
+        # Should be capped — 20 lines + 1 truncation marker
+        assert len(preview.split("\n")) <= 21
+        assert "more lines" in preview
 
-    def test_empty_old_returns_none(self, handler):
-        """Empty old_string returns None."""
-        chunk = handler.generate_edit_preview_chunk("", "new", "/test.py")
-        assert chunk is None
+    def test_empty_old_produces_creation_diff(self, handler):
+        """Empty old_string (file creation) produces a full-add diff."""
+        chunk = handler.generate_edit_preview_chunk("", "new content", "/test.py")
+        assert chunk is not None
+        assert "+new content" in chunk.metadata["edit_preview"]
 
-    def test_empty_new_returns_none(self, handler):
-        """Empty new_string returns None."""
-        chunk = handler.generate_edit_preview_chunk("old", "", "/test.py")
+    def test_empty_new_produces_deletion_diff(self, handler):
+        """Empty new_string (content removal) produces a full-delete diff."""
+        chunk = handler.generate_edit_preview_chunk("old content", "", "/test.py")
+        assert chunk is not None
+        assert "-old content" in chunk.metadata["edit_preview"]
+
+    def test_both_empty_returns_none(self, handler):
+        """Both empty: no edit happened, no preview."""
+        chunk = handler.generate_edit_preview_chunk("", "", "/test.py")
         assert chunk is None
 
 
@@ -1270,7 +1345,7 @@ class TestGenerateToolResultChunks:
     def test_simple_success(self, handler):
         """Simple successful result generates one chunk."""
         result = {
-            "name": "read_file",
+            "name": "read",
             "elapsed": 0.5,
             "args": {"path": "/test.py"},
             "success": True,
@@ -1281,10 +1356,10 @@ class TestGenerateToolResultChunks:
         assert len(chunks) == 1
         assert chunks[0].metadata["tool_result"]["success"] is True
 
-    def test_write_file_with_preview(self, handler):
-        """write_file generates result and preview chunks."""
+    def test_write_with_preview(self, handler):
+        """Canonical write generates result and preview chunks."""
         result = {
-            "name": "write_file",
+            "name": "write",
             "elapsed": 0.3,
             "args": {"path": "/test.py", "content": "line1\nline2\nline3"},
             "success": True,
@@ -1293,23 +1368,60 @@ class TestGenerateToolResultChunks:
         chunks = handler.generate_tool_result_chunks(result)
 
         assert len(chunks) == 2
-        assert chunks[0].metadata["tool_result"]["name"] == "write_file"
+        assert chunks[0].metadata["tool_result"]["name"] == "write"
         assert "file_preview" in chunks[1].metadata
+        handler.message_adder.add_message.assert_called_once_with(
+            "system",
+            "File preview: /test.py",
+            preview_body="line1\nline2\nline3",
+            preview_kind="file",
+            preview_language="py",
+            preview_path="/test.py",
+        )
 
-    def test_edit_files_with_preview(self, handler):
-        """edit_files generates result and edit preview chunks."""
+    def test_pruned_read_chunk_preserves_full_result_for_renderer(self, handler):
+        """Pruned read results expose preview and full output separately."""
         result = {
-            "name": "edit_files",
+            "name": "read",
+            "elapsed": 0.3,
+            "args": {"path": "/test.py"},
+            "success": True,
+            "was_pruned": True,
+            "result": "preview line 1\npreview line 2\n[PRUNED PREVIEW: omitted 200 lines]",
+            "full_result": "preview line 1\npreview line 2\nfull line 3\nfull line 4",
+        }
+
+        chunks = handler.generate_tool_result_chunks(result)
+
+        assert len(chunks) == 1
+        tool_metadata = chunks[0].metadata["tool_result"]
+        # Now shows brief metadata-only message instead of pruned preview
+        assert (
+            tool_metadata["result"]
+            == "Tool completed successfully. Use /expand or Ctrl+O at prompt to see full output."
+        )
+        assert tool_metadata["original_result"] == result["full_result"]
+        assert tool_metadata["was_pruned"] is True
+
+    def test_edit_with_preview(self, handler):
+        """Canonical edit generates result and edit preview chunks."""
+        result = {
+            "name": "edit",
             "elapsed": 0.4,
             "args": {
-                "files": [
+                "ops": [
                     {
+                        "type": "replace",
                         "path": "/test.py",
-                        "edits": [
-                            {"old_string": "old1", "new_string": "new1"},
-                            {"old_string": "old2", "new_string": "new2"},
-                        ],
-                    }
+                        "old_str": "old1",
+                        "new_str": "new1",
+                    },
+                    {
+                        "type": "replace",
+                        "path": "/test.py",
+                        "old_str": "old2",
+                        "new_str": "new2",
+                    },
                 ]
             },
             "success": True,
@@ -1318,9 +1430,25 @@ class TestGenerateToolResultChunks:
         chunks = handler.generate_tool_result_chunks(result)
 
         assert len(chunks) == 3  # 1 result + 2 edit previews
-        assert chunks[0].metadata["tool_result"]["name"] == "edit_files"
+        assert chunks[0].metadata["tool_result"]["name"] == "edit"
         assert "edit_preview" in chunks[1].metadata
         assert "edit_preview" in chunks[2].metadata
+        # Verify two preview messages were recorded with unified-diff bodies.
+        # Exact diff text is checked via substring rather than full equality
+        # because difflib output formatting may vary slightly across versions.
+        recorded_calls = handler.message_adder.add_message.call_args_list
+        assert len(recorded_calls) == 2
+        for idx, expected_old, expected_new in (
+            (0, "-old1", "+new1"),
+            (1, "-old2", "+new2"),
+        ):
+            args, kwargs = recorded_calls[idx]
+            assert args == ("system", "Edit preview: /test.py")
+            assert kwargs["preview_kind"] == "edit"
+            assert kwargs["preview_language"] == "diff"
+            assert kwargs["preview_path"] == "/test.py"
+            assert expected_old in kwargs["preview_body"]
+            assert expected_new in kwargs["preview_body"]
 
     def test_failed_result_no_preview(self, handler):
         """Failed result doesn't generate preview chunks."""
@@ -1337,6 +1465,48 @@ class TestGenerateToolResultChunks:
         assert len(chunks) == 1
         assert chunks[0].metadata["tool_result"]["success"] is False
 
+    def test_preview_message_falls_back_when_adder_rejects_kwargs(self, mock_settings):
+        """Preview recording should retry without kwargs for legacy adders."""
+
+        class RejectingAdder:
+            def __init__(self) -> None:
+                self.calls = []
+
+            def add_message(self, role: str, content: str, **kwargs):
+                self.calls.append((role, content, kwargs))
+                if kwargs:
+                    raise TypeError("legacy adder")
+
+        adder = RejectingAdder()
+        handler = StreamingChatHandler(
+            settings=mock_settings,
+            message_adder=adder,
+            session_idle_timeout=60.0,
+        )
+        result = {
+            "name": "write",
+            "elapsed": 0.3,
+            "args": {"path": "/test.py", "content": "line1\nline2\nline3"},
+            "success": True,
+        }
+
+        chunks = handler.generate_tool_result_chunks(result)
+
+        assert len(chunks) == 2
+        assert adder.calls == [
+            (
+                "system",
+                "File preview: /test.py",
+                {
+                    "preview_body": "line1\nline2\nline3",
+                    "preview_kind": "file",
+                    "preview_language": "py",
+                    "preview_path": "/test.py",
+                },
+            ),
+            ("system", "File preview: /test.py", {}),
+        ]
+
     def test_max_files_limit(self, handler):
         """Respects max_files limit for edit_files."""
         result = {
@@ -1344,7 +1514,10 @@ class TestGenerateToolResultChunks:
             "elapsed": 0.5,
             "args": {
                 "files": [
-                    {"path": f"/file{i}.py", "edits": [{"old_string": "old", "new_string": "new"}]}
+                    {
+                        "path": f"/file{i}.py",
+                        "edits": [{"old_string": "old", "new_string": "new"}],
+                    }
                     for i in range(10)
                 ]
             },
@@ -1398,7 +1571,7 @@ class TestHandleLoopWarning:
         assert "repeated pattern detected" in chunk.content
         mock_message_adder.add_message.assert_called_once()
         call_args = mock_message_adder.add_message.call_args
-        assert call_args[0][0] == "system"
+        assert call_args[0][0] == "user"
 
     def test_returns_none_when_no_warning(self, handler, mock_message_adder):
         """Returns None when warning message is empty."""
@@ -1641,7 +1814,10 @@ class TestFilterBlockedToolCalls:
         """Returns all tools when none are blocked."""
         tool_calls = [
             {"name": "read_file", "arguments": {"path": "/test.txt"}},
-            {"name": "write_file", "arguments": {"path": "/out.txt", "content": "hello"}},
+            {
+                "name": "write_file",
+                "arguments": {"path": "/out.txt", "content": "hello"},
+            },
         ]
 
         # Block checker that blocks nothing
@@ -1660,7 +1836,10 @@ class TestFilterBlockedToolCalls:
         """Returns empty list when all tools are blocked."""
         tool_calls = [
             {"name": "read_file", "arguments": {"path": "/test.txt"}},
-            {"name": "write_file", "arguments": {"path": "/out.txt", "content": "hello"}},
+            {
+                "name": "write_file",
+                "arguments": {"path": "/out.txt", "content": "hello"},
+            },
         ]
 
         # Block checker that blocks everything
@@ -1679,7 +1858,10 @@ class TestFilterBlockedToolCalls:
         """Returns only non-blocked tools when some are blocked."""
         tool_calls = [
             {"name": "read_file", "arguments": {"path": "/test.txt"}},
-            {"name": "write_file", "arguments": {"path": "/out.txt", "content": "hello"}},
+            {
+                "name": "write_file",
+                "arguments": {"path": "/out.txt", "content": "hello"},
+            },
             {"name": "list_dir", "arguments": {"path": "/"}},
         ]
 

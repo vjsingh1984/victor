@@ -245,7 +245,13 @@ class TestCustomEventCategory:
 
     def test_custom_category_valid_names(self):
         """Valid lowercase identifier names should work."""
-        valid_names = ["security_audit", "ml_pipeline", "custom123", "a", "test_category"]
+        valid_names = [
+            "security_audit",
+            "ml_pipeline",
+            "custom123",
+            "a",
+            "test_category",
+        ]
         for name in valid_names:
             category = CustomEventCategory(
                 name=name,

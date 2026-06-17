@@ -10,7 +10,9 @@ import asyncio
 import io
 import logging
 import sys
+import warnings
 from typing import Any
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch, Mock
 
 import pytest
@@ -113,6 +115,26 @@ class TestConfigureLogging:
         stream = io.StringIO()
         _configure_logging("debug", stream=stream, file_logging=False)
         assert any(h.level == logging.DEBUG for h in logging.root.handlers)
+
+    def test_configure_logging_uses_global_victor_dir_for_default_log_file(self, tmp_path):
+        """Default log file should resolve through centralized Victor paths."""
+        from victor.ui.commands.utils import configure_logging as _configure_logging
+
+        global_dir = tmp_path / ".victor"
+        fake_paths = SimpleNamespace(global_victor_dir=global_dir)
+        mock_file_handler = MagicMock()
+        mock_file_handler.level = logging.NOTSET
+
+        with (
+            patch("victor.ui.commands.utils.get_project_paths", return_value=fake_paths),
+            patch(
+                "logging.handlers.RotatingFileHandler", return_value=mock_file_handler
+            ) as mock_handler,
+        ):
+            _configure_logging("INFO", stream=io.StringIO(), file_logging=True)
+
+        assert mock_handler.call_args is not None
+        assert mock_handler.call_args.args[0] == global_dir / "logs" / "victor.log"
 
 
 # =============================================================================
@@ -417,6 +439,22 @@ class TestCliCommands:
         # May fail without config - allow exit code 0, 1, or 2 (usage error)
         assert result.exit_code in [0, 1, 2]
 
+    def test_profiles_help_is_canonical_and_profile_alias_remains(self, runner):
+        """Root CLI exposes canonical profiles command and keeps profile alias."""
+        from victor.ui.cli import app
+
+        help_result = runner.invoke(app, ["--help"])
+        assert help_result.exit_code == 0
+        assert "profiles" in help_result.stdout
+
+        profiles_help = runner.invoke(app, ["profiles", "--help"])
+        assert profiles_help.exit_code == 0
+        assert "Manage configuration profiles" in profiles_help.stdout
+
+        alias_help = runner.invoke(app, ["profile", "--help"])
+        assert alias_help.exit_code == 0
+        assert "deprecated" in alias_help.stdout.lower()
+
     def test_security_help(self, runner):
         """Test security command help."""
         from victor.ui.cli import app
@@ -428,7 +466,7 @@ class TestCliCommands:
         """Test embeddings command help."""
         from victor.ui.cli import app
 
-        result = runner.invoke(app, ["embeddings", "--help"])
+        result = runner.invoke(app, ["embedding", "--help"])
         assert result.exit_code == 0
 
     def test_keys_help(self, runner):
@@ -467,7 +505,9 @@ class TestCheckCodebaseIndex:
 
         with patch.dict("sys.modules", {"victor_coding.codebase.indexer": MagicMock()}):
             with patch(
-                "victor.ui.commands.utils.CodebaseIndex", return_value=mock_index, create=True
+                "victor.ui.commands.utils.CodebaseIndex",
+                return_value=mock_index,
+                create=True,
             ):
                 # Should not raise
                 await check_codebase_index("/tmp", mock_console)
@@ -495,6 +535,49 @@ class TestCheckCodebaseIndex:
         ):
             await check_codebase_index("/tmp", mock_console, silent=True)
             # No output expected when not stale and silent
+
+    @pytest.mark.asyncio
+    async def test_check_codebase_index_passes_graph_writer_mode(self, mock_console, monkeypatch):
+        """Graph writer mode should be explicitly forwarded to the indexer."""
+        from types import SimpleNamespace
+        from victor.ui.commands.utils import check_codebase_index
+
+        mock_index = MagicMock()
+        mock_index.check_staleness_by_mtime.return_value = (False, [], [])
+
+        mock_factory = MagicMock()
+        mock_factory.create.return_value = mock_index
+
+        mock_container = MagicMock()
+        mock_container.get_optional.return_value = mock_factory
+
+        settings = SimpleNamespace(
+            codebase_graph_writer_mode="compatibility",
+            codebase_graph_store="sqlite",
+            codebase_graph_path=None,
+        )
+
+        monkeypatch.setattr(
+            "victor.config.settings.load_settings",
+            lambda: settings,
+        )
+
+        with (
+            patch(
+                "victor.ui.commands.utils.CodebaseIndexFactoryProtocol",
+                new=MagicMock(),
+            ),
+            patch("victor.ui.commands.utils.get_container", return_value=mock_container),
+        ):
+            await check_codebase_index("/tmp", mock_console, silent=True)
+            mock_factory.create.assert_called_once_with(
+                root_path="/tmp",
+                use_embeddings=False,
+                enable_watcher=False,
+                graph_writer_mode="compatibility",
+                graph_store_name="sqlite",
+                graph_path=None,
+            )
 
 
 # =============================================================================
@@ -649,6 +732,280 @@ class TestOutputFormatOptions:
         # Verify the module has expected attributes (moved from cli to chat)
         assert hasattr(chat_module, "run_oneshot")
         assert hasattr(chat_module, "run_interactive")
+
+
+class TestChatChromePolicy:
+    """Tests for Rich-only chat command chrome."""
+
+    def test_cli_chrome_shown_for_default_rich_mode(self):
+        """Rich output can include human-facing command chrome."""
+        from victor.ui.commands.chat import _should_render_cli_chrome
+        from victor.ui.output_formatter import create_formatter
+
+        assert _should_render_cli_chrome(create_formatter()) is True
+
+    @pytest.mark.parametrize(
+        "kwargs",
+        [
+            {"json_mode": True},
+            {"jsonl": True},
+            {"plain": True},
+            {"code_only": True},
+            {"quiet": True},
+        ],
+    )
+    def test_cli_chrome_hidden_for_automation_modes(self, kwargs):
+        """Automation output modes must not receive extra stdout chrome."""
+        from victor.ui.commands.chat import _should_render_cli_chrome
+        from victor.ui.output_formatter import create_formatter
+
+        assert _should_render_cli_chrome(create_formatter(**kwargs)) is False
+
+    def test_interactive_tool_banner_shown_for_prompt_toolkit_cli(self):
+        """Prompt-toolkit CLI sessions print startup chrome."""
+        from victor.ui.commands.chat import _should_render_interactive_tool_banner
+
+        assert _should_render_interactive_tool_banner() is True
+
+    def test_build_cli_panel_accepts_profile_like_object(self):
+        """CLI header builder should work with fallback profile display objects."""
+        from types import SimpleNamespace
+
+        from victor.ui.commands.chat import _build_cli_panel
+
+        panel = _build_cli_panel(SimpleNamespace(provider="openai", model="gpt-4o"))
+        assert panel is not None
+
+    def test_resolve_profile_display_prefers_provider_override(self):
+        """CLI headers should show explicit provider overrides, not stale defaults."""
+        from types import SimpleNamespace
+
+        from victor.framework.session_config import SessionConfig
+        from victor.ui.commands.chat import _resolve_profile_display
+
+        config = SessionConfig.from_cli_flags(provider="openai", model="gpt-5-codex")
+        settings = SimpleNamespace(
+            provider=SimpleNamespace(default_provider="ollama", default_model="qwen")
+        )
+        profile = SimpleNamespace(provider="anthropic", model="claude")
+
+        display = _resolve_profile_display(
+            config=config,
+            profile_config=profile,
+            settings=settings,
+        )
+
+        assert display.provider == "openai"
+        assert display.model == "gpt-5-codex"
+
+    def test_non_default_missing_profile_message_points_to_provider_flags(self):
+        """Profile lookup errors should explain the -p/--provider distinction."""
+        from victor.ui.commands.chat import _profile_not_found_message
+
+        message = _profile_not_found_message("gpt5-codex", {"default": object()})
+
+        assert "Profile 'gpt5-codex' not found" in message
+        assert "--provider/-P" in message
+        assert "--model" in message
+
+    def test_provider_option_has_uppercase_short_alias(self):
+        """Chat should keep -p for profiles and expose -P for provider selection."""
+        import inspect
+
+        from victor.ui.commands.chat import chat
+
+        provider_option = inspect.signature(chat).parameters["provider"].default
+
+        assert provider_option.param_decls == ("--provider", "-P")
+
+    def test_summarize_tool_output_mode_plain_text(self):
+        """Startup summaries should use plain text, not Rich markup."""
+        from types import SimpleNamespace
+
+        from victor.ui.commands.chat import _summarize_tool_output_mode
+
+        settings = SimpleNamespace(
+            tool_output_pruning_safe_only=True,
+            tool_output_preview_enabled=False,
+        )
+        assert (
+            _summarize_tool_output_mode(settings)
+            == "Tool output: safe read-heavy pruning, preview off"
+        )
+
+    def test_print_interactive_startup_messages_handles_queue(self):
+        """Queued startup notices should render through the shared status style."""
+        from victor.ui.commands.chat import _print_interactive_startup_messages
+
+        console = MagicMock()
+        _print_interactive_startup_messages(
+            console,
+            ["Profile fallback active", "Warning: file watchers disabled"],
+        )
+
+        assert console.print.call_count == 2
+
+    def test_build_file_watcher_exec_context_uses_current_cwd(self):
+        """File watcher startup context should preserve cwd and settings."""
+        from victor.ui.commands import chat as chat_module
+
+        settings = object()
+
+        with patch.object(chat_module.os, "getcwd", return_value="/repo/project"):
+            context = chat_module._build_file_watcher_exec_context(settings)
+
+        assert context == {"cwd": "/repo/project", "settings": settings}
+
+    @pytest.mark.asyncio
+    async def test_initialize_file_watchers_background_swallows_failures(self, caplog):
+        """Background watcher initialization should log non-fatal failures."""
+        from victor.ui.commands import chat as chat_module
+
+        with patch(
+            "victor.core.indexing.watcher_initializer.initialize_from_context",
+            new=AsyncMock(side_effect=RuntimeError("watcher failed")),
+        ) as initialize:
+            with caplog.at_level(logging.WARNING):
+                await chat_module._initialize_file_watchers_background({"cwd": "/repo"})
+
+        initialize.assert_awaited_once_with({"cwd": "/repo"})
+        assert "continuing without automatic file watching" in caplog.text
+
+    @pytest.mark.asyncio
+    async def test_cancel_file_watcher_initialization_cancels_pending_task(self):
+        """Shutdown should cancel pending watcher initialization cleanly."""
+        from victor.ui.commands import chat as chat_module
+
+        task = asyncio.create_task(asyncio.sleep(30))
+
+        await chat_module._cancel_file_watcher_initialization(task)
+
+        assert task.cancelled()
+
+
+class TestChatReplRendering:
+    """Tests for CLI REPL rendering ownership."""
+
+    @pytest.mark.asyncio
+    async def test_formatter_renderer_response_is_not_reprinted(self):
+        """The REPL must not print stream_response() content a second time."""
+        from victor.ui.commands import chat as chat_module
+
+        class FakeKeyBindings:
+            def add(self, *_args, **_kwargs):
+                def decorator(func):
+                    return func
+
+                return decorator
+
+        class FakePromptSession:
+            def __init__(self):
+                self.key_bindings = FakeKeyBindings()
+                self._inputs = iter(["hello", "/exit"])
+
+            async def prompt_async(self, _prompt):
+                return next(self._inputs)
+
+        cmd_handler = MagicMock()
+        cmd_handler.is_command.return_value = False
+        agent = MagicMock()
+        settings = MagicMock()
+        profile_config = MagicMock(provider="test-provider", model="test-model")
+
+        with (
+            patch.object(
+                chat_module,
+                "_create_cli_prompt_session",
+                # _create_cli_prompt_session now returns (session, renderer_holder).
+                return_value=(FakePromptSession(), {"ref": None}),
+            ),
+            patch.object(chat_module.console, "print") as mock_print,
+            patch(
+                "victor.ui.rendering.stream_response",
+                new=AsyncMock(return_value="dup content"),
+            ),
+        ):
+            await chat_module._run_cli_repl(
+                agent=agent,
+                settings=settings,
+                cmd_handler=cmd_handler,
+                profile_config=profile_config,
+                stream=True,
+                renderer_choice="text",
+            )
+
+        rendered = [
+            str(call_args.args[0]) for call_args in mock_print.call_args_list if call_args.args
+        ]
+        assert not any("dup content" in item for item in rendered)
+
+    @pytest.mark.asyncio
+    async def test_provider_error_recovery_does_not_raise_unbound_provider(self):
+        """Provider failures should still render cleanly when error auto-save fails."""
+        from victor.ui.commands import chat as chat_module
+
+        class FakeKeyBindings:
+            def add(self, *_args, **_kwargs):
+                def decorator(func):
+                    return func
+
+                return decorator
+
+        class FakePromptSession:
+            def __init__(self):
+                self.key_bindings = FakeKeyBindings()
+                self._inputs = iter(["hello", "/exit"])
+
+            async def prompt_async(self, _prompt):
+                return next(self._inputs)
+
+        cmd_handler = MagicMock()
+        cmd_handler.is_command.return_value = False
+        agent = MagicMock()
+        agent.chat = AsyncMock(side_effect=RuntimeError("network error"))
+        agent.get_conversation_history.side_effect = RuntimeError("history unavailable")
+        settings = SimpleNamespace(
+            provider=SimpleNamespace(default_provider="openai", default_model="gpt-5")
+        )
+        profile_config = SimpleNamespace(provider="zai", model="glm-5.1")
+
+        with warnings.catch_warnings(record=True) as caught_warnings:
+            warnings.simplefilter("always")
+            with (
+                patch.object(
+                    chat_module,
+                    "_create_cli_prompt_session",
+                    # _create_cli_prompt_session now returns (session, renderer_holder).
+                    return_value=(FakePromptSession(), {"ref": None}),
+                ),
+                patch.object(chat_module.console, "print") as mock_print,
+                patch.object(
+                    chat_module,
+                    "format_exception_for_user",
+                    return_value="network error",
+                ),
+            ):
+                await chat_module._run_cli_repl(
+                    agent=agent,
+                    settings=settings,
+                    cmd_handler=cmd_handler,
+                    profile_config=profile_config,
+                    stream=False,
+                )
+
+        rendered = [
+            str(call_args.args[0]) for call_args in mock_print.call_args_list if call_args.args
+        ]
+        assert any("network error" in item.lower() for item in rendered)
+        assert any("different provider" in item.lower() for item in rendered)
+        assert not any("cannot access local variable 'provider'" in item for item in rendered)
+        assert not any(
+            "SQLiteSessionPersistence is deprecated" in str(w.message) for w in caught_warnings
+        )
+        assert not any(
+            "get_sqlite_session_persistence() is deprecated" in str(w.message)
+            for w in caught_warnings
+        )
 
 
 # =============================================================================

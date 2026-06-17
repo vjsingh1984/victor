@@ -110,6 +110,7 @@ from victor.teams.types import (
 if TYPE_CHECKING:
     from victor.protocols.team import (
         IAgent,
+        IDelegateFollowUpCoordinator,
         IEnhancedTeamCoordinator,
         IMessageBusProvider,
         IObservableCoordinator,
@@ -125,6 +126,7 @@ else:
     # victor.protocols.team imports from victor.teams.types, which creates a cycle
     # if victor.teams.__init__ imports from victor.protocols.team at module level
     IAgent = None  # type: ignore
+    IDelegateFollowUpCoordinator = None  # type: ignore
     IEnhancedTeamCoordinator = None  # type: ignore
     IMessageBusProvider = None  # type: ignore
     IObservableCoordinator = None  # type: ignore
@@ -143,8 +145,9 @@ else:
 # Framework coordinator (for testing/lightweight usage)
 # Note: Imported in create_coordinator() to avoid circular dependency
 
-# Communication infrastructure (from agent.teams)
-from victor.agent.teams.communication import TeamMessageBus, TeamSharedMemory
+# Communication infrastructure (lazy to avoid agent.teams → coordinator chain)
+# Import at call site instead of module level.
+# from victor.agent.teams.communication import TeamMessageBus, TeamSharedMemory
 
 # Team configuration types (canonical)
 from victor.teams.types import TeamConfig, TeamMember
@@ -194,9 +197,6 @@ def create_coordinator(
         # Lightweight coordinator for testing
         coordinator = create_coordinator(lightweight=True)
     """
-    # Import here to avoid circular dependency
-    from victor.framework import AgentTeam
-
     if lightweight:
         # For testing, use UnifiedTeamCoordinator in lightweight mode
         from victor.teams.unified_coordinator import UnifiedTeamCoordinator
@@ -236,8 +236,21 @@ def __getattr__(name: str) -> Any:
 
         globals()["UnifiedTeamCoordinator"] = UnifiedTeamCoordinator
         return UnifiedTeamCoordinator
+    if name == "TeamCoordinator":
+        # Deprecated compatibility shim (legacy integrations/tests).
+        # New code should use create_coordinator() + execute_team_config/execute_task.
+        from victor.agent.teams.coordinator import TeamCoordinator
+
+        globals()["TeamCoordinator"] = TeamCoordinator
+        return TeamCoordinator
+    if name == "StateGraphNodeConfig":
+        from victor.teams.unified_coordinator import StateGraphNodeConfig
+
+        globals()["StateGraphNodeConfig"] = StateGraphNodeConfig
+        return StateGraphNodeConfig
     if name in {
         "IAgent",
+        "IDelegateFollowUpCoordinator",
         "IEnhancedTeamCoordinator",
         "IMessageBusProvider",
         "IObservableCoordinator",
@@ -250,6 +263,7 @@ def __getattr__(name: str) -> Any:
     }:
         from victor.protocols.team import (
             IAgent,
+            IDelegateFollowUpCoordinator,
             IEnhancedTeamCoordinator,
             IMessageBusProvider,
             IObservableCoordinator,
@@ -264,4 +278,11 @@ def __getattr__(name: str) -> Any:
         # Store in module globals for future access
         globals()[name] = locals()[name]
         return locals()[name]
+    # Communication infrastructure (lazy to avoid agent.teams → coordinator chain)
+    if name in {"TeamMessageBus", "TeamSharedMemory"}:
+        from victor.agent.teams.communication import TeamMessageBus, TeamSharedMemory
+
+        globals()["TeamMessageBus"] = TeamMessageBus
+        globals()["TeamSharedMemory"] = TeamSharedMemory
+        return globals()[name]
     raise AttributeError(f"module '{__name__}' has no attribute '{name}'")

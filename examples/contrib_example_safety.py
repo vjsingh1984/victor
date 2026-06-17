@@ -81,7 +81,6 @@ class ExampleVerticalSafetyExtension(BaseSafetyExtension, VerticalSafetyMixin):
                 description="Dangerous system operation",
                 severity=10,
             ),
-
             # Example 2: Use helper for file deletion pattern
             self.create_file_deletion_rule(
                 rule_id="example_database_delete",
@@ -89,7 +88,6 @@ class ExampleVerticalSafetyExtension(BaseSafetyExtension, VerticalSafetyMixin):
                 description="Database file deletion",
                 severity=9,
             ),
-
             # Example 3: Use helper for completely blocked operation
             self.create_blocked_operation_rule(
                 rule_id="example_production_modify",
@@ -97,7 +95,6 @@ class ExampleVerticalSafetyExtension(BaseSafetyExtension, VerticalSafetyMixin):
                 description="Cannot modify production systems",
                 category=SafetyCategory.SHELL,
             ),
-
             # Example 4: Create custom rule directly
             SafetyRule(
                 rule_id="example_custom_tool_restriction",
@@ -109,19 +106,16 @@ class ExampleVerticalSafetyExtension(BaseSafetyExtension, VerticalSafetyMixin):
                 tool_names=["shell"],
                 confirmation_prompt="This will copy files to production. Confirm?",
             ),
-
             # Example 5: Use helper for git operations
             self.create_git_force_push_rule(
                 rule_id="example_git_force_push",
                 severity=8,
             ),
-
             # Example 6: Use helper for Docker operations
             self.create_docker_container_deletion_rule(
                 rule_id="example_docker_rm",
                 severity=7,
             ),
-
             # Example 7: Use helper for system directory protection
             self.create_system_write_rule(
                 rule_id="example_system_write",
@@ -131,6 +125,7 @@ class ExampleVerticalSafetyExtension(BaseSafetyExtension, VerticalSafetyMixin):
 
 
 # Example of vertical-specific customization
+
 
 class DevOpsSafetyExtension(BaseSafetyExtension, VerticalSafetyMixin):
     """DevOps-specific safety extension example.
@@ -154,7 +149,6 @@ class DevOpsSafetyExtension(BaseSafetyExtension, VerticalSafetyMixin):
                 "Infrastructure destruction",
                 severity=10,
             ),
-
             # Production deployment safety
             SafetyRule(
                 rule_id="deploy_production",
@@ -166,7 +160,6 @@ class DevOpsSafetyExtension(BaseSafetyExtension, VerticalSafetyMixin):
                 tool_names=["shell"],
                 confirmation_prompt="Deploying to PRODUCTION. Confirm?",
             ),
-
             # Configuration file safety
             self.create_file_deletion_rule(
                 "config_delete",
@@ -203,7 +196,6 @@ class SecuritySafetyExtension(BaseSafetyExtension, VerticalSafetyMixin):
                 severity=3,  # Low severity, these are expected
                 tool_names=["shell"],
             ),
-
             # Block accidental modifications during security analysis
             self.create_blocked_operation_rule(
                 "security_no_modify",
@@ -211,7 +203,6 @@ class SecuritySafetyExtension(BaseSafetyExtension, VerticalSafetyMixin):
                 description="No code modifications during security analysis",
                 category=SafetyCategory.FILE,
             ),
-
             # Dangerous security tools
             self.create_dangerous_command_rule(
                 "security_dangerous_tool",
@@ -219,7 +210,6 @@ class SecuritySafetyExtension(BaseSafetyExtension, VerticalSafetyMixin):
                 "Penetration testing tool - requires confirmation",
                 severity=9,
             ),
-
             # Protect secrets from being exposed
             SafetyRule(
                 rule_id="security_secret_protection",

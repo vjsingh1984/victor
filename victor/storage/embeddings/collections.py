@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 # Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -29,11 +31,22 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-import numpy as np
-
 from victor.storage.embeddings.service import EmbeddingService, get_embedding_service
 
 logger = logging.getLogger(__name__)
+
+np = None  # type: ignore[assignment]
+
+
+def _ensure_numpy():
+    """Import numpy into module scope on first actual use."""
+
+    global np
+    if np is None:
+        import numpy
+
+        np = numpy
+    return np
 
 
 @dataclass
@@ -93,6 +106,7 @@ class StaticEmbeddingCollection:
             cache_dir: Directory for cache files (default: ~/.victor/embeddings/)
             embedding_service: Shared embedding service (uses singleton if not provided)
         """
+        _ensure_numpy()
         from victor.config.settings import get_project_paths
 
         self.name = name
@@ -370,6 +384,7 @@ class StaticEmbeddingCollection:
         query: str,
         top_k: int = 5,
         threshold: float = 0.0,
+        use_weighted_similarity: bool = False,
     ) -> List[Tuple[CollectionItem, float]]:
         """Search collection for similar items.
 
@@ -377,6 +392,9 @@ class StaticEmbeddingCollection:
             query: Query text
             top_k: Maximum number of results
             threshold: Minimum similarity score (0-1)
+            use_weighted_similarity: If True, use weighted cosine similarity with
+                key term boosting for better task classification. Default: False
+                (maintains backward compatibility).
 
         Returns:
             List of (item, score) tuples, sorted by score descending
@@ -389,7 +407,17 @@ class StaticEmbeddingCollection:
         query_embedding = await self.embedding_service.embed_text(query)
 
         # Calculate similarities
-        similarities = EmbeddingService.cosine_similarity_matrix(query_embedding, self._embeddings)
+        if use_weighted_similarity:
+            # Get corpus texts for weighted similarity
+            corpus_texts = [self._items[pid].text for pid in self._item_ids]
+            similarities = EmbeddingService.weighted_cosine_similarity(
+                query_embedding, query, self._embeddings, corpus_texts
+            )
+        else:
+            # Use standard cosine similarity (backward compatible)
+            similarities = EmbeddingService.cosine_similarity_matrix(
+                query_embedding, self._embeddings
+            )
 
         # Get top-k indices
         top_indices = np.argsort(similarities)[::-1][:top_k]
@@ -410,6 +438,7 @@ class StaticEmbeddingCollection:
         query: str,
         top_k: int = 5,
         threshold: float = 0.0,
+        use_weighted_similarity: bool = False,
     ) -> List[Tuple[CollectionItem, float]]:
         """Search collection for similar items (sync version).
 
@@ -417,6 +446,9 @@ class StaticEmbeddingCollection:
             query: Query text
             top_k: Maximum number of results
             threshold: Minimum similarity score (0-1)
+            use_weighted_similarity: If True, use weighted cosine similarity with
+                key term boosting for better task classification. Default: False
+                (maintains backward compatibility).
 
         Returns:
             List of (item, score) tuples, sorted by score descending
@@ -429,7 +461,17 @@ class StaticEmbeddingCollection:
         query_embedding = self.embedding_service.embed_text_sync(query)
 
         # Calculate similarities
-        similarities = EmbeddingService.cosine_similarity_matrix(query_embedding, self._embeddings)
+        if use_weighted_similarity:
+            # Get corpus texts for weighted similarity
+            corpus_texts = [self._items[pid].text for pid in self._item_ids]
+            similarities = EmbeddingService.weighted_cosine_similarity(
+                query_embedding, query, self._embeddings, corpus_texts
+            )
+        else:
+            # Use standard cosine similarity (backward compatible)
+            similarities = EmbeddingService.cosine_similarity_matrix(
+                query_embedding, self._embeddings
+            )
 
         # Get top-k indices
         top_indices = np.argsort(similarities)[::-1][:top_k]

@@ -83,7 +83,9 @@ from victor.storage.checkpoints.manager import ConversationCheckpointManager
 
 # SQLiteCheckpointBackend requires aiosqlite - lazy import to avoid import errors
 if TYPE_CHECKING:
-    from victor.storage.checkpoints.backends.sqlite_backend import SQLiteCheckpointBackend
+    from victor.storage.checkpoints.backends.sqlite_backend import (
+        SQLiteCheckpointBackend,
+    )
 
 from victor.storage.checkpoints.tree import (
     BranchStatus,

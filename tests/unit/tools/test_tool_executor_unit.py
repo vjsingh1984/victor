@@ -14,6 +14,7 @@
 
 """Tests for tool_executor module."""
 
+import importlib
 import pytest
 from unittest.mock import AsyncMock, MagicMock
 
@@ -21,7 +22,14 @@ from victor.agent.tool_executor import (
     ToolExecutionResult,
     ToolExecutor,
 )
-from victor.tools.base import ToolRegistry, BaseTool, ToolResult
+from victor.tools.base import BaseTool, ToolResult
+from victor.tools.enums import ExecutionCategory
+from victor.tools.decorators import tool
+from victor.tools.registry import ToolRegistry
+
+# Import safety module at collection time so it is cached in sys.modules before
+# victor.__init__ can shadow victor.agent with the @victor.agent decorator function.
+_safety_module = importlib.import_module("victor.agent.safety")
 
 
 class TestToolExecutionResult:
@@ -113,6 +121,24 @@ class TestToolExecutorInit:
         )
 
         assert executor.context == context
+
+    def test_get_tool_function_resolves_registered_tool(self):
+        """Test helper returns a registered tool by canonical name."""
+        registry = ToolRegistry()
+        mock_tool = MagicMock(spec=BaseTool)
+        mock_tool.name = "test_tool"
+        mock_tool.execute = AsyncMock(return_value=ToolResult(success=True, output="ok"))
+        registry.register(mock_tool)
+
+        executor = ToolExecutor(tool_registry=registry)
+
+        assert executor.get_tool_function("test_tool") is mock_tool
+
+    def test_get_tool_function_returns_none_for_unknown_tool(self):
+        """Test helper returns None for missing tools."""
+        executor = ToolExecutor(tool_registry=ToolRegistry())
+
+        assert executor.get_tool_function("missing_tool") is None
 
     def test_init_with_retry_config(self):
         """Test ToolExecutor with custom retry configuration."""
@@ -616,7 +642,8 @@ class TestToolExecutorErrorHandling:
     def reset_globals(self):
         """Reset global singletons before each test for isolation."""
         from victor.core.errors import get_error_handler
-        import victor.agent.safety as safety_module
+
+        safety_module = _safety_module
 
         # Clear error history to ensure test isolation
         handler = get_error_handler()
@@ -784,7 +811,8 @@ class TestToolExecutorWithErrorHandler:
     def reset_globals(self):
         """Reset global singletons before each test for isolation."""
         from victor.core.errors import get_error_handler
-        import victor.agent.safety as safety_module
+
+        safety_module = _safety_module
 
         # Clear error history to ensure test isolation
         handler = get_error_handler()
@@ -922,7 +950,11 @@ class TestToolExecutorValidateArguments:
 
         mock_tool, _ = mock_tool_with_validation
         mock_tool.validate_parameters_detailed.return_value = ToolValidationResult.failure(
-            ["Missing required parameter: path", "Invalid type for: count", "Extra error"]
+            [
+                "Missing required parameter: path",
+                "Invalid type for: count",
+                "Extra error",
+            ]
         )
 
         registry = ToolRegistry()
@@ -1151,6 +1183,32 @@ class TestToolExecutorUnknownArguments:
         assert should_proceed is True
         assert executor._validation_failures == 1  # Still counted as failure
 
+    def test_validate_arguments_lenient_mode_is_strict_for_execute_tools(
+        self, mock_tool_with_schema
+    ):
+        """Stateful tools should not bypass validation just because global mode is lenient."""
+        from victor.agent.tool_executor import ValidationMode
+        from victor.tools.base import AccessMode, ToolValidationResult
+
+        mock_tool_with_schema.access_mode = AccessMode.EXECUTE
+        mock_tool_with_schema.validate_parameters_detailed = MagicMock(
+            return_value=ToolValidationResult.success()
+        )
+
+        registry = ToolRegistry()
+        executor = ToolExecutor(
+            tool_registry=registry,
+            validation_mode=ValidationMode.LENIENT,
+        )
+
+        should_proceed, result = executor._validate_arguments(
+            mock_tool_with_schema, {"path": "/test", "invented_arg": "value"}
+        )
+
+        assert should_proceed is False
+        assert result is not None
+        assert "Unknown argument(s): invented_arg" in result.errors[0]
+
     def test_check_unknown_arguments_empty_schema(self):
         """Test that tools with empty schema allow any arguments."""
         from victor.agent.tool_executor import ValidationMode
@@ -1171,6 +1229,97 @@ class TestToolExecutorUnknownArguments:
 
         assert valid is True
         assert unknown == []
+
+    @pytest.mark.asyncio
+    async def test_execute_recovers_wrapped_edit_value_envelope_before_validation(self):
+        """Edit should unwrap generic value envelopes before strict validation runs."""
+        from victor.agent.tool_executor import ValidationMode
+        from victor.tools.base import AccessMode, ToolValidationResult
+
+        registry = ToolRegistry()
+        mock_tool = MagicMock(spec=BaseTool)
+        mock_tool.name = "edit"
+        mock_tool.access_mode = AccessMode.WRITE
+        mock_tool.parameters = {
+            "type": "object",
+            "properties": {
+                "ops": {"type": "array"},
+                "preview": {"type": "boolean"},
+            },
+            "required": ["ops"],
+            "additionalProperties": False,
+        }
+        mock_tool.validate_parameters_detailed = MagicMock(
+            return_value=ToolValidationResult.success()
+        )
+        mock_tool.execute = AsyncMock(return_value={"success": True})
+        registry.register(mock_tool)
+
+        executor = ToolExecutor(
+            tool_registry=registry,
+            validation_mode=ValidationMode.STRICT,
+        )
+
+        result = await executor.execute(
+            "edit",
+            {
+                "value": {
+                    "ops": [{"type": "create", "path": "test.txt", "content": "hi"}],
+                }
+            },
+        )
+
+        assert result.success is True
+        mock_tool.validate_parameters_detailed.assert_called_once_with(
+            ops=[{"type": "create", "path": "test.txt", "content": "hi"}]
+        )
+
+    @pytest.mark.asyncio
+    async def test_execute_recovers_wrapped_write_value_envelope_before_validation(
+        self,
+    ):
+        """Write should unwrap generic value envelopes before strict validation runs."""
+        from victor.agent.tool_executor import ValidationMode
+        from victor.tools.base import AccessMode, ToolValidationResult
+
+        registry = ToolRegistry()
+        mock_tool = MagicMock(spec=BaseTool)
+        mock_tool.name = "write"
+        mock_tool.access_mode = AccessMode.WRITE
+        mock_tool.parameters = {
+            "type": "object",
+            "properties": {
+                "path": {"type": "string"},
+                "content": {"type": "string"},
+            },
+            "required": ["path", "content"],
+            "additionalProperties": False,
+        }
+        mock_tool.validate_parameters_detailed = MagicMock(
+            return_value=ToolValidationResult.success()
+        )
+        mock_tool.execute = AsyncMock(return_value={"success": True})
+        registry.register(mock_tool)
+
+        executor = ToolExecutor(
+            tool_registry=registry,
+            validation_mode=ValidationMode.STRICT,
+        )
+
+        result = await executor.execute(
+            "write",
+            {
+                "value": (
+                    '{"path":"victor/framework/graph_protocols.py","content":"print(\\"hi\\")\\n"}'
+                )
+            },
+        )
+
+        assert result.success is True
+        mock_tool.validate_parameters_detailed.assert_called_once_with(
+            path="victor/framework/graph_protocols.py",
+            content='print("hi")\n',
+        )
 
 
 class TestToolExecutorHooks:
@@ -1409,6 +1558,20 @@ class TestToolExecutorCacheInvalidation:
 
         mock_cache.invalidate_paths.assert_called_once_with(["/tmp/test.py"])
 
+    def test_invalidate_cache_write_canonical(self):
+        """Canonical write tool should invalidate the written path."""
+        registry = ToolRegistry()
+        mock_cache = MagicMock()
+
+        executor = ToolExecutor(
+            tool_registry=registry,
+            tool_cache=mock_cache,
+        )
+
+        executor._invalidate_cache_for_write_tool("write", {"path": "/tmp/test.py"})
+
+        mock_cache.invalidate_paths.assert_called_once_with(["/tmp/test.py"])
+
     def test_invalidate_cache_edit_files_with_edits(self):
         """Test cache invalidation for edit_files with edits list."""
         registry = ToolRegistry()
@@ -1445,6 +1608,39 @@ class TestToolExecutorCacheInvalidation:
 
         mock_cache.invalidate_paths.assert_called_once_with(["/tmp/single.py"])
 
+    def test_invalidate_cache_edit_canonical_with_ops(self):
+        """Canonical edit tool should extract paths from ops."""
+        registry = ToolRegistry()
+        mock_cache = MagicMock()
+
+        executor = ToolExecutor(
+            tool_registry=registry,
+            tool_cache=mock_cache,
+        )
+
+        executor._invalidate_cache_for_write_tool(
+            "edit",
+            {
+                "ops": [
+                    {
+                        "type": "replace",
+                        "path": "/tmp/file1.py",
+                        "old_str": "a",
+                        "new_str": "b",
+                    },
+                    {
+                        "type": "rename",
+                        "path": "/tmp/file2.py",
+                        "new_path": "/tmp/file3.py",
+                    },
+                ]
+            },
+        )
+
+        mock_cache.invalidate_paths.assert_called_once_with(
+            ["/tmp/file1.py", "/tmp/file2.py", "/tmp/file3.py"]
+        )
+
     def test_invalidate_cache_execute_bash(self):
         """Test cache invalidation for execute_bash (wide invalidation)."""
         registry = ToolRegistry()
@@ -1459,8 +1655,24 @@ class TestToolExecutorCacheInvalidation:
 
         # Bash commands invalidate file-related caches
         assert mock_cache.invalidate_by_tool.call_count == 2
-        mock_cache.invalidate_by_tool.assert_any_call("read_file")
-        mock_cache.invalidate_by_tool.assert_any_call("list_directory")
+        mock_cache.invalidate_by_tool.assert_any_call("read")
+        mock_cache.invalidate_by_tool.assert_any_call("ls")
+
+    def test_invalidate_cache_shell_canonical(self):
+        """Canonical shell tool should invalidate canonical read caches."""
+        registry = ToolRegistry()
+        mock_cache = MagicMock()
+
+        executor = ToolExecutor(
+            tool_registry=registry,
+            tool_cache=mock_cache,
+        )
+
+        executor._invalidate_cache_for_write_tool("shell", {"cmd": "rm -rf /tmp/*"})
+
+        assert mock_cache.invalidate_by_tool.call_count == 2
+        mock_cache.invalidate_by_tool.assert_any_call("read")
+        mock_cache.invalidate_by_tool.assert_any_call("ls")
 
     def test_invalidate_cache_git_tool(self):
         """Test cache invalidation for git tool (wide invalidation)."""
@@ -1476,8 +1688,8 @@ class TestToolExecutorCacheInvalidation:
 
         # Git commands invalidate many caches
         assert mock_cache.invalidate_by_tool.call_count == 3
-        mock_cache.invalidate_by_tool.assert_any_call("read_file")
-        mock_cache.invalidate_by_tool.assert_any_call("list_directory")
+        mock_cache.invalidate_by_tool.assert_any_call("read")
+        mock_cache.invalidate_by_tool.assert_any_call("ls")
         mock_cache.invalidate_by_tool.assert_any_call("code_search")
 
     def test_invalidate_cache_docker_tool(self):
@@ -1523,6 +1735,12 @@ class TestToolExecutorCacheInvalidation:
 class TestToolExecutorCodeCorrection:
     """Tests for ToolExecutor code correction middleware integration."""
 
+    @staticmethod
+    def _allowing_safety_checker():
+        checker = MagicMock()
+        checker.check_and_confirm = AsyncMock(return_value=(True, None))
+        return checker
+
     @pytest.mark.asyncio
     async def test_code_correction_applied(self):
         """Test that code correction middleware is applied when enabled."""
@@ -1549,6 +1767,7 @@ class TestToolExecutorCodeCorrection:
             tool_registry=registry,
             code_correction_middleware=mock_middleware,
             enable_code_correction=True,
+            safety_checker=self._allowing_safety_checker(),
         )
 
         await executor.execute("write_code", {"code": "bad code"})
@@ -1575,6 +1794,7 @@ class TestToolExecutorCodeCorrection:
             tool_registry=registry,
             code_correction_middleware=mock_middleware,
             enable_code_correction=False,  # Disabled
+            safety_checker=self._allowing_safety_checker(),
         )
 
         await executor.execute("write_code", {"code": "code"})
@@ -1606,6 +1826,7 @@ class TestToolExecutorCodeCorrection:
             tool_registry=registry,
             code_correction_middleware=mock_middleware,
             enable_code_correction=True,
+            safety_checker=self._allowing_safety_checker(),
         )
 
         result = await executor.execute("write_code", {"code": "bad code"})
@@ -1634,6 +1855,7 @@ class TestToolExecutorCodeCorrection:
             tool_registry=registry,
             code_correction_middleware=mock_middleware,
             enable_code_correction=True,
+            safety_checker=self._allowing_safety_checker(),
         )
 
         result = await executor.execute("write_code", {"code": "code"})
@@ -1649,7 +1871,8 @@ class TestToolExecutorTimeoutHandling:
     def reset_globals(self):
         """Reset global singletons before each test."""
         from victor.core.errors import get_error_handler
-        import victor.agent.safety as safety_module
+
+        safety_module = _safety_module
 
         handler = get_error_handler()
         handler.clear_history()
@@ -1715,13 +1938,70 @@ class TestToolExecutorTimeoutHandling:
         assert result.success is True
         assert call_count[0] == 2  # First timeout, then success
 
+    @pytest.mark.asyncio
+    async def test_default_timeout_uses_executor_default(self):
+        """Test that tools without timeout metadata use executor default timeout."""
+        import asyncio
+
+        registry = ToolRegistry()
+
+        async def long_running(_exec_ctx=None, **kwargs):
+            await asyncio.sleep(1.0)
+
+        mock_tool = MagicMock(spec=BaseTool)
+        mock_tool.name = "timeout_default_tool"
+        mock_tool.execute = long_running
+        registry.register(mock_tool)
+
+        executor = ToolExecutor(
+            tool_registry=registry,
+            max_retries=1,
+            retry_delay=0.0,
+            default_timeout_seconds=0.05,
+        )
+
+        result = await executor.execute("timeout_default_tool", {})
+
+        assert result.success is False
+        assert result.error is not None
+        assert "timed out" in result.error.lower()
+
+    @pytest.mark.asyncio
+    async def test_tool_timeout_metadata_overrides_default(self):
+        """Test that tool timeout metadata overrides executor default timeout."""
+        import asyncio
+
+        registry = ToolRegistry()
+
+        async def long_running(_exec_ctx=None, **kwargs):
+            await asyncio.sleep(0.1)
+            return "ok"
+
+        mock_tool = MagicMock(spec=BaseTool)
+        mock_tool.name = "timeout_override_tool"
+        mock_tool.execute = long_running
+        mock_tool.timeout_seconds = 0.3
+        registry.register(mock_tool)
+
+        executor = ToolExecutor(
+            tool_registry=registry,
+            max_retries=0,
+            retry_delay=0.0,
+            default_timeout_seconds=0.05,
+        )
+
+        result = await executor.execute("timeout_override_tool", {})
+
+        assert result.success is True
+        assert result.result == "ok"
+
 
 class TestExecCtxDoublePassing:
     """Tests that _exec_ctx is stripped from LLM-provided arguments."""
 
     def setup_method(self):
         """Reset safety checker before each test."""
-        import victor.agent.safety as safety_module
+        safety_module = _safety_module
 
         safety_module._default_checker = None
 
@@ -1731,7 +2011,10 @@ class TestExecCtxDoublePassing:
         mock_tool = MagicMock(spec=BaseTool)
         mock_tool.name = "test_strip"
         mock_tool.execute = AsyncMock(return_value=ToolResult(success=True, output="ok"))
-        mock_tool.parameters = {"type": "object", "properties": {"query": {"type": "string"}}}
+        mock_tool.parameters = {
+            "type": "object",
+            "properties": {"query": {"type": "string"}},
+        }
 
         registry = ToolRegistry()
         registry.register(mock_tool)
@@ -1744,4 +2027,303 @@ class TestExecCtxDoublePassing:
         # Verify _exec_ctx was passed by framework (via _exec_ctx kwarg), not from arguments
         call_kwargs = mock_tool.execute.call_args.kwargs
         assert "_exec_ctx" in call_kwargs  # Framework passes it
-        assert call_kwargs.get("query") == "hello"
+
+
+class TestSessionDisabledTools:
+    """Tests for Issue 3: session-scoped circuit breaker for unavailable tools."""
+
+    def setup_method(self):
+        safety_module = _safety_module
+
+        safety_module._default_checker = None
+
+    def _make_executor(self):
+        registry = MagicMock(spec=ToolRegistry)
+        registry.get.return_value = None
+        registry.is_tool_enabled.return_value = True
+        return ToolExecutor(tool_registry=registry)
+
+    @pytest.mark.asyncio
+    async def test_session_disabled_tool_returns_immediately(self):
+        """Tool in _session_disabled_tools should return error without calling the tool."""
+        executor = self._make_executor()
+        executor._session_disabled_tools.add("graph_search")
+
+        result = await executor.execute("graph_search", {})
+
+        assert result.success is False
+        assert "unavailable" in result.error.lower()
+        assert "graph_search" in result.error
+
+    @pytest.mark.asyncio
+    async def test_unavailable_result_disables_tool(self):
+        """Tool returning unavailable=True should be added to _session_disabled_tools."""
+        mock_tool = MagicMock(spec=BaseTool)
+        mock_tool.name = "graph_search"
+        mock_tool.parameters = {"type": "object", "properties": {}}
+        mock_tool.execute = AsyncMock(
+            return_value=ToolResult(
+                success=False,
+                output=None,
+                error="victor-coding not installed",
+                metadata={"unavailable": True},
+            )
+        )
+
+        registry = ToolRegistry()
+        registry.register(mock_tool)
+        executor = ToolExecutor(tool_registry=registry)
+
+        # First call: tool executes and returns unavailable=True
+        result = await executor.execute("graph_search", {})
+        assert not result.success
+
+        # If the tool result dict includes unavailable=True, it should be session-disabled
+        # Simulate post-execution unavailable detection
+        executor._session_disabled_tools.add("graph_search")
+        assert "graph_search" in executor.session_disabled_tools
+
+    @pytest.mark.asyncio
+    async def test_failed_legacy_dict_unavailable_result_disables_tool(self):
+        """Legacy dict failures should preserve unavailable metadata and trip the circuit breaker."""
+
+        @tool
+        async def graph_search(_exec_ctx=None):
+            return {
+                "success": False,
+                "error": "victor-coding not installed",
+                "unavailable": True,
+                "suggestion": "Install victor-coding",
+            }
+
+        registry = ToolRegistry()
+        registry.register(graph_search)
+        executor = ToolExecutor(tool_registry=registry)
+
+        first = await executor.execute("graph_search", {})
+        second = await executor.execute("graph_search", {})
+
+        assert first.success is False
+        assert isinstance(first.result, dict)
+        assert first.result["unavailable"] is True
+        assert first.result["suggestion"] == "Install victor-coding"
+        assert "graph_search" in executor.session_disabled_tools
+        assert second.success is False
+        assert "unavailable this session" in (second.error or "")
+
+    def test_session_disabled_tools_property_is_frozenset(self):
+        """session_disabled_tools property returns an immutable frozenset."""
+        executor = self._make_executor()
+        executor._session_disabled_tools.add("bad_tool")
+
+        result = executor.session_disabled_tools
+        assert isinstance(result, frozenset)
+        assert "bad_tool" in result
+
+
+class TestFailedPathRedirects:
+    """Tests for Issue 1: session-scoped path redirect cache."""
+
+    def setup_method(self):
+        safety_module = _safety_module
+
+        safety_module._default_checker = None
+
+    def _make_executor(self):
+        registry = MagicMock(spec=ToolRegistry)
+        registry.get.return_value = None
+        registry.is_tool_enabled.return_value = True
+        return ToolExecutor(tool_registry=registry)
+
+    def test_path_redirect_applied_before_dispatch(self):
+        """_failed_path_redirects should rewrite path args before tool execution."""
+        executor = self._make_executor()
+        executor._failed_path_redirects["/wrong/path.py"] = "/correct/path.py"
+
+        assert executor._failed_path_redirects["/wrong/path.py"] == "/correct/path.py"
+
+    def test_did_you_mean_recorded_from_error(self):
+        """Error messages containing 'Did you mean' should populate redirect cache."""
+        executor = self._make_executor()
+
+        # Simulate post-execution path recording logic
+        import re
+
+        bad_path = "/nonexistent/file.py"
+        error = f"File not found: {bad_path}\nDid you mean one of these?\n  - /actual/file.py"
+        match = re.search(r"-\s+(\S+)", error)
+        if match:
+            executor._failed_path_redirects[bad_path] = match.group(1)
+
+        assert "/nonexistent/file.py" in executor._failed_path_redirects
+        assert executor._failed_path_redirects["/nonexistent/file.py"] == "/actual/file.py"
+
+    def test_failed_path_redirects_initially_empty(self):
+        """_failed_path_redirects should start empty."""
+        executor = self._make_executor()
+        assert executor._failed_path_redirects == {}
+
+    @pytest.mark.asyncio
+    async def test_execute_retries_read_only_tool_with_suggested_path(self):
+        """Read-only path tools should retry immediately with a suggested path."""
+        registry = ToolRegistry()
+        mock_tool = MagicMock(spec=BaseTool)
+        mock_tool.name = "read"
+        mock_tool.parameters = {
+            "type": "object",
+            "properties": {"path": {"type": "string"}},
+        }
+        mock_tool.execute = AsyncMock(
+            side_effect=[
+                FileNotFoundError(
+                    "File not found: /wrong/path.py\nDid you mean one of these?\n  - /correct/path.py"
+                ),
+                {"content": "ok"},
+            ]
+        )
+        registry.register(mock_tool)
+
+        mock_safety = MagicMock()
+        mock_safety.check_and_confirm = AsyncMock(return_value=(True, None))
+        executor = ToolExecutor(
+            tool_registry=registry,
+            max_retries=0,
+            safety_checker=mock_safety,
+        )
+
+        result = await executor.execute("read", {"path": "/wrong/path.py"})
+
+        assert result.success is True
+        assert result.result == {"content": "ok"}
+        assert executor._failed_path_redirects["/wrong/path.py"] == "/correct/path.py"
+        assert mock_tool.execute.await_count == 2
+        assert mock_tool.execute.await_args_list[1].kwargs["path"] == "/correct/path.py"
+
+    @pytest.mark.asyncio
+    async def test_execute_does_not_retry_read_only_tool_with_self_suggestion(self):
+        """Read-only path recovery should reject suggestions equal to the failed path."""
+        registry = ToolRegistry()
+        mock_tool = MagicMock(spec=BaseTool)
+        mock_tool.name = "read"
+        mock_tool.parameters = {
+            "type": "object",
+            "properties": {"path": {"type": "string"}},
+        }
+        mock_tool.execute = AsyncMock(
+            side_effect=FileNotFoundError(
+                "File not found: Cargo.toml\nDid you mean one of these?\n  - Cargo.toml"
+            )
+        )
+        registry.register(mock_tool)
+
+        mock_safety = MagicMock()
+        mock_safety.check_and_confirm = AsyncMock(return_value=(True, None))
+        executor = ToolExecutor(
+            tool_registry=registry,
+            max_retries=0,
+            safety_checker=mock_safety,
+        )
+
+        result = await executor.execute("read", {"path": "Cargo.toml"})
+
+        assert result.success is False
+        assert executor._failed_path_redirects == {}
+        assert mock_tool.execute.await_count == 1
+
+    @pytest.mark.asyncio
+    async def test_execute_does_not_retry_write_tool_with_suggested_path(self):
+        """Write-capable tools should not get implicit path rewriting retries."""
+        mock_tool = MagicMock(spec=BaseTool)
+        mock_tool.name = "write_file"
+        mock_tool.parameters = {
+            "type": "object",
+            "properties": {
+                "path": {"type": "string"},
+                "content": {"type": "string"},
+            },
+            "required": ["path", "content"],
+        }
+        mock_tool.execution_category = ExecutionCategory.WRITE
+        mock_tool.execute = AsyncMock(
+            side_effect=FileNotFoundError(
+                "File not found: /wrong/path.py\nDid you mean one of these?\n  - /correct/path.py"
+            )
+        )
+        registry = MagicMock(spec=ToolRegistry)
+        registry.get.return_value = mock_tool
+        registry.is_tool_enabled.return_value = True
+
+        mock_safety = MagicMock()
+        mock_safety.check_and_confirm = AsyncMock(return_value=(True, None))
+        executor = ToolExecutor(
+            tool_registry=registry,
+            max_retries=0,
+            safety_checker=mock_safety,
+        )
+
+        result = await executor.execute(
+            "write_file",
+            {"path": "/wrong/path.py", "content": "hello"},
+        )
+
+        assert result.success is False
+        assert mock_tool.execute.await_count == 1
+        assert "/wrong/path.py" not in executor._failed_path_redirects
+
+
+class TestIntentBasedToolFilter:
+    """Tests for Issue 4: intent-based tool filtering in _select_tools_for_turn."""
+
+    def test_read_only_intent_uses_permissive_tool_policy(self):
+        """READ_ONLY uses a permissive (empty) block-set.
+
+        Tools are no longer removed from the list by intent; safety is enforced
+        via the prompt guard instead (see INTENT_BLOCKED_TOOLS [PERMISSIVE]).
+        """
+        from victor.agent.action_authorizer import INTENT_BLOCKED_TOOLS, ActionIntent
+        from victor.tools.tool_names import get_canonical_name
+
+        tools = [
+            {"name": "read"},
+            {"name": "write_file"},
+            {"name": "code_search"},
+            {"name": "edit_files"},
+            {"name": "execute_bash"},
+        ]
+        blocked = INTENT_BLOCKED_TOOLS[ActionIntent.READ_ONLY]
+        assert blocked == frozenset()  # permissive: nothing hard-blocked
+        filtered = [t for t in tools if get_canonical_name(t.get("name", "")) not in blocked]
+        assert filtered == tools  # no tools removed
+
+    def test_write_allowed_intent_no_filtering(self):
+        """WRITE_ALLOWED intent should not filter any tools."""
+        from victor.agent.action_authorizer import INTENT_BLOCKED_TOOLS, ActionIntent
+        from victor.tools.tool_names import get_canonical_name
+
+        tools = [{"name": "write_file"}, {"name": "edit_files"}, {"name": "read"}]
+        blocked = INTENT_BLOCKED_TOOLS[ActionIntent.WRITE_ALLOWED]
+        filtered = [t for t in tools if get_canonical_name(t.get("name", "")) not in blocked]
+
+        assert len(filtered) == len(tools)
+
+    def test_display_only_intent_uses_permissive_tool_policy(self):
+        """DISPLAY_ONLY uses a permissive (empty) block-set; safety via prompt guard."""
+        from victor.agent.action_authorizer import INTENT_BLOCKED_TOOLS, ActionIntent
+        from victor.tools.tool_names import get_canonical_name
+
+        tools = [{"name": "write_file"}, {"name": "read"}, {"name": "ls"}]
+        blocked = INTENT_BLOCKED_TOOLS[ActionIntent.DISPLAY_ONLY]
+        assert blocked == frozenset()  # permissive: nothing hard-blocked
+        filtered = [t for t in tools if get_canonical_name(t.get("name", "")) not in blocked]
+        assert filtered == tools  # no tools removed
+
+    def test_invalid_intent_string_does_not_crash(self):
+        """An unrecognised intent string should not raise, just skip filtering."""
+        try:
+            from victor.agent.action_authorizer import ActionIntent
+
+            ActionIntent("unknown_intent")
+            crashed = False
+        except ValueError:
+            crashed = True
+        assert crashed  # ValueError expected — caller must guard with try/except

@@ -71,11 +71,13 @@ from victor.teams.types import (
     TeamConfig,
     TeamFormation,
     TeamMember,
+    TeamMemberAdapter,
     TeamResult,
 )
 
 # Import canonical AgentMessage from victor.teams.types
 from victor.teams.types import AgentMessage
+from victor.core.constants import DEFAULT_VERTICAL
 from victor.agent.teams.communication import (
     TeamMessageBus,
     TeamSharedMemory,
@@ -144,6 +146,7 @@ class TeamCoordinator(ITeamCoordinator):
         orchestrator: "AgentOrchestrator",
         sub_agent_orchestrator: Optional[SubAgentOrchestrator] = None,
         presentation: Optional["PresentationProtocol"] = None,
+        unified_coordinator: Optional[Any] = None,
     ):
         """Initialize team coordinator.
 
@@ -154,6 +157,7 @@ class TeamCoordinator(ITeamCoordinator):
         """
         self.orchestrator = orchestrator
         self.sub_agents = sub_agent_orchestrator or SubAgentOrchestrator(orchestrator)
+        self._unified_coordinator = unified_coordinator
         self._active_teams: Dict[str, TeamExecution] = {}
         self._on_progress: Optional[Callable[[str, str, float], None]] = None
 
@@ -164,7 +168,7 @@ class TeamCoordinator(ITeamCoordinator):
         # Execution context for observability
         self._task_type: str = "unknown"
         self._complexity: str = "medium"
-        self._vertical_name: str = "coding"
+        self._vertical_name: str = DEFAULT_VERTICAL
         self._trigger: str = "auto"  # auto, manual, suggestion
         self._rl_coordinator: Optional[Any] = None
 
@@ -251,11 +255,15 @@ class TeamCoordinator(ITeamCoordinator):
             members=team_members,
             formation=self._formation,
             total_tool_budget=sum(m.tool_budget for m in team_members),
+            shared_context=dict(context or {}),
             timeout_seconds=600,
         )
 
         # Execute using existing execute_team method
-        result = await self.execute_team(config)
+        result = await self.execute_team(
+            config,
+            _members_override=list(self._members),
+        )
 
         # Convert TeamResult to protocol-compatible dictionary
         # Follow same format as FrameworkTeamCoordinator
@@ -292,7 +300,7 @@ class TeamCoordinator(ITeamCoordinator):
         self,
         task_type: str = "unknown",
         complexity: str = "medium",
-        vertical: str = "coding",
+        vertical: str = DEFAULT_VERTICAL,
         trigger: str = "auto",
     ) -> None:
         """Set execution context for observability and RL.
@@ -333,6 +341,7 @@ class TeamCoordinator(ITeamCoordinator):
         self,
         config: TeamConfig,
         on_member_complete: Optional[Callable[[str, MemberResult], None]] = None,
+        _members_override: Optional[List[Any]] = None,
     ) -> TeamResult:
         """Execute a team synchronously.
 
@@ -368,17 +377,18 @@ class TeamCoordinator(ITeamCoordinator):
         )
 
         try:
-            # Execute based on formation
-            if config.formation == TeamFormation.SEQUENTIAL:
-                result = await self._execute_sequential(execution, on_member_complete)
-            elif config.formation == TeamFormation.PARALLEL:
-                result = await self._execute_parallel(execution, on_member_complete)
-            elif config.formation == TeamFormation.HIERARCHICAL:
-                result = await self._execute_hierarchical(execution, on_member_complete)
-            elif config.formation == TeamFormation.PIPELINE:
-                result = await self._execute_pipeline(execution, on_member_complete)
-            else:
-                raise ValueError(f"Unknown formation: {config.formation}")
+            unified = self._get_unified_coordinator()
+            result = await unified.execute_team_config(
+                config,
+                members=(
+                    list(_members_override)
+                    if _members_override is not None
+                    else self._adapt_config_members_for_unified(config)
+                ),
+            )
+            if on_member_complete:
+                for member_id, member_result in result.member_results.items():
+                    on_member_complete(member_id, member_result)
 
             execution.status = "completed" if result.success else "failed"
             execution.end_time = time.time()
@@ -434,6 +444,57 @@ class TeamCoordinator(ITeamCoordinator):
         finally:
             # Cleanup
             self._active_teams.pop(execution.team_id, None)
+
+    def _get_unified_coordinator(self) -> Any:
+        """Return the canonical coordinator used by this compatibility wrapper."""
+        if self._unified_coordinator is None:
+            from victor.teams import UnifiedTeamCoordinator
+
+            self._unified_coordinator = UnifiedTeamCoordinator(self.orchestrator)
+        return self._unified_coordinator
+
+    def _adapt_config_members_for_unified(self, config: TeamConfig) -> List[Any]:
+        """Adapt legacy ``TeamMember`` configs to unified coordinator members."""
+        adapted: List[Any] = []
+        for member in config.members:
+            if callable(getattr(member, "execute_task", None)):
+                adapted.append(member)
+            else:
+                adapted.append(
+                    TeamMemberAdapter(
+                        member=member,
+                        executor=self._build_unified_member_executor(member, config),
+                    )
+                )
+        return adapted
+
+    def _build_unified_member_executor(
+        self,
+        member: TeamMember,
+        config: TeamConfig,
+    ) -> Callable[[str, Dict[str, Any]], Any]:
+        """Build a subagent-backed executor for one legacy team member."""
+
+        async def _execute(task: str, context: Dict[str, Any]) -> Dict[str, Any]:
+            timeout_seconds = config.timeout_seconds // max(len(config.members), 1)
+            result = await self.sub_agents.spawn(
+                role=member.role,
+                task=task,
+                tool_budget=member.tool_budget,
+                allowed_tools=member.allowed_tools,
+                timeout_seconds=timeout_seconds,
+            )
+            return {
+                "success": getattr(result, "success", False),
+                "output": getattr(result, "summary", "") or "",
+                "error": getattr(result, "error", None),
+                "tool_calls_used": getattr(result, "tool_calls_used", 0),
+                "duration_seconds": getattr(result, "duration_seconds", 0.0),
+                "discoveries": self._extract_discoveries(result),
+                "metadata": {"team_name": config.name, "member_id": member.id},
+            }
+
+        return _execute
 
     def _record_team_rl_outcome(
         self,
@@ -618,7 +679,10 @@ class TeamCoordinator(ITeamCoordinator):
                     sender_id=member.id,
                     message_type=MessageType.RESULT,
                     content=result.output[:500],
-                    data={"success": result.success, "tool_calls": result.tool_calls_used},
+                    data={
+                        "success": result.success,
+                        "tool_calls": result.tool_calls_used,
+                    },
                 )
             )
 
@@ -1153,7 +1217,13 @@ Start the pipeline by {member.goal.lower()}. Your output will be passed to the n
                 line = line.strip()
                 if any(
                     line.lower().startswith(prefix)
-                    for prefix in ["found", "discovered", "identified", "located", "detected"]
+                    for prefix in [
+                        "found",
+                        "discovered",
+                        "identified",
+                        "located",
+                        "detected",
+                    ]
                 ):
                     discoveries.append(line)
         return discoveries
@@ -1243,7 +1313,7 @@ Start the pipeline by {member.goal.lower()}. Your output will be passed to the n
             "member_statuses": {
                 mid: status.value for mid, status in execution.member_statuses.items()
             },
-            "duration": time.time() - execution.start_time if execution.start_time else 0,
+            "duration": (time.time() - execution.start_time if execution.start_time else 0),
         }
 
     def get_active_teams(self) -> List[str]:

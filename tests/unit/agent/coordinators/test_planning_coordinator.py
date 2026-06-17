@@ -12,11 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Unit tests for PlanningCoordinator integration with ChatCoordinator."""
+"""Unit tests for PlanningCoordinator and chat service/coordinator integration."""
 
 import pytest
 
-from victor.agent.coordinators.planning_coordinator import (
+from victor.agent.services.planning_runtime import (
     PlanningCoordinator,
     PlanningConfig,
     PlanningMode,
@@ -217,20 +217,100 @@ class TestPlanningCoordinator:
 
         assert should_plan is True
 
+    def test_should_use_planning_for_checklist_first_request(self):
+        """Explicit checklist-first requests should not fall through to direct chat."""
+        coordinator = self._create_coordinator()
+
+        message = (
+            "Review this Rust workspace by creating a checklist first and showing me, "
+            "then go module by module."
+        )
+        should_plan = coordinator._should_use_planning(message)
+
+        assert should_plan is True
+
+    def test_summary_prompt_includes_evidence_and_failure_state(self):
+        """Final summary prompt should be grounded in step results, not generic completion."""
+        from victor.agent.planning.base import PlanResult, StepResult
+        from victor.agent.planning.readable_schema import (
+            ReadableTaskPlan,
+            TaskComplexity as PlanningTaskComplexity,
+        )
+
+        coordinator = self._create_coordinator()
+        plan = ReadableTaskPlan(
+            name="Rust Audit",
+            complexity=PlanningTaskComplexity.COMPLEX,
+            desc="Audit Rust performance",
+            steps=[
+                [1, "research", "Map workspaces", "read"],
+                [2, "analyze", "Inspect Arc usage", "grep"],
+            ],
+            duration="1h",
+        )
+        result = PlanResult(
+            plan_id="plan_1",
+            success=False,
+            total_steps=2,
+            steps_completed=1,
+            steps_failed=1,
+            final_output="workspace evidence",
+            step_results={
+                "1": StepResult(success=True, output="Cargo.toml declares workspace members"),
+                "2": StepResult(
+                    success=False,
+                    output="",
+                    error="Insufficient progress",
+                ),
+            },
+        )
+
+        prompt = coordinator._build_summary_prompt(plan, result)
+
+        assert "Overall success: False" in prompt
+        assert "Evidence: Cargo.toml declares workspace members" in prompt
+        assert "Error: Insufficient progress" in prompt
+        assert "do not invent repository findings" in prompt
+
+    def test_build_plan_generation_context_includes_repository_profile(self, tmp_path):
+        """Plan generation should receive language-aware repository inventory guidance."""
+        coordinator = self._create_coordinator()
+        (tmp_path / "go.mod").write_text("module example.com/app\n")
+        (tmp_path / "main.go").write_text("package main\n")
+
+        with pytest.MonkeyPatch.context() as monkeypatch:
+            monkeypatch.setattr(
+                "victor.config.settings.get_project_paths",
+                lambda: type("Paths", (), {"project_root": str(tmp_path)})(),
+            )
+            context = coordinator._build_plan_generation_context()
+
+        assert "Repository profile" in context
+        assert "primary=go" in context
+        assert "read go.mod first" in context
+
 
 class TestPlanningCoordinatorIntegration:
-    """Integration tests for PlanningCoordinator with ChatCoordinator."""
+    """Integration tests for PlanningCoordinator with chat entry points."""
 
-    def test_planning_coordinator_protocol(self):
-        """Test that coordinator can be used with ChatCoordinator."""
-        from victor.agent.coordinators.chat_coordinator import ChatCoordinator
+    def test_legacy_coordinator_module_reexports_service_runtime(self):
+        """Legacy planning coordinator import path should re-export the service runtime."""
+        from victor.agent.services.planning_runtime import (
+            PlanningCoordinator as legacy_planning_coordinator,
+        )
+        from victor.agent.services.planning_runtime import (
+            PlanningCoordinator as service_planning_coordinator,
+        )
 
-        # This test verifies the integration structure
-        # Actual execution would require full orchestrator setup
-        assert hasattr(ChatCoordinator, "__init__")
-        assert hasattr(ChatCoordinator, "chat")
-        assert hasattr(ChatCoordinator, "_should_use_planning")
-        assert hasattr(ChatCoordinator, "_chat_with_planning")
+        assert legacy_planning_coordinator is service_planning_coordinator
+
+    def test_planning_entrypoints_exist(self):
+        """Planning should be canonical on ChatService."""
+        from victor.agent.services.chat_service import ChatService
+        from victor.agent.services.protocols import ChatServiceProtocol
+
+        assert hasattr(ChatServiceProtocol, "chat_with_planning")
+        assert hasattr(ChatService, "chat_with_planning")
 
     def test_config_settings_exist(self):
         """Test that planning settings exist in config."""
@@ -238,12 +318,13 @@ class TestPlanningCoordinatorIntegration:
 
         settings = Settings()
 
-        # Check that planning settings are available
-        assert hasattr(settings, "enable_planning")
-        assert hasattr(settings, "planning_min_complexity")
-        assert hasattr(settings, "planning_show_plan")
+        # Check that planning settings are available in nested group
+        assert hasattr(settings, "agent")
+        assert hasattr(settings.agent, "enable_planning")
+        assert hasattr(settings.agent, "planning_min_complexity")
+        assert hasattr(settings.agent, "planning_show_plan")
 
         # Check defaults
-        assert settings.enable_planning is False
-        assert settings.planning_min_complexity == "moderate"
-        assert settings.planning_show_plan is True
+        assert settings.agent.enable_planning is False
+        assert settings.agent.planning_min_complexity == "moderate"
+        assert settings.agent.planning_show_plan is True

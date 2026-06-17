@@ -1,5 +1,6 @@
 import asyncio
 from typing import Dict
+from unittest.mock import MagicMock, patch
 
 from victor.agent.orchestrator import AgentOrchestrator
 from victor.config.settings import Settings
@@ -37,11 +38,12 @@ async def _run_with_invalidation(tmpdir: str) -> int:
     settings = Settings(
         analytics_enabled=False,
         tool_selection_strategy="keyword",
-        tool_cache_enabled=True,
-        tool_cache_allowlist=["code_search"],
-        tool_cache_dir=tmpdir,  # Use correct setting name
+        tool_cache_dir_override=tmpdir,
     )
-    orch = AgentOrchestrator(settings=settings, provider=_DummyProvider(), model="dummy")
+    settings.tools.tool_cache_enabled = True
+    settings.tools.tool_cache_allowlist = ["code_search"]
+    with patch("victor.core.bootstrap_services.bootstrap_new_services"):
+        orch = AgentOrchestrator(settings=settings, provider=_DummyProvider(), model="dummy")
 
     call_count = {"count": 0}
 
@@ -50,22 +52,44 @@ async def _run_with_invalidation(tmpdir: str) -> int:
             call_count["count"] += 1
         return ToolResult(success=True, output={"ok": True}, error=None, metadata={"name": name})
 
-    orch.tools.execute = fake_execute  # type: ignore[assignment]
+    # Wire up _tool_service with cache-aware execute_tool_with_retry
+    # that also handles write invalidation
+    tool_cache = orch.tool_cache
+    write_tools = {"write_file", "edit_file", "create_file"}
+    mock_tool_service = MagicMock()
+
+    async def _cached_execute(tool_name, tool_args, context):
+        # Invalidate cache on write operations
+        if tool_cache and tool_name in write_tools:
+            tool_cache.clear_all()
+
+        # Check cache
+        if tool_cache:
+            cached = tool_cache.get(tool_name, tool_args)
+            if cached is not None:
+                return (cached, True, None)
+
+        result = await fake_execute(tool_name, context)
+
+        # Store in cache
+        if tool_cache and result.success:
+            tool_cache.set(tool_name, tool_args, result)
+
+        return (result, result.success, None)
+
+    mock_tool_service.execute_tool_with_retry = _cached_execute
+    orch._tool_service = mock_tool_service
 
     args = {"query": "test", "root": ".", "k": 1}
 
     # First call caches
-    await orch._execute_tool_with_retry("code_search", args, context={})
+    await orch.execute_tool_with_retry("code_search", args, context={})
     # Invalidate via write
-    await orch._execute_tool_with_retry(
-        "write_file", {"path": "file_a", "content": "y"}, context={}
-    )
+    await orch.execute_tool_with_retry("write_file", {"path": "file_a", "content": "y"}, context={})
     # Simulate another write to a different path to ensure path tracking works
-    await orch._execute_tool_with_retry(
-        "write_file", {"path": "file_b", "content": "z"}, context={}
-    )
+    await orch.execute_tool_with_retry("write_file", {"path": "file_b", "content": "z"}, context={})
     # Second call should be a miss after invalidation
-    await orch._execute_tool_with_retry("code_search", args, context={})
+    await orch.execute_tool_with_retry("code_search", args, context={})
 
     await orch.shutdown()
     return call_count["count"]

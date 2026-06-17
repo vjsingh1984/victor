@@ -62,7 +62,11 @@ class TestTogetherProviderInitialization:
 
     def test_initialization_warning_without_key(self, caplog):
         """Test APIKeyNotFoundError is raised when no API key provided."""
-        from victor.providers.resolution import APIKeyResult, KeySource, APIKeyNotFoundError
+        from victor.providers.resolution import (
+            APIKeyResult,
+            KeySource,
+            APIKeyNotFoundError,
+        )
 
         with patch.dict("os.environ", {"TOGETHER_API_KEY": ""}, clear=False):
             # Mock UnifiedApiKeyResolver to return None
@@ -185,7 +189,10 @@ class TestTogetherProviderRequestPayload:
             ToolDefinition(
                 name="list_directory",
                 description="List files in a directory",
-                parameters={"type": "object", "properties": {"path": {"type": "string"}}},
+                parameters={
+                    "type": "object",
+                    "properties": {"path": {"type": "string"}},
+                },
             )
         ]
 

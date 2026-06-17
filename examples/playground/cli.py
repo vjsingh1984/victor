@@ -63,11 +63,13 @@ def interactive(
 ):
     """Start an interactive session."""
 
-    console.print(Panel(
-        "[bold blue]Victor Playground - Interactive Mode[/bold blue]\n"
-        "Type your messages below. Press Ctrl+D to exit.",
-        title="Welcome"
-    ))
+    console.print(
+        Panel(
+            "[bold blue]Victor Playground - Interactive Mode[/bold blue]\n"
+            "Type your messages below. Press Ctrl+D to exit.",
+            title="Welcome",
+        )
+    )
 
     agent = Agent.create(provider=provider, tools=tools)
 

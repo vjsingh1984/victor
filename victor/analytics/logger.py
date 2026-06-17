@@ -1,3 +1,5 @@
-# Backwards compatibility redirect
-# This module has been moved to victor.observability.analytics.logger
-from victor.observability.analytics.logger import *  # noqa: F403
+"""Backward-compatible UsageLogger import surface."""
+
+from victor.observability.analytics.logger import UsageLogger
+
+__all__ = ["UsageLogger"]

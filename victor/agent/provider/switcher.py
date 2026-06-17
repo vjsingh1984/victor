@@ -211,7 +211,7 @@ class ProviderSwitcher(IProviderSwitcher):
             self._model_switcher.switch(
                 provider=provider_name,
                 model=model,
-                reason=SwitchReason.USER_REQUEST if reason == "manual" else SwitchReason.FALLBACK,
+                reason=(SwitchReason.USER_REQUEST if reason == "manual" else SwitchReason.FALLBACK),
                 metadata={
                     "from_provider": old_provider,
                     "from_model": old_model,
@@ -289,7 +289,7 @@ class ProviderSwitcher(IProviderSwitcher):
             self._model_switcher.switch(
                 provider=self._current_state.provider_name,
                 model=model,
-                reason=SwitchReason.USER_REQUEST if reason == "manual" else SwitchReason.FALLBACK,
+                reason=(SwitchReason.USER_REQUEST if reason == "manual" else SwitchReason.FALLBACK),
                 metadata={"from_model": old_model},
             )
 

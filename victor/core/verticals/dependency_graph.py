@@ -31,7 +31,7 @@ import threading
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Set
 
-from victor_sdk.verticals.manifest import ExtensionManifest
+from victor_contracts.verticals.manifest import ExtensionManifest
 
 logger = logging.getLogger(__name__)
 

@@ -182,7 +182,12 @@ CIRCLECI_TEMPLATES = {
                 "docker": [{"image": "cimg/python:3.12"}],
                 "steps": [
                     "checkout",
-                    {"run": {"name": "Install dependencies", "command": "pip install -e .[dev]"}},
+                    {
+                        "run": {
+                            "name": "Install dependencies",
+                            "command": "pip install -e .[dev]",
+                        }
+                    },
                     {"run": {"name": "Run tests", "command": "pytest"}},
                 ],
             },
@@ -222,7 +227,7 @@ async def cicd(
     validate_command: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
-    Unified CI/CD tool for pipeline management.
+    Run CI/CD pipelines: trigger builds, check status, view logs.
 
     Performs CI/CD operations including generating configurations, validating
     pipelines, and listing available templates. Consolidates all CI/CD
@@ -342,7 +347,10 @@ async def cicd(
     # Validate operation
     elif operation == "validate":
         if not file:
-            return {"success": False, "error": "Validate operation requires 'file' parameter"}
+            return {
+                "success": False,
+                "error": "Validate operation requires 'file' parameter",
+            }
 
         file_obj = Path(file)
         if not file_obj.exists():
@@ -391,15 +399,24 @@ async def cicd(
         external_output = None
         if validate_command:
             try:
-                proc = subprocess.run(
-                    validate_command.split(),
-                    check=True,
-                    capture_output=True,
-                    text=True,
+                # Use asyncio subprocess to avoid blocking event loop
+                import asyncio
+
+                proc = await asyncio.create_subprocess_exec(
+                    *validate_command.split(),
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
                 )
-                external_output = proc.stdout.strip()
-            except subprocess.CalledProcessError as exc:
-                issues.append(f"External validator failed: {exc.stderr.strip()}")
+                stdout, stderr = await proc.communicate()
+                if proc.returncode != 0:
+                    raise subprocess.CalledProcessError(proc.returncode, validate_command, stderr)
+                external_output = stdout.decode("utf-8").strip()
+            except (subprocess.CalledProcessError, Exception) as exc:
+                error_msg = str(getattr(exc, "stderr", b"")) if hasattr(exc, "stderr") else str(exc)
+                if error_msg:
+                    issues.append(f"External validator failed: {error_msg}")
+                else:
+                    issues.append(f"External validator failed: {exc}")
 
         # Build report
         report = []

@@ -15,10 +15,11 @@
 """Profile management commands.
 
 Provides commands for:
-- victor profile list - List all available profiles
-- victor profile show <name> - Show profile details
-- victor profile apply <name> - Apply a profile
-- victor profile current - Show current profile
+- victor profiles list - List configured profiles from ~/.victor/profiles.yaml
+- victor profiles templates - List built-in profile templates
+- victor profiles show <name> - Show profile details
+- victor profiles apply <name> - Apply a profile
+- victor profiles current - Show current profile
 """
 
 from pathlib import Path
@@ -33,77 +34,128 @@ import yaml
 
 from victor.config.profiles import (
     ProfileLevel,
+    ProfileManager,
     PROFILES,
+    generate_profile_yaml,
     get_profile,
-    list_profiles,
     get_recommended_profile,
     install_profile,
-    get_current_profile,
-    generate_profile_yaml,
+    list_profiles,
 )
+from victor.config.settings import get_project_paths
 
-profiles_app = typer.Typer(name="profile", help="Manage configuration profiles.")
+profiles_app = typer.Typer(name="profiles", help="Manage configuration profiles.")
 console = Console()
 
 
 # =============================================================================
-# Helper functions for backward compatibility with tests
+# Helper functions
 # =============================================================================
 
 
-def _load_profiles_yaml(profiles_file: Path) -> Dict[str, Any]:
-    """Load profiles from a YAML file.
-
-    Args:
-        profiles_file: Path to profiles.yaml file
-
-    Returns:
-        Dictionary containing profiles data, or empty dict if file doesn't exist or is invalid
-    """
-    if not profiles_file.exists():
-        return {"profiles": {}}
-
-    try:
-        with open(profiles_file) as f:
-            return yaml.safe_load(f) or {"profiles": {}}
-    except (yaml.YAMLError, IOError, OSError):
-        return {"profiles": {}}
+def _resolve_config_dir(config_dir: Optional[str]) -> Path:
+    """Resolve the target config directory through centralized Victor paths."""
+    return Path(config_dir) if config_dir else get_project_paths().global_victor_dir
 
 
-def _save_profiles_yaml(profiles_file: Path, data: Dict[str, Any]) -> None:
-    """Save profiles to a YAML file.
-
-    Args:
-        profiles_file: Path to profiles.yaml file
-        data: Dictionary containing profiles data
-
-    Raises:
-        typer.Exit: If file cannot be written
-    """
-    import sys
-
-    try:
-        profiles_file.parent.mkdir(parents=True, exist_ok=True)
-        with open(profiles_file, "w") as f:
-            yaml.safe_dump(data, f, default_flow_style=False)
-    except (IOError, OSError) as e:
-        console.print(f"[red]Error writing profiles file: {e}[/]")
-        raise typer.Exit(1)
+def _get_profile_manager(config_dir: Optional[str]) -> ProfileManager:
+    """Get a ProfileManager for the given config directory."""
+    config_path = _resolve_config_dir(config_dir)
+    return ProfileManager.for_config_dir(config_path)
 
 
 @profiles_app.command("list")
 def profile_list(
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Show detailed profile settings"),
+    config_dir: Optional[str] = typer.Option(None, "--config-dir", "-d", help="Config directory"),
 ) -> None:
-    """List all available configuration profiles."""
+    """List configured profiles from ~/.victor/profiles.yaml."""
+    mgr = _get_profile_manager(config_dir)
+    data = mgr.load_profiles()
+    profiles = data.get("profiles", {}) or {}
+    config_path = _resolve_config_dir(config_dir)
+    profiles_path = config_path / "profiles.yaml"
+    default_profile = data.get("default_profile") or "default"
+
+    console.print("\n[bold]Configured Profiles[/]")
+    console.print(f"[dim]Source: {profiles_path}[/]")
+    console.print("═" * 60)
+
+    if not profiles:
+        console.print("\n[yellow]No configured profiles found.[/]")
+        console.print(
+            "Create one with: [bold]victor profiles create <name> --provider <provider> --model <model>[/]"
+        )
+        console.print("Apply a template with: [bold]victor profiles apply basic[/]")
+        console.print("View profile templates with: [bold]victor profiles templates[/]")
+        return
+
+    table = Table(show_header=True)
+    table.add_column("Profile", style="cyan", no_wrap=True)
+    table.add_column("Provider", style="green")
+    table.add_column("Model", style="yellow")
+    table.add_column("Temperature", justify="right")
+    table.add_column("Max Tokens", justify="right")
+    table.add_column("Account/Auth", style="magenta")
+
+    for name, profile_data in sorted(profiles.items()):
+        if not isinstance(profile_data, dict):
+            profile_data = {}
+        display_name = f"{name} ★" if name == default_profile else name
+        provider = str(profile_data.get("provider", "—"))
+        model = str(profile_data.get("model", "—"))
+        temperature = _format_optional_value(profile_data.get("temperature"))
+        max_tokens = _format_optional_value(
+            profile_data.get("max_tokens", profile_data.get("max_completion_tokens"))
+        )
+        account_auth = _format_profile_auth(profile_data)
+
+        table.add_row(
+            display_name,
+            provider,
+            model,
+            temperature,
+            max_tokens,
+            account_auth,
+        )
+
+    console.print(table)
+    console.print(f"\n[dim]Total: {len(profiles)} configured profile(s). ★ = default[/]")
+    console.print("[dim]Built-in templates: victor profiles templates[/]")
+
+    if verbose:
+        console.print("\n[bold]Raw Profile Settings:[/]")
+        console.print("─" * 60)
+        for name, profile_data in sorted(profiles.items()):
+            console.print(f"\n[cyan bold]{name}[/]")
+            syntax = Syntax(
+                yaml.safe_dump(profile_data, default_flow_style=False, sort_keys=False).strip(),
+                "yaml",
+                theme="monokai",
+            )
+            console.print(syntax)
+
+
+@profiles_app.command("templates")
+def profile_templates(
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Show detailed template settings"),
+) -> None:
+    """List built-in profile templates that can be applied to profiles.yaml."""
+    _list_profile_templates_impl(verbose=verbose)
+
+
+def _list_profile_templates_impl(*, verbose: bool) -> None:
+    """List built-in profile templates."""
     all_profiles = list_profiles()
 
-    console.print("\n[bold]Available Configuration Profiles[/]")
+    console.print("\n[bold]Built-in Profile Templates[/]")
     console.print("═" * 60)
 
     table = Table(show_header=True, show_lines=True)
-    table.add_column("Profile", style="cyan")
+    table.add_column("Template", style="cyan")
     table.add_column("Level", style="magenta")
+    table.add_column("Default Provider", style="green")
+    table.add_column("Default Model", style="yellow")
     table.add_column("Description", style="white")
 
     for profile in sorted(all_profiles, key=lambda p: p.level.value):
@@ -114,8 +166,10 @@ def profile_list(
         }.get(profile.level, profile.level.value)
 
         table.add_row(
-            profile.display_name,
+            f"{profile.display_name} ([dim]{profile.name}[/])",
             level_display,
+            str(profile.settings.get("default_provider", "auto")),
+            str(profile.settings.get("default_model", "auto")),
             profile.description,
         )
 
@@ -144,8 +198,38 @@ def profile_list(
 
     # Show recommended
     recommended = get_recommended_profile()
-    console.print(f"\n💡 [yellow]Recommended for you:[/] {recommended.display_name}")
-    console.print("   Use: [bold]victor profile apply {recommended.name}[/]")
+    from victor.ui.emoji import get_icon
+
+    console.print(
+        f"\n{get_icon('info')} [yellow]Recommended for you:[/] {recommended.display_name}"
+    )
+    console.print(f"   Use: [bold]victor profiles apply {recommended.name}[/]")
+
+
+def _format_optional_value(value: Any) -> str:
+    if value is None:
+        return "[dim]—[/]"
+    return str(value)
+
+
+def _format_profile_auth(profile_data: Dict[str, Any]) -> str:
+    account = profile_data.get("account")
+    if account:
+        return f"account:{account}"
+
+    auth = profile_data.get("auth")
+    if isinstance(auth, dict):
+        method = auth.get("method", "api_key")
+        source = auth.get("source")
+        return f"{method}/{source}" if source else str(method)
+    if isinstance(auth, str):
+        return auth
+
+    auth_mode = profile_data.get("auth_mode")
+    if auth_mode:
+        return str(auth_mode)
+
+    return "[dim]—[/]"
 
 
 @profiles_app.command("show")
@@ -159,7 +243,9 @@ def profile_show(
     profile = get_profile(name)
 
     if not profile:
-        console.print(f"[red]✗[/] Profile '{name}' not found")
+        from victor.ui.emoji import get_icon
+
+        console.print(f"{get_icon('error')} Profile '{name}' not found")
         console.print("\nAvailable profiles: " + ", ".join(PROFILES.keys()))
         raise typer.Exit(1)
 
@@ -212,12 +298,14 @@ def profile_apply(
     profile = get_profile(name)
 
     if not profile:
-        console.print(f"[red]✗[/] Profile '{name}' not found")
+        from victor.ui.emoji import get_icon
+
+        console.print(f"{get_icon('error')} Profile '{name}' not found")
         console.print("\nAvailable profiles: " + ", ".join(PROFILES.keys()))
         raise typer.Exit(1)
 
     # Resolve config directory
-    config_path = Path(config_dir) if config_dir else Path.home() / ".victor"
+    config_path = _resolve_config_dir(config_dir)
 
     # Generate YAML content
     yaml_content = generate_profile_yaml(profile, provider_override=provider, model_override=model)
@@ -234,10 +322,17 @@ def profile_apply(
     # Apply the profile
     try:
         profiles_path = install_profile(
-            profile, config_dir=config_path, provider_override=provider, model_override=model
+            profile,
+            config_dir=config_path,
+            provider_override=provider,
+            model_override=model,
         )
 
-        console.print(f"\n[green]✓[/] Applied [bold cyan]{profile.display_name}[/] profile")
+        from victor.ui.emoji import get_icon
+
+        console.print(
+            f"\n{get_icon('success')} Applied [bold cyan]{profile.display_name}[/] profile"
+        )
         console.print(f"[dim]Config written to: {profiles_path}[/]")
 
         # Show summary
@@ -264,10 +359,10 @@ def profile_apply(
 
         console.print(table)
 
-        console.print("\n[yellow]💡 Next steps:[/]")
+        console.print(f"\n{get_icon('info')} Next steps:[/]")
         console.print("  1. [bold]victor doctor[/] - Verify your configuration")
         console.print("  2. [bold]victor chat[/] - Start using Victor")
-        console.print(f"\n[dim]To change profiles, run: victor profile apply <name>[/]")
+        console.print("\n[dim]To change profiles, run: victor profiles apply <name>[/]")
 
     except Exception as e:
         console.print(f"\n[red]✗[/] Failed to apply profile: {e}")
@@ -279,20 +374,21 @@ def profile_current(
     config_dir: Optional[str] = typer.Option(None, "--config-dir", "-d", help="Config directory"),
 ) -> None:
     """Show the current active profile."""
-    config_path = Path(config_dir) if config_dir else Path.home() / ".victor"
-    profile_name = get_current_profile(config_path)
+    mgr = _get_profile_manager(config_dir)
+    profile_name = mgr.get_current_profile_name()
+    config_path = _resolve_config_dir(config_dir)
 
     if not profile_name:
         console.print("\n[yellow]⚠[/] No profile detected")
         console.print(f"[dim]Config directory: {config_path}[/]")
         console.print("\n[yellow]💡 To get started:[/]")
-        console.print("  [bold]victor profile apply basic[/] - Apply basic profile")
-        console.print("  [bold]victor profile list[/] - List all profiles")
+        console.print("  [bold]victor profiles apply basic[/] - Apply basic profile")
+        console.print("  [bold]victor profiles list[/] - List all profiles")
         return
 
     profile = get_profile(profile_name)
     if profile:
-        console.print(f"\n[bold]Current Profile:[/]")
+        console.print("\n[bold]Current Profile:[/]")
         console.print(f"  Name: [cyan]{profile.display_name}[/] ([dim]{profile.name}[/])")
         console.print(f"  Level: [yellow]{profile.level.value.upper()}[/]")
         console.print(f"  Description: {profile.description}")
@@ -306,24 +402,33 @@ def profile_create(
     name: str = typer.Argument(..., help="Profile name to create"),
     provider: str = typer.Option("ollama", "--provider", "-p", help="LLM provider"),
     model: str = typer.Option("llama2", "--model", "-m", help="Model name"),
+    account: Optional[str] = typer.Option(None, "--account", "-a", help="Provider account name"),
+    auth_method: Optional[str] = typer.Option(None, "--auth-method", help="Auth method"),
+    auth_source: Optional[str] = typer.Option(None, "--auth-source", help="Auth source"),
     temperature: Optional[float] = typer.Option(None, "--temperature", "-t", help="Temperature"),
     max_tokens: Optional[int] = typer.Option(None, "--max-tokens", help="Max tokens"),
     description: Optional[str] = typer.Option(None, "--description", "-d", help="Description"),
+    set_default: bool = typer.Option(False, "--default", help="Set this profile as default"),
     config_dir: Optional[str] = typer.Option(None, "--config-dir", help="Config directory"),
 ) -> None:
     """Create a new custom profile."""
-    config_path = Path(config_dir) if config_dir else Path.home() / ".victor"
-    profiles_file = config_path / "profiles.yaml"
-
-    data = _load_profiles_yaml(profiles_file)
+    mgr = _get_profile_manager(config_dir)
+    data = mgr.load_profiles()
     profiles = data.get("profiles", {})
 
     if name in profiles:
         console.print(f"[red]✗[/] Profile '{name}' already exists")
-        console.print("Use [bold]victor profile edit[/] to modify it.")
+        console.print("Use [bold]victor profiles edit[/] to modify it.")
         return
 
     profile_data: Dict[str, Any] = {"provider": provider, "model": model}
+    if account is not None:
+        profile_data["account"] = account
+    if auth_method is not None or auth_source is not None:
+        profile_data["auth"] = {
+            "method": auth_method or "api_key",
+            "source": auth_source or "keyring",
+        }
     if temperature is not None:
         profile_data["temperature"] = temperature
     if max_tokens is not None:
@@ -333,9 +438,19 @@ def profile_create(
 
     profiles[name] = profile_data
     data["profiles"] = profiles
-    _save_profiles_yaml(profiles_file, data)
+    if set_default:
+        data["default_profile"] = name
+    try:
+        mgr.save_profiles(data)
+    except IOError as e:
+        console.print(f"[red]Error writing profiles file: {e}[/]")
+        raise typer.Exit(1)
 
-    console.print(f"[green]✓[/] Created profile '{name}'")
+    from victor.ui.emoji import get_icon
+
+    console.print(f"\n{get_icon('success')} Created profile '{name}'")
+    if set_default:
+        console.print("[dim]Default profile: yes[/]")
 
 
 @profiles_app.command("edit")
@@ -349,14 +464,14 @@ def profile_edit(
     config_dir: Optional[str] = typer.Option(None, "--config-dir", help="Config directory"),
 ) -> None:
     """Edit an existing custom profile."""
-    config_path = Path(config_dir) if config_dir else Path.home() / ".victor"
-    profiles_file = config_path / "profiles.yaml"
-
-    data = _load_profiles_yaml(profiles_file)
+    mgr = _get_profile_manager(config_dir)
+    data = mgr.load_profiles()
     profiles = data.get("profiles", {})
 
     if name not in profiles:
-        console.print(f"[red]✗[/] Profile '{name}' not found")
+        from victor.ui.emoji import get_icon
+
+        console.print(f"{get_icon('error')} Profile '{name}' not found")
         return
 
     updates: Dict[str, Any] = {}
@@ -377,7 +492,11 @@ def profile_edit(
 
     profiles[name].update(updates)
     data["profiles"] = profiles
-    _save_profiles_yaml(profiles_file, data)
+    try:
+        mgr.save_profiles(data)
+    except IOError as e:
+        console.print(f"[red]Error writing profiles file: {e}[/]")
+        raise typer.Exit(1)
 
     console.print(f"[green]✓[/] Updated profile '{name}'")
 
@@ -389,14 +508,14 @@ def profile_delete(
     config_dir: Optional[str] = typer.Option(None, "--config-dir", help="Config directory"),
 ) -> None:
     """Delete a custom profile."""
-    config_path = Path(config_dir) if config_dir else Path.home() / ".victor"
-    profiles_file = config_path / "profiles.yaml"
-
-    data = _load_profiles_yaml(profiles_file)
+    mgr = _get_profile_manager(config_dir)
+    data = mgr.load_profiles()
     profiles = data.get("profiles", {})
 
     if name not in profiles:
-        console.print(f"[red]✗[/] Profile '{name}' not found")
+        from victor.ui.emoji import get_icon
+
+        console.print(f"{get_icon('error')} Profile '{name}' not found")
         return
 
     if not force:
@@ -407,7 +526,11 @@ def profile_delete(
 
     del profiles[name]
     data["profiles"] = profiles
-    _save_profiles_yaml(profiles_file, data)
+    try:
+        mgr.save_profiles(data)
+    except IOError as e:
+        console.print(f"[red]Error writing profiles file: {e}[/]")
+        raise typer.Exit(1)
 
     console.print(f"[green]✓[/] Deleted profile '{name}'")
 
@@ -418,14 +541,14 @@ def profile_set_default(
     config_dir: Optional[str] = typer.Option(None, "--config-dir", help="Config directory"),
 ) -> None:
     """Set a profile as the default."""
-    config_path = Path(config_dir) if config_dir else Path.home() / ".victor"
-    profiles_file = config_path / "profiles.yaml"
-
-    data = _load_profiles_yaml(profiles_file)
+    mgr = _get_profile_manager(config_dir)
+    data = mgr.load_profiles()
     profiles = data.get("profiles", {})
 
     if name not in profiles:
-        console.print(f"[red]✗[/] Profile '{name}' not found")
+        from victor.ui.emoji import get_icon
+
+        console.print(f"{get_icon('error')} Profile '{name}' not found")
         return
 
     current_default = data.get("default_profile")
@@ -434,7 +557,11 @@ def profile_set_default(
         return
 
     data["default_profile"] = name
-    _save_profiles_yaml(profiles_file, data)
+    try:
+        mgr.save_profiles(data)
+    except IOError as e:
+        console.print(f"[red]Error writing profiles file: {e}[/]")
+        raise typer.Exit(1)
 
     console.print(f"[green]✓[/] Set '{name}' as the default profile")
 

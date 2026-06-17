@@ -29,6 +29,8 @@ from victor.agent.services.protocols.decision_service import (
     DecisionResult,
 )
 from victor.core.async_utils import run_sync
+from victor.framework.runtime_evaluation_policy import RuntimeEvaluationFeedback
+from victor.providers.base import Message
 
 if TYPE_CHECKING:
     from victor.providers.base import BaseProvider
@@ -74,6 +76,23 @@ class LLMDecisionService:
 
         # Metrics
         self._metrics = DecisionMetrics()
+        self._auto_disable_warned = False
+
+    def _requires_fresh_provider_for_sync_thread(self) -> bool:
+        """Return whether sync thread bridging should clone the provider per call.
+
+        httpx-based OpenAI-compatible providers hold an AsyncClient that is bound
+        to the event loop that first uses it. decide_sync() runs async work on a
+        fresh thread/loop, so reusing the same client across loops can trigger
+        ``RuntimeError: Event loop is closed`` on follow-up calls.
+        """
+
+        try:
+            from victor.providers.httpx_openai_compat import HttpxOpenAICompatProvider
+
+            return isinstance(self._provider, HttpxOpenAICompatProvider)
+        except Exception:
+            return False
 
     async def decide(
         self,
@@ -217,30 +236,85 @@ class LLMDecisionService:
                 confidence=heuristic_confidence,
             )
 
-        # Use run_sync_in_thread to handle both cases:
-        # 1. No running loop — runs in a thread with its own loop
-        # 2. Inside async context — also runs in a thread (avoids blocking)
-        # This ensures the edge model's Ollama provider gets a fresh event loop
-        # each time, avoiding the "Event loop is closed" httpx bug.
-        try:
-            from victor.core.async_utils import run_sync_in_thread
-
-            return run_sync_in_thread(
-                self.decide(
-                    decision_type,
-                    context,
-                    heuristic_result=heuristic_result,
-                    heuristic_confidence=heuristic_confidence,
-                ),
-                timeout=self._config.timeout_ms / 1000.0,
-            )
-        except (TimeoutError, Exception) as e:
-            logger.debug("decide_sync thread execution failed: %s", e)
+        # Auto-disable if timeout rate is too high (>60% after 10+ calls)
+        if (
+            self._metrics.total_calls >= 10
+            and self._metrics.timeouts / max(self._metrics.total_calls, 1) > 0.6
+        ):
+            if not self._auto_disable_warned:
+                logger.warning(
+                    "Edge model auto-disabled: %.0f%% timeout rate (%d/%d calls)",
+                    100 * self._metrics.timeouts / self._metrics.total_calls,
+                    self._metrics.timeouts,
+                    self._metrics.total_calls,
+                )
+                self._auto_disable_warned = True
             self._metrics.total_calls += 1
             return DecisionResult(
                 decision_type=decision_type,
                 result=heuristic_result,
-                source="heuristic",
+                source="auto_disabled",
+                confidence=heuristic_confidence,
+            )
+
+        # Use run_sync_in_thread to handle both cases:
+        # 1. No running loop — runs in a thread with its own loop
+        # 2. Inside async context — also runs in a thread (avoids blocking)
+        # httpx-based OpenAI-compatible providers need a fresh provider/client
+        # inside that loop to avoid cross-loop AsyncClient reuse.
+        try:
+            from victor.core.async_utils import run_sync_in_thread
+
+            if self._requires_fresh_provider_for_sync_thread():
+                start = time.monotonic()
+                result = run_sync_in_thread(
+                    self._call_llm_with_fresh_provider(decision_type, context),
+                    timeout=self._config.timeout_ms / 1000.0,
+                )
+                self._budget_used += 1
+                self._metrics.total_calls += 1
+                self._metrics.llm_calls += 1
+                result.latency_ms = _elapsed_ms(start)
+                self._update_latency(result.latency_ms)
+                self._cache[cache_key] = (
+                    result,
+                    time.monotonic() + self._config.cache_ttl,
+                )
+            else:
+                result = run_sync_in_thread(
+                    self.decide(
+                        decision_type,
+                        context,
+                        heuristic_result=heuristic_result,
+                        heuristic_confidence=heuristic_confidence,
+                    ),
+                    timeout=self._config.timeout_ms / 1000.0,
+                )
+
+            # Log decision for fine-tuning data collection
+            try:
+                from victor.agent.decisions.chain import log_decision
+
+                log_decision(
+                    decision_type=decision_type.value,
+                    context=context,
+                    result=str(getattr(result.result, "__dict__", result.result)),
+                    source=result.source,
+                    confidence=result.confidence,
+                )
+            except Exception:
+                pass
+
+            return result
+        except (TimeoutError, Exception) as e:
+            logger.debug("decide_sync thread execution failed: %s", e)
+            self._metrics.total_calls += 1
+            if isinstance(e, TimeoutError):
+                self._metrics.timeouts += 1
+            return DecisionResult(
+                decision_type=decision_type,
+                result=heuristic_result,
+                source=("timeout_fallback" if isinstance(e, TimeoutError) else "heuristic"),
                 confidence=heuristic_confidence,
             )
 
@@ -283,10 +357,26 @@ class LLMDecisionService:
         """Get aggregate metrics for monitoring."""
         return self._metrics
 
+    def get_runtime_evaluation_feedback(self) -> RuntimeEvaluationFeedback:
+        """Export runtime evaluation thresholds aligned to the service confidence gate."""
+        threshold = self._config.confidence_threshold
+        return RuntimeEvaluationFeedback(
+            completion_threshold=threshold,
+            enhanced_progress_threshold=max(0.35, min(threshold, threshold - 0.15)),
+            minimum_supported_evidence_score=min(0.95, max(0.55, threshold + 0.05)),
+            metadata={
+                "source": "llm_decision_service",
+                "confidence_threshold": threshold,
+                "micro_budget": self._config.micro_budget,
+            },
+        )
+
     async def _call_llm(
         self,
         decision_type: DecisionType,
         context: Dict[str, Any],
+        *,
+        provider: Optional[BaseProvider] = None,
     ) -> DecisionResult:
         """Build prompt, call provider, parse structured response."""
         prompt_config = DECISION_PROMPTS[decision_type]
@@ -299,18 +389,22 @@ class LLMDecisionService:
             raise
 
         messages = [
-            {"role": "system", "content": prompt_config.system},
-            {"role": "user", "content": user_message},
+            Message(role="system", content=prompt_config.system),
+            Message(role="user", content=user_message),
         ]
 
         max_tokens = self._config.max_tokens_override or prompt_config.max_tokens
+        provider_instance = provider or self._provider
 
-        response = await self._provider.chat(
+        # Disable thinking/reasoning for edge decisions — we need raw JSON,
+        # not reasoning text. Ollama's "think" is a top-level parameter.
+        response = await provider_instance.chat(
             messages=messages,
             model=self._model,
             temperature=self._config.temperature,
             max_tokens=max_tokens,
             tools=None,
+            think=False,
         )
 
         # Extract text content from response
@@ -330,6 +424,32 @@ class LLMDecisionService:
             confidence=confidence,
             tokens_used=tokens_used,
         )
+
+    async def _call_llm_with_fresh_provider(
+        self,
+        decision_type: DecisionType,
+        context: Dict[str, Any],
+    ) -> DecisionResult:
+        """Run one LLM decision call with a fresh provider inside the worker loop."""
+
+        provider = self._provider
+        if provider is None or not self._requires_fresh_provider_for_sync_thread():
+            return await self._call_llm(decision_type, context)
+
+        fresh_provider = provider.__class__(
+            api_key=provider.api_key,
+            base_url=provider.base_url,
+            timeout=provider.timeout,
+            max_retries=provider.max_retries,
+            **provider.extra_config,
+        )
+        try:
+            return await self._call_llm(decision_type, context, provider=fresh_provider)
+        finally:
+            try:
+                await fresh_provider.close()
+            except Exception:
+                logger.debug("Fresh sync-thread provider cleanup failed", exc_info=True)
 
     def _extract_response_text(self, response: Any) -> str:
         """Extract text content from a provider response."""
@@ -364,22 +484,42 @@ class LLMDecisionService:
         return 0
 
     def _parse_response(self, raw_text: str, schema: type) -> Any:
-        """Parse raw LLM text into a Pydantic model."""
-        # Strip markdown code fences if present
+        """Parse raw LLM text into a Pydantic model.
+
+        Handles common edge model output patterns:
+        - Markdown code fences (```json ... ```)
+        - Embedded JSON within reasoning text (e.g., qwen3 thinking prefix)
+        """
         text = raw_text.strip()
+
+        # Strip markdown code fences if present
         if text.startswith("```"):
             lines = text.split("\n")
-            # Remove first and last lines (code fence markers)
             lines = [line for line in lines[1:] if not line.startswith("```")]
             text = "\n".join(lines).strip()
 
+        # First try: direct parse
         try:
             data = json.loads(text)
             return schema.model_validate(data)
-        except (json.JSONDecodeError, Exception) as e:
-            self._metrics.parse_failures += 1
-            logger.debug("Failed to parse LLM decision response: %s (raw: %s)", e, raw_text[:200])
-            raise
+        except json.JSONDecodeError:
+            pass
+
+        # Second try: extract embedded JSON object from mixed text
+        # (handles models that prepend reasoning before the JSON)
+        brace_pos = text.find("{")
+        if brace_pos > 0:
+            last_brace = text.rfind("}")
+            if last_brace > brace_pos:
+                try:
+                    data = json.loads(text[brace_pos : last_brace + 1])
+                    return schema.model_validate(data)
+                except (json.JSONDecodeError, Exception):
+                    pass
+
+        self._metrics.parse_failures += 1
+        logger.debug("Failed to parse LLM decision response (raw: %s)", raw_text[:200])
+        raise ValueError(f"Could not extract JSON from response: {raw_text[:100]}")
 
     def _cache_key(self, decision_type: DecisionType, context: Dict[str, Any]) -> str:
         """Generate a cache key from decision type and context."""

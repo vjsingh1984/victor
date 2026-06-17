@@ -160,7 +160,7 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
                     TeamConfig,
                     TeamMember,
                     TeamFormation,
-                    TeamCoordinator,
+                    create_coordinator,
                 )
                 from victor.agent.subagents import SubAgentRole
 
@@ -202,7 +202,11 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
                     total_tool_budget=team["total_tool_budget"],
                 )
 
-                coordinator = TeamCoordinator(orchestrator)
+                coordinator = create_coordinator(
+                    orchestrator=orchestrator,
+                    enable_observability=False,
+                    enable_rl=False,
+                )
                 result = await coordinator.execute_team(config)
 
                 if team_id in _teams:

@@ -16,7 +16,7 @@
 
 from typing import Any, List
 
-from victor_sdk.capabilities import (
+from victor_contracts.capabilities import (
     PromptContribution,
     PromptContributionCapability as SdkPromptContributionCapability,
 )

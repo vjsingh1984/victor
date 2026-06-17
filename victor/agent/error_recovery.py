@@ -24,11 +24,15 @@ SOLID Principles Applied:
 Implements GAP-10 from Grok/DeepSeek provider testing.
 """
 
+import ast
 from abc import ABC, abstractmethod
+import json
 from typing import Optional, Dict, Any, List
 from dataclasses import dataclass, field
 from enum import Enum
+import asyncio
 import logging
+import os
 import re
 
 logger = logging.getLogger(__name__)
@@ -154,6 +158,142 @@ class MissingParameterHandler(ErrorRecoveryHandler):
         r"missing required argument[s]?: (\w+)",
     ]
 
+    def _extract_missing_params(self, error_str: str) -> List[str]:
+        """Extract all missing parameter names from an error message."""
+        list_patterns = [
+            r"missing \d+ required positional argument[s]?:\s*(.+)$",
+            r"required parameter[s]?\s+(.+?)\s+was not provided",
+            r"required parameter[s]?\s+(.+?)\s+were not provided",
+            r"missing required argument[s]?:\s*(.+)$",
+            r"(.+?)\s+is a required property",
+            r"(.+?)\s+are required properties",
+        ]
+
+        for pattern in list_patterns:
+            match = re.search(pattern, error_str, re.IGNORECASE)
+            if not match:
+                continue
+
+            raw_params = match.group(1).strip().rstrip(".")
+            params = [
+                token
+                for token in re.findall(r"[A-Za-z_][A-Za-z0-9_]*", raw_params)
+                if token.lower()
+                not in {
+                    "and",
+                    "or",
+                    "required",
+                    "require",
+                    "parameter",
+                    "parameters",
+                    "argument",
+                    "arguments",
+                    "property",
+                    "properties",
+                    "positional",
+                    "provided",
+                    "was",
+                    "were",
+                    "missing",
+                }
+            ]
+            if params:
+                return list(dict.fromkeys(params))
+
+        quoted_params = re.findall(r"'(\w+)'", error_str)
+        if quoted_params:
+            return list(dict.fromkeys(quoted_params))
+
+        return []
+
+    def _recover_wrapped_value_arguments(
+        self, args: Dict[str, Any], missing_params: List[str], tool_name: str
+    ) -> Optional[Dict[str, Any]]:
+        """Recover structured tool args wrapped inside a generic value envelope.
+
+        Enhanced with better diagnostics for large payloads and partial recovery.
+        """
+        if set(args.keys()) != {"value"}:
+            return None
+
+        payload = args.get("value")
+        payload_size = len(str(payload)) if isinstance(payload, str) else 0
+
+        if isinstance(payload, str):
+            # Log large payload attempts for debugging
+            if payload_size > 5000:
+                self._logger.info(
+                    "Attempting to recover large value envelope (%d chars) for tool '%s' with missing params: %s",
+                    payload_size,
+                    tool_name,
+                    missing_params,
+                )
+
+            # Try multiple parsing strategies with detailed logging
+            parse_attempts = []
+            for parser_name, parser in [
+                ("json", json.loads),
+                ("ast", ast.literal_eval),
+            ]:
+                try:
+                    payload = parser(payload)
+                    parse_attempts.append(f"{parser_name}=success")
+                    break
+                except Exception as exc:
+                    parse_attempts.append(f"{parser_name}=failed({str(exc)[:50]})")
+                    continue
+
+            if payload_size > 5000:
+                self._logger.debug(
+                    "Parse attempts for large payload: %s",
+                    ", ".join(parse_attempts),
+                )
+
+        if not isinstance(payload, dict):
+            # For large payloads that failed to parse, try heuristic extraction
+            if payload_size > 10000 and tool_name == "write" and isinstance(args.get("value"), str):
+                import re
+
+                raw_value = args.get("value", "")
+                path_match = re.search(r'"path"\s*:\s*"([^"]+)"', raw_value)
+                if path_match and "path" in missing_params:
+                    self._logger.warning(
+                        "Partial recovery: extracted path from malformed write payload (size=%d)",
+                        payload_size,
+                    )
+                    return {"path": path_match.group(1)}
+
+            self._logger.debug(
+                "Value envelope payload is not a dict after parsing (type=%s), cannot recover",
+                type(payload).__name__,
+            )
+            return None
+
+        try:
+            from victor.agent.argument_normalizer import ArgumentNormalizer
+
+            payload, _ = ArgumentNormalizer(provider_name="recovery").normalize_parameter_aliases(
+                payload,
+                tool_name,
+            )
+        except Exception:
+            payload = dict(payload)
+
+        if not all(param in payload for param in missing_params):
+            self._logger.debug(
+                "Recovered payload missing required params: have=%s, need=%s",
+                list(payload.keys()),
+                missing_params,
+            )
+            return None
+
+        self._logger.info(
+            "Recovered wrapped value envelope for %s with params: %s",
+            tool_name,
+            ", ".join(sorted(payload.keys())),
+        )
+        return payload
+
     def can_handle(self, error: Exception, tool_name: str, args: Dict[str, Any]) -> bool:
         error_str = str(error).lower()
         # Check for various missing parameter/argument patterns
@@ -179,35 +319,53 @@ class MissingParameterHandler(ErrorRecoveryHandler):
         return False
 
     def handle(self, error: Exception, tool_name: str, args: Dict[str, Any]) -> RecoveryResult:
-        # Extract missing parameter from error message
         error_str = str(error)
-        param_name = None
+        missing_params = self._extract_missing_params(error_str)
 
-        for pattern in self.PATTERNS:
-            match = re.search(pattern, error_str, re.IGNORECASE)
-            if match:
-                param_name = match.group(1)
-                break
+        if missing_params:
+            recovered_args = self._recover_wrapped_value_arguments(args, missing_params, tool_name)
+            if recovered_args is not None:
+                return RecoveryResult(
+                    action=RecoveryAction.RETRY_WITH_INFERRED,
+                    modified_args=recovered_args,
+                    user_message=("Recovered structured arguments from wrapped value payload"),
+                )
 
-        # Fallback: look for quoted parameter names
-        if not param_name:
-            quoted_match = re.search(r"'(\w+)'", error_str)
-            if quoted_match:
-                param_name = quoted_match.group(1)
-
-        if param_name and param_name in self.DEFAULTS:
+        if missing_params and all(param in self.DEFAULTS for param in missing_params):
+            defaults = {param: self.DEFAULTS[param] for param in missing_params}
             self._logger.info(
-                f"Providing default value for missing param '{param_name}': {self.DEFAULTS[param_name]}"
+                "Providing default values for missing params %s",
+                defaults,
             )
             return RecoveryResult(
                 action=RecoveryAction.RETRY_WITH_DEFAULTS,
-                modified_args={**args, param_name: self.DEFAULTS[param_name]},
-                user_message=f"Using default value for '{param_name}'",
+                modified_args={**args, **defaults},
+                user_message=(
+                    "Using default values for "
+                    + ", ".join(f"'{param}'" for param in missing_params)
+                ),
+            )
+
+        param_name = missing_params[0] if missing_params else None
+
+        # Build a helpful error message with context
+        if "value" in args and len(missing_params) == 1:
+            # Special case: value envelope unwrapping failed
+            error_detail = (
+                f"Parameter '{param_name}' was wrapped in a value envelope but couldn't be extracted. "
+                f"This can happen with large payloads containing special characters. "
+                f"Try breaking the command into smaller parts or using different quoting."
+            )
+        else:
+            error_detail = (
+                "Cannot infer value for required parameter(s): "
+                + ", ".join(missing_params or ([param_name] if param_name else ["unknown"]))
+                + ". Provide explicit values for these parameters."
             )
 
         return RecoveryResult(
             action=RecoveryAction.SKIP,
-            user_message=f"Cannot infer value for required parameter '{param_name}'",
+            user_message=error_detail,
         )
 
 
@@ -298,14 +456,31 @@ class FileNotFoundHandler(ErrorRecoveryHandler):
         )
 
     def handle(self, error: Exception, tool_name: str, args: Dict[str, Any]) -> RecoveryResult:
-        # Try common path variations
         path = args.get("path") or args.get("file_path") or args.get("file")
 
         if path:
+            suggested_paths = self._extract_suggested_paths(str(error))
+            suggested_retry = self._choose_best_suggested_path(path, suggested_paths, tool_name)
+            if suggested_retry:
+                self._logger.info(f"Trying suggested path: {suggested_retry}")
+                path_key = self._get_path_arg_key(args)
+                return RecoveryResult(
+                    action=RecoveryAction.RETRY_WITH_INFERRED,
+                    modified_args={**args, path_key: suggested_retry},
+                    user_message=f"Trying suggested path: {suggested_retry}",
+                    metadata={"suggested_paths": suggested_paths},
+                )
+            if suggested_paths:
+                return RecoveryResult(
+                    action=RecoveryAction.SKIP,
+                    user_message="File not found and suggestions did not provide a new path",
+                    metadata={"suggested_paths": suggested_paths},
+                )
+
             variations = self._get_path_variations(path)
             if variations:
                 self._logger.info(f"Trying path variation: {variations[0]}")
-                path_key = "path" if "path" in args else "file_path"
+                path_key = self._get_path_arg_key(args)
                 return RecoveryResult(
                     action=RecoveryAction.RETRY_WITH_INFERRED,
                     modified_args={**args, path_key: variations[0]},
@@ -341,6 +516,71 @@ class FileNotFoundHandler(ErrorRecoveryHandler):
 
         return variations
 
+    def _get_path_arg_key(self, args: Dict[str, Any]) -> str:
+        """Select the canonical path-like argument key for retries."""
+        if "path" in args:
+            return "path"
+        if "file_path" in args:
+            return "file_path"
+        if "file" in args:
+            return "file"
+        return "path"
+
+    def _extract_suggested_paths(self, error_str: str) -> List[str]:
+        """Parse candidate paths from "Did you mean" style error text."""
+        suggested_paths = re.findall(r"^\s*-\s+(.+?)\s*$", error_str, re.MULTILINE)
+        if suggested_paths:
+            return suggested_paths
+
+        inline_match = re.search(r"Did you mean:\s*(.+)", error_str)
+        if not inline_match:
+            return []
+
+        return [
+            candidate.strip() for candidate in inline_match.group(1).split(",") if candidate.strip()
+        ]
+
+    def _choose_best_suggested_path(
+        self, original_path: str, suggestions: List[str], tool_name: str
+    ) -> Optional[str]:
+        """Prefer the most relevant suggestion for the tool being retried."""
+        if not suggestions:
+            return None
+
+        normalized_original = original_path.rstrip("/").replace("\\", "/")
+        base_path, _ = os.path.splitext(normalized_original)
+        filtered_suggestions = [
+            candidate
+            for candidate in suggestions
+            if candidate.rstrip("/").replace("\\", "/") != normalized_original
+        ]
+        if not filtered_suggestions:
+            return None
+
+        file_suggestions = [
+            candidate for candidate in filtered_suggestions if not candidate.endswith("/")
+        ]
+        directory_suggestions = [
+            candidate for candidate in filtered_suggestions if candidate.endswith("/")
+        ]
+
+        if tool_name in {"read", "open", "cat"}:
+            package_file_matches = [
+                candidate
+                for candidate in file_suggestions
+                if candidate.replace("\\", "/").startswith(f"{base_path}/")
+            ]
+            if package_file_matches:
+                return package_file_matches[0]
+            if file_suggestions:
+                return file_suggestions[0]
+            return filtered_suggestions[0]
+
+        if tool_name in {"ls", "find"} and directory_suggestions:
+            return directory_suggestions[0]
+
+        return filtered_suggestions[0]
+
 
 class RateLimitHandler(ErrorRecoveryHandler):
     """Handle rate limit errors with exponential backoff."""
@@ -372,6 +612,57 @@ class RateLimitHandler(ErrorRecoveryHandler):
         )
 
 
+class ResourceBudgetTimeoutHandler(ErrorRecoveryHandler):
+    """Handle resource-budget timeouts from bounded local tools."""
+
+    BUDGET_TIMEOUT_PATTERNS = [
+        r"exceeded\s+\d+(?:\.\d+)?s?\s+budget",
+        r"exceeded\s+.*\btime\s+budget\b",
+        r"\bresource[-_\s]?budget\b",
+        r"\bdeadline exceeded\b",
+        r"\btime limit exceeded\b",
+    ]
+
+    def can_handle(self, error: Exception, tool_name: str, args: Dict[str, Any]) -> bool:
+        error_str = str(error).lower()
+        return any(
+            re.search(pattern, error_str, re.IGNORECASE) for pattern in self.BUDGET_TIMEOUT_PATTERNS
+        )
+
+    def handle(self, error: Exception, tool_name: str, args: Dict[str, Any]) -> RecoveryResult:
+        return RecoveryResult(
+            action=RecoveryAction.SKIP,
+            user_message=(
+                f"Tool '{tool_name}' exceeded its resource budget. "
+                "Retry with a narrower path, smaller top_k, or a more specific mode."
+            ),
+            metadata={"error_kind": "resource_budget_timeout"},
+        )
+
+
+class TimeoutErrorHandler(ErrorRecoveryHandler):
+    """Handle tool timeout errors.
+
+    Timeouts are expected for slow tools (code_search, web_search, etc.)
+    and do not require handler intervention beyond clear messaging.
+    """
+
+    def can_handle(self, error: Exception, tool_name: str, args: Dict[str, Any]) -> bool:
+        if isinstance(error, asyncio.TimeoutError):
+            return True
+        error_str = str(error).lower()
+        return "timed out" in error_str or "timeout" in error_str
+
+    def handle(self, error: Exception, tool_name: str, args: Dict[str, Any]) -> RecoveryResult:
+        return RecoveryResult(
+            action=RecoveryAction.SKIP,
+            user_message=(
+                f"Tool '{tool_name}' timed out. "
+                "Consider increasing the per-tool timeout setting or simplifying the operation."
+            ),
+        )
+
+
 class PermissionErrorHandler(ErrorRecoveryHandler):
     """Handle permission errors."""
 
@@ -391,6 +682,54 @@ class PermissionErrorHandler(ErrorRecoveryHandler):
         return RecoveryResult(
             action=RecoveryAction.ASK_USER,
             user_message="Permission denied. Please check file permissions or run with elevated privileges.",
+        )
+
+
+class GraphDatabaseErrorHandler(ErrorRecoveryHandler):
+    """Handle graph database errors with intelligent fallbacks."""
+
+    def can_handle(self, error: Exception, tool_name: str, args: Dict[str, Any]) -> bool:
+        """Check if this is a graph database error we can handle."""
+        if tool_name != "graph":
+            return False
+        error_str = str(error).lower()
+        return (
+            "project graph database is empty" in error_str
+            or "project graph database is unavailable" in error_str
+            or "graph data unavailable" in error_str
+            or "graph database is empty" in error_str
+        )
+
+    def handle(
+        self, error: Exception, tool_name: str, args: Dict[str, Any]
+    ) -> Optional[RecoveryResult]:
+        """Handle graph database errors with helpful suggestions."""
+        error_str = str(error).lower()
+        path = args.get("path", ".")
+
+        if "empty" in error_str:
+            return RecoveryResult(
+                action=RecoveryAction.ASK_USER,
+                user_message=(
+                    f"Graph database is empty for path '{path}'. "
+                    f"Build the index with: graph(mode='stats', path='{path}', reindex=True). "
+                    f"Or use ls(path='{path}', depth=2) for file operations."
+                ),
+            )
+
+        if "unavailable" in error_str:
+            return RecoveryResult(
+                action=RecoveryAction.ASK_USER,
+                user_message=(
+                    f"Graph index unavailable for path '{path}'. "
+                    f"Try: graph(mode='stats', path='{path}', reindex=True) "
+                    "or use code_search(mode='literal', ...) for text search."
+                ),
+            )
+
+        return RecoveryResult(
+            action=RecoveryAction.ASK_USER,
+            user_message=f"Graph database error: {error}",
         )
 
 
@@ -434,6 +773,70 @@ class TypeErrorHandler(ErrorRecoveryHandler):
         )
 
 
+class ShellGrepRedirectHandler(ErrorRecoveryHandler):
+    """Handle shell tool errors that suggest using code_search instead.
+
+    When the shell tool rejects grep/rg commands for project code and suggests
+    using code_search, this handler extracts the search query and suggests
+    using code_search with the appropriate parameters.
+    """
+
+    # Pattern to detect the shell tool's code_search suggestion
+    CODE_SEARCH_SUGGESTION = "use code_search(query='..."
+
+    # Pattern to extract grep pattern from shell commands
+    GREP_PATTERN_PATTERNS = [
+        # grep/rg -r "pattern" [path]
+        r'(?:grep|rg|ag|ack)\s+(?:-[a-zA-Z]*\s+)*[\'"]([^\']+)[\'"]',
+        # grep/rg "pattern" file
+        r'(?:grep|rg|ag|ack)\s+[\'"]([^\']+)[\'"]',
+        # grep -e pattern
+        r'-e\s+[\'"]?([^\'"\s]+)[\'"]?',
+    ]
+
+    def can_handle(self, error: Exception, tool_name: str, args: Dict[str, Any]) -> bool:
+        """Check if this is a shell tool error suggesting code_search."""
+        if tool_name != "shell":
+            return False
+
+        error_str = str(error).lower()
+        return "code_search" in error_str and "instead of shell" in error_str
+
+    def handle(self, error: Exception, tool_name: str, args: Dict[str, Any]) -> RecoveryResult:
+        """Extract the search query and suggest code_search."""
+        cmd = args.get("cmd", "")
+
+        # Try to extract the search pattern from the command
+        query = self._extract_search_query(cmd)
+
+        if query:
+            self._logger.info(f"Redirecting shell grep to code_search with query: {query}")
+            return RecoveryResult(
+                action=RecoveryAction.FALLBACK_TOOL,
+                fallback_tool="code_search",
+                modified_args={"query": query, "mode": "semantic"},
+                user_message=f"Using code_search instead of shell grep for query: {query}",
+            )
+
+        # If we couldn't extract a query, still suggest code_search
+        return RecoveryResult(
+            action=RecoveryAction.FALLBACK_TOOL,
+            fallback_tool="code_search",
+            user_message="Use code_search for project code instead of shell grep",
+        )
+
+    def _extract_search_query(self, cmd: str) -> Optional[str]:
+        """Extract the search pattern from a grep/rg command."""
+        for pattern in self.GREP_PATTERN_PATTERNS:
+            match = re.search(pattern, cmd, re.IGNORECASE)
+            if match:
+                query = match.group(1).strip()
+                # Clean up the query - remove regex special chars if it looks like a literal search
+                if query and len(query) < 200:  # Reasonable query length
+                    return query
+        return None
+
+
 def build_recovery_chain() -> ErrorRecoveryHandler:
     """Build the default error recovery chain.
 
@@ -441,12 +844,16 @@ def build_recovery_chain() -> ErrorRecoveryHandler:
     """
     chain = MissingParameterHandler()
     (
-        chain.set_next(TypeErrorHandler())
+        chain.set_next(ShellGrepRedirectHandler())
+        .set_next(TypeErrorHandler())
         .set_next(FileNotFoundHandler())
         .set_next(ToolNotFoundHandler())
         .set_next(RateLimitHandler())
+        .set_next(ResourceBudgetTimeoutHandler())
         .set_next(NetworkErrorHandler())
+        .set_next(TimeoutErrorHandler())
         .set_next(PermissionErrorHandler())
+        .set_next(GraphDatabaseErrorHandler())
     )
     return chain
 
@@ -461,6 +868,16 @@ def get_recovery_chain() -> ErrorRecoveryHandler:
     if _default_chain is None:
         _default_chain = build_recovery_chain()
     return _default_chain
+
+
+def reset_recovery_chain() -> None:
+    """Reset the recovery chain singleton.
+
+    Forces the chain to be rebuilt on the next call to get_recovery_chain().
+    Useful when new handlers have been added dynamically.
+    """
+    global _default_chain
+    _default_chain = None
 
 
 def recover_from_error(

@@ -106,7 +106,11 @@ class JSONChunkingStrategy(ChunkingStrategy):
                             start_char=pos,
                             end_char=pos + len(full_content),
                             chunk_type="json_value_part",
-                            metadata={"key": key, "part": i + 1, "total_parts": len(sub_chunks)},
+                            metadata={
+                                "key": key,
+                                "part": i + 1,
+                                "total_parts": len(sub_chunks),
+                            },
                         )
                     )
                     pos += len(full_content)

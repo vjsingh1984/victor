@@ -36,6 +36,7 @@ from typing import Optional
 
 from victor.framework.rl.base import BaseLearner, RLOutcome, RLRecommendation
 from victor.core.schema import Tables
+from victor.framework.rl.migration import RLTableMigrator
 
 logger = logging.getLogger(__name__)
 
@@ -53,36 +54,48 @@ class SemanticThresholdLearner(BaseLearner):
     """
 
     def _ensure_tables(self) -> None:
-        """Create tables for semantic threshold stats."""
-        cursor = self.db.cursor()
+        """Migrate legacy per-learner tables to unified RL tables."""
+        RLTableMigrator(self.db).run_if_needed(
+            self.name, RLTableMigrator.migrate_semantic_threshold
+        )
 
-        # Stats table: one row per embedding_model:task_type:tool_name
-        cursor.execute(f"""
-            CREATE TABLE IF NOT EXISTS {Tables.RL_SEMANTIC_STAT} (
-                context_key TEXT PRIMARY KEY,
-                embedding_model TEXT NOT NULL,
-                task_type TEXT NOT NULL,
-                tool_name TEXT NOT NULL,
-                total_searches INTEGER DEFAULT 0,
-                zero_result_count INTEGER DEFAULT 0,
-                low_quality_count INTEGER DEFAULT 0,
-                avg_results_count REAL DEFAULT 0.0,
-                avg_threshold REAL DEFAULT 0.5,
-                recommended_threshold REAL,
-                results_sum REAL DEFAULT 0.0,
-                threshold_sum REAL DEFAULT 0.0,
-                last_updated TEXT
-            )
-            """)
+    def _load_context_stats(self, cursor: sqlite3.Cursor, context_key: str) -> dict:
+        """Load all stat_keys for a context_key from rl_task_stat."""
+        cursor.execute(
+            f"SELECT stat_key, stat_value, sample_count FROM {Tables.RL_TASK_STAT}"
+            f" WHERE learner_id = ? AND task_type = ?",
+            (self.name, context_key),
+        )
+        row_map: dict = {}
+        for row in cursor.fetchall():
+            if hasattr(row, "keys"):
+                row_dict = dict(row)
+                stat_key = row_dict["stat_key"]
+                stat_value = row_dict["stat_value"]
+                sample_count = row_dict["sample_count"]
+            else:
+                stat_key, stat_value, sample_count = row
+            row_map[stat_key] = (stat_value, sample_count)
+        return row_map
 
-        # Index for fast lookups
-        cursor.execute(f"""
-            CREATE INDEX IF NOT EXISTS idx_rl_semantic_stat_model
-            ON {Tables.RL_SEMANTIC_STAT}(embedding_model, task_type, tool_name)
-            """)
-
-        self.db.commit()
-        logger.debug("RL: semantic_threshold tables ensured")
+    def _upsert_stat(
+        self,
+        cursor: sqlite3.Cursor,
+        context_key: str,
+        stat_key: str,
+        stat_value: float,
+        sample_count: int,
+        ts: str,
+    ) -> None:
+        """Upsert a single stat row into rl_task_stat."""
+        cursor.execute(
+            f"""
+            INSERT OR REPLACE INTO {Tables.RL_TASK_STAT}
+            (learner_id, task_type, stat_key, stat_value, sample_count, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (self.name, context_key, stat_key, stat_value, sample_count, ts),
+        )
 
     def record_outcome(self, outcome: RLOutcome) -> None:
         """Record semantic search outcome.
@@ -99,6 +112,17 @@ class SemanticThresholdLearner(BaseLearner):
         Args:
             outcome: Outcome with semantic search data
         """
+        # Check RL mode — skip writes in "none" mode
+        try:
+            from victor.config.settings import load_settings
+
+            rl_mode = getattr(load_settings(), "rl_mode", "selective")
+        except Exception:
+            rl_mode = "selective"
+
+        if rl_mode == "none":
+            return
+
         # Extract metadata
         embedding_model = outcome.metadata.get("embedding_model", "unknown")
         tool_name = outcome.metadata.get("tool_name", "code_search")
@@ -107,90 +131,83 @@ class SemanticThresholdLearner(BaseLearner):
 
         cursor = self.db.cursor()
 
-        # Get or create stats
-        cursor.execute(
-            f"SELECT * FROM {Tables.RL_SEMANTIC_STAT} WHERE context_key = ?",
-            (context_key,),
-        )
-        row = cursor.fetchone()
+        # Load existing stats from rl_task_stat
+        row_map = self._load_context_stats(cursor, context_key)
 
-        if row:
-            # Update existing - convert row to dict using column names from cursor description
-            column_names = [description[0] for description in cursor.description]
-            stats = dict(zip(column_names, row))
-        else:
-            # Initialize new entry
-            stats = {
-                "context_key": context_key,
-                "embedding_model": embedding_model,
-                "task_type": outcome.task_type,
-                "tool_name": tool_name,
-                "total_searches": 0,
-                "zero_result_count": 0,
-                "low_quality_count": 0,
-                "avg_results_count": 0.0,
-                "avg_threshold": 0.5,
-                "recommended_threshold": None,
-                "results_sum": 0.0,
-                "threshold_sum": 0.0,
-                "last_updated": outcome.timestamp,
-            }
+        def _sv(key: str, default: float) -> float:
+            return row_map[key][0] if key in row_map else default
+
+        total_searches = int(_sv("total_searches", 0))
+        zero_result_count = int(_sv("zero_result_count", 0))
+        low_quality_count = int(_sv("low_quality_count", 0))
+        results_sum = _sv("results_sum", 0.0)
+        threshold_sum = _sv("threshold_sum", 0.0)
+        prev_recommended = _sv("recommended_threshold", -1.0)
 
         # Update counts
-        stats["total_searches"] += 1
-
+        total_searches += 1
         results_count = outcome.metadata.get("results_count", 0)
         if results_count == 0:
-            stats["zero_result_count"] += 1
-
+            zero_result_count += 1
         if outcome.metadata.get("false_positives", False):
-            stats["low_quality_count"] += 1
+            low_quality_count += 1
 
         # Update weighted moving average (decay=0.9)
         decay = 0.9
         threshold_used = outcome.metadata.get("threshold_used", 0.5)
+        results_sum = decay * results_sum + results_count
+        threshold_sum = decay * threshold_sum + threshold_used
+        avg_results_count = results_sum / (1 + (total_searches - 1) * decay)
+        avg_threshold = threshold_sum / (1 + (total_searches - 1) * decay)
 
-        stats["results_sum"] = decay * stats["results_sum"] + results_count
-        stats["threshold_sum"] = decay * stats["threshold_sum"] + threshold_used
+        # Build stats dict for _update_threshold
+        stats = {
+            "context_key": context_key,
+            "total_searches": total_searches,
+            "zero_result_count": zero_result_count,
+            "low_quality_count": low_quality_count,
+            "avg_results_count": avg_results_count,
+            "avg_threshold": avg_threshold,
+            "recommended_threshold": None,
+        }
 
-        stats["avg_results_count"] = stats["results_sum"] / (
-            1 + (stats["total_searches"] - 1) * decay
-        )
-        stats["avg_threshold"] = stats["threshold_sum"] / (
-            1 + (stats["total_searches"] - 1) * decay
-        )
-
-        stats["last_updated"] = outcome.timestamp
-
-        # Update recommendation if enough data
-        if stats["total_searches"] >= 5:
+        if total_searches >= 5:
             self._update_threshold(stats)
 
-        # Upsert to database
-        cursor.execute(
-            f"""
-            INSERT OR REPLACE INTO {Tables.RL_SEMANTIC_STAT}
-            (context_key, embedding_model, task_type, tool_name, total_searches,
-             zero_result_count, low_quality_count, avg_results_count, avg_threshold,
-             recommended_threshold, results_sum, threshold_sum, last_updated)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                stats["context_key"],
-                stats["embedding_model"],
-                stats["task_type"],
-                stats["tool_name"],
-                stats["total_searches"],
-                stats["zero_result_count"],
-                stats["low_quality_count"],
-                stats["avg_results_count"],
-                stats["avg_threshold"],
-                stats["recommended_threshold"],
-                stats["results_sum"],
-                stats["threshold_sum"],
-                stats["last_updated"],
-            ),
-        )
+        recommended = stats.get("recommended_threshold")
+
+        # Dirty-check: skip write only when recommendation is stable
+        if rl_mode == "selective" and row_map and recommended is not None and prev_recommended >= 0:
+            if abs(recommended - prev_recommended) < 0.01:
+                logger.debug(
+                    "RL: semantic_threshold recommendation unchanged for %s, skipping",
+                    context_key,
+                )
+                return
+
+        # Upsert all stats to rl_task_stat
+        ts = outcome.timestamp
+        for stat_key, stat_value in (
+            ("total_searches", float(total_searches)),
+            ("zero_result_count", float(zero_result_count)),
+            ("low_quality_count", float(low_quality_count)),
+            ("avg_results_count", avg_results_count),
+            ("avg_threshold", avg_threshold),
+            ("results_sum", results_sum),
+            ("threshold_sum", threshold_sum),
+        ):
+            self._upsert_stat(cursor, context_key, stat_key, stat_value, total_searches, ts)
+
+        if recommended is not None:
+            self._upsert_stat(
+                cursor,
+                context_key,
+                "recommended_threshold",
+                recommended,
+                total_searches,
+                ts,
+            )
+
         self.db.commit()
 
         logger.debug(
@@ -263,7 +280,7 @@ class SemanticThresholdLearner(BaseLearner):
         if abs(recommended - current) < 0.01:
             return
 
-        logger.info(
+        logger.debug(
             f"RL: Updated semantic_threshold for {stats['context_key']}: "
             f"{current:.2f} → {recommended:.2f} "
             f"(zero_rate={zero_rate:.1%}, low_quality_rate={low_quality_rate:.1%})"
@@ -292,42 +309,38 @@ class SemanticThresholdLearner(BaseLearner):
         context_key = self._get_context_key(embedding_model, task_type, tool_name)
 
         cursor = self.db.cursor()
-        cursor.execute(
-            f"SELECT * FROM {Tables.RL_SEMANTIC_STAT} WHERE context_key = ?",
-            (context_key,),
-        )
-        row = cursor.fetchone()
+        row_map = self._load_context_stats(cursor, context_key)
 
-        if not row:
-            # No data yet - return None (caller will use default)
+        if not row_map:
             return None
 
-        # Convert row tuple to dict using column names from cursor description
-        column_names = [description[0] for description in cursor.description]
-        stats = dict(zip(column_names, row))
+        def _sv(key: str, default: float) -> float:
+            return row_map[key][0] if key in row_map else default
 
-        # Need at least 5 searches for confidence
-        if stats["total_searches"] < 5:
+        total_searches = int(_sv("total_searches", 0))
+        if total_searches < 5:
             return None
 
-        # Calculate confidence based on sample size
-        confidence = min(1.0, stats["total_searches"] / 30.0)
+        zero_result_count = _sv("zero_result_count", 0.0)
+        low_quality_count = _sv("low_quality_count", 0.0)
+        avg_threshold = _sv("avg_threshold", 0.5)
+        recommended_threshold = _sv("recommended_threshold", -1.0)
 
-        # Reduce confidence if high false positive/negative rate
-        zero_rate = stats["zero_result_count"] / stats["total_searches"]
-        low_quality_rate = stats["low_quality_count"] / stats["total_searches"]
+        confidence = min(1.0, total_searches / 30.0)
+        zero_rate = zero_result_count / total_searches
+        low_quality_rate = low_quality_count / total_searches
 
         if zero_rate > 0.3 or low_quality_rate > 0.3:
             confidence *= 0.7
 
-        recommended = stats["recommended_threshold"] or stats["avg_threshold"]
+        recommended = recommended_threshold if recommended_threshold >= 0 else avg_threshold
 
         return RLRecommendation(
             value=recommended,
             confidence=confidence,
-            reason=f"Learned from {stats['total_searches']} searches "
+            reason=f"Learned from {total_searches} searches "
             f"(zero_rate={zero_rate:.1%}, low_quality_rate={low_quality_rate:.1%})",
-            sample_size=stats["total_searches"],
+            sample_size=total_searches,
             is_baseline=False,
         )
 

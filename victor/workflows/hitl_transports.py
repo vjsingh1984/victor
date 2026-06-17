@@ -610,7 +610,10 @@ class SlackTransport(BaseTransport):
     ) -> List[Dict]:
         """Build Slack Block Kit blocks."""
         blocks = [
-            {"type": "header", "text": {"type": "plain_text", "text": "🔔 Approval Required"}},
+            {
+                "type": "header",
+                "text": {"type": "plain_text", "text": "🔔 Approval Required"},
+            },
             {
                 "type": "section",
                 "text": {

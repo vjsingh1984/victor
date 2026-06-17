@@ -7,7 +7,9 @@ from pathlib import Path
 
 from victor.framework.rl.base import RLOutcome, RLRecommendation
 from victor.framework.rl.coordinator import RLCoordinator
-from victor.framework.rl.learners.continuation_patience import ContinuationPatienceLearner
+from victor.framework.rl.learners.continuation_patience import (
+    ContinuationPatienceLearner,
+)
 from victor.core.database import reset_database, get_database
 from victor.core.schema import Tables
 
@@ -70,15 +72,17 @@ def _get_patience_stats(
     """Helper to retrieve raw stats from the database."""
     cursor = coordinator.db.cursor()
     context_key = f"{provider}:{model}:{task_type}"
-    cursor.execute(
-        f"SELECT * FROM {Tables.RL_PATIENCE_STAT} WHERE context_key = ?",
+    rows = cursor.execute(
+        f"SELECT stat_key, stat_value, sample_count FROM {Tables.RL_TASK_STAT} "
+        f"WHERE learner_id = 'continuation_patience' AND task_type = ?",
         (context_key,),
-    )
-    row = cursor.fetchone()
-    if row:
-        columns = [description[0] for description in cursor.description]
-        return dict(zip(columns, row))
-    return None
+    ).fetchall()
+    if not rows:
+        return None
+    result: dict = {"context_key": context_key}
+    for stat_key, stat_value, sample_count in rows:
+        result[stat_key] = stat_value
+    return result
 
 
 class TestContinuationPatienceLearner:
@@ -87,7 +91,7 @@ class TestContinuationPatienceLearner:
         assert learner.name == "continuation_patience"
         cursor = learner.db.cursor()
         cursor.execute(
-            f"SELECT name FROM sqlite_master WHERE type='table' AND name='{Tables.RL_PATIENCE_STAT}';"
+            f"SELECT name FROM sqlite_master WHERE type='table' AND name='{Tables.RL_TASK_STAT}';"
         )
         assert cursor.fetchone() is not None
 

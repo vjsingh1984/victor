@@ -18,10 +18,15 @@ These tests verify the framework's unified prompt building system that
 consolidates duplicate prompt construction logic.
 """
 
-import pytest
+import importlib
 from typing import Dict
-from unittest.mock import MagicMock
+from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
 
+import pytest
+import victor.framework.prompt_sections as prompt_sections_module
+
+from victor.core.grounding_texts import GROUNDING_RULES
 from victor.framework.prompt_builder import (
     PromptBuilder,
     PromptSection,
@@ -36,8 +41,11 @@ from victor.framework.prompt_sections import (
     GROUNDING_RULES_EXTENDED,
     CODING_IDENTITY,
     CODING_GUIDELINES,
+    DATA_ANALYSIS_GROUNDING,
     DEVOPS_IDENTITY,
+    DEVOPS_GROUNDING,
     RESEARCH_IDENTITY,
+    RESEARCH_GROUNDING,
     DATA_ANALYSIS_IDENTITY,
 )
 
@@ -154,6 +162,18 @@ class TestPromptBuilder:
 
         assert first_idx < middle_idx < last_idx
 
+    def test_build_document_renders_same_as_build(self):
+        """Canonical prompt document should be the single rendering source."""
+        builder = PromptBuilder()
+        builder.add_section("identity", "I am an assistant.", priority=10)
+        builder.add_tool_hints({"read": "Read files"})
+        builder.add_safety_rules(["Be careful"])
+        builder.add_context("Working on code")
+
+        document = builder.build_document()
+
+        assert document.render() == builder.build()
+
     def test_ensure_section_adds_missing(self):
         """Ensure section helper adds fallback content."""
         builder = PromptBuilder()
@@ -192,6 +212,52 @@ class TestPromptBuilder:
             name for name in ("context_a", "context_b") if builder.has_section(name)
         ]
         assert len(remaining_context) == 1
+
+    def test_get_section_fallback_uses_shared_registry(self):
+        """Framework prompt builder should reuse registry-backed fallback text."""
+        from victor.agent.prompt_section_registry import build_fallback_map
+
+        builder = PromptBuilder()
+
+        assert (
+            builder._get_section_fallback("LARGE_FILE_PAGINATION_GUIDANCE")
+            == build_fallback_map(["LARGE_FILE_PAGINATION_GUIDANCE"])[
+                "LARGE_FILE_PAGINATION_GUIDANCE"
+            ]
+        )
+
+    def test_add_evolved_section_uses_optimization_injector_interface(self):
+        """Framework prompt builder should wire the canonical injector into the resolver."""
+        builder = PromptBuilder()
+        resolved = SimpleNamespace(text="EVOLVED PAGINATION", source="evolved")
+
+        with (
+            patch("victor.agent.optimization_injector.OptimizationInjector") as injector_cls,
+            patch("victor.agent.evolved_content_resolver.EvolvedContentResolver") as resolver_cls,
+        ):
+            injector_instance = injector_cls.return_value
+            resolver_cls.return_value.resolve_section.return_value = resolved
+
+            builder.add_evolved_section(
+                "LARGE_FILE_PAGINATION_GUIDANCE",
+                provider="anthropic",
+                model="claude-sonnet",
+                task_type="analysis",
+                priority=55,
+            )
+
+        resolver_cls.assert_called_once_with(optimization_injector=injector_instance)
+        resolver_cls.return_value.resolve_section.assert_called_once_with(
+            section_name="LARGE_FILE_PAGINATION_GUIDANCE",
+            provider="anthropic",
+            model="claude-sonnet",
+            task_type="analysis",
+            fallback_text=builder._get_section_fallback("LARGE_FILE_PAGINATION_GUIDANCE"),
+        )
+        section = builder.get_section("large_file_pagination_guidance")
+        assert section is not None
+        assert section.content == "EVOLVED PAGINATION"
+        assert section.priority == 55
 
     def test_add_section_with_custom_header(self):
         """Test adding section with custom header."""
@@ -604,6 +670,78 @@ class TestPromptSectionsImports:
         """Test GROUNDING_RULES_EXTENDED has expected content."""
         assert "CRITICAL" in GROUNDING_RULES_EXTENDED
         assert "TOOL OUTPUT GROUNDING" in GROUNDING_RULES_EXTENDED
+
+    def test_framework_vertical_grounding_sections_compose_canonical_base(self):
+        """Framework vertical grounding exports should build on canonical shared grounding."""
+        assert DEVOPS_GROUNDING.startswith(GROUNDING_RULES)
+        assert RESEARCH_GROUNDING.startswith(GROUNDING_RULES)
+        assert DATA_ANALYSIS_GROUNDING.startswith(GROUNDING_RULES)
+        assert "Verify configuration syntax before suggesting." in DEVOPS_GROUNDING
+        assert "Always cite URLs for claims." in RESEARCH_GROUNDING
+        assert "Always show code that produced results." in DATA_ANALYSIS_GROUNDING
+
+    def test_shared_framework_sections_resolve_from_registry(self, monkeypatch):
+        """Framework shared guidance exports should follow the canonical registry."""
+        from victor.agent import prompt_section_registry as registry_module
+        from victor.agent.prompt_section_registry import (
+            SectionCategory,
+            SectionDefinition,
+            UnifiedSectionRegistry,
+            _initialize_default_sections,
+        )
+
+        fresh_registry = UnifiedSectionRegistry()
+        _initialize_default_sections(fresh_registry)
+        fresh_registry.register(
+            SectionDefinition(
+                name="GROUNDING_RULES",
+                aliases={"grounding", "grounding_rules", "safety_rules"},
+                category=SectionCategory.GROUNDING,
+                default_text="Registry framework minimal grounding.",
+                evolvable=True,
+                required=True,
+                priority=80,
+                default_strategies=("gepa", "prefpo"),
+            )
+        )
+        fresh_registry.register(
+            SectionDefinition(
+                name="GROUNDING_RULES_EXTENDED",
+                aliases={"strict_grounding", "grounding_rules_extended"},
+                category=SectionCategory.GROUNDING,
+                default_text="Registry framework strict grounding.",
+                evolvable=True,
+                required=False,
+                priority=85,
+                default_strategies=("gepa",),
+            )
+        )
+        fresh_registry.register(
+            SectionDefinition(
+                name="PARALLEL_READ_GUIDANCE",
+                aliases={"parallel_read_guidance", "parallel_reads", "batch_reading"},
+                category=SectionCategory.TOOL_GUIDANCE,
+                default_text="Registry framework parallel reads.",
+                evolvable=True,
+                required=False,
+                priority=70,
+                default_strategies=("gepa",),
+            )
+        )
+        monkeypatch.setattr(registry_module, "_registry", fresh_registry)
+
+        reloaded_module = importlib.reload(prompt_sections_module)
+        try:
+            assert (
+                reloaded_module.GROUNDING_RULES_MINIMAL == "Registry framework minimal grounding."
+            )
+            assert (
+                reloaded_module.GROUNDING_RULES_EXTENDED == "Registry framework strict grounding."
+            )
+            assert reloaded_module.PARALLEL_READ_GUIDANCE == "Registry framework parallel reads."
+        finally:
+            monkeypatch.setattr(registry_module, "_registry", None)
+            importlib.reload(prompt_sections_module)
 
     def test_coding_identity_content(self):
         """Test CODING_IDENTITY has expected content."""

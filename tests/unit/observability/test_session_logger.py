@@ -205,7 +205,7 @@ class TestSessionLoggingInWorkflow:
                     "logger": record.name,
                     "level": record.levelname,
                     "message": record.getMessage(),
-                    "session_id": record.name.split(".")[-1] if "." in record.name else None,
+                    "session_id": (record.name.split(".")[-1] if "." in record.name else None),
                 }
                 return json.dumps(log_obj)
 

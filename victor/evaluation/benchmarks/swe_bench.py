@@ -282,6 +282,14 @@ class SWEBenchRunner(BaseBenchmarkRunner):
             if task.repo:
                 # Extract project name from repo URL (e.g., "astropy" from "astropy/astropy")
                 repo_name = task.repo.rstrip("/").split("/")[-1].replace(".git", "")
+
+                # Use framework's workspace dependency installer
+                from victor.context.workspace_setup import (
+                    ensure_project_importable,
+                )
+
+                await ensure_project_importable(repo_name, cached_repo, install_deps=True)
+
                 try:
                     spec = __import__(repo_name)
                     site_pkg_dir = Path(spec.__file__).parent
@@ -301,14 +309,31 @@ class SWEBenchRunner(BaseBenchmarkRunner):
                     )
                     site_out, site_err = await apply_site.communicate()
                     if apply_site.returncode == 0:
-                        logger.info("Patch also applied to installed package at %s", site_pkg_dir)
+                        logger.info(
+                            "Patch also applied to installed package at %s",
+                            site_pkg_dir,
+                        )
                     site_patch_file.unlink(missing_ok=True)
                 except Exception as e:
                     logger.debug("Could not patch installed package: %s", e)
 
-            # Run tests — prefer running from a temp dir to avoid conftest conflicts
-            test_cmd = self._build_test_command(task, cached_repo)
-            test_cmd.insert(test_cmd.index("-m") + 2, "--noconftest")
+            # Run tests using detected test runner
+            from victor.context.test_runner import detect_test_runner
+            import re as _re
+
+            _test_files = None
+            if hasattr(task, "fail_to_pass") and task.fail_to_pass:
+                _test_files = task.fail_to_pass
+            elif task.test_code:
+                _extracted = _re.findall(r"diff --git a/(\S+)", task.test_code)
+                _test_files = [f for f in _extracted if "test" in f.lower()]
+
+            _runner_config = detect_test_runner(cached_repo, test_files=_test_files or None)
+            test_cmd = _runner_config.command
+            # Add --noconftest only for pytest (avoids conftest conflicts)
+            if _runner_config.runner_type == "pytest" and "-m" in test_cmd:
+                idx = test_cmd.index("-m")
+                test_cmd.insert(idx + 2, "--noconftest")
             logger.info("Running tests: %s", " ".join(test_cmd))
 
             # Use installed package path as test root if available
@@ -316,6 +341,8 @@ class SWEBenchRunner(BaseBenchmarkRunner):
 
             clean_env = os.environ.copy()
             clean_env["PYTHONDONTWRITEBYTECODE"] = "1"
+            # Apply runner-specific env vars (e.g., DJANGO_SETTINGS_MODULE)
+            clean_env.update(_runner_config.env)
 
             test_proc = await asyncio.create_subprocess_exec(
                 *test_cmd,
@@ -340,9 +367,6 @@ class SWEBenchRunner(BaseBenchmarkRunner):
             result.stdout = stdout_str[-2000:]  # Last 2KB for diagnostics
             result.stderr = stderr_str[-2000:]
 
-            logger.info("Test stdout (last 500): %s", stdout_str[-500:])
-            logger.info("Test stderr (last 500): %s", stderr_str[-500:])
-
             # Parse test results
             passed, total = self._parse_test_output(stdout_str + stderr_str)
             result.tests_passed = passed
@@ -351,14 +375,22 @@ class SWEBenchRunner(BaseBenchmarkRunner):
 
             if total > 0 and passed == total:
                 result.status = TaskStatus.PASSED
+                if stdout_str:
+                    logger.debug("Test stdout (last 500): %s", stdout_str[-500:])
+                if stderr_str:
+                    logger.debug("Test stderr (last 500): %s", stderr_str[-500:])
                 logger.info("Tests PASSED: %d/%d", passed, total)
             elif total > 0 and passed > 0:
                 result.status = TaskStatus.FAILED
                 result.error_message = f"Partial pass: {passed}/{total}"
+                logger.info("Test stdout (last 500): %s", stdout_str[-500:])
+                logger.info("Test stderr (last 500): %s", stderr_str[-500:])
                 logger.info("Tests partial: %d/%d", passed, total)
             elif total > 0:
                 result.status = TaskStatus.FAILED
                 result.error_message = f"All tests failed ({total} total)"
+                logger.info("Test stdout (last 500): %s", stdout_str[-500:])
+                logger.info("Test stderr (last 500): %s", stderr_str[-500:])
                 logger.info("Tests FAILED: %d/%d", passed, total)
             else:
                 # Tests couldn't run (0 collected) — likely missing project deps.
@@ -397,27 +429,31 @@ class SWEBenchRunner(BaseBenchmarkRunner):
         return result
 
     def _build_test_command(self, task: BenchmarkTask, repo_dir: Path) -> list:
-        """Build the test command for a SWE-bench task."""
+        """Build the test command for a SWE-bench task.
+
+        Uses framework test runner detection to choose the right runner
+        (pytest, django, unittest) based on project structure.
+        """
         import re
-        import sys
 
-        # Use the current interpreter (venv python) not system python
-        python = sys.executable
+        from victor.context.test_runner import detect_test_runner
 
-        # Use FAIL_TO_PASS test list if available (from SWE-bench metadata)
+        # Extract test file paths from test_code patch or fail_to_pass
+        test_files = None
         if hasattr(task, "fail_to_pass") and task.fail_to_pass:
-            test_ids = task.fail_to_pass
-            return [python, "-m", "pytest", "-xvs"] + test_ids
+            test_files = task.fail_to_pass
+        elif task.test_code:
+            extracted = re.findall(r"diff --git a/(\S+)", task.test_code)
+            test_files = [f for f in extracted if "test" in f.lower()]
 
-        # Extract test file paths from test_code patch (SWE-bench provides test diffs)
-        if task.test_code:
-            test_files = re.findall(r"diff --git a/(\S+)", task.test_code)
-            test_files = [f for f in test_files if "test" in f.lower()]
-            if test_files:
-                return [python, "-m", "pytest", "-xvs"] + test_files
-
-        # Fallback: run tests related to the modified module
-        return [python, "-m", "pytest", "-x", "--tb=short", "-q"]
+        # Use framework test runner detection
+        config = detect_test_runner(repo_dir, test_files=test_files or None)
+        logger.info(
+            "Test runner detected: %s (command: %s)",
+            config.runner_type,
+            " ".join(config.command[:4]),
+        )
+        return config.command
 
     def _parse_test_output(self, output: str) -> tuple:
         """Parse pytest output to extract pass/fail counts."""

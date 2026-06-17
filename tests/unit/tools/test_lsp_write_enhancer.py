@@ -217,7 +217,9 @@ class TestLSPWriteEnhancer:
         enhancer = LSPWriteEnhancer()
 
         # Unknown file extension
-        content, formatter_name = enhancer.format_with_formatter("test.unknown_ext", "some content")
+        content, formatter_name = await enhancer.format_with_formatter(
+            "test.unknown_ext", "some content"
+        )
 
         # Should return content unchanged
         assert content == "some content"
@@ -229,7 +231,9 @@ class TestLSPWriteEnhancer:
         enhancer = LSPWriteEnhancer()
 
         # Python file but formatter might not be installed
-        content, formatter_name = enhancer.format_with_formatter("test.py", "def hello(): pass")
+        content, formatter_name = await enhancer.format_with_formatter(
+            "test.py", "def hello(): pass"
+        )
 
         # Should return content (possibly formatted or unchanged)
         assert isinstance(content, str)
@@ -273,7 +277,7 @@ class TestLSPWriteEnhancer:
             enhancer = LSPWriteEnhancer(workspace_root=tmpdir)
 
             # Mock methods to avoid actual LSP calls
-            enhancer.format_with_formatter = MagicMock(return_value=("formatted content", "black"))
+            enhancer.format_with_formatter = AsyncMock(return_value=("formatted content", "black"))
             enhancer.validate_with_lsp = AsyncMock(return_value=[])
 
             result = await enhancer.write_with_lsp(
@@ -302,7 +306,7 @@ class TestLSPWriteEnhancer:
             enhancer = LSPWriteEnhancer(workspace_root=tmpdir)
 
             # Mock validation to return errors
-            enhancer.format_with_formatter = MagicMock(return_value=("formatted content", "black"))
+            enhancer.format_with_formatter = AsyncMock(return_value=("formatted content", "black"))
             enhancer.validate_with_lsp = AsyncMock(
                 return_value=[
                     Diagnostic(
@@ -336,7 +340,7 @@ class TestLSPWriteEnhancer:
             enhancer = LSPWriteEnhancer(workspace_root=tmpdir)
 
             # Mock methods
-            enhancer.format_with_formatter = MagicMock(return_value=("formatted content", "black"))
+            enhancer.format_with_formatter = AsyncMock(return_value=("formatted content", "black"))
             enhancer.validate_with_lsp = AsyncMock(return_value=[])
 
             # Use full path in tmpdir

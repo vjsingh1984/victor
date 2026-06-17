@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 # Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -25,12 +27,14 @@ import asyncio
 import hashlib
 import logging
 import os
+import re
 import threading
 import time
 from collections import OrderedDict
-from typing import Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
-import numpy as np
+if TYPE_CHECKING:
+    import numpy as np
 
 # Import TRACE level from debug_logger (initializes the level on import)
 from victor.agent.debug_logger import TRACE
@@ -45,6 +49,30 @@ from victor.agent.debug_logger import TRACE
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 logger = logging.getLogger(__name__)
+
+np = None  # type: ignore[assignment]
+
+
+def _ensure_numpy():
+    """Import numpy into module scope on first actual use."""
+
+    global np
+    if np is None:
+        import numpy
+
+        np = numpy
+    return np
+
+
+# Import fuzzy matching for robust classification
+# This module provides Levenshtein-based fuzzy matching to handle typos
+try:
+    from victor.storage.embeddings.fuzzy_matcher import extract_key_terms_fuzzy
+
+    _FUZZY_MATCHING_AVAILABLE = True
+except ImportError:
+    _FUZZY_MATCHING_AVAILABLE = False
+
 
 # Default embedding model - matches unified_embedding_model in settings.py
 # BAAI/bge-small-en-v1.5: 130MB, 384-dim, ~6ms, MTEB 62.2
@@ -78,6 +106,8 @@ class EmbeddingService:
         # Sync version (for non-async contexts)
         embedding = service.embed_text_sync("Hello world")
     """
+
+    semantic: bool = True  # ML model-based, produces real semantic vectors
 
     _instance: Optional["EmbeddingService"] = None
     _lock = threading.Lock()
@@ -121,6 +151,9 @@ class EmbeddingService:
         # Shutdown flag to prevent new operations after shutdown initiated
         self._shutdown = False
 
+        # Tracks whether model has been successfully loaded at least once
+        self._initialized = False
+
         # Fast hash for cache keys (xxhash if available, else SHA-256)
         self._hash_fn = self._init_hash_fn()
 
@@ -149,10 +182,16 @@ class EmbeddingService:
 
     @classmethod
     def reset_instance(cls) -> None:
-        """Reset the singleton instance (mainly for testing)."""
+        """Reset the singleton instance (mainly for testing).
+
+        Note: the discarded instance is intentionally NOT marked ``_shutdown``.
+        Components (e.g. the intent/task/question classifiers) may still hold a
+        reference to it; a shut-down instance returns zero vectors, which leaks
+        as non-deterministic embedding failures into later tests. Dropping the
+        model lets any lingering reference lazily reload and keep working.
+        """
         with cls._lock:
             if cls._instance is not None:
-                cls._instance._shutdown = True
                 cls._instance._model = None
                 cls._instance = None
                 logger.info("Reset EmbeddingService singleton")
@@ -168,66 +207,118 @@ class EmbeddingService:
         logger.debug("[EmbeddingService] Shutdown signaled, new operations will be skipped")
 
     def _ensure_model_loaded(self) -> None:
-        """Ensure the model is loaded (lazy loading)."""
-        if self._model is None:
-            with self._model_lock:
-                if self._model is None:
-                    try:
-                        import warnings
-                        import logging
-                        import sys
-                        from contextlib import redirect_stderr
-                        from io import StringIO
-                        from sentence_transformers import SentenceTransformer
+        """Ensure the model is loaded (lazy loading).
 
-                        # Suppress all warnings from transformers/sentence_transformers during model loading
-                        # The BERT LOAD REPORT is printed directly by transformers library
-                        warnings.filterwarnings("ignore")
+        Resilient to transient model-fetch failures (e.g. HuggingFace ``429 Too
+        Many Requests`` under load): retries with backoff, and on persistent
+        failure leaves ``_model`` unset so callers degrade to zero-vector
+        embeddings rather than crashing. Embeddings are an optimization — an
+        unavailable model backend must not bring down an agent turn.
+        """
+        if self._model is not None:
+            return
+        with self._model_lock:
+            if self._model is not None:
+                return
 
-                        # Also suppress transformers library logging
-                        logging.getLogger("transformers").setLevel(logging.ERROR)
-                        logging.getLogger("sentence_transformers").setLevel(logging.ERROR)
+            import warnings
+            import logging
+            from contextlib import redirect_stderr
+            from io import StringIO
 
-                        load_start = time.perf_counter()
-                        logger.info(
-                            f"[EmbeddingService] Loading model: {self.model_name} "
-                            f"(device={self.device or 'auto'})"
+            try:
+                from sentence_transformers import SentenceTransformer
+            except ImportError as e:
+                raise ImportError(
+                    "sentence-transformers not installed. "
+                    "Install with: pip install sentence-transformers"
+                ) from e
+
+            # Suppress noisy warnings/logging during model loading.
+            warnings.filterwarnings("ignore")
+            logging.getLogger("transformers").setLevel(logging.ERROR)
+            logging.getLogger("sentence_transformers").setLevel(logging.ERROR)
+            logger.debug(
+                "[EmbeddingService] Model specs: "
+                "BAAI/bge-small-en-v1.5=130MB/384-dim/MTEB-62.2, "
+                "thenlper/gte-small=67MB/384-dim, "
+                "all-MiniLM-L6-v2=80MB/384-dim/fastest"
+            )
+
+            import random as _random
+
+            last_err: Optional[Exception] = None
+            max_attempts = 4
+            for attempt in range(max_attempts):
+                try:
+                    load_start = time.perf_counter()
+                    logger.info(
+                        f"[EmbeddingService] Loading model: {self.model_name} "
+                        f"(device={self.device or 'auto'}, attempt={attempt + 1})"
+                    )
+                    # Suppress stderr to hide the BERT LOAD REPORT (C++ library).
+                    stderr_capture = StringIO()
+                    with redirect_stderr(stderr_capture):
+                        self._model = SentenceTransformer(
+                            self.model_name,
+                            device=self.device,
                         )
-                        logger.debug(
-                            "[EmbeddingService] Model specs: "
-                            "BAAI/bge-small-en-v1.5=130MB/384-dim/MTEB-62.2, "
-                            "thenlper/gte-small=67MB/384-dim, "
-                            "all-MiniLM-L6-v2=80MB/384-dim/fastest"
-                        )
+                    self._dimension = self._model.get_sentence_embedding_dimension()
+                    self._initialized = True
+                    load_time = time.perf_counter() - load_start
+                    logger.info(
+                        f"[EmbeddingService] Model loaded successfully: "
+                        f"model={self.model_name}, dimension={self._dimension}, "
+                        f"device={self._model.device}, load_time={load_time:.2f}s"
+                    )
+                    return
+                except Exception as e:
+                    last_err = e
+                    # Only retry TRANSIENT failures (rate limit / network). A
+                    # permanent error (offline + uncached, model-not-found) won't
+                    # recover, so degrade immediately instead of wasting backoff.
+                    if attempt >= max_attempts - 1 or not self._is_transient_load_error(e):
+                        break
+                    # Exponential backoff with jitter: jitter de-synchronizes the
+                    # parallel shards whose lock-step retries cause the 429s.
+                    delay = (2 ** (attempt + 1)) * (0.75 + 0.5 * _random.random())
+                    time.sleep(delay)
 
-                        # Suppress stderr to hide BERT LOAD REPORT (printed directly by C++ library)
-                        stderr_capture = StringIO()
-                        with redirect_stderr(stderr_capture):
-                            self._model = SentenceTransformer(
-                                self.model_name,
-                                device=self.device,
-                            )
+            # Attempts exhausted or a permanent error — degrade gracefully
+            # (leave _model unset so embed_*_sync return zero vectors).
+            # Recoverable: a later call retries the load.
+            logger.warning(
+                "[EmbeddingService] Model %s failed to load (%s); embeddings "
+                "degrade to zero vectors. Pre-cache the model or set HF_TOKEN to "
+                "raise HuggingFace rate limits.",
+                self.model_name,
+                last_err,
+            )
 
-                        # Get embedding dimension from model
-                        self._dimension = self._model.get_sentence_embedding_dimension()
-                        load_time = time.perf_counter() - load_start
+    @staticmethod
+    def _is_transient_load_error(exc: Exception) -> bool:
+        """Whether a model-load error is worth retrying.
 
-                        logger.info(
-                            f"[EmbeddingService] Model loaded successfully: "
-                            f"model={self.model_name}, "
-                            f"dimension={self._dimension}, "
-                            f"device={self._model.device}, "
-                            f"load_time={load_time:.2f}s"
-                        )
-                        logger.debug(
-                            "[EmbeddingService] Singleton instance ready. "
-                            "Memory footprint ~130MB for bge-small-en-v1.5"
-                        )
-                    except ImportError as e:
-                        raise ImportError(
-                            "sentence-transformers not installed. "
-                            "Install with: pip install sentence-transformers"
-                        ) from e
+        Transient (retry): rate limits (HTTP 429), server errors (5xx),
+        connection/timeout errors. Permanent (degrade now): offline-without-cache,
+        model-not-found (HTTP 404 / 4xx), missing files — retrying can't help.
+        """
+        message = str(exc).lower()
+        permanent_markers = (
+            "offline",
+            "couldn't find",
+            "could not find",
+            "no such file",
+            "not a valid model identifier",
+            "repository not found",
+        )
+        if any(marker in message for marker in permanent_markers):
+            return False
+        status = getattr(getattr(exc, "response", None), "status_code", None)
+        if isinstance(status, int):
+            return status == 429 or 500 <= status < 600
+        # No HTTP status (connection reset, timeout, DNS, etc.) — treat as transient.
+        return True
 
     @property
     def dimension(self) -> int:
@@ -313,6 +404,7 @@ class EmbeddingService:
         Returns:
             Embedding vector as numpy array (float32)
         """
+        _ensure_numpy()
         # Check cache first
         if use_cache:
             cache_key = self._get_cache_key(text)
@@ -325,6 +417,11 @@ class EmbeddingService:
             self._cache_misses += 1
 
         self._ensure_model_loaded()
+        if self._model is None:
+            # Model unavailable (load failed) — degrade gracefully. Use the
+            # cached/default dimension directly; `self.dimension` would re-run
+            # the (just-failed) load and waste another round of retries.
+            return np.zeros(self._dimension or 384, dtype=np.float32)
 
         try:
             start_time = time.perf_counter()
@@ -410,10 +507,15 @@ class EmbeddingService:
         Returns:
             2D numpy array of embeddings (shape: [len(texts), dimension])
         """
+        _ensure_numpy()
         if not texts:
             return np.empty((0, self.dimension), dtype=np.float32)
 
         self._ensure_model_loaded()
+        if self._model is None:
+            # Model unavailable (load failed) — degrade gracefully without
+            # re-triggering the just-failed load via the `dimension` property.
+            return np.zeros((len(texts), self._dimension or 384), dtype=np.float32)
 
         try:
             start_time = time.perf_counter()
@@ -493,10 +595,12 @@ class EmbeddingService:
         Returns:
             Embedding vector as numpy array (float32)
         """
+        _ensure_numpy()
         # Check shutdown flag before starting operation
         if self._shutdown:
             logger.log(
-                TRACE, f"[EmbeddingService] Skipping embed_text (shutdown): chars={len(text)}"
+                TRACE,
+                f"[EmbeddingService] Skipping embed_text (shutdown): chars={len(text)}",
             )
             return np.zeros(self.dimension, dtype=np.float32)
 
@@ -511,10 +615,12 @@ class EmbeddingService:
         Returns:
             2D numpy array of embeddings (shape: [len(texts), dimension])
         """
+        _ensure_numpy()
         # Check shutdown flag before starting operation
         if self._shutdown:
             logger.log(
-                TRACE, f"[EmbeddingService] Skipping embed_batch (shutdown): count={len(texts)}"
+                TRACE,
+                f"[EmbeddingService] Skipping embed_batch (shutdown): count={len(texts)}",
             )
             return np.zeros((len(texts), self.dimension), dtype=np.float32)
 
@@ -536,6 +642,7 @@ class EmbeddingService:
             Similarity score (0-1 for normalized vectors, -1 to 1 in general)
         """
         # NumPy with BLAS is faster than Rust for vectorized operations
+        _ensure_numpy()
         dot_product = np.dot(a, b)
         norm_a = np.linalg.norm(a)
         norm_b = np.linalg.norm(b)
@@ -563,6 +670,7 @@ class EmbeddingService:
         Returns:
             Similarity scores (shape: [n_items])
         """
+        _ensure_numpy()
         if corpus.size == 0:
             return np.array([])
 
@@ -583,6 +691,123 @@ class EmbeddingService:
         # Dot product
         similarities = np.dot(corpus_norms, query_norm)
         return np.asarray(similarities)
+
+    # Task classification key term weights for boosting similarity
+    TASK_KEY_TERMS = {
+        # Analysis terms (highest boost)
+        "analyze": 1.5,
+        "analysis": 1.5,
+        "review": 1.4,
+        "audit": 1.4,
+        "examine": 1.3,
+        "inspect": 1.3,
+        "investigate": 1.3,
+        # Structural/architecture terms
+        "structure": 1.2,
+        "architecture": 1.2,
+        "framework": 1.1,
+        "design": 1.1,
+        "system": 1.0,
+        # Generation terms
+        "create": 1.3,
+        "generate": 1.3,
+        "write": 1.2,
+        "make": 1.1,
+        # Edit/refactor terms
+        "edit": 1.2,
+        "refactor": 1.3,
+        "fix": 1.2,
+        "modify": 1.2,
+        # Search terms
+        "search": 1.3,
+        "find": 1.2,
+        "locate": 1.2,
+        "grep": 1.3,
+        # Execution terms
+        "run": 1.2,
+        "execute": 1.2,
+        "deploy": 1.2,
+        # Testing terms
+        "test": 1.2,
+        "testing": 1.2,
+        "coverage": 1.1,
+    }
+
+    @staticmethod
+    def weighted_cosine_similarity(
+        query: np.ndarray,
+        query_text: str,
+        corpus: np.ndarray,
+        corpus_texts: List[str],
+        key_term_weights: Optional[Dict[str, float]] = None,
+    ) -> np.ndarray:
+        """Calculate weighted cosine similarity with key term boosting.
+
+        Combines semantic similarity from embeddings with lexical matching
+        of key task terms. This handles cases like:
+        - "structural analysis" vs "analyze the structure"
+        - "framework review" vs "review the framework"
+
+        The boost is applied logarithmically to avoid over-boosting:
+        boost = 1.0 + ln(avg_weight_of_overlapping_terms)
+
+        Args:
+            query: Query embedding vector (shape: [dimension])
+            query_text: Query text for tokenization
+            corpus: Corpus embeddings matrix (shape: [n_items, dimension])
+            corpus_texts: Corpus texts for tokenization
+            key_term_weights: Optional custom term weights (default: TASK_KEY_TERMS)
+
+        Returns:
+            Weighted similarity scores (shape: [n_items]), capped at 1.0
+        """
+        import re
+
+        _ensure_numpy()
+
+        # Use provided weights or default task classification weights
+        weights = key_term_weights or EmbeddingService.TASK_KEY_TERMS
+
+        # Calculate base cosine similarity
+        base_similarities = EmbeddingService.cosine_similarity_matrix(query, corpus)
+
+        # Extract key terms from query with fuzzy matching for typo tolerance
+        query_lower = query_text.lower()
+        query_words = set(re.findall(r"\b\w+\b", query_lower))
+
+        # Use fuzzy matching if available, otherwise fall back to exact matching
+        if _FUZZY_MATCHING_AVAILABLE:
+            query_key_terms = extract_key_terms_fuzzy(query_words, weights)
+        else:
+            # Fallback to exact matching
+            query_key_terms = {w for w in query_words if w in weights}
+
+        # If no key terms in query, return base similarities
+        if not query_key_terms:
+            return base_similarities
+
+        # Calculate term overlap boosts for each corpus item
+        boosts = np.ones(len(corpus_texts))
+
+        for i, doc_text in enumerate(corpus_texts):
+            doc_lower = doc_text.lower()
+            doc_words = set(re.findall(r"\b\w+\b", doc_lower))
+            doc_key_terms = {w for w in doc_words if w in weights}
+
+            # Find overlapping key terms
+            overlap = query_key_terms & doc_key_terms
+
+            if overlap:
+                # Calculate average boost weight for overlapping terms
+                avg_boost = sum(weights[t] for t in overlap) / len(overlap)
+                # Apply boost logarithmically to avoid over-boosting
+                # This ensures: 1.0 = no boost, ~1.4 = strong boost
+                boosts[i] = 1.0 + np.log(max(avg_boost, 1.0))
+
+        # Combine: base similarity * boost, capped at 1.0
+        weighted_similarities = np.minimum(base_similarities * boosts, 1.0)
+
+        return np.asarray(weighted_similarities)
 
 
 def get_embedding_service(

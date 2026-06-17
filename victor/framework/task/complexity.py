@@ -40,7 +40,7 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple
 
 from .protocols import TaskClassification, TaskClassifierProtocol, TaskComplexity
 
@@ -51,16 +51,28 @@ from victor.classification import (
     get_pattern_matcher,
 )
 
+# Per-turn tool budgets are sourced from the framework-wide budget policy so the
+# complexity-derived budgets cannot drift away from BUDGET_LIMITS again.
+from victor.config.orchestrator_constants import BUDGET_LIMITS
+
 logger = logging.getLogger(__name__)
 
 
 # Consolidated pattern definitions for classification
 PATTERNS: Dict[TaskComplexity, List[Tuple[str, float, str]]] = {
     TaskComplexity.SIMPLE: [
-        (r"\b(list|show|display)\s+.*?(files?|directories?|folders?)\b", 1.0, "list_files"),
+        (
+            r"\b(list|show|display)\s+.*?(files?|directories?|folders?)\b",
+            1.0,
+            "list_files",
+        ),
         (r"\bwhat\s+files\s+(are\s+)?(in|at)\b", 1.0, "what_files"),
         (r"\bgit\s+(status|log|branch)\b", 1.0, "git_status"),
-        (r"\b(show|what|get)\s+(the\s+)?(current\s+)?(git\s+)?status\b", 0.9, "status_query"),
+        (
+            r"\b(show|what|get)\s+(the\s+)?(current\s+)?(git\s+)?status\b",
+            0.9,
+            "status_query",
+        ),
         (r"\bpwd\b|\bcurrent\s+(directory|dir|folder)\b", 1.0, "pwd"),
         # ls command - exclude ls= (Python kwarg like linestyle) and ls| (pipe)
         (r"(?:^|\s)ls\s+(?![\=\'])", 0.9, "ls_command"),
@@ -73,7 +85,11 @@ PATTERNS: Dict[TaskComplexity, List[Tuple[str, float, str]]] = {
             "explain_code",
         ),
         (r"\bread\s+(and\s+)?(explain|summarize)\b", 0.9, "read_explain"),
-        (r"\bfind\s+(all\s+)?(classes?|functions?|methods?)\b", 0.8, "find_definitions"),
+        (
+            r"\bfind\s+(all\s+)?(classes?|functions?|methods?)\b",
+            0.8,
+            "find_definitions",
+        ),
         (r"\bwhere\s+(is|are|does)\b", 0.8, "where_query"),
         (r"\bhow\s+(does|do|is)\s+.+\s+(work|implemented)\b", 0.9, "how_works"),
     ],
@@ -104,13 +120,29 @@ PATTERNS: Dict[TaskComplexity, List[Tuple[str, float, str]]] = {
         (r"\b(bug|issue)\s*(report|#\d+)?\s*:", 0.9, "bug_report"),
         # SWE-bench narrative patterns (GitHub issue style)
         (r"\bthe\s+issue\s+is\s+(that\s+)?", 1.0, "swe_issue_narrative"),
-        (r"\bwhen\s+\w+.+\s+(fails?|breaks?|raises?|throws?)\b", 0.95, "swe_when_fails"),
+        (
+            r"\bwhen\s+\w+.+\s+(fails?|breaks?|raises?|throws?)\b",
+            0.95,
+            "swe_when_fails",
+        ),
         (r"\b(test|tests?)\s+(fails?|failing|broken)\b", 1.0, "swe_test_fails"),
-        (r"\bTraceback\b|\bAttributeError\b|\bTypeError\b|\bValueError\b", 1.0, "swe_traceback"),
-        (r"\bexpected\s+.+\s+but\s+(got|received|returns?)\b", 0.95, "swe_expected_but"),
+        (
+            r"\bTraceback\b|\bAttributeError\b|\bTypeError\b|\bValueError\b",
+            1.0,
+            "swe_traceback",
+        ),
+        (
+            r"\bexpected\s+.+\s+but\s+(got|received|returns?)\b",
+            0.95,
+            "swe_expected_but",
+        ),
         (r"\bdoes\s+not\s+(work|function|import|load|return)\b", 0.95, "swe_does_not"),
         (r"\b(import|importing)\s+.+\s+(fails?|error)\b", 0.95, "swe_import_fails"),
-        (r"\bmodule\s+.+\s+(not\s+found|missing|unavailable)\b", 0.95, "swe_module_missing"),
+        (
+            r"\bmodule\s+.+\s+(not\s+found|missing|unavailable)\b",
+            0.95,
+            "swe_module_missing",
+        ),
     ],
     TaskComplexity.GENERATION: [
         (
@@ -123,8 +155,16 @@ PATTERNS: Dict[TaskComplexity, List[Tuple[str, float, str]]] = {
             1.0,
             "write_lang_script",
         ),
-        (r"\bcomplete\s+(this|the)\s+(function|code|implementation)\b", 1.0, "complete_function"),
-        (r"\bshow\s+(me\s+)?(a\s+)?code\s+(example|sample)\b", 0.95, "show_code_example"),
+        (
+            r"\bcomplete\s+(this|the)\s+(function|code|implementation)\b",
+            1.0,
+            "complete_function",
+        ),
+        (
+            r"\bshow\s+(me\s+)?(a\s+)?code\s+(example|sample)\b",
+            0.95,
+            "show_code_example",
+        ),
         (r"\bshow\s+me\s+code\s+for\b", 0.95, "show_code_for"),
         (r"\bimplement\s+(the\s+)?function\s+to\s+pass\b", 0.95, "implement_function"),
         # Lower weight - often appears in issue reports as code examples
@@ -133,10 +173,22 @@ PATTERNS: Dict[TaskComplexity, List[Tuple[str, float, str]]] = {
     ],
     TaskComplexity.ACTION: [
         (r"\bgit\s+(add|commit|push|pull|merge|rebase|stash)\b", 1.0, "git_command"),
-        (r"\b(run|execute)\s+(the\s+)?(tests?|pytest|unittest|jest|mocha)\b", 1.0, "run_tests"),
+        (
+            r"\b(run|execute)\s+(the\s+)?(tests?|pytest|unittest|jest|mocha)\b",
+            1.0,
+            "run_tests",
+        ),
         (r"\bpytest\b|\bnpm\s+test\b|\bcargo\s+test\b", 1.0, "test_command"),
-        (r"\b(build|compile|deploy)\s+(the\s+)?(project|app|code)\b", 0.9, "build_deploy"),
-        (r"\b(perform|do|run)\s+(a\s+)?(web\s*search|websearch)\b", 1.0, "web_search_action"),
+        (
+            r"\b(build|compile|deploy)\s+(the\s+)?(project|app|code)\b",
+            0.9,
+            "build_deploy",
+        ),
+        (
+            r"\b(perform|do|run)\s+(a\s+)?(web\s*search|websearch)\b",
+            1.0,
+            "web_search_action",
+        ),
         # SWE-bench / GitHub issue format (multi-step issue resolution)
         (
             r"###\s*(Description|Expected\s+behavior|Actual\s+behavior|Steps)",
@@ -144,7 +196,11 @@ PATTERNS: Dict[TaskComplexity, List[Tuple[str, float, str]]] = {
             "github_issue_format",
         ),
         (r"\bSteps\s+to\s+Reproduce\b", 1.0, "steps_to_reproduce"),
-        (r"\bPlease\s+(fix|resolve|address)\s+(this|the)\s+(issue|bug)\b", 0.95, "issue_request"),
+        (
+            r"\bPlease\s+(fix|resolve|address)\s+(this|the)\s+(issue|bug)\b",
+            0.95,
+            "issue_request",
+        ),
     ],
     TaskComplexity.ANALYSIS: [
         (
@@ -152,7 +208,11 @@ PATTERNS: Dict[TaskComplexity, List[Tuple[str, float, str]]] = {
             1.0,
             "detailed_analysis",
         ),
-        (r"\barchitecture\s+(review|analysis|overview)\b", 1.0, "architecture_analysis"),
+        (
+            r"\barchitecture\s+(review|analysis|overview)\b",
+            1.0,
+            "architecture_analysis",
+        ),
         (
             r"\b(analyze|review|audit)\s+(the\s+)?(entire\s+)?(codebase|project|code)\b",
             1.0,
@@ -190,48 +250,58 @@ class ComplexityBudget:
         return COMPLEXITY_BUDGETS.get(complexity, COMPLEXITY_BUDGETS[TaskComplexity.MEDIUM])
 
 
-# Single source of truth for all budget-related configs
+# Single source of truth for all budget-related configs.
+#
+# Tool budgets are derived from BUDGET_LIMITS (victor.config.orchestrator_constants)
+# so that the per-turn budget enforced by the chat/streaming path stays aligned with
+# the framework-wide budget policy. Previously these values were hardcoded small
+# numbers (MEDIUM=15, ANALYSIS=60) that had drifted away from BUDGET_LIMITS
+# (medium=50, analysis=500). A real multi-file analysis task classified as MEDIUM
+# would then exhaust its 15-call budget after a handful of `ls`/`read` calls and stop
+# before producing anything. The framework's design intent (documented on
+# BUDGET_LIMITS) is generous exploration bounded by task-completion detection, not by
+# tiny hard caps — so budgets are sourced from BUDGET_LIMITS to prevent re-drift.
 COMPLEXITY_BUDGETS: Dict[TaskComplexity, ComplexityBudget] = {
     TaskComplexity.SIMPLE: ComplexityBudget(
-        tool_budget=10,
-        max_turns=5,
-        max_continuation_requests=3,
-        timeout_seconds=60,
+        tool_budget=BUDGET_LIMITS.simple_task,  # 20
+        max_turns=10,
+        max_continuation_requests=4,
+        timeout_seconds=120,
         per_tool_timeout_seconds=15,
     ),
     TaskComplexity.MEDIUM: ComplexityBudget(
-        tool_budget=15,
-        max_turns=10,
-        max_continuation_requests=5,
-        timeout_seconds=120,
-        per_tool_timeout_seconds=30,
-    ),
-    TaskComplexity.COMPLEX: ComplexityBudget(
-        tool_budget=25,
+        tool_budget=BUDGET_LIMITS.medium_task,  # 50
         max_turns=20,
         max_continuation_requests=10,
         timeout_seconds=300,
-        per_tool_timeout_seconds=60,
+        per_tool_timeout_seconds=30,
     ),
-    TaskComplexity.GENERATION: ComplexityBudget(
-        tool_budget=10,
-        max_turns=5,
-        max_continuation_requests=3,
-        timeout_seconds=60,
-        per_tool_timeout_seconds=15,
-    ),
-    TaskComplexity.ACTION: ComplexityBudget(
-        tool_budget=50,
-        max_turns=30,
-        max_continuation_requests=15,
+    TaskComplexity.COMPLEX: ComplexityBudget(
+        tool_budget=BUDGET_LIMITS.complex_task,  # 100
+        max_turns=40,
+        max_continuation_requests=20,
         timeout_seconds=600,
         per_tool_timeout_seconds=60,
     ),
-    TaskComplexity.ANALYSIS: ComplexityBudget(
-        tool_budget=60,
-        max_turns=40,
-        max_continuation_requests=20,
+    TaskComplexity.GENERATION: ComplexityBudget(
+        tool_budget=BUDGET_LIMITS.simple_task,  # 20
+        max_turns=10,
+        max_continuation_requests=4,
+        timeout_seconds=120,
+        per_tool_timeout_seconds=15,
+    ),
+    TaskComplexity.ACTION: ComplexityBudget(
+        tool_budget=BUDGET_LIMITS.action_task,  # 200
+        max_turns=60,
+        max_continuation_requests=30,
         timeout_seconds=900,
+        per_tool_timeout_seconds=60,
+    ),
+    TaskComplexity.ANALYSIS: ComplexityBudget(
+        tool_budget=BUDGET_LIMITS.analysis_task,  # 500
+        max_turns=80,
+        max_continuation_requests=40,
+        timeout_seconds=1200,
         per_tool_timeout_seconds=60,
     ),
 }
@@ -311,6 +381,7 @@ class TaskComplexityService:
         use_semantic: bool = True,
         semantic_threshold: float = 0.65,
         use_rl: bool = True,
+        llm_decision_service: Optional[Any] = None,
     ) -> None:
         """Initialize the complexity service.
 
@@ -329,12 +400,14 @@ class TaskComplexityService:
             use_semantic: Whether to use semantic classification (embeddings)
             semantic_threshold: Confidence threshold for semantic classification
             use_rl: Whether to use RL-based adjustments (learns from outcomes)
+            llm_decision_service: Optional LLM decision service for edge model classification
         """
         self.budgets = budgets or DEFAULT_BUDGETS.copy()
         self.custom_classifiers = custom_classifiers or []
         self.use_semantic = use_semantic
         self.semantic_threshold = semantic_threshold
         self.use_rl = use_rl
+        self._llm_decision_service = llm_decision_service
         self._semantic_classifier = None
         self._rl_learner = None
 
@@ -491,17 +564,14 @@ class TaskComplexityService:
         Handles complex prompts (e.g., SWE-bench issue text) that regex
         patterns can't reliably classify.
         """
+        service = self._llm_decision_service
+        if service is None:
+            return None
+
         try:
-            from victor.core import get_container
+            from victor.agent.decisions.chain import should_use_llm
 
-            container = get_container()
-
-            from victor.agent.services.protocols.decision_service import (
-                LLMDecisionServiceProtocol,
-            )
-
-            service = container.get(LLMDecisionServiceProtocol)
-            if service is None:
+            if not should_use_llm("task_type_classification"):
                 return None
 
             from victor.agent.decisions.schemas import DecisionType
@@ -586,6 +656,20 @@ class TaskComplexityService:
                 tool_budget=self.budgets[TaskComplexity.SIMPLE],
                 confidence=0.3,
                 matched_patterns=[],
+            )
+
+        from victor.framework.task.direct_response import (
+            classify_direct_response_prompt,
+        )
+
+        direct_response = classify_direct_response_prompt(message)
+        if direct_response.is_direct_response:
+            tool_budget = 1 if direct_response.is_exact_response else 2
+            return TaskClassification(
+                complexity=TaskComplexity.SIMPLE,
+                tool_budget=tool_budget,
+                confidence=direct_response.confidence,
+                matched_patterns=[f"direct_response:{direct_response.reason}"],
             )
 
         # Try custom classifiers first

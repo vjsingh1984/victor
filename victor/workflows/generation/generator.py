@@ -35,7 +35,7 @@ Key Features:
 
 Example:
     from victor.workflows.generation import WorkflowGenerator
-    from victor.framework.protocols import OrchestratorProtocol
+    from victor.framework.protocols import FrameworkOrchestratorProtocol as OrchestratorProtocol
 
     generator = WorkflowGenerator(orchestrator, vertical="coding")
     workflow_schema = await generator.generate_from_requirements(requirements)

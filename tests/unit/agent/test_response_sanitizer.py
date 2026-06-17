@@ -14,10 +14,13 @@
 
 """Tests for ResponseSanitizer module."""
 
+from unittest.mock import patch
+
 import pytest
 
 from victor.agent.response_sanitizer import (
     ResponseSanitizer,
+    create_streaming_filter,
     sanitize_response,
     is_garbage_content,
     is_valid_tool_name,
@@ -193,6 +196,25 @@ class TestResponseSanitizerEdgeCases:
         assert "Data" in result
         assert "End" in result
 
+    def test_sanitize_removes_plaintext_shell_like_command_lines(self, sanitizer):
+        text = (
+            "I'll analyze the codebase structure.\n"
+            "ls rust\n"
+            "scripts ls\n"
+            "victor/core ls\n"
+            "Then I will summarize the findings."
+        )
+        result = sanitizer.sanitize(text)
+        assert "ls rust" not in result
+        assert "scripts ls" not in result
+        assert "victor/core ls" not in result
+        assert "I'll analyze the codebase structure." in result
+        assert "Then I will summarize the findings." in result
+
+    def test_has_tool_format_confusion_detects_plaintext_shell_commands(self, sanitizer):
+        text = "I'll inspect the repository first.\n" "ls rust\n" "scripts ls\n" "victor/tools ls\n"
+        assert sanitizer.has_tool_format_confusion(text) is True
+
     def test_sanitize_logs_warning_on_significant_removal(self, sanitizer, caplog):
         """Test warning logged when >50% content removed (covers line 167)."""
         import logging
@@ -220,3 +242,19 @@ class TestResponseSanitizerEdgeCases:
         result = sanitizer.sanitize(text)
         # IMPORTANT tags should be removed
         assert "Text" in result or result == ""
+
+
+def test_create_streaming_filter_enforces_patched_thinking_limit() -> None:
+    """Factory-created filters should honor the active thinking cap on all backends."""
+    with patch("victor.agent.response_sanitizer.StreamingContentFilter.MAX_THINKING_CONTENT", 5):
+        content_filter = create_streaming_filter(suppress_thinking=False)
+
+        content_filter.process_chunk("<think>")
+        result = content_filter.process_chunk("123456")
+
+    assert result.content == ""
+    assert result.is_thinking is True
+    assert content_filter.should_abort() is True
+    assert content_filter.abort_reason == (
+        "Thinking content exceeded 5 chars. Model may be stuck in a reasoning loop."
+    )

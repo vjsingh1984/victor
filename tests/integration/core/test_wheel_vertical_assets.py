@@ -79,7 +79,14 @@ def test_wheel_omits_extracted_vertical_runtime_assets(tmp_path: Path) -> None:
 
     with zipfile.ZipFile(wheel_path) as archive:
         names = set(archive.namelist())
-        assert "victor/verticals/contrib/__init__.py" in names
+
+        # contrib/ was removed when verticals were extracted to sibling packages.
+        # Verify no contrib remnants leaked into the wheel.
+        contrib_files = sorted(name for name in names if "verticals/contrib/" in name)
+        assert not contrib_files, (
+            "Core wheel should not contain extracted-vertical remnants: " f"{contrib_files}"
+        )
+
         bundled_legacy_assets = sorted(legacy_vertical_assets & names)
         assert not bundled_legacy_assets, (
             "Core wheel should not bundle extracted vertical runtime assets: "

@@ -71,6 +71,12 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, TYPE_CHECKING
 
 import numpy as np
 
+from victor.core.grounding_texts import (
+    GROUNDING_RULES as CANONICAL_GROUNDING_RULES,
+    GROUNDING_RULES_EXTENDED as CANONICAL_GROUNDING_RULES_EXTENDED,
+)
+from victor.tools.core_tool_aliases import canonicalize_core_tool_name
+
 if TYPE_CHECKING:
     from victor.agent.conversation_embedding_store import ConversationEmbeddingStore
     from victor.storage.embeddings.service import EmbeddingService
@@ -524,27 +530,21 @@ class IntelligentPromptBuilder:
     """
 
     # Cloud providers with robust native tool calling
-    CLOUD_PROVIDERS = {"anthropic", "openai", "google", "xai", "moonshot", "kimi", "deepseek"}
+    CLOUD_PROVIDERS = {
+        "anthropic",
+        "openai",
+        "google",
+        "xai",
+        "moonshot",
+        "kimi",
+        "deepseek",
+    }
     LOCAL_PROVIDERS = {"ollama", "lmstudio", "vllm"}
 
-    # Grounding rules
-    GROUNDING_RULES_MINIMAL = """
-GROUNDING: Base ALL responses on tool output only. Never invent file paths or content.
-Quote code exactly from tool output. If more info needed, call another tool.
-""".strip()
+    # Grounding rules (thrifty & performant)
+    GROUNDING_RULES_MINIMAL = CANONICAL_GROUNDING_RULES
 
-    GROUNDING_RULES_STRICT = """
-CRITICAL - TOOL OUTPUT GROUNDING:
-When you receive tool output in <TOOL_OUTPUT> tags:
-1. The content between ═══ markers is ACTUAL file/command output - NEVER ignore it
-2. You MUST base your analysis ONLY on this actual content
-3. NEVER fabricate, invent, or imagine file contents that differ from tool output
-4. If you need more information, call another tool - do NOT guess
-5. When citing code, quote EXACTLY from the tool output
-6. If tool output is empty or truncated, acknowledge this limitation
-
-VIOLATION OF THESE RULES WILL RESULT IN INCORRECT ANALYSIS.
-""".strip()
+    GROUNDING_RULES_STRICT = CANONICAL_GROUNDING_RULES_EXTENDED
 
     def __init__(
         self,
@@ -554,6 +554,7 @@ VIOLATION OF THESE RULES WILL RESULT IN INCORRECT ANALYSIS.
         embedding_store: Optional["ConversationEmbeddingStore"] = None,
         embedding_service: Optional["EmbeddingService"] = None,
         learning_store: Optional[ProfileLearningStore] = None,
+        retrieval_gateway: Optional[Any] = None,
     ):
         """Initialize the intelligent prompt builder.
 
@@ -564,6 +565,7 @@ VIOLATION OF THESE RULES WILL RESULT IN INCORRECT ANALYSIS.
             embedding_store: Optional conversation embedding store
             embedding_service: Optional embedding service
             learning_store: Optional profile learning store
+            retrieval_gateway: Optional RetrievalGateway for semantic search
         """
         self.provider_name = (str(provider_name) if provider_name else "").lower()
         self.model = str(model) if model else ""
@@ -572,6 +574,7 @@ VIOLATION OF THESE RULES WILL RESULT IN INCORRECT ANALYSIS.
 
         self._embedding_store = embedding_store
         self._embedding_service = embedding_service
+        self._retrieval_gateway = retrieval_gateway
         self._learning_store = learning_store or ProfileLearningStore()
         self._scheduler = EmbeddingScheduler(embedding_store, embedding_service)
 
@@ -736,34 +739,57 @@ VIOLATION OF THESE RULES WILL RESULT IN INCORRECT ANALYSIS.
         limit: int = 5,
     ) -> List[ContextFragment]:
         """Retrieve relevant context fragments from conversation history."""
-        if not self._embedding_store:
-            return []
-
         try:
-            results = await self._embedding_store.search_similar(
-                query=task,
-                session_id=session_id,
-                limit=limit * 2,  # Fetch more for filtering
-                min_similarity=0.4,
-            )
+            gateway = self._get_retrieval_gateway()
+            if gateway is not None:
+                from victor.storage.retrieval.gateway import RetrievalRequest
 
-            fragments = []
-            for result in results[:limit]:
-                fragment = ContextFragment(
-                    content=f"[Previous: {result.message_id}]",  # Content from SQLite
-                    similarity=result.similarity,
+                request = RetrievalRequest(
+                    query=task,
+                    session_id=session_id,
+                    limit=limit * 2,
+                    min_similarity=0.4,
+                )
+                items = await gateway.search(request)
+                fragments = [
+                    ContextFragment(
+                        content=f"[Previous: {item.message_id}]",
+                        similarity=item.score,
+                        task_type=task_type,
+                        was_successful=True,
+                        timestamp=datetime.now(),
+                        source="conversation",
+                    )
+                    for item in items[:limit]
+                ]
+                return sorted(fragments, key=lambda f: f.relevance_score, reverse=True)
+
+            # Fallback: direct embedding store access when gateway unavailable
+            if not self._embedding_store:
+                return []
+            results = await self._embedding_store.search_similar(
+                query=task, session_id=session_id, limit=limit * 2, min_similarity=0.4
+            )
+            fragments = [
+                ContextFragment(
+                    content=f"[Previous: {r.message_id}]",
+                    similarity=r.similarity,
                     task_type=task_type,
-                    was_successful=True,  # Would need to track this
-                    timestamp=result.timestamp or datetime.now(),
+                    was_successful=True,
+                    timestamp=r.timestamp or datetime.now(),
                     source="conversation",
                 )
-                fragments.append(fragment)
-
+                for r in results[:limit]
+            ]
             return sorted(fragments, key=lambda f: f.relevance_score, reverse=True)
 
         except Exception as e:
             logger.warning(f"[IntelligentPromptBuilder] Context retrieval failed: {e}")
             return []
+
+    def _get_retrieval_gateway(self):
+        """Get RetrievalGateway for semantic context retrieval (injected via constructor)."""
+        return self._retrieval_gateway
 
     def _determine_strategy(self, context: PromptContext) -> PromptStrategy:
         """Determine the best prompt strategy based on context and learning."""
@@ -852,30 +878,32 @@ VIOLATION OF THESE RULES WILL RESULT IN INCORRECT ANALYSIS.
             )
 
     def _get_task_hint(self, task_type: str) -> str:
-        """Get task-specific hint."""
+        """Get task-specific hint (concise)."""
         hints = {
-            "code_generation": "[GENERATE] Write code directly. No exploration needed. Complete implementation.",
-            "create_simple": "[CREATE] Write file immediately. Skip codebase exploration. One tool call max.",
-            "create": "[CREATE+CONTEXT] Read 1-2 relevant files, then create. Follow existing patterns.",
-            "edit": "[EDIT] Read target file first, then modify. Focused changes only.",
-            "search": "[SEARCH] Use code_search/list_directory. Summarize after 2-4 calls.",
-            "action": "[ACTION] Execute git/test/build operations. Continue until complete.",
-            "analysis_deep": "[ANALYSIS] Thorough codebase exploration. Read all relevant modules.",
-            "analyze": "[ANALYZE] Examine code carefully. Read related files. Structured findings.",
-            "general": "[GENERAL] Moderate exploration. 3-6 tool calls. Answer concisely.",
+            "code_generation": "[GENERATE] Write code directly. Full implementation.",
+            "create_simple": "[CREATE] Write file immediately. One tool call max.",
+            "create": "[CREATE+CONTEXT] Read relevant files, then create.",
+            "edit": "[EDIT] Read target file first, then modify.",
+            "search": "[SEARCH] Use code_search/ls. Summarize after 2-4 calls.",
+            "action": "[ACTION] Execute git/test/build. Continue until complete.",
+            "analysis_deep": "[ANALYSIS] Thorough exploration. Read all modules.",
+            "analyze": "[ANALYZE] Examine code carefully. Structured findings.",
+            "general_query": (
+                "[QUERY] Answer directly. Use tools only if the prompt explicitly "
+                "requires external lookup or workspace inspection."
+            ),
+            "general": "[GENERAL] Moderate exploration. Answer concisely.",
         }
-        # Defensive: ensure task_type is a string before calling .lower()
         task_type_str = str(task_type).lower() if task_type else "general"
         return hints.get(task_type_str, "")
 
     def _get_mode_hint(self, mode: str, iteration_budget: int) -> str:
-        """Get mode-specific hint."""
+        """Get mode-specific hint (concise)."""
         mode_hints = {
-            "explore": f"MODE: Explore - Focus on understanding code. Budget: {iteration_budget} iterations.",
-            "build": f"MODE: Build - Focus on implementation. Budget: {iteration_budget} iterations.",
-            "plan": f"MODE: Plan - Create detailed plan before implementing. Budget: {iteration_budget} iterations.",
+            "explore": f"MODE: Explore - Understand code. Budget: {iteration_budget} turns.",
+            "build": f"MODE: Build - Implement. Budget: {iteration_budget} turns.",
+            "plan": f"MODE: Plan - Draft plan first. Budget: {iteration_budget} turns.",
         }
-        # Defensive: ensure mode is a string before calling .lower()
         mode_str = str(mode).lower() if mode else "explore"
         return mode_hints.get(mode_str, "")
 
@@ -884,36 +912,42 @@ VIOLATION OF THESE RULES WILL RESULT IN INCORRECT ANALYSIS.
         context: PromptContext,
         strategy: PromptStrategy,
     ) -> str:
-        """Get tool usage guidance based on strategy and learned patterns."""
+        """Get tool usage guidance based on strategy (concise)."""
+        available_tools = sorted(
+            {
+                canonicalize_core_tool_name(tool)
+                for tool in context.available_tools
+                if isinstance(tool, str) and tool
+            }
+        )
+        browse_guidance = ""
+        if available_tools:
+            browse_guidance = f"\n- Available tools: {', '.join(available_tools[:6])}"
+
         if strategy == PromptStrategy.MINIMAL:
             return (
-                "Tool usage:\n"
-                "- Call tools when needed for information\n"
-                "- Parallel calls allowed for independent operations\n"
-                f"- Tool budget: {context.recommended_tool_budget}"
+                "TOOLS:\n- Use for information gathering\n"
+                f"- Budget: {context.recommended_tool_budget} calls"
+                f"{browse_guidance}"
             )
 
         elif strategy == PromptStrategy.STRUCTURED:
             return (
-                "TOOL USAGE:\n"
-                "- Use list_directory and read_file to inspect code\n"
-                "- Call tools one at a time, waiting for results\n"
-                f"- Budget: {context.recommended_tool_budget} tool calls\n"
-                "- After gathering info, provide a clear answer\n"
-                "- Do NOT repeat identical tool calls"
+                "TOOL RULES:\n"
+                "- Use ls/read to inspect code\n"
+                "- Call tools sequentially, waiting for results\n"
+                f"- Budget: {context.recommended_tool_budget} calls\n"
+                f"- Ensure each call provides NEW information{browse_guidance}"
             )
 
         else:  # STRICT
             return (
-                "CRITICAL TOOL RULES:\n"
-                "1. Call tools ONE AT A TIME. Wait for each result.\n"
-                f"2. Budget: {context.recommended_tool_budget} tool calls maximum.\n"
-                "3. After reading 2-3 files, STOP and provide your answer.\n"
-                "4. Do NOT repeat the same tool call.\n\n"
-                "OUTPUT FORMAT:\n"
-                "1. Write your answer in plain English text.\n"
-                "2. Do NOT output JSON objects in your response.\n"
-                "3. Do NOT output XML tags or function call syntax."
+                "TOOL RULES:\n"
+                "1. Call tools sequentially; wait for each result.\n"
+                f"2. Budget: {context.recommended_tool_budget} calls max.\n"
+                "3. Gather sufficient info before answering.\n"
+                "4. Provide plain English text responses only.\n"
+                f"5. Ensure calls are unique and purposeful.{browse_guidance}"
             )
 
     def _format_context_fragments(self, fragments: List[ContextFragment]) -> str:
@@ -933,15 +967,37 @@ VIOLATION OF THESE RULES WILL RESULT IN INCORRECT ANALYSIS.
         metrics: Optional[ProfileMetrics],
     ) -> str:
         """Get grounding rules based on strategy and learned needs."""
+        minimal_rules, strict_rules = self._get_canonical_grounding_rule_variants()
+
         # If we've learned this model needs strict grounding
         if metrics and metrics.needs_strict_grounding:
-            return self.GROUNDING_RULES_STRICT
+            return strict_rules
 
         # Otherwise based on strategy
         if strategy in (PromptStrategy.STRICT, PromptStrategy.ADAPTIVE):
-            return self.GROUNDING_RULES_STRICT
+            return strict_rules
 
-        return self.GROUNDING_RULES_MINIMAL
+        return minimal_rules
+
+    @classmethod
+    def _get_canonical_grounding_rule_variants(cls) -> Tuple[str, str]:
+        """Resolve minimal/strict grounding text from the shared section registry."""
+        minimal_rules = cls.GROUNDING_RULES_MINIMAL
+        strict_rules = cls.GROUNDING_RULES_STRICT
+
+        try:
+            from victor.agent.prompt_section_registry import build_fallback_map
+
+            fallback_map = build_fallback_map(["GROUNDING_RULES", "GROUNDING_RULES_EXTENDED"])
+            minimal_rules = fallback_map.get("GROUNDING_RULES") or minimal_rules
+            strict_rules = fallback_map.get("GROUNDING_RULES_EXTENDED") or strict_rules
+        except Exception:
+            logger.debug(
+                "[IntelligentPromptBuilder] Falling back to legacy grounding rules",
+                exc_info=True,
+            )
+
+        return minimal_rules, strict_rules
 
     def record_feedback(
         self,

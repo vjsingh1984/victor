@@ -51,9 +51,9 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
 
         request_id = _new_chat_request_id()
         response.headers["X-Victor-Request-Id"] = request_id
-        orchestrator = await server._get_orchestrator()
+        client = await server._get_victor_client()
         with request_correlation_id(request_id):
-            chat_result = await orchestrator.chat(request.messages[-1].content)
+            chat_result = await client.chat(request.messages[-1].content)
 
         content = getattr(chat_result, "content", None) or ""
         tool_calls = getattr(chat_result, "tool_calls", None) or []
@@ -70,11 +70,11 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
 
         async def event_generator() -> AsyncIterator[str]:
             try:
-                orchestrator = await server._get_orchestrator()
+                client = await server._get_victor_client()
                 yield f'data: {json.dumps({"type": "request", "request_id": request_id})}\n\n'
 
                 with request_correlation_id(request_id):
-                    async for chunk in orchestrator.stream_chat(request.messages[-1].content):
+                    async for chunk in client.stream_chat(request.messages[-1].content):
                         if hasattr(chunk, "content") or hasattr(chunk, "tool_calls"):
                             content = getattr(chunk, "content", "")
                             tool_calls = getattr(chunk, "tool_calls", None)

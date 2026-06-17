@@ -22,9 +22,18 @@ Part of SOLID-based refactoring to eliminate OCP violations.
 """
 
 from abc import ABC, abstractmethod
+from enum import Enum
 from typing import Set
 
 from victor.agent.protocols import IProviderClassificationStrategy
+
+
+class ProviderCategory(str, Enum):
+    """Provider deployment category."""
+
+    CLOUD = "cloud"  # Cloud-hosted LLM providers
+    LOCAL = "local"  # Locally-hosted LLM providers
+    UNKNOWN = "unknown"  # Unclassified providers
 
 
 class DefaultProviderClassificationStrategy(IProviderClassificationStrategy):
@@ -73,20 +82,20 @@ class DefaultProviderClassificationStrategy(IProviderClassificationStrategy):
         """
         return provider_name.lower() in self._local_providers
 
-    def get_provider_type(self, provider_name: str) -> str:
+    def get_provider_type(self, provider_name: str) -> ProviderCategory:
         """Get provider type category.
 
         Args:
             provider_name: Name of the provider
 
         Returns:
-            Provider type ("cloud", "local", "unknown")
+            Provider type enum value
         """
         if self.is_cloud_provider(provider_name):
-            return "cloud"
+            return ProviderCategory.CLOUD
         if self.is_local_provider(provider_name):
-            return "local"
-        return "unknown"
+            return ProviderCategory.LOCAL
+        return ProviderCategory.UNKNOWN
 
 
 class ConfigurableProviderClassificationStrategy(IProviderClassificationStrategy):
@@ -164,17 +173,17 @@ class ConfigurableProviderClassificationStrategy(IProviderClassificationStrategy
         """
         return provider_name.lower() in self._local_providers
 
-    def get_provider_type(self, provider_name: str) -> str:
+    def get_provider_type(self, provider_name: str) -> ProviderCategory:
         """Get provider type category.
 
         Args:
             provider_name: Name of the provider
 
         Returns:
-            Provider type ("cloud", "local", "unknown")
+            Provider type enum value
         """
         if self.is_cloud_provider(provider_name):
-            return "cloud"
+            return ProviderCategory.CLOUD
         if self.is_local_provider(provider_name):
-            return "local"
-        return "unknown"
+            return ProviderCategory.LOCAL
+        return ProviderCategory.UNKNOWN

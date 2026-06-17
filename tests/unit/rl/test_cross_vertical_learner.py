@@ -92,7 +92,14 @@ def insert_outcome(
         (learner, task_type, vertical, quality_score, metadata, created_at)
         VALUES (?, ?, ?, ?, ?, ?)
         """,
-        ("test", task_type, vertical, quality_score, metadata, datetime.now().isoformat()),
+        (
+            "test",
+            task_type,
+            vertical,
+            quality_score,
+            metadata,
+            datetime.now().isoformat(),
+        ),
     )
     db_connection.commit()
 

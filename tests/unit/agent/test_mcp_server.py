@@ -60,7 +60,10 @@ class MockToolWithListParams(BaseTool):
         self._parameters = [
             ToolParameter(name="path", type="string", description="File path", required=True),
             ToolParameter(
-                name="recursive", type="boolean", description="Recursive", required=False
+                name="recursive",
+                type="boolean",
+                description="Recursive",
+                required=False,
             ),
         ]
 

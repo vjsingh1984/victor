@@ -294,7 +294,7 @@ class FrameworkIntegrationRegistryService:
             self._record_applied("handlers", len(handlers))
             return len(handlers)
         except ImportError:
-            from victor.workflows.executor import register_compute_handler
+            from victor.workflows.compute_registry import register_compute_handler
 
             for name, handler in handlers.items():
                 register_compute_handler(name, handler)

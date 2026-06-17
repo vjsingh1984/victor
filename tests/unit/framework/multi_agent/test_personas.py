@@ -202,7 +202,7 @@ class TestPersonaTraitsCreation:
         assert persona.verbosity == 0.8
         assert persona.strengths == ["analysis", "documentation"]
         assert persona.weaknesses == ["speed"]
-        assert persona.preferred_tools == ["read_file", "grep"]
+        assert persona.preferred_tools == ["read", "grep"]
         assert persona.risk_tolerance == 0.3
         assert persona.creativity == 0.7
         assert persona.custom_traits == {"domain": "security"}

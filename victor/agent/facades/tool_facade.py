@@ -20,7 +20,8 @@ single interface.
 
 This facade wraps already-initialized components from the orchestrator,
 providing a coherent grouping without changing initialization ordering.
-The orchestrator delegates property access through this facade.
+The orchestrator delegates property access through this facade. It does not own
+tool behavior.
 """
 
 from __future__ import annotations
@@ -47,6 +48,7 @@ class ToolFacade:
         - tool_graph: ToolDependencyGraph for planning
         - tool_registrar: ToolRegistrar for dynamic tool discovery
         - tool_budget: Maximum tool calls per session
+        - runtime_state_host: Canonical runtime owner for mutable tool state
         - tool_output_formatter: LLM-context-aware output formatting
         - deduplication_tracker: Optional tracker for preventing duplicates
         - argument_normalizer: Handles malformed tool arguments
@@ -70,6 +72,7 @@ class ToolFacade:
         tool_graph: Optional[Any] = None,
         tool_registrar: Optional[Any] = None,
         tool_budget: int = 50,
+        runtime_state_host: Optional[Any] = None,
         tool_output_formatter: Optional[Any] = None,
         deduplication_tracker: Optional[Any] = None,
         argument_normalizer: Optional[Any] = None,
@@ -95,6 +98,7 @@ class ToolFacade:
         self._tool_graph = tool_graph
         self._tool_registrar = tool_registrar
         self._tool_budget = tool_budget
+        self._runtime_state_host = runtime_state_host
         self._tool_output_formatter = tool_output_formatter
         self._deduplication_tracker = deduplication_tracker
         self._argument_normalizer = argument_normalizer
@@ -167,11 +171,15 @@ class ToolFacade:
     @property
     def tool_budget(self) -> int:
         """Maximum tool calls per session."""
+        if self._runtime_state_host is not None:
+            return getattr(self._runtime_state_host, "tool_budget", self._tool_budget)
         return self._tool_budget
 
     @tool_budget.setter
     def tool_budget(self, value: int) -> None:
         """Update the tool budget."""
+        if self._runtime_state_host is not None:
+            self._runtime_state_host.tool_budget = value
         self._tool_budget = value
 
     @property

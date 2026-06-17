@@ -26,7 +26,7 @@ logging:
   commands:
     # chat: uses defaults (WARNING console, INFO file)
     benchmark:
-      file_level: DEBUG         # Detailed logs for debugging stage transitions
+      file_level: INFO          # INFO for clean signal; use --log-level DEBUG for full traces
     serve:
       console_level: INFO       # Servers show more visibility
     debug:

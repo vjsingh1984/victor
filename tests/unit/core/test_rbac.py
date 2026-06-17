@@ -327,9 +327,9 @@ class TestRBACManager:
         assert rbac.check_permission("alice", Permission.READ)
 
     def test_check_permission_disabled(self):
-        """Test permission check when disabled."""
-        rbac = RBACManager(enabled=False)
-        # All permissions pass when disabled
+        """Test permission check when disabled with fail_open."""
+        rbac = RBACManager(enabled=False, fail_open=True)
+        # All permissions pass when disabled and fail_open=True
         assert rbac.check_permission("anyone", Permission.ADMIN)
 
     def test_check_permission_denied(self):
@@ -350,10 +350,10 @@ class TestRBACManager:
         assert not rbac.check_tool_access("dev", "web_search", "network", AccessMode.NETWORK)
 
     def test_check_tool_access_disabled(self):
-        """Test tool access check when disabled."""
+        """Test tool access check when disabled with fail_open."""
         from victor.tools.base import AccessMode
 
-        rbac = RBACManager(enabled=False)
+        rbac = RBACManager(enabled=False, fail_open=True)
         assert rbac.check_tool_access("anyone", "any_tool", "any_cat", AccessMode.MIXED)
 
     def test_check_current_user_tool_access(self):

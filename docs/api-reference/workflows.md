@@ -14,6 +14,18 @@ This document provides API reference documentation for Victor's workflow system,
 
 ---
 
+## Compatibility Aliases
+
+- `WorkflowGraph` from `victor.workflows.graph` is a deprecated compatibility
+  alias. Use `BasicWorkflowGraph` for the simple container or
+  `victor.workflows.graph_dsl.WorkflowGraph` for the typed DSL. This
+  warning-backed alias remains supported through `v0.8.0` (`2026-12-31`); see
+  `docs/architecture/migration.md`.
+- `TeamNode*` workflow names are deprecated. Use `TeamStep*` names; the
+  warning-backed aliases remain supported through `v0.9.0` (`2027-03-31`).
+
+---
+
 ## StateGraph API
 
 The `StateGraph` class provides a LangGraph-compatible API for building cyclic, stateful agent workflows with typed state management.
@@ -875,23 +887,27 @@ nodes:
     next: [apply_changes]
 ```
 
-### TeamNode
+### TeamStep
 
 Spawn an ad-hoc multi-agent team.
 
 ```python
 @dataclass
-class TeamNode:
+class TeamStep:
     id: str
     name: str
     goal: str
     team_formation: TeamFormation    # SEQUENTIAL, PARALLEL, HIERARCHICAL, PIPELINE, CONSENSUS
     members: List[TeamMember]
-    config: TeamNodeConfig
+    config: TeamStepConfig
     shared_context: Dict[str, Any]
     max_iterations: int = 50
     total_tool_budget: int = 100
 ```
+
+`TeamNode` / `TeamNodeConfig` are deprecated compatibility aliases. Use
+`TeamStep` / `TeamStepConfig`; the legacy names remain available during the
+current migration window and will be removed in `v0.9.0` (`2027-03-31`).
 
 **YAML Example:**
 ```yaml

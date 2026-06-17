@@ -9,7 +9,6 @@ from typing import (
     Optional,
     Protocol,
     Set,
-    TYPE_CHECKING,
     Tuple,
     runtime_checkable,
 )
@@ -192,13 +191,10 @@ class RecoveryHandlerProtocol(
     ...
 
 
-@runtime_checkable
-class ResponseSanitizerProtocol(Protocol):
-    """Protocol for response sanitization."""
-
-    def sanitize(self, response: str) -> str:
-        """Sanitize model response."""
-        ...
+# NOTE: ResponseSanitizerProtocol and ReminderManagerProtocol are canonical
+# service-owned runtime protocols in
+# victor.agent.services.protocols.infrastructure_runtime. This module re-exports
+# them at the bottom as deprecated compatibility names.
 
 
 @runtime_checkable
@@ -341,71 +337,9 @@ class DebugLoggerProtocol(Protocol):
         ...
 
 
-@runtime_checkable
-class ReminderManagerProtocol(Protocol):
-    """Protocol for context reminder management.
-
-    Manages intelligent injection of context reminders to reduce token waste.
-    """
-
-    def reset(self) -> None:
-        """Reset state for a new conversation turn."""
-        ...
-
-    def update_state(
-        self,
-        observed_files: Optional[Set[str]] = None,
-        executed_tool: Optional[str] = None,
-        tool_calls: Optional[int] = None,
-        tool_budget: Optional[int] = None,
-        task_complexity: Optional[str] = None,
-        task_hint: Optional[str] = None,
-    ) -> None:
-        """Update the current context state."""
-        ...
-
-    def add_observed_file(self, file_path: str) -> None:
-        """Add a file to the observed files set."""
-        ...
-
-    def get_consolidated_reminder(self, force: bool = False) -> Optional[str]:
-        """Get a consolidated reminder combining all active reminders."""
-        ...
-
-
-@runtime_checkable
-class RLCoordinatorProtocol(Protocol):
-    """Protocol for reinforcement learning coordinator.
-
-    Manages all RL learners with unified SQLite storage.
-    """
-
-    def record_outcome(
-        self,
-        learner_name: str,
-        outcome: Any,
-        vertical: str = "coding",
-    ) -> None:
-        """Record an outcome for a specific learner."""
-        ...
-
-    def get_recommendation(
-        self,
-        learner_name: str,
-        provider: str,
-        model: str,
-        task_type: str,
-    ) -> Optional[Any]:
-        """Get recommendation from a learner."""
-        ...
-
-    def export_metrics(self) -> Dict[str, Any]:
-        """Export all learned values and metrics for monitoring."""
-        ...
-
-    def close(self) -> None:
-        """Close database connection."""
-        ...
+# NOTE: RLCoordinatorProtocol is a canonical service-owned runtime protocol in
+# victor.agent.services.protocols.runtime_support. This module re-exports it at
+# the bottom as a deprecated compatibility name.
 
 
 @runtime_checkable
@@ -734,3 +668,12 @@ class SessionContextLinkerProtocol(Protocol):
     def find_related_sessions(self, query: str, limit: int = 3) -> List[Dict[str, Any]]:
         """Semantic search across sessions for cross-session linking."""
         ...
+
+
+from victor.agent.services.protocols.infrastructure_runtime import (
+    ReminderManagerProtocol,
+    ResponseSanitizerProtocol,
+)
+from victor.agent.services.protocols.runtime_support import (
+    RLLearningRuntimeProtocol as RLCoordinatorProtocol,
+)

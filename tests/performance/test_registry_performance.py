@@ -37,14 +37,25 @@ Usage:
 from __future__ import annotations
 
 import time
+from dataclasses import dataclass
 from typing import Any, Dict, List
-from unittest.mock import MagicMock
 
 import pytest
 
-from victor.framework.capabilities.base import BaseCapabilityProvider, CapabilityMetadata
-from victor.framework.chain_registry import ChainRegistry, ChainMetadata, reset_chain_registry
-from victor.framework.persona_registry import PersonaRegistry, PersonaSpec, reset_persona_registry
+from victor.framework.capabilities.base import (
+    BaseCapabilityProvider,
+    CapabilityMetadata,
+)
+from victor.framework.chain_registry import (
+    ChainRegistry,
+    ChainMetadata,
+    reset_chain_registry,
+)
+from victor.framework.persona_registry import (
+    PersonaRegistry,
+    PersonaSpec,
+    reset_persona_registry,
+)
 from victor.framework.middleware import (
     GitSafetyMiddleware,
     LoggingMiddleware,
@@ -55,6 +66,13 @@ from victor.framework.middleware import (
 # =============================================================================
 # Test Fixtures
 # =============================================================================
+
+
+@dataclass
+class _ChainStub:
+    """Lightweight chain object for registry benchmarks."""
+
+    name: str
 
 
 @pytest.fixture(autouse=True)
@@ -76,9 +94,7 @@ def create_mock_chain(n: int) -> Any:
     Returns:
         Mock chain object
     """
-    mock = MagicMock()
-    mock.name = f"chain_{n}"
-    return mock
+    return _ChainStub(name=f"chain_{n}")
 
 
 def create_persona_spec(n: int, expertise_areas: List[str] | None = None) -> PersonaSpec:
@@ -91,14 +107,14 @@ def create_persona_spec(n: int, expertise_areas: List[str] | None = None) -> Per
     Returns:
         PersonaSpec instance
     """
-    expertise = expertise_areas or [f"skill_{i % 10}" for i in range(n)]
+    expertise = expertise_areas or [f"skill_{i % 10}" for i in range(min(n, 10))]
     return PersonaSpec(
         name=f"persona_{n}",
         role=f"Role {n}",
         expertise=expertise,
         communication_style="formal",
         behavioral_traits=["trait_1", "trait_2"],
-        tags=[f"tag_{i % 5}" for i in range(n)],
+        tags=[f"tag_{i % 5}" for i in range(min(n, 5))],
     )
 
 
@@ -125,7 +141,7 @@ class TestCapabilityProvider(BaseCapabilityProvider[MockCapability]):
                 name=f"capability_{i}",
                 description=f"Test capability {i}",
                 version="1.0",
-                tags=[f"tag_{j % 5}" for j in range(i)],
+                tags=[f"tag_{j % 5}" for j in range(min(i, 5))],
             )
             for i in range(num_capabilities)
         }
@@ -167,7 +183,7 @@ class TestChainRegistryPerformance:
                     create_mock_chain(i),
                     vertical="test",
                     description=f"Test chain {i}",
-                    tags=[f"tag_{j % 5}" for j in range(i)],
+                    tags=[f"tag_{j % 5}" for j in range(i % 5)],
                 )
 
         result = benchmark(register_10_chains)
@@ -190,7 +206,7 @@ class TestChainRegistryPerformance:
                     create_mock_chain(i),
                     vertical="test",
                     description=f"Test chain {i}",
-                    tags=[f"tag_{j % 5}" for j in range(i)],
+                    tags=[f"tag_{j % 5}" for j in range(i % 5)],
                 )
 
         result = benchmark(register_100_chains)
@@ -213,7 +229,7 @@ class TestChainRegistryPerformance:
                     create_mock_chain(i),
                     vertical="test",
                     description=f"Test chain {i}",
-                    tags=[f"tag_{j % 5}" for j in range(i)],
+                    tags=[f"tag_{j % 5}" for j in range(i % 5)],
                 )
 
         result = benchmark(register_1000_chains)
@@ -344,7 +360,7 @@ class TestChainRegistryPerformance:
                 create_mock_chain(i),
                 vertical="test",
                 description=f"Test chain {i}",
-                tags=[f"tag_{j % 5}" for j in range(i)],
+                tags=[f"tag_{j % 5}" for j in range(i % 5)],
             )
 
         def get_metadata():
@@ -648,21 +664,27 @@ class TestMiddlewarePerformance:
     - Tool filtering: < 0.05ms per filter
     """
 
+    @staticmethod
+    def _run_ready_coroutine(coro):
+        """Drive coroutines that complete without awaiting external work."""
+        try:
+            coro.send(None)
+        except StopIteration as exc:
+            return exc.value
+        raise AssertionError("Benchmark coroutine suspended; update the benchmark driver")
+
     def test_logging_middleware_overhead(self, benchmark):
         """Benchmark logging middleware execution overhead.
 
         Expected: < 0.1ms per call
         """
-        import asyncio
-
         middleware = LoggingMiddleware(log_level=0)  # Use high level to reduce I/O
-
-        async def run_middleware():
-            return await middleware.before_tool_call("test_tool", {"arg1": "value1"})
 
         # Run sync wrapper for benchmark
         def run_sync():
-            return asyncio.run(run_middleware())
+            return self._run_ready_coroutine(
+                middleware.before_tool_call("test_tool", {"arg1": "value1"})
+            )
 
         result = benchmark(run_sync)
         assert result is not None
@@ -672,15 +694,12 @@ class TestMiddlewarePerformance:
 
         Expected: < 0.1ms per call
         """
-        import asyncio
-
         middleware = SecretMaskingMiddleware(replacement="[REDACTED]")
 
-        async def run_middleware():
-            return await middleware.before_tool_call("test_tool", {"secret": "hidden_value"})
-
         def run_sync():
-            return asyncio.run(run_middleware())
+            return self._run_ready_coroutine(
+                middleware.before_tool_call("test_tool", {"secret": "hidden_value"})
+            )
 
         result = benchmark(run_sync)
         assert result is not None
@@ -690,15 +709,12 @@ class TestMiddlewarePerformance:
 
         Expected: < 0.1ms per call
         """
-        import asyncio
-
         middleware = MetricsMiddleware(enable_timing=True)
 
-        async def run_middleware():
-            return await middleware.before_tool_call("test_tool", {"arg1": "value1"})
-
         def run_sync():
-            return asyncio.run(run_middleware())
+            return self._run_ready_coroutine(
+                middleware.before_tool_call("test_tool", {"arg1": "value1"})
+            )
 
         result = benchmark(run_sync)
         assert result is not None
@@ -708,15 +724,12 @@ class TestMiddlewarePerformance:
 
         Expected: < 0.1ms per call
         """
-        import asyncio
-
         middleware = GitSafetyMiddleware(block_dangerous=True)
 
-        async def run_middleware():
-            return await middleware.before_tool_call("git", {"command": "git status"})
-
         def run_sync():
-            return asyncio.run(run_middleware())
+            return self._run_ready_coroutine(
+                middleware.before_tool_call("git", {"command": "git status"})
+            )
 
         result = benchmark(run_sync)
         assert result is not None
@@ -771,8 +784,6 @@ class TestMiddlewarePerformance:
 
         Expected: < 0.5ms for 5 middleware
         """
-        import asyncio
-
         middleware_list = [
             LoggingMiddleware(log_level=0),
             SecretMaskingMiddleware(),
@@ -788,7 +799,7 @@ class TestMiddlewarePerformance:
             return True
 
         def run_sync():
-            return asyncio.run(execute_chain())
+            return self._run_ready_coroutine(execute_chain())
 
         result = benchmark(run_sync)
         assert result is True

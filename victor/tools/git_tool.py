@@ -15,25 +15,41 @@
 """Git tool with AI-powered commit messages and smart operations.
 
 This tool provides:
-1. Unified git operations (status, diff, stage, commit, log, branch)
+1. Unified git operations (status, diff, stage, commit, push, log, branch)
 2. AI-generated commit messages based on diff analysis
 3. PR creation and management
 4. Conflict detection and resolution help
+5. Push with --force-with-lease, --tags, --dry-run, and --all support
+
+Fallback: If this tool is unavailable or fails, use the shell tool:
+    shell(cmd="git push origin <branch>")
+    shell(cmd="git push --force-with-lease origin <branch>")
+    shell(cmd="git push --tags origin <branch>")
 """
 
 import logging
 import os
+import shlex
 from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
 from victor.config.timeouts import ProcessTimeouts
-from victor.tools.base import AccessMode, DangerLevel, ExecutionCategory, Priority, ToolConfig
+from victor.tools.formatters import format_git_output
+from victor.tools.base import (
+    AccessMode,
+    DangerLevel,
+    ExecutionCategory,
+    Priority,
+    ToolConfig,
+)
 from victor.tools.decorators import tool
 from victor.tools.subprocess_executor import run_command_async
 
 
-def _get_provider_and_model(context: Optional[Dict[str, Any]] = None) -> Tuple[Any, Optional[str]]:
+def _get_provider_and_model(
+    context: Optional[Dict[str, Any]] = None,
+) -> Tuple[Any, Optional[str]]:
     """Get provider and model from ToolConfig in execution context.
 
     Args:
@@ -64,8 +80,10 @@ async def _run_git_async(
     Returns:
         Tuple of (success, stdout, stderr)
     """
-    # Build the git command string
-    command = "git " + " ".join(args)
+    # Build the git command string with each argument shell-quoted so values
+    # containing spaces, parentheses, or special characters are passed verbatim
+    # (e.g. commit messages like "feat(ui): add X" or --pretty=format strings).
+    command = "git " + " ".join(shlex.quote(a) for a in args)
 
     # Prepare environment
     cmd_env = None
@@ -100,10 +118,16 @@ async def _run_git_async(
     ],
     task_types=["action", "analysis"],  # Task types for classification-aware selection
     execution_category=ExecutionCategory.MIXED,  # Can both read and write
-    progress_params=["operation", "files", "branch"],  # Params indicating different operations
+    signature_params=[
+        "operation",
+        "files",
+        "branch",
+    ],  # Params indicating different operations
     keywords=[
         "git",
         "commit",
+        "push",
+        "git push",
         "stage",
         "diff",
         "status",
@@ -119,12 +143,17 @@ async def _run_git_async(
         "review changes",
         "check changes",
         "commit analysis",
+        "push to remote",
+        "push branch",
+        "force push",
+        "push tags",
     ],
     use_cases=[
         "checking repository status",
         "viewing file changes and diffs",
         "staging files for commit",
         "committing changes with custom authorship",
+        "pushing commits to remote (supports --force-with-lease, --tags, --all, --dry-run)",
         "viewing commit history",
         "creating and switching branches",
         "reviewing uncommitted changes",
@@ -138,20 +167,27 @@ async def _run_git_async(
         "commit as John Doe john@example.com",
         "show last 5 commits",
         "create new branch feature/auth",
+        "push to origin (operation='push')",
+        "push with force-with-lease (operation='push', options={'force': True})",
+        "push tags (operation='push', options={'tags': True})",
+        "push specific branch (operation='push', branch='feature/auth')",
     ],
     priority_hints=[
         "Use for all git version control operations",
         "Supports custom author name and email for commits",
         "Can stage individual files or all changes",
         "Use operation='status' or 'diff' to review changes before committing",
+        "Use operation='push' to push commits to remote, supports --force-with-lease and --tags",
     ],
     mandatory_keywords=[
         "commit",
         "git commit",
+        "git push",
         "git status",
         "git diff",
         "git log",
         "git branch",
+        "push to remote",
         "review changes",
         "uncommitted changes",
         "committed changes",
@@ -169,11 +205,26 @@ async def git(
     author_email: Optional[str] = None,
     context: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """Unified git operations: status, diff, stage, commit, log, branch.
+    """Run git operations: status, diff, stash, log, branch, commit_msg, conflicts, push.
 
-    Operations: status, diff (staged=True for staged), stage (files or all),
-    commit (message required), log (limit), branch (list/create/switch).
+    Operations:
+      - status: Show working tree status (short + full).
+      - diff: Show unstaged changes. Use staged=True for staged changes.
+      - stage: Stage files (pass list) or all changes (no files).
+      - commit: Commit staged changes. Requires message parameter.
+      - push: Push commits to remote. Options: remote (default 'origin'),
+              force (bool, uses --force-with-lease), tags (bool),
+              dry_run (bool), all (bool, push all branches).
+              Optionally specify branch to push a specific branch.
+      - log: Show commit history. Use limit to control count.
+      - branch: List branches (no branch arg), or create/switch (with branch arg).
+      - commit_msg: Generate AI commit message from staged diff.
+      - conflicts: Analyze merge conflicts with optional AI suggestions.
+
     Supports custom author_name/author_email for commits.
+
+    Fallback: If this tool is unavailable, use the shell tool:
+        shell(cmd='git push origin <branch>')
     """
     if not operation:
         return {"success": False, "error": "Missing required parameter: operation"}
@@ -191,10 +242,21 @@ async def git(
         # Also get longer status for summary
         _, long_status, _ = await _run_git_async("status")
 
+        # Use unified formatter system
+        formatted_result = format_git_output(
+            {
+                "output": stdout,
+                "operation": "status",
+            },
+            operation="status",
+        )
+
         return {
             "success": True,
             "output": f"Short status:\n{stdout}\n\nFull status:\n{long_status}",
             "error": "",
+            "formatted_output": formatted_result.content,  # Rich-formatted for console
+            "contains_markup": formatted_result.contains_markup,
         }
 
     # Diff operation
@@ -212,13 +274,37 @@ async def git(
             return {"success": False, "output": "", "error": stderr}
 
         if not stdout:
+            formatted_result = format_git_output(
+                {
+                    "output": "",
+                    "operation": "diff",
+                },
+                operation="diff",
+            )
             return {
                 "success": True,
                 "output": "No changes to show" if not staged else "No staged changes",
                 "error": "",
+                "formatted_output": formatted_result.content,  # Rich-formatted for console
+                "contains_markup": formatted_result.contains_markup,
             }
 
-        return {"success": True, "output": stdout, "error": ""}
+        # Use unified formatter system
+        formatted_result = format_git_output(
+            {
+                "output": stdout,
+                "operation": "diff",
+            },
+            operation="diff",
+        )
+
+        return {
+            "success": True,
+            "output": stdout,
+            "error": "",
+            "formatted_output": formatted_result.content,  # Rich-formatted for console
+            "contains_markup": formatted_result.contains_markup,
+        }
 
     # Stage operation
     elif operation == "stage":
@@ -259,9 +345,16 @@ async def git(
             env_overrides["GIT_AUTHOR_EMAIL"] = author_email
             env_overrides["GIT_COMMITTER_EMAIL"] = author_email
 
+        # Append Victor Agent trailer to commit message
+        trailer = "\n\n🤖 Generated with Victor Agent"
+        full_message = f"{message}{trailer}"
+
         # Commit with message and optional author override
         success, stdout, stderr = await _run_git_async(
-            "commit", "-m", message, env_overrides=env_overrides if env_overrides else None
+            "commit",
+            "-m",
+            full_message,
+            env_overrides=env_overrides if env_overrides else None,
         )
 
         if not success:
@@ -307,68 +400,84 @@ async def git(
 
         return {"success": True, "output": stdout, "error": ""}
 
-    else:
+    # Push operation
+    elif operation == "push":
+        remote = (options or {}).get("remote", "origin")
+        push_branch = branch  # optional: push a specific branch
+        push_all = (options or {}).get("all", False)
+        force = (options or {}).get("force", False)
+        tags = (options or {}).get("tags", False)
+        dry_run = (options or {}).get("dry_run", False)
+
+        # Get current branch if none specified
+        if not push_branch and not push_all:
+            success, current, stderr = await _run_git_async("rev-parse", "--abbrev-ref", "HEAD")
+            if not success:
+                return {
+                    "success": False,
+                    "output": "",
+                    "error": f"Failed to determine current branch: {stderr}",
+                }
+            push_branch = current.strip()
+
+        args = ["push"]
+        if force:
+            args.append("--force-with-lease")
+        if tags:
+            args.append("--tags")
+        if dry_run:
+            args.append("--dry-run")
+
+        if push_all:
+            args.append("--all")
+            args.append(remote)
+        else:
+            # Push specific branch; set upstream if not already set
+            args.extend(["--set-upstream" if not dry_run else "-u", remote, push_branch])
+
+        success, stdout, stderr = await _run_git_async(*args)
+
+        if not success:
+            # Provide helpful error context
+            error_msg = stderr.strip()
+            if "no upstream branch" in error_msg.lower():
+                error_msg += "\nHint: The push operation already includes --set-upstream. Try with force=True or check remote access."
+            return {"success": False, "output": stdout or "", "error": error_msg}
+
         return {
-            "success": False,
-            "error": f"Unknown operation: {operation}. Valid operations: status, diff, stage, commit, log, branch",
+            "success": True,
+            "output": stdout.strip() or f"Successfully pushed to {remote}/{push_branch}",
+            "error": "",
         }
 
+    # Commit message generation operation
+    elif operation == "commit_msg":
+        provider, model = _get_provider_and_model(context)
+        if not provider:
+            return {
+                "success": False,
+                "output": "",
+                "error": "No LLM provider available for AI generation",
+            }
 
-@tool(
-    category="git",
-    priority=Priority.MEDIUM,  # Task-specific AI operation
-    access_mode=AccessMode.READONLY,  # Only reads diff, doesn't commit
-    danger_level=DangerLevel.SAFE,  # No side effects
-    keywords=["commit message", "ai", "generate", "suggest", "conventional commit"],
-    mandatory_keywords=["generate commit message", "suggest commit"],  # Force inclusion
-    task_types=["generation", "git"],  # Classification-aware selection
-    use_cases=["generating commit messages", "creating conventional commits"],
-    examples=["suggest a commit message", "generate commit message for staged changes"],
-)
-async def commit_msg(context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """Generate an AI-powered commit message from staged changes.
+        # Get staged diff
+        success, diff, stderr = await _run_git_async("diff", "--staged")
 
-    Analyzes the staged diff and generates a conventional commit message
-    using the configured LLM provider. The generated message follows the
-    conventional commit format: type(scope): subject
+        if not success:
+            return {"success": False, "output": "", "error": stderr}
 
-    Types used: feat, fix, docs, style, refactor, test, chore
+        if not diff:
+            return {
+                "success": False,
+                "output": "",
+                "error": "No staged changes to analyze",
+            }
 
-    Args:
-        context: Tool execution context (injected by decorator, do not pass manually)
+        # Get list of changed files
+        _, files, _ = await _run_git_async("diff", "--staged", "--name-only")
 
-    Returns:
-        Dictionary containing:
-        - success: bool - Whether message generation succeeded
-        - output: str - The generated commit message
-        - error: str - Error message if failed (empty on success)
-
-    Note:
-        Requires staged changes (git add) before calling this tool.
-        Uses the configured LLM provider for message generation.
-    """
-    provider, model = _get_provider_and_model(context)
-    if not provider:
-        return {
-            "success": False,
-            "output": "",
-            "error": "No LLM provider available for AI generation",
-        }
-
-    # Get staged diff
-    success, diff, stderr = await _run_git_async("diff", "--staged")
-
-    if not success:
-        return {"success": False, "output": "", "error": stderr}
-
-    if not diff:
-        return {"success": False, "output": "", "error": "No staged changes to analyze"}
-
-    # Get list of changed files
-    _, files, _ = await _run_git_async("diff", "--staged", "--name-only")
-
-    # Prepare prompt for LLM
-    prompt = f"""Analyze these git changes and generate a concise, conventional commit message.
+        # Prepare prompt for LLM
+        prompt = f"""Analyze these git changes and generate a concise, conventional commit message.
 
 Changed files:
 {files}
@@ -384,28 +493,151 @@ Subject: Present tense, lowercase, no period, max 50 chars
 
 Generate ONLY the commit message, nothing else."""
 
-    try:
-        # Call LLM
-        from victor.providers.base import Message
+        try:
+            # Call LLM
+            from victor.providers.base import Message
 
-        response = await provider.complete(
-            model=model or "default",
-            messages=[Message(role="user", content=prompt)],
-            temperature=0.3,  # Lower temperature for consistency
-            max_tokens=200,
-        )
+            response = await provider.complete(
+                model=model or "default",
+                messages=[Message(role="user", content=prompt)],
+                temperature=0.3,  # Lower temperature for consistency
+                max_tokens=200,
+            )
 
-        message = response.content.strip()
+            message = response.content.strip()
 
-        # Clean up message
-        message = message.replace('"', "").replace("'", "")
-        if message.startswith("Commit message:"):
-            message = message.replace("Commit message:", "").strip()
+            # Clean up message
+            message = message.replace('"', "").replace("'", "")
+            if message.startswith("Commit message:"):
+                message = message.replace("Commit message:", "").strip()
 
-        return {"success": True, "output": message, "error": ""}
+            return {"success": True, "output": message, "error": ""}
 
-    except Exception as e:
-        return {"success": False, "output": "", "error": f"AI generation failed: {str(e)}"}
+        except Exception as e:
+            return {
+                "success": False,
+                "output": "",
+                "error": f"AI generation failed: {str(e)}",
+            }
+
+    # Conflicts analysis operation
+    elif operation == "conflicts":
+        # Get list of conflicted files
+        success, status, stderr = await _run_git_async("status", "--short")
+
+        if not success:
+            return {"success": False, "output": "", "error": stderr}
+
+        # Find conflicted files (marked with UU)
+        conflicted = [line.split()[-1] for line in status.split("\n") if line.startswith("UU")]
+
+        if not conflicted:
+            return {
+                "success": True,
+                "output": "No merge conflicts detected",
+                "error": "",
+            }
+
+        # Analyze each conflicted file
+        analysis = [f"Found {len(conflicted)} conflicted file(s):\n"]
+
+        for file in conflicted:
+            analysis.append(f"\n{file}:")
+
+            # Read file to show conflict markers
+            try:
+                with open(file) as f:
+                    content = f.read()
+
+                # Count conflict markers
+                conflict_count = content.count("<<<<<<< ")
+
+                analysis.append(f"   {conflict_count} conflict(s) in file")
+
+                # Show first conflict context
+                if "<<<<<<< " in content:
+                    start = content.find("<<<<<<< ")
+                    end = content.find(">>>>>>> ", start)
+                    if end != -1:
+                        conflict_section = content[start : end + 50]
+                        analysis.append(
+                            f"   First conflict preview:\n   {conflict_section[:200]}..."
+                        )
+
+            except Exception as e:
+                analysis.append(f"   Error reading file: {e}")
+
+        # If AI available, get resolution suggestions
+        provider, model = _get_provider_and_model(context)
+        if provider:
+            analysis.append("\n\nAI-generated resolution suggestions:")
+            try:
+                # Collect conflict details for AI analysis
+                conflict_details = []
+                for file in conflicted[:3]:  # Limit to first 3 files for context size
+                    try:
+                        with open(file) as f:
+                            content = f.read()
+                        # Extract conflict sections
+                        conflicts_in_file = []
+                        pos = 0
+                        while True:
+                            start = content.find("<<<<<<< ", pos)
+                            if start == -1:
+                                break
+                            end = content.find(">>>>>>> ", start)
+                            if end == -1:
+                                break
+                            # Get the full conflict block
+                            end_line = content.find("\n", end)
+                            if end_line == -1:
+                                end_line = len(content)
+                            conflict_block = content[start:end_line]
+                            conflicts_in_file.append(conflict_block[:500])  # Limit size
+                            pos = end_line
+                        if conflicts_in_file:
+                            conflict_details.append(
+                                f"File: {file}\n" + "\n---\n".join(conflicts_in_file[:2])
+                            )
+                    except Exception as e:
+                        logger.debug("Failed to read merge conflict details for %s: %s", file, e)
+
+                if conflict_details:
+                    prompt = f"""Analyze these git merge conflicts and suggest how to resolve them.
+
+{chr(10).join(conflict_details)}
+
+For each conflict:
+1. Explain what changed in each branch
+2. Suggest which changes to keep or how to combine them
+3. Provide the resolved code if possible
+
+Be concise and practical."""
+
+                    from victor.providers.base import Message
+
+                    response = await provider.complete(
+                        model=model or "default",
+                        messages=[Message(role="user", content=prompt)],
+                        temperature=0.3,
+                        max_tokens=1000,
+                    )
+
+                    suggestions = response.content.strip()
+                    # Indent the suggestions for better formatting
+                    for line in suggestions.split("\n"):
+                        analysis.append(f"   {line}")
+
+            except Exception as e:
+                analysis.append(f"\n   AI analysis failed: {e}")
+
+        return {"success": True, "output": "\n".join(analysis), "error": ""}
+
+    else:
+        return {
+            "success": False,
+            "error": f"Unknown operation: {operation}. Valid operations: status, diff, stage, commit, push, log, branch, commit_msg, conflicts",
+        }
 
 
 @tool(
@@ -540,7 +772,11 @@ DESCRIPTION:
     )
 
     if not success:
-        return {"success": False, "output": "", "error": f"Failed to push branch: {stderr}"}
+        return {
+            "success": False,
+            "output": "",
+            "error": f"Failed to push branch: {stderr}",
+        }
 
     # Create PR with gh CLI
     pr_command = (
@@ -574,145 +810,6 @@ DESCRIPTION:
         }
 
 
-@tool(
-    category="git",
-    priority=Priority.MEDIUM,  # Context-specific conflict resolution
-    access_mode=AccessMode.READONLY,  # Only analyzes, doesn't modify
-    danger_level=DangerLevel.SAFE,  # No side effects
-    keywords=["merge conflict", "conflict", "resolve", "rebase", "merge"],
-    use_cases=["analyzing merge conflicts", "resolving git conflicts", "conflict resolution help"],
-    examples=["analyze conflicts", "show merge conflicts", "help resolve conflicts"],
-)
-async def conflicts(context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """Analyze merge conflicts and provide resolution guidance.
-
-    Detects files with merge conflicts (marked as UU in git status) and provides
-    detailed information about each conflict, including previews of conflict
-    markers and step-by-step resolution instructions.
-
-    Args:
-        context: Tool execution context (injected by decorator, do not pass manually)
-
-    Returns:
-        Dictionary containing:
-        - success: bool - Whether analysis succeeded
-        - output: str - Conflict analysis with file list, conflict counts,
-            conflict previews, and resolution steps
-        - error: str - Error message if failed (empty on success)
-
-    Note:
-        Call this after a failed merge or rebase to understand what needs
-        to be resolved. After manual resolution, stage files with git add
-        and continue with git merge --continue or git rebase --continue.
-    """
-    # Get list of conflicted files
-    success, status, stderr = await _run_git_async("status", "--short")
-
-    if not success:
-        return {"success": False, "output": "", "error": stderr}
-
-    # Find conflicted files (marked with UU)
-    conflicted = [line.split()[-1] for line in status.split("\n") if line.startswith("UU")]
-
-    if not conflicted:
-        return {"success": True, "output": "No merge conflicts detected", "error": ""}
-
-    # Analyze each conflicted file
-    analysis = [f"Found {len(conflicted)} conflicted file(s):\n"]
-
-    for file in conflicted:
-        analysis.append(f"\n{file}:")
-
-        # Read file to show conflict markers
-        try:
-            with open(file) as f:
-                content = f.read()
-
-            # Count conflict markers
-            conflict_count = content.count("<<<<<<< ")
-
-            analysis.append(f"   {conflict_count} conflict(s) in file")
-
-            # Show first conflict context
-            if "<<<<<<< " in content:
-                start = content.find("<<<<<<< ")
-                end = content.find(">>>>>>> ", start)
-                if end != -1:
-                    conflict_section = content[start : end + 50]
-                    analysis.append(f"   First conflict preview:\n   {conflict_section[:200]}...")
-
-        except Exception as e:
-            analysis.append(f"   Error reading file: {e}")
-
-    # If AI available, get resolution suggestions
-    provider, model = _get_provider_and_model(context)
-    if provider:
-        analysis.append("\n\nAI-generated resolution suggestions:")
-        try:
-            # Collect conflict details for AI analysis
-            conflict_details = []
-            for file in conflicted[:3]:  # Limit to first 3 files for context size
-                try:
-                    with open(file) as f:
-                        content = f.read()
-                    # Extract conflict sections
-                    conflicts_in_file = []
-                    pos = 0
-                    while True:
-                        start = content.find("<<<<<<< ", pos)
-                        if start == -1:
-                            break
-                        end = content.find(">>>>>>> ", start)
-                        if end == -1:
-                            break
-                        # Get the full conflict block
-                        end_line = content.find("\n", end)
-                        if end_line == -1:
-                            end_line = len(content)
-                        conflict_block = content[start:end_line]
-                        conflicts_in_file.append(conflict_block[:500])  # Limit size
-                        pos = end_line
-                    if conflicts_in_file:
-                        conflict_details.append(
-                            f"File: {file}\n" + "\n---\n".join(conflicts_in_file[:2])
-                        )
-                except Exception as e:
-                    logger.debug("Failed to read merge conflict details for %s: %s", file, e)
-
-            if conflict_details:
-                prompt = f"""Analyze these git merge conflicts and suggest how to resolve them.
-
-{chr(10).join(conflict_details)}
-
-For each conflict:
-1. Explain what changed in each branch
-2. Suggest which changes to keep or how to combine them
-3. Provide the resolved code if possible
-
-Be concise and practical."""
-
-                from victor.providers.base import Message
-
-                response = await provider.complete(
-                    model=model or "default",
-                    messages=[Message(role="user", content=prompt)],
-                    temperature=0.3,
-                    max_tokens=1000,
-                )
-
-                suggestions = response.content.strip()
-                # Indent the suggestions for better formatting
-                for line in suggestions.split("\n"):
-                    analysis.append(f"   {line}")
-            else:
-                analysis.append("   Could not extract conflict details for AI analysis.")
-        except Exception as e:
-            analysis.append(f"   AI analysis failed: {e}")
-
-    analysis.append("\n\nTo resolve:")
-    analysis.append("1. Edit conflicted files manually")
-    analysis.append("2. Remove conflict markers (<<<<<<, =======, >>>>>>>)")
-    analysis.append("3. Stage resolved files: git add <file>")
-    analysis.append("4. Continue: git merge --continue or git rebase --continue")
-
-    return {"success": True, "output": "\n".join(analysis), "error": ""}
+# ============================================================================
+# Rich Formatting Functions for Git Operations
+# ============================================================================

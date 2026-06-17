@@ -14,6 +14,8 @@
 import * as vscode from 'vscode';
 import { VictorClient } from './victorClient';
 
+type AgentMode = 'build' | 'plan' | 'review' | 'delegate' | 'explore';
+
 // Agent status enum
 export enum AgentStatus {
     Pending = 'pending',
@@ -36,7 +38,7 @@ export interface AgentTask {
     toolCalls: AgentToolCall[];
     output?: string;
     error?: string;
-    mode?: 'build' | 'plan' | 'explore';
+    mode?: AgentMode;
 }
 
 // Tool call made by an agent
@@ -671,7 +673,7 @@ export class AgentsViewProvider implements vscode.TreeDataProvider<AgentTreeItem
     /**
      * Start a new background agent
      */
-    async startAgent(task: string, mode: 'build' | 'plan' | 'explore' = 'build'): Promise<string | null> {
+    async startAgent(task: string, mode: AgentMode = 'build'): Promise<string | null> {
         // Check max concurrent agents limit
         const config = vscode.workspace.getConfiguration('victor.agents');
         const maxConcurrent = config.get<number>('maxConcurrent', 4);

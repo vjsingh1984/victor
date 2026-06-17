@@ -112,10 +112,16 @@ class TestProviderAccount:
         """Test ProviderAccount.is_local()."""
         # Local providers
         assert ProviderAccount(
-            name="ollama", provider="ollama", model="llama3", auth=AuthConfig(method="none")
+            name="ollama",
+            provider="ollama",
+            model="llama3",
+            auth=AuthConfig(method="none"),
         ).is_local()
         assert ProviderAccount(
-            name="lmstudio", provider="lmstudio", model="local", auth=AuthConfig(method="none")
+            name="lmstudio",
+            provider="lmstudio",
+            model="local",
+            auth=AuthConfig(method="none"),
         ).is_local()
         assert ProviderAccount(
             name="vllm", provider="vllm", model="local", auth=AuthConfig(method="none")
@@ -132,7 +138,10 @@ class TestProviderAccount:
     def test_provider_account_oauth_enabled(self):
         """Test ProviderAccount.is_oauth_enabled()."""
         assert ProviderAccount(
-            name="openai", provider="openai", model="gpt-4", auth=AuthConfig(method="oauth")
+            name="openai",
+            provider="openai",
+            model="gpt-4",
+            auth=AuthConfig(method="oauth"),
         ).is_oauth_enabled()
         assert not ProviderAccount(
             name="anthropic",
@@ -144,7 +153,10 @@ class TestProviderAccount:
     def test_provider_account_get_endpoint_variant(self):
         """Test ProviderAccount.get_endpoint_variant()."""
         account = ProviderAccount(
-            name="glm", provider="zai", model="glm-4.6:coding", auth=AuthConfig(method="api_key")
+            name="glm",
+            provider="zai",
+            model="glm-4.6:coding",
+            auth=AuthConfig(method="api_key"),
         )
         assert account.get_endpoint_variant() == "coding"
 
@@ -160,7 +172,10 @@ class TestProviderAccount:
     def test_provider_account_get_base_model(self):
         """Test ProviderAccount.get_base_model()."""
         account = ProviderAccount(
-            name="glm", provider="zai", model="glm-4.6:coding", auth=AuthConfig(method="api_key")
+            name="glm",
+            provider="zai",
+            model="glm-4.6:coding",
+            auth=AuthConfig(method="api_key"),
         )
         assert account.get_base_model() == "glm-4.6"
 
@@ -238,7 +253,10 @@ class TestVictorConfig:
         """Test VictorConfig.add_account()."""
         config = VictorConfig()
         account = ProviderAccount(
-            name="test", provider="anthropic", model="claude", auth=AuthConfig(method="api_key")
+            name="test",
+            provider="anthropic",
+            model="claude",
+            auth=AuthConfig(method="api_key"),
         )
 
         config.add_account(account)
@@ -249,7 +267,10 @@ class TestVictorConfig:
         """Test VictorConfig.remove_account()."""
         config = VictorConfig()
         account = ProviderAccount(
-            name="test", provider="anthropic", model="claude", auth=AuthConfig(method="api_key")
+            name="test",
+            provider="anthropic",
+            model="claude",
+            auth=AuthConfig(method="api_key"),
         )
         config.add_account(account)
 
@@ -263,10 +284,16 @@ class TestVictorConfig:
         """Test VictorConfig.list_accounts()."""
         config = VictorConfig()
         account1 = ProviderAccount(
-            name="test1", provider="anthropic", model="claude", auth=AuthConfig(method="api_key")
+            name="test1",
+            provider="anthropic",
+            model="claude",
+            auth=AuthConfig(method="api_key"),
         )
         account2 = ProviderAccount(
-            name="test2", provider="openai", model="gpt-4", auth=AuthConfig(method="api_key")
+            name="test2",
+            provider="openai",
+            model="gpt-4",
+            auth=AuthConfig(method="api_key"),
         )
 
         config.add_account(account1)
@@ -281,7 +308,10 @@ class TestVictorConfig:
         """Test VictorConfig.to_dict()."""
         config = VictorConfig()
         account = ProviderAccount(
-            name="test", provider="anthropic", model="claude", auth=AuthConfig(method="api_key")
+            name="test",
+            provider="anthropic",
+            model="claude",
+            auth=AuthConfig(method="api_key"),
         )
         config.add_account(account)
         config.defaults.account = "test"
@@ -365,10 +395,16 @@ class TestAccountManager:
     def test_account_manager_list_accounts(self, mock_account_manager):
         """Test listing all accounts."""
         account1 = ProviderAccount(
-            name="test1", provider="anthropic", model="claude", auth=AuthConfig(method="api_key")
+            name="test1",
+            provider="anthropic",
+            model="claude",
+            auth=AuthConfig(method="api_key"),
         )
         account2 = ProviderAccount(
-            name="test2", provider="openai", model="gpt-4", auth=AuthConfig(method="api_key")
+            name="test2",
+            provider="openai",
+            model="gpt-4",
+            auth=AuthConfig(method="api_key"),
         )
 
         mock_account_manager.save_account(account1)
@@ -380,7 +416,10 @@ class TestAccountManager:
     def test_account_manager_list_providers(self, mock_account_manager):
         """Test listing unique providers."""
         account1 = ProviderAccount(
-            name="test1", provider="anthropic", model="claude", auth=AuthConfig(method="api_key")
+            name="test1",
+            provider="anthropic",
+            model="claude",
+            auth=AuthConfig(method="api_key"),
         )
         account2 = ProviderAccount(
             name="test2",
@@ -389,7 +428,10 @@ class TestAccountManager:
             auth=AuthConfig(method="api_key"),
         )
         account3 = ProviderAccount(
-            name="test3", provider="openai", model="gpt-4", auth=AuthConfig(method="api_key")
+            name="test3",
+            provider="openai",
+            model="gpt-4",
+            auth=AuthConfig(method="api_key"),
         )
 
         mock_account_manager.save_account(account1)
@@ -407,7 +449,9 @@ class TestAccountManager:
 
         # Mock API key retrieval
         with patch.object(
-            mock_account_manager, "_get_api_key_from_keyring", return_value="sk-test-key"
+            mock_account_manager,
+            "_get_api_key_from_keyring",
+            return_value="sk-test-key",
         ):
             config = mock_account_manager.resolve_provider_config(sample_account)
 

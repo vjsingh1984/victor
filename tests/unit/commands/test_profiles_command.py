@@ -17,6 +17,7 @@
 import pytest
 import tempfile
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch, MagicMock
 import yaml
 
@@ -25,20 +26,19 @@ import typer
 
 from victor.ui.commands.profiles import (
     profiles_app,
-    _load_profiles_yaml,
-    _save_profiles_yaml,
 )
-from victor.config.profiles import ProfileLevel
+from victor.config.profiles import ProfileLevel, ProfileManager
 
 runner = CliRunner()
 
 
 class TestLoadProfilesYaml:
-    """Tests for _load_profiles_yaml helper function."""
+    """Tests for ProfileManager.load_profiles method."""
 
     def test_load_nonexistent_file(self, tmp_path):
         """Test loading from a nonexistent file returns empty dict."""
-        result = _load_profiles_yaml(tmp_path / "nonexistent.yaml")
+        mgr = ProfileManager.for_config_dir(tmp_path)
+        result = mgr.load_profiles()
         assert result == {"profiles": {}}
 
     def test_load_valid_yaml(self, tmp_path):
@@ -57,7 +57,8 @@ class TestLoadProfilesYaml:
         with open(profiles_file, "w") as f:
             yaml.safe_dump(test_data, f)
 
-        result = _load_profiles_yaml(profiles_file)
+        mgr = ProfileManager.for_config_dir(tmp_path)
+        result = mgr.load_profiles()
         assert result == test_data
 
     def test_load_empty_yaml(self, tmp_path):
@@ -65,7 +66,8 @@ class TestLoadProfilesYaml:
         profiles_file = tmp_path / "profiles.yaml"
         profiles_file.touch()
 
-        result = _load_profiles_yaml(profiles_file)
+        mgr = ProfileManager.for_config_dir(tmp_path)
+        result = mgr.load_profiles()
         # Function always returns profiles dict for consistency
         assert result == {"profiles": {}}
 
@@ -75,21 +77,23 @@ class TestLoadProfilesYaml:
         with open(profiles_file, "w") as f:
             f.write("invalid: yaml: content: [")
 
-        result = _load_profiles_yaml(profiles_file)
+        mgr = ProfileManager.for_config_dir(tmp_path)
+        result = mgr.load_profiles()
         assert result == {"profiles": {}}
 
 
 class TestSaveProfilesYaml:
-    """Tests for _save_profiles_yaml helper function."""
+    """Tests for ProfileManager.save_profiles method."""
 
     def test_save_profiles_creates_directory(self, tmp_path):
         """Test saving creates parent directories if needed."""
         nested_dir = tmp_path / "nested" / "dir"
-        profiles_file = nested_dir / "profiles.yaml"
         test_data = {"profiles": {"test": {"provider": "test"}}}
 
-        _save_profiles_yaml(profiles_file, test_data)
+        mgr = ProfileManager.for_config_dir(nested_dir)
+        mgr.save_profiles(test_data)
 
+        profiles_file = nested_dir / "profiles.yaml"
         assert profiles_file.exists()
         with open(profiles_file) as f:
             loaded = yaml.safe_load(f)
@@ -106,7 +110,8 @@ class TestSaveProfilesYaml:
 
         # Save new data
         new_data = {"profiles": {"new": {"provider": "new"}}}
-        _save_profiles_yaml(profiles_file, new_data)
+        mgr = ProfileManager.for_config_dir(tmp_path)
+        mgr.save_profiles(new_data)
 
         with open(profiles_file) as f:
             loaded = yaml.safe_load(f)
@@ -130,8 +135,9 @@ class TestSaveProfilesYaml:
         if sys.platform != "win32":
             readonly_dir.chmod(0o444)
             try:
-                with pytest.raises(Exit):
-                    _save_profiles_yaml(profiles_file, {"test": "data"})
+                mgr = ProfileManager.for_config_dir(readonly_dir)
+                with pytest.raises(IOError):
+                    mgr.save_profiles({"test": "data"})
             finally:
                 readonly_dir.chmod(0o755)
 
@@ -139,29 +145,63 @@ class TestSaveProfilesYaml:
 class TestListProfiles:
     """Tests for list_profiles command."""
 
-    def test_list_no_profiles(self):
+    def test_list_no_configured_profiles(self, tmp_path):
         """Test listing when no profiles configured."""
-        with patch("victor.ui.commands.profiles.list_profiles", return_value=[]):
-            result = runner.invoke(profiles_app, ["list"])
+        result = runner.invoke(profiles_app, ["list", "--config-dir", str(tmp_path)])
 
         assert result.exit_code == 0
-        # When no profiles, should show something but might not show "No profiles configured"
-        # since it shows built-in profiles by default
-        assert result.exit_code == 0
+        assert "No configured profiles found" in result.stdout
+        assert "profile templates" in result.stdout
 
-    def test_list_with_profiles(self):
-        """Test listing profiles displays them correctly."""
+    def test_list_with_configured_profiles(self, tmp_path):
+        """Test listing profiles.yaml entries displays runtime settings."""
+        profiles_file = tmp_path / "profiles.yaml"
+        profiles_file.write_text(
+            yaml.safe_dump(
+                {
+                    "default_profile": "cheap",
+                    "profiles": {
+                        "cheap": {
+                            "provider": "openai",
+                            "model": "gpt-5-nano",
+                            "temperature": 0.2,
+                            "max_tokens": 2048,
+                            "auth": {"method": "oauth", "source": "keyring"},
+                            "description": "Low-cost OpenAI smoke tests",
+                        }
+                    },
+                }
+            )
+        )
+
+        result = runner.invoke(profiles_app, ["list", "--config-dir", str(tmp_path)])
+
+        assert result.exit_code == 0
+        assert "Configured Profiles" in result.stdout
+        assert "cheap" in result.stdout
+        assert "openai" in result.stdout
+        assert "gpt-5-nano" in result.stdout
+        assert "oauth/keyring" in result.stdout
+
+    def test_templates_lists_built_in_profiles(self):
+        """Test built-in profile templates are available separately from configured profiles."""
         mock_profile = MagicMock()
         mock_profile.name = "default"
         mock_profile.display_name = "Default"
         mock_profile.level = ProfileLevel.BASIC
         mock_profile.description = "Test profile"
+        mock_profile.settings = {
+            "default_provider": "ollama",
+            "default_model": "llama2",
+        }
 
         with patch("victor.ui.commands.profiles.list_profiles", return_value=[mock_profile]):
-            result = runner.invoke(profiles_app, ["list"])
+            result = runner.invoke(profiles_app, ["templates"])
 
         assert result.exit_code == 0
-        assert "Default" in result.stdout or "Available Configuration Profiles" in result.stdout
+        assert "Built-in Profile Templates" in result.stdout
+        assert "Default" in result.stdout
+        assert "ollama" in result.stdout
 
 
 class TestCreateProfile:
@@ -191,6 +231,43 @@ class TestCreateProfile:
 
         assert result.exit_code == 0
         assert "Created profile" in result.stdout
+
+    def test_create_profile_with_account_auth_and_default(self, tmp_path):
+        """Test creating a profile linked to an account and OAuth source."""
+        result = runner.invoke(
+            profiles_app,
+            [
+                "create",
+                "openai-cheap",
+                "--provider",
+                "openai",
+                "--model",
+                "gpt-5-nano",
+                "--account",
+                "openai-cheap",
+                "--auth-method",
+                "oauth",
+                "--auth-source",
+                "codex",
+                "--temperature",
+                "0.2",
+                "--max-tokens",
+                "2048",
+                "--default",
+                "--config-dir",
+                str(tmp_path),
+            ],
+        )
+
+        assert result.exit_code == 0
+        with open(tmp_path / "profiles.yaml") as f:
+            data = yaml.safe_load(f)
+        profile = data["profiles"]["openai-cheap"]
+        assert data["default_profile"] == "openai-cheap"
+        assert profile["account"] == "openai-cheap"
+        assert profile["auth"] == {"method": "oauth", "source": "codex"}
+        assert profile["temperature"] == 0.2
+        assert profile["max_tokens"] == 2048
 
     def test_create_profile_already_exists(self, tmp_path):
         """Test creating a profile that already exists shows error."""
@@ -233,6 +310,29 @@ class TestCreateProfile:
 
         assert result.exit_code == 0
 
+    def test_create_profile_uses_global_victor_dir_by_default(self, tmp_path):
+        """Default CLI config dir should come from centralized Victor paths."""
+        global_dir = tmp_path / ".victor"
+
+        with patch(
+            "victor.ui.commands.profiles.get_project_paths",
+            return_value=SimpleNamespace(global_victor_dir=global_dir),
+        ):
+            result = runner.invoke(
+                profiles_app,
+                [
+                    "create",
+                    "default_path_profile",
+                    "--provider",
+                    "ollama",
+                    "--model",
+                    "llama2",
+                ],
+            )
+
+        assert result.exit_code == 0
+        assert (global_dir / "profiles.yaml").exists()
+
 
 class TestEditProfile:
     """Tests for edit_profile command."""
@@ -268,7 +368,14 @@ class TestEditProfile:
 
         result = runner.invoke(
             profiles_app,
-            ["edit", "nonexistent", "--temperature", "0.5", "--config-dir", str(tmp_path)],
+            [
+                "edit",
+                "nonexistent",
+                "--temperature",
+                "0.5",
+                "--config-dir",
+                str(tmp_path),
+            ],
         )
 
         assert "not found" in result.stdout
@@ -335,7 +442,8 @@ class TestDeleteProfile:
             yaml.safe_dump(existing_data, f)
 
         result = runner.invoke(
-            profiles_app, ["delete", "delete_me", "--force", "--config-dir", str(tmp_path)]
+            profiles_app,
+            ["delete", "delete_me", "--force", "--config-dir", str(tmp_path)],
         )
 
         assert result.exit_code == 0
@@ -347,7 +455,8 @@ class TestDeleteProfile:
         profiles_file.touch()
 
         result = runner.invoke(
-            profiles_app, ["delete", "nonexistent", "--force", "--config-dir", str(tmp_path)]
+            profiles_app,
+            ["delete", "nonexistent", "--force", "--config-dir", str(tmp_path)],
         )
 
         assert "not found" in result.stdout

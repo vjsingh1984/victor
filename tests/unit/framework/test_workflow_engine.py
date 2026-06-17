@@ -178,6 +178,34 @@ class TestWorkflowEngine:
         engine.disable_caching()
         assert engine.config.enable_caching is False
 
+    def test_get_executor_uses_runtime_executor_factory(self):
+        """Legacy executor construction should flow through the shared factory seam."""
+        engine = create_workflow_engine()
+        sentinel = object()
+
+        with patch(
+            "victor.framework.workflow_engine.create_legacy_workflow_executor",
+            return_value=sentinel,
+        ) as factory:
+            assert engine._get_executor() is sentinel
+            assert engine._get_executor() is sentinel
+
+        factory.assert_called_once_with()
+
+    def test_get_streaming_executor_uses_runtime_executor_factory(self):
+        """Legacy streaming executor construction should flow through the shared factory seam."""
+        engine = create_workflow_engine()
+        sentinel = object()
+
+        with patch(
+            "victor.framework.workflow_engine.create_legacy_streaming_workflow_executor",
+            return_value=sentinel,
+        ) as factory:
+            assert engine._get_streaming_executor() is sentinel
+            assert engine._get_streaming_executor() is sentinel
+
+        factory.assert_called_once_with()
+
 
 class TestWorkflowEngineProtocol:
     """Tests for WorkflowEngineProtocol compliance."""

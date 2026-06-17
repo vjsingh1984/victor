@@ -41,7 +41,9 @@ def _prefixed(name: str, context: Optional[Dict[str, Any]] = None) -> str:
     return f"{prefix}_{name}"
 
 
-def get_mcp_tool_definitions(context: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
+def get_mcp_tool_definitions(
+    context: Optional[Dict[str, Any]] = None,
+) -> List[Dict[str, Any]]:
     """Return MCP tools as Victor tool definitions with a name prefix."""
     mcp_client = _get_mcp_client(context)
     if not mcp_client or not mcp_client.tools:

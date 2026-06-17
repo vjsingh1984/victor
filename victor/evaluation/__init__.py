@@ -56,6 +56,11 @@ Example usage:
 """
 
 from victor.evaluation.protocol import (
+    BenchmarkFailureCategory,
+    ConfidenceAssessment,
+    ConfidenceBucket,
+    FailureDiagnosis,
+    FailureStage,
     BenchmarkMetadata,
     BenchmarkTask,
     BenchmarkType,
@@ -71,10 +76,18 @@ from victor.evaluation.harness import (
     BaseBenchmarkRunner,
     BenchmarkRunner,
     EvaluationHarness,
+    PromptCandidateEvaluationRun,
+    PromptCandidateEvaluationSpec,
+    PromptCandidateEvaluationSuiteResult,
     TaskEnvironment,
+    bind_prompt_candidate_evaluation_config,
+    load_prompt_candidate_evaluation_suite,
     get_harness,
 )
 from victor.evaluation.benchmarks import (
+    BrowserTaskBenchmarkRunner,
+    DeepResearchBenchmarkRunner,
+    ExternalAgenticBenchmarkRunner,
     HumanEvalRunner,
     MBPPRunner,
     SWEBenchRunner,
@@ -96,6 +109,29 @@ from victor.evaluation.analyzers import (
     AnalyzerRegistry,
     get_code_quality_analyzer,
     get_pass_at_k_evaluator,
+)
+from victor.evaluation.services import (
+    materialize_validated_session_truth_service,
+    parse_validated_session_truth_legacy_kwargs,
+    ValidatedSessionTruthServiceProtocol,
+    ValidatedSessionTruthService,
+    create_validated_session_truth_service,
+    resolve_validated_session_truth_service,
+)
+from victor.evaluation.planning_feedback import (
+    aggregate_planning_feedback,
+    extract_planning_events,
+    summarize_planning_feedback,
+)
+from victor.evaluation.degradation_feedback import (
+    aggregate_degradation_feedback,
+    extract_degradation_events,
+    summarize_degradation_feedback,
+)
+from victor.evaluation.team_feedback import (
+    aggregate_team_feedback,
+    extract_team_feedback_artifacts,
+    summarize_team_feedback,
 )
 
 # Code generation harness (HumanEval, MBPP - provider-only, no tools)
@@ -207,6 +243,11 @@ from victor.evaluation.evaluation_orchestrator import (
 
 __all__ = [
     # Protocol types
+    "BenchmarkFailureCategory",
+    "ConfidenceAssessment",
+    "ConfidenceBucket",
+    "FailureDiagnosis",
+    "FailureStage",
     "BenchmarkMetadata",
     "BenchmarkTask",
     "BenchmarkType",
@@ -221,9 +262,17 @@ __all__ = [
     "BaseBenchmarkRunner",
     "BenchmarkRunner",
     "EvaluationHarness",
+    "PromptCandidateEvaluationRun",
+    "PromptCandidateEvaluationSpec",
+    "PromptCandidateEvaluationSuiteResult",
     "TaskEnvironment",
+    "bind_prompt_candidate_evaluation_config",
+    "load_prompt_candidate_evaluation_suite",
     "get_harness",
     # Benchmark runners
+    "BrowserTaskBenchmarkRunner",
+    "DeepResearchBenchmarkRunner",
+    "ExternalAgenticBenchmarkRunner",
     "HumanEvalRunner",
     "MBPPRunner",
     "SWEBenchRunner",
@@ -242,6 +291,22 @@ __all__ = [
     "AnalyzerRegistry",
     "get_code_quality_analyzer",
     "get_pass_at_k_evaluator",
+    "materialize_validated_session_truth_service",
+    "parse_validated_session_truth_legacy_kwargs",
+    "ValidatedSessionTruthServiceProtocol",
+    "ValidatedSessionTruthService",
+    "create_validated_session_truth_service",
+    "resolve_validated_session_truth_service",
+    # Planning feedback helpers
+    "aggregate_planning_feedback",
+    "extract_planning_events",
+    "summarize_planning_feedback",
+    "aggregate_team_feedback",
+    "extract_team_feedback_artifacts",
+    "summarize_team_feedback",
+    "aggregate_degradation_feedback",
+    "extract_degradation_events",
+    "summarize_degradation_feedback",
     # Code generation harness (HumanEval, MBPP - provider-only)
     "CodeGenMetrics",
     "CodeGenResult",

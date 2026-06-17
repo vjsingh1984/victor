@@ -12,7 +12,6 @@ from __future__ import annotations
 from pathlib import Path
 import sys
 
-
 ROOT = Path.cwd().resolve()
 MARKER = "victor-vertical.toml"
 

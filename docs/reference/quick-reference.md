@@ -11,7 +11,7 @@ Essential commands, options, and configurations for the Victor agentic AI framew
 | `pipx install victor-ai` | Install Victor (recommended) |
 | `pip install victor-ai` | Install in virtual environment |
 | `victor init` | Initialize Victor in current directory |
-| `victor` | Start TUI (interactive terminal) mode |
+| `victor` | Start interactive CLI terminal mode |
 | `victor chat "Your message"` | Start CLI chat mode |
 | `victor chat --provider anthropic` | Use specific provider |
 | `victor chat --provider openai --model gpt-4o` | Use specific model |

@@ -517,4 +517,7 @@ class TestSummarizeReport:
 
         assert len(result["failures"]) == 1
         assert result["failures"][0]["error_message"] == "Error representation was not a string."
-        assert result["failures"][0]["full_error"] == {"error": "Some error", "line": 42}
+        assert result["failures"][0]["full_error"] == {
+            "error": "Some error",
+            "line": 42,
+        }

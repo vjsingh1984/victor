@@ -46,7 +46,7 @@ from __future__ import annotations
 import logging
 from typing import Any, List, Type
 
-from victor.core.registry_base import ItemRegistry
+from victor.core.registry import ItemRegistry
 
 logger = logging.getLogger(__name__)
 

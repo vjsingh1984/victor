@@ -18,6 +18,13 @@ This package contains shared utilities used across the codebase.
 """
 
 from victor.core.utils.content_hasher import ContentHasher, HasherPresets
+from victor.core.utils.math_utils import (
+    clamp,
+    coerce_float,
+    coerce_int,
+    lerp,
+    normalize_score,
+)
 from victor.core.utils.text_normalizer import (
     TextNormalizationPresets,
     normalize_for_filename,
@@ -36,4 +43,10 @@ __all__ = [
     "sanitize_class_name",
     "normalize_for_test_filename",
     "TextNormalizationPresets",
+    # Math utilities
+    "clamp",
+    "coerce_float",
+    "coerce_int",
+    "lerp",
+    "normalize_score",
 ]

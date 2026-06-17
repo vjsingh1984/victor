@@ -21,7 +21,6 @@ This module bridges the evaluation orchestrator pipeline with the
 framework comparison reporting system.
 """
 
-import json
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -39,6 +38,7 @@ from victor.evaluation.result_correlation import CorrelationReport
 from victor.evaluation.benchmarks.framework_comparison import (
     ComparisonReport,
     create_comparison_report,
+    save_comparison_report_bundle,
 )
 
 logger = logging.getLogger(__name__)
@@ -157,6 +157,7 @@ class SelfBenchmarkRunner:
         eval_config = EvaluationConfig(
             benchmark=config.benchmark_types[0],
             model=config.model,
+            provider=config.provider,
             max_tasks=config.max_tasks,
             timeout_per_task=config.timeout_per_task,
             parallel_tasks=config.parallel,
@@ -188,11 +189,6 @@ class SelfBenchmarkRunner:
     def _save_report(self, report: ComparisonReport) -> None:
         """Save comparison report to output directory."""
         self.config.output_dir.mkdir(parents=True, exist_ok=True)
-
-        md_path = self.config.output_dir / "comparison_report.md"
-        md_path.write_text(report.to_markdown())
-
-        json_path = self.config.output_dir / "comparison_report.json"
-        json_path.write_text(report.to_json())
+        save_comparison_report_bundle(report, self.config.output_dir, primary_format="markdown")
 
         logger.info(f"Benchmark report saved to {self.config.output_dir}")

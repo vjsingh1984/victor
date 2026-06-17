@@ -1,4 +1,5 @@
 """Tests for RecipeLoader."""
+
 import pytest
 from victor_cookbook.loader import RecipeLoader
 

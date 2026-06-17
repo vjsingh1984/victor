@@ -49,12 +49,12 @@ class S3CompilerPlugin(WorkflowCompilerPlugin):
         result = await compiled.invoke({'query': 'AI trends'})
     """
 
-    supported_schemes = ['s3', 's3+https']
+    supported_schemes = ["s3", "s3+https"]
 
     def __init__(
         self,
         bucket: str,
-        region: str = 'us-east-1',
+        region: str = "us-east-1",
         **options,
     ):
         """Initialize S3 compiler plugin.
@@ -98,7 +98,7 @@ class S3CompilerPlugin(WorkflowCompilerPlugin):
         # Delegate to YAML compiler
         from victor.workflows.create import create_compiler
 
-        yaml_compiler = create_compiler('yaml://')
+        yaml_compiler = create_compiler("yaml://")
 
         return yaml_compiler.compile(
             yaml_content,
@@ -128,27 +128,16 @@ class S3CompilerPlugin(WorkflowCompilerPlugin):
             import boto3
 
             # Initialize S3 client with options
-            self._s3_client = boto3.client(
-                's3',
-                region_name=self.region,
-                **self._options
-            )
+            self._s3_client = boto3.client("s3", region_name=self.region, **self._options)
 
         try:
             # Get object from S3
-            response = self._s3_client.get_object(
-                Bucket=self.bucket,
-                Key=key
-            )
-            return response['Body'].read().decode('utf-8')
+            response = self._s3_client.get_object(Bucket=self.bucket, Key=key)
+            return response["Body"].read().decode("utf-8")
         except self._s3_client.exceptions.NoSuchKey:
-            raise FileNotFoundError(
-                f"S3 object not found: s3://{self.bucket}/{key}"
-            )
+            raise FileNotFoundError(f"S3 object not found: s3://{self.bucket}/{key}")
         except Exception as e:
-            raise RuntimeError(
-                f"Failed to load from S3: {e}"
-            ) from e
+            raise RuntimeError(f"Failed to load from S3: {e}") from e
 
     def validate_source(self, source: str) -> bool:
         """Validate S3 source.
@@ -160,11 +149,11 @@ class S3CompilerPlugin(WorkflowCompilerPlugin):
             True if key appears valid, False otherwise
         """
         # Basic validation: check if key looks like a path
-        if not source or source.startswith('/'):
+        if not source or source.startswith("/"):
             return False
 
         # Check for suspicious patterns
-        if '..' in source:
+        if ".." in source:
             return False
 
         return True

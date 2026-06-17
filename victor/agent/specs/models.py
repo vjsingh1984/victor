@@ -26,6 +26,13 @@ from enum import Enum
 from typing import Any, Dict, List, Optional, Set, Union
 import hashlib
 
+from victor.tools.core_tool_aliases import canonicalize_core_tool_name
+
+
+def _canonicalize_tool_set(tools: Set[str]) -> Set[str]:
+    """Normalize tool names onto the canonical internal registry surface."""
+    return {canonicalize_core_tool_name(tool) for tool in tools if tool}
+
 
 class ModelPreference(str, Enum):
     """Model selection preferences.
@@ -94,15 +101,36 @@ class AgentCapabilities:
     can_execute_code: bool = False
     can_modify_files: bool = False
 
+    def __post_init__(self) -> None:
+        """Normalize explicit tool names to canonical runtime identifiers."""
+        self.tools = _canonicalize_tool_set(self.tools)
+
+    def resolve_skills(self, registry: Any) -> List[Any]:
+        """Resolve skill names to SkillDefinition objects.
+
+        Args:
+            registry: A SkillRegistry instance
+
+        Returns:
+            List of resolved SkillDefinition objects for skills in this set
+        """
+        resolved = []
+        for skill_name in sorted(self.skills):
+            skill = registry.get_optional(skill_name)
+            if skill is not None:
+                resolved.append(skill)
+        return resolved
+
     def allows_tool(self, tool_name: str) -> bool:
         """Check if a tool is allowed."""
-        if tool_name in self.tools:
+        canonical_tool_name = canonicalize_core_tool_name(tool_name)
+        if canonical_tool_name in self.tools:
             return True
         # Check patterns (simple glob)
         import fnmatch
 
         for pattern in self.tool_patterns:
-            if fnmatch.fnmatch(tool_name, pattern):
+            if fnmatch.fnmatch(canonical_tool_name, pattern) or fnmatch.fnmatch(tool_name, pattern):
                 return True
         return False
 
@@ -160,6 +188,10 @@ class AgentConstraints:
     min_context_tokens: Optional[int] = None
     required_tools: Set[str] = field(default_factory=set)
 
+    def __post_init__(self) -> None:
+        """Normalize required tools to canonical runtime identifiers."""
+        self.required_tools = _canonicalize_tool_set(self.required_tools)
+
     def to_dict(self) -> Dict[str, Any]:
         """Serialize to dictionary."""
         return {
@@ -203,7 +235,7 @@ class AgentSpec:
             name="researcher",
             description="Finds and analyzes information",
             capabilities=AgentCapabilities(
-                tools={"web_search", "read_file"},
+                tools={"web_search", "read"},
                 can_browse_web=True,
             ),
             model_preference=ModelPreference.REASONING,
@@ -213,7 +245,7 @@ class AgentSpec:
         agent = AgentSpec.from_dict({
             "name": "researcher",
             "description": "Finds and analyzes information",
-            "capabilities": ["web_search", "read_file"],
+            "capabilities": ["web_search", "read"],
             "model_preference": "reasoning",
         })
     """

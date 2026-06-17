@@ -114,11 +114,7 @@ class DeprecatedConstantDescriptor(Generic[T]):
             The loaded and cached constant value
         """
         if not self._warned:
-            warnings.warn(
-                self.deprecation_message,
-                DeprecationWarning,
-                stacklevel=self.stacklevel,
-            )
+            logger.warning(self.deprecation_message)
             self._warned = True
 
         if not self._loaded:

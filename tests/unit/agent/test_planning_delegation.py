@@ -129,6 +129,22 @@ class TestStepDelegation:
         assert "Research complete" in result.output
 
     @pytest.mark.asyncio
+    async def test_delegation_preserves_step_allowed_tools(self):
+        planner, _, mock_sub = _make_planner(with_sub_agent_orchestrator=True)
+        step = _make_step(StepType.RESEARCH)
+        step.allowed_tools = ["grep", "shell"]
+
+        result = await planner._execute_step_via_subagent(step)
+
+        assert result.success is True
+        assert mock_sub.spawn.await_args.kwargs["allowed_tools"] == [
+            "read",
+            "ls",
+            "grep",
+            "shell",
+        ]
+
+    @pytest.mark.asyncio
     async def test_delegation_failure_marks_step_failed(self):
         planner, _, mock_sub = _make_planner(with_sub_agent_orchestrator=True)
         mock_sub.spawn = AsyncMock(side_effect=RuntimeError("spawn failed"))

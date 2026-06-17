@@ -81,39 +81,39 @@ class ExampleVerticalModeConfig(BaseModeConfigProvider, ModeHelperMixin):
         }
 
         # Add vertical-specific modes
-        modes.update({
-            # Example: Custom mode with specific requirements
-            "analysis": ModeDefinition(
-                name="analysis",
-                tool_budget=20,
-                max_iterations=50,
-                temperature=0.7,
-                description="Deep analysis and investigation",
-                exploration_multiplier=2.5,
-                priority_tools=["code_search", "overview", "grep"],
-            ),
-
-            # Example: Mode with tool restrictions
-            "readonly": ModeDefinition(
-                name="readonly",
-                tool_budget=15,
-                max_iterations=30,
-                temperature=0.5,
-                description="Read-only investigation mode",
-                exploration_multiplier=2.0,
-                allowed_tools={"read", "ls", "grep", "code_search", "overview"},
-            ),
-
-            # Example: High-exploration mode
-            "explore": ModeDefinition(
-                name="explore",
-                tool_budget=25,
-                max_iterations=60,
-                temperature=0.7,
-                description="Extended exploration for understanding",
-                exploration_multiplier=3.0,
-            ),
-        })
+        modes.update(
+            {
+                # Example: Custom mode with specific requirements
+                "analysis": ModeDefinition(
+                    name="analysis",
+                    tool_budget=20,
+                    max_iterations=50,
+                    temperature=0.7,
+                    description="Deep analysis and investigation",
+                    exploration_multiplier=2.5,
+                    priority_tools=["code_search", "overview", "grep"],
+                ),
+                # Example: Mode with tool restrictions
+                "readonly": ModeDefinition(
+                    name="readonly",
+                    tool_budget=15,
+                    max_iterations=30,
+                    temperature=0.5,
+                    description="Read-only investigation mode",
+                    exploration_multiplier=2.0,
+                    allowed_tools={"read", "ls", "grep", "code_search", "overview"},
+                ),
+                # Example: High-exploration mode
+                "explore": ModeDefinition(
+                    name="explore",
+                    tool_budget=25,
+                    max_iterations=60,
+                    temperature=0.7,
+                    description="Extended exploration for understanding",
+                    exploration_multiplier=3.0,
+                ),
+            }
+        )
 
         return modes
 
@@ -134,12 +134,10 @@ class ExampleVerticalModeConfig(BaseModeConfigProvider, ModeHelperMixin):
             # Quick tasks
             "quick_check": 5,
             "simple_fix": 8,
-
             # Standard tasks
             "analysis": 15,
             "refactor": 15,
             "debug": 12,
-
             # Complex tasks
             "investigation": 25,
             "comprehensive": 30,
@@ -165,6 +163,7 @@ class ExampleVerticalModeConfig(BaseModeConfigProvider, ModeHelperMixin):
 
 # Example: DevOps mode configuration
 
+
 class DevOpsModeConfig(BaseModeConfigProvider, ModeHelperMixin):
     """DevOps-specific mode configuration.
 
@@ -186,51 +185,50 @@ class DevOpsModeConfig(BaseModeConfigProvider, ModeHelperMixin):
         }
 
         # Add DevOps-specific modes
-        modes.update({
-            # Infrastructure modification mode (high caution)
-            "infra_modify": ModeDefinition(
-                name="infra_modify",
-                tool_budget=40,
-                max_iterations=80,
-                temperature=0.3,  # Low temperature for consistency
-                description="Infrastructure modification with verification",
-                exploration_multiplier=1.5,
-                priority_tools=["shell", "terraform", "kubectl", "ansible"],
-            ),
-
-            # Deployment mode (requires confirmation)
-            "deploy": ModeDefinition(
-                name="deploy",
-                tool_budget=30,
-                max_iterations=60,
-                temperature=0.5,
-                description="Deployment with rollback support",
-                exploration_multiplier=1.5,
-                priority_tools=["shell", "git", "docker", "kubectl"],
-            ),
-
-            # Monitoring and observability mode
-            "monitoring": ModeDefinition(
-                name="monitoring",
-                tool_budget=20,
-                max_iterations=40,
-                temperature=0.5,
-                description="Monitoring and observability setup",
-                exploration_multiplier=2.0,
-                priority_tools=["shell", "read", "code_search"],
-            ),
-
-            # CI/CD pipeline mode
-            "cicd": ModeDefinition(
-                name="cicd",
-                tool_budget=25,
-                max_iterations=50,
-                temperature=0.5,
-                description="CI/CD pipeline configuration",
-                exploration_multiplier=1.8,
-                priority_tools=["shell", "git", "read", "write"],
-            ),
-        })
+        modes.update(
+            {
+                # Infrastructure modification mode (high caution)
+                "infra_modify": ModeDefinition(
+                    name="infra_modify",
+                    tool_budget=40,
+                    max_iterations=80,
+                    temperature=0.3,  # Low temperature for consistency
+                    description="Infrastructure modification with verification",
+                    exploration_multiplier=1.5,
+                    priority_tools=["shell", "terraform", "kubectl", "ansible"],
+                ),
+                # Deployment mode (requires confirmation)
+                "deploy": ModeDefinition(
+                    name="deploy",
+                    tool_budget=30,
+                    max_iterations=60,
+                    temperature=0.5,
+                    description="Deployment with rollback support",
+                    exploration_multiplier=1.5,
+                    priority_tools=["shell", "git", "docker", "kubectl"],
+                ),
+                # Monitoring and observability mode
+                "monitoring": ModeDefinition(
+                    name="monitoring",
+                    tool_budget=20,
+                    max_iterations=40,
+                    temperature=0.5,
+                    description="Monitoring and observability setup",
+                    exploration_multiplier=2.0,
+                    priority_tools=["shell", "read", "code_search"],
+                ),
+                # CI/CD pipeline mode
+                "cicd": ModeDefinition(
+                    name="cicd",
+                    tool_budget=25,
+                    max_iterations=50,
+                    temperature=0.5,
+                    description="CI/CD pipeline configuration",
+                    exploration_multiplier=1.8,
+                    priority_tools=["shell", "git", "read", "write"],
+                ),
+            }
+        )
 
         return modes
 
@@ -241,12 +239,10 @@ class DevOpsModeConfig(BaseModeConfigProvider, ModeHelperMixin):
             "config_change": 8,
             "log_check": 10,
             "status_check": 5,
-
             # Standard operations
             "deploy": 25,
             "service_restart": 12,
             "scale": 15,
-
             # Complex operations
             "infra_setup": 40,
             "migration": 50,
@@ -258,6 +254,7 @@ class DevOpsModeConfig(BaseModeConfigProvider, ModeHelperMixin):
 
 
 # Example: Security mode configuration
+
 
 class SecurityModeConfig(BaseModeConfigProvider, ModeHelperMixin):
     """Security-specific mode configuration.
@@ -280,62 +277,60 @@ class SecurityModeConfig(BaseModeConfigProvider, ModeHelperMixin):
         }
 
         # Add security-specific modes
-        modes.update({
-            # Quick vulnerability scan
-            "quick_scan": ModeDefinition(
-                name="quick_scan",
-                tool_budget=15,
-                max_iterations=20,
-                temperature=0.3,  # Low for consistent analysis
-                description="Quick security scan for high-severity issues",
-                exploration_multiplier=0.8,
-                priority_tools=["code_search", "shell", "read"],
-            ),
-
-            # Comprehensive security audit
-            "comprehensive": ModeDefinition(
-                name="comprehensive",
-                tool_budget=50,
-                max_iterations=100,
-                temperature=0.5,
-                description="Comprehensive security audit covering all categories",
-                exploration_multiplier=2.5,
-                priority_tools=["code_search", "shell", "grep", "read"],
-            ),
-
-            # Compliance-focused mode
-            "compliance": ModeDefinition(
-                name="compliance",
-                tool_budget=40,
-                max_iterations=80,
-                temperature=0.3,
-                description="Compliance-focused audit (SOC2, HIPAA, PCI-DSS)",
-                exploration_multiplier=2.0,
-                priority_tools=["shell", "code_search", "read"],
-            ),
-
-            # Penetration testing mode
-            "pen_test": ModeDefinition(
-                name="pen_test",
-                tool_budget=60,
-                max_iterations=120,
-                temperature=0.7,
-                description="Penetration testing with exploit verification",
-                exploration_multiplier=3.0,
-                priority_tools=["shell", "code_search"],
-            ),
-
-            # Secret detection mode
-            "secret_scan": ModeDefinition(
-                name="secret_scan",
-                tool_budget=20,
-                max_iterations=30,
-                temperature=0.4,
-                description="Secret and credential detection",
-                exploration_multiplier=1.5,
-                priority_tools=["code_search", "shell", "grep"],
-            ),
-        })
+        modes.update(
+            {
+                # Quick vulnerability scan
+                "quick_scan": ModeDefinition(
+                    name="quick_scan",
+                    tool_budget=15,
+                    max_iterations=20,
+                    temperature=0.3,  # Low for consistent analysis
+                    description="Quick security scan for high-severity issues",
+                    exploration_multiplier=0.8,
+                    priority_tools=["code_search", "shell", "read"],
+                ),
+                # Comprehensive security audit
+                "comprehensive": ModeDefinition(
+                    name="comprehensive",
+                    tool_budget=50,
+                    max_iterations=100,
+                    temperature=0.5,
+                    description="Comprehensive security audit covering all categories",
+                    exploration_multiplier=2.5,
+                    priority_tools=["code_search", "shell", "grep", "read"],
+                ),
+                # Compliance-focused mode
+                "compliance": ModeDefinition(
+                    name="compliance",
+                    tool_budget=40,
+                    max_iterations=80,
+                    temperature=0.3,
+                    description="Compliance-focused audit (SOC2, HIPAA, PCI-DSS)",
+                    exploration_multiplier=2.0,
+                    priority_tools=["shell", "code_search", "read"],
+                ),
+                # Penetration testing mode
+                "pen_test": ModeDefinition(
+                    name="pen_test",
+                    tool_budget=60,
+                    max_iterations=120,
+                    temperature=0.7,
+                    description="Penetration testing with exploit verification",
+                    exploration_multiplier=3.0,
+                    priority_tools=["shell", "code_search"],
+                ),
+                # Secret detection mode
+                "secret_scan": ModeDefinition(
+                    name="secret_scan",
+                    tool_budget=20,
+                    max_iterations=30,
+                    temperature=0.4,
+                    description="Secret and credential detection",
+                    exploration_multiplier=1.5,
+                    priority_tools=["code_search", "shell", "grep"],
+                ),
+            }
+        )
 
         return modes
 
@@ -346,11 +341,9 @@ class SecurityModeConfig(BaseModeConfigProvider, ModeHelperMixin):
             "vulnerability_scan": 25,
             "secret_detection": 15,
             "dependency_audit": 20,
-
             # Analysis tasks
             "code_review": 30,
             "compliance_review": 35,
-
             # Assessment tasks
             "risk_assessment": 25,
             "pen_test": 60,

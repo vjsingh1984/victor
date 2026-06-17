@@ -22,6 +22,7 @@ Protocols:
     IAgent: Base agent protocol
     ITeamMember: Team member protocol
     ITeamCoordinator: Base coordinator protocol
+    IDelegateFollowUpCoordinator: Delegate follow-up execution capability
     IObservableCoordinator: Observability capabilities
     IRLCoordinator: RL integration capabilities
     IMessageBusProvider: Message bus provider
@@ -37,6 +38,7 @@ from victor.protocols.team import (
     IAgent,
     ITeamMember,
     ITeamCoordinator,
+    IDelegateFollowUpCoordinator,
     IObservableCoordinator,
     IRLCoordinator,
     IMessageBusProvider,
@@ -50,6 +52,7 @@ __all__ = [
     "IAgent",
     "ITeamMember",
     "ITeamCoordinator",
+    "IDelegateFollowUpCoordinator",
     "IObservableCoordinator",
     "IRLCoordinator",
     "IMessageBusProvider",

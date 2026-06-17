@@ -2,10 +2,30 @@
 
 ## Metadata
 
-- **Status**: Accepted
+- **Status**: Superseded
 - **Date**: 2025-02-26
 - **Decision Makers**: Vijaykumar Singh
 - **Related ADRs**: None
+
+## Update (2026-05-04)
+
+This ADR captures the original move away from a monolithic orchestrator, but it
+no longer describes the current steady-state runtime.
+
+Current runtime shape:
+
+- `AgentOrchestrator` is the composition root, session boundary, and
+  compatibility hotspot.
+- Canonical effectful behavior lives in `ChatService`, `ToolService`,
+  `SessionService`, `ContextService`, `ProviderService`, and
+  `RecoveryService`.
+- State-passed coordinators are used selectively for exploration, safety,
+  system-prompt classification, and coordination recommendation.
+- Facades and deprecated coordinators remain compatibility or grouping
+  surfaces; they are not the canonical ownership layer for new behavior.
+
+See `docs/architecture/CURRENT_STATE.md` for the authoritative current runtime
+architecture.
 
 ## Context
 
@@ -22,7 +42,7 @@ The challenge is balancing:
 - Performance for production workloads
 - Maintainability over time
 
-## Decision
+## Historical Decision
 
 We will use a **Coordinator Pattern** with the Agent Orchestrator as the central coordinator, delegating specialized responsibilities to focused coordinator classes.
 
@@ -180,3 +200,4 @@ result = await agent.run("Hello!")
 | Date | Version | Changes | Author |
 |------|---------|---------|--------|
 | 2025-02-26 | 1.0 | Initial ADR | Vijaykumar Singh |
+| 2026-05-04 | 1.1 | Marked superseded; redirected to current service-first runtime docs | Vijaykumar Singh |

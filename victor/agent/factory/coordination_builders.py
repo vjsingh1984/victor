@@ -23,45 +23,211 @@ Part of CRITICAL-001: Monolithic Orchestrator decomposition.
 from __future__ import annotations
 
 import logging
+import warnings
 from typing import Any, Callable, Dict, Optional, Tuple, TYPE_CHECKING
 
+from victor.config.tool_selection_access import is_semantic_tool_selection_enabled
+from victor.agent.coordinators.factory_support import (
+    create_coordination_advisor_runtime as build_coordination_advisor_runtime,
+    create_coordination_state_passed_coordinator as build_coordination_state_passed_coordinator,
+    create_exploration_coordinator as build_exploration_coordinator,
+    create_exploration_state_passed_coordinator as build_exploration_state_passed_coordinator,
+    create_safety_state_passed_coordinator as build_safety_state_passed_coordinator,
+    create_system_prompt_state_passed_coordinator as build_system_prompt_state_passed_coordinator,
+)
+
 if TYPE_CHECKING:
+    from pathlib import Path
     from victor.config.settings import Settings
     from victor.providers.base import BaseProvider
-    from victor.agent.tool_calling import BaseToolCallingAdapter, ToolCallingCapabilities
-    from victor.agent.conversation_controller import ConversationController
+    from victor.agent.tool_calling import (
+        BaseToolCallingAdapter,
+        ToolCallingCapabilities,
+    )
+    from victor.agent.conversation.controller import ConversationController
     from victor.agent.context_compactor import ContextCompactor
     from victor.agent.recovery import RecoveryHandler
     from victor.agent.orchestrator_recovery import OrchestratorRecoveryIntegration
     from victor.agent.middleware_chain import MiddlewareChain
-    from victor.agent.conversation_state import ConversationStateMachine
+    from victor.agent.conversation.state_machine import ConversationStateMachine
     from victor.agent.task_completion import TaskCompletionDetector
     from victor.agent.read_cache import ReadResultCache
     from victor.agent.time_aware_executor import TimeAwareExecutor
     from victor.agent.thinking_detector import ThinkingPatternDetector
     from victor.agent.resource_manager import ResourceManager
     from victor.agent.budget_manager import ModeCompletionCriteria
-    from victor.agent.context_assembler import TurnBoundaryContextAssembler
+    from victor.agent.conversation.assembler import TurnBoundaryContextAssembler
     from victor.agent.referential_intent_resolver import ReferentialIntentResolver
     from victor.agent.session_ledger import SessionLedger
-    from victor.agent.mode_workflow_team_coordinator import ModeWorkflowTeamCoordinator
     from victor.observability.integration import ObservabilityIntegration
     from victor.storage.embeddings.intent_classifier import IntentClassifier
+    from victor.protocols.coordination import CoordinationAdvisorProtocol
     from victor.agent.protocols.infrastructure_protocols import (
         SafetyCheckerProtocol,
         AutoCommitterProtocol,
-        ReminderManagerProtocol,
         CodeExecutionManagerProtocol,
         WorkflowRegistryProtocol,
     )
-    from victor.agent.protocols.coordination_protocols import TaskCoordinatorProtocol
-    from victor.agent.protocols.streaming_protocols import (
-        StreamingRecoveryCoordinatorProtocol as StreamingRecoveryCoordinatorProto,
-        ChunkGeneratorProtocol as ChunkGeneratorProto,
+    from victor.agent.services.protocols import (
+        ChunkRuntimeProtocol as ChunkGeneratorProto,
+        ReminderManagerProtocol,
+        RLLearningRuntimeProtocol as RLCoordinatorProtocol,
+        StreamingRecoveryRuntimeProtocol as StreamingRecoveryCoordinatorProto,
+        TaskRuntimeProtocol as TaskCoordinatorProtocol,
     )
-    from victor.agent.protocols.infrastructure_protocols import RLCoordinatorProtocol
 
 logger = logging.getLogger(__name__)
+
+
+def build_policy_emitter(container: Any) -> Optional[Callable[[str, Dict[str, Any]], None]]:
+    """Build a sync emitter forwarding policy DENY/ASK to the event bus.
+
+    The PolicyEngine calls the emitter synchronously from within an async
+    context; ObservabilityBus.emit is async, so we schedule it on the running
+    loop (best-effort, audit-only). Returns None if the bus is unavailable.
+
+    Shared by tool-policy and message-policy wiring.
+    """
+    try:
+        from victor.core.events.backends import ObservabilityBus
+
+        bus = container.get_optional(ObservabilityBus)
+    except Exception:  # pragma: no cover - defensive
+        bus = None
+    if bus is None:
+        return None
+
+    # Retain references so fire-and-forget audit tasks aren't GC'd mid-flight.
+    pending: set = set()
+
+    def _emit(topic: str, payload: Dict[str, Any]) -> None:
+        import asyncio
+
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return  # no running loop; skip audit emit
+        task = loop.create_task(bus.emit(topic, payload, source="policy_engine"))
+        pending.add(task)
+        task.add_done_callback(pending.discard)
+
+    return _emit
+
+
+def resolve_policy_approval_handler(governance: Any, container: Any = None) -> Optional[Any]:
+    """Resolve an approval handler for ASK verdicts (tool or message phases).
+
+    Resolution order:
+      1. A ``PolicyApprovalHandler`` registered in the DI container — used on any
+         surface (HTTP API, TUI, websocket), taking precedence so non-TTY
+         surfaces can supply their own elicitation.
+      2. The built-in console handler, only when ``governance.interactive_approval``
+         is set AND stdin is an interactive TTY.
+      3. None — ASK then resolves via ``ask_fallback`` (default fail-safe deny).
+    """
+    # 1. Container-registered handler (works on non-TTY surfaces).
+    if container is not None:
+        try:
+            from victor.framework.policies import PolicyApprovalHandler
+
+            holder = container.get_optional(PolicyApprovalHandler)
+            if holder is not None and getattr(holder, "handler", None) is not None:
+                return holder.handler
+        except Exception:  # pragma: no cover - defensive
+            pass
+
+    # 2. TTY console handler (opt-in).
+    if not getattr(governance, "interactive_approval", False):
+        return None
+    try:
+        import sys
+
+        if not sys.stdin or not sys.stdin.isatty():
+            logger.debug("interactive_approval set but stdin is not a TTY; skipping handler")
+            return None
+        from victor.framework.policies import console_approval_handler
+
+        return console_approval_handler
+    except Exception:  # pragma: no cover - defensive
+        return None
+
+
+def build_message_policy_gate(settings: Any, container: Any, model: Optional[str]) -> Optional[Any]:
+    """Build the governance message gate (REQUEST/RESPONSE phases), or None.
+
+    No-op unless the USE_POLICY_ENGINE feature flag and
+    ``settings.governance.enabled`` are both set AND at least one message-phase
+    policy is configured (redaction or block patterns). Mirrors
+    ``CoordinationBuildersMixin._maybe_add_policy_engine`` for the tool path but
+    returns a :class:`~victor.framework.policies.gate.MessagePolicyGate` for the
+    turn boundary to consume.
+    """
+    try:
+        from victor.core.feature_flags import FeatureFlag, is_feature_enabled
+
+        if not is_feature_enabled(FeatureFlag.USE_POLICY_ENGINE):
+            return None
+
+        governance = getattr(settings, "governance", None)
+        if governance is None or not getattr(governance, "enabled", False):
+            return None
+
+        from victor.framework.policies import (
+            BlockPatternPolicy,
+            MessagePolicyGate,
+            Phase,
+            PolicyContext,
+            PolicyEngine,
+            RedactContentPolicy,
+        )
+
+        policies: list = []
+        if getattr(governance, "redact_patterns", None):
+            policies.append(
+                RedactContentPolicy(
+                    governance.redact_patterns,
+                    placeholder=getattr(governance, "redact_placeholder", "[REDACTED]"),
+                )
+            )
+        if getattr(governance, "block_request_patterns", None):
+            policies.append(
+                BlockPatternPolicy(
+                    governance.block_request_patterns,
+                    phases={Phase.REQUEST},
+                    reason="Your message was blocked by a content policy.",
+                )
+            )
+        if getattr(governance, "block_response_patterns", None):
+            policies.append(
+                BlockPatternPolicy(
+                    governance.block_response_patterns,
+                    phases={Phase.RESPONSE},
+                    reason="The response was withheld by a content policy.",
+                )
+            )
+
+        if not policies:
+            return None
+
+        def _context_provider() -> "PolicyContext":
+            return PolicyContext(model=model)
+
+        engine = PolicyEngine(policies, event_emitter=build_policy_emitter(container))
+        gate = MessagePolicyGate(
+            engine,
+            context_provider=_context_provider,
+            approval_handler=resolve_policy_approval_handler(governance, container),
+            ask_fallback=getattr(governance, "ask_fallback", "deny"),
+        )
+        logger.info(
+            "Message policy gate enabled with %d policy(ies): %s",
+            len(policies),
+            ", ".join(p.name for p in policies),
+        )
+        return gate
+    except Exception as e:  # pragma: no cover - never break runtime init
+        logger.warning("Message policy gate wiring skipped: %s", e)
+        return None
 
 
 class CoordinationBuildersMixin:
@@ -74,6 +240,90 @@ class CoordinationBuildersMixin:
         - self.provider_name: Optional[str]
         - self.container: DI container
     """
+
+    def create_exploration_coordinator(self) -> Any:
+        """Create the canonical read-only exploration runtime."""
+        coordinator = build_exploration_coordinator()
+        logger.debug("ExplorationCoordinator created")
+        return coordinator
+
+    def _get_runtime_intelligence_service(self) -> Any:
+        """Get or create the canonical runtime-intelligence service for factory-built components."""
+        runtime_intelligence = getattr(self, "_runtime_intelligence_service", None)
+        if runtime_intelligence is not None:
+            return runtime_intelligence
+
+        try:
+            from victor.agent.services.runtime_intelligence import (
+                RuntimeIntelligenceService,
+            )
+
+            runtime_intelligence = RuntimeIntelligenceService.from_container(self.container)
+        except Exception as exc:
+            logger.debug("Could not create runtime intelligence service: %s", exc)
+            runtime_intelligence = None
+
+        self._runtime_intelligence_service = runtime_intelligence
+        return runtime_intelligence
+
+    def create_exploration_state_passed_coordinator(
+        self,
+        project_root: Optional["Path"] = None,
+        max_results: int = 5,
+    ) -> Any:
+        """Create the state-passed exploration wrapper."""
+        coordinator = build_exploration_state_passed_coordinator(
+            settings=self.settings,
+            project_root=project_root,
+            max_results=max_results,
+        )
+        logger.debug("ExplorationStatePassedCoordinator created")
+        return coordinator
+
+    def create_system_prompt_state_passed_coordinator(
+        self,
+        task_analyzer: Optional[Any] = None,
+    ) -> Any:
+        """Create the canonical state-passed system prompt coordinator."""
+        coordinator = build_system_prompt_state_passed_coordinator(
+            container=self.container,
+            task_analyzer=task_analyzer,
+        )
+        logger.debug("SystemPromptStatePassedCoordinator created")
+        return coordinator
+
+    def create_safety_state_passed_coordinator(self) -> Any:
+        """Create the canonical state-passed safety wrapper."""
+        coordinator = build_safety_state_passed_coordinator()
+        logger.debug("SafetyStatePassedCoordinator created")
+        return coordinator
+
+    def create_coordination_advisor_runtime(self) -> Any:
+        """Create the canonical service-owned coordination runtime."""
+        from victor.agent.services.protocols import CoordinationAdvisorRuntimeProtocol
+
+        try:
+            runtime = self.container.get(CoordinationAdvisorRuntimeProtocol)
+        except Exception:
+            runtime = build_coordination_advisor_runtime()
+        logger.debug("CoordinationAdvisorRuntime created")
+        return runtime
+
+    def create_coordination_state_passed_coordinator(
+        self,
+        *,
+        coordination_runtime: Any,
+        coordination_advisor: Optional[Any] = None,
+        vertical_context: Optional[Any] = None,
+    ) -> Any:
+        """Create the canonical state-passed coordination wrapper."""
+        coordinator = build_coordination_state_passed_coordinator(
+            coordination_runtime=coordination_runtime,
+            coordination_advisor=coordination_advisor,
+            vertical_context=vertical_context,
+        )
+        logger.debug("CoordinationStatePassedCoordinator created")
+        return coordinator
 
     def create_recovery_handler(self) -> Optional["RecoveryHandler"]:
         """Create recovery handler (from DI container)."""
@@ -107,9 +357,9 @@ class CoordinationBuildersMixin:
         Returns:
             StreamingRecoveryCoordinator instance for recovery coordination
         """
-        from victor.agent.protocols import StreamingRecoveryCoordinatorProtocol
+        from victor.agent.services.protocols import StreamingRecoveryRuntimeProtocol
 
-        recovery_coordinator = self.container.get(StreamingRecoveryCoordinatorProtocol)
+        recovery_coordinator = self.container.get(StreamingRecoveryRuntimeProtocol)
         logger.debug("StreamingRecoveryCoordinator created via DI")
         return recovery_coordinator
 
@@ -119,9 +369,9 @@ class CoordinationBuildersMixin:
         Returns:
             ChunkGenerator instance for chunk generation
         """
-        from victor.agent.protocols import ChunkGeneratorProtocol
+        from victor.agent.services.protocols import ChunkRuntimeProtocol
 
-        chunk_generator = self.container.get(ChunkGeneratorProtocol)
+        chunk_generator = self.container.get(ChunkRuntimeProtocol)
         logger.debug("ChunkGenerator created via DI")
         return chunk_generator
 
@@ -157,7 +407,7 @@ class CoordinationBuildersMixin:
             truncation_strategy_str, TruncationStrategy.SMART
         )
 
-        provider_name = getattr(self.settings, "provider", "").lower()
+        provider_name = str(getattr(self.settings, "provider", "")).lower()
         local_providers = {"ollama", "lmstudio", "vllm", "llamacpp", "local"}
         provider_type = "local" if any(p in provider_name for p in local_providers) else "cloud"
 
@@ -175,6 +425,7 @@ class CoordinationBuildersMixin:
             enable_tool_truncation=getattr(self.settings, "tool_result_truncation", True),
             pruning_learner=pruning_learner,
             provider_type=provider_type,
+            runtime_intelligence=self._get_runtime_intelligence_service(),
         )
 
         rl_status = "with RL learner" if pruning_learner else "without RL learner"
@@ -184,7 +435,9 @@ class CoordinationBuildersMixin:
         )
         return compactor
 
-    def create_middleware_chain(self) -> Tuple[Optional["MiddlewareChain"], Optional[Any]]:
+    def create_middleware_chain(
+        self,
+    ) -> Tuple[Optional["MiddlewareChain"], Optional[Any]]:
         """Create middleware chain with vertical extensions.
 
         Returns:
@@ -238,7 +491,108 @@ class CoordinationBuildersMixin:
         except ImportError as e:
             logger.warning(f"Middleware chain unavailable: {e}")
 
+        # Governance policy engine (opt-in: USE_POLICY_ENGINE + governance.enabled).
+        # Assembled from existing primitives — adds a single CRITICAL-priority
+        # middleware that gates tool calls with ALLOW/DENY/ASK verdicts.
+        if middleware_chain is not None:
+            self._maybe_add_policy_engine(middleware_chain)
+
         return middleware_chain, code_correction_middleware
+
+    def _maybe_add_policy_engine(self, middleware_chain: "MiddlewareChain") -> None:
+        """Conditionally add the governance PolicyEngineMiddleware to the chain.
+
+        No-op unless the USE_POLICY_ENGINE feature flag and
+        ``settings.governance.enabled`` are both set. Builtin policies are
+        constructed from ``settings.governance``; the cost context is resolved
+        lazily from the ConversationController (live token cost) and the
+        configured model.
+        """
+        try:
+            from victor.core.feature_flags import FeatureFlag, is_feature_enabled
+
+            if not is_feature_enabled(FeatureFlag.USE_POLICY_ENGINE):
+                return
+
+            governance = getattr(self.settings, "governance", None)
+            if governance is None or not getattr(governance, "enabled", False):
+                return
+
+            from victor.framework.policies import (
+                AllowToolsPolicy,
+                AskOnToolsPolicy,
+                CostBudgetPolicy,
+                DenyToolsPolicy,
+                MaxToolCallsPolicy,
+                PolicyContext,
+                PolicyEngine,
+                PolicyEngineMiddleware,
+            )
+
+            policies: list = []
+            if getattr(governance, "cost_budget_usd", 0.0) or getattr(
+                governance, "cost_ask_thresholds_usd", None
+            ):
+                policies.append(
+                    CostBudgetPolicy(
+                        max_cost_usd=(governance.cost_budget_usd or None),
+                        ask_thresholds_usd=governance.cost_ask_thresholds_usd,
+                        expensive_models=governance.expensive_models,
+                    )
+                )
+            # Hard tool gates first: a DENY must win over an ASK for the same tool
+            # (the engine short-circuits on the first DENY).
+            if getattr(governance, "deny_tools", None):
+                policies.append(DenyToolsPolicy(governance.deny_tools))
+            if getattr(governance, "allow_tools", None):
+                policies.append(AllowToolsPolicy(governance.allow_tools))
+            if getattr(governance, "ask_on_tools", None):
+                policies.append(AskOnToolsPolicy(governance.ask_on_tools))
+            if getattr(governance, "max_tool_calls_per_session", 0):
+                policies.append(MaxToolCallsPolicy(limit=governance.max_tool_calls_per_session))
+
+            if not policies:
+                logger.debug("Policy engine enabled but no policies configured; skipping")
+                return
+
+            model = getattr(self, "model", None)
+
+            def _context_provider() -> PolicyContext:
+                """Resolve a live session snapshot for policy evaluation."""
+                cost = 0.0
+                try:
+                    from victor.agent.conversation.controller import ConversationController
+
+                    controller = self.container.get_optional(ConversationController)
+                    if controller is not None:
+                        cost = controller.get_session_cost_usd()
+                except Exception:  # pragma: no cover - defensive
+                    cost = 0.0
+                return PolicyContext(cost_usd=cost, model=model)
+
+            engine = PolicyEngine(policies, event_emitter=self._build_policy_emitter())
+            middleware = PolicyEngineMiddleware(
+                engine,
+                context_provider=_context_provider,
+                approval_handler=self._resolve_policy_approval_handler(governance),
+                ask_fallback=getattr(governance, "ask_fallback", "deny"),
+            )
+            middleware_chain.add(middleware)
+            logger.info(
+                "Policy engine enabled with %d policy(ies): %s",
+                len(policies),
+                ", ".join(p.name for p in policies),
+            )
+        except Exception as e:  # pragma: no cover - never break orchestrator init
+            logger.warning(f"Policy engine wiring skipped: {e}")
+
+    def _build_policy_emitter(self) -> Optional[Callable[[str, Dict[str, Any]], None]]:
+        """Build a sync emitter that forwards policy DENY/ASK to the event bus."""
+        return build_policy_emitter(self.container)
+
+    def _resolve_policy_approval_handler(self, governance: Any) -> Optional[Any]:
+        """Resolve an approval handler for ASK verdicts."""
+        return resolve_policy_approval_handler(governance, self.container)
 
     def create_safety_checker(self) -> "SafetyCheckerProtocol":
         """Create safety checker with vertical safety patterns.
@@ -320,9 +674,9 @@ class CoordinationBuildersMixin:
             return None
 
         try:
-            from victor.agent.protocols import RLCoordinatorProtocol
+            from victor.agent.services.protocols import RLLearningRuntimeProtocol
 
-            coordinator = self.container.get(RLCoordinatorProtocol)
+            coordinator = self.container.get(RLLearningRuntimeProtocol)
             logger.info("RL: Coordinator initialized with unified database")
             return coordinator
         except Exception as e:
@@ -342,7 +696,7 @@ class CoordinationBuildersMixin:
         Returns:
             ReminderManager instance
         """
-        from victor.agent.protocols import ReminderManagerProtocol
+        from victor.agent.services.protocols import ReminderManagerProtocol
 
         with self.container.create_scope() as scope:
             reminder_manager = scope.get(ReminderManagerProtocol)
@@ -356,9 +710,9 @@ class CoordinationBuildersMixin:
         Returns:
             TaskCoordinator instance for task coordination
         """
-        from victor.agent.protocols import TaskCoordinatorProtocol
+        from victor.agent.services.protocols import TaskRuntimeProtocol
 
-        task_coordinator = self.container.get(TaskCoordinatorProtocol)
+        task_coordinator = self.container.get(TaskRuntimeProtocol)
         logger.debug("TaskCoordinator created via DI")
         return task_coordinator
 
@@ -374,25 +728,27 @@ class CoordinationBuildersMixin:
         logger.debug("IntentClassifier singleton retrieved")
         return classifier
 
-    def create_mode_workflow_team_coordinator(
+    def create_coordination_advisor(
         self,
         vertical_context: Any,
-    ) -> "ModeWorkflowTeamCoordinator":
-        """Create ModeWorkflowTeamCoordinator for intelligent task coordination.
+    ) -> "CoordinationAdvisorProtocol":
+        """Create the canonical coordination advisor for task/team/workflow routing.
 
         Args:
             vertical_context: VerticalContext with team specs and workflows
 
         Returns:
-            ModeWorkflowTeamCoordinator instance
+            Framework-native coordination advisor
         """
-        from victor.agent.mode_workflow_team_coordinator import create_coordinator
+        from victor.framework.coordination_runtime import (
+            create_vertical_coordination_advisor,
+        )
 
         team_learner = None
         try:
-            from victor.agent.protocols import RLCoordinatorProtocol
+            from victor.agent.services.protocols import RLLearningRuntimeProtocol
 
-            rl_coordinator = self.container.get_optional(RLCoordinatorProtocol)
+            rl_coordinator = self.container.get_optional(RLLearningRuntimeProtocol)
             if rl_coordinator:
                 team_learner = rl_coordinator.get_learner("team_composition")
         except Exception as e:
@@ -400,14 +756,14 @@ class CoordinationBuildersMixin:
 
         selection_strategy = getattr(self.settings, "team_selection_strategy", "hybrid")
 
-        coordinator = create_coordinator(
+        advisor = create_vertical_coordination_advisor(
             vertical_context=vertical_context,
             team_learner=team_learner,
             selection_strategy=selection_strategy,
         )
 
-        logger.debug(f"ModeWorkflowTeamCoordinator created with strategy={selection_strategy}")
-        return coordinator
+        logger.debug("Coordination advisor created with strategy=%s", selection_strategy)
+        return advisor
 
     def setup_subagent_orchestration(self) -> tuple[Optional[Any], bool]:
         """Setup sub-agent orchestration with lazy initialization.
@@ -425,7 +781,7 @@ class CoordinationBuildersMixin:
         Returns:
             Tuple of (use_semantic_selection, embedding_preload_task_placeholder)
         """
-        use_semantic = getattr(self.settings, "use_semantic_tool_selection", False)
+        use_semantic = is_semantic_tool_selection_enabled(self.settings, default=False)
         logger.debug(f"Semantic selection setup: enabled={use_semantic}")
         return (use_semantic, None)
 
@@ -464,7 +820,9 @@ class CoordinationBuildersMixin:
         """
         from victor.agent.task_completion import create_task_completion_detector
 
-        detector = create_task_completion_detector()
+        detector = create_task_completion_detector(
+            runtime_intelligence=self._get_runtime_intelligence_service()
+        )
         logger.debug("TaskCompletionDetector created")
         return detector
 
@@ -520,6 +878,7 @@ class CoordinationBuildersMixin:
         detector = create_thinking_detector(
             repetition_threshold=repetition_threshold,
             similarity_threshold=similarity_threshold,
+            runtime_intelligence=self._get_runtime_intelligence_service(),
         )
         logger.debug(
             f"ThinkingPatternDetector created "
@@ -560,17 +919,23 @@ class CoordinationBuildersMixin:
 
         Args:
             ledger: SessionLedger instance
-            controller: ConversationController (used for score_fn extraction)
+            controller: ConversationController (for semantic retrieval)
         """
-        from victor.agent.context_assembler import TurnBoundaryContextAssembler
+        from victor.agent.conversation.assembler import TurnBoundaryContextAssembler
+        from victor.agent.conversation.scoring import score_messages, CONTROLLER_WEIGHTS
+        from victor.agent.conversation.types import ConversationMessage
 
-        score_fn = None
-        if controller is not None:
-            score_fn = getattr(controller, "_score_messages", None)
+        def _canonical_score_fn(messages, current_query=None):
+            """Bridge provider Messages to canonical scorer."""
+            conv_msgs = [ConversationMessage.from_provider_message(m) for m in messages]
+            scored = score_messages(conv_msgs, current_query, weights=CONTROLLER_WEIGHTS)
+            # Map back to original Message objects
+            conv_to_orig = {id(cm): msg for cm, msg in zip(conv_msgs, messages)}
+            return [(conv_to_orig[id(cm)], s) for cm, s in scored]
 
         assembler = TurnBoundaryContextAssembler(
             session_ledger=ledger,
-            score_fn=score_fn,
+            score_fn=_canonical_score_fn,
             conversation_controller=controller,
         )
         logger.debug("TurnBoundaryContextAssembler created")

@@ -40,6 +40,8 @@ import re
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
+from victor.tools.core_tool_aliases import canonicalize_core_tool_name
+
 logger = logging.getLogger(__name__)
 
 
@@ -70,7 +72,9 @@ class ToolCallExtractor:
     # Patterns for detecting file paths
     FILE_PATH_PATTERNS = [
         # Explicit path mentions
-        r"(?:to|file|path|in|create|write|save|modify|update|edit)\s+[`'\"]?([a-zA-Z0-9_./-]+\.[a-zA-Z]{1,10})[`'\"]?",
+        r"(?:to|file|path|in|create|write|save|modify|update|edit|read|open|view|check)\s+(?:the\s+)?[`'\"]?([a-zA-Z0-9_./-]+\.[a-zA-Z]{1,10})[`'\"]?",
+        # Path followed by "file"
+        r"[`'\"]?([a-zA-Z0-9_./-]+\.[a-zA-Z]{1,10})[`'\"]?\s+file\b",
         # Path at start of sentence with action
         r"^[`'\"]?([a-zA-Z0-9_./-]+\.[a-zA-Z]{1,10})[`'\"]?\s+(?:with|should|will)",
         # After "the file" or "this file"
@@ -131,10 +135,31 @@ class ToolCallExtractor:
         if not mentioned_tools:
             return None
 
-        # Try extraction for each mentioned tool, return first successful
-        for tool_name in mentioned_tools:
-            result = self._extract_for_tool(text, tool_name, context)
-            if result and result.confidence >= 0.5:
+        # P0 FIX: Prioritize tools and improve extraction with lower confidence threshold
+        # Priority order: ls > read > write/edit > others
+        tool_priority = {
+            "ls": 1,
+            "list": 1,
+            "read": 2,
+            "write": 3,
+            "edit": 3,
+            "graph": 4,
+            "code_search": 5,
+            "grep": 6,
+            "shell": 7,
+        }
+
+        # Sort mentioned tools by priority
+        prioritized_tools = sorted(
+            mentioned_tools,
+            key=lambda t: tool_priority.get(canonicalize_core_tool_name(t).lower(), 99),
+        )
+
+        # Try extraction for each mentioned tool with lower threshold
+        for tool_name in prioritized_tools:
+            result = self._extract_for_tool(text, canonicalize_core_tool_name(tool_name), context)
+            # P0 FIX: Lower confidence threshold from 0.5 to 0.3 for recovery attempts
+            if result and result.confidence >= 0.3:
                 logger.info(
                     f"[ToolCallExtractor] Extracted {tool_name} call with "
                     f"confidence {result.confidence:.2f}: {list(result.arguments.keys())}"
@@ -163,21 +188,20 @@ class ToolCallExtractor:
         Returns:
             ExtractedToolCall or None
         """
-        # Normalize tool name
-        tool_lower = tool_name.lower()
+        tool_lower = canonicalize_core_tool_name(tool_name).lower()
 
         # Route to appropriate extractor
-        if tool_lower in ("write", "write_file"):
+        if tool_lower == "write":
             return self._extract_write_call(text, context)
-        elif tool_lower in ("edit", "edit_file", "edit_files"):
+        elif tool_lower == "edit":
             return self._extract_edit_call(text, context)
-        elif tool_lower in ("read", "read_file"):
+        elif tool_lower == "read":
             return self._extract_read_call(text, context)
-        elif tool_lower in ("shell", "bash", "execute", "run"):
+        elif tool_lower == "shell":
             return self._extract_shell_call(text, context)
         elif tool_lower in ("grep", "search", "find"):
             return self._extract_search_call(text, context)
-        elif tool_lower in ("ls", "list", "list_directory"):
+        elif tool_lower in ("ls", "list"):
             return self._extract_ls_call(text, context)
         elif tool_lower in ("graph", "graph_search", "query_graph"):
             return self._extract_graph_call(text, context)
@@ -243,8 +267,8 @@ class ToolCallExtractor:
                 tool_name="edit",
                 arguments={
                     "path": file_path,
-                    "old_string": old_content,
-                    "new_string": new_content,
+                    "old_str": old_content,
+                    "new_str": new_content,
                 },
                 confidence=0.8,
                 source_text=text[:200],
@@ -320,7 +344,7 @@ class ToolCallExtractor:
 
         return ExtractedToolCall(
             tool_name="shell",
-            arguments={"command": command},
+            arguments={"cmd": command},
             confidence=0.75,
             source_text=text[:150],
         )
@@ -356,43 +380,76 @@ class ToolCallExtractor:
     def _extract_ls_call(
         self, text: str, context: Optional[Dict[str, Any]] = None
     ) -> Optional[ExtractedToolCall]:
-        """Extract ls/list directory call."""
+        """Extract ls/list directory call.
+
+        P0 FIX: Improved patterns for common hallucinated mentions like:
+        - "let me explore victor/agent"
+        - "I'll check the directory structure"
+        - "show me what's in src/"
+        """
         # Find directory path - try backtick-wrapped first
         backtick_match = re.search(r"`([a-zA-Z0-9_./-]+)`", text)
         if backtick_match:
             path = backtick_match.group(1)
-            return ExtractedToolCall(
-                tool_name="ls",
-                arguments={"path": path},
-                confidence=0.85,
-                source_text=text[:100],
-            )
+            # Validate it looks like a directory (has / or is a common dir name)
+            if "/" in path or path in ("src", "lib", "tests", "examples", "."):
+                return ExtractedToolCall(
+                    tool_name="ls",
+                    arguments={"path": path},
+                    confidence=0.9,  # Increased confidence for backtick-wrapped paths
+                    source_text=text[:100],
+                )
 
-        # Try directory patterns
+        # Try directory patterns - improved for hallucinated mentions
         dir_patterns = [
+            # "show me what's in src/" pattern
+            r"(?:show|tell)\s+(?:me\s+)?what'?s?\s+in\s+(?:the\s+)?[`'\"]?([a-zA-Z0-9_./-]+/?)[`'\"]?\s*(?:directory|folder)?",
             # "explore victor/agent" pattern (common with hallucinated calls)
-            r"(?:explore|list|check|inspect)\s+[`'\"]?([a-zA-Z0-9_./-]+/[a-zA-Z0-9_./-]*)[`'\"]?",
+            r"(?:explore|list|check|inspect|examine)\s+(?:the\s+)?[`'\"]?([a-zA-Z0-9_./-]+/[a-zA-Z0-9_./-]*)[`'\"]?",
             # "list the directory PATH"
             r"(?:list|ls)\s+(?:the\s+)?(?:directory\s+)?[`'\"]?([a-zA-Z0-9_./-]+/[a-zA-Z0-9_./-]*)[`'\"]?",
+            # "what's in X"
+            r"what'?s?\s+in\s+(?:the\s+)?(?:directory\s+)?[`'\"]?([a-zA-Z0-9_./-]+/?)[`'\"]?",
             r"(?:in|of)\s+[`'\"]?([a-zA-Z0-9_./-]+)[`'\"]?\s+(?:directory|folder)",
             r"(?:directory|folder)\s+[`'\"]?([a-zA-Z0-9_./-]+)[`'\"]?",
         ]
 
         path = "."
+        confidence = 0.6  # Default confidence
         for pattern in dir_patterns:
             match = re.search(pattern, text, re.IGNORECASE)
             if match:
                 candidate = match.group(1)
                 # Filter out common words and short matches
-                skip_words = ("the", "a", "an", "this", "that", "to", "and", "or")
+                skip_words = (
+                    "the",
+                    "a",
+                    "an",
+                    "this",
+                    "that",
+                    "to",
+                    "and",
+                    "or",
+                    "me",
+                    "in",
+                    "of",
+                    "for",
+                    "what",
+                    "whats",
+                    "directory",
+                    "folder",
+                )
                 if candidate.lower() not in skip_words and len(candidate) > 2:
                     path = candidate
+                    # Boost confidence for multi-segment paths (likely real directories)
+                    if "/" in candidate and len(candidate.split("/")) >= 2:
+                        confidence = 0.85
                     break
 
         return ExtractedToolCall(
             tool_name="ls",
             arguments={"path": path},
-            confidence=0.8,
+            confidence=confidence,
             source_text=text[:100],
         )
 
@@ -439,7 +496,14 @@ class ToolCallExtractor:
             mode = "find"  # default
             if any(
                 word in query.lower()
-                for word in ["neighbor", "connected", "related", "calls", "callee", "caller"]
+                for word in [
+                    "neighbor",
+                    "connected",
+                    "related",
+                    "calls",
+                    "callee",
+                    "caller",
+                ]
             ):
                 mode = "neighbors"
             elif any(word in query.lower() for word in ["path", "between", "connection"]):

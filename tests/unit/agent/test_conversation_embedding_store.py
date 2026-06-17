@@ -94,7 +94,9 @@ class TestConversationEmbeddingSearchResult:
 
     def test_creation(self):
         """Test creating a search result."""
-        from victor.agent.conversation_embedding_store import ConversationEmbeddingSearchResult
+        from victor.agent.conversation_embedding_store import (
+            ConversationEmbeddingSearchResult,
+        )
 
         result = ConversationEmbeddingSearchResult(
             message_id="msg_123",
@@ -109,7 +111,9 @@ class TestConversationEmbeddingSearchResult:
 
     def test_repr(self):
         """Test string representation."""
-        from victor.agent.conversation_embedding_store import ConversationEmbeddingSearchResult
+        from victor.agent.conversation_embedding_store import (
+            ConversationEmbeddingSearchResult,
+        )
 
         result = ConversationEmbeddingSearchResult(
             message_id="msg_123",
@@ -127,7 +131,11 @@ class TestConversationEmbeddingStore:
 
     @pytest.fixture
     def temp_paths(self):
-        """Create temporary directories for SQLite and LanceDB."""
+        """Create temporary directories for SQLite and LanceDB.
+
+        Note: Tests use temporary conversation.db for isolation.
+        In production, embedding store uses a separate database from project.db/victor.db.
+        """
         with tempfile.TemporaryDirectory() as tmpdir:
             yield {
                 "sqlite_db": Path(tmpdir) / "conversation.db",
@@ -448,10 +456,14 @@ class TestConversationStoreIntegration:
 
     @pytest.fixture
     def temp_paths(self):
-        """Create temporary paths for both stores."""
+        """Create temporary paths for both stores.
+
+        Note: Tests use temporary project.db for isolation.
+        In production, ConversationStore uses project.db (consolidated database).
+        """
         with tempfile.TemporaryDirectory() as tmpdir:
             yield {
-                "db_path": Path(tmpdir) / "conversation.db",
+                "db_path": Path(tmpdir) / "project.db",
                 "embed_path": Path(tmpdir) / "embeddings",
             }
 
@@ -462,7 +474,8 @@ class TestConversationStoreIntegration:
         Note: The embedding store uses lazy embedding, so messages added to
         ConversationStore are only embedded when search_similar is called.
         """
-        from victor.agent.conversation_memory import ConversationStore, MessageRole
+        from victor.agent.conversation.store import ConversationStore
+        from victor.agent.conversation.types import MessageRole
         from victor.agent.conversation_embedding_store import ConversationEmbeddingStore
 
         mock_service = MockEmbeddingService()

@@ -15,8 +15,9 @@ These classes implement the protocols defined in victor.workflows.protocols.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
+from typing import Any, Callable, Dict, List, Literal, Optional, Set, TYPE_CHECKING
 
+from victor.framework.graph_algorithms import detect_cycle, find_reachable
 from victor.workflows.protocols import (
     ProtocolNodeStatus,
     RetryPolicy,
@@ -25,6 +26,10 @@ from victor.workflows.protocols import (
     IWorkflowEdge,
     IWorkflowGraph,
 )
+
+# Type alias for router functions with Literal return types for better type safety
+# Example: RouterFunction[Literal["success", "error"]] for a router that returns those values
+RouterFunction = Callable[[Dict[str, Any]], str]
 
 
 class DuplicateNodeError(Exception):
@@ -181,13 +186,26 @@ class _RouterEdge:
 
     Used by add_conditional_edge to create multiple conditional edges
     based on a router function's output.
+
+    Type Safety:
+        Router functions should use Literal return types for compile-time checking:
+        ```python
+        from typing import Literal
+
+        def route_by_status(state: Dict[str, Any]) -> Literal["success", "error", "retry"]:
+            if state.get("error"):
+                return "error"
+            if state.get("needs_retry"):
+                return "retry"
+            return "success"
+        ```
     """
 
     def __init__(
         self,
         source_id: str,
         target_id: str,
-        router: Callable[[Dict[str, Any]], str],
+        router: RouterFunction,
         route_key: str,
     ):
         self.source_id = source_id
@@ -301,7 +319,7 @@ class BasicWorkflowGraph:
     def add_conditional_edge(
         self,
         source_id: str,
-        router: Callable[[Dict[str, Any]], str],
+        router: RouterFunction,
         targets: Dict[str, str],
     ) -> "BasicWorkflowGraph":
         """Add conditional branching edges based on a router function.
@@ -321,13 +339,23 @@ class BasicWorkflowGraph:
             InvalidEdgeError: If source or any target node doesn't exist.
 
         Example:
-            def route_by_status(state):
-                return "success" if state.get("ok") else "error"
+            from typing import Literal
+
+            def route_by_status(state: Dict[str, Any]) -> Literal["success", "error", "retry"]:
+                if state.get("error"):
+                    return "error"
+                if state.get("needs_retry"):
+                    return "retry"
+                return "success"
 
             graph.add_conditional_edge(
                 source_id="check",
                 router=route_by_status,
-                targets={"success": "handle_success", "error": "handle_error"}
+                targets={
+                    "success": "handle_success",
+                    "error": "handle_error",
+                    "retry": "retry_step"
+                }
             )
         """
         if source_id not in self._nodes:
@@ -486,24 +514,11 @@ class BasicWorkflowGraph:
         if self._entry_node_id is None:
             return set()
 
-        reachable: Set[str] = set()
-        queue = [self._entry_node_id]
+        adjacency: Dict[str, List[str]] = {node_id: [] for node_id in self._nodes}
+        for edge in self._edges:
+            adjacency.setdefault(edge.source_id, []).append(edge.target_id)
 
-        while queue:
-            current_id = queue.pop(0)
-
-            if current_id in reachable:
-                continue
-
-            reachable.add(current_id)
-
-            # Find all outgoing edges from current node
-            for edge in self._edges:
-                if edge.source_id == current_id:
-                    if edge.target_id not in reachable:
-                        queue.append(edge.target_id)
-
-        return reachable
+        return find_reachable(self._entry_node_id, adjacency)
 
     def _find_cycles(self) -> List[List[str]]:
         """Find all cycles in the graph.
@@ -516,56 +531,35 @@ class BasicWorkflowGraph:
         Returns:
             List of cycles, each cycle is a list of node IDs.
         """
-        WHITE, GRAY, BLACK = 0, 1, 2
-        color: Dict[str, int] = dict.fromkeys(self._nodes, WHITE)
-        cycles: List[List[str]] = []
-        parent: Dict[str, Optional[str]] = dict.fromkeys(self._nodes)
-
-        # Build adjacency list
-        adjacency: Dict[str, List[str]] = {node_id: [] for node_id in self._nodes}
+        adjacency: Dict[str, Set[str]] = {node_id: set() for node_id in self._nodes}
         for edge in self._edges:
-            adjacency[edge.source_id].append(edge.target_id)
+            adjacency.setdefault(edge.source_id, set()).add(edge.target_id)
 
-        def dfs(node_id: str, path: List[str]) -> None:
-            color[node_id] = GRAY
-            current_path = path + [node_id]
+        cycle = detect_cycle(set(self._nodes), adjacency)
+        return [cycle] if cycle else []
 
-            for neighbor_id in adjacency[node_id]:
-                if color[neighbor_id] == GRAY:
-                    # Found a cycle
-                    cycle_start_idx = current_path.index(neighbor_id)
-                    cycle = current_path[cycle_start_idx:] + [neighbor_id]
-                    cycles.append(cycle)
-                elif color[neighbor_id] == WHITE:
-                    parent[neighbor_id] = node_id
-                    dfs(neighbor_id, current_path)
 
-            color[node_id] = BLACK
-
-        # Start DFS from entry node if set, otherwise check all nodes
-        if self._entry_node_id is not None:
-            dfs(self._entry_node_id, [])
-
-        # Check any remaining unvisited nodes
-        for node_id in self._nodes:
-            if color[node_id] == WHITE:
-                dfs(node_id, [])
-
-        return cycles
+LegacyWorkflowGraph = BasicWorkflowGraph
+"""Explicit legacy alias for callers migrating off ``WorkflowGraph``."""
 
 
 # Deprecation alias for backward compatibility
 import warnings as _warnings
+
+_WORKFLOW_GRAPH_ALIAS_DEPRECATION_MESSAGE = (
+    "WorkflowGraph from victor.workflows.graph is deprecated. "
+    "Use BasicWorkflowGraph for the simple graph container or "
+    "victor.workflows.graph_dsl.WorkflowGraph for the typed workflow DSL. "
+    "This warning-backed alias remains supported through v0.8.0 (2026-12-31). "
+    "See docs/architecture/migration.md for migration guidance."
+)
 
 
 def __getattr__(name: str):
     """Provide deprecation warning for WorkflowGraph alias."""
     if name == "WorkflowGraph":
         _warnings.warn(
-            "WorkflowGraph from victor.workflows.graph is deprecated. "
-            "Use BasicWorkflowGraph instead, or for typed workflows use "
-            "victor.workflows.graph_dsl.WorkflowGraph. "
-            "Will be removed in v1.0.",
+            _WORKFLOW_GRAPH_ALIAS_DEPRECATION_MESSAGE,
             DeprecationWarning,
             stacklevel=2,
         )

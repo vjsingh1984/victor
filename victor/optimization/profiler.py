@@ -452,7 +452,10 @@ class WorkflowProfiler:
                         )
                     )
 
-            elif bottleneck.type in [BottleneckType.SLOW_NODE, BottleneckType.DOMINANT_NODE]:
+            elif bottleneck.type in [
+                BottleneckType.SLOW_NODE,
+                BottleneckType.DOMINANT_NODE,
+            ]:
                 # Parallelization opportunity
                 if bottleneck.node_id:
                     # Estimate potential speedup from parallelization

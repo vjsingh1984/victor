@@ -14,7 +14,7 @@
 
 """Framework compatibility re-export for SDK file operation capability contracts."""
 
-from victor_sdk.capabilities import (
+from victor_contracts.capabilities import (
     FileOperation,
     FileOperationsCapability,
     FileOperationType,

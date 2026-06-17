@@ -292,7 +292,8 @@ class TestConnectionValidationIntegration:
                 validator,
                 "_validate_auth",
                 return_value=ValidationResult(
-                    status=ValidationStatus.SUCCESS, message="OAuth client_id configured"
+                    status=ValidationStatus.SUCCESS,
+                    message="OAuth client_id configured",
                 ),
             ):
                 result = await validator.test_account(account)
@@ -486,6 +487,24 @@ class TestOAuthFlowIntegration:
             assert config["auth_mode"] == "oauth"
             assert "oauth_client_id" in config
 
+    def test_oauth_provider_resolution_preserves_external_source(self, clean_account_manager):
+        """OAuth accounts should pass external token source to provider adapters."""
+        account = ProviderAccount(
+            name="openai-codex",
+            provider="openai",
+            model="gpt-5-nano",
+            auth=AuthConfig(method="oauth", source="codex"),
+        )
+        clean_account_manager.save_account(account)
+
+        with patch.object(
+            clean_account_manager, "_get_oauth_client_id", return_value="test-client-id"
+        ):
+            config = clean_account_manager.resolve_provider_config(account=account)
+
+        assert config["auth_mode"] == "oauth"
+        assert config["oauth_source"] == "codex"
+
 
 class TestAccountResolutionIntegration:
     """Integration tests for account resolution logic."""
@@ -541,7 +560,9 @@ class TestAccountResolutionIntegration:
 
         # Mock keyring retrieval
         with patch.object(
-            clean_account_manager, "_get_api_key_from_keyring", return_value="sk-ant-keyring-key"
+            clean_account_manager,
+            "_get_api_key_from_keyring",
+            return_value="sk-ant-keyring-key",
         ):
             config = clean_account_manager.resolve_provider_config(account)
 

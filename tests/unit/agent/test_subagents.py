@@ -25,6 +25,7 @@ Tests cover:
 
 import asyncio
 from dataclasses import dataclass
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -44,6 +45,7 @@ from victor.agent.subagents.orchestrator import (
     FanOutResult,
     SubAgentTask,
 )
+from victor.core.errors import ProviderRateLimitError
 
 # =============================================================================
 # SubAgentRole Tests
@@ -95,6 +97,74 @@ class TestSubAgentConfig:
         assert config.allowed_tools == ["read", "ls"]
         assert config.tool_budget == 10
         assert config.context_limit == 30000
+
+    def test_identity_fields(self):
+        """Test optional team/session identity metadata can be carried by config."""
+        config = SubAgentConfig(
+            role=SubAgentRole.RESEARCHER,
+            task="Research authentication",
+            allowed_tools=["read", "ls"],
+            tool_budget=10,
+            context_limit=30000,
+            member_id="auth_researcher",
+            agent_id="agent_auth_researcher_1",
+            display_name="Authentication Researcher",
+            team_id="team_auth",
+            plan_id="plan_auth",
+            plan_step_id="2",
+            parent_session_id="session_root",
+            child_session_id="session_child",
+        )
+
+        assert config.member_id == "auth_researcher"
+        assert config.agent_id == "agent_auth_researcher_1"
+        assert config.display_name == "Authentication Researcher"
+        assert config.team_id == "team_auth"
+        assert config.plan_id == "plan_auth"
+        assert config.plan_step_id == "2"
+        assert config.parent_session_id == "session_root"
+        assert config.child_session_id == "session_child"
+
+    def test_to_runtime_context_uses_identity_fields(self):
+        """Test config can produce the common per-agent runtime context."""
+        config = SubAgentConfig(
+            role=SubAgentRole.RESEARCHER,
+            task="Research authentication",
+            allowed_tools=["read", "ls"],
+            tool_budget=10,
+            context_limit=30000,
+            member_id="auth_researcher",
+            agent_id="agent_auth_researcher_1",
+            display_name="Authentication Researcher",
+            team_id="team_auth",
+            plan_id="plan_auth",
+            plan_step_id="2",
+            parent_session_id="session_root",
+            child_session_id="session_child",
+        )
+
+        runtime_context = config.to_runtime_context()
+
+        assert runtime_context.agent_id == "agent_auth_researcher_1"
+        assert runtime_context.display_name == "Authentication Researcher"
+        assert runtime_context.role == "researcher"
+        assert runtime_context.session_id == "session_child"
+        assert runtime_context.parent_session_id == "session_root"
+
+    def test_to_runtime_context_generates_readable_default_display_name(self):
+        """Default display names should be human-facing, not persistence IDs."""
+        config = SubAgentConfig(
+            role=SubAgentRole.REVIEWER,
+            task="Review Rust Arc usage and performance",
+            allowed_tools=["read"],
+            tool_budget=10,
+            context_limit=10000,
+        )
+
+        runtime_context = config.to_runtime_context()
+
+        assert runtime_context.agent_id.startswith("agent_reviewer_")
+        assert runtime_context.display_name == "Rust Arc Reviewer"
 
     def test_default_values(self):
         """Test default values are applied."""
@@ -333,6 +403,141 @@ class TestSubAgent:
         # Should return the researcher prompt
         assert len(prompt) > 100
 
+    @pytest.mark.asyncio
+    async def test_execute_with_retry_respects_provider_retry_after(
+        self,
+        sample_config,
+        mock_parent_orchestrator,
+    ):
+        """Rate-limit retries should honor provider/circuit-breaker cooldowns."""
+        subagent = SubAgent(sample_config, mock_parent_orchestrator)
+        response = SimpleNamespace(content="done")
+        subagent.orchestrator = SimpleNamespace(
+            chat=AsyncMock(
+                side_effect=[
+                    ProviderRateLimitError("circuit open", retry_after=17),
+                    response,
+                ]
+            )
+        )
+
+        with patch("asyncio.sleep", new_callable=AsyncMock) as sleep_mock:
+            result = await subagent._execute_with_retry()
+
+        assert result is response
+        sleep_mock.assert_awaited_once_with(17.0)
+
+    @pytest.mark.asyncio
+    async def test_execute_runs_context_lifecycle_and_adds_parent_handoff(
+        self,
+        sample_config,
+        mock_parent_orchestrator,
+    ):
+        """Successful execution should compact via common lifecycle service."""
+        lifecycle = MagicMock()
+        lifecycle.after_agent_turn = AsyncMock(
+            return_value={
+                "compacted": True,
+                "messages_removed": 2,
+                "tokens_freed": 10,
+            }
+        )
+        lifecycle.build_parent_handoff.return_value = {
+            "agent_id": "agent_1",
+            "summary": "bounded",
+            "status": "success",
+        }
+        subagent = SubAgent(sample_config, mock_parent_orchestrator, context_lifecycle=lifecycle)
+        subagent.orchestrator = MagicMock()
+        subagent.orchestrator.tool_calls_used = 1
+        subagent.orchestrator.get_messages.return_value = [
+            {"role": "user", "content": "x" * 20},
+            {"role": "assistant", "content": "y" * 20},
+        ]
+        subagent._execute_with_retry = AsyncMock(return_value=SimpleNamespace(content="done"))
+
+        result = await subagent.execute()
+
+        assert result.success is True
+        assert result.details["context_lifecycle"]["compacted"] is True
+        assert result.details["parent_handoff"]["summary"] == "bounded"
+        lifecycle.after_agent_turn.assert_awaited_once()
+        call = lifecycle.after_agent_turn.call_args
+        assert call.args[0].agent_id == result.details["agent_id"]
+        assert call.kwargs["messages"] == subagent.orchestrator.get_messages.return_value
+
+    @pytest.mark.asyncio
+    async def test_execute_preserves_full_summary_for_parent_handoff_by_default(
+        self,
+        sample_config,
+        mock_parent_orchestrator,
+    ):
+        """Sub-agent results should preserve evidence unless explicitly bounded."""
+        full_content = "line\n" * 200
+        subagent = SubAgent(sample_config, mock_parent_orchestrator)
+        subagent.orchestrator = MagicMock()
+        subagent.orchestrator.tool_calls_used = 1
+        subagent.orchestrator.get_messages.return_value = []
+        subagent._execute_with_retry = AsyncMock(return_value=SimpleNamespace(content=full_content))
+
+        result = await subagent.execute()
+
+        assert result.summary == full_content
+
+    @pytest.mark.asyncio
+    async def test_execute_can_bound_summary_when_configured(
+        self,
+        sample_config,
+        mock_parent_orchestrator,
+    ):
+        sample_config.result_summary_max_chars = 10
+        subagent = SubAgent(sample_config, mock_parent_orchestrator)
+        subagent.orchestrator = MagicMock()
+        subagent.orchestrator.tool_calls_used = 1
+        subagent.orchestrator.get_messages.return_value = []
+        subagent._execute_with_retry = AsyncMock(
+            return_value=SimpleNamespace(content="0123456789abcdef")
+        )
+
+        result = await subagent.execute()
+
+        assert result.summary == "0123456789"
+
+    @pytest.mark.asyncio
+    async def test_execute_propagates_failed_agentic_loop_metadata(
+        self,
+        sample_config,
+        mock_parent_orchestrator,
+    ):
+        """Agentic loop failure metadata should make the sub-agent fail."""
+        lifecycle = MagicMock()
+        lifecycle.after_agent_turn = AsyncMock(return_value={"compacted": False})
+        lifecycle.build_parent_handoff.return_value = {
+            "agent_id": "agent_1",
+            "summary": "failed loop",
+            "status": "failed",
+        }
+        subagent = SubAgent(sample_config, mock_parent_orchestrator, context_lifecycle=lifecycle)
+        subagent.orchestrator = MagicMock()
+        subagent.orchestrator.tool_calls_used = 2
+        subagent.orchestrator.get_messages.return_value = []
+        subagent._execute_with_retry = AsyncMock(
+            return_value=SimpleNamespace(
+                content="I could not complete the task.",
+                metadata={
+                    "agentic_loop_success": False,
+                    "agentic_loop_error": "Insufficient progress",
+                },
+            )
+        )
+
+        result = await subagent.execute()
+
+        assert result.success is False
+        assert result.error == "Insufficient progress"
+        assert result.details["agentic_loop_success"] is False
+        assert result.details["agentic_loop_error"] == "Insufficient progress"
+
 
 # =============================================================================
 # SubAgentOrchestrator Tests
@@ -369,6 +574,109 @@ class TestSubAgentOrchestrator:
         orchestrator = SubAgentOrchestrator(mock_parent)
         assert orchestrator.get_active_count() == 0
 
+    @pytest.mark.asyncio
+    async def test_spawn_propagates_identity_metadata_to_result(self, mock_parent):
+        """Test spawn carries team/session identity into SubAgentConfig and result details."""
+        orchestrator = SubAgentOrchestrator(mock_parent)
+
+        with patch("victor.agent.subagents.orchestrator.SubAgent") as subagent_cls:
+            subagent = MagicMock()
+            subagent.execute = AsyncMock(
+                return_value=SubAgentResult(
+                    success=True,
+                    summary="done",
+                    details={},
+                    tool_calls_used=1,
+                    context_size=100,
+                    duration_seconds=0.1,
+                )
+            )
+            subagent_cls.return_value = subagent
+
+            result = await orchestrator.spawn(
+                role=SubAgentRole.RESEARCHER,
+                task="Research auth",
+                member_id="auth_researcher",
+                agent_id="agent_auth_researcher_1",
+                display_name="Authentication Researcher",
+                team_id="team_auth",
+                plan_id="plan_auth",
+                plan_step_id="2",
+                parent_session_id="session_root",
+                child_session_id="session_child",
+            )
+
+        created_config = subagent_cls.call_args.args[0]
+        assert created_config.member_id == "auth_researcher"
+        assert created_config.agent_id == "agent_auth_researcher_1"
+        assert created_config.display_name == "Authentication Researcher"
+        assert created_config.team_id == "team_auth"
+        assert result.details["member_id"] == "auth_researcher"
+        assert result.details["agent_id"] == "agent_auth_researcher_1"
+        assert result.details["display_name"] == "Authentication Researcher"
+        assert result.details["team_id"] == "team_auth"
+        assert result.details["plan_id"] == "plan_auth"
+        assert result.details["plan_step_id"] == "2"
+        assert result.details["parent_session_id"] == "session_root"
+        assert result.details["child_session_id"] == "session_child"
+
+    @pytest.mark.asyncio
+    async def test_spawn_generates_default_identity_names(self, mock_parent):
+        """Spawn should assign stable IDs and readable display names when omitted."""
+        orchestrator = SubAgentOrchestrator(mock_parent)
+
+        with patch("victor.agent.subagents.orchestrator.SubAgent") as subagent_cls:
+            subagent = MagicMock()
+            subagent.execute = AsyncMock(
+                return_value=SubAgentResult(
+                    success=True,
+                    summary="done",
+                    details={},
+                    tool_calls_used=1,
+                    context_size=100,
+                    duration_seconds=0.1,
+                )
+            )
+            subagent_cls.return_value = subagent
+
+            result = await orchestrator.spawn(
+                role=SubAgentRole.RESEARCHER,
+                task="Find API endpoints",
+            )
+
+        created_config = subagent_cls.call_args.args[0]
+        assert created_config.agent_id.startswith("agent_researcher_")
+        assert created_config.display_name == "API Endpoints Researcher"
+        assert result.details["agent_id"] == created_config.agent_id
+        assert result.details["display_name"] == "API Endpoints Researcher"
+
+    @pytest.mark.asyncio
+    async def test_spawn_injects_context_lifecycle_service(self, mock_parent):
+        """Sub-agent orchestration should use the shared context lifecycle service."""
+        lifecycle = MagicMock()
+        orchestrator = SubAgentOrchestrator(mock_parent, context_lifecycle=lifecycle)
+
+        with patch("victor.agent.subagents.orchestrator.SubAgent") as subagent_cls:
+            subagent = MagicMock()
+            subagent.execute = AsyncMock(
+                return_value=SubAgentResult(
+                    success=True,
+                    summary="done",
+                    details={},
+                    tool_calls_used=1,
+                    context_size=100,
+                    duration_seconds=0.1,
+                )
+            )
+            subagent_cls.return_value = subagent
+
+            await orchestrator.spawn(
+                role=SubAgentRole.RESEARCHER,
+                task="Find API endpoints",
+            )
+
+        assert subagent_cls.call_args.kwargs["context_lifecycle"] is lifecycle
+
 
 # =============================================================================
 # SubAgentTask Tests
@@ -389,6 +697,30 @@ class TestSubAgentTask:
         assert task.tool_budget is None
         assert task.allowed_tools is None
         assert task.context_limit is None
+
+    def test_task_identity_fields(self):
+        """Test optional team/session identity metadata can be carried by tasks."""
+        task = SubAgentTask(
+            role=SubAgentRole.RESEARCHER,
+            task="Find API endpoints",
+            member_id="api_researcher",
+            agent_id="agent_api_researcher_1",
+            display_name="API Researcher",
+            team_id="team_api",
+            plan_id="plan_api",
+            plan_step_id="1",
+            parent_session_id="session_root",
+            child_session_id="session_child",
+        )
+
+        assert task.member_id == "api_researcher"
+        assert task.agent_id == "agent_api_researcher_1"
+        assert task.display_name == "API Researcher"
+        assert task.team_id == "team_api"
+        assert task.plan_id == "plan_api"
+        assert task.plan_step_id == "1"
+        assert task.parent_session_id == "session_root"
+        assert task.child_session_id == "session_child"
 
     def test_task_with_overrides(self):
         """Test creating task with custom overrides."""
@@ -554,14 +886,14 @@ class TestOrchestratorSubAgentIntegration:
         )
 
     def test_subagent_orchestrator_property_is_lazy(self):
-        """Test that intelligent_integration property follows lazy init pattern."""
+        """Test that runtime_intelligence_integration property follows lazy init pattern."""
         import inspect
         from victor.agent.orchestrator import AgentOrchestrator
 
-        source = inspect.getsource(AgentOrchestrator.intelligent_integration.fget)
+        source = inspect.getsource(AgentOrchestrator.runtime_intelligence_integration.fget)
         # Check for lazy initialization pattern
-        assert "_intelligent_pipeline_enabled" in source
-        assert "_intelligent_integration is None" in source
+        assert "_runtime_intelligence_enabled" in source
+        assert "_runtime_intelligence_integration is None" in source
         assert "from victor.agent.orchestrator_integration import OrchestratorIntegration" in source
 
     def test_subagent_orchestrator_returns_none_when_disabled(self):

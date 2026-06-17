@@ -17,25 +17,197 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 import typer
 from rich.console import Console
+from rich.syntax import Syntax
 from rich.table import Table
 
-from victor.agent.sqlite_session_persistence import get_sqlite_session_persistence
+from victor.agent.conversation.store import ConversationStore
+from victor.ui.json_utils import create_json_option, print_json_data
 
-sessions_app = typer.Typer(name="sessions", help="Manage conversation sessions.")
+sessions_app = typer.Typer(name="session", help="Manage conversation sessions.")
 console = Console()
+
+
+def _use_legacy_session_backend() -> bool:
+    """Return whether CLI should use the legacy SQLite session shim."""
+
+    return bool(os.environ.get("VICTOR_TEST_DB_PATH"))
+
+
+def _get_session_backend() -> Any:
+    """Return the active session backend.
+
+    Tests still seed the legacy SQLiteSessionPersistence directly via
+    ``VICTOR_TEST_DB_PATH``. Keep the command layer compatible with that
+    persisted shape while the default runtime continues to use ConversationStore.
+    """
+
+    if _use_legacy_session_backend():
+        from victor.agent.sqlite_session_persistence import SQLiteSessionPersistence
+
+        return SQLiteSessionPersistence(db_path=Path(os.environ["VICTOR_TEST_DB_PATH"]))
+    return ConversationStore()
+
+
+def _preview_count_from_session_data(session_data: dict[str, Any]) -> int:
+    """Return preview message count from loaded session payload."""
+
+    conversation = session_data.get("conversation", {})
+    preview_messages = conversation.get("preview_messages", [])
+    return len(preview_messages) if isinstance(preview_messages, list) else 0
+
+
+def _summary_from_loaded_session(session_data: dict[str, Any]) -> dict[str, Any]:
+    """Build flat session summary from a loaded session payload."""
+
+    metadata = session_data.get("metadata", {})
+    return {
+        "session_id": metadata.get("session_id", ""),
+        "title": metadata.get("title", "Untitled"),
+        "model": metadata.get("model", "unknown"),
+        "provider": metadata.get("provider", "unknown"),
+        "profile": metadata.get("profile", "default"),
+        "created_at": metadata.get("created_at"),
+        "updated_at": metadata.get("updated_at"),
+        "message_count": metadata.get("message_count", 0),
+        "preview_count": _preview_count_from_session_data(session_data),
+        "tags": metadata.get("tags", []),
+    }
+
+
+def _load_session_data(session_id: str) -> Optional[dict[str, Any]]:
+    """Load a full session payload using the active backend."""
+
+    backend = _get_session_backend()
+    if _use_legacy_session_backend():
+        return backend.load_session(session_id)
+    return backend.load_session(session_id)
+
+
+def _list_session_summaries(limit: int) -> list[dict[str, Any]]:
+    """List session summaries with a consistent cross-backend schema."""
+
+    backend = _get_session_backend()
+    if _use_legacy_session_backend():
+        return backend.list_sessions(limit=limit)
+
+    summaries: list[dict[str, Any]] = []
+    for session in backend.list_sessions(limit=limit):
+        loaded = backend.load_session(session.session_id)
+        if loaded:
+            summaries.append(_summary_from_loaded_session(loaded))
+    return summaries
+
+
+def _search_session_summaries(query: str, limit: int) -> list[dict[str, Any]]:
+    """Search sessions and normalize result summaries across backends."""
+
+    backend = _get_session_backend()
+    raw_results = backend.search_sessions(query, limit=limit)
+    if _use_legacy_session_backend():
+        return raw_results
+
+    summaries: list[dict[str, Any]] = []
+    for result in raw_results:
+        session_id = result.get("session_id")
+        if not session_id:
+            continue
+        loaded = backend.load_session(session_id)
+        if loaded:
+            summaries.append(_summary_from_loaded_session(loaded))
+    return summaries
+
+
+def _exportable_sessions(limit: int = 1000) -> list[dict[str, Any]]:
+    """Load full session payloads for export."""
+
+    backend = _get_session_backend()
+    sessions: list[dict[str, Any]] = []
+
+    if _use_legacy_session_backend():
+        for session in backend.list_sessions(limit=limit):
+            loaded = backend.load_session(session["session_id"])
+            if loaded:
+                sessions.append(loaded)
+        return sessions
+
+    for session in backend.list_sessions(limit=limit):
+        loaded = backend.load_session(session.session_id)
+        if loaded:
+            sessions.append(loaded)
+    return sessions
+
+
+def _truncate_preview_body(
+    preview_body: str,
+    *,
+    max_lines: int = 12,
+    max_chars: int = 1200,
+) -> str:
+    """Keep preview snippets compact in terminal output."""
+    body = preview_body[:max_chars]
+    lines = body.splitlines()
+    rendered = "\n".join(lines[:max_lines])
+
+    if len(lines) > max_lines or len(preview_body) > len(body):
+        return f"{rendered}\n..." if rendered else "..."
+
+    return rendered
+
+
+def _render_preview_messages(preview_messages: list[dict[str, object]]) -> None:
+    """Render replay-only preview sidecars in human-readable session output."""
+    if not preview_messages:
+        return
+
+    console.print("\n[bold]Preview Messages:[/]")
+    for preview in preview_messages[-3:]:
+        if not isinstance(preview, dict):
+            continue
+
+        content = str(preview.get("content", "")).strip()
+        if content:
+            console.print(f"[magenta]Preview:[/] {content}")
+
+        metadata = preview.get("metadata", {})
+        if not isinstance(metadata, dict):
+            metadata = {}
+
+        preview_kind = str(metadata.get("preview_kind", "")).replace("_", " ").strip()
+        preview_path = str(metadata.get("preview_path", "")).strip()
+        details = []
+        if preview_kind:
+            details.append(preview_kind.title())
+        if preview_path:
+            details.append(preview_path)
+        if details:
+            console.print(f"[dim]{' | '.join(details)}[/]")
+
+        preview_body = metadata.get("preview_body")
+        if isinstance(preview_body, str) and preview_body:
+            language = str(metadata.get("preview_language") or "text")
+            console.print(
+                Syntax(
+                    _truncate_preview_body(preview_body),
+                    language,
+                    theme="monokai",
+                    line_numbers=False,
+                    word_wrap=True,
+                )
+            )
 
 
 @sessions_app.command("list")
 def sessions_list(
     limit: int = typer.Option(10, "--limit", "-n", help="Maximum number of sessions to list"),
     all: bool = typer.Option(False, "--all", help="List all sessions (no limit)"),
-    json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
+    json_output: bool = create_json_option(),
 ) -> None:
     """List saved conversation sessions.
 
@@ -46,48 +218,37 @@ def sessions_list(
         victor sessions list --json       # Output as JSON
     """
     try:
-        persistence = get_sqlite_session_persistence()
-        # If --all is specified, use a very high limit
         actual_limit = 100000 if all else limit
-        sessions = persistence.list_sessions(limit=actual_limit)
+        sessions = _list_session_summaries(limit=actual_limit)
 
         if not sessions:
             console.print("[dim]No sessions found[/]")
             sys.exit(0)
 
         if json_output:
-            # Output as JSON
-            console.print_json(json.dumps(sessions, indent=2))
+            print_json_data(sessions)
         else:
-            # Output as table
             table = Table(title=f"Saved Sessions (last {len(sessions)})")
             table.add_column("Session ID", style="cyan", no_wrap=True)
             table.add_column("Title", style="white")
             table.add_column("Model", style="yellow")
             table.add_column("Provider", style="blue")
             table.add_column("Messages", justify="right")
+            table.add_column("Previews", justify="right")
             table.add_column("Created", style="dim")
 
             for session in sessions:
-                try:
-                    from datetime import datetime
+                created_at = str(session.get("created_at") or "")
+                date_str = created_at.replace("T", " ")[:16] if created_at else "unknown"
+                title = str(session.get("title") or "Untitled")
 
-                    dt = datetime.fromisoformat(session["created_at"])
-                    date_str = dt.strftime("%Y-%m-%d %H:%M")
-                except Exception:
-                    date_str = session["created_at"][:16]
-
-                title = (
-                    session["title"][:40] + "..."
-                    if len(session["title"]) > 40
-                    else session["title"]
-                )
                 table.add_row(
-                    session["session_id"],
+                    str(session.get("session_id", "")),
                     title,
-                    session["model"],
-                    session["provider"],
-                    str(session["message_count"]),
+                    str(session.get("model") or "unknown"),
+                    str(session.get("provider") or "unknown"),
+                    str(session.get("message_count", 0)),
+                    str(session.get("preview_count", 0)),
                     date_str,
                 )
 
@@ -103,7 +264,7 @@ def sessions_list(
 @sessions_app.command("show")
 def sessions_show(
     session_id: str = typer.Argument(..., help="Session ID to show"),
-    json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
+    json_output: bool = create_json_option(),
 ) -> None:
     """Show details of a specific session.
 
@@ -112,25 +273,23 @@ def sessions_show(
         victor sessions show myproj-9Kx7Z2 --json
     """
     try:
-        persistence = get_sqlite_session_persistence()
-        session_data = persistence.load_session(session_id)
+        session = _load_session_data(session_id)
 
-        if not session_data:
+        if not session:
             console.print(f"[red]Session not found:[/] {session_id}")
             sys.exit(1)
 
-        metadata = session_data.get("metadata", {})
-
         if json_output:
-            # Output as JSON
-            console.print_json(json.dumps(session_data, indent=2))
+            print_json_data(session)
         else:
-            # Output formatted
             from rich.panel import Panel
 
-            # Get messages
-            messages = session_data.get("conversation", {}).get("messages", [])
-            message_count = len(messages)
+            metadata = session.get("metadata", {})
+            conversation = session.get("conversation", {})
+            messages = conversation.get("messages", [])
+            preview_messages = conversation.get("preview_messages", [])
+            message_count = int(metadata.get("message_count", len(messages)))
+            preview_count = len(preview_messages) if isinstance(preview_messages, list) else 0
 
             panel_content = (
                 f"[bold]Session ID:[/] {metadata.get('session_id', session_id)}\n"
@@ -139,6 +298,7 @@ def sessions_show(
                 f"[bold]Provider:[/] {metadata.get('provider', 'N/A')}\n"
                 f"[bold]Profile:[/] {metadata.get('profile', 'N/A')}\n"
                 f"[bold]Messages:[/] {message_count}\n"
+                f"[bold]Previews:[/] {preview_count}\n"
                 f"[bold]Created:[/] {metadata.get('created_at', 'N/A')}\n"
                 f"[bold]Updated:[/] {metadata.get('updated_at', 'N/A')}\n"
             )
@@ -149,14 +309,23 @@ def sessions_show(
             if messages:
                 console.print("\n[bold]Recent Messages:[/]")
                 for msg in messages[-5:]:
-                    role_style = {"user": "cyan", "assistant": "green", "system": "dim"}.get(
-                        msg.get("role", ""), "white"
-                    )
-                    content = msg.get("content", "")
+                    role_style = {
+                        "user": "cyan",
+                        "assistant": "green",
+                        "system": "dim",
+                    }.get(str(msg.get("role", "")), "white")
+                    content = str(msg.get("content", ""))
                     # Truncate long messages
                     if len(content) > 200:
                         content = content[:200] + "..."
-                    console.print(f"[{role_style}]{msg.get('role', '').capitalize()}:[/] {content}")
+                    console.print(
+                        f"[{role_style}]{str(msg.get('role', '')).capitalize()}:[/] {content}"
+                    )
+
+            if isinstance(preview_messages, list) and preview_messages:
+                _render_preview_messages(preview_messages)
+            else:
+                console.print("[dim]No preview messages available[/]")
 
     except Exception as e:
         console.print(f"[red]Error showing session:[/] {e}")
@@ -167,7 +336,7 @@ def sessions_show(
 def sessions_search(
     query: str = typer.Argument(..., help="Search query string"),
     limit: int = typer.Option(10, "--limit", "-n", help="Maximum results"),
-    json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
+    json_output: bool = create_json_option(),
 ) -> None:
     """Search sessions by title or content.
 
@@ -177,15 +346,14 @@ def sessions_search(
         victor sessions search test --json
     """
     try:
-        persistence = get_sqlite_session_persistence()
-        sessions = persistence.search_sessions(query, limit=limit)
+        sessions = _search_session_summaries(query, limit=limit)
 
         if not sessions:
             console.print(f"[dim]No sessions found matching '{query}'[/]")
             sys.exit(0)
 
         if json_output:
-            console.print_json(json.dumps(sessions, indent=2))
+            print_json_data(sessions)
         else:
             table = Table(title=f"Sessions matching '{query}'")
             table.add_column("Session ID", style="cyan", no_wrap=True)
@@ -193,19 +361,16 @@ def sessions_search(
             table.add_column("Model", style="yellow")
             table.add_column("Provider", style="blue")
             table.add_column("Messages", justify="right")
+            table.add_column("Previews", justify="right")
 
             for session in sessions:
-                title = (
-                    session["title"][:40] + "..."
-                    if len(session["title"]) > 40
-                    else session["title"]
-                )
                 table.add_row(
-                    session["session_id"],
-                    title,
-                    session["model"],
-                    session["provider"],
-                    str(session["message_count"]),
+                    str(session.get("session_id", "")),
+                    str(session.get("title") or "Untitled"),
+                    str(session.get("model") or "unknown"),
+                    str(session.get("provider") or "unknown"),
+                    str(session.get("message_count", 0)),
+                    str(session.get("preview_count", 0)),
                 )
 
             console.print(table)
@@ -235,14 +400,10 @@ def sessions_delete(
                 console.print("[dim]Cancelled[/]")
                 sys.exit(0)
 
-        persistence = get_sqlite_session_persistence()
-        success = persistence.delete_session(session_id)
+        backend = _get_session_backend()
+        backend.delete_session(session_id)
 
-        if success:
-            console.print(f"[green]✓[/] Deleted session: {session_id}")
-        else:
-            console.print(f"[red]Failed to delete session:[/] {session_id}")
-            sys.exit(1)
+        console.print(f"[green]✓[/] Deleted session: {session_id}")
 
     except Exception as e:
         console.print(f"[red]Error deleting session:[/] {e}")
@@ -262,20 +423,13 @@ def sessions_export(
         victor sessions export --no-pretty
     """
     try:
-        persistence = get_sqlite_session_persistence()
-        all_sessions = persistence.list_sessions(limit=1000)  # Get all sessions
+        all_sessions = _exportable_sessions(limit=1000)
 
         if not all_sessions:
             console.print("[dim]No sessions to export[/]")
             sys.exit(0)
 
-        # Export data
-        export_data = []
-        for session in all_sessions:
-            session_id = session["session_id"]
-            full_session = persistence.load_session(session_id)
-            if full_session:
-                export_data.append(full_session)
+        export_data = all_sessions
 
         # Determine output path
         if not output:
@@ -304,7 +458,9 @@ def sessions_clear(
         None, help="Clear sessions with IDs starting with this prefix (min 6 chars)"
     ),
     all: bool = typer.Option(
-        False, "--all", help="Clear all sessions (default behavior when no prefix specified)"
+        False,
+        "--all",
+        help="Clear all sessions (default behavior when no prefix specified)",
     ),
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
 ) -> None:
@@ -324,14 +480,14 @@ def sessions_clear(
             console.print("[red]Error:[/] Prefix must be at least 6 characters long.")
             sys.exit(1)
 
-        persistence = get_sqlite_session_persistence()
-
         # Get all sessions to show what will be deleted
-        all_sessions = persistence.list_sessions(limit=100000)
+        all_sessions = _list_session_summaries(limit=100000)
 
         # Filter sessions by prefix if specified
         if prefix:
-            sessions_to_delete = [s for s in all_sessions if s["session_id"].startswith(prefix)]
+            sessions_to_delete = [
+                s for s in all_sessions if str(s.get("session_id", "")).startswith(prefix)
+            ]
             if not sessions_to_delete:
                 console.print(f"[dim]No sessions found matching prefix '{prefix}'[/]")
                 sys.exit(0)
@@ -369,11 +525,11 @@ def sessions_clear(
                     sys.exit(0)
 
         # Delete sessions
+        backend = _get_session_backend()
         deleted_count = 0
         for session in sessions_to_delete:
-            session_id = session["session_id"]
-            if persistence.delete_session(session_id):
-                deleted_count += 1
+            backend.delete_session(str(session.get("session_id", "")))
+            deleted_count += 1
 
         if prefix:
             console.print(

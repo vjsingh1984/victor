@@ -48,6 +48,13 @@ class TestProviderRegistry:
         assert "mlx-lm" in providers
         assert "applesilicon" in providers
 
+    def test_get_aliases_uses_canonical_provider_names(self):
+        """Aliases should resolve to stable provider names, not class names."""
+        aliases = ProviderRegistry.get_aliases()
+        assert aliases["ollama"] == "ollama"
+        assert aliases["grok"] == "xai"
+        assert aliases["zai-coding"] == "zai"
+
     def test_registry_import_does_not_eager_import_mlx_provider(self):
         """Importing registry should not import mlx provider module."""
         result = subprocess.run(
@@ -55,6 +62,8 @@ class TestProviderRegistry:
                 sys.executable,
                 "-c",
                 (
+                    "import os\n"
+                    "os.environ['VICTOR_LIGHT_IMPORT']='1'\n"
                     "import sys\n"
                     "import victor.providers.registry\n"
                     "print('victor.providers.mlx_provider' in sys.modules)"
@@ -76,6 +85,7 @@ class TestProviderRegistry:
                 "-c",
                 (
                     "import os\n"
+                    "os.environ['VICTOR_LIGHT_IMPORT']='1'\n"
                     "os.environ['VICTOR_ENABLE_MLX_PROVIDER']='0'\n"
                     "from victor.providers.base import ProviderNotFoundError\n"
                     "from victor.providers.registry import ProviderRegistry\n"
@@ -101,6 +111,7 @@ class TestProviderRegistry:
                 "-c",
                 (
                     "import os\n"
+                    "os.environ['VICTOR_LIGHT_IMPORT']='1'\n"
                     "os.environ['VICTOR_ENABLE_MLX_PROVIDER']='0'\n"
                     "from victor.providers.registry import ProviderRegistry\n"
                     "print(ProviderRegistry.get_optional('vllm') is not None)\n"

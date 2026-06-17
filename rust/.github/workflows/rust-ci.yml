@@ -1,0 +1,111 @@
+name: Rust CI
+
+on:
+  push:
+    paths:
+      - 'rust/**'
+    branches: [main, develop]
+  pull_request:
+    paths:
+      - 'rust/**'
+    branches: [main, develop]
+
+defaults:
+  run:
+    working-directory: rust
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  check:
+    name: Check & Lint & Test
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        rust: [stable, beta]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ matrix.rust }}
+          components: rustfmt, clippy
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            rust/target
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ matrix.rust }}-${{ hashFiles('rust/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-${{ matrix.rust }}-
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Clippy lint
+        run: cargo clippy --all-targets --workspace -- -D warnings
+
+      - name: Clippy lint (all features)
+        run: cargo clippy --all-targets --workspace --all-features -- -D warnings
+
+      - name: Run tests
+        run: cargo test --workspace
+
+      - name: Run tests (all features)
+        run: cargo test --workspace --all-features
+
+      - name: Check build (release)
+        run: cargo check --release --workspace
+
+  security:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+
+      - name: Run security audit
+        working-directory: rust
+        run: cargo audit
+
+  build-native:
+    name: Build Python Native Extension
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ['3.10', '3.11', '3.12', '3.13']
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install maturin
+        run: pip install maturin
+
+      - name: Build native extension
+        working-directory: rust
+        run: maturin build --release --interpreter python${{ matrix.python-version }}
+
+      - name: Upload wheel
+        uses: actions/upload-artifact@v4
+        with:
+          name: victor-native-${{ matrix.os }}-py${{ matrix.python-version }}
+          path: rust/target/wheels/*.whl

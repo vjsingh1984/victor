@@ -24,7 +24,6 @@ from victor.tools.code_intelligence_tool import (
     symbol,
     refs,
 )
-from victor.tools.refactor_tool import rename
 
 try:
     from victor.core.capability_registry import CapabilityRegistry
@@ -152,16 +151,23 @@ class TestClass:
 
     @pytest.mark.asyncio
     async def test_symbol_generic_exception(self, tmp_path):
-        """Test generic exception handling in symbol."""
+        """Test generic exception handling in symbol's fallback parser path."""
         from unittest.mock import patch
 
         test_file = tmp_path / "test.py"
         test_file.write_text("def test_func(): pass")
 
-        # Mock to raise a generic exception during parsing
-        with patch(
-            "victor.tools.code_intelligence_tool._get_tree_sitter_parser",
-            side_effect=RuntimeError("Parse error"),
+        # Force the legacy parser path (disable the analysis provider) and
+        # make it explode to exercise the unexpected-error branch.
+        with (
+            patch(
+                "victor.tools.code_intelligence_tool._get_analysis_provider",
+                return_value=None,
+            ),
+            patch(
+                "victor.tools.code_intelligence_tool._get_tree_sitter_parser",
+                side_effect=RuntimeError("Parse error"),
+            ),
         ):
             result = await symbol(file_path=str(test_file), symbol_name="test_func")
 
@@ -265,270 +271,124 @@ result = target_function()
             assert len(result) == 0
 
 
-class TestRename:
-    """Tests for consolidated rename function from refactor_tool."""
+# ────────────────────────────────────────────────────────────────────────
+# TSA-6: provider-preferring symbol() path
+# ────────────────────────────────────────────────────────────────────────
 
-    @pytest.mark.asyncio
-    async def test_rename_single_file(self, tmp_path):
-        """Test renaming symbol in a single file."""
-        test_file = tmp_path / "test.py"
-        test_file.write_text("""def old_func():
-    return True
 
-result = old_func()
-""")
+def _provider_unit_tests_marker():
+    """These tests do not require victor-coding installed — they monkeypatch
+    the provider directly. Allow them to run even when the file-level skip
+    fires for the integration tests above.
+    """
+    return [pytest.mark.unit]
 
-        result = await rename(
-            old_name="old_func",
-            new_name="new_func",
-            path=str(test_file),
-            scope="file",
-            preview=False,
-        )
 
-        assert result["success"] is True
-        assert result["files_count"] == 1
-        assert result["total_changes"] >= 2  # Definition + usage
+class _FakeProviderSymbol:
+    def __init__(self, *, supported=("python",), symbols=None):
+        self._supported = set(supported)
+        self._symbols = list(symbols or [])
+        self.calls: list[tuple[str, str]] = []
 
-        # Verify file was modified
-        content = test_file.read_text()
-        assert "new_func" in content
-        assert "old_func" not in content
+    def supports_language(self, language: str) -> bool:
+        return language in self._supported
 
-    @pytest.mark.asyncio
-    async def test_rename_single_file_preview(self, tmp_path):
-        """Test preview mode doesn't modify file."""
-        test_file = tmp_path / "test.py"
-        original_content = """def old_func():
-    return True
-"""
-        test_file.write_text(original_content)
+    def extract_symbols(self, content, language, *, file_path):
+        self.calls.append((file_path, language))
+        return list(self._symbols)
 
-        result = await rename(
-            old_name="old_func",
-            new_name="new_func",
-            path=str(test_file),
-            scope="file",
-            preview=True,
-        )
 
-        assert result["success"] is True
-        assert "PREVIEW" in result["formatted_report"]
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_symbol_prefers_analysis_provider(monkeypatch, tmp_path):
+    """symbol() should consult the TreeSitterAnalysisProtocol provider first."""
+    from victor.tools import code_intelligence_tool as cit
 
-        # File should NOT be modified
-        assert test_file.read_text() == original_content
+    test_file = tmp_path / "a.py"
+    test_file.write_text("def foo():\n    return 1\n")
 
-    @pytest.mark.asyncio
-    async def test_rename_directory_scope(self, tmp_path):
-        """Test renaming symbol across directory."""
-        # Create files in directory
-        file1 = tmp_path / "module1.py"
-        file1.write_text("def helper(): pass\nhelper()")
+    provider = _FakeProviderSymbol(
+        symbols=[
+            {
+                "name": "foo",
+                "symbol_type": "function",
+                "file_path": str(test_file),
+                "line_start": 1,
+                "line_end": 2,
+                "ast_kind": "function_definition",
+            }
+        ]
+    )
+    monkeypatch.setattr(cit, "_get_analysis_provider", lambda: provider)
 
-        file2 = tmp_path / "module2.py"
-        file2.write_text("from module1 import helper\nhelper()")
+    # Guarantee the legacy parser path is not used.
+    def _should_not_use_legacy(*args, **kwargs):  # pragma: no cover - guard
+        raise AssertionError("legacy parser must not run when provider returns a hit")
 
-        result = await rename(
-            old_name="helper",
-            new_name="util",
-            path=str(tmp_path),
-            scope="directory",
-            preview=False,
-        )
+    monkeypatch.setattr(cit, "_get_tree_sitter_parser", _should_not_use_legacy)
 
-        assert result["success"] is True
-        assert result["files_count"] == 2
+    result = await cit.symbol(file_path=str(test_file), symbol_name="foo")
 
-        # Both files should be modified
-        assert "util" in file1.read_text()
-        assert "util" in file2.read_text()
+    assert result is not None
+    assert result["symbol_name"] == "foo"
+    assert result["type"] == "function"
+    assert result["start_line"] == 1
+    assert result["end_line"] == 2
+    assert "def foo" in result["code"]
+    assert provider.calls == [(str(test_file), "python")]
 
-    @pytest.mark.asyncio
-    async def test_rename_project_scope(self, tmp_path):
-        """Test renaming symbol across entire project."""
-        # Create nested directory structure
-        subdir = tmp_path / "subpackage"
-        subdir.mkdir()
 
-        file1 = tmp_path / "main.py"
-        file1.write_text("CONFIG = 'test'\nprint(CONFIG)")
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_symbol_returns_none_when_provider_misses(monkeypatch, tmp_path):
+    """If the provider supports the language but returns no match for the
+    name, symbol() returns None without falling back to the legacy path.
+    The provider is authoritative for languages it claims.
+    """
+    from victor.tools import code_intelligence_tool as cit
 
-        file2 = subdir / "utils.py"
-        file2.write_text("from main import CONFIG\nval = CONFIG")
+    test_file = tmp_path / "a.py"
+    test_file.write_text("def other(): pass\n")
 
-        result = await rename(
-            old_name="CONFIG",
-            new_name="SETTINGS",
-            path=str(tmp_path),
-            scope="project",
-            preview=False,
-        )
+    provider = _FakeProviderSymbol(
+        symbols=[
+            {
+                "name": "other",
+                "symbol_type": "function",
+                "file_path": str(test_file),
+                "line_start": 1,
+                "line_end": 1,
+            }
+        ]
+    )
+    monkeypatch.setattr(cit, "_get_analysis_provider", lambda: provider)
 
-        assert result["success"] is True
-        assert result["files_count"] == 2
+    def _should_not_use_legacy(*args, **kwargs):  # pragma: no cover - guard
+        raise AssertionError("legacy parser must not run when provider answered")
 
-        # Both files should be modified
-        assert "SETTINGS" in file1.read_text()
-        assert "SETTINGS" in file2.read_text()
+    monkeypatch.setattr(cit, "_get_tree_sitter_parser", _should_not_use_legacy)
 
-    @pytest.mark.asyncio
-    async def test_rename_with_depth_limit(self, tmp_path):
-        """Test depth limiting for project scope."""
-        # Create nested structure
-        deep_dir = tmp_path / "level1" / "level2" / "level3"
-        deep_dir.mkdir(parents=True)
+    result = await cit.symbol(file_path=str(test_file), symbol_name="missing")
+    assert result is None
 
-        file_root = tmp_path / "root.py"
-        file_root.write_text("target = 1")
 
-        file_deep = deep_dir / "deep.py"
-        file_deep.write_text("target = 2")
+@pytest.mark.unit
+def test_detect_language_from_path():
+    from victor.tools.code_intelligence_tool import _detect_language_from_path
 
-        # Only rename at depth 0 (current dir only)
-        result = await rename(
-            old_name="target",
-            new_name="renamed",
-            path=str(tmp_path),
-            scope="project",
-            depth=0,
-            preview=False,
-        )
+    assert _detect_language_from_path("a.py") == "python"
+    assert _detect_language_from_path("a.rs") == "rust"
+    assert _detect_language_from_path("a.tsx") == "tsx"
+    # Unknown suffix defaults to "python" — backward compat for the tool.
+    assert _detect_language_from_path("a.xyz") == "python"
 
-        assert result["success"] is True
-        # Should only modify root file
-        assert "renamed" in file_root.read_text()
-        assert "target" in file_deep.read_text()  # Deep file unchanged
 
-    @pytest.mark.asyncio
-    async def test_rename_missing_params(self):
-        """Test error when required params missing."""
-        result = await rename(old_name="", new_name="new")
-        assert result["success"] is False
-        assert "Missing" in result["error"]
+@pytest.mark.unit
+def test_read_line_range():
+    from victor.tools.code_intelligence_tool import _read_line_range
 
-    @pytest.mark.asyncio
-    async def test_rename_same_name(self, tmp_path):
-        """Test error when old and new names are the same."""
-        test_file = tmp_path / "test.py"
-        test_file.write_text("def func(): pass")
-
-        result = await rename(
-            old_name="func",
-            new_name="func",
-            path=str(test_file),
-            scope="file",
-        )
-
-        assert result["success"] is False
-        assert "different" in result["error"]
-
-    @pytest.mark.asyncio
-    async def test_rename_invalid_scope(self, tmp_path):
-        """Test error with invalid scope."""
-        test_file = tmp_path / "test.py"
-        test_file.write_text("def func(): pass")
-
-        result = await rename(
-            old_name="func",
-            new_name="new_func",
-            path=str(test_file),
-            scope="invalid",
-        )
-
-        assert result["success"] is False
-        assert "Invalid scope" in result["error"]
-
-    @pytest.mark.asyncio
-    async def test_rename_file_not_found(self):
-        """Test error when file doesn't exist."""
-        result = await rename(
-            old_name="func",
-            new_name="new_func",
-            path="/nonexistent/file.py",
-            scope="file",
-        )
-
-        assert result["success"] is False
-        assert "not found" in result["error"]
-
-    @pytest.mark.asyncio
-    async def test_rename_symbol_not_found(self, tmp_path):
-        """Test error when symbol not found in file."""
-        test_file = tmp_path / "test.py"
-        test_file.write_text("def other_func(): pass")
-
-        result = await rename(
-            old_name="nonexistent",
-            new_name="new_name",
-            path=str(test_file),
-            scope="file",
-        )
-
-        assert result["success"] is False
-        assert "not found" in result["error"]
-
-    @pytest.mark.asyncio
-    async def test_rename_no_python_files(self, tmp_path):
-        """Test error when no Python files in directory."""
-        # Create empty directory
-        result = await rename(
-            old_name="func",
-            new_name="new_func",
-            path=str(tmp_path),
-            scope="project",
-        )
-
-        assert result["success"] is False
-        assert "No Python files" in result["error"]
-
-    @pytest.mark.asyncio
-    async def test_rename_skips_excluded_dirs(self, tmp_path):
-        """Test that __pycache__, .git etc are skipped."""
-        # Create file in __pycache__
-        cache_dir = tmp_path / "__pycache__"
-        cache_dir.mkdir()
-        cache_file = cache_dir / "cached.py"
-        cache_file.write_text("target = 1")
-
-        # Create normal file
-        normal_file = tmp_path / "main.py"
-        normal_file.write_text("target = 2")
-
-        result = await rename(
-            old_name="target",
-            new_name="renamed",
-            path=str(tmp_path),
-            scope="project",
-            preview=False,
-        )
-
-        assert result["success"] is True
-        # Cache file should be unchanged
-        assert "target" in cache_file.read_text()
-        # Normal file should be modified
-        assert "renamed" in normal_file.read_text()
-
-    @pytest.mark.asyncio
-    async def test_rename_word_boundary_safety(self, tmp_path):
-        """Test that rename uses word boundaries to avoid partial matches."""
-        test_file = tmp_path / "test.py"
-        test_file.write_text("""def get_user(): pass
-def get_username(): pass  # Should NOT be renamed
-user = get_user()
-username = get_username()  # Should NOT be renamed
-""")
-
-        result = await rename(
-            old_name="get_user",
-            new_name="fetch_user",
-            path=str(test_file),
-            scope="file",
-            preview=False,
-        )
-
-        assert result["success"] is True
-
-        content = test_file.read_text()
-        assert "fetch_user" in content
-        assert "get_username" in content  # Not renamed
-        assert "fetch_username" not in content  # Partial match prevented
+    src = b"alpha\nbeta\ngamma\ndelta\n"
+    assert _read_line_range(src, 1, 1) == "alpha"
+    assert _read_line_range(src, 2, 3) == "beta\ngamma"
+    # Out-of-range upper bound clamps cleanly.
+    assert _read_line_range(src, 3, 99) == "gamma\ndelta"

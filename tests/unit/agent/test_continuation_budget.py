@@ -37,25 +37,25 @@ def _make_base_kwargs(settings=None):
     intent.intent = MagicMock()
     intent.intent.value = "unknown"
     intent.confidence = 0.5
-    return dict(
-        intent_result=intent,
-        is_analysis_task=False,
-        is_action_task=False,
-        content_length=100,
-        full_content="Some response content",
-        continuation_prompts=0,
-        asking_input_prompts=0,
-        one_shot_mode=False,
-        mentioned_tools=None,
-        max_prompts_summary_requested=False,
-        settings=settings or _make_settings(),
-        rl_coordinator=None,
-        provider_name="anthropic",
-        model="claude-sonnet",
-        tool_budget=10,
-        unified_tracker_config={},
-        task_completion_signals=None,
-    )
+    return {
+        "intent_result": intent,
+        "is_analysis_task": False,
+        "is_action_task": False,
+        "content_length": 100,
+        "full_content": "Some response content",
+        "continuation_prompts": 0,
+        "asking_input_prompts": 0,
+        "one_shot_mode": False,
+        "mentioned_tools": None,
+        "max_prompts_summary_requested": False,
+        "settings": settings or _make_settings(),
+        "rl_coordinator": None,
+        "provider_name": "anthropic",
+        "model": "claude-sonnet",
+        "tool_budget": 10,
+        "unified_tracker_config": {},
+        "task_completion_signals": None,
+    }
 
 
 class TestBudgetWithClassification:

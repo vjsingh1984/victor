@@ -258,7 +258,6 @@ class ProviderRegistry:
             f"Legacy provider entry-point group '{group}' is deprecated. "
             f"Publish providers via '{canonical_group}' instead."
         )
-        warnings.warn(message, DeprecationWarning, stacklevel=3)
         logger.warning(message)
         _WARNED_LEGACY_PROVIDER_GROUPS.add(group)
 

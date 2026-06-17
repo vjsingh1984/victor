@@ -161,14 +161,15 @@ class TestAmbiguousIntent:
     """Tests for AMBIGUOUS intent detection."""
 
     def test_unrecognized_message(self):
-        """Test that unrecognized messages use default intent."""
+        """Test that unrecognized messages use the default intent."""
         from victor.agent.action_authorizer import IntentDetector, ActionIntent
 
         detector = IntentDetector()
         result = detector.detect("xyzzy foobar baz")
 
-        # Should use default (DISPLAY_ONLY for safety)
-        assert result.intent == ActionIntent.DISPLAY_ONLY
+        # Default is AMBIGUOUS: intent is unclear, so the AMBIGUOUS prompt guard
+        # steers the model to safe behavior rather than locking it to display-only.
+        assert result.intent == ActionIntent.AMBIGUOUS
         assert result.confidence < 0.5
 
 
@@ -195,10 +196,11 @@ class TestConvenienceFunctions:
 
         guard = get_prompt_guard("Show me a function")
         assert "SEE code" in guard
-        assert "NOT use write_file" in guard
+        assert "Do NOT use write" in guard or "Do NOT modify any existing files" in guard
 
         guard = get_prompt_guard("Save to file.py")
-        assert guard == ""  # No guard for write_allowed
+        # WRITE_ALLOWED carries a positive authorization guard (permissive policy).
+        assert "explicitly authorized file modifications" in guard
 
 
 class TestSafeActions:
@@ -210,9 +212,9 @@ class TestSafeActions:
 
         result = detect_intent("Show me a function")
 
-        assert "read_file" in result.safe_actions
+        assert "read" in result.safe_actions
         assert "generate_response" in result.safe_actions
-        assert "write_file" not in result.safe_actions
+        assert "write" not in result.safe_actions
 
     def test_write_allowed_safe_actions(self):
         """Test safe actions for WRITE_ALLOWED intent."""
@@ -220,9 +222,9 @@ class TestSafeActions:
 
         result = detect_intent("Save this to utils.py")
 
-        assert "read_file" in result.safe_actions
-        assert "write_file" in result.safe_actions
-        assert "edit_file" in result.safe_actions
+        assert "read" in result.safe_actions
+        assert "write" in result.safe_actions
+        assert "edit" in result.safe_actions
 
     def test_read_only_safe_actions(self):
         """Test safe actions for READ_ONLY intent."""
@@ -230,9 +232,9 @@ class TestSafeActions:
 
         result = detect_intent("List files in src/")
 
-        assert "read_file" in result.safe_actions
-        assert "list_directory" in result.safe_actions
-        assert "write_file" not in result.safe_actions
+        assert "read" in result.safe_actions
+        assert "ls" in result.safe_actions
+        assert "write" not in result.safe_actions
         assert "generate_response" not in result.safe_actions
 
 
@@ -275,7 +277,10 @@ class TestPromptGuards:
         result = detect_intent("Show me a binary search function")
 
         assert "DISPLAY" in result.prompt_guard
-        assert "NOT use write_file" in result.prompt_guard
+        assert (
+            "Do NOT use write" in result.prompt_guard
+            or "Do NOT modify any existing files" in result.prompt_guard
+        )
 
     def test_read_only_prompt_guard(self):
         """Test prompt guard for READ_ONLY intent."""
@@ -286,13 +291,13 @@ class TestPromptGuards:
         assert "read-only" in result.prompt_guard
         assert "NOT write" in result.prompt_guard
 
-    def test_write_allowed_no_prompt_guard(self):
-        """Test that WRITE_ALLOWED has no prompt guard."""
+    def test_write_allowed_authorization_prompt_guard(self):
+        """WRITE_ALLOWED emits a positive file-modification authorization guard."""
         from victor.agent.action_authorizer import detect_intent
 
         result = detect_intent("Save this to utils.py and update the file")
 
-        assert result.prompt_guard == ""
+        assert "explicitly authorized file modifications" in result.prompt_guard
 
 
 class TestEdgeCases:
@@ -317,8 +322,9 @@ class TestEdgeCases:
         detector = IntentDetector()
         result = detector.detect("")
 
-        # Should default to safe
-        assert result.intent == ActionIntent.DISPLAY_ONLY
+        # Empty input has no signals -> AMBIGUOUS (the safe default intent),
+        # whose prompt guard steers the model toward safe behavior.
+        assert result.intent == ActionIntent.AMBIGUOUS
         assert result.confidence < 0.5
 
 

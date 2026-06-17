@@ -179,7 +179,7 @@ class ContextReminderManager:
             custom_formatters: Custom formatter functions per reminder type
             presentation: Optional presentation adapter for icons (creates default if None)
         """
-        self.provider = provider.lower()
+        self.provider = str(provider).lower()
         self.configs = configs or self.DEFAULT_CONFIGS.copy()
         self.custom_formatters = custom_formatters or {}
         self.state = ContextState()
@@ -400,6 +400,24 @@ class ContextReminderManager:
         # Combine into single message
         return " | ".join(parts)
 
+    def get_user_message_prefix(self, force: bool = False) -> str:
+        """Get reminder text formatted for user message injection.
+
+        Returns formatted prefix string for prepending to user messages.
+        Used when cache_optimization is enabled to keep system messages
+        byte-stable (enabling provider prefix caching at 90% discount).
+
+        Args:
+            force: Force injection even if conditions aren't met
+
+        Returns:
+            Formatted prefix string, or empty string if no reminders needed
+        """
+        reminder = self.get_consolidated_reminder(force=force)
+        if not reminder:
+            return ""
+        return f"[Context: {reminder}]\n\n"
+
     def get_minimal_reminder(self) -> Optional[str]:
         """Get a minimal reminder for token-constrained situations.
 
@@ -430,7 +448,7 @@ class ContextReminderManager:
         Args:
             provider: The provider name
         """
-        self.provider = provider.lower()
+        self.provider = str(provider).lower()
 
         # Adjust configs based on provider characteristics
         if provider in {"google", "anthropic", "openai"}:

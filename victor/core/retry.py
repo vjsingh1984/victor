@@ -471,6 +471,30 @@ class RetryExecutor:
                     )
 
 
+def _handle_retry_result(
+    result: "RetryResult",
+    raise_on_failure: bool,
+) -> Optional[T]:
+    """Handle retry result - shared logic for sync and async wrappers.
+
+    Args:
+        result: Result from executor.execute_sync() or executor.execute_async()
+        raise_on_failure: Whether to raise exception on final failure
+
+    Returns:
+        Result value if successful, None if failed and not raising
+
+    Raises:
+        Exception: If result failed and raise_on_failure is True
+    """
+    if result.success:
+        return cast(T, result.result)
+    elif raise_on_failure and result.exception:
+        raise result.exception
+    else:
+        return None  # type: ignore
+
+
 def with_retry(
     strategy: Optional[BaseRetryStrategy] = None,
     raise_on_failure: bool = True,
@@ -492,13 +516,7 @@ def with_retry(
         @wraps(func)
         async def wrapper(*args: Any, **kwargs: Any) -> T:
             result = await executor.execute_async(func, *args, **kwargs)
-
-            if result.success:
-                return cast(T, result.result)
-            elif raise_on_failure and result.exception:
-                raise result.exception
-            else:
-                return None  # type: ignore
+            return _handle_retry_result(result, raise_on_failure)
 
         return wrapper
 
@@ -526,13 +544,7 @@ def with_retry_sync(
         @wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> T:
             result = executor.execute_sync(func, *args, **kwargs)
-
-            if result.success:
-                return cast(T, result.result)
-            elif raise_on_failure and result.exception:
-                raise result.exception
-            else:
-                return None  # type: ignore
+            return _handle_retry_result(result, raise_on_failure)
 
         return wrapper
 

@@ -47,7 +47,6 @@ from victor.tools.composition import (
 # Import actual Victor tools (decorated functions)
 from victor.tools.filesystem import ls, read
 
-
 # =============================================================================
 # Example 1: Simple Pipe Chain
 # =============================================================================

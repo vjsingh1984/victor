@@ -85,7 +85,15 @@ class TestAgentCapability:
         from victor.framework.agent_protocols import AgentCapability
 
         # Verify we have all expected capabilities
-        expected = {"read", "write", "execute", "search", "communicate", "delegate", "approve"}
+        expected = {
+            "read",
+            "write",
+            "execute",
+            "search",
+            "communicate",
+            "delegate",
+            "approve",
+        }
         actual = {cap.value for cap in AgentCapability}
         assert actual == expected
 
@@ -359,6 +367,32 @@ class TestITeamCoordinatorProtocol:
         assert hasattr(ITeamCoordinator, "_is_runtime_protocol")
 
 
+class TestIDelegateFollowUpCoordinatorProtocol:
+    """Tests for delegate follow-up coordinator capability protocol."""
+
+    def test_follow_up_protocol_has_request_execution(self):
+        """IDelegateFollowUpCoordinator should expose request execution."""
+        from victor.framework.agent_protocols import IDelegateFollowUpCoordinator
+
+        assert "execute_follow_up_request" in dir(IDelegateFollowUpCoordinator) or hasattr(
+            IDelegateFollowUpCoordinator, "execute_follow_up_request"
+        )
+
+    def test_follow_up_protocol_has_contract_execution(self):
+        """IDelegateFollowUpCoordinator should expose contract execution."""
+        from victor.framework.agent_protocols import IDelegateFollowUpCoordinator
+
+        assert "execute_follow_up_contract" in dir(IDelegateFollowUpCoordinator) or hasattr(
+            IDelegateFollowUpCoordinator, "execute_follow_up_contract"
+        )
+
+    def test_follow_up_protocol_is_runtime_checkable(self):
+        """IDelegateFollowUpCoordinator should be runtime checkable."""
+        from victor.framework.agent_protocols import IDelegateFollowUpCoordinator
+
+        assert hasattr(IDelegateFollowUpCoordinator, "_is_runtime_protocol")
+
+
 # =============================================================================
 # TeamFormation Enum Tests
 # =============================================================================
@@ -402,11 +436,25 @@ class TestTeamFormationEnum:
         assert TeamFormation.CONSENSUS is not None
         assert TeamFormation.CONSENSUS.value == "consensus"
 
-    def test_all_formations_count(self):
-        """TeamFormation should have exactly 5 formations."""
+    def test_formation_reflection_exists(self):
+        """TeamFormation should have REFLECTION value."""
         from victor.framework.agent_protocols import TeamFormation
 
-        expected = {"sequential", "parallel", "hierarchical", "pipeline", "consensus"}
+        assert TeamFormation.REFLECTION is not None
+        assert TeamFormation.REFLECTION.value == "reflection"
+
+    def test_all_formations_count(self):
+        """TeamFormation should have exactly 6 formations."""
+        from victor.framework.agent_protocols import TeamFormation
+
+        expected = {
+            "sequential",
+            "parallel",
+            "hierarchical",
+            "pipeline",
+            "consensus",
+            "reflection",
+        }
         actual = {f.value for f in TeamFormation}
         assert actual == expected
 

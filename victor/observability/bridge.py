@@ -295,7 +295,12 @@ class ObservabilityBridge:
         """
         if self._enabled:
             self._model_emitter.model_response(
-                provider, model, prompt_tokens, completion_tokens, latency_ms, **metadata
+                provider,
+                model,
+                prompt_tokens,
+                completion_tokens,
+                latency_ms,
+                **metadata,
             )
 
     def model_streaming_delta(

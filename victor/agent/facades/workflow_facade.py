@@ -14,12 +14,13 @@
 
 """Workflow domain facade for orchestrator decomposition.
 
-Groups workflow registry, execution, optimization, and mode-workflow-team
-coordination components behind a single interface.
+Groups workflow registry, execution, optimization, and coordination-advisor
+components behind a single interface.
 
 This facade wraps already-initialized components from the orchestrator,
 providing a coherent grouping without changing initialization ordering.
-The orchestrator delegates property access through this facade.
+The orchestrator delegates property access through this facade. It does not own
+workflow behavior.
 """
 
 from __future__ import annotations
@@ -41,7 +42,8 @@ class WorkflowFacade:
         - workflow_registry: Workflow registry for workflow lookup
         - workflow_runtime: Workflow runtime boundary components
         - workflow_optimization: Workflow optimization components
-        - mode_workflow_team_coordinator: Coordinator for team/workflow suggestions
+        - coordination_advisor: Framework-facing team/workflow advisor surface
+        - runtime_state_host: Canonical runtime owner for mutable workflow state
     """
 
     def __init__(
@@ -50,18 +52,20 @@ class WorkflowFacade:
         workflow_registry: Optional[Any] = None,
         workflow_runtime: Optional[Any] = None,
         workflow_optimization: Optional[Any] = None,
-        mode_workflow_team_coordinator: Optional[Any] = None,
+        coordination_advisor: Optional[Any] = None,
+        runtime_state_host: Optional[Any] = None,
     ) -> None:
         self._workflow_registry = workflow_registry
         self._workflow_runtime = workflow_runtime
         self._workflow_optimization = workflow_optimization
-        self._mode_workflow_team_coordinator = mode_workflow_team_coordinator
+        self._coordination_advisor = coordination_advisor
+        self._runtime_state_host = runtime_state_host
 
         logger.debug(
-            "WorkflowFacade initialized (registry=%s, optimization=%s, coordinator=%s)",
+            "WorkflowFacade initialized (registry=%s, optimization=%s, advisor=%s)",
             workflow_registry is not None,
             workflow_optimization is not None,
-            mode_workflow_team_coordinator is not None,
+            self._coordination_advisor is not None,
         )
 
     # ------------------------------------------------------------------
@@ -71,11 +75,19 @@ class WorkflowFacade:
     @property
     def workflow_registry(self) -> Optional[Any]:
         """Workflow registry for workflow lookup."""
+        if self._runtime_state_host is not None:
+            return getattr(
+                self._runtime_state_host,
+                "_workflow_registry",
+                self._workflow_registry,
+            )
         return self._workflow_registry
 
     @workflow_registry.setter
     def workflow_registry(self, value: Any) -> None:
         """Update the workflow registry."""
+        if self._runtime_state_host is not None:
+            self._runtime_state_host._workflow_registry = value
         self._workflow_registry = value
 
     @property
@@ -89,11 +101,19 @@ class WorkflowFacade:
         return self._workflow_optimization
 
     @property
-    def mode_workflow_team_coordinator(self) -> Optional[Any]:
-        """Coordinator for intelligent team/workflow suggestions."""
-        return self._mode_workflow_team_coordinator
+    def coordination_advisor(self) -> Optional[Any]:
+        """Framework-facing advisor for intelligent team/workflow suggestions."""
+        if self._runtime_state_host is not None:
+            return getattr(
+                self._runtime_state_host,
+                "_coordination_advisor",
+                self._coordination_advisor,
+            )
+        return self._coordination_advisor
 
-    @mode_workflow_team_coordinator.setter
-    def mode_workflow_team_coordinator(self, value: Any) -> None:
-        """Update the mode-workflow-team coordinator."""
-        self._mode_workflow_team_coordinator = value
+    @coordination_advisor.setter
+    def coordination_advisor(self, value: Any) -> None:
+        """Update the framework-facing coordination advisor."""
+        if self._runtime_state_host is not None:
+            self._runtime_state_host._coordination_advisor = value
+        self._coordination_advisor = value

@@ -17,14 +17,20 @@
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 from typing import Awaitable, Callable, cast
 
 from rich.markdown import Markdown
 from rich.panel import Panel
 
-from victor.core.utils.coding_support import load_codebase_analyzer_attr
+from victor.core.utils.capability_loader import load_codebase_analyzer_attr
+from victor.ui.commands.init_content import (
+    count_architecture_patterns,
+    ensure_quality_baseline_section,
+)
 from victor.ui.slash.protocol import BaseSlashCommand, CommandContext, CommandMetadata
 from victor.ui.slash.registry import register_command
+from victor.tools.code_search_tool import _resolve_graph_writer_mode
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +69,9 @@ class ReindexCommand(BaseSlashCommand):
             root = Path.cwd()
             settings = load_settings()
             paths = get_project_paths(root)
+            graph_writer_mode = _resolve_graph_writer_mode(settings)
+            graph_store_name = getattr(settings, "codebase_graph_store", "sqlite")
+            graph_path = getattr(settings, "codebase_graph_path", None)
 
             embedding_config = {
                 "vector_store": getattr(settings, "codebase_vector_store", "lancedb"),
@@ -79,6 +88,9 @@ class ReindexCommand(BaseSlashCommand):
                 root_path=str(root),
                 use_embeddings=True,
                 embedding_config=embedding_config,
+                graph_writer_mode=str(graph_writer_mode),
+                graph_store_name=graph_store_name,
+                graph_path=Path(graph_path) if graph_path else None,
             )
 
             if show_stats:
@@ -211,9 +223,11 @@ class InitCommand(BaseSlashCommand):
 
         try:
             if deep or use_learn:
+                # Pass agent for orchestrator reuse (logging, events, GEPA)
                 new_content = await generate_enhanced_init_md(
                     use_llm=deep,
                     include_conversations=use_learn or deep,
+                    agent=ctx.agent,
                 )
             elif use_index:
                 new_content = await generate_victor_md_from_index()
@@ -227,6 +241,8 @@ class InitCommand(BaseSlashCommand):
             else:
                 content = new_content
 
+            content = ensure_quality_baseline_section(content)
+
             # Write the file
             target_path.write_text(content, encoding="utf-8")
             ctx.console.print(f"[green]Created {target_path}[/]")
@@ -234,7 +250,7 @@ class InitCommand(BaseSlashCommand):
             # Show what was detected
             lines = content.split("\n")
             component_count = content.count("| `")
-            pattern_count = content.count(". **") + content.count("Pattern:")
+            pattern_count = count_architecture_patterns(content)
 
             ctx.console.print(
                 f"[dim]  Lines: {len(lines)}, Components: {component_count}, Patterns: {pattern_count}[/]"
@@ -283,10 +299,8 @@ class InitCommand(BaseSlashCommand):
             return existing + "\n\n" + "\n".join(new_lines)
         return existing
 
-    def _create_symlinks(self, target: "Path", ctx: CommandContext) -> None:
+    def _create_symlinks(self, target: Path, ctx: CommandContext) -> None:
         """Create symlinks for other tools (CLAUDE.md, etc.)."""
-        from pathlib import Path
-
         aliases = ["CLAUDE.md", "CURSOR.md"]
         for alias in aliases:
             alias_path = target.parent.parent / alias

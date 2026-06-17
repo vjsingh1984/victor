@@ -356,6 +356,7 @@ def get_logging_config(
     command: Optional[str] = None,
     cli_console_level: Optional[str] = None,
     cli_file_level: Optional[str] = None,
+    cli_debug_modules: Optional[str] = None,
 ) -> LoggingConfig:
     """Get logging configuration with priority chain applied.
 
@@ -455,6 +456,18 @@ def get_logging_config(
         config.console_level = cli_console_level.upper()
     if cli_file_level:
         config.file_level = cli_file_level.upper()
+
+    # Apply module-specific debug overrides from CLI or environment
+    import os
+
+    debug_modules = cli_debug_modules or os.environ.get("VICTOR_DEBUG_MODULES")
+    if debug_modules:
+        for module in debug_modules.split(","):
+            module = module.strip()
+            if module:
+                # Auto-prefix with "victor." if not already qualified
+                full_name = f"victor.{module}" if "." not in module else module
+                config.module_levels[full_name] = "DEBUG"
 
     return config
 

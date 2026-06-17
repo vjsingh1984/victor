@@ -26,21 +26,22 @@ class TestServerSessionSecretAutoGeneration:
         from victor.config.settings import Settings
 
         settings = Settings()
-        assert settings.server_session_secret is not None
+        assert settings.server.server_session_secret is not None
 
     def test_explicit_secret_is_preserved(self):
         """An explicitly supplied SecretStr must not be overwritten."""
         from victor.config.settings import Settings
+        from victor.config.groups.server_config import ServerSettings
 
-        settings = Settings(server_session_secret=SecretStr("custom"))
-        assert settings.server_session_secret.get_secret_value() == "custom"
+        server = ServerSettings(server_session_secret=SecretStr("custom"))
+        assert server.server_session_secret.get_secret_value() == "custom"
 
     def test_generated_secret_has_sufficient_length(self):
         """Auto-generated secret should be at least 32 characters."""
         from victor.config.settings import Settings
 
         settings = Settings()
-        secret_value = settings.server_session_secret.get_secret_value()
+        secret_value = settings.server.server_session_secret.get_secret_value()
         assert len(secret_value) >= 32
 
 

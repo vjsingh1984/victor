@@ -668,6 +668,18 @@ class ConcreteProtocol(VictorProtocol):
     async def code_search(self, query, regex=False, case_sensitive=False, file_pattern=None):
         return []
 
+    async def get_effective_config(self):
+        return {"profile": "default", "mode": "build"}
+
+    async def get_profiles(self):
+        return [{"name": "default"}]
+
+    async def get_modes(self):
+        return [{"name": "build", "description": "Build"}]
+
+    async def switch_profile(self, profile):
+        pass
+
     async def switch_model(self, provider, model):
         pass
 

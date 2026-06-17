@@ -14,8 +14,9 @@
 
 """Agent modes for different operational contexts.
 
-Inspired by OpenCode's agent modes, this module provides Build, Plan, and
-Explore modes that modify agent behavior for different tasks.
+Inspired by OpenCode's agent modes, this module provides a narrow,
+coding-first set of modes for planning, building, reviewing, delegating,
+and deeper exploration tasks.
 """
 
 import logging
@@ -23,24 +24,28 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Set
 
+from victor.tools.core_tool_aliases import canonicalize_core_tool_name
+
 logger = logging.getLogger(__name__)
 
 
 class AgentMode(str, Enum):
     """Available agent modes.
 
-    This is the CANONICAL AgentMode enum with 3 base modes.
+    This is the CANONICAL AgentMode enum for coding workflows.
 
     Inherits from str to allow direct string comparison (e.g., AgentMode.BUILD == "build").
 
     Semantic Variants (different modes for different purposes):
-    - AgentMode (here): Base 3 modes (BUILD, PLAN, EXPLORE) for core agent control
+    - AgentMode (here): Core coding modes for runtime behavior
     - RLAgentMode: Extended 5 modes for RL state machine (includes REVIEW, COMPLETE)
     - AdaptiveAgentMode: Extended 5 modes for adaptive control
     """
 
     BUILD = "build"
     PLAN = "plan"
+    REVIEW = "review"
+    DELEGATE = "delegate"
     EXPLORE = "explore"
 
 
@@ -85,6 +90,20 @@ class OperationalModeConfig:
     # Whether edits are allowed in sandbox even if disallowed_tools has edit
     allow_sandbox_edits: bool = False
 
+    def __post_init__(self) -> None:
+        """Normalize tool names to the canonical runtime surface."""
+        self.allowed_tools = {
+            canonicalize_core_tool_name(tool) for tool in self.allowed_tools if tool
+        }
+        self.disallowed_tools = {
+            canonicalize_core_tool_name(tool) for tool in self.disallowed_tools if tool
+        }
+        self.tool_priorities = {
+            canonicalize_core_tool_name(tool): priority
+            for tool, priority in self.tool_priorities.items()
+            if tool
+        }
+
 
 # Default mode configurations
 MODE_CONFIGS: Dict[AgentMode, OperationalModeConfig] = {
@@ -92,7 +111,7 @@ MODE_CONFIGS: Dict[AgentMode, OperationalModeConfig] = {
         name="Build",
         description="Implementation mode for creating and modifying code",
         allow_all_tools=True,
-        disallowed_tools=set(),  # All tools available
+        disallowed_tools=set(),
         system_prompt_addition="""
 You are in BUILD mode - focused on TAKING ACTION and implementing changes.
 
@@ -104,41 +123,42 @@ ACTION-FIRST PRINCIPLE:
 
 IMPLEMENTATION WORKFLOW:
 1. Read the target file ONCE to understand current state
-2. IMMEDIATELY use edit_files() or write_file() to make changes
+2. IMMEDIATELY use edit() or write() to make changes
 3. Run tests if applicable
 4. Commit your changes
 
 ANTI-PATTERNS TO AVOID:
-- Reading a file 3+ times without editing (you already have the content)
+- Reading a file 3+ times without editing
 - Saying "Let me read..." when you've already read the file
 - Planning to edit without actually calling the edit tool
 - Exploration loops without taking action
 
-When the user asks you to edit a file, your NEXT tool call should be edit_files() or write_file().
+When the user asks you to edit a file, your NEXT tool call should be edit() or write().
 """,
         require_write_confirmation=False,
         verbose_planning=False,
-        max_files_per_operation=0,  # No limit
+        max_files_per_operation=0,
         tool_priorities={
-            "edit": 1.5,  # Boost edit tool priority in BUILD mode (canonical name)
-            "edit_files": 1.5,  # Alias for edit
-            "write_file": 1.5,  # Boost write tool priority
-            "bash": 1.2,
+            "edit": 1.5,
+            "write": 1.5,
+            "shell": 1.2,
             "git_status": 1.0,
-            "read_file": 0.9,  # Slightly lower read priority to encourage action
+            "read": 0.9,
         },
-        exploration_multiplier=5.0,  # 5x exploration for reading before writing (was 2x)
+        exploration_multiplier=5.0,
     ),
     AgentMode.PLAN: OperationalModeConfig(
         name="Plan",
         description="Planning mode for analysis and strategy before implementation",
         allow_all_tools=False,
         allowed_tools={
-            # Read-only and analysis tools
-            "read_file",
-            "list_directory",
+            "read",
+            "ls",
             "code_search",
             "semantic_code_search",
+            "symbol",
+            "refs",
+            "lsp",
             "glob",
             "grep",
             "git_status",
@@ -146,27 +166,27 @@ When the user asks you to edit a file, your NEXT tool call should be edit_files(
             "git_log",
             "dependency_graph",
             "code_review",
-            # Planning-specific
             "plan_files",
-            # Sandbox editing (limited to .victor/sandbox/)
-            "write_file",
-            "edit_files",
+            "write",
+            "edit",
         },
         disallowed_tools={
-            # No direct bash/shell or git modifications
-            "bash",  # Could modify things outside sandbox
-            "shell",  # Also shell tool (same as bash)
+            "bash",
+            "shell",
             "git_commit",
             "git_push",
         },
         system_prompt_addition="""
 You are in PLAN mode - focused on analysis and planning before implementation.
 
+Prefer structure-aware navigation first when possible:
+- symbol(file_path=..., symbol_name=...) for concrete definitions
+- refs(symbol_name=...) for usages and impact analysis
+- lsp(action="definition"|"references"|"diagnostics", ...) for precise symbol lookup
+- read(path=...) only after you have narrowed to the most relevant file or range
+
 SANDBOX EDITING: You can create/edit files ONLY in the `.victor/sandbox/` directory.
-This is useful for:
-- Drafting code snippets before implementation
-- Creating plan documents
-- Testing small code samples
+This is useful for drafting snippets, plan documents, and small experiments.
 
 RESTRICTIONS:
 - DO NOT modify files outside `.victor/sandbox/`
@@ -183,15 +203,134 @@ WORKFLOW:
 """,
         require_write_confirmation=True,
         verbose_planning=True,
-        max_files_per_operation=5,  # Limited edits in sandbox
+        max_files_per_operation=5,
         tool_priorities={
             "code_search": 1.3,
             "semantic_code_search": 1.3,
-            "read_file": 1.2,
+            "symbol": 1.4,
+            "refs": 1.4,
+            "lsp": 1.4,
+            "read": 1.2,
             "dependency_graph": 1.2,
             "plan_files": 1.5,
         },
-        exploration_multiplier=10.0,  # 10x exploration in plan mode (effectively unlimited like Claude Code)
+        exploration_multiplier=10.0,
+        sandbox_dir=".victor/sandbox",
+        allow_sandbox_edits=True,
+    ),
+    AgentMode.REVIEW: OperationalModeConfig(
+        name="Review",
+        description="Review mode for diagnostics, impact analysis, and findings-first feedback",
+        allow_all_tools=False,
+        allowed_tools={
+            "read",
+            "ls",
+            "code_search",
+            "semantic_code_search",
+            "symbol",
+            "refs",
+            "lsp",
+            "glob",
+            "grep",
+            "git_status",
+            "git_diff",
+            "git_log",
+            "git_show",
+            "dependency_graph",
+            "code_review",
+            "write",
+        },
+        disallowed_tools={
+            "edit",
+            "shell",
+            "git_commit",
+            "git_push",
+            "git_checkout",
+        },
+        system_prompt_addition="""
+You are in REVIEW mode - focused on Findings-first validation and code review.
+
+Review workflow:
+1. Prefer diagnostics and symbol-aware navigation before broad file reads
+2. Use refs() and lsp(...references/diagnostics/definition) to trace impact
+3. Use git diff/status/show to scope recent changes
+4. Report the most important findings first, with concrete evidence
+5. Use `.victor/sandbox/` only for review notes or draft reports
+
+Do not modify the main codebase in REVIEW mode. Prioritize correctness,
+regressions, merge risks, and missing validation over implementation ideas.
+""",
+        require_write_confirmation=True,
+        verbose_planning=False,
+        max_files_per_operation=3,
+        tool_priorities={
+            "code_review": 1.6,
+            "lsp": 1.5,
+            "refs": 1.5,
+            "symbol": 1.4,
+            "git_diff": 1.4,
+            "dependency_graph": 1.3,
+            "read": 1.1,
+        },
+        exploration_multiplier=15.0,
+        sandbox_dir=".victor/sandbox",
+        allow_sandbox_edits=True,
+    ),
+    AgentMode.DELEGATE: OperationalModeConfig(
+        name="Delegate",
+        description="Delegation mode for scoped worker planning and merge preparation",
+        allow_all_tools=False,
+        allowed_tools={
+            "read",
+            "ls",
+            "code_search",
+            "semantic_code_search",
+            "symbol",
+            "refs",
+            "lsp",
+            "glob",
+            "grep",
+            "git_status",
+            "git_diff",
+            "git_log",
+            "dependency_graph",
+            "code_review",
+            "plan_files",
+            "write",
+            "edit",
+        },
+        disallowed_tools={
+            "shell",
+            "git_commit",
+            "git_push",
+            "git_checkout",
+        },
+        system_prompt_addition="""
+You are in DELEGATE mode - focused on parallel work breakdown and worktree isolation.
+
+Delegation workflow:
+1. Decompose work into independent worker scopes with minimal file overlap
+2. Prefer symbol(), refs(), lsp(...), and dependency_graph to identify precise boundaries
+3. Draft plans and worker briefs in `.victor/sandbox/` when helpful
+4. Prefer worktree isolation, explicit claimed paths, and merge-order planning
+5. Each worker contract should include: task summary, changed files, validation run, merge risks
+
+Do not make broad main-branch edits in DELEGATE mode. Use this mode to prepare safe,
+reviewable parallel execution with worktree isolation.
+""",
+        require_write_confirmation=True,
+        verbose_planning=True,
+        max_files_per_operation=10,
+        tool_priorities={
+            "plan_files": 1.6,
+            "dependency_graph": 1.4,
+            "symbol": 1.4,
+            "refs": 1.4,
+            "lsp": 1.4,
+            "code_review": 1.2,
+            "read": 1.1,
+        },
+        exploration_multiplier=12.0,
         sandbox_dir=".victor/sandbox",
         allow_sandbox_edits=True,
     ),
@@ -200,11 +339,13 @@ WORKFLOW:
         description="Exploration mode for understanding code without modifications",
         allow_all_tools=False,
         allowed_tools={
-            # Read-only tools only
-            "read_file",
-            "list_directory",
+            "read",
+            "ls",
             "code_search",
             "semantic_code_search",
+            "symbol",
+            "refs",
+            "lsp",
             "glob",
             "grep",
             "git_status",
@@ -215,13 +356,11 @@ WORKFLOW:
             "code_review",
             "web_search",
             "web_fetch",
-            # Sandbox notes (limited to .victor/sandbox/)
-            "write_file",
+            "write",
         },
         disallowed_tools={
-            "edit_files",  # No editing main codebase
-            "bash",
-            "shell",  # Also shell tool (same as bash)
+            "edit",
+            "shell",
             "git_commit",
             "git_push",
             "git_checkout",
@@ -229,10 +368,14 @@ WORKFLOW:
         system_prompt_addition="""
 You are in EXPLORE mode - focused on understanding and navigating code.
 
+Prefer structure-aware navigation first when possible:
+- symbol(file_path=..., symbol_name=...) for concrete definitions
+- refs(symbol_name=...) to trace usages before opening more files
+- lsp(action="definition"|"references"|"diagnostics", ...) for precise symbol lookup
+- read(path=...) after you have narrowed to the right file or section
+
 NOTES: You can create notes ONLY in the `.victor/sandbox/` directory.
-This is useful for:
-- Saving findings and observations
-- Creating documentation drafts
+This is useful for saving findings and documentation drafts.
 
 RESTRICTIONS:
 - DO NOT modify files outside `.victor/sandbox/`
@@ -247,14 +390,17 @@ WORKFLOW:
 """,
         require_write_confirmation=True,
         verbose_planning=False,
-        max_files_per_operation=3,  # Limited notes in sandbox
+        max_files_per_operation=3,
         tool_priorities={
-            "read_file": 1.3,
+            "read": 1.3,
             "code_search": 1.2,
             "semantic_code_search": 1.2,
-            "list_directory": 1.1,
+            "symbol": 1.4,
+            "refs": 1.4,
+            "lsp": 1.4,
+            "ls": 1.1,
         },
-        exploration_multiplier=20.0,  # 20x exploration in explore mode (effectively unlimited like Claude Code)
+        exploration_multiplier=20.0,
         sandbox_dir=".victor/sandbox",
         allow_sandbox_edits=True,
     ),
@@ -384,9 +530,10 @@ class AgentModeController:
             True if the tool is allowed
         """
         config = self.config
+        canonical_tool_name = canonicalize_core_tool_name(tool_name)
 
         # Check disallowed list first (takes precedence)
-        if tool_name in config.disallowed_tools:
+        if canonical_tool_name in config.disallowed_tools:
             return False
 
         # If allow_all_tools, it's allowed unless disallowed
@@ -394,7 +541,7 @@ class AgentModeController:
             return True
 
         # Otherwise, check allowed list
-        return tool_name in config.allowed_tools
+        return canonical_tool_name in config.allowed_tools
 
     def get_tool_priority(self, tool_name: str) -> float:
         """Get priority adjustment for a tool in current mode.
@@ -405,7 +552,8 @@ class AgentModeController:
         Returns:
             Priority multiplier (1.0 = no adjustment)
         """
-        return self.config.tool_priorities.get(tool_name, 1.0)
+        canonical_tool_name = canonicalize_core_tool_name(tool_name)
+        return self.config.tool_priorities.get(canonical_tool_name, 1.0)
 
     def get_system_prompt_addition(self) -> str:
         """Get additional system prompt text for current mode.

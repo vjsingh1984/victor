@@ -1,5 +1,7 @@
 """Tests for the Victor self-benchmark runner."""
 
+import json
+
 from datetime import datetime
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -245,6 +247,32 @@ class TestReportMarkdownOutput:
         data = json.loads(json_str)
         assert data["benchmark"] == "swe_bench"
         assert len(data["results"]) >= 1
+
+    def test_save_report_writes_summary_bundle(self, tmp_path):
+        """Saving a report should emit a compact summary artifact for automation."""
+        config = SelfBenchmarkConfig(output_dir=tmp_path, include_published=False)
+        runner = SelfBenchmarkRunner(config)
+        report = create_quick_comparison(
+            benchmark=BenchmarkType.SWE_BENCH,
+            victor_pass_rate=0.72,
+            include_published=False,
+        )
+        victor_result = report.results[0]
+        victor_result.metrics.accepted_patch_rate = 0.6
+        victor_result.metrics.tokens_to_merge = 120.0
+        victor_result.metrics.avg_time_to_first_edit_seconds = 1.75
+        victor_result.metrics.code_intelligence_task_coverage = 0.8
+
+        runner._save_report(report)
+
+        summary = json.loads((tmp_path / "comparison_report_summary.json").read_text())
+        assert summary["benchmark"] == "swe_bench"
+        assert summary["winner"] == "victor"
+        assert summary["framework_count"] == 1
+        assert summary["results"][0]["framework"] == "victor"
+        assert summary["results"][0]["accepted_patch_rate"] == pytest.approx(0.6)
+        assert summary["results"][0]["tokens_to_merge"] == pytest.approx(120.0)
+        assert summary["results"][0]["avg_time_to_first_edit_seconds"] == pytest.approx(1.75)
 
 
 class TestCreateQuickComparison:

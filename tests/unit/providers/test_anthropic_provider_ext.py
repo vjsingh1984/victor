@@ -16,6 +16,7 @@
 
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+from datetime import datetime, timedelta, timezone
 
 from victor.providers.anthropic_provider import AnthropicProvider
 from victor.providers.base import (
@@ -25,6 +26,7 @@ from victor.providers.base import (
     ProviderAuthError,
     ProviderRateLimitError,
 )
+from victor.workflows.services.credentials import SSOTokens
 
 
 @pytest.fixture
@@ -54,6 +56,26 @@ async def test_initialization():
     assert provider.timeout == 45
     assert provider.max_retries == 5
     assert provider.client is not None
+
+
+@pytest.mark.asyncio
+async def test_oauth_mode_uses_claude_code_token_source():
+    """Anthropic OAuth mode should consume Claude Code tokens via OAuthTokenManager."""
+    tokens = SSOTokens(
+        access_token="claude_oauth_token",
+        refresh_token="ref",
+        expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
+    )
+    with patch("victor.providers.anthropic_provider.OAuthTokenManager") as MockMgr:
+        mock_instance = MagicMock()
+        mock_instance.get_valid_token = AsyncMock(return_value="claude_oauth_token")
+        mock_instance._load_cached = MagicMock(return_value=tokens)
+        MockMgr.return_value = mock_instance
+
+        provider = AnthropicProvider(auth_mode="oauth", oauth_source="claude-code")
+
+    MockMgr.assert_called_once_with("anthropic", token_source="claude-code")
+    assert provider.client.auth_token == "claude_oauth_token"
 
 
 @pytest.mark.asyncio
@@ -137,10 +159,18 @@ async def test_chat_with_system_message(anthropic_provider):
             model="claude-3-opus",
         )
 
-        # Verify system message was separated
+        # Verify system message was separated and wrapped with cache_control
         call_args = mock_create.call_args
         assert "system" in call_args.kwargs
-        assert call_args.kwargs["system"] == "You are a helpful assistant"
+        system_val = call_args.kwargs["system"]
+        # Anthropic provider wraps system messages with cache_control for prompt caching
+        assert system_val == [
+            {
+                "type": "text",
+                "text": "You are a helpful assistant",
+                "cache_control": {"type": "ephemeral"},
+            }
+        ]
         assert len(call_args.kwargs["messages"]) == 1
         assert call_args.kwargs["messages"][0]["role"] == "user"
 
@@ -387,10 +417,16 @@ async def test_stream_with_system_message(anthropic_provider):
         ):
             chunks.append(chunk)
 
-        # Verify system message was separated
+        # Verify system message was separated and wrapped with cache_control
         call_args = mock_stream_method.call_args
         assert "system" in call_args.kwargs
-        assert call_args.kwargs["system"] == "System prompt"
+        assert call_args.kwargs["system"] == [
+            {
+                "type": "text",
+                "text": "System prompt",
+                "cache_control": {"type": "ephemeral"},
+            }
+        ]
 
 
 @pytest.mark.asyncio
@@ -599,6 +635,12 @@ async def test_multiple_system_messages(anthropic_provider):
             model="claude-3-opus",
         )
 
-        # Verify the last system message was used
+        # Verify the last system message was used (wrapped with cache_control)
         call_args = mock_create.call_args
-        assert call_args.kwargs["system"] == "Second system message"
+        assert call_args.kwargs["system"] == [
+            {
+                "type": "text",
+                "text": "Second system message",
+                "cache_control": {"type": "ephemeral"},
+            }
+        ]

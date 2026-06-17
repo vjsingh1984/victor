@@ -36,6 +36,9 @@ from typing import Any, AsyncIterator, Dict, List, Optional, Tuple, Union
 
 import httpx
 
+from victor.providers.openai_compat import (
+    extract_thinking_content as _extract_thinking_content,
+)
 from victor.providers.base import (
     BaseProvider,
     CompletionResponse,
@@ -83,28 +86,6 @@ def _model_supports_tools(model: str) -> bool:
     """Check if a model supports native tool calling."""
     model_lower = model.lower()
     return any(pattern in model_lower for pattern in TOOL_CAPABLE_MODELS)
-
-
-def _extract_thinking_content(response: str) -> Tuple[str, str]:
-    """Extract <think>...</think> tags from response.
-
-    Args:
-        response: Raw response text
-
-    Returns:
-        Tuple of (thinking_content, main_content)
-    """
-    if not response:
-        return ("", "")
-
-    # Match <think>...</think> tags (case insensitive, multiline)
-    think_pattern = r"<think>(.*?)</think>"
-    matches = re.findall(think_pattern, response, re.DOTALL | re.IGNORECASE)
-
-    thinking = "\n".join(matches) if matches else ""
-    content = re.sub(think_pattern, "", response, flags=re.DOTALL | re.IGNORECASE).strip()
-
-    return (thinking, content)
 
 
 class LMStudioProvider(BaseProvider):
@@ -261,6 +242,22 @@ class LMStudioProvider(BaseProvider):
         """LMStudio supports streaming."""
         return True
 
+    def supports_prompt_caching(self) -> bool:
+        """LMStudio has no API-level prompt caching (no billing discount)."""
+        return False
+
+    def supports_kv_prefix_caching(self) -> bool:
+        """LMStudio reuses KV cache for GGUF models with matching prefixes."""
+        return True
+
+    def context_window(self, model: Optional[str] = None) -> int:
+        # LMStudio loads various GGUF models; share Ollama's table since
+        # the same model files are typically served.
+        from victor.providers.context_windows import OLLAMA, LMSTUDIO_DEFAULT, lookup
+
+        target = model or getattr(self, "_current_model", None)
+        return lookup(OLLAMA, target, LMSTUDIO_DEFAULT)
+
     def model_uses_thinking_tags(self, model: Optional[str] = None) -> bool:
         """Check if model outputs thinking tags.
 
@@ -343,7 +340,10 @@ class LMStudioProvider(BaseProvider):
             raw_response = resp.json()
 
             models = raw_response.get("data", [])
-            match = next((m for m in models if m.get("id") == model), models[0] if models else None)
+            match = next(
+                (m for m in models if m.get("id") == model),
+                models[0] if models else None,
+            )
 
             if match:
                 capabilities = match.get("capabilities", {}) or {}

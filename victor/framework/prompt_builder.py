@@ -38,14 +38,10 @@ The PromptBuilder uses a fluent API pattern for ergonomic construction:
 
 Integration with verticals:
 
-try:
-        from victor_coding.prompts import CodingPromptContributor
-except ImportError:
-    # External vertical package may not be installed
-    pass
-
+    # Prompt contributors are provided by external vertical packages
+    # (e.g., victor-coding) via victor.prompt_contributors entry points.
     builder = PromptBuilder()
-    builder.add_from_contributor(CodingPromptContributor())
+    builder.add_from_contributor(prompt_contributor)
     prompt = builder.build()
 """
 
@@ -55,6 +51,8 @@ import asyncio
 import logging
 import sys
 from dataclasses import dataclass, field
+from textwrap import dedent
+from enum import Enum
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
@@ -62,6 +60,7 @@ from typing import (
     Dict,
     Iterable,
     List,
+    Literal,
     Optional,
     Tuple,
     Union,
@@ -76,11 +75,45 @@ except ImportError:
 if TYPE_CHECKING:
     from victor.core.verticals.protocols import PromptContributorProtocol
 
+from victor.framework.prompt_document import (
+    PromptBlock,
+    PromptDeduplicationProcessor,
+    PromptDocument,
+    PromptPriorityTrimProcessor,
+)
+from victor.context.instruction_discovery import (
+    DEFAULT_INSTRUCTION_FILENAMES,
+    discover_instruction_files as discover_shared_instruction_files,
+)
+
 logger = logging.getLogger(__name__)
 
 
+# =============================================================================
+# Enums for Prompt Building
+# =============================================================================
+
+
+class PromptScope(str, Enum):
+    """Scope level for prompt sections.
+
+    Determines where prompt sections are visible:
+    - WORKSPACE: All agents in the workspace
+    - PROJECT: All agents in the project
+    - USER: User-specific configuration
+    """
+
+    WORKSPACE = "workspace"  # All agents in the workspace
+    PROJECT = "project"  # All agents in the project
+    USER = "user"  # User-specific configuration
+
+
+# Backward compatibility
+_PromptScopeLiteral = Literal["workspace", "project", "user"]
+
+
 @dataclass
-class PromptSection:
+class PromptSection(PromptBlock):
     """A section of the system prompt.
 
     Sections are composed together to form the final prompt, ordered by priority.
@@ -94,33 +127,7 @@ class PromptSection:
         header: Optional header format. If None, uses "## {name}". Set to "" to disable.
     """
 
-    name: str
-    content: str
-    priority: int = 50
-    enabled: bool = True
-    header: Optional[str] = None
-
-    def get_formatted_content(self) -> str:
-        """Get the section content with optional header.
-
-        Returns:
-            Formatted section content with header if applicable
-        """
-        if not self.enabled:
-            return ""
-
-        # Determine header
-        if self.header is None:
-            # Default: use section name as header
-            header_text = f"## {self.name.replace('_', ' ').title()}\n"
-        elif self.header == "":
-            # Empty string: no header
-            header_text = ""
-        else:
-            # Custom header
-            header_text = f"{self.header}\n"
-
-        return f"{header_text}{self.content}"
+    pass
 
 
 @dataclass
@@ -179,7 +186,8 @@ class PromptBuilder:
 
     def __init__(self) -> None:
         """Initialize a new PromptBuilder."""
-        self._sections: Dict[str, PromptSection] = {}
+        self._document = PromptDocument()
+        self._sections: Dict[str, PromptSection] = self._document.blocks  # Backward compat
         self._tool_hints: Dict[str, ToolHint] = {}
         self._safety_rules: List[str] = []
         self._context: List[str] = []
@@ -207,12 +215,14 @@ class PromptBuilder:
         Returns:
             Self for method chaining
         """
-        self._sections[name] = PromptSection(
-            name=name,
-            content=content,
-            priority=priority,
-            enabled=True,
-            header=header,
+        self._document.upsert(
+            PromptSection(
+                name=name,
+                content=content,
+                priority=priority,
+                enabled=True,
+                header=header,
+            )
         )
         return self
 
@@ -417,19 +427,23 @@ class PromptBuilder:
 
     def iter_sections(self) -> List[PromptSection]:
         """Return a list of current sections."""
-        return list(self._sections.values())
+        return [
+            section
+            for section in self._document.iter_blocks()
+            if isinstance(section, PromptSection)
+        ]
 
     def iter_named_sections(self) -> List[Tuple[str, PromptSection]]:
         """Return (name, section) tuples for all sections."""
-        return list(self._sections.items())
+        return [
+            (name, section)
+            for name, section in self._document.iter_named_blocks()
+            if isinstance(section, PromptSection)
+        ]
 
     def estimate_section_length(self) -> int:
         """Estimate total character length of all sections."""
-        return sum(
-            len(section.get_formatted_content())
-            for section in self._sections.values()
-            if section.enabled
-        )
+        return self._document.estimate_length()
 
     def trim_sections_by_priority(
         self,
@@ -447,28 +461,17 @@ class PromptBuilder:
         if max_total_chars <= 0:
             return
 
-        protected = {name.lower() for name in protected_sections or []}
+        self._document = PromptPriorityTrimProcessor(
+            max_total_chars=max_total_chars,
+            protected_blocks=protected_sections or (),
+            min_priority=min_priority,
+        ).process(self._document)
+        self._sections = self._document.blocks
 
-        def over_budget() -> bool:
-            return self.estimate_section_length() > max_total_chars
-
-        candidates = sorted(
-            self._sections.items(),
-            key=lambda item: item[1].priority,
-            reverse=True,
-        )
-
-        for name, section in candidates:
-            if not over_budget():
-                break
-
-            if section.priority < min_priority:
-                continue
-
-            if name.lower() in protected:
-                continue
-
-            self.remove_section(name)
+    def deduplicate_sections(self) -> None:
+        """Deduplicate or remove empty sections through the canonical processor."""
+        self._document = PromptDeduplicationProcessor().process(self._document)
+        self._sections = self._document.blocks
 
     def clear(self) -> Self:
         """Clear all sections, hints, rules, and context.
@@ -476,7 +479,8 @@ class PromptBuilder:
         Returns:
             Self for method chaining
         """
-        self._sections.clear()
+        self._document = PromptDocument()
+        self._sections = self._document.blocks
         self._tool_hints.clear()
         self._safety_rules.clear()
         self._context.clear()
@@ -501,15 +505,18 @@ class PromptBuilder:
         Returns:
             Self for method chaining
         """
+        from victor.core.verticals.protocols.prompt_provider import (
+            collect_prompt_section_contributions,
+        )
+
         # Get priority from contributor
         priority_offset = contributor.get_priority() * 10
 
-        # Add system prompt section
-        system_section = contributor.get_system_prompt_section()
-        if system_section:
+        # Add system prompt section(s)
+        for contribution in collect_prompt_section_contributions(contributor):
             self.add_section(
-                name=f"vertical_{type(contributor).__name__}",
-                content=system_section,
+                name=contribution.name.lower(),
+                content=contribution.text,
                 priority=self.PRIORITY_GUIDELINES + priority_offset,
             )
 
@@ -536,6 +543,26 @@ class PromptBuilder:
                     for tool in task_hint.priority_tools:
                         self.add_tool_hint(tool, f"Prioritized for {task_type}", 0.2)
 
+                # Add execution guidance based on skip flags (arXiv:2604.01681)
+                execution_guidance = []
+                if hasattr(task_hint, "skip_planning") and task_hint.skip_planning:
+                    execution_guidance.append("Execute directly without extensive planning")
+                if hasattr(task_hint, "skip_evaluation") and task_hint.skip_evaluation:
+                    execution_guidance.append("No need to explicitly verify results")
+                if hasattr(task_hint, "token_budget") and task_hint.token_budget:
+                    execution_guidance.append(
+                        f"Keep response concise (target ~{task_hint.token_budget} tokens)"
+                    )
+
+                if execution_guidance:
+                    guidance_text = "Execution constraints:\n- " + "\n- ".join(execution_guidance)
+                    self.add_section(
+                        name="task_execution_guidance",
+                        content=guidance_text,
+                        priority=self.PRIORITY_GUIDELINES + 5,  # Just after guidelines
+                        header="",
+                    )
+
         return self
 
     def merge(self, other: "PromptBuilder") -> Self:
@@ -551,8 +578,16 @@ class PromptBuilder:
             Self for method chaining
         """
         # Merge sections (other overrides same-named sections)
-        for name, section in other._sections.items():
-            self._sections[name] = section
+        for name, section in other.iter_named_sections():
+            self._document.upsert(
+                PromptSection(
+                    name=name,
+                    content=section.content,
+                    priority=section.priority,
+                    enabled=section.enabled,
+                    header=section.header,
+                )
+            )
 
         # Merge tool hints
         self._tool_hints.update(other._tool_hints)
@@ -596,50 +631,158 @@ class PromptBuilder:
             return GROUNDING_RULES_EXTENDED
         return GROUNDING_RULES_MINIMAL
 
-    def build(self) -> str:
-        """Build the final prompt string.
+    def build_document(self) -> PromptDocument:
+        """Build the canonical prompt document."""
+        document = self._document.clone()
 
-        Assembles all sections, tool hints, safety rules, context, and
-        grounding rules into a single prompt string, ordered by priority.
-
-        Returns:
-            The complete system prompt string
-        """
-        parts: List[str] = []
-
-        # Add sections sorted by priority
-        sorted_sections = sorted(
-            [s for s in self._sections.values() if s.enabled],
-            key=lambda s: s.priority,
-        )
-        for section in sorted_sections:
-            formatted = section.get_formatted_content()
-            if formatted:
-                parts.append(formatted)
-
-        # Add tool hints if any
         if self._tool_hints:
             hints_lines = [f"- {hint.tool_name}: {hint.hint}" for hint in self._tool_hints.values()]
             hints_text = "\n".join(hints_lines)
-            parts.append(f"## Tool Hints\n{hints_text}")
+            document.upsert(
+                PromptBlock(
+                    name="tool_hints",
+                    content=hints_text,
+                    priority=self.PRIORITY_TOOL_GUIDANCE,
+                    header="## Tool Hints",
+                    kind="tool_hints",
+                )
+            )
 
-        # Add safety rules if any
+        document.upsert(
+            PromptBlock(
+                name="analysis_efficiency",
+                content=dedent("""\
+                    Before starting any structural or architectural analysis of the codebase:
+                    1. Call `analysis_checkpoint(mode="list", topic="")` to see available cached analyses.
+                    2. Call `analysis_checkpoint(mode="read", topic="<topic>")` for the relevant topic.
+                    3. If status is "current" — use the cached content directly. Skip tool-intensive analysis.
+                    4. If status is "stale" — re-analyze only the changed files listed in stale_files, then
+                       update: `analysis_checkpoint(mode="write", topic="...", source_files=[...], content="...")`.
+                    5. If status is "not_found" — run analysis, then write a checkpoint on completion.
+
+                    Checkpoints live in `.victor/analysis/{slug}-analysis.md` with YAML frontmatter tracking
+                    source file mtimes. Staleness is auto-detected via the graph_file_mtime table.
+                    Reading a checkpoint costs ~500 tokens vs 8,000–15,000 for a fresh deep analysis.\
+                """),
+                priority=self.PRIORITY_TOOL_GUIDANCE,
+                header="## Analysis Efficiency",
+                kind="analysis_efficiency",
+            )
+        )
+
         if self._safety_rules:
             rules_lines = [f"- {rule}" for rule in self._safety_rules]
             rules_text = "\n".join(rules_lines)
-            parts.append(f"## Safety Rules\n{rules_text}")
+            document.upsert(
+                PromptBlock(
+                    name="safety_rules",
+                    content=rules_text,
+                    priority=self.PRIORITY_SAFETY,
+                    header="## Safety Rules",
+                    kind="safety_rules",
+                )
+            )
 
-        # Add context if any
         if self._context:
             context_text = "\n\n".join(self._context)
-            parts.append(f"## Context\n{context_text}")
+            document.upsert(
+                PromptBlock(
+                    name="context",
+                    content=context_text,
+                    priority=self.PRIORITY_CONTEXT,
+                    header="## Context",
+                    kind="context",
+                )
+            )
 
-        # Add grounding rules (always last)
         grounding = self._get_grounding_rules()
         if grounding:
-            parts.append(grounding)
+            document.upsert(
+                PromptBlock(
+                    name="grounding",
+                    content=grounding,
+                    priority=self.PRIORITY_GROUNDING,
+                    header="",
+                    kind="grounding",
+                )
+            )
 
-        return "\n\n".join(parts)
+        return document
+
+    def build(self) -> str:
+        """Build the final prompt string from the canonical document."""
+        return self.build_document().render()
+
+    def add_evolved_section(
+        self,
+        section_name: str,
+        provider: str = "",
+        model: str = "",
+        task_type: str = "default",
+        priority: int = 50,
+    ) -> "PromptBuilder":
+        """Add an evolvable section with automatic content resolution.
+
+        This method checks for evolved content via OptimizationInjector
+        and falls back to static defaults if no evolved version exists.
+
+        Args:
+            section_name: Name of the section (e.g., "ASI_TOOL_EFFECTIVENESS_GUIDANCE")
+            provider: Provider name for evolution lookup
+            model: Model name for evolution lookup
+            task_type: Task type for context
+            priority: Section priority for ordering
+
+        Returns:
+            Self for method chaining
+        """
+        from victor.agent.evolved_content_resolver import EvolvedContentResolver
+        from victor.agent.optimization_injector import OptimizationInjector
+
+        # Get resolver (create if needed)
+        if not hasattr(self, "_evolved_resolver"):
+            self._evolved_resolver = EvolvedContentResolver(
+                optimization_injector=OptimizationInjector()
+            )
+
+        # Get fallback text
+        fallback = self._get_section_fallback(section_name)
+
+        # Resolve evolved content
+        resolved = self._evolved_resolver.resolve_section(
+            section_name=section_name,
+            provider=provider,
+            model=model,
+            task_type=task_type,
+            fallback_text=fallback,
+        )
+
+        # Add to document
+        if resolved.text:
+            self.add_section(
+                name=section_name.lower(),
+                content=resolved.text,
+                priority=priority,
+            )
+            logger.debug(
+                f"Added evolved section '{section_name}' "
+                f"(source={resolved.source}, priority={priority})"
+            )
+
+        return self
+
+    def _get_section_fallback(self, section_name: str) -> str:
+        """Get static fallback text for a section.
+
+        Args:
+            section_name: Section name
+
+        Returns:
+            Static fallback text
+        """
+        from victor.agent.prompt_section_registry import build_fallback_map
+
+        return build_fallback_map([section_name]).get(section_name, "")
 
     def __repr__(self) -> str:
         """Return a string representation of the builder state."""
@@ -673,7 +816,11 @@ def create_coding_prompt_builder() -> PromptBuilder:
         PromptBuilder()
         .add_section("identity", CODING_IDENTITY, priority=PromptBuilder.PRIORITY_IDENTITY)
         .add_section("guidelines", CODING_GUIDELINES, priority=PromptBuilder.PRIORITY_GUIDELINES)
-        .add_section("tool_usage", CODING_TOOL_USAGE, priority=PromptBuilder.PRIORITY_TOOL_GUIDANCE)
+        .add_section(
+            "tool_usage",
+            CODING_TOOL_USAGE,
+            priority=PromptBuilder.PRIORITY_TOOL_GUIDANCE,
+        )
     )
 
 
@@ -692,8 +839,16 @@ def create_devops_prompt_builder() -> PromptBuilder:
     return (
         PromptBuilder()
         .add_section("identity", DEVOPS_IDENTITY, priority=PromptBuilder.PRIORITY_IDENTITY)
-        .add_section("security", DEVOPS_SECURITY_CHECKLIST, priority=PromptBuilder.PRIORITY_SAFETY)
-        .add_section("pitfalls", DEVOPS_COMMON_PITFALLS, priority=PromptBuilder.PRIORITY_GUIDELINES)
+        .add_section(
+            "security",
+            DEVOPS_SECURITY_CHECKLIST,
+            priority=PromptBuilder.PRIORITY_SAFETY,
+        )
+        .add_section(
+            "pitfalls",
+            DEVOPS_COMMON_PITFALLS,
+            priority=PromptBuilder.PRIORITY_GUIDELINES,
+        )
     )
 
 
@@ -713,10 +868,14 @@ def create_research_prompt_builder() -> PromptBuilder:
         PromptBuilder()
         .add_section("identity", RESEARCH_IDENTITY, priority=PromptBuilder.PRIORITY_IDENTITY)
         .add_section(
-            "quality", RESEARCH_QUALITY_CHECKLIST, priority=PromptBuilder.PRIORITY_GUIDELINES
+            "quality",
+            RESEARCH_QUALITY_CHECKLIST,
+            priority=PromptBuilder.PRIORITY_GUIDELINES,
         )
         .add_section(
-            "sources", RESEARCH_SOURCE_HIERARCHY, priority=PromptBuilder.PRIORITY_GUIDELINES + 5
+            "sources",
+            RESEARCH_SOURCE_HIERARCHY,
+            priority=PromptBuilder.PRIORITY_GUIDELINES + 5,
         )
     )
 
@@ -737,10 +896,14 @@ def create_data_analysis_prompt_builder() -> PromptBuilder:
         PromptBuilder()
         .add_section("identity", DATA_ANALYSIS_IDENTITY, priority=PromptBuilder.PRIORITY_IDENTITY)
         .add_section(
-            "libraries", DATA_ANALYSIS_LIBRARIES, priority=PromptBuilder.PRIORITY_CAPABILITIES
+            "libraries",
+            DATA_ANALYSIS_LIBRARIES,
+            priority=PromptBuilder.PRIORITY_CAPABILITIES,
         )
         .add_section(
-            "operations", DATA_ANALYSIS_OPERATIONS, priority=PromptBuilder.PRIORITY_GUIDELINES
+            "operations",
+            DATA_ANALYSIS_OPERATIONS,
+            priority=PromptBuilder.PRIORITY_GUIDELINES,
         )
     )
 
@@ -1027,7 +1190,7 @@ class WorkspaceContextBuilder:
 # ---------------------------------------------------------------------------
 
 
-def _classify_scope(file_dir: Path, workspace_dir: Path) -> str:
+def _classify_scope(file_dir: Path, workspace_dir: Path) -> PromptScope:
     """Determine the scope label for a discovered file.
 
     Args:
@@ -1082,13 +1245,7 @@ class ProjectContextDiscovery:
         )
     """
 
-    _INSTRUCTION_FILENAMES: List[str] = [
-        "CLAUDE.md",
-        "CLAUDE.local.md",
-        ".victor/init.md",
-        ".victor/instructions.md",
-        ".victor.md",
-    ]
+    _INSTRUCTION_FILENAMES: List[str] = list(DEFAULT_INSTRUCTION_FILENAMES)
 
     @staticmethod
     async def discover(
@@ -1154,47 +1311,18 @@ class ProjectContextDiscovery:
         Returns:
             Ordered list of ContextFile instances.
         """
-        seen_contents: set[str] = set()
         results: List[ContextFile] = []
-
-        current = cwd.resolve()
-        root = Path(current.anchor)
-
-        while True:
-            for name in ProjectContextDiscovery._INSTRUCTION_FILENAMES:
-                candidate = current / name
-                if not candidate.is_file():
-                    continue
-
-                try:
-                    content = candidate.read_text(encoding="utf-8")
-                except OSError:
-                    logger.debug(
-                        "Could not read instruction file %s",
-                        candidate,
-                    )
-                    continue
-
-                if content in seen_contents:
-                    continue
-                seen_contents.add(content)
-
-                scope = _classify_scope(
-                    file_dir=current,
-                    workspace_dir=cwd.resolve(),
+        for item in discover_shared_instruction_files(
+            cwd,
+            filenames=ProjectContextDiscovery._INSTRUCTION_FILENAMES,
+        ):
+            results.append(
+                ContextFile(
+                    path=str(item.path),
+                    content=item.content,
+                    scope=item.scope,
                 )
-                results.append(
-                    ContextFile(
-                        path=str(candidate),
-                        content=content,
-                        scope=scope,
-                    )
-                )
-
-            if current == root:
-                break
-            current = current.parent
-
+            )
         return results
 
     @staticmethod

@@ -163,8 +163,8 @@ class BaseQueryEnhancementStrategy(ABC):
 
             settings = load_settings()
 
-            provider_name = self._provider_name or settings.default_provider or "ollama"
-            model = self._model or settings.default_model
+            provider_name = self._provider_name or settings.provider.default_provider or "ollama"
+            model = self._model or settings.provider.default_model
 
             self._provider_instance = ProviderRegistry.create(provider_name)
             if not self._model:

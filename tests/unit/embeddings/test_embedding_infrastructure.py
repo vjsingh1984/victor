@@ -27,7 +27,10 @@ from unittest.mock import MagicMock, patch
 import numpy as np
 import pytest
 
-from victor.storage.embeddings.collections import CollectionItem, StaticEmbeddingCollection
+from victor.storage.embeddings.collections import (
+    CollectionItem,
+    StaticEmbeddingCollection,
+)
 from victor.storage.embeddings.intent_classifier import (
     COMPLETION_PHRASES,
     CONTINUATION_PHRASES,
@@ -36,6 +39,7 @@ from victor.storage.embeddings.intent_classifier import (
     IntentType,
 )
 from victor.storage.embeddings.service import EmbeddingService
+from victor.core.completion_markers import TASK_DONE_MARKER
 
 # ============================================================================
 # EmbeddingService Tests
@@ -453,6 +457,32 @@ class TestIntentClassifier:
 
         assert result.intent == IntentType.COMPLETION
         assert result.confidence > 0.5
+
+    def test_completion_marker_heuristic_uses_rare_victor_marker(self, mock_embedding_service):
+        """Explicit rare completion markers should force completion intent."""
+        classifier = IntentClassifier(
+            cache_dir=Path(self.temp_dir),
+            embedding_service=mock_embedding_service,
+        )
+        classifier.initialize_sync()
+
+        result = classifier.classify_intent_sync(f"{TASK_DONE_MARKER} Fixed parser")
+
+        assert result.intent == IntentType.COMPLETION
+
+    def test_legacy_done_marker_no_longer_forces_completion(self, mock_embedding_service):
+        """Generic DONE markers should not trigger the completion heuristic."""
+        classifier = IntentClassifier(
+            cache_dir=Path(self.temp_dir),
+            embedding_service=mock_embedding_service,
+            continuation_threshold=0.8,
+            completion_threshold=0.8,
+        )
+        classifier.initialize_sync()
+
+        result = classifier.classify_intent_sync("DONE: Fixed parser")
+
+        assert result.intent != IntentType.COMPLETION
 
     def test_classify_neutral_intent(self, mock_embedding_service):
         """Test classifier returns neutral for ambiguous text."""

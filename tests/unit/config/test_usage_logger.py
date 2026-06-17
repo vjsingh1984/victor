@@ -6,7 +6,12 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
-from victor.analytics.logger import UsageLogger
+from victor.observability.analytics.logger import UsageLogger
+
+
+class RecursivePayload:
+    def __init__(self) -> None:
+        self.self_ref = self
 
 
 @pytest.fixture
@@ -70,18 +75,57 @@ def test_log_multiple_events(log_file: Path):
 
 
 def test_handles_non_serializable_data(log_file: Path):
-    """Tests that the logger handles non-serializable data gracefully."""
+    """Tests that the logger sanitizes non-serializable objects for logging.
+
+    NOTE: After April 2026 sanitizer enhancement, objects with __dict__
+    (like MagicMock) are successfully sanitized and logged instead of
+    causing errors. This test verifies the sanitizer works correctly.
+    """
     logger = UsageLogger(log_file=log_file, enabled=True)
 
     non_serializable_data = {"a_mock": MagicMock()}
 
-    with patch.object(logger._logger, "error") as mock_error:
-        logger.log_event("bad_event", non_serializable_data)
-        mock_error.assert_called_once()
-        assert "Failed to serialize log entry" in mock_error.call_args[0][0]
+    # Log the event - should succeed after sanitization
+    logger.log_event("bad_event", non_serializable_data)
 
-    # The file should be empty as the write failed
-    assert os.stat(log_file).st_size == 0
+    # The file should contain the sanitized log entry
+    assert os.stat(log_file).st_size > 0
+
+    # Verify the log contains the event
+    with open(log_file, "r") as f:
+        log_content = f.read()
+        assert "bad_event" in log_content
+        # The MagicMock should have been sanitized to its __dict__ representation
+        assert "a_mock" in log_content
+
+
+def test_log_event_handles_recursive_object_graph(log_file: Path):
+    """Recursive object graphs should be sanitized without blowing the stack."""
+    logger = UsageLogger(log_file=log_file, enabled=True)
+
+    logger.log_event("recursive_event", {"payload": RecursivePayload()})
+
+    with open(log_file, "r") as f:
+        log_entry = json.loads(f.readline())
+
+    assert log_entry["data"]["payload"]["__class__"] == "RecursivePayload"
+    assert log_entry["data"]["payload"]["self_ref"] == "<recursive_ref:RecursivePayload>"
+
+
+def test_log_event_handles_recursive_mappings(log_file: Path):
+    """Recursive dict/list structures should be scrubbed and serialized safely."""
+    logger = UsageLogger(log_file=log_file, enabled=True)
+    payload = {"message": "hello"}
+    payload["self"] = payload
+    payload["items"] = [payload]
+
+    logger.log_event("recursive_mapping", payload)
+
+    with open(log_file, "r") as f:
+        log_entry = json.loads(f.readline())
+
+    assert log_entry["data"]["self"]["__recursive_ref__"] == "dict"
+    assert log_entry["data"]["items"][0]["__recursive_ref__"] == "dict"
 
 
 def test_prepare_log_file_exception(tmp_path: Path):
@@ -105,3 +149,17 @@ def test_log_event_write_exception(log_file: Path):
             logger.log_event("test_event", {"data": "value"})
             mock_error.assert_called_once()
             assert "Failed to write to log file" in mock_error.call_args[0][0]
+
+
+def test_log_event_sanitization_exception_is_contained(log_file: Path):
+    """Unexpected sanitization failures should not escape to callers."""
+    logger = UsageLogger(log_file=log_file, enabled=True)
+
+    with (
+        patch.object(logger, "_sanitize_log_data", side_effect=RuntimeError("boom")),
+        patch.object(logger._logger, "error") as mock_error,
+    ):
+        logger.log_event("test_event", {"data": "value"})
+
+    mock_error.assert_called_once()
+    assert "Failed to write to log file" in mock_error.call_args[0][0]

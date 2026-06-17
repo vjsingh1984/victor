@@ -479,7 +479,7 @@ class TestOutputFormatterRichMode:
         formatter.tool_result("execute_bash", True)
         output = stderr.getvalue()
         # Implementation truncates args in _format_args - check tool output exists
-        assert "execute_bash" in output
+        assert "executeBash" in output
         assert "✓" in output
 
     def test_tool_start_with_many_args(self):
@@ -491,7 +491,7 @@ class TestOutputFormatterRichMode:
         formatter.tool_start("test_tool", {"a": 1, "b": 2, "c": 3, "d": 4})
         formatter.tool_result("test_tool", True)
         output = stderr.getvalue()
-        assert "test_tool" in output
+        assert "testTool" in output
         assert "✓" in output
 
     def test_tool_result_error_recorded(self):
@@ -511,7 +511,7 @@ class TestOutputFormatterRichMode:
         formatter.tool_result("test_tool", True)
         output = stderr.getvalue()
         # New compact format: "# ✓ tool_name(args) (duration)"
-        assert "test_tool" in output
+        assert "testTool" in output
         assert "✓" in output
 
     def test_tool_result_plain_mode_failed(self):
@@ -522,8 +522,18 @@ class TestOutputFormatterRichMode:
         formatter.tool_result("test_tool", False)
         output = stderr.getvalue()
         # New compact format: "# ✗ tool_name(args) (duration) - error"
-        assert "test_tool" in output
+        assert "testTool" in output
         assert "✗" in output
+
+    def test_tool_result_rich_mode_formats_tool_name_for_display(self):
+        """Rich tool output uses lower-camel display names."""
+        stdout = io.StringIO()
+        config = OutputConfig(mode=OutputMode.RICH, stdout=stdout)
+        formatter = OutputFormatter(config)
+
+        formatter.tool_result("code_search", True)
+
+        assert "codeSearch" in stdout.getvalue()
 
     def test_tool_result_plain_mode_shows_follow_up_suggestions(self):
         """Test tool_result prints visible next-step suggestions in Plain mode."""

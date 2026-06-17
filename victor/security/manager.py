@@ -174,7 +174,12 @@ class SecurityManager:
             lines.append("")
 
         # Vulnerabilities by severity
-        for severity in [Severity.CRITICAL, Severity.HIGH, Severity.MEDIUM, Severity.LOW]:
+        for severity in [
+            Severity.CRITICAL,
+            Severity.HIGH,
+            Severity.MEDIUM,
+            Severity.LOW,
+        ]:
             vulns = result.get_by_severity(severity)
             if vulns:
                 lines.append(f"{severity.value.upper()} VULNERABILITIES")
@@ -239,7 +244,12 @@ class SecurityManager:
             lines.append("## Vulnerabilities")
             lines.append("")
 
-            for severity in [Severity.CRITICAL, Severity.HIGH, Severity.MEDIUM, Severity.LOW]:
+            for severity in [
+                Severity.CRITICAL,
+                Severity.HIGH,
+                Severity.MEDIUM,
+                Severity.LOW,
+            ]:
                 vulns = result.get_by_severity(severity)
                 if vulns:
                     lines.append(f"### {severity.value.capitalize()}")

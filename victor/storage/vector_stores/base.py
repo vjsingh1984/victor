@@ -55,11 +55,12 @@ class EmbeddingConfig(BaseModel):
         description="Embedding model type (sentence-transformers=local/offline, ollama, openai, cohere)",
     )
     embedding_model_name: str = Field(
-        default="all-MiniLM-L12-v2",
-        description="Embedding model name (all-MiniLM-L12-v2 = 384-dim, 120MB, ~8ms, optimal balance)",
+        default="BAAI/bge-small-en-v1.5",
+        description="Embedding model name (BAAI/bge-small-en-v1.5 = 384-dim, 130MB, ~6ms, recommended default)",
     )
     embedding_api_key: Optional[str] = Field(
-        default=None, description="API key for cloud embedding providers (or Ollama base URL)"
+        default=None,
+        description="API key for cloud embedding providers (or Ollama base URL)",
     )
 
     # Provider-specific configuration
@@ -110,7 +111,9 @@ class BaseEmbeddingProvider(ABC):
     """
 
     def __init__(
-        self, config: EmbeddingConfig, embedding_model: Optional["BaseEmbeddingModel"] = None
+        self,
+        config: EmbeddingConfig,
+        embedding_model: Optional["BaseEmbeddingModel"] = None,
     ):
         """Initialize provider with configuration.
 

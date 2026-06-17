@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from victor.core.utils.coding_support import (
+from victor.core.utils.capability_loader import (
     load_codebase_analyzer_attr,
     load_codebase_analyzer_module,
 )

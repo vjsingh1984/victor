@@ -229,6 +229,17 @@ GROUNDING_STOPWORDS: frozenset = frozenset(
         "showed",
         "showing",
         "shown",
+        # Common explanation nouns that are often capitalized or backticked in
+        # prose but are not code symbols.
+        "analysis",
+        "codebase",
+        "detail",
+        "details",
+        "evidence",
+        "findings",
+        "information",
+        "results",
+        "summary",
         "hear",
         "hears",
         "heard",
@@ -776,7 +787,7 @@ class GroundingVerificationResult:
             files = [f"'{i.reference}'" for i in file_issues]
             feedback_parts.append(
                 f"- File(s) not found: {', '.join(files)}. "
-                "Use read_file or list_directory to verify paths before referencing."
+                "Use read or ls to verify paths before referencing."
             )
 
         if symbol_issues:
@@ -904,7 +915,7 @@ class GroundingVerifier:
 
     # Pattern for line references like "file.py:123" or "lines 10-20"
     LINE_REF_PATTERN = re.compile(
-        r"([\w./-]+\.(?:py|js|ts|java|go))(?::(\d+)(?:-(\d+))?|,?\s*(?:line|lines?)\s*(\d+)(?:\s*-\s*(\d+))?)",
+        r"([\w./-]+\.(?:py|js|ts|tsx|jsx|java|go|rs|rb|c|cpp|h|hpp|md|yaml|yml|json|toml))(?::(\d+)(?:-(\d+))?|,?\s*(?:line|lines?)\s*(\d+)(?:\s*-\s*(\d+))?)",
         re.IGNORECASE,
     )
 
@@ -1097,6 +1108,27 @@ class GroundingVerifier:
 
         return list(paths)
 
+    def extract_line_references(self, response: str) -> List[Dict[str, Any]]:
+        """Extract file line references from response."""
+        refs: List[Dict[str, Any]] = []
+        for match in self.LINE_REF_PATTERN.findall(response):
+            path, colon_start, colon_end, word_start, word_end = match
+            start_text = colon_start or word_start
+            end_text = colon_end or word_end or start_text
+            try:
+                start_line = int(start_text)
+                end_line = int(end_text)
+            except (TypeError, ValueError):
+                continue
+            refs.append(
+                {
+                    "path": path.strip("`\"'"),
+                    "start_line": min(start_line, end_line),
+                    "end_line": max(start_line, end_line),
+                }
+            )
+        return refs
+
     def extract_code_snippets(self, response: str) -> List[Dict[str, Any]]:
         """Extract code snippets from response.
 
@@ -1210,6 +1242,71 @@ class GroundingVerifier:
                     )
                 )
                 result.unverified_references.append(path)
+
+    def _resolve_existing_file_reference(self, path: str) -> Optional[str]:
+        """Resolve a referenced path to a single existing project-relative file path."""
+        existing_files = self._get_existing_files()
+        clean_path = path.lstrip("./")
+        if path in existing_files:
+            return path
+        if clean_path in existing_files:
+            return clean_path
+
+        filename = os.path.basename(path)
+        partial_matches = [
+            f
+            for f in existing_files
+            if f.endswith(filename) and (f == filename or f.endswith("/" + filename))
+        ]
+        if "/" not in path and len(partial_matches) == 1:
+            return partial_matches[0]
+        if len(partial_matches) == 1 and partial_matches[0].endswith("/" + clean_path):
+            return partial_matches[0]
+        return None
+
+    async def verify_line_references(
+        self,
+        line_refs: List[Dict[str, Any]],
+        result: VerificationResult,
+    ) -> None:
+        """Verify cited line numbers exist in the referenced files."""
+        for ref in line_refs[: self.config.max_files_to_check]:
+            path = ref["path"]
+            resolved_path = self._resolve_existing_file_reference(path)
+            if not resolved_path:
+                continue
+
+            content = self._read_file_cached(resolved_path)
+            if content is None:
+                continue
+
+            line_count = len(content.splitlines())
+            start_line = ref["start_line"]
+            end_line = ref["end_line"]
+            reference = (
+                f"{path}:{start_line}"
+                if start_line == end_line
+                else f"{path}:{start_line}-{end_line}"
+            )
+
+            if start_line < 1 or end_line > line_count:
+                result.add_issue(
+                    GroundingIssue(
+                        issue_type=IssueType.UNVERIFIABLE,
+                        severity=IssueSeverity.MEDIUM,
+                        description=(
+                            f"Line reference '{reference}' is outside file bounds "
+                            f"(file has {line_count} lines)"
+                        ),
+                        reference=reference,
+                        suggestion=(
+                            "Re-read the file with line-numbered output before citing exact lines."
+                        ),
+                    )
+                )
+                result.unverified_references.append(reference)
+            else:
+                result.verified_references.append(reference)
 
     def _is_generated_code_context(self, context: Optional[Dict[str, Any]]) -> bool:
         """Check if the context indicates code generation task.
@@ -1617,10 +1714,12 @@ class GroundingVerifier:
 
         # Extract references
         file_paths = self.extract_file_references(response)
+        line_refs = self.extract_line_references(response)
         code_snippets = self.extract_code_snippets(response)
         symbols = self.extract_symbols(response)
 
         result.metadata["file_refs"] = len(file_paths)
+        result.metadata["line_refs"] = len(line_refs)
         result.metadata["code_snippets"] = len(code_snippets)
         result.metadata["symbols"] = len(symbols)
 
@@ -1639,6 +1738,9 @@ class GroundingVerifier:
         # Run verifications
         if self.config.verify_file_paths and file_paths:
             await self.verify_file_paths(file_paths, result)
+
+        if self.config.verify_file_paths and line_refs:
+            await self.verify_line_references(line_refs, result)
 
         if self.config.verify_code_snippets and code_snippets:
             await self.verify_code_snippets(

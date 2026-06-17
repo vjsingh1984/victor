@@ -17,20 +17,30 @@
 This package provides focused components for provider management,
 extracted from ProviderManager to follow the Single Responsibility
 Principle (SRP).
+
+Migration Note (2026-05-04):
+- ProviderCoordinator and ProviderSwitchCoordinator removed in v1.0.0
+- Use ProviderService for all provider operations
 """
 
 from victor.agent.provider.health_monitor import ProviderHealthMonitor
+from victor.agent.provider.switch_contracts import (
+    HookPriority,
+    PostSwitchHook,
+    SwitchContext,
+)
 from victor.agent.provider.switcher import (
     ProviderSwitcher,
     ProviderSwitcherState,
 )
 from victor.agent.provider.tool_adapter_coordinator import ToolAdapterCoordinator
-from victor.agent.provider_switch_coordinator import ProviderSwitchCoordinator
 
 __all__ = [
     "ProviderHealthMonitor",
+    "HookPriority",
+    "PostSwitchHook",
     "ProviderSwitcher",
     "ProviderSwitcherState",
+    "SwitchContext",
     "ToolAdapterCoordinator",
-    "ProviderSwitchCoordinator",
 ]

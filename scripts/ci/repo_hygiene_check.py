@@ -31,15 +31,17 @@ PRIMARY_VERTICAL_CONTRACT_FILES = (
     Path("scripts/scaffold_vertical.py"),
     Path("docs/guides/vertical-quickstart.md"),
     Path("docs/guides/FRAMEWORK_CAPABILITIES.md"),
+    Path("docs/guides/EDGE_MODEL.md"),
+    Path("docs/development/extending/verticals.md"),
     Path("docs/reference/verticals/index.md"),
     Path("docs/verticals/api_reference.md"),
     Path("docs/verticals/best_practices.md"),
     Path("docs/verticals/migration_guide.md"),
     Path("docs/demos/10-minute-vertical-demo.md"),
-    Path("victor-sdk/README.md"),
-    Path("victor-sdk/VERTICAL_DEVELOPMENT.md"),
-    Path("victor-sdk/examples/minimal_vertical/README.md"),
-    Path("victor-sdk/examples/minimal_vertical/pyproject.toml"),
+    Path("victor-contracts/README.md"),
+    Path("victor-contracts/VERTICAL_DEVELOPMENT.md"),
+    Path("victor-contracts/examples/minimal_vertical/README.md"),
+    Path("victor-contracts/examples/minimal_vertical/pyproject.toml"),
     Path("examples/external_vertical/README.md"),
     Path("examples/external_vertical/pyproject.toml"),
 )
@@ -52,45 +54,82 @@ STALE_VERTICAL_CONTRACT_PATTERNS = {
         "primary vertical contract docs/examples must use the canonical victor.plugins"
         " group, not nested victor.plugins.* groups"
     ),
+    '[project.entry-points."victor.sdk.protocols"]': (
+        "primary vertical contract docs/examples must use victor.extension.protocols,"
+        " not the legacy victor.sdk.protocols group"
+    ),
+    '[project.entry-points."victor.sdk.capabilities"]': (
+        "primary vertical contract docs/examples must use victor.extension.capabilities,"
+        " not the legacy victor.sdk.capabilities group"
+    ),
+    '[project.entry-points."victor.sdk.validators"]': (
+        "primary vertical contract docs/examples must use victor.extension.validators,"
+        " not the legacy victor.sdk.validators group"
+    ),
+    "SDK"
+    "-first": (
+        "primary vertical contract docs/examples must use contract-first wording,"
+        " not legacy wording"
+    ),
+    "SDK"
+    "-only": (
+        "primary vertical contract docs/examples must use contract-only wording,"
+        " not legacy wording"
+    ),
+    "from victor"
+    "_sdk import": (
+        "primary vertical contract docs/examples must use the victor_contracts import namespace,"
+        " not the removed legacy namespace"
+    ),
+    "from victor"
+    "_sdk.": (
+        "primary vertical contract docs/examples must use the victor_contracts import namespace,"
+        " not the removed legacy namespace"
+    ),
+    "`victor"
+    "_sdk.": (
+        "primary vertical contract docs/examples must point authors at victor_contracts,"
+        " not the removed legacy namespace"
+    ),
     "Must inherit from victor.core.verticals.VerticalBase": (
-        "primary vertical contract docs/examples must point authors at victor_sdk.VerticalBase"
+        "primary vertical contract docs/examples must point authors at victor_contracts.VerticalBase"
     ),
     "from victor.core.verticals import VerticalBase": (
         "primary vertical contract docs/examples must not import victor.core.verticals.VerticalBase"
     ),
     "from victor.verticals import VerticalBase": (
-        "primary vertical contract docs/examples must point authors at victor_sdk.VerticalBase,"
+        "primary vertical contract docs/examples must point authors at victor_contracts.VerticalBase,"
         " not victor.verticals.VerticalBase"
     ),
     "from victor.framework.vertical_base import": (
-        "primary vertical contract docs/examples must point authors at victor_sdk.VerticalBase,"
+        "primary vertical contract docs/examples must point authors at victor_contracts.VerticalBase,"
         " not victor.framework.vertical_base"
     ),
     "from victor.framework.extensions import VerticalBase": (
-        "primary vertical contract docs/examples must point authors at victor_sdk.VerticalBase,"
+        "primary vertical contract docs/examples must point authors at victor_contracts.VerticalBase,"
         " not victor.framework.extensions.VerticalBase"
     ),
     "from victor.framework.extensions import StageDefinition": (
-        "primary vertical contract docs/examples must point authors at victor_sdk.StageDefinition,"
+        "primary vertical contract docs/examples must point authors at victor_contracts.StageDefinition,"
         " not victor.framework.extensions.StageDefinition"
     ),
     "from victor.framework.extensions import VerticalConfig": (
-        "primary vertical contract docs/examples must point authors at victor_sdk.VerticalConfig,"
+        "primary vertical contract docs/examples must point authors at victor_contracts.VerticalConfig,"
         " not victor.framework.extensions.VerticalConfig"
     ),
     "from victor.core.verticals.registration import register_vertical": (
-        "primary vertical contract docs/examples must import register_vertical from victor_sdk,"
+        "primary vertical contract docs/examples must import register_vertical from victor_contracts,"
         " not victor.core.verticals.registration"
     ),
     "victor.core.verticals.registration.register_vertical": (
-        "primary vertical contract docs/examples must reference victor_sdk.register_vertical,"
+        "primary vertical contract docs/examples must reference victor_contracts.register_vertical,"
         " not victor.core.verticals.registration.register_vertical"
     ),
     "from victor.verticals.base import StageDefinition": (
-        "primary vertical contract docs/examples must point authors at victor_sdk.StageDefinition"
+        "primary vertical contract docs/examples must point authors at victor_contracts.StageDefinition"
     ),
     "from victor.verticals.base import VerticalConfig": (
-        "primary vertical contract docs/examples must point authors at victor_sdk.VerticalConfig"
+        "primary vertical contract docs/examples must point authors at victor_contracts.VerticalConfig"
     ),
     "VerticalRegistry.register(": (
         "primary vertical contract docs/examples must register external verticals through"
@@ -129,6 +168,381 @@ class HygieneFinding:
     message: str
 
 
+@dataclass(frozen=True)
+class TextRequirement:
+    """A required text fragment plus the error to report if it is missing."""
+
+    needle: str
+    missing_message: str
+
+
+@dataclass(frozen=True)
+class DeprecationContract:
+    """Declarative deprecation contract for a public compatibility surface."""
+
+    label: str
+    runtime_files: tuple[Path, ...]
+    activation_needles: tuple[str, ...]
+    runtime_requirements: tuple[TextRequirement, ...]
+    inventory_path: Path
+    inventory_requirements: tuple[TextRequirement, ...]
+    changelog_path: Path
+    changelog_requirements: tuple[TextRequirement, ...]
+    migration_path: Path
+    migration_requirements: tuple[TextRequirement, ...]
+
+
+TEAM_NODE_DEPRECATION_CONTRACT = DeprecationContract(
+    label="TeamNode*",
+    runtime_files=(
+        Path("victor/framework/workflows/nodes.py"),
+        Path("victor/workflows/definition.py"),
+        Path("victor/workflows/__init__.py"),
+        Path("victor/workflows/executors/__init__.py"),
+        Path("victor/workflows/executors/team.py"),
+    ),
+    activation_needles=(
+        "TeamNode",
+        "TeamNodeConfig",
+        "TeamNodeWorkflow",
+        "TeamNodeExecutor",
+    ),
+    runtime_requirements=(
+        TextRequirement(
+            needle="v0.9.0",
+            missing_message="deprecation warning must publish the target removal version",
+        ),
+        TextRequirement(
+            needle="2027-03-31",
+            missing_message="deprecation warning must publish the target removal date",
+        ),
+        TextRequirement(
+            needle="docs/architecture/migration.md",
+            missing_message="deprecation warning must point at the migration guide",
+        ),
+    ),
+    inventory_path=Path("docs/development/deprecation-inventory-2026-03-03.md"),
+    inventory_requirements=(
+        TextRequirement(
+            needle="TeamNode*",
+            missing_message="deprecation inventory entry is missing 'TeamNode*'",
+        ),
+        TextRequirement(
+            needle="v0.9.0",
+            missing_message="deprecation inventory entry is missing the target removal version",
+        ),
+        TextRequirement(
+            needle="2027-03-31",
+            missing_message="deprecation inventory entry is missing the target removal date",
+        ),
+        TextRequirement(
+            needle="TeamStep*",
+            missing_message="deprecation inventory entry is missing the replacement path",
+        ),
+    ),
+    changelog_path=Path("CHANGELOG.md"),
+    changelog_requirements=(
+        TextRequirement(
+            needle="## [Unreleased]",
+            missing_message="deprecation changelog entry is missing the Unreleased section",
+        ),
+        TextRequirement(
+            needle="TeamNode*",
+            missing_message="deprecation changelog entry is missing the shim family name",
+        ),
+        TextRequirement(
+            needle="To be removed in:",
+            missing_message="deprecation changelog entry is missing the removal-version line",
+        ),
+        TextRequirement(
+            needle="v0.9.0",
+            missing_message="deprecation changelog entry is missing the target removal version",
+        ),
+        TextRequirement(
+            needle="Target removal date:",
+            missing_message="deprecation changelog entry is missing the removal-date line",
+        ),
+        TextRequirement(
+            needle="2027-03-31",
+            missing_message="deprecation changelog entry is missing the target removal date",
+        ),
+        TextRequirement(
+            needle="Replacement:",
+            missing_message="deprecation changelog entry is missing the replacement line",
+        ),
+        TextRequirement(
+            needle="TeamStep*",
+            missing_message="deprecation changelog entry is missing the replacement path",
+        ),
+        TextRequirement(
+            needle="Compatibility shim status:",
+            missing_message="deprecation changelog entry is missing shim-status guidance",
+        ),
+    ),
+    migration_path=Path("docs/architecture/migration.md"),
+    migration_requirements=(
+        TextRequirement(
+            needle="TeamNode*",
+            missing_message="migration guidance is missing the shim family name",
+        ),
+        TextRequirement(
+            needle="v0.9.0",
+            missing_message="migration guidance is missing the target removal version",
+        ),
+        TextRequirement(
+            needle="2027-03-31",
+            missing_message="migration guidance is missing the target removal date",
+        ),
+        TextRequirement(
+            needle="TeamStep*",
+            missing_message="migration guidance is missing the replacement path",
+        ),
+    ),
+)
+
+WORKFLOW_GRAPH_ALIAS_DEPRECATION_CONTRACT = DeprecationContract(
+    label="WorkflowGraph alias from victor.workflows.graph",
+    runtime_files=(Path("victor/workflows/graph.py"),),
+    activation_needles=("WorkflowGraph from victor.workflows.graph is deprecated",),
+    runtime_requirements=(
+        TextRequirement(
+            needle="v0.8.0",
+            missing_message="deprecation warning must publish the target removal version",
+        ),
+        TextRequirement(
+            needle="2026-12-31",
+            missing_message="deprecation warning must publish the target removal date",
+        ),
+        TextRequirement(
+            needle="docs/architecture/migration.md",
+            missing_message="deprecation warning must point at the migration guide",
+        ),
+        TextRequirement(
+            needle="BasicWorkflowGraph",
+            missing_message="deprecation warning must publish the simple-container replacement",
+        ),
+        TextRequirement(
+            needle="victor.workflows.graph_dsl.WorkflowGraph",
+            missing_message="deprecation warning must publish the typed-DSL replacement",
+        ),
+    ),
+    inventory_path=Path("docs/development/deprecation-inventory-2026-03-03.md"),
+    inventory_requirements=(
+        TextRequirement(
+            needle="`WorkflowGraph` alias from `victor.workflows.graph`",
+            missing_message="deprecation inventory entry is missing the shim family name",
+        ),
+        TextRequirement(
+            needle="v0.8.0",
+            missing_message="deprecation inventory entry is missing the target removal version",
+        ),
+        TextRequirement(
+            needle="2026-12-31",
+            missing_message="deprecation inventory entry is missing the target removal date",
+        ),
+        TextRequirement(
+            needle="BasicWorkflowGraph",
+            missing_message="deprecation inventory entry is missing the simple-container replacement",
+        ),
+        TextRequirement(
+            needle="victor.workflows.graph_dsl.WorkflowGraph",
+            missing_message="deprecation inventory entry is missing the typed-DSL replacement",
+        ),
+    ),
+    changelog_path=Path("CHANGELOG.md"),
+    changelog_requirements=(
+        TextRequirement(
+            needle="## [Unreleased]",
+            missing_message="deprecation changelog entry is missing the Unreleased section",
+        ),
+        TextRequirement(
+            needle="`WorkflowGraph` alias from `victor.workflows.graph`",
+            missing_message="deprecation changelog entry is missing the shim family name",
+        ),
+        TextRequirement(
+            needle="To be removed in:",
+            missing_message="deprecation changelog entry is missing the removal-version line",
+        ),
+        TextRequirement(
+            needle="v0.8.0",
+            missing_message="deprecation changelog entry is missing the target removal version",
+        ),
+        TextRequirement(
+            needle="Target removal date:",
+            missing_message="deprecation changelog entry is missing the removal-date line",
+        ),
+        TextRequirement(
+            needle="2026-12-31",
+            missing_message="deprecation changelog entry is missing the target removal date",
+        ),
+        TextRequirement(
+            needle="Replacement:",
+            missing_message="deprecation changelog entry is missing the replacement line",
+        ),
+        TextRequirement(
+            needle="BasicWorkflowGraph",
+            missing_message="deprecation changelog entry is missing the simple-container replacement",
+        ),
+        TextRequirement(
+            needle="victor.workflows.graph_dsl.WorkflowGraph",
+            missing_message="deprecation changelog entry is missing the typed-DSL replacement",
+        ),
+        TextRequirement(
+            needle="Compatibility shim status:",
+            missing_message="deprecation changelog entry is missing shim-status guidance",
+        ),
+    ),
+    migration_path=Path("docs/architecture/migration.md"),
+    migration_requirements=(
+        TextRequirement(
+            needle="`WorkflowGraph` import from `victor.workflows.graph`",
+            missing_message="migration guidance is missing the shim family name",
+        ),
+        TextRequirement(
+            needle="v0.8.0",
+            missing_message="migration guidance is missing the target removal version",
+        ),
+        TextRequirement(
+            needle="2026-12-31",
+            missing_message="migration guidance is missing the target removal date",
+        ),
+        TextRequirement(
+            needle="BasicWorkflowGraph",
+            missing_message="migration guidance is missing the simple-container replacement",
+        ),
+        TextRequirement(
+            needle="victor.workflows.graph_dsl.WorkflowGraph",
+            missing_message="migration guidance is missing the typed-DSL replacement",
+        ),
+    ),
+)
+
+FRAMEWORK_SHIM_DEPRECATION_CONTRACT = DeprecationContract(
+    label="FrameworkShim compatibility surface",
+    runtime_files=(
+        Path("victor/framework/shim.py"),
+        Path("victor/framework/__init__.py"),
+    ),
+    activation_needles=(
+        "FrameworkShim is deprecated",
+        "victor.framework.FrameworkShim is deprecated",
+    ),
+    runtime_requirements=(
+        TextRequirement(
+            needle="v1.0.0",
+            missing_message="deprecation warning must publish the target removal version",
+        ),
+        TextRequirement(
+            needle="2027-06-30",
+            missing_message="deprecation warning must publish the target removal date",
+        ),
+        TextRequirement(
+            needle="docs/architecture/migration.md",
+            missing_message="deprecation warning must point at the migration guide",
+        ),
+        TextRequirement(
+            needle="Agent.create()",
+            missing_message="deprecation warning must publish the public replacement path",
+        ),
+    ),
+    inventory_path=Path("docs/development/deprecation-inventory-2026-03-03.md"),
+    inventory_requirements=(
+        TextRequirement(
+            needle="`FrameworkShim` compatibility surface",
+            missing_message="deprecation inventory entry is missing the shim family name",
+        ),
+        TextRequirement(
+            needle="v1.0.0",
+            missing_message="deprecation inventory entry is missing the target removal version",
+        ),
+        TextRequirement(
+            needle="2027-06-30",
+            missing_message="deprecation inventory entry is missing the target removal date",
+        ),
+        TextRequirement(
+            needle="Agent.create()",
+            missing_message="deprecation inventory entry is missing the public replacement path",
+        ),
+        TextRequirement(
+            needle="AgentFactory",
+            missing_message="deprecation inventory entry is missing the internal replacement path",
+        ),
+    ),
+    changelog_path=Path("CHANGELOG.md"),
+    changelog_requirements=(
+        TextRequirement(
+            needle="## [Unreleased]",
+            missing_message="deprecation changelog entry is missing the Unreleased section",
+        ),
+        TextRequirement(
+            needle="`FrameworkShim` compatibility surface",
+            missing_message="deprecation changelog entry is missing the shim family name",
+        ),
+        TextRequirement(
+            needle="To be removed in:",
+            missing_message="deprecation changelog entry is missing the removal-version line",
+        ),
+        TextRequirement(
+            needle="v1.0.0",
+            missing_message="deprecation changelog entry is missing the target removal version",
+        ),
+        TextRequirement(
+            needle="Target removal date:",
+            missing_message="deprecation changelog entry is missing the removal-date line",
+        ),
+        TextRequirement(
+            needle="2027-06-30",
+            missing_message="deprecation changelog entry is missing the target removal date",
+        ),
+        TextRequirement(
+            needle="Replacement:",
+            missing_message="deprecation changelog entry is missing the replacement line",
+        ),
+        TextRequirement(
+            needle="Agent.create()",
+            missing_message="deprecation changelog entry is missing the public replacement path",
+        ),
+        TextRequirement(
+            needle="AgentFactory",
+            missing_message="deprecation changelog entry is missing the internal replacement path",
+        ),
+        TextRequirement(
+            needle="Compatibility shim status:",
+            missing_message="deprecation changelog entry is missing shim-status guidance",
+        ),
+    ),
+    migration_path=Path("docs/architecture/migration.md"),
+    migration_requirements=(
+        TextRequirement(
+            needle="`FrameworkShim`",
+            missing_message="migration guidance is missing the shim family name",
+        ),
+        TextRequirement(
+            needle="v1.0.0",
+            missing_message="migration guidance is missing the target removal version",
+        ),
+        TextRequirement(
+            needle="2027-06-30",
+            missing_message="migration guidance is missing the target removal date",
+        ),
+        TextRequirement(
+            needle="Agent.create()",
+            missing_message="migration guidance is missing the public replacement path",
+        ),
+        TextRequirement(
+            needle="AgentFactory",
+            missing_message="migration guidance is missing the internal replacement path",
+        ),
+    ),
+)
+
+PUBLIC_SHIM_DEPRECATION_CONTRACTS = (
+    FRAMEWORK_SHIM_DEPRECATION_CONTRACT,
+    TEAM_NODE_DEPRECATION_CONTRACT,
+    WORKFLOW_GRAPH_ALIAS_DEPRECATION_CONTRACT,
+)
+
+
 def _load_toml_module():
     """Load a TOML parser compatible with Python 3.10+."""
     try:
@@ -149,6 +563,23 @@ def _iter_unique_files(root: Path, patterns: tuple[str, ...]) -> list[Path]:
 
 def _relative(path: Path, root: Path) -> Path:
     return path.relative_to(root)
+
+
+def _text_contains_any(text: str, needles: tuple[str, ...]) -> bool:
+    return any(needle in text for needle in needles)
+
+
+def _check_text_requirements(
+    *,
+    findings: list[HygieneFinding],
+    path: Path,
+    text: str,
+    contract: DeprecationContract,
+    requirements: tuple[TextRequirement, ...],
+) -> None:
+    for requirement in requirements:
+        if requirement.needle not in text:
+            findings.append(HygieneFinding(path, f"{contract.label} {requirement.missing_message}"))
 
 
 def _workflow_on_config(data: object) -> object | None:
@@ -529,19 +960,22 @@ def check_security_baseline(root: Path) -> list[HygieneFinding]:
         if "## Current CI Enforcement Baseline" not in text:
             findings.append(
                 HygieneFinding(
-                    Path("SECURITY.md"), "missing the Current CI Enforcement Baseline section"
+                    Path("SECURITY.md"),
+                    "missing the Current CI Enforcement Baseline section",
                 ),
             )
         if "**Blocking today**" not in text:
             findings.append(
                 HygieneFinding(
-                    Path("SECURITY.md"), "missing the Blocking today security baseline summary"
+                    Path("SECURITY.md"),
+                    "missing the Blocking today security baseline summary",
                 ),
             )
         if "**Advisory today**" not in text:
             findings.append(
                 HygieneFinding(
-                    Path("SECURITY.md"), "missing the Advisory today security baseline summary"
+                    Path("SECURITY.md"),
+                    "missing the Advisory today security baseline summary",
                 ),
             )
         if "### Current Thresholds" not in text:
@@ -551,24 +985,123 @@ def check_security_baseline(root: Path) -> list[HygieneFinding]:
         if "Trivy filesystem scan" not in text:
             findings.append(
                 HygieneFinding(
-                    Path("SECURITY.md"), "missing Trivy filesystem scan threshold documentation"
+                    Path("SECURITY.md"),
+                    "missing Trivy filesystem scan threshold documentation",
                 ),
             )
         if "| Dependency audit | Blocking |" not in text:
             findings.append(
                 HygieneFinding(
-                    Path("SECURITY.md"), "missing blocking dependency-audit threshold documentation"
+                    Path("SECURITY.md"),
+                    "missing blocking dependency-audit threshold documentation",
                 ),
             )
         if "| Bandit (SAST) | Blocking |" not in text:
             findings.append(
                 HygieneFinding(
-                    Path("SECURITY.md"), "missing blocking Bandit threshold documentation"
+                    Path("SECURITY.md"),
+                    "missing blocking Bandit threshold documentation",
                 ),
             )
     else:
         findings.append(HygieneFinding(Path("SECURITY.md"), "security policy document is missing"))
 
+    return findings
+
+
+def check_deprecation_contract(root: Path, contract: DeprecationContract) -> list[HygieneFinding]:
+    """Validate one public deprecation contract across code and docs.
+
+    If the compatibility surface still exists in runtime files, its warning
+    text, inventory entry, changelog note, and migration guide must remain
+    synchronized.
+    """
+
+    findings: list[HygieneFinding] = []
+    alias_runtime_files: list[tuple[Path, str]] = []
+
+    for rel_path in contract.runtime_files:
+        path = root / rel_path
+        if not path.is_file():
+            continue
+        text = path.read_text(encoding="utf-8")
+        if not _text_contains_any(text, contract.activation_needles):
+            continue
+        alias_runtime_files.append((rel_path, text))
+        _check_text_requirements(
+            findings=findings,
+            path=rel_path,
+            text=text,
+            contract=contract,
+            requirements=contract.runtime_requirements,
+        )
+
+    if not alias_runtime_files:
+        return findings
+
+    inventory_path = root / contract.inventory_path
+    if not inventory_path.is_file():
+        findings.append(
+            HygieneFinding(
+                contract.inventory_path,
+                f"{contract.label} deprecation inventory entry is missing",
+            )
+        )
+    else:
+        inventory_text = inventory_path.read_text(encoding="utf-8")
+        _check_text_requirements(
+            findings=findings,
+            path=contract.inventory_path,
+            text=inventory_text,
+            contract=contract,
+            requirements=contract.inventory_requirements,
+        )
+
+    changelog_path = root / contract.changelog_path
+    if not changelog_path.is_file():
+        findings.append(
+            HygieneFinding(
+                contract.changelog_path,
+                f"{contract.label} deprecation changelog entry is missing",
+            )
+        )
+    else:
+        changelog_text = changelog_path.read_text(encoding="utf-8")
+        _check_text_requirements(
+            findings=findings,
+            path=contract.changelog_path,
+            text=changelog_text,
+            contract=contract,
+            requirements=contract.changelog_requirements,
+        )
+
+    migration_path = root / contract.migration_path
+    if not migration_path.is_file():
+        findings.append(
+            HygieneFinding(
+                contract.migration_path,
+                f"{contract.label} migration guide entry is missing",
+            )
+        )
+    else:
+        migration_text = migration_path.read_text(encoding="utf-8")
+        _check_text_requirements(
+            findings=findings,
+            path=contract.migration_path,
+            text=migration_text,
+            contract=contract,
+            requirements=contract.migration_requirements,
+        )
+
+    return findings
+
+
+def check_public_shim_deprecation_contracts(root: Path) -> list[HygieneFinding]:
+    """Validate all registered public compatibility-shim deprecation contracts."""
+
+    findings: list[HygieneFinding] = []
+    for contract in PUBLIC_SHIM_DEPRECATION_CONTRACTS:
+        findings.extend(check_deprecation_contract(root, contract))
     return findings
 
 
@@ -584,6 +1117,7 @@ def run_checks(root: Path) -> list[HygieneFinding]:
     findings.extend(check_vertical_extra_metadata(root))
     findings.extend(check_primary_vertical_contract_docs(root))
     findings.extend(check_security_baseline(root))
+    findings.extend(check_public_shim_deprecation_contracts(root))
     return findings
 
 

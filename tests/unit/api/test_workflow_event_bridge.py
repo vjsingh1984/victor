@@ -29,7 +29,7 @@ from victor.integrations.api.workflow_event_bridge import (
     WorkflowEventBridge,
     workflow_stream_chunk_to_ws_event,
 )
-from victor.core.events import MessagingEvent, UnifiedEventType
+from victor.core.events import MessagingEvent
 from victor.workflows.streaming import (
     WorkflowEventType,
     WorkflowStreamChunk,

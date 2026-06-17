@@ -178,7 +178,7 @@ class MergeContext:
             "conflict_files": [f.to_dict() for f in self.conflict_files],
             "resolutions": [r.to_dict() for r in self.resolutions],
             "started_at": self.started_at.isoformat(),
-            "completed_at": self.completed_at.isoformat() if self.completed_at else None,
+            "completed_at": (self.completed_at.isoformat() if self.completed_at else None),
         }
 
 

@@ -130,6 +130,7 @@ Learn these commands to work efficiently:
 | Command | Description |
 |---------|-------------|
 | `/help` | Show all available commands |
+| `/shortcuts` | Show interactive CLI keyboard shortcuts |
 | `/clear` | Clear conversation history |
 | `/provider <name>` | Switch to a different LLM provider |
 | `/mode <mode>` | Switch between BUILD/PLAN/EXPLORE |
@@ -215,12 +216,19 @@ Running Victor:
 
 In-Chat Commands:
   /help                           # Show help
+  /shortcuts                      # Show keyboard shortcuts
   /provider <name>                # Switch provider
   /mode <mode>                    # Switch mode (build/plan/explore)
   /save "title"                   # Save session
   /resume                         # Restore session
   /clear                          # Clear history
   /quit                           # Exit
+
+Interactive CLI Shortcuts:
+  Tab                             # Complete commands and known command arguments
+  F1                              # Show shortcut help
+  Alt+Enter                       # Insert newline
+  Ctrl+O                          # Expand last tool output
 
 Modes:
   BUILD   - Full edits allowed (default)

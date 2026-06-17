@@ -14,8 +14,8 @@
 
 """Compatibility wrapper for the SDK-owned tool naming registry.
 
-New definition-layer code should import these symbols from `victor_sdk`
-or `victor_sdk.constants`. This module remains for backward compatibility
+New definition-layer code should import these symbols from `victor_contracts`
+or `victor_contracts.constants`. This module remains for backward compatibility
 with existing victor-ai callers during the migration.
 """
 
@@ -26,8 +26,8 @@ from typing import Any
 try:
     # Direct re-exports from the SDK -- identity-preserving so that
     # ``from victor.tools.tool_names import ToolNames`` is the *same*
-    # object as ``from victor_sdk import ToolNames``.
-    from victor_sdk.constants import (
+    # object as ``from victor_contracts import ToolNames``.
+    from victor_contracts.constants import (
         ToolNames,
         ToolNameEntry,
         CANONICAL_TO_ALIASES,

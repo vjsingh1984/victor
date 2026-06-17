@@ -75,7 +75,7 @@ STEP_TOOL_MAPPING: Dict[str, Set[str]] = {
         "code_search",
         "edit",
         "test",
-        "shell_readonly",  # Read-only shell for debugging
+        "shell",  # Shell for debugging
     },
     # Refactoring needs code manipulation tools
     "refactor": {
@@ -91,7 +91,7 @@ STEP_TOOL_MAPPING: Dict[str, Set[str]] = {
         "test",
         "read",
         "grep",
-        "shell_readonly",
+        "shell",
     },
     # Review needs read-only analysis tools
     "review": {

@@ -56,7 +56,8 @@ from typing import (
 
 if TYPE_CHECKING:
     from victor.workflows.definition import WorkflowDefinition
-    from victor.workflows.executor import WorkflowExecutor, WorkflowResult
+    from victor.workflows.context import WorkflowResult
+    from victor.workflows.protocols import IWorkflowRuntimeExecutor
 
 logger = logging.getLogger(__name__)
 
@@ -323,7 +324,7 @@ class BatchWorkflowExecutor(Generic[T]):
 
     def __init__(
         self,
-        workflow_executor: "WorkflowExecutor",
+        workflow_executor: "IWorkflowRuntimeExecutor",
         config: Optional[BatchConfig] = None,
     ):
         """Initialize batch executor.

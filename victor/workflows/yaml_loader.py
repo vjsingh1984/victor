@@ -100,7 +100,17 @@ import re
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, TYPE_CHECKING, Union
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Literal,
+    Optional,
+    Tuple,
+    TYPE_CHECKING,
+    Union,
+)
 
 import yaml
 
@@ -1836,7 +1846,9 @@ class WorkflowArgument:
             "str": str,
             "int": int,
             "float": float,
-            "bool": lambda v: v.lower() in ("true", "1", "yes") if isinstance(v, str) else bool(v),
+            "bool": lambda v: (
+                v.lower() in ("true", "1", "yes") if isinstance(v, str) else bool(v)
+            ),
             "list": lambda v: v.split(",") if isinstance(v, str) else list(v),
         }
         converter = type_map.get(self.type, str)

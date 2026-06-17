@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Victor Observability Dashboard</title>
+    <link rel="stylesheet" href="/static/observability.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Victor Observability Dashboard</h1>
+            <div class="header-info">
+                <span id="connection-status" class="status connected">● Connected</span>
+                <span id="last-update">Last update: Never</span>
+            </div>
+        </header>
+
+        <nav class="tabs">
+            <button class="tab active" data-tab="dashboard">Dashboard</button>
+            <button class="tab" data-tab="events">Events</button>
+            <button class="tab" data-tab="sessions">Sessions</button>
+            <button class="tab" data-tab="tools">Tools</button>
+            <button class="tab" data-tab="tokens">Tokens</button>
+        </nav>
+
+        <main>
+            <!-- Dashboard Tab -->
+            <section id="dashboard-tab" class="tab-content active">
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <h3>Tool Calls</h3>
+                        <div class="metric-value" id="tool-calls-total">-</div>
+                        <div class="metric-sub">
+                            <span class="success" id="tool-calls-success">-</span> successful
+                            <span class="error" id="tool-calls-error">-</span> failed
+                        </div>
+                    </div>
+
+                    <div class="metric-card">
+                        <h3>Tokens Used</h3>
+                        <div class="metric-value" id="tokens-total">-</div>
+                        <div class="metric-sub">
+                            <span id="tokens-prompt">-</span> prompt
+                            <span id="tokens-completion">-</span> completion
+                        </div>
+                    </div>
+
+                    <div class="metric-card">
+                        <h3>Active Sessions</h3>
+                        <div class="metric-value" id="active-sessions">-</div>
+                        <div class="metric-sub">Current activity</div>
+                    </div>
+
+                    <div class="metric-card">
+                        <h3>Error Rate</h3>
+                        <div class="metric-value" id="error-rate">-</div>
+                        <div class="metric-sub">Avg latency: <span id="avg-latency">-</span></div>
+                    </div>
+                </div>
+
+                <div class="recent-events">
+                    <h2>Recent Events</h2>
+                    <div id="recent-events-list" class="event-list"></div>
+                </div>
+            </section>
+
+            <!-- Events Tab -->
+            <section id="events-tab" class="tab-content">
+                <div class="section-header">
+                    <h2>Events Stream</h2>
+                    <div class="filters">
+                        <select id="event-severity-filter">
+                            <option value="">All Severities</option>
+                            <option value="error">Error</option>
+                            <option value="warning">Warning</option>
+                            <option value="info">Info</option>
+                        </select>
+                        <input type="text" id="event-search" placeholder="Search events...">
+                    </div>
+                </div>
+                <div id="events-table-container" class="table-container">
+                    <table id="events-table">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Type</th>
+                                <th>Severity</th>
+                                <th>Details</th>
+                            </tr>
+                        </thead>
+                        <tbody id="events-table-body"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Sessions Tab -->
+            <section id="sessions-tab" class="tab-content">
+                <div class="section-header">
+                    <h2>Sessions</h2>
+                </div>
+                <div id="sessions-table-container" class="table-container">
+                    <table id="sessions-table">
+                        <thead>
+                            <tr>
+                                <th>Session ID</th>
+                                <th>Created</th>
+                                <th>Messages</th>
+                                <th>Provider</th>
+                                <th>Model</th>
+                            </tr>
+                        </thead>
+                        <tbody id="sessions-table-body"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Tools Tab -->
+            <section id="tools-tab" class="tab-content">
+                <div class="section-header">
+                    <h2>Tool Statistics</h2>
+                </div>
+                <div id="tools-table-container" class="table-container">
+                    <table id="tools-table">
+                        <thead>
+                            <tr>
+                                <th>Tool</th>
+                                <th>Total Calls</th>
+                                <th>Success Rate</th>
+                                <th>Avg Duration</th>
+                                <th>Last Called</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tools-table-body"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Tokens Tab -->
+            <section id="tokens-tab" class="tab-content">
+                <div class="section-header">
+                    <h2>Token Usage</h2>
+                </div>
+                <div class="token-breakdown">
+                    <h3>By Session</h3>
+                    <div id="tokens-by-session" class="token-chart"></div>
+
+                    <h3>By Model</h3>
+                    <div id="tokens-by-model" class="token-chart"></div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="/static/observability.js"></script>
+</body>
+</html>

@@ -77,14 +77,10 @@ def get_vertical_name(cls: Type, emit_warning: bool = True) -> str:
 
     # Fallback to legacy pattern with deprecation warning
     if emit_warning:
-        warnings.warn(
-            f"Vertical {cls.__name__} should use the @register_vertical decorator "
-            f"or define an explicit 'name' attribute. "
-            f"Support for automatic name inference from class names will be removed "
-            f"in v1.0. "
-            f"Use: @register_vertical(name='<vertical_name>')",
-            DeprecationWarning,
-            stacklevel=2,
+        logger.warning(
+            "Vertical %s should use @register_vertical(name='...') or define an "
+            "explicit 'name' attribute. Automatic name inference will be removed in v1.0.",
+            cls.__name__,
         )
 
     # Use legacy string replacement pattern
