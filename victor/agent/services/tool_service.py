@@ -2675,7 +2675,7 @@ class ToolService:
         3. Semantic selection within budget for small local models.
 
         Does NOT emit tool-strategy events — that responsibility stays with the
-        orchestrator shim to preserve ``MetricsCoordinator`` ownership.
+        orchestrator shim to preserve ``AgentMetricsService`` ownership.
         """
         from victor.config.tool_tiers import get_provider_category
 

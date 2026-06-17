@@ -14,7 +14,7 @@
 
 """Service-owned metrics runtime for agent orchestration.
 
-This module provides MetricsCoordinator, a service-owned facade for
+This module provides AgentMetricsService, a service-owned facade for
 metrics collection, cost tracking, and usage analytics in the orchestrator.
 
 The coordinator wraps:
@@ -119,7 +119,7 @@ class _ActiveTaskReport:
     snapshot: _TaskUsageSnapshot
 
 
-class MetricsCoordinator:
+class AgentMetricsService:
     """Coordinates all metrics collection and tracking for the orchestrator.
 
     This class serves as a facade for:
@@ -133,7 +133,7 @@ class MetricsCoordinator:
     - SessionCostTracker: Cost tracking and export
 
     Example:
-        coordinator = MetricsCoordinator(
+        coordinator = AgentMetricsService(
             metrics_collector=collector,
             session_cost_tracker=cost_tracker,
             cumulative_token_usage={"prompt_tokens": 0, ...}
@@ -1166,12 +1166,12 @@ class MetricsCoordinator:
         return results
 
 
-def create_metrics_coordinator(
+def create_agent_metrics_service(
     metrics_collector: "MetricsCollector",
     session_cost_tracker: "SessionCostTracker",
     cumulative_token_usage: Optional[Dict[str, int]] = None,
-) -> MetricsCoordinator:
-    """Factory function to create a MetricsCoordinator.
+) -> AgentMetricsService:
+    """Factory function to create a AgentMetricsService.
 
     Args:
         metrics_collector: The metrics collector instance
@@ -1179,7 +1179,7 @@ def create_metrics_coordinator(
         cumulative_token_usage: Optional token usage dict (creates new if None)
 
     Returns:
-        Configured MetricsCoordinator instance
+        Configured AgentMetricsService instance
     """
     if cumulative_token_usage is None:
         cumulative_token_usage = {
@@ -1190,7 +1190,7 @@ def create_metrics_coordinator(
             "cache_write_tokens": 0,
         }
 
-    return MetricsCoordinator(
+    return AgentMetricsService(
         metrics_collector=metrics_collector,
         session_cost_tracker=session_cost_tracker,
         cumulative_token_usage=cumulative_token_usage,
