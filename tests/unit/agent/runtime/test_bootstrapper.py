@@ -16,120 +16,21 @@ class TestAgentRuntimeBootstrapper:
         orch._background_tasks = set()
         return orch
 
-    def test_create_facades_sets_all_eight(self):
+    def test_create_facades_sets_orchestration_facade(self):
         orch = self._make_mock_orchestrator()
         AgentRuntimeBootstrapper.create_facades(orch)
 
-        assert hasattr(orch, "_chat_facade")
-        assert hasattr(orch, "_tool_facade")
-        assert hasattr(orch, "_provider_facade")
-        assert hasattr(orch, "_session_facade")
-        assert hasattr(orch, "_metrics_facade")
-        assert hasattr(orch, "_resilience_facade")
-        assert hasattr(orch, "_workflow_facade")
+        # Only OrchestrationFacade remains; the 7 per-domain facades were removed
+        # as dead parallel views (zero production readers).
         assert hasattr(orch, "_orchestration_facade")
 
-    def test_create_facades_lazifies_compatibility_facades(self):
+    def test_create_facades_lazifies_orchestration_facade(self):
         orch = self._make_mock_orchestrator()
 
         AgentRuntimeBootstrapper.create_facades(orch)
 
-        assert isinstance(orch._chat_facade, LazyRuntimeProxy)
-        assert isinstance(orch._tool_facade, LazyRuntimeProxy)
-        assert isinstance(orch._provider_facade, LazyRuntimeProxy)
-        assert isinstance(orch._session_facade, LazyRuntimeProxy)
-        assert isinstance(orch._metrics_facade, LazyRuntimeProxy)
-        assert isinstance(orch._resilience_facade, LazyRuntimeProxy)
-        assert isinstance(orch._workflow_facade, LazyRuntimeProxy)
         assert isinstance(orch._orchestration_facade, LazyRuntimeProxy)
-        assert orch._chat_facade.initialized is False
-        assert orch._tool_facade.initialized is False
-        assert orch._provider_facade.initialized is False
-        assert orch._session_facade.initialized is False
-        assert orch._metrics_facade.initialized is False
-        assert orch._resilience_facade.initialized is False
-        assert orch._workflow_facade.initialized is False
         assert orch._orchestration_facade.initialized is False
-
-    def test_lazy_facades_materialize_from_current_orchestrator_state(self):
-        orch = self._make_mock_orchestrator()
-
-        AgentRuntimeBootstrapper.create_facades(orch)
-
-        assert orch._chat_facade.conversation_controller is orch._conversation_controller
-        assert orch._tool_facade.tool_pipeline is orch._tool_pipeline
-        assert orch._provider_facade.provider_manager is orch._provider_manager
-        assert orch._session_facade.session_ledger is orch._session_ledger
-        assert orch._metrics_facade.metrics_runtime is orch._metrics_runtime
-        assert orch._resilience_facade.recovery_coordinator is orch._recovery_coordinator
-        assert orch._workflow_facade.workflow_registry is orch._workflow_registry
-        assert orch._chat_facade.initialized is True
-        assert orch._tool_facade.initialized is True
-        assert orch._provider_facade.initialized is True
-        assert orch._session_facade.initialized is True
-        assert orch._metrics_facade.initialized is True
-        assert orch._resilience_facade.initialized is True
-        assert orch._workflow_facade.initialized is True
-
-    def test_create_facades_provider_facade_derives_compatibility_from_runtime(self):
-        orch = self._make_mock_orchestrator()
-
-        with patch("victor.agent.facades.ProviderFacade") as facade_cls:
-            AgentRuntimeBootstrapper.create_facades(orch)
-            assert (
-                orch._provider_facade.provider_manager is facade_cls.return_value.provider_manager
-            )
-
-        kwargs = facade_cls.call_args.kwargs
-        assert kwargs["provider_runtime"] is orch._provider_runtime
-        assert kwargs["provider_service"] is getattr(orch, "_provider_service", None)
-        assert kwargs["runtime_state_host"] is orch
-        assert "provider_coordinator" not in kwargs
-        assert "provider_switch_coordinator" not in kwargs
-
-    def test_create_facades_chat_facade_derives_live_runtime_state_from_orchestrator(
-        self,
-    ):
-        orch = self._make_mock_orchestrator()
-
-        with patch("victor.agent.facades.ChatFacade") as facade_cls:
-            AgentRuntimeBootstrapper.create_facades(orch)
-            assert (
-                orch._chat_facade.conversation_controller
-                is facade_cls.return_value.conversation_controller
-            )
-
-        kwargs = facade_cls.call_args.kwargs
-        assert kwargs["runtime_state_host"] is orch
-
-    def test_create_facades_resilience_facade_derives_live_runtime_state_from_orchestrator(
-        self,
-    ):
-        orch = self._make_mock_orchestrator()
-
-        with patch("victor.agent.facades.ResilienceFacade") as facade_cls:
-            AgentRuntimeBootstrapper.create_facades(orch)
-            assert (
-                orch._resilience_facade.recovery_coordinator
-                is facade_cls.return_value.recovery_coordinator
-            )
-
-        kwargs = facade_cls.call_args.kwargs
-        assert kwargs["runtime_state_host"] is orch
-
-    def test_create_facades_workflow_facade_derives_live_runtime_state_from_orchestrator(
-        self,
-    ):
-        orch = self._make_mock_orchestrator()
-
-        with patch("victor.agent.facades.WorkflowFacade") as facade_cls:
-            AgentRuntimeBootstrapper.create_facades(orch)
-            assert (
-                orch._workflow_facade.workflow_runtime is facade_cls.return_value.workflow_runtime
-            )
-
-        kwargs = facade_cls.call_args.kwargs
-        assert kwargs["runtime_state_host"] is orch
 
     def test_create_facades_orchestration_facade_derives_live_runtime_state_from_orchestrator(
         self,
@@ -142,144 +43,6 @@ class TestAgentRuntimeBootstrapper:
 
         kwargs = facade_cls.call_args.kwargs
         assert kwargs["runtime_state_host"] is orch
-
-    def test_provider_facade_tracks_current_orchestrator_state_after_materialization(
-        self,
-    ):
-        orch = self._make_mock_orchestrator()
-        orch.provider = sentinel.initial_provider
-        orch.model = "initial-model"
-        orch.provider_name = "initial-provider"
-        orch.temperature = 0.3
-        orch.max_tokens = 1024
-        orch.thinking = True
-
-        AgentRuntimeBootstrapper.create_facades(orch)
-
-        provider_facade = orch._provider_facade
-        assert provider_facade.model == "initial-model"
-
-        orch.provider = sentinel.updated_provider
-        orch.model = "updated-model"
-        orch.provider_name = "updated-provider"
-        orch.temperature = 0.8
-        orch.max_tokens = 4096
-        orch.thinking = False
-
-        assert provider_facade.provider is sentinel.updated_provider
-        assert provider_facade.model == "updated-model"
-        assert provider_facade.provider_name == "updated-provider"
-        assert provider_facade.temperature == 0.8
-        assert provider_facade.max_tokens == 4096
-        assert provider_facade.thinking is False
-
-    def test_chat_facade_tracks_current_orchestrator_chat_state_after_materialization(
-        self,
-    ):
-        orch = self._make_mock_orchestrator()
-        orch._memory_session_id = "initial-memory"
-        orch._conversation_embedding_store = sentinel.initial_embedding_store
-        orch._system_prompt = "initial prompt"
-        orch._context_compactor = sentinel.initial_compactor
-
-        AgentRuntimeBootstrapper.create_facades(orch)
-
-        chat_facade = orch._chat_facade
-        assert chat_facade.memory_session_id == "initial-memory"
-        assert chat_facade.embedding_store is sentinel.initial_embedding_store
-        assert chat_facade.system_prompt == "initial prompt"
-        assert chat_facade.context_compactor is sentinel.initial_compactor
-
-        orch._memory_session_id = "updated-memory"
-        orch._conversation_embedding_store = sentinel.updated_embedding_store
-        orch._system_prompt = "updated prompt"
-        orch._context_compactor = sentinel.updated_compactor
-
-        assert chat_facade.memory_session_id == "updated-memory"
-        assert chat_facade.embedding_store is sentinel.updated_embedding_store
-        assert chat_facade.system_prompt == "updated prompt"
-        assert chat_facade.context_compactor is sentinel.updated_compactor
-
-    def test_tool_facade_tracks_current_orchestrator_budget_after_materialization(self):
-        orch = self._make_mock_orchestrator()
-        orch.tool_budget = 10
-
-        AgentRuntimeBootstrapper.create_facades(orch)
-
-        tool_facade = orch._tool_facade
-        assert tool_facade.tool_budget == 10
-
-        orch.tool_budget = 25
-        assert tool_facade.tool_budget == 25
-
-    def test_session_facade_tracks_current_orchestrator_session_state_after_materialization(
-        self,
-    ):
-        orch = self._make_mock_orchestrator()
-        orch._session_ledger = sentinel.initial_ledger
-        orch.active_session_id = "initial-session"
-        orch._memory_session_id = "initial-memory"
-
-        AgentRuntimeBootstrapper.create_facades(orch)
-
-        session_facade = orch._session_facade
-        assert session_facade.session_ledger is sentinel.initial_ledger
-        assert session_facade.active_session_id == "initial-session"
-        assert session_facade.memory_session_id == "initial-memory"
-
-        orch._session_ledger = sentinel.updated_ledger
-        orch.active_session_id = "updated-session"
-        orch._memory_session_id = "updated-memory"
-
-        assert session_facade.session_ledger is sentinel.updated_ledger
-        assert session_facade.active_session_id == "updated-session"
-        assert session_facade.memory_session_id == "updated-memory"
-
-    def test_resilience_facade_tracks_current_orchestrator_state_after_materialization(
-        self,
-    ):
-        orch = self._make_mock_orchestrator()
-        orch._recovery_handler = sentinel.initial_handler
-        orch._recovery_integration = sentinel.initial_integration
-        orch._cancel_event = sentinel.initial_cancel_event
-        orch._is_streaming = False
-
-        AgentRuntimeBootstrapper.create_facades(orch)
-
-        resilience_facade = orch._resilience_facade
-        assert resilience_facade.recovery_handler is sentinel.initial_handler
-        assert resilience_facade.recovery_integration is sentinel.initial_integration
-        assert resilience_facade.cancel_event is sentinel.initial_cancel_event
-        assert resilience_facade.is_streaming is False
-
-        orch._recovery_handler = sentinel.updated_handler
-        orch._recovery_integration = sentinel.updated_integration
-        orch._cancel_event = sentinel.updated_cancel_event
-        orch._is_streaming = True
-
-        assert resilience_facade.recovery_handler is sentinel.updated_handler
-        assert resilience_facade.recovery_integration is sentinel.updated_integration
-        assert resilience_facade.cancel_event is sentinel.updated_cancel_event
-        assert resilience_facade.is_streaming is True
-
-    def test_workflow_facade_tracks_current_orchestrator_state_after_materialization(
-        self,
-    ):
-        orch = self._make_mock_orchestrator()
-        orch._workflow_registry = sentinel.initial_registry
-        orch._coordination_advisor = sentinel.initial_advisor
-
-        AgentRuntimeBootstrapper.create_facades(orch)
-
-        workflow_facade = orch._workflow_facade
-        assert workflow_facade.workflow_registry is sentinel.initial_registry
-        assert workflow_facade.coordination_advisor is sentinel.initial_advisor
-
-        orch._workflow_registry = sentinel.updated_registry
-        orch._coordination_advisor = sentinel.updated_advisor
-
-        assert workflow_facade.workflow_registry is sentinel.updated_registry
-        assert workflow_facade.coordination_advisor is sentinel.updated_advisor
 
     def test_orchestration_facade_tracks_current_orchestrator_state_after_materialization(
         self,
