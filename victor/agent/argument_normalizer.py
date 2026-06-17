@@ -892,7 +892,7 @@ class ArgumentNormalizer:
         return arguments
 
     @staticmethod
-    def _coerce_arg_string(raw: str) -> Dict[str, Any]:
+    def coerce_arg_string(raw: str) -> Dict[str, Any]:
         """Coerce a raw model ``arguments`` *string* into a dict.
 
         The single coercion ladder (previously duplicated at 6 call sites): strict
@@ -935,7 +935,7 @@ class ArgumentNormalizer:
         if raw_args is None:
             coerced: Dict[str, Any] = {}
         elif isinstance(raw_args, str):
-            coerced = self._coerce_arg_string(raw_args)
+            coerced = self.coerce_arg_string(raw_args)
         elif isinstance(raw_args, dict):
             coerced = raw_args
         else:
