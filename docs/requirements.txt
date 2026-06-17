@@ -1,27 +1,25 @@
 # Documentation dependencies for Victor AI Framework
+#
+# Builds the Sphinx site (docs/conf.py + docs/Makefile via sphinx-build /
+# sphinx-autobuild / sphinx-apidoc). Note: the root `make docs` target uses
+# MkDocs; this file is specifically for the Sphinx API-reference build.
+#
+# Sphinx's own bundled extensions used by conf.py — autodoc, autosummary,
+# napoleon, viewcode, intersphinx, duration, doctest, coverage — ship inside
+# Sphinx as sphinx.ext.* and need no separate package.
 
-# Sphinx documentation framework
+# Sphinx framework (provides sphinx.ext.* and the sphinx-apidoc CLI)
 sphinx>=7.0.0
 
-# Sphinx extensions
+# Third-party Sphinx extensions loaded in conf.py:
+#   sphinx_autodoc_typehints, myst_parser (Markdown source support)
 sphinx-autodoc-typehints>=2.0.0
-sphinx-autodoc-annotation>=1.0
-sphinxcontrib-apidoc>=0.5.0
+myst-parser>=2.0.0
 
-# Napoleon (Google/NumPy-style docstrings) is bundled with Sphinx as
-# sphinx.ext.napoleon — no separate package is needed (provided by sphinx>=7.0.0).
-
-# Additional Sphinx extensions
-sphinx-viewcode>=2.0
-sphinx-intersphinx>=2.0
-sphinx-duration>=0.2
-sphinx-doctest>=1.0
-sphinx-coverage>=2.0
-
-# Theme
+# HTML theme (html_theme = "furo")
 furo>=2023.0.0
 
-# Live reloading
+# Live-reloading dev server (docs/Makefile `live` target)
 sphinx-autobuild>=2023.0.0
 
 # Type validation (optional, for better docs)
