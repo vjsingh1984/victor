@@ -485,67 +485,76 @@ _SHELL_SAFE_BUILTINS = frozenset(
 _ASSIGNMENT_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
 
 
-def _extract_command_substitutions(text: str) -> List[str]:
-    """Return the inner command strings of ``$(...)`` and ``backtick`` subs.
+def _scan_substitutions(text: str) -> "tuple[List[str], str]":
+    """Quote-aware scan for command substitutions.
 
-    Substitutions execute during expansion, so their contents must themselves be
-    validated against the read-only allowlist. Handles nesting via depth count.
+    Returns ``(subs, stripped)`` where ``subs`` are the inner command strings of
+    genuine ``$(...)`` / backtick substitutions — which execute during expansion
+    and must be validated against the read-only allowlist — and ``stripped`` is
+    ``text`` with those substitutions replaced by the benign ``true`` builtin so
+    the surrounding command can be parsed without their spaces/operators leaking
+    into structural parsing.
+
+    Shell quoting is respected, which is the whole point: inside **single quotes**
+    everything is literal, so backticks/``$()`` in a grep pattern such as
+    ``'^```mermaid'`` or ``'```\\|```'`` are NOT substitutions and are left intact.
+    Inside double quotes and unquoted text, ``$(...)`` and backticks are active,
+    matching shell semantics. (The previous regex-based extractor ignored quoting
+    and mis-read literal backticks as substitutions, rejecting valid commands.)
     """
     subs: List[str] = []
-    i, n = 0, len(text)
-    while i < n:
-        if text[i] == "$" and i + 1 < n and text[i + 1] == "(":
-            depth, j = 1, i + 2
-            start = j
-            while j < n and depth:
-                if text[j] == "(":
-                    depth += 1
-                elif text[j] == ")":
-                    depth -= 1
-                j += 1
-            if depth == 0:
-                subs.append(text[start : j - 1])
-                i = j
-                continue
-            break  # unbalanced — stop scanning
-        i += 1
-    for m in re.finditer(r"`([^`]*)`", text):
-        subs.append(m.group(1))
-    return subs
-
-
-def _strip_command_substitutions(text: str) -> str:
-    """Replace ``$(...)`` / ``backtick`` substitutions with a benign placeholder.
-
-    Removes spaces/operators inside substitutions so structural parsing of the
-    surrounding command is not confused. The substitutions are validated
-    separately by :func:`_extract_command_substitutions`. The placeholder is the
-    safe ``true`` builtin so a bare ``$(...)`` command position never mis-rejects.
-    """
     out: List[str] = []
     i, n = 0, len(text)
+    in_single = False
+    in_double = False
     while i < n:
-        if text[i] == "$" and i + 1 < n and text[i + 1] == "(":
-            depth, j = 1, i + 2
-            while j < n and depth:
-                if text[j] == "(":
-                    depth += 1
-                elif text[j] == ")":
-                    depth -= 1
-                j += 1
-            if depth == 0:
-                out.append("true")
-                i = j
-                continue
-        if text[i] == "`":
-            j = text.find("`", i + 1)
-            if j != -1:
-                out.append("true")
-                i = j + 1
-                continue
-        out.append(text[i])
+        ch = text[i]
+        # Backslash escapes the next char (not inside single quotes).
+        if ch == "\\" and i + 1 < n and not in_single:
+            out.append(ch)
+            out.append(text[i + 1])
+            i += 2
+            continue
+        if ch == "'" and not in_double:
+            in_single = not in_single
+            out.append(ch)
+            i += 1
+            continue
+        if ch == '"' and not in_single:
+            in_double = not in_double
+            out.append(ch)
+            i += 1
+            continue
+        if not in_single:
+            # $(...) — depth-balanced so nested parens don't end it early.
+            if ch == "$" and i + 1 < n and text[i + 1] == "(":
+                depth, j = 1, i + 2
+                start = j
+                while j < n and depth:
+                    if text[j] == "(":
+                        depth += 1
+                    elif text[j] == ")":
+                        depth -= 1
+                    j += 1
+                if depth == 0:
+                    subs.append(text[start : j - 1])
+                    out.append("true")
+                    i = j
+                    continue
+                out.append(text[i:])  # unbalanced — keep the rest literal
+                break
+            # `...` backtick substitution
+            if ch == "`":
+                j = text.find("`", i + 1)
+                if j != -1:
+                    subs.append(text[i + 1 : j])
+                    out.append("true")
+                    i = j + 1
+                    continue
+                # unbalanced backtick — treat literally
+        out.append(ch)
         i += 1
-    return "".join(out)
+    return subs, "".join(out)
 
 
 def _strip_structural_prefix(component: str) -> Optional[str]:
@@ -586,18 +595,17 @@ def _validate_readonly_command(cmd: str) -> tuple[bool, str]:
     the read-only allowlist. A read-only loop is allowed, but a mutation in a loop
     body (``rm``) or a header substitution (``$(curl ...)``) is still rejected.
     """
-    # 1. Command substitutions execute during expansion — validate each.
-    for sub in _extract_command_substitutions(cmd):
+    # 1. Quote-aware substitution scan: extract genuine $(...) / backtick subs
+    #    (validated below) and strip them so their inner spaces/operators don't
+    #    confuse structural parsing. Literal backticks inside quotes are kept.
+    subs, sanitized = _scan_substitutions(cmd)
+    for sub in subs:
         sub = sub.strip()
         if not sub:
             continue
         valid, failing = _validate_readonly_command(sub)
         if not valid:
             return False, failing
-
-    # 2. Strip substitutions so structural parsing isn't confused by spaces or
-    #    operators inside them (already validated above).
-    sanitized = _strip_command_substitutions(cmd)
 
     # 3. Split compound commands and validate each simple command.
     components = _split_compound_command(sanitized)

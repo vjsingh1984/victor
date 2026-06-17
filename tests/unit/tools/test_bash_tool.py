@@ -199,3 +199,43 @@ class TestReadonlyControlFlow:
         assert self._valid("rm -rf /") is False
         assert self._valid("git status") is True
         assert self._valid("git push") is False
+
+
+class TestReadonlyQuoteAwareSubstitutions:
+    """Quote-aware substitution scanning (regression: literal backticks/pipes).
+
+    Markdown/mermaid audits run `grep '^```mermaid'` and `grep -c '```\|```'`.
+    A prior naive scanner treated the single-quoted backticks as command
+    substitutions and surfaced a spurious `|` command, wrongly rejecting these
+    read-only greps. Single quotes are literal in shell, so they must pass; real
+    (unquoted / double-quoted) substitutions must still be validated.
+    """
+
+    @staticmethod
+    def _valid(cmd: str) -> bool:
+        from victor.tools.bash import _validate_readonly_command
+
+        return _validate_readonly_command(cmd)[0]
+
+    @pytest.mark.parametrize(
+        "cmd",
+        [
+            "grep -n '^```mermaid' docs/architecture/BLUEPRINT.md",
+            "grep -c '```\\|```' docs/architecture/BLUEPRINT.md",
+            "echo '$(rm -rf /)'",  # single-quoted -> literal -> safe
+            "cat file `echo hi`",  # real backtick sub of a read-only command
+        ],
+    )
+    def test_quoted_literals_and_safe_subs_allowed(self, cmd):
+        assert self._valid(cmd) is True
+
+    @pytest.mark.parametrize(
+        "cmd",
+        [
+            "cat $(rm important.txt)",  # unquoted substitution mutation
+            "cat file `rm important.txt`",  # backtick substitution mutation
+            'echo "$(rm important.txt)"',  # double-quoted subs ARE active in shell
+        ],
+    )
+    def test_real_substitution_mutations_rejected(self, cmd):
+        assert self._valid(cmd) is False
