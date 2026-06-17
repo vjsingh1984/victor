@@ -226,6 +226,8 @@ class TestLikelihoodComputation:
             name="observation_model",
             db_connection=conn,
         )
+        # Seed RNG so the single Thompson draw is deterministic (avoids shard flake)
+        learner.seed_rng(0)
 
         # Record 8 affirmations for success, 2 failures
         # Use "Yes, correct" which both categorizers recognize as "affirm"
@@ -263,6 +265,8 @@ class TestLikelihoodComputation:
             name="observation_model",
             db_connection=conn,
         )
+        # Seed RNG so Thompson sampling is deterministic (avoids shard flake)
+        learner.seed_rng(0)
 
         # New agent has no observations
         # Thompson sampling from Beta(1,1) gives values in [0,1] with mean 0.5
@@ -288,6 +292,8 @@ class TestLikelihoodComputation:
             name="observation_model",
             db_connection=conn,
         )
+        # Seed RNG so the Thompson draw is deterministic (avoids shard flake)
+        learner.seed_rng(0)
 
         # Record some observations with "Yes" keyword (affirm category)
         for _ in range(5):
@@ -408,6 +414,8 @@ class TestThompsonSampling:
             name="observation_model",
             db_connection=conn,
         )
+        # Seed RNG so the 100-sample Thompson sequence is deterministic
+        learner.seed_rng(0)
 
         # Record observations to establish parameters
         # Use "Yes" which both categorizers will recognize as "affirm"
