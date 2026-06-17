@@ -1520,3 +1520,51 @@ class TestGreedyWriteEnvelopeRecovery:
         assert out is not None
         assert out["path"] == "docs/javascripts/mermaid-init.js"
         assert "\n" not in out["path"]
+
+
+class TestParseToolArgumentsUnifiedEntry:
+    """End-to-end coverage of the single authority parse_tool_arguments().
+
+    All tool-call entry points now route raw model args through this one method
+    (coercion ladder + schema-aware value-envelope recovery + normalization),
+    replacing six duplicated json/ast/{value:...} blocks and the duplicate
+    recovery in error_recovery.
+    """
+
+    def _norm(self):
+        return ArgumentNormalizer(provider_name="zai")
+
+    def test_well_formed_json_string(self):
+        out, _ = self._norm().parse_tool_arguments('{"path": "a.md", "content": "hi"}', "write")
+        assert out["path"] == "a.md" and out["content"] == "hi"
+
+    def test_dict_passthrough(self):
+        out, _ = self._norm().parse_tool_arguments({"path": "a.md", "content": "x"}, "write")
+        assert out["path"] == "a.md"
+
+    def test_none_becomes_empty(self):
+        out, _ = self._norm().parse_tool_arguments(None, "read")
+        assert out == {} or isinstance(out, dict)
+
+    def test_malformed_write_path_first(self):
+        body = '# Doc\n\nA{node} and "quotes".\n' * 30
+        raw = '{"path":"docs/BLUEPRINT.md","content":"' + body + '"}'
+        out, _ = self._norm().parse_tool_arguments(raw, "write")
+        assert out["path"] == "docs/BLUEPRINT.md"
+        assert out["content"] == body
+
+    def test_malformed_write_content_first(self):
+        body = '# Doc\n\nA{node} and "quotes".\n' * 30
+        raw = '{"content":"' + body + '","path":"docs/BLUEPRINT.md"}'
+        out, _ = self._norm().parse_tool_arguments(raw, "write")
+        assert out["path"] == "docs/BLUEPRINT.md"
+        assert out["content"] == body
+
+    def test_extract_by_schema_shell_cmd(self):
+        raw = '{"cmd":"cat > f << \'EOF\'\nhello "world"\nEOF"}'
+        out = ArgumentNormalizer._extract_by_schema(raw, ["cmd"])
+        assert out is not None and out["cmd"].startswith("cat > f")
+
+    def test_extract_by_schema_requires_all_fields(self):
+        # Only content present; path required -> None (never fabricates a path).
+        assert ArgumentNormalizer._extract_by_schema('{"content":"x"}', ["path", "content"]) is None

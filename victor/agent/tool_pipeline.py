@@ -1031,20 +1031,9 @@ class ToolPipeline:
         Returns:
             Tuple of (normalized_args, strategy_used)
         """
-        # Handle string arguments (from streaming)
-        if isinstance(arguments, str):
-            try:
-                arguments = json.loads(arguments)
-            except Exception:
-                try:
-                    arguments = ast.literal_eval(arguments)
-                except Exception:
-                    arguments = {"value": arguments}
-        elif arguments is None:
-            arguments = {}
-
-        # Apply basic normalizer first
-        normalized_args, strategy = self.normalizer.normalize_arguments(arguments, tool_name)
+        # Single authority: coercion + value-envelope recovery + normalization
+        # (replaces the local json/ast/{value:...} ladder + normalize_arguments).
+        normalized_args, strategy = self.normalizer.parse_tool_arguments(arguments, tool_name)
 
         # Apply parameter enforcement if available for this tool
         # This handles missing required parameters and type coercion (GAP-9)
@@ -2201,12 +2190,9 @@ class ToolPipeline:
             tool_name = tc.get("name", "")
             raw_args = tc.get("arguments", {})
 
-            # Normalize arguments for signature comparison
+            # Coerce arguments for signature comparison (single coercion ladder).
             if isinstance(raw_args, str):
-                try:
-                    raw_args = json.loads(raw_args)
-                except Exception:
-                    raw_args = {"value": raw_args}
+                raw_args = ArgumentNormalizer.coerce_arg_string(raw_args)
             elif raw_args is None:
                 raw_args = {}
 
@@ -2300,10 +2286,7 @@ class ToolPipeline:
                 tool_name = tool_call.get("name", "")
                 raw_args = tool_call.get("arguments", {})
                 if isinstance(raw_args, str):
-                    try:
-                        raw_args = json.loads(raw_args)
-                    except Exception:
-                        raw_args = {"value": raw_args}
+                    raw_args = ArgumentNormalizer.coerce_arg_string(raw_args)
                 elif raw_args is None:
                     raw_args = {}
                 signature = self._get_call_signature(tool_name, raw_args)

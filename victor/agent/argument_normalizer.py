@@ -433,13 +433,12 @@ class ArgumentNormalizer:
         except Exception as exc:
             logger.debug("Regex extraction failed: %s", str(exc)[:100])
 
-        # Layer 5: Last-ditch heuristic for known tool patterns
-        # For write tool with large content, try to extract path and salvage
+        # Layer 5: schema-driven span recovery for a large write envelope.
         if len(value) > 10000:  # Large payload threshold
-            salvaged = self._try_salvage_large_payload(value)
-            if salvaged is not _STRUCTURED_PARSE_FAILED:
+            salvaged = self._extract_by_schema(value, ["path", "content"])
+            if salvaged is not None:
                 logger.warning(
-                    "Successfully salvaged large payload (%d chars) via heuristic",
+                    "Successfully salvaged large payload (%d chars) via schema extraction",
                     len(value),
                 )
                 return salvaged
@@ -587,180 +586,69 @@ class ArgumentNormalizer:
         )
         return decoded
 
+    # File-like fields must never contain a newline/tab (a `"path":"foo.js\n"`
+    # envelope would otherwise create a corrupt filename).
+    _PATH_LIKE_FIELDS = frozenset({"path", "new_path", "file_path", "filename"})
+
+    @staticmethod
+    def _extract_by_schema(payload: str, fields: List[str]) -> Optional[Dict[str, str]]:
+        """Recover ``{field: value}`` from a malformed tool-arg ``value`` envelope.
+
+        The single, schema-driven recovery used for every tool (``write`` =
+        ``[path, content]``, ``shell`` = ``[cmd]``, ``edit`` = ``[ops]``, etc.).
+        Models (notably glm-5.1) emit large free-text fields (content/cmd) that are
+        not validly escaped — literal newlines, unescaped ``"`` / ``}`` from
+        markdown/mermaid (``A{decision}``), or a truncated tail with no closing
+        ``"}``. Strict and lookahead JSON parsers then fail or stop early.
+
+        Each field's value is recovered by *span*: located fields are ordered by
+        position, and a field's value runs from just after its ``"field":"`` marker
+        to the start of the next located field's marker (or end-of-string for the
+        trailing field, trimming one object terminator). This is order-independent
+        (handles ``{path, content}`` and ``{content, path}``) and tolerant of
+        unescaped quotes/braces and truncation.
+
+        Returns the dict only when *all* requested ``fields`` are located (never
+        fabricates a field, which could clobber a file), else ``None``.
+        """
+        import re
+
+        located: List[Tuple[str, int, int]] = []  # (field, value_start, marker_start)
+        for field in fields:
+            m = re.search(r'["\']' + re.escape(field) + r'["\']\s*:\s*["\']', payload)
+            if not m:
+                return None
+            located.append((field, m.end(), m.start()))
+        located.sort(key=lambda t: t[2])
+
+        result: Dict[str, str] = {}
+        for idx, (field, value_start, _marker_start) in enumerate(located):
+            if idx + 1 < len(located):
+                # Value ends just before the next field's `","field":` separator.
+                raw = payload[value_start : located[idx + 1][2]]
+                raw = re.sub(r'["\']\s*,\s*$', "", raw)
+            else:
+                # Trailing field: run to end, trim a single object terminator.
+                raw = payload[value_start:]
+                trimmed = re.sub(r'["\']\s*\}\s*$', "", raw)
+                raw = trimmed if trimmed != raw else re.sub(r'["\']\s*$', "", raw)
+            value = (
+                raw.replace("\\n", "\n")
+                .replace("\\t", "\t")
+                .replace("\\r", "\r")
+                .replace('\\"', '"')
+                .replace("\\'", "'")
+                .replace("\\\\", "\\")
+            )
+            if field in ArgumentNormalizer._PATH_LIKE_FIELDS:
+                value = value.replace("\n", "").replace("\t", "").replace("\r", "").strip()
+            result[field] = value
+        return result
+
     @staticmethod
     def extract_write_payload_greedy(value: str) -> Optional[Dict[str, str]]:
-        """Best-effort recover ``{path, content}`` from a malformed write envelope.
-
-        Models (notably glm-5.1 via the ``value`` envelope) frequently emit a
-        ``write`` call as a single JSON *string* whose large ``content`` field is
-        not validly escaped — literal newlines, unescaped ``"`` and ``}`` from
-        markdown/mermaid (e.g. ``A{decision}``), or a truncated tail with no
-        closing ``"}``. Strict and lookahead parsers then fail or stop early.
-
-        ``content`` is recovered by span: from just after ``"content":"`` to
-        wherever the ``content`` value ends. The end is determined by field
-        order, since models emit either ``{path, content}`` or ``{content, path}``:
-
-        * ``path`` is a *later* field → content ends just before the ``","path":``
-          separator (so the path suffix is not swallowed into the file body).
-        * otherwise (``path`` first, or only ``content``) → content runs to the
-          end of the string, trimming a single trailing object terminator. This
-          tolerates unescaped quotes/braces and a truncated tail.
-
-        Returns ``{"path": ..., "content": ...}`` only when *both* markers are
-        located (never fabricates empty content, which would clobber a file), else
-        ``None``.
-        """
-        import re
-
-        path_match = re.search(r'["\']path["\']\s*:\s*["\']([^"\']+)["\']', value)
-        if not path_match:
-            return None
-
-        content_match = re.search(r'["\']content["\']\s*:\s*["\']', value)
-        if not content_match:
-            return None
-
-        content_start = content_match.end()
-        if path_match.start() > content_match.start():
-            # `path` is a later field: content ends just before `","path":...`.
-            raw = value[content_start : path_match.start()]
-            raw = re.sub(r'["\']\s*,\s*$', "", raw)  # strip the `","` separator
-        else:
-            # `path` first (or absent): content is the trailing field.
-            raw = value[content_start:]
-            trimmed = re.sub(r'["\']\s*\}\s*$', "", raw)  # closing `"}`
-            raw = trimmed if trimmed != raw else re.sub(r'["\']\s*$', "", raw)
-
-        content = (
-            raw.replace("\\n", "\n")
-            .replace("\\t", "\t")
-            .replace("\\r", "\r")
-            .replace('\\"', '"')
-            .replace("\\'", "'")
-            .replace("\\\\", "\\")
-        )
-        # A file path never contains a newline/tab; strip stray escapes/whitespace
-        # so a `"path":"foo.js\n"` envelope doesn't create a corrupt filename.
-        path = path_match.group(1).replace("\\n", "").replace("\\t", "").replace("\\r", "").strip()
-        return {"path": path, "content": content}
-
-    def _try_salvage_large_payload(self, value: str) -> Any:
-        """Salvage tool arguments from large malformed JSON payloads.
-
-        For large write operations where JSON parsing fails, attempt to
-        extract the 'path' parameter and recover as much content as possible.
-        This is a last-resort fallback for when the LLM generates
-        malformed JSON in large content values.
-        """
-        import re
-
-        try:
-            # Greedy recovery handles the common failure: large `content` with
-            # unescaped quotes/braces or a truncated tail (content is the
-            # trailing field, so take it to end-of-string).
-            recovered = self.extract_write_payload_greedy(value)
-            if recovered:
-                return recovered
-
-            # No `content` marker — at least recover the path so the model gets a
-            # precise, actionable error instead of a silent failure.
-            path_match = re.search(r'"path"\s*:\s*"([^"]+)"', value)
-            if not path_match:
-                path_match = re.search(r"'path'\s*:\s*'([^']+)'", value)
-            if path_match:
-                return {"path": path_match.group(1), "content": ""}
-
-        except Exception as exc:
-            logger.debug("Payload salvage failed: %s", str(exc)[:100])
-
-        return _STRUCTURED_PARSE_FAILED
-
-    def _try_salvage_write_path(self, payload: str) -> Optional[Dict[str, Any]]:
-        """Extract path from malformed write payload during unwrap phase.
-
-        This is a lightweight salvage for the value envelope unwrap phase,
-        designed to at minimum recover the file path when JSON parsing fails.
-        The full content recovery happens in `_try_salvage_large_payload`.
-
-        Args:
-            payload: Malformed JSON string that failed to parse
-
-        Returns:
-            Dict with at least 'path' key, or None if path can't be extracted
-        """
-        import re
-
-        try:
-            # Try JSON-style double quotes first
-            path_match = re.search(r'"path"\s*:\s*"([^"]+)"', payload)
-            if not path_match:
-                # Try Python-style single quotes
-                path_match = re.search(r"'path'\s*:\s*'([^']+)'", payload)
-
-            if path_match:
-                path = path_match.group(1)
-                # Include the original payload as content for potential manual recovery
-                return {"path": path, "content": payload}
-
-        except Exception as exc:
-            logger.debug("Write path salvage failed: %s", str(exc)[:100])
-
-        return None
-
-    def _try_salvage_shell_cmd(self, payload: str) -> Optional[Dict[str, Any]]:
-        """Extract shell command from malformed shell payload.
-
-        For shell commands with large heredoc content where JSON parsing fails,
-        attempt to extract the command string. Handles common patterns like:
-        - {"cmd": "cat > file << 'EOF'\ncontent...\nEOF"}
-        - Shell commands with embedded quotes and special characters
-
-        Args:
-            payload: Malformed JSON string that failed to parse
-
-        Returns:
-            Dict with 'cmd' key, or None if command can't be extracted
-        """
-        import re
-
-        try:
-            # Try to find cmd parameter with various quote styles
-            cmd_match = re.search(r'"cmd"\s*:\s*"((?:[^"\\]|\\.)*)"', payload, re.DOTALL)
-            if not cmd_match:
-                cmd_match = re.search(r"'cmd'\s*:\s*'((?:[^'\\]|\\.)*)'", payload, re.DOTALL)
-
-            if cmd_match:
-                cmd = cmd_match.group(1)
-                # Unescape common escape sequences
-                cmd = cmd.replace("\\n", "\n").replace("\\t", "\t").replace("\\r", "\r")
-                cmd = cmd.replace('\\"', '"').replace("\\'", "'").replace("\\\\", "\\")
-                return {"cmd": cmd}
-
-            # Fallback: Look for heredoc pattern directly
-            # Pattern: cat > file << 'EOF'\n...\nEOF
-            heredoc_match = re.search(
-                r'(cat|echo|printf)\s+>[> ]?\s*\S+\s+<<\s*["\']?(\w+)["\']?\n.*?\n\2',
-                payload,
-                re.DOTALL,
-            )
-            if heredoc_match:
-                # Extract the full heredoc command (simplified)
-                start = payload.find(heredoc_match.group(0))
-                if start >= 0:
-                    # Find the end of the heredoc (closing delimiter)
-                    cmd_text = payload[start : start + len(heredoc_match.group(0)) + 2000]
-                    end_marker = payload.find(
-                        "\n" + heredoc_match.group(2), len(heredoc_match.group(0))
-                    )
-                    if end_marker > 0:
-                        cmd_text = payload[start : end_marker + len(heredoc_match.group(2)) + 1]
-                        return {"cmd": cmd_text}
-
-        except Exception as exc:
-            logger.debug("Shell command salvage failed: %s", str(exc)[:100])
-
-        return None
+        """Write-specific entry to the schema-driven recovery (``[path, content]``)."""
+        return ArgumentNormalizer._extract_by_schema(value, ["path", "content"])
 
     def _looks_like_edit_operation(self, value: Dict[str, Any]) -> bool:
         """Heuristic check for a single edit operation dict."""
@@ -922,23 +810,21 @@ class ArgumentNormalizer:
                     )
                     return tolerant_extract
 
-                # Legacy tool-specific salvage as a final fallback (kept for
-                # backward compatibility — may extract partial data).
+                # Final schema-driven fallback for write/shell value envelopes.
                 if canonical_tool_name == "write" and payload_size > 50:
-                    salvaged = self._try_salvage_write_path(payload)
+                    salvaged = self._extract_by_schema(payload, ["path", "content"])
                     if salvaged:
                         logger.info(
-                            "[%s] Partial recovery: extracted path '%s' from malformed write payload",
+                            "[%s] Schema recovery: write payload from malformed envelope",
                             self.provider_name,
-                            salvaged.get("path"),
                         )
                         return salvaged
 
                 if canonical_tool_name == "shell" and payload_size > 50:
-                    salvaged = self._try_salvage_shell_cmd(payload)
+                    salvaged = self._extract_by_schema(payload, ["cmd"])
                     if salvaged:
                         logger.info(
-                            "[%s] Partial recovery: extracted shell command (%d chars) from malformed payload",
+                            "[%s] Schema recovery: shell command (%d chars) from malformed payload",
                             self.provider_name,
                             len(str(salvaged.get("cmd", ""))),
                         )
@@ -1004,6 +890,57 @@ class ArgumentNormalizer:
             return {"ops": payload}
 
         return arguments
+
+    @staticmethod
+    def coerce_arg_string(raw: str) -> Dict[str, Any]:
+        """Coerce a raw model ``arguments`` *string* into a dict.
+
+        The single coercion ladder (previously duplicated at 6 call sites): strict
+        JSON → ``ast.literal_eval`` → native JSON repair → ``{"value": raw}``
+        envelope. The envelope is the deliberate fallback; schema-aware recovery of
+        a malformed envelope then happens in ``_unwrap_tool_specific_value_envelope``
+        via ``_extract_by_schema``.
+        """
+        try:
+            parsed = json.loads(raw)
+        except Exception:
+            try:
+                parsed = ast.literal_eval(raw)
+            except Exception:
+                parsed = None
+                if _NATIVE_AVAILABLE:
+                    try:
+                        repaired = native_repair_json(raw)
+                        if repaired:
+                            parsed = json.loads(repaired)
+                    except Exception:
+                        parsed = None
+        else:
+            return parsed if isinstance(parsed, dict) else {"value": raw}
+        if isinstance(parsed, dict):
+            return parsed
+        return {"value": raw}
+
+    def parse_tool_arguments(
+        self, raw_args: Any, tool_name: str
+    ) -> Tuple[Dict[str, Any], NormalizationStrategy]:
+        """Single authority: raw model tool-call args → normalized dict.
+
+        Accepts a JSON/Python string, a dict, or ``None`` and returns the fully
+        normalized arguments (coercion + value-envelope recovery + alias/type
+        normalization). All tool-call entry points (chat, streaming, pipeline,
+        error recovery) route through this one method instead of re-implementing
+        the string-coercion + ``{value: ...}`` wrap locally.
+        """
+        if raw_args is None:
+            coerced: Dict[str, Any] = {}
+        elif isinstance(raw_args, str):
+            coerced = self.coerce_arg_string(raw_args)
+        elif isinstance(raw_args, dict):
+            coerced = raw_args
+        else:
+            coerced = {"value": raw_args}
+        return self.normalize_arguments(coerced, tool_name)
 
     def normalize_arguments(
         self, arguments: Dict[str, Any], tool_name: str
