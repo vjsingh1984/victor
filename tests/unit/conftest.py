@@ -381,9 +381,9 @@ def isolate_project_victor_storage(isolated_project_victor_dir):
         yield
 
 
-@pytest.fixture(autouse=True)
-def isolate_global_victor_db(tmp_path, monkeypatch):
-    """Redirect the GLOBAL ``~/.victor`` database to a temp dir for each test.
+@pytest.fixture(autouse=True, scope="session")
+def isolate_global_victor_db():
+    """Redirect the GLOBAL ``~/.victor`` database to a temp dir for the session.
 
     The global database (``~/.victor/victor.db``) holds user-wide RL data —
     ``rl_outcomes`` and the ``*_q_values`` tables that drive model/tool routing,
@@ -392,21 +392,31 @@ def isolate_global_victor_db(tmp_path, monkeypatch):
     code paths wrote outcomes straight into the developer's real DB, skewing the
     learned routing (e.g. surfacing ``fake:fake`` / ``test-profile`` providers).
 
-    ``DatabaseManager`` resolves ``Path.home()/.victor/victor.db`` at runtime, so
-    pointing ``HOME`` at a per-test temp dir (plus resetting the singleton and the
-    cached ``GLOBAL_VICTOR_DIR``) sandboxes every global-DB write without changing
-    production code.
+    ``DatabaseManager`` resolves ``Path.home()/.victor/victor.db`` at runtime via
+    stdlib ``Path.home()`` (which honors ``$HOME``), so pointing ``HOME`` at a
+    temp dir sandboxes every global-DB write without changing production code.
+
+    Session-scoped on purpose: a per-test redirect re-created the full victor.db
+    schema for every test, which both slowed the suite and produced thousands of
+    throwaway temp DBs (a local disk blowout). One sandbox home per session keeps
+    isolation while paying the schema cost once. Tests that need a pristine global
+    DB already create their own (see the RL coordinator fixtures).
+
+    Note: ``GLOBAL_VICTOR_DIR`` is deliberately left untouched. ``secure_paths``
+    resolves the victor dir from the passwd database (anti-``$HOME``-spoofing), so
+    patching the constant would diverge from ``get_victor_dir()`` and the security
+    invariants. Only the database (which uses ``Path.home()``) needs redirecting.
     """
-    fake_home = tmp_path / "global_home"
-    # Mirror the global ~/.victor structure production creates on first use, so
-    # tests asserting these dirs exist still pass under the sandboxed home.
-    (fake_home / ".victor" / "logs").mkdir(parents=True, exist_ok=True)
-    monkeypatch.setenv("HOME", str(fake_home))
-    monkeypatch.setenv("USERPROFILE", str(fake_home))  # Windows
+    import os
+    import shutil
+    import tempfile
+    from pathlib import Path
 
-    import victor.config.settings as _settings
-
-    monkeypatch.setattr(_settings, "GLOBAL_VICTOR_DIR", fake_home / ".victor", raising=False)
+    sandbox = tempfile.mkdtemp(prefix="victor_test_home_")
+    (Path(sandbox) / ".victor").mkdir(parents=True, exist_ok=True)
+    saved = {k: os.environ.get(k) for k in ("HOME", "USERPROFILE")}
+    os.environ["HOME"] = sandbox
+    os.environ["USERPROFILE"] = sandbox  # Windows
 
     try:
         from victor.core.database import reset_database
@@ -417,12 +427,18 @@ def isolate_global_victor_db(tmp_path, monkeypatch):
 
     yield
 
+    for key, value in saved.items():
+        if value is None:
+            os.environ.pop(key, None)
+        else:
+            os.environ[key] = value
     try:
         from victor.core.database import reset_database
 
         reset_database()
     except Exception:
         pass
+    shutil.rmtree(sandbox, ignore_errors=True)
 
 
 @pytest.fixture(autouse=True)
