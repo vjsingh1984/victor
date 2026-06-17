@@ -597,10 +597,15 @@ class ArgumentNormalizer:
         markdown/mermaid (e.g. ``A{decision}``), or a truncated tail with no
         closing ``"}``. Strict and lookahead parsers then fail or stop early.
 
-        ``content`` is the *trailing* field of the write envelope, so it can be
-        recovered greedily: take everything after ``"content":"`` to the end of
-        the string, trim a single trailing object terminator, and decode standard
-        escapes. This tolerates unescaped quotes/braces and truncation.
+        ``content`` is recovered by span: from just after ``"content":"`` to
+        wherever the ``content`` value ends. The end is determined by field
+        order, since models emit either ``{path, content}`` or ``{content, path}``:
+
+        * ``path`` is a *later* field → content ends just before the ``","path":``
+          separator (so the path suffix is not swallowed into the file body).
+        * otherwise (``path`` first, or only ``content``) → content runs to the
+          end of the string, trimming a single trailing object terminator. This
+          tolerates unescaped quotes/braces and a truncated tail.
 
         Returns ``{"path": ..., "content": ...}`` only when *both* markers are
         located (never fabricates empty content, which would clobber a file), else
@@ -616,22 +621,29 @@ class ArgumentNormalizer:
         if not content_match:
             return None
 
-        raw = value[content_match.end() :]
-        # Trim a single trailing object terminator: closing quote (+ ws) + `}` at
-        # end; failing that, a lone trailing quote. A truncated tail keeps as-is.
-        trimmed = re.sub(r'["\']\s*\}\s*$', "", raw)
-        if trimmed == raw:
-            trimmed = re.sub(r'["\']\s*$', "", raw)
+        content_start = content_match.end()
+        if path_match.start() > content_match.start():
+            # `path` is a later field: content ends just before `","path":...`.
+            raw = value[content_start : path_match.start()]
+            raw = re.sub(r'["\']\s*,\s*$', "", raw)  # strip the `","` separator
+        else:
+            # `path` first (or absent): content is the trailing field.
+            raw = value[content_start:]
+            trimmed = re.sub(r'["\']\s*\}\s*$', "", raw)  # closing `"}`
+            raw = trimmed if trimmed != raw else re.sub(r'["\']\s*$', "", raw)
 
         content = (
-            trimmed.replace("\\n", "\n")
+            raw.replace("\\n", "\n")
             .replace("\\t", "\t")
             .replace("\\r", "\r")
             .replace('\\"', '"')
             .replace("\\'", "'")
             .replace("\\\\", "\\")
         )
-        return {"path": path_match.group(1), "content": content}
+        # A file path never contains a newline/tab; strip stray escapes/whitespace
+        # so a `"path":"foo.js\n"` envelope doesn't create a corrupt filename.
+        path = path_match.group(1).replace("\\n", "").replace("\\t", "").replace("\\r", "").strip()
+        return {"path": path, "content": content}
 
     def _try_salvage_large_payload(self, value: str) -> Any:
         """Salvage tool arguments from large malformed JSON payloads.

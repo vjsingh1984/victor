@@ -1501,3 +1501,22 @@ class TestGreedyWriteEnvelopeRecovery:
         out = ArgumentNormalizer.extract_write_payload_greedy(payload)
         assert out is not None
         assert out["content"] == 'line1\nline2\ttabbed and a "quote"'
+
+    def test_greedy_recovers_content_first_field_order(self):
+        # glm-5.1 also emits {content, path} — content must NOT swallow the
+        # trailing `","path":"..."` (the failure seen in the docs-audit run).
+        content = '# Victor\n\nA{node} and "quotes" everywhere.\n' * 20
+        payload = '{"content":"' + content + '","path":"docs/architecture/BLUEPRINT.md"}'
+        out = ArgumentNormalizer.extract_write_payload_greedy(payload)
+        assert out is not None
+        assert out["path"] == "docs/architecture/BLUEPRINT.md"
+        assert out["content"] == content  # path suffix not swallowed into the body
+
+    def test_greedy_sanitizes_newline_in_path(self):
+        # A stray newline in the path must not create a corrupt filename
+        # (transcript: docs/javascripts/mermaid-init.js\n).
+        payload = '{"path":"docs/javascripts/mermaid-init.js\\n","content":"x = 1;\\n"}'
+        out = ArgumentNormalizer.extract_write_payload_greedy(payload)
+        assert out is not None
+        assert out["path"] == "docs/javascripts/mermaid-init.js"
+        assert "\n" not in out["path"]
