@@ -1446,19 +1446,9 @@ class ToolService:
 
         _failed = failed_signatures if failed_signatures is not None else set()
 
-        tool_args = raw_args
-        if isinstance(tool_args, str):
-            try:
-                tool_args = json.loads(tool_args)
-            except Exception:
-                try:
-                    tool_args = ast.literal_eval(tool_args)
-                except Exception:
-                    tool_args = {"value": tool_args}
-        elif tool_args is None:
-            tool_args = {}
-
-        normalized_args, strategy = argument_normalizer.normalize_arguments(tool_args, tool_name)
+        # Single authority for raw-args coercion + value-envelope recovery +
+        # normalization (replaces the locally-duplicated json/ast/{value:...} ladder).
+        normalized_args, strategy = argument_normalizer.parse_tool_arguments(raw_args, tool_name)
         normalized_args = tool_adapter.normalize_arguments(normalized_args, tool_name)
         normalized_args = infer_git_operation(original_name, tool_name, normalized_args)
 

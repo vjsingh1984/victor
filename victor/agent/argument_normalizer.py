@@ -587,63 +587,69 @@ class ArgumentNormalizer:
         )
         return decoded
 
+    # File-like fields must never contain a newline/tab (a `"path":"foo.js\n"`
+    # envelope would otherwise create a corrupt filename).
+    _PATH_LIKE_FIELDS = frozenset({"path", "new_path", "file_path", "filename"})
+
     @staticmethod
-    def extract_write_payload_greedy(value: str) -> Optional[Dict[str, str]]:
-        """Best-effort recover ``{path, content}`` from a malformed write envelope.
+    def _extract_by_schema(payload: str, fields: List[str]) -> Optional[Dict[str, str]]:
+        """Recover ``{field: value}`` from a malformed tool-arg ``value`` envelope.
 
-        Models (notably glm-5.1 via the ``value`` envelope) frequently emit a
-        ``write`` call as a single JSON *string* whose large ``content`` field is
-        not validly escaped — literal newlines, unescaped ``"`` and ``}`` from
-        markdown/mermaid (e.g. ``A{decision}``), or a truncated tail with no
-        closing ``"}``. Strict and lookahead parsers then fail or stop early.
+        The single, schema-driven recovery used for every tool (``write`` =
+        ``[path, content]``, ``shell`` = ``[cmd]``, ``edit`` = ``[ops]``, etc.).
+        Models (notably glm-5.1) emit large free-text fields (content/cmd) that are
+        not validly escaped — literal newlines, unescaped ``"`` / ``}`` from
+        markdown/mermaid (``A{decision}``), or a truncated tail with no closing
+        ``"}``. Strict and lookahead JSON parsers then fail or stop early.
 
-        ``content`` is recovered by span: from just after ``"content":"`` to
-        wherever the ``content`` value ends. The end is determined by field
-        order, since models emit either ``{path, content}`` or ``{content, path}``:
+        Each field's value is recovered by *span*: located fields are ordered by
+        position, and a field's value runs from just after its ``"field":"`` marker
+        to the start of the next located field's marker (or end-of-string for the
+        trailing field, trimming one object terminator). This is order-independent
+        (handles ``{path, content}`` and ``{content, path}``) and tolerant of
+        unescaped quotes/braces and truncation.
 
-        * ``path`` is a *later* field → content ends just before the ``","path":``
-          separator (so the path suffix is not swallowed into the file body).
-        * otherwise (``path`` first, or only ``content``) → content runs to the
-          end of the string, trimming a single trailing object terminator. This
-          tolerates unescaped quotes/braces and a truncated tail.
-
-        Returns ``{"path": ..., "content": ...}`` only when *both* markers are
-        located (never fabricates empty content, which would clobber a file), else
-        ``None``.
+        Returns the dict only when *all* requested ``fields`` are located (never
+        fabricates a field, which could clobber a file), else ``None``.
         """
         import re
 
-        path_match = re.search(r'["\']path["\']\s*:\s*["\']([^"\']+)["\']', value)
-        if not path_match:
-            return None
+        located: List[Tuple[str, int, int]] = []  # (field, value_start, marker_start)
+        for field in fields:
+            m = re.search(r'["\']' + re.escape(field) + r'["\']\s*:\s*["\']', payload)
+            if not m:
+                return None
+            located.append((field, m.end(), m.start()))
+        located.sort(key=lambda t: t[2])
 
-        content_match = re.search(r'["\']content["\']\s*:\s*["\']', value)
-        if not content_match:
-            return None
+        result: Dict[str, str] = {}
+        for idx, (field, value_start, _marker_start) in enumerate(located):
+            if idx + 1 < len(located):
+                # Value ends just before the next field's `","field":` separator.
+                raw = payload[value_start : located[idx + 1][2]]
+                raw = re.sub(r'["\']\s*,\s*$', "", raw)
+            else:
+                # Trailing field: run to end, trim a single object terminator.
+                raw = payload[value_start:]
+                trimmed = re.sub(r'["\']\s*\}\s*$', "", raw)
+                raw = trimmed if trimmed != raw else re.sub(r'["\']\s*$', "", raw)
+            value = (
+                raw.replace("\\n", "\n")
+                .replace("\\t", "\t")
+                .replace("\\r", "\r")
+                .replace('\\"', '"')
+                .replace("\\'", "'")
+                .replace("\\\\", "\\")
+            )
+            if field in ArgumentNormalizer._PATH_LIKE_FIELDS:
+                value = value.replace("\n", "").replace("\t", "").replace("\r", "").strip()
+            result[field] = value
+        return result
 
-        content_start = content_match.end()
-        if path_match.start() > content_match.start():
-            # `path` is a later field: content ends just before `","path":...`.
-            raw = value[content_start : path_match.start()]
-            raw = re.sub(r'["\']\s*,\s*$', "", raw)  # strip the `","` separator
-        else:
-            # `path` first (or absent): content is the trailing field.
-            raw = value[content_start:]
-            trimmed = re.sub(r'["\']\s*\}\s*$', "", raw)  # closing `"}`
-            raw = trimmed if trimmed != raw else re.sub(r'["\']\s*$', "", raw)
-
-        content = (
-            raw.replace("\\n", "\n")
-            .replace("\\t", "\t")
-            .replace("\\r", "\r")
-            .replace('\\"', '"')
-            .replace("\\'", "'")
-            .replace("\\\\", "\\")
-        )
-        # A file path never contains a newline/tab; strip stray escapes/whitespace
-        # so a `"path":"foo.js\n"` envelope doesn't create a corrupt filename.
-        path = path_match.group(1).replace("\\n", "").replace("\\t", "").replace("\\r", "").strip()
-        return {"path": path, "content": content}
+    @staticmethod
+    def extract_write_payload_greedy(value: str) -> Optional[Dict[str, str]]:
+        """Write-specific entry to the schema-driven recovery (``[path, content]``)."""
+        return ArgumentNormalizer._extract_by_schema(value, ["path", "content"])
 
     def _try_salvage_large_payload(self, value: str) -> Any:
         """Salvage tool arguments from large malformed JSON payloads.
@@ -1004,6 +1010,57 @@ class ArgumentNormalizer:
             return {"ops": payload}
 
         return arguments
+
+    @staticmethod
+    def _coerce_arg_string(raw: str) -> Dict[str, Any]:
+        """Coerce a raw model ``arguments`` *string* into a dict.
+
+        The single coercion ladder (previously duplicated at 6 call sites): strict
+        JSON → ``ast.literal_eval`` → native JSON repair → ``{"value": raw}``
+        envelope. The envelope is the deliberate fallback; schema-aware recovery of
+        a malformed envelope then happens in ``_unwrap_tool_specific_value_envelope``
+        via ``_extract_by_schema``.
+        """
+        try:
+            parsed = json.loads(raw)
+        except Exception:
+            try:
+                parsed = ast.literal_eval(raw)
+            except Exception:
+                parsed = None
+                if _NATIVE_AVAILABLE:
+                    try:
+                        repaired = native_repair_json(raw)
+                        if repaired:
+                            parsed = json.loads(repaired)
+                    except Exception:
+                        parsed = None
+        else:
+            return parsed if isinstance(parsed, dict) else {"value": raw}
+        if isinstance(parsed, dict):
+            return parsed
+        return {"value": raw}
+
+    def parse_tool_arguments(
+        self, raw_args: Any, tool_name: str
+    ) -> Tuple[Dict[str, Any], NormalizationStrategy]:
+        """Single authority: raw model tool-call args → normalized dict.
+
+        Accepts a JSON/Python string, a dict, or ``None`` and returns the fully
+        normalized arguments (coercion + value-envelope recovery + alias/type
+        normalization). All tool-call entry points (chat, streaming, pipeline,
+        error recovery) route through this one method instead of re-implementing
+        the string-coercion + ``{value: ...}`` wrap locally.
+        """
+        if raw_args is None:
+            coerced: Dict[str, Any] = {}
+        elif isinstance(raw_args, str):
+            coerced = self._coerce_arg_string(raw_args)
+        elif isinstance(raw_args, dict):
+            coerced = raw_args
+        else:
+            coerced = {"value": raw_args}
+        return self.normalize_arguments(coerced, tool_name)
 
     def normalize_arguments(
         self, arguments: Dict[str, Any], tool_name: str
