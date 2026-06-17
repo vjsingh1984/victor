@@ -8,8 +8,8 @@ sphinx-autodoc-typehints>=2.0.0
 sphinx-autodoc-annotation>=1.0
 sphinxcontrib-apidoc>=0.5.0
 
-# Napoleon for Google/NumPy style docstrings
-sphinx napoleon>=0.9
+# Napoleon (Google/NumPy-style docstrings) is bundled with Sphinx as
+# sphinx.ext.napoleon — no separate package is needed (provided by sphinx>=7.0.0).
 
 # Additional Sphinx extensions
 sphinx-viewcode>=2.0
