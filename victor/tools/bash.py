@@ -439,18 +439,187 @@ def _split_compound_command(cmd: str) -> List[str]:
     return components if components else [cmd.strip()]
 
 
-def _validate_readonly_command(cmd: str) -> tuple[bool, str]:
-    """Validate if a command is readonly and return (is_valid, failing_cmd)."""
-    # Split compound commands and validate each component
-    components = _split_compound_command(cmd)
+# Shell control-flow keywords are structural — they run no command themselves.
+_SHELL_CONTROL_FLOW_KEYWORDS = frozenset(
+    {
+        "for",
+        "while",
+        "until",
+        "if",
+        "then",
+        "elif",
+        "else",
+        "fi",
+        "do",
+        "done",
+        "case",
+        "esac",
+        "select",
+        "time",
+        "function",
+        "!",
+        "{",
+        "}",
+    }
+)
+# Keywords that introduce a word-list/header (not a command) after them.
+_SHELL_LOOP_HEADER_KEYWORDS = frozenset({"for", "select", "case"})
+# Read-only shell builtins that aren't external binaries in the allowlist.
+_SHELL_SAFE_BUILTINS = frozenset(
+    {
+        "read",
+        "echo",
+        "printf",
+        "test",
+        "true",
+        "false",
+        ":",
+        "pwd",
+        "shift",
+        "break",
+        "continue",
+        "return",
+        "local",
+    }
+)
+_ASSIGNMENT_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
 
+
+def _extract_command_substitutions(text: str) -> List[str]:
+    """Return the inner command strings of ``$(...)`` and ``backtick`` subs.
+
+    Substitutions execute during expansion, so their contents must themselves be
+    validated against the read-only allowlist. Handles nesting via depth count.
+    """
+    subs: List[str] = []
+    i, n = 0, len(text)
+    while i < n:
+        if text[i] == "$" and i + 1 < n and text[i + 1] == "(":
+            depth, j = 1, i + 2
+            start = j
+            while j < n and depth:
+                if text[j] == "(":
+                    depth += 1
+                elif text[j] == ")":
+                    depth -= 1
+                j += 1
+            if depth == 0:
+                subs.append(text[start : j - 1])
+                i = j
+                continue
+            break  # unbalanced — stop scanning
+        i += 1
+    for m in re.finditer(r"`([^`]*)`", text):
+        subs.append(m.group(1))
+    return subs
+
+
+def _strip_command_substitutions(text: str) -> str:
+    """Replace ``$(...)`` / ``backtick`` substitutions with a benign placeholder.
+
+    Removes spaces/operators inside substitutions so structural parsing of the
+    surrounding command is not confused. The substitutions are validated
+    separately by :func:`_extract_command_substitutions`. The placeholder is the
+    safe ``true`` builtin so a bare ``$(...)`` command position never mis-rejects.
+    """
+    out: List[str] = []
+    i, n = 0, len(text)
+    while i < n:
+        if text[i] == "$" and i + 1 < n and text[i + 1] == "(":
+            depth, j = 1, i + 2
+            while j < n and depth:
+                if text[j] == "(":
+                    depth += 1
+                elif text[j] == ")":
+                    depth -= 1
+                j += 1
+            if depth == 0:
+                out.append("true")
+                i = j
+                continue
+        if text[i] == "`":
+            j = text.find("`", i + 1)
+            if j != -1:
+                out.append("true")
+                i = j + 1
+                continue
+        out.append(text[i])
+        i += 1
+    return "".join(out)
+
+
+def _strip_structural_prefix(component: str) -> Optional[str]:
+    """Strip leading control-flow keywords and variable assignments.
+
+    Returns the residual simple command, or ``None`` if the component is purely
+    structural (a loop/case header, a bare keyword like ``do``/``done``/``then``/
+    ``fi``, or only ``VAR=value`` assignments) and runs no command itself.
+    """
+    s = component.strip()
+    if not s:
+        return None
+    try:
+        tokens = shlex.split(s)
+    except ValueError:
+        tokens = s.split()
+    if not tokens:
+        return None
+    # A loop/case header (`for VAR in WORDS`, `case WORD in`) runs no command.
+    if tokens[0].lower() in _SHELL_LOOP_HEADER_KEYWORDS:
+        return None
+    idx = 0
+    while idx < len(tokens) and tokens[idx].lower() in _SHELL_CONTROL_FLOW_KEYWORDS:
+        idx += 1
+    while idx < len(tokens) and _ASSIGNMENT_RE.match(tokens[idx]):
+        idx += 1
+    if idx >= len(tokens):
+        return None
+    return " ".join(tokens[idx:])
+
+
+def _validate_readonly_command(cmd: str) -> tuple[bool, str]:
+    """Validate if a command is readonly and return (is_valid, failing_cmd).
+
+    Shell control-flow (``for``/``while``/``if`` ... ``do``/``then``/``done``) is
+    supported: the structural keywords are stripped and every *actual* command —
+    loop bodies, command substitutions, and assignment RHS — is validated against
+    the read-only allowlist. A read-only loop is allowed, but a mutation in a loop
+    body (``rm``) or a header substitution (``$(curl ...)``) is still rejected.
+    """
+    # 1. Command substitutions execute during expansion — validate each.
+    for sub in _extract_command_substitutions(cmd):
+        sub = sub.strip()
+        if not sub:
+            continue
+        valid, failing = _validate_readonly_command(sub)
+        if not valid:
+            return False, failing
+
+    # 2. Strip substitutions so structural parsing isn't confused by spaces or
+    #    operators inside them (already validated above).
+    sanitized = _strip_command_substitutions(cmd)
+
+    # 3. Split compound commands and validate each simple command.
+    components = _split_compound_command(sanitized)
     if len(components) > 1:
-        # Compound command: all components must be readonly
         for comp in components:
-            valid, failing = _validate_readonly_command(comp.strip())
+            valid, failing = _validate_single_readonly_command(comp.strip())
             if not valid:
                 return False, failing
         return True, ""
+
+    return _validate_single_readonly_command(sanitized.strip())
+
+
+def _validate_single_readonly_command(cmd: str) -> tuple[bool, str]:
+    """Validate a single (already split, substitution-free) shell command."""
+    # Strip leading control-flow keywords, loop headers, and assignments. What
+    # remains is the actual command to validate (or nothing, for a structural
+    # fragment like `do` / `done` / `for x in ...`).
+    residual = _strip_structural_prefix(cmd)
+    if residual is None:
+        return True, ""
+    cmd = residual
 
     readonly_commands = _get_readonly_commands()
     base_cmd = _extract_base_command(cmd)
@@ -458,8 +627,10 @@ def _validate_readonly_command(cmd: str) -> tuple[bool, str]:
     if not base_cmd:
         return False, cmd
 
-    # Check if base command is in readonly set
-    if base_cmd not in readonly_commands:
+    # Read-only shell builtins (read, printf, test, true, ...) aren't external
+    # binaries in the allowlist; accept them past the allowlist gate but still
+    # apply the redirect / pipe-to-shell checks below (so `echo x > f` is caught).
+    if base_cmd not in readonly_commands and base_cmd not in _SHELL_SAFE_BUILTINS:
         return False, base_cmd
 
     # Special handling for commands with subcommands
