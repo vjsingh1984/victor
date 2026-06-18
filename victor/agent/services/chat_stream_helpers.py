@@ -28,6 +28,7 @@ from victor.agent.unified_task_tracker import TrackerTaskType
 from victor.core.loop_thresholds import DEFAULT_BLOCKED_CONSECUTIVE_THRESHOLD
 from victor.core.errors import (
     ProviderAuthError,
+    ProviderConnectionError,
     ProviderRateLimitError,
     ProviderTimeoutError,
 )
@@ -1266,6 +1267,26 @@ class ChatStreamHelperMixin:
                     await asyncio.sleep(wait_time)
                 else:
                     logger.error(f"Rate limit persisted after {max_retries + 1} attempts")
+            except ProviderConnectionError as exc:
+                # A mid-stream disconnect (broken SSE) cannot be resumed at the
+                # HTTP level, but the turn can be safely re-issued: all prior
+                # iterations' work is already in conversation history, so a
+                # bounded retry here prevents a single transient drop from
+                # aborting the whole task and discarding accumulated progress.
+                last_exception = exc
+                if attempt < max_retries:
+                    wait_time = min(2.0**attempt, 8.0)
+                    logger.warning(
+                        f"Provider connection dropped mid-stream "
+                        f"(attempt {attempt + 1}/{max_retries + 1}): "
+                        f"{str(exc)[:200]}. Re-issuing turn in {wait_time:.0f}s..."
+                    )
+                    await asyncio.sleep(wait_time)
+                else:
+                    logger.error(
+                        f"Provider connection failed after {max_retries + 1} attempts; "
+                        "giving up on this turn."
+                    )
             except Exception as exc:
                 exc_str = str(exc).lower()
                 if "rate_limit" in exc_str or "429" in exc_str or "rate limit" in exc_str:
