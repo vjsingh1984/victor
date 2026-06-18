@@ -3181,17 +3181,38 @@ class TestPrepareStream:
     async def test_prepare_stream_promotes_write_followup_to_action_budget(self, orchestrator):
         """Explicit write-authorized follow-ups should be promoted out of simple/general."""
         from victor.agent.unified_task_tracker import TrackerTaskType
-        from victor.framework.task import DEFAULT_BUDGETS, TaskComplexity
+        from victor.framework.task import DEFAULT_BUDGETS, TaskClassification, TaskComplexity
+        from victor.agent.action_authorizer import ActionIntent, IntentClassification
 
-        # The promotion-to-EDIT path is gated on a GENERAL base task type, which comes
-        # from the semantic TaskTypeClassifier. This deliberately-ambiguous follow-up
-        # sits on the GENERAL/edit-action decision boundary (margin ~0.001), so its
-        # classification flips across platforms and embedding-load states (green on
-        # macOS, red on CI-Linux). Pin the base type to GENERAL — as the sibling
-        # carry-forward tests do — so this test deterministically exercises the
-        # write-followup promotion logic instead of the fuzzy classifier boundary.
+        # This test verifies the write-followup -> ACTION promotion logic, which depends on
+        # THREE platform-sensitive classifiers for a deliberately-ambiguous follow-up. On
+        # macOS they happen to land on the promoting path; on CI-Linux the semantic/
+        # complexity classifiers flip (e.g. complexity falls back to MEDIUM), so the
+        # promotion never fires. Pin all three so the test exercises the promotion logic
+        # deterministically rather than the fuzzy classifier boundaries:
+        #   1. task TYPE -> GENERAL  (chat_stream promotes a write-authorized follow-up to EDIT)
+        #   2. base COMPLEXITY -> SIMPLE  (prepare_task gates the ACTION promotion on SIMPLE)
+        #   3. INTENT -> WRITE_ALLOWED  (required for the SIMPLE -> ACTION promotion)
         orchestrator.unified_tracker.detect_task_type = MagicMock(
             return_value=TrackerTaskType.GENERAL
+        )
+        analyzer = orchestrator.task_coordinator.task_analyzer
+        analyzer.classify_complexity = MagicMock(
+            return_value=TaskClassification(
+                complexity=TaskComplexity.SIMPLE,
+                tool_budget=DEFAULT_BUDGETS[TaskComplexity.SIMPLE],
+                confidence=0.9,
+                matched_patterns=[],
+            )
+        )
+        analyzer.detect_intent = MagicMock(
+            return_value=IntentClassification(
+                intent=ActionIntent.WRITE_ALLOWED,
+                confidence=0.9,
+                matched_signals=[],
+                safe_actions=set(),
+                prompt_guard="",
+            )
         )
 
         result = await orchestrator._get_chat_stream_adapter()._prepare_stream(
