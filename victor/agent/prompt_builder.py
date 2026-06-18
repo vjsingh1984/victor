@@ -381,6 +381,16 @@ class SystemPromptBuilder:
         """Expose task guidance for runtimes that inject it outside the system prompt."""
         return self._get_task_guidance_section()
 
+    def get_contextual_guidance_text(self) -> str:
+        """Expose per-turn contextual guidance for user-prefix injection.
+
+        Mirrors :meth:`get_task_guidance_text`: lets KV-cache runtimes inject the
+        guidance into the per-turn user message instead of the frozen system
+        prompt, so the system prefix stays stable across turns (otherwise this
+        per-turn content would be silently dropped once the prompt is frozen).
+        """
+        return self.contextual_guidance or ""
+
     def get_stable_prompt_tools(self) -> List[str]:
         """Return the stable tool set used in the system-prompt surface."""
         tools = getattr(self, "stable_prompt_tools", None)

@@ -380,6 +380,11 @@ class TaskCoordinator:
             classify_direct_response_prompt,
         )
 
+        # Reset per-turn guidance up front: the prompt builder is session-scoped, so
+        # without this the intent/db guidance from prior turns would accumulate via the
+        # `existing + db_hint` aggregation below and leak across turns.
+        self.prompt_builder.contextual_guidance = None
+
         previous_intent = self._current_intent
         intent_result = self.task_analyzer.detect_intent(user_message)
         is_continuation, continuation_payload = split_continuation_request(user_message)
