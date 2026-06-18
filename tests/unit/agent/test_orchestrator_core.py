@@ -3183,6 +3183,17 @@ class TestPrepareStream:
         from victor.agent.unified_task_tracker import TrackerTaskType
         from victor.framework.task import DEFAULT_BUDGETS, TaskComplexity
 
+        # The promotion-to-EDIT path is gated on a GENERAL base task type, which comes
+        # from the semantic TaskTypeClassifier. This deliberately-ambiguous follow-up
+        # sits on the GENERAL/edit-action decision boundary (margin ~0.001), so its
+        # classification flips across platforms and embedding-load states (green on
+        # macOS, red on CI-Linux). Pin the base type to GENERAL — as the sibling
+        # carry-forward tests do — so this test deterministically exercises the
+        # write-followup promotion logic instead of the fuzzy classifier boundary.
+        orchestrator.unified_tracker.detect_task_type = MagicMock(
+            return_value=TrackerTaskType.GENERAL
+        )
+
         result = await orchestrator._get_chat_stream_adapter()._prepare_stream(
             "Are you able to address them. if yes please address them comprehensively."
         )
