@@ -61,3 +61,31 @@ async def test_extract_graphrag_edges():
         assert relations[RelationType.CALLS].relation_type == RelationType.CALLS
         assert relations[RelationType.DATA_DEP].relation_type == RelationType.DATA_DEP
         assert relations[RelationType.CONTROL_DEP].relation_type == RelationType.CONTROL_DEP
+
+
+@pytest.mark.asyncio
+async def test_graceful_degradation_when_capability_absent():
+    """When the Tree-sitter capability is not registered, extraction degrades to an empty
+    result on the normal control-flow path (no exception), and is_available() reports
+    False. This is the optional-dependency graceful-degradation contract."""
+    extractor = TreeSitterEntityExtractor()
+    with patch.object(extractor, "_get_extractor", return_value=None):
+        assert extractor.is_available() is False
+        result = await extractor.extract("def f():\n    pass\n", source="x.py")
+        assert result.entities == []
+        assert result.relations == []
+        # Safe to rerun (idempotent for the unavailable case).
+        again = await extractor.extract("def f():\n    pass\n", source="x.py")
+        assert again.entities == []
+        assert again.relations == []
+
+
+@pytest.mark.asyncio
+async def test_inline_extraction_degrades_gracefully_when_capability_absent():
+    """The inline (no source path) path must also degrade gracefully, with temp-file
+    cleanup still happening via the finally block."""
+    extractor = TreeSitterEntityExtractor()
+    with patch.object(extractor, "_get_extractor", return_value=None):
+        result = await extractor.extract("def f():\n    pass\n", context={"language": "python"})
+        assert result.entities == []
+        assert result.relations == []
