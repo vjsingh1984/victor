@@ -175,6 +175,9 @@ class PromptConfig:
 ### Direct Matches
 {direct_matches}
 
+### Impact & Potential Regressions
+{impact_analysis}
+
 ### Related Symbols
 {related_symbols}
 
