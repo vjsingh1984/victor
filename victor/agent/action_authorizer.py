@@ -148,6 +148,9 @@ GENERATION_TOOLS: frozenset[str] = frozenset(
 # Signals that indicate the user explicitly wants readonly shell/SQLite inspection.
 READONLY_SHELL_SIGNALS: List[Tuple[str, str]] = [
     (r"\b(sqlite|sqlite3|sqllite|sqllite3)\b", "sqlite"),
+    (r"\b(ls|list|dir|find|grep|cat|head|tail|wc|stat|file)\b", "read_only_binary"),
+    (r"\b(git\s+(status|log|show|branch|tag|diff))\b", "git_read_only"),
+    (r"\b(pytest|npm\s+test|cargo\s+test|go\s+test|tox)\b", "test_execution"),
     (
         r"\b(use|run|query|inspect|review|check|look\s+at)\b.*\b(shell|bash|terminal|sqlite3?)\b",
         "explicit_shell_request",

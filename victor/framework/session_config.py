@@ -245,6 +245,7 @@ class SessionConfig:
     observability_logging: Optional[bool] = None
     auto_skill_enabled: Optional[bool] = None
     one_shot_mode: Optional[bool] = None
+    headless_mode: bool = False
 
     # Composed sub-configs (for structured access)
     compaction: CompactionConfig = field(default_factory=CompactionConfig)
@@ -306,6 +307,7 @@ class SessionConfig:
         observability_logging: Optional[bool] = None,
         auto_skill_enabled: Optional[bool] = None,
         one_shot_mode: Optional[bool] = None,
+        headless_mode: bool = False,
         provider: Optional[str] = None,
         model: Optional[str] = None,
         endpoint: Optional[str] = None,
@@ -376,6 +378,7 @@ class SessionConfig:
             observability_logging=observability_logging,
             auto_skill_enabled=auto_skill_enabled,
             one_shot_mode=one_shot_mode,
+            headless_mode=headless_mode,
             compaction=CompactionConfig(
                 threshold=compaction_threshold,
                 adaptive=adaptive_threshold,
@@ -473,6 +476,13 @@ class SessionConfig:
                 object.__setattr__(automation, "one_shot_mode", self.one_shot_mode)
             if hasattr(settings, "one_shot_mode"):
                 object.__setattr__(settings, "one_shot_mode", self.one_shot_mode)
+
+        if self.headless_mode:
+            automation = getattr(settings, "headless", None)
+            if automation is not None and hasattr(automation, "headless_mode"):
+                object.__setattr__(automation, "headless_mode", True)
+            if hasattr(settings, "headless_mode"):
+                object.__setattr__(settings, "headless_mode", True)
 
         provider_override = self.provider_override
         provider_settings = getattr(settings, "provider", None)
