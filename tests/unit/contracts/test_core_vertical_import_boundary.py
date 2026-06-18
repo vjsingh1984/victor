@@ -30,23 +30,15 @@ EXTERNAL_VERTICAL_PREFIXES = (
 
 # Known violations to track migration progress (baseline).
 # These are architectural violations that should be migrated to entry points.
-KNOWN_VIOLATIONS: Dict[str, Set[str]] = {
-    "victor_coding": {
-        # Fallback-only after the TSA migration.
-        # victor/core/graph_rag/language_handlers.py now prefers the
-        # enhanced TreeSitterAnalysisProtocol provider; _get_victor_coding_handler
-        # is the secondary path used only when the analysis provider is not
-        # registered. The direct victor_coding import remains because the
-        # fallback adapter (_VictorCodingPluginAdapter) still wraps a
-        # LanguagePlugin from the language registry, and integration tests in
-        # tests/unit/core/graph_rag/test_language_handlers.py construct that
-        # adapter directly to exercise the LanguagePlugin contract for several
-        # languages (TypeScript, C++, C#, Kotlin, Swift, ...). Removing the
-        # import requires either deleting those tests or relocating them to
-        # victor-coding — a separate cleanup tracked as a follow-up.
-        "victor_coding.languages.registry",
-    }
-}
+#
+# Empty: the last tracked violation (victor/core/graph_rag/language_handlers.py
+# importing victor_coding.languages.registry as a legacy edge-handler fallback)
+# was removed. Edge handlers now resolve exclusively through the
+# TreeSitterAnalysisProtocol capability, whose registry access lazily runs
+# plugin bootstrap — so any installed language provider registers itself
+# without core importing it by name. Core is now fully decoupled from external
+# verticals; keep this empty (test_no_stale_known_violations enforces it).
+KNOWN_VIOLATIONS: Dict[str, Set[str]] = {}
 
 # Files in root that must NEVER import victor_coding directly, even via the
 # KNOWN_VIOLATIONS allowlist. These are the canonical tree-sitter consumers
