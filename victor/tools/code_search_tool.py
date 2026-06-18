@@ -1773,6 +1773,8 @@ async def _on_file_change(
     index_cache = _get_index_cache(exec_ctx)
     index_key = str(root)
     lock_registry = IndexLockRegistry.get_instance()
+    # A watcher refresh writes the incremental update, so it needs the exclusive
+    # (writer) lock — a shared lock would allow concurrent writers to corrupt it.
     path_lock = await lock_registry.acquire_lock(root)
 
     async with path_lock:
@@ -2136,6 +2138,19 @@ def _build_graph_follow_up_suggestions(
             }
         )
 
+        # Add impact analysis suggestion for all symbols
+        suggestions.append(
+            {
+                "tool": "graph",
+                "command": f'graph(mode="impact", node="{display_name}")',
+                "arguments": {
+                    "mode": "impact",
+                    "node": symbol_name,
+                },
+                "reason": f"Analyze data and control flow impact of changing {display_name}.",
+            }
+        )
+
         return suggestions
 
     return []
@@ -2340,11 +2355,22 @@ async def _get_or_build_index(
         else:
             logger.info("[code_search] Cache changed for %s, refreshing under lock", root)
 
-    # Acquire lock for this path to prevent concurrent indexing
+    # Acquire an EXCLUSIVE lock for the build/refresh — the body below writes to
+    # the index, so a shared lock would let two processes rebuild concurrently.
+    # Use a bounded timeout: if a background refresh (possibly in another process)
+    # holds the lock, serve the stale cache instead of blocking for the full
+    # timeout. This is what stops a long graph-watch refresh from starving
+    # code_search into a hard timeout.
+    #
+    # We enter/exit the lock manually (rather than `async with`) so a TimeoutError
+    # raised on *acquisition* can fall back to the stale cache, while the lock is
+    # still released before the post-lock cleanup runs.
     lock_registry = IndexLockRegistry.get_instance()
-    path_lock = await lock_registry.acquire_lock(root)
-
-    async with path_lock:
+    path_lock = await lock_registry.acquire_lock(root, timeout_seconds=10.0)
+    _lock_entered = False
+    try:
+        await path_lock.__aenter__()
+        _lock_entered = True
         # Double-check cache inside lock (another task may have built it while we waited)
         cache_entry = index_cache.get(str(root))
         cached_index = cache_entry["index"] if cache_entry else None
@@ -2579,6 +2605,39 @@ async def _get_or_build_index(
         lock_registry.mark_lock_used(root)
 
         logger.info(f"[code_search] Index build complete for {root} (releasing lock)")
+
+    except TimeoutError:
+        if _lock_entered:
+            raise
+        # Lock busy (a background refresh holds it) — serve the stale cache
+        # rather than block, otherwise fall back to a read-only on-disk load.
+        if cached_index:
+            logger.info(
+                "[code_search] Lock busy (background refresh active), serving cached index for %s",
+                root,
+            )
+            return cached_index, False
+        logger.info("[code_search] Lock busy, attempting read-only index load for %s", root)
+        try:
+            index = _index_factory.create(
+                root_path=str(root),
+                use_embeddings=True,
+                embedding_config=embedding_config,
+                graph_store_name=getattr(settings, "codebase_graph_store", "sqlite"),
+                graph_path=(
+                    Path(settings.codebase_graph_path)
+                    if getattr(settings, "codebase_graph_path", None)
+                    else None
+                ),
+                graph_writer_mode="off",  # Force read-only
+            )
+            return index, False
+        except Exception as e:
+            logger.warning("[code_search] Read-only index load failed: %s", e)
+            raise TimeoutError(f"Index lock for {root} busy and no usable cache found.")
+    finally:
+        if _lock_entered:
+            await path_lock.__aexit__(None, None, None)
 
     # Clear failure cache on successful build
     try:
