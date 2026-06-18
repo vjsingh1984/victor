@@ -90,6 +90,11 @@ class RelationType(str, Enum):
     REFERENCES = "references"  # A references B
     USED_BY = "used_by"  # A is used by B
 
+    # Code relationships
+    CALLS = "CALLS"  # Function A calls function B
+    DATA_DEP = "DDG_DEF_USE"  # B depends on data from A (DDG)
+    CONTROL_DEP = "CDG"  # B execution depends on A (CDG)
+
     # Ownership/authorship
     CREATED_BY = "created_by"
     OWNED_BY = "owned_by"

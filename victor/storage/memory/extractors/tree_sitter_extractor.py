@@ -304,8 +304,10 @@ class TreeSitterEntityExtractor(EntityExtractor):
     def _edge_type_to_relation_type(self, edge_type: str) -> Optional[RelationType]:
         """Convert Tree-sitter edge type to RelationType."""
         mapping = {
-            "CALLS": RelationType.REFERENCES,  # CALLS maps to REFERENCES
-            "INHERITS": RelationType.EXTENDS,  # INHERITS maps to EXTENDS
+            "CALLS": RelationType.CALLS,
+            "DATA_DEP": RelationType.DATA_DEP,
+            "CONTROL_DEP": RelationType.CONTROL_DEP,
+            "INHERITS": RelationType.EXTENDS,
             "IMPLEMENTS": RelationType.IMPLEMENTS,
             "COMPOSITION": RelationType.CONTAINS,
         }
