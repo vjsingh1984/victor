@@ -8,12 +8,15 @@ from __future__ import annotations
 
 import logging
 import time
+from collections import deque
 from typing import Any
 
-from rich.console import Console
+from rich.console import Console, Group
 from rich.live import Live
 from rich.markdown import Markdown
 from rich.markup import escape as _markup_escape
+from rich.panel import Panel
+from rich.text import Text
 
 from victor.ui.rendering.metrics import StreamingMetrics
 
@@ -72,6 +75,11 @@ class LiveDisplayRenderer:
         self._tool_section_shown = False  # Track if tool section separator shown
         self._current_tool_start_time: float | None = None  # Track tool execution start time
         self._current_tool_category: str | None = None  # Track current tool category for grouping
+        # Live tool-output streaming (progressive terminal block)
+        self._tool_progress_lines: deque[str] = deque(maxlen=12)
+        self._tool_progress_active = False
+        self._tool_progress_name = ""
+        self._last_progress_render_ms = 0.0
 
     def start(self) -> None:
         """Start the Live display."""
@@ -164,6 +172,70 @@ class LiveDisplayRenderer:
             self.console.print(f"[dim]  → {display_name} starting…[/]")
             self.resume()
 
+    def _visible_content(self) -> str:
+        """Post-pause slice of the content buffer (what the live panel shows)."""
+        return self._content_buffer[len(self._content_shown_before_pause) :]
+
+    def on_tool_progress(
+        self,
+        name: str,
+        stdout: str = "",
+        stderr: str = "",
+        progress: float = 0.0,
+        is_final: bool = False,
+    ) -> None:
+        """Render a live, updating terminal block from streamed tool output.
+
+        Best-effort: only acts while the Live display is active and never raises
+        (UI streaming must not break tool execution). Throttled to avoid flooding
+        the terminal. The block is cleared on completion (see ``on_tool_result``)
+        so it does not freeze into the scrollback.
+        """
+        try:
+            if not self._live or self._is_paused:
+                return
+
+            combined = (stdout or "") + (stderr or "")
+            if combined:
+                for line in combined.splitlines():
+                    self._tool_progress_lines.append(line)
+                self._tool_progress_name = name
+                self._tool_progress_active = True
+
+            now_ms = time.monotonic() * 1000
+            if not is_final and (now_ms - self._last_progress_render_ms) < 100.0:
+                return  # throttle to ~10 fps
+            self._last_progress_render_ms = now_ms
+
+            self._render_tool_progress()
+            if is_final:
+                self._clear_tool_progress_panel()
+        except Exception:  # pragma: no cover - defensive; never break the stream
+            logger.debug("on_tool_progress render failed", exc_info=True)
+
+    def _render_tool_progress(self) -> None:
+        """Update the Live renderable to content + a live tool-output panel."""
+        if not self._live or not self._tool_progress_active:
+            return
+        body = Text("\n".join(self._tool_progress_lines) or "…", style="dim")
+        panel = Panel(
+            body,
+            title=f"[dim]{format_tool_display_name(self._tool_progress_name)} · live[/]",
+            border_style="dim",
+            expand=True,
+        )
+        self._live.update(Group(Markdown(self._visible_content()), panel))
+
+    def _clear_tool_progress_panel(self) -> None:
+        """Drop the live panel and reset progress state.
+
+        Called before the result line prints so the frozen final frame is clean.
+        """
+        self._tool_progress_lines.clear()
+        self._tool_progress_active = False
+        if self._live and not self._is_paused:
+            self._live.update(Markdown(self._visible_content()))
+
     def on_tool_result(
         self,
         name: str,
@@ -192,6 +264,11 @@ class LiveDisplayRenderer:
             result: Tool output (alias for original_result)
         """
         from victor.config.tool_settings import get_tool_settings
+
+        # Tear down any live progress panel before the result line is committed
+        # to scrollback, so the streamed block does not freeze permanently.
+        if self._tool_progress_active:
+            self._clear_tool_progress_panel()
 
         # Show tool section separator before first tool call
         if not self._tool_section_shown:
