@@ -520,7 +520,8 @@ class HttpxOpenAICompatProvider(BaseProvider):
             # The classify_error() path sets error_msg=str(e) which is "" for bare ReadError().
             error_detail = str(e) or "connection dropped mid-stream (no additional detail)"
             logger.warning(
-                "%s stream ReadError: %s — retrying once",
+                "%s stream ReadError: %s — surfacing as ProviderConnectionError "
+                "(turn retried upstream)",
                 self.name,
                 error_detail,
             )
