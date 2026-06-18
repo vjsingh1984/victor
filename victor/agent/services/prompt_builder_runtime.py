@@ -276,7 +276,10 @@ class PromptBuilderRuntime:
             pipeline.is_frozen if pipeline else getattr(runtime, "_system_prompt_frozen", False)
         )
         if getattr(runtime, "_kv_optimization_enabled", False) and is_frozen:
-            runtime._dynamic_task_guidance = self._get_task_guidance_text(builder)
+            # System prompt is frozen for KV stability, so per-turn task AND
+            # contextual guidance must ride the user-prefix instead — otherwise
+            # contextual_guidance (set after the freeze) is silently dropped.
+            runtime._dynamic_task_guidance = self._combine_dynamic_guidance(builder)
             logger.debug("[cache] System prompt frozen - skipping rebuild for query classification")
             return
 
@@ -515,6 +518,21 @@ class PromptBuilderRuntime:
         if hasattr(builder, "_get_task_guidance_section"):
             return builder._get_task_guidance_section() or None
         return None
+
+    @classmethod
+    def _combine_dynamic_guidance(cls, builder: Any) -> Optional[str]:
+        """Combine task + contextual guidance for frozen-prompt user-prefix injection.
+
+        When the system prompt is frozen for KV stability, both the per-turn task
+        guidance and the per-turn contextual guidance must be injected via the
+        user-prefix. This mirrors how the non-frozen path carries both inside the
+        rebuilt system prompt, keeping behavior consistent across providers.
+        """
+        parts = [cls._get_task_guidance_text(builder)]
+        if builder is not None and hasattr(builder, "get_contextual_guidance_text"):
+            parts.append(builder.get_contextual_guidance_text() or None)
+        combined = "\n\n".join(p for p in parts if p)
+        return combined or None
 
     @staticmethod
     def _sync_tool_guidance_strategy(builder: Any, provider_name: str) -> None:
