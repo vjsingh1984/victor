@@ -47,26 +47,29 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def _get_registry_plugin(registry: Any, language: str) -> Optional[Any]:
-    """Return a victor_coding plugin from the current registry API."""
-    try:
-        return registry.get(language)
-    except KeyError:
-        return None
-
-
-def _ensure_registry_discovered(registry: Any) -> Any:
-    """Populate victor_coding's registry when it has not discovered plugins yet."""
-    if not registry.list_languages():
-        registry.discover_plugins()
-    return registry
-
-
 # Non-CALLS edge types the analysis provider currently emits via
 # extract_edges. Kept in sync with TreeSitterAnalysisProvider._edges_from_parsed
 # (CALLS + INHERITS + IMPLEMENTS + COMPOSITION). When victor-coding adds a new
 # structural edge type, extend this set so it stops being silently dropped.
 _RELATIONSHIP_EDGE_TYPES = frozenset({"INHERITS", "IMPLEMENTS", "COMPOSITION"})
+
+# Language aliases the TreeSitterAnalysisProtocol provider does not resolve on
+# its own. Applied only as a fallback when the provider rejects the literal
+# language, keeping edge-handler resolution alias-tolerant (this coverage was
+# previously supplied by the now-removed victor_coding registry fallback).
+_LANGUAGE_ALIASES = {
+    "ts": "typescript",
+    "tsx": "typescript",
+    "jsx": "javascript",
+    "golang": "go",
+    "py": "python",
+    "js": "javascript",
+    "rs": "rust",
+    "kt": "kotlin",
+    "cs": "csharp",
+    "rb": "ruby",
+    "c++": "cpp",
+}
 
 
 @dataclass
@@ -289,13 +292,11 @@ def register_edge_handler(
 def get_edge_handler(language: str) -> Optional[LanguageEdgeHandler]:
     """Get edge handler for a language.
 
-    Resolution order:
-    1. Enhanced ``TreeSitterAnalysisProtocol`` provider via the capability
-       registry — the preferred path; works for every language the
-       provider's plugins declare.
-    2. Direct victor_coding ``LanguagePlugin`` adapter fallback —
-       activated only when no enhanced analysis provider is registered
-       (e.g. an older host that hasn't completed plugin discovery yet).
+    Resolves through the enhanced ``TreeSitterAnalysisProtocol`` provider via
+    the capability registry — the canonical, vertical-agnostic path. Accessing
+    the registry lazily runs capability bootstrap (``ensure_bootstrapped``),
+    which triggers plugin discovery, so any installed language provider (e.g.
+    ``victor-coding``) registers itself without core importing it by name.
 
     Args:
         language: Language identifier
@@ -303,10 +304,7 @@ def get_edge_handler(language: str) -> Optional[LanguageEdgeHandler]:
     Returns:
         Handler instance or None if no provider handles this language.
     """
-    handler = _get_analysis_provider_handler(language)
-    if handler is not None:
-        return handler
-    return _get_victor_coding_handler(language)
+    return _get_analysis_provider_handler(language)
 
 
 def _get_analysis_provider_handler(language: str) -> Optional[LanguageEdgeHandler]:
@@ -328,44 +326,16 @@ def _get_analysis_provider_handler(language: str) -> Optional[LanguageEdgeHandle
     except Exception:
         return None
 
-    if provider is None or not provider.supports_language(language):
+    if provider is None:
         return None
-    return _AnalysisProviderEdgeHandler(provider, language)
 
-
-def _get_victor_coding_handler(language: str) -> Optional[LanguageEdgeHandler]:
-    """Fallback: get edge handler from victor_coding ``LanguagePlugin``.
-
-    ARCHITECTURAL VIOLATION (tracked):
-    This function imports ``victor_coding`` directly, which the core →
-    external boundary normally forbids. It is the *fallback* path for
-    cases where the preferred ``TreeSitterAnalysisProtocol`` provider is
-    not registered (only the null stub) but ``victor_coding`` is still
-    importable — typically during early bootstrap, in tests that disable
-    capability registration, or via an older host that hasn't migrated.
-    Tracked in ``tests/unit/contracts/test_core_vertical_import_boundary.py``
-    KNOWN_VIOLATIONS with a pointer back to this function.
-
-    Args:
-        language: Language identifier
-
-    Returns:
-        Handler instance or None if not found
-    """
-    try:
-        from victor_coding.languages.registry import get_language_registry
-
-        # Ensure plugins are discovered
-        registry = _ensure_registry_discovered(get_language_registry())
-
-        plugin = _get_registry_plugin(registry, language)
-        if plugin is not None:
-            # Wrap the language plugin as an edge handler
-            return _VictorCodingPluginAdapter(plugin)
-    except ImportError:
-        logger.debug("victor_coding not available for edge detection")
-
-    return None
+    resolved = language
+    if not provider.supports_language(resolved):
+        alias = _LANGUAGE_ALIASES.get(language)
+        if alias is None or not provider.supports_language(alias):
+            return None
+        resolved = alias
+    return _AnalysisProviderEdgeHandler(provider, resolved)
 
 
 class _AnalysisProviderEdgeHandler:
