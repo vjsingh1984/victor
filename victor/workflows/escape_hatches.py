@@ -471,6 +471,29 @@ TRANSFORMS = {
     "format_implementation_plan": format_implementation_plan,
 }
 
+def register_escape_hatches(registry: Any) -> None:
+    """Register these generic conditions/transforms into the global namespace.
+
+    Follows the ``victor.escape_hatches`` provider convention
+    (``register_escape_hatches(registry)``). Registers into the *global* namespace
+    (``vertical=None``) so the conditions are available to every YAML workflow, with
+    ``replace=True`` so the call is idempotent (safe across registry resets and repeated
+    provider configuration). Provider-specific escape hatches still take precedence —
+    they are merged on top of the global ones by the YAML config loader.
+    """
+    for name, fn in CONDITIONS.items():
+        registry.register_condition(name, fn, vertical=None, replace=True)
+    for name, fn in TRANSFORMS.items():
+        registry.register_transform(name, fn, vertical=None, replace=True)
+
+
+def ensure_global_escape_hatches_registered() -> None:
+    """Idempotently register the generic escape hatches into the global registry."""
+    from victor.framework.escape_hatch_registry import get_escape_hatch_registry
+
+    register_escape_hatches(get_escape_hatch_registry())
+
+
 __all__ = [
     # Conditions
     "tests_passing",
@@ -488,4 +511,7 @@ __all__ = [
     # Registries
     "CONDITIONS",
     "TRANSFORMS",
+    # Registration
+    "register_escape_hatches",
+    "ensure_global_escape_hatches_registered",
 ]

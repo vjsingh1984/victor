@@ -13,7 +13,14 @@
 # limitations under the License.
 
 import pytest
-from victor.workflows.escape_hatches import tests_passing, should_continue_fixing, complexity_check
+from victor.workflows.escape_hatches import (
+    CONDITIONS,
+    TRANSFORMS,
+    tests_passing,
+    should_continue_fixing,
+    complexity_check,
+    ensure_global_escape_hatches_registered,
+)
 
 def test_tests_passing():
     # Scenario: No tests
@@ -82,3 +89,49 @@ def test_complexity_check():
     # Scenario: Team size - complex
     ctx = {"task_analysis": {"team_size": 4}}
     assert complexity_check(ctx) == "complex"
+
+
+def test_generic_hatches_register_into_global_namespace():
+    """The generic conditions/transforms must be registered into the global registry so
+    every YAML workflow can use them (previously the module was orphaned — imported only
+    by this test)."""
+    from victor.framework.escape_hatch_registry import (
+        EscapeHatchRegistry,
+        get_escape_hatch_registry,
+    )
+
+    EscapeHatchRegistry.reset_instance()
+    ensure_global_escape_hatches_registered()
+    conditions, transforms = get_escape_hatch_registry().get_registry_for_vertical(
+        "", include_global=True
+    )
+    for name in CONDITIONS:
+        assert name in conditions, name
+    for name in TRANSFORMS:
+        assert name in transforms, name
+
+
+def test_registration_is_idempotent():
+    """Repeated registration must not raise (replace=True), so reconfiguring providers or
+    resetting the registry is safe."""
+    ensure_global_escape_hatches_registered()
+    ensure_global_escape_hatches_registered()
+
+
+def test_provider_hatches_take_precedence_over_global():
+    """Provider-specific escape hatches override global generics on name conflict —
+    the YAML config loader merges global beneath provider-specific."""
+    from victor.framework.escape_hatch_registry import (
+        EscapeHatchRegistry,
+        get_escape_hatch_registry,
+    )
+
+    EscapeHatchRegistry.reset_instance()
+    ensure_global_escape_hatches_registered()
+    global_conditions, _ = get_escape_hatch_registry().get_registry_for_vertical(
+        "", include_global=True
+    )
+    provider_conditions = {"complexity_check": lambda ctx: "provider_specific"}
+    merged = {**global_conditions, **provider_conditions}
+    assert merged["complexity_check"]({}) == "provider_specific"
+    assert merged["tdd_cycle_status"]({"tests_written": False}) == "red"
