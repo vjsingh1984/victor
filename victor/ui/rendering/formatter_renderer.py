@@ -107,6 +107,16 @@ class FormatterRenderer:
         self._last_tool_start = {"name": name, "arguments": arguments}
         self.formatter.tool_start(name, arguments)
 
+    def on_tool_progress(
+        self,
+        name: str,
+        stdout: str = "",
+        stderr: str = "",
+        progress: float = 0.0,
+        is_final: bool = False,
+    ) -> None:
+        """No-op: formatter mode renders consolidated output, not live progress."""
+
     def on_tool_result(
         self,
         name: str,

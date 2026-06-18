@@ -32,7 +32,7 @@ class EventType(str, Enum):
 
     Events are categorized by their purpose:
     - Content events: CONTENT, THINKING
-    - Tool events: TOOL_CALL, TOOL_RESULT, TOOL_ERROR
+    - Tool events: TOOL_CALL, TOOL_RESULT, TOOL_ERROR, TOOL_PROGRESS
     - State events: STAGE_CHANGE
     - Lifecycle events: STREAM_START, STREAM_END
     - Error events: ERROR, RECOVERY
@@ -56,6 +56,14 @@ class EventType(str, Enum):
 
     TOOL_ERROR = "tool_error"
     """Tool execution failed."""
+
+    TOOL_PROGRESS = "tool_progress"
+    """Partial/streamed stdout/stderr while a tool is actively running.
+
+    Emitted incrementally for long-running tools (graph, code_search, shell)
+    so the UI can render a live, updating terminal block instead of waiting
+    for the final result.
+    """
 
     # State events
     STAGE_CHANGE = "stage_change"
@@ -188,6 +196,7 @@ class AgentExecutionEvent:
             EventType.TOOL_CALL,
             EventType.TOOL_RESULT,
             EventType.TOOL_ERROR,
+            EventType.TOOL_PROGRESS,
         )
 
     @property
@@ -320,6 +329,49 @@ def tool_result_event(
         tool_id=tool_id,
         result=result,
         success=success,
+        **kwargs,
+    )
+
+
+def tool_progress_event(
+    tool_name: str,
+    stdout: str = "",
+    stderr: str = "",
+    progress: float = 0.0,
+    tool_id: Optional[str] = None,
+    is_final: bool = False,
+    **kwargs: Any,
+) -> AgentExecutionEvent:
+    """Create a tool progress event carrying partial streamed tool output.
+
+    Args:
+        tool_name: Name of the tool that is running.
+        stdout: Partial stdout chunk produced since the last progress event.
+        stderr: Partial stderr chunk produced since the last progress event.
+        progress: Optional progress estimate in the range 0.0 to 1.0.
+        tool_id: Optional unique identifier matching the originating tool call.
+        is_final: Whether this is the last progress chunk before the result.
+        **kwargs: Additional event attributes.
+
+    Returns:
+        AgentExecutionEvent with type=TOOL_PROGRESS. The partial output is
+        exposed both via ``content`` (stdout) and ``metadata["tool_progress"]``.
+    """
+    metadata = kwargs.pop("metadata", {})
+    metadata["tool_progress"] = {
+        "name": tool_name,
+        "stdout": stdout,
+        "stderr": stderr,
+        "progress": progress,
+        "is_final": is_final,
+    }
+    return AgentExecutionEvent(
+        type=EventType.TOOL_PROGRESS,
+        tool_name=tool_name,
+        tool_id=tool_id,
+        content=stdout,
+        progress=progress,
+        metadata=metadata,
         **kwargs,
     )
 

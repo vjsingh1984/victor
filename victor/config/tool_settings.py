@@ -159,6 +159,15 @@ class ToolSettings(BaseModel):
         description="Group related tools by category with visual headers (default: enabled)",
     )
 
+    tool_progress_streaming_enabled: bool = Field(
+        default=True,
+        description=(
+            "Stream partial stdout/stderr from long-running tools (shell, "
+            "code_search) into a live terminal block while they run (default: "
+            "enabled). UI-only; never affects what the model sees."
+        ),
+    )
+
     # Rich formatting configuration
     rich_formatting_enabled: bool = Field(
         default=True,

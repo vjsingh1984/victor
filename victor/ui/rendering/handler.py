@@ -81,6 +81,24 @@ async def stream_response(
         The accumulated response content
     """
     renderer.start()
+
+    # Register a UI-ephemeral progress sink so long-running tools can stream
+    # partial output into the live display while they run. Best-effort and
+    # gated by settings; cleared in the finally below so it never leaks across
+    # turns. Progress never enters the conversation or reaches the model.
+    _progress_sink_registered = False
+    on_progress = getattr(renderer, "on_tool_progress", None)
+    if callable(on_progress):
+        try:
+            from victor.config.tool_settings import get_tool_settings
+            from victor.framework.tool_progress import set_progress_sink
+
+            if get_tool_settings().tool_progress_streaming_enabled:
+                set_progress_sink(on_progress)
+                _progress_sink_registered = True
+        except Exception:  # pragma: no cover - defensive wiring
+            logger.debug("Failed to register tool progress sink", exc_info=True)
+
     stream_gen = _resolve_stream_factory(agent)(message)
 
     # Initialize content filter for thinking markers
@@ -193,6 +211,21 @@ async def stream_response(
                 renderer.on_tool_result(
                     **tool_result_kwargs,
                 )
+            # Handle streamed tool progress (live terminal block). UI-ephemeral:
+            # never added to conversation or sent to the model.
+            elif (
+                event_metadata and "tool_progress" in event_metadata
+            ) or event_type == EventType.TOOL_PROGRESS:
+                progress_data = (event_metadata or {}).get("tool_progress") or {}
+                on_progress = getattr(renderer, "on_tool_progress", None)
+                if callable(on_progress):
+                    on_progress(
+                        name=str(progress_data.get("name", event_tool_name or "unknown")),
+                        stdout=progress_data.get("stdout", event_content or ""),
+                        stderr=progress_data.get("stderr", ""),
+                        progress=progress_data.get("progress", 0.0),
+                        is_final=bool(progress_data.get("is_final", False)),
+                    )
             # Handle status messages (thinking indicator, etc.)
             elif event_metadata and "status" in event_metadata:
                 status_message = str(event_metadata["status"])
@@ -299,6 +332,13 @@ async def stream_response(
         return final_content
 
     finally:
+        if _progress_sink_registered:
+            try:
+                from victor.framework.tool_progress import clear_progress_sink
+
+                clear_progress_sink()
+            except Exception:  # pragma: no cover - defensive
+                pass
         renderer.cleanup()
         # Graceful cleanup of async generator to prevent RuntimeError on abort
         aclose = getattr(stream_gen, "aclose", None)

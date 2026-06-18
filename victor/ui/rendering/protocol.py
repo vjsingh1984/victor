@@ -49,6 +49,22 @@ class StreamRenderer(Protocol):
         """Handle tool execution start event."""
         ...
 
+    def on_tool_progress(
+        self,
+        name: str,
+        stdout: str = "",
+        stderr: str = "",
+        progress: float = 0.0,
+        is_final: bool = False,
+    ) -> None:
+        """Handle incremental tool output streamed while a tool is running.
+
+        Emitted between ``on_tool_start`` and ``on_tool_result`` for long-running
+        tools so the UI can render a live, updating terminal block. Renderers that
+        do not show live output may treat this as a no-op.
+        """
+        ...
+
     def on_tool_result(
         self,
         name: str,

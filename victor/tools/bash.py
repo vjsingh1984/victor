@@ -1068,6 +1068,44 @@ def _is_dangerous(command: str) -> bool:
     return _is_dangerous_consolidated(command)
 
 
+_PROGRESS_TOOL_NAME = "shell"
+
+
+async def _stream_subprocess_output(process: Any, tool_name: str) -> tuple[bytes, bytes]:
+    """Read a subprocess's stdout/stderr concurrently, emitting live progress.
+
+    Returns the full accumulated (stdout, stderr) bytes so the existing result
+    contract (truncation, caching) is unchanged. Used only when a UI progress
+    sink is active; otherwise the caller uses the cheaper ``communicate()``.
+    """
+    from victor.framework.tool_progress import emit_tool_progress
+
+    out_buf = bytearray()
+    err_buf = bytearray()
+
+    async def _drain(stream: Any, buf: bytearray, is_stderr: bool) -> None:
+        if stream is None:
+            return
+        while True:
+            chunk = await stream.read(4096)
+            if not chunk:
+                break
+            buf.extend(chunk)
+            text = chunk.decode("utf-8", "replace")
+            emit_tool_progress(
+                name=tool_name,
+                stdout="" if is_stderr else text,
+                stderr=text if is_stderr else "",
+            )
+
+    await asyncio.gather(
+        _drain(process.stdout, out_buf, False),
+        _drain(process.stderr, err_buf, True),
+    )
+    await process.wait()
+    return bytes(out_buf), bytes(err_buf)
+
+
 @tool(
     category="execution",
     priority=Priority.CRITICAL,  # Always available
@@ -1194,7 +1232,7 @@ async def shell(
         # Detect command substitution in the file path (e.g. "$(python -c '...')/file.py")
         _has_cmd_sub = bool(_re.search(r"\$\(", _base_cmd))
 
-        if not _targets_external and (not _targets_file or _is_recursive):
+        if not _targets_external and (not _targets_file or _is_recursive) and not readonly:
             if _has_cmd_sub:
                 error_msg = (
                     "Command substitution in file paths is not supported for grep. "
@@ -1319,12 +1357,23 @@ async def shell(
                 cwd=cwd,
             )
 
-        # Wait for completion with timeout
+        # Wait for completion with timeout. When a live progress sink is active,
+        # stream stdout/stderr incrementally so the UI shows output as it is
+        # produced; otherwise use the cheaper single communicate() call.
+        from victor.framework.tool_progress import emit_tool_progress, has_progress_sink
+
+        _streaming_progress = has_progress_sink()
         try:
-            stdout, stderr = await asyncio.wait_for(
-                process.communicate(),
-                timeout=timeout,
-            )
+            if _streaming_progress:
+                stdout, stderr = await asyncio.wait_for(
+                    _stream_subprocess_output(process, _PROGRESS_TOOL_NAME),
+                    timeout=timeout,
+                )
+            else:
+                stdout, stderr = await asyncio.wait_for(
+                    process.communicate(),
+                    timeout=timeout,
+                )
         except asyncio.TimeoutError:
             process.kill()
             await process.wait()
@@ -1335,6 +1384,9 @@ async def shell(
                 "stderr": "",
                 "return_code": -1,
             }
+
+        if _streaming_progress:
+            emit_tool_progress(name=_PROGRESS_TOOL_NAME, is_final=True)
 
         stdout_str = stdout.decode("utf-8") if stdout else ""
         stderr_str = stderr.decode("utf-8") if stderr else ""
