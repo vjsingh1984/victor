@@ -14,30 +14,19 @@
 
 """Benchmark runners for industry-standard evaluation datasets.
 
-All runners load REAL benchmark data from HuggingFace and execute
-REAL tests. Results are not simulated - they represent actual test
-execution against actual benchmark problems.
-
-Supported benchmarks:
-- SWE-bench: Real-world GitHub issues from Python repositories
-- HumanEval: Code generation from docstrings (OpenAI)
-- MBPP: Mostly Basic Python Problems (Google Research)
-
-Framework comparison:
-- Compare Victor against Aider, Claude Code, Cursor, and others
-- Uses published benchmark results for standardized comparison
+MODULAR ARCHITECTURE: Benchmarks have been extracted to their respective
+verticals (e.g., victor-coding). This module now provides soft-loading
+bridges to maintain backward compatibility.
 """
 
-from victor.evaluation.benchmarks.swe_bench import (
-    HumanEvalRunner,
-    MBPPRunner,
-    SWEBenchRunner,
-)
+import logging
+
+logger = logging.getLogger(__name__)
+
+# --- Generic Benchmarks (Still in Core) ---
+
 from victor.evaluation.benchmarks.external_agentic import (
     ExternalAgenticBenchmarkRunner,
-)
-from victor.evaluation.benchmarks.browser_tasks import (
-    BrowserTaskBenchmarkRunner,
 )
 from victor.evaluation.benchmarks.deep_research import (
     DeepResearchBenchmarkRunner,
@@ -78,6 +67,27 @@ from victor.evaluation.benchmarks.framework_comparison import (
     save_comparison_report_bundle,
     verify_fixture_sets,
 )
+
+# --- Extracted Benchmarks (Soft Loaded from Verticals) ---
+
+try:
+    from victor_coding.evaluation.swe_bench import (
+        HumanEvalRunner,
+        MBPPRunner,
+        SWEBenchRunner,
+    )
+except ImportError:
+    logger.debug("victor-coding benchmarks not available via victor_coding.evaluation")
+    HumanEvalRunner = MBPPRunner = SWEBenchRunner = None
+
+try:
+    from victor_coding.evaluation.browser_tasks import (
+        BrowserTaskBenchmarkRunner,
+    )
+except ImportError:
+    logger.debug("victor-coding browser benchmarks not available")
+    BrowserTaskBenchmarkRunner = None
+
 
 __all__ = [
     # Runners
