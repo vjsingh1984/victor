@@ -16,35 +16,31 @@ import pytest
 from victor.agent.prompt_builder import SystemPromptBuilder
 from victor.agent.prompt_section_texts import HEADLESS_MODE_GUIDANCE
 
+
 def test_headless_mode_prompt_inclusion():
     # Scenario 1: Headless mode OFF
     builder_off = SystemPromptBuilder(
-        provider_name="anthropic",
-        model="claude-3-5-sonnet",
-        headless_mode=False
+        provider_name="anthropic", model="claude-3-5-sonnet", headless_mode=False
     )
     prompt_off = builder_off.build()
     assert "HEADLESS MODE" not in prompt_off
-    
+
     # Scenario 2: Headless mode ON
     builder_on = SystemPromptBuilder(
-        provider_name="anthropic",
-        model="claude-3-5-sonnet",
-        headless_mode=True
+        provider_name="anthropic", model="claude-3-5-sonnet", headless_mode=True
     )
     prompt_on = builder_on.build()
     assert "HEADLESS MODE" in prompt_on
     assert "AUTOMATED EXECUTION" in prompt_on
     assert "Do not ask for user confirmation" in prompt_on
 
+
 def test_headless_mode_in_document():
     builder = SystemPromptBuilder(
-        provider_name="anthropic",
-        model="claude-3-5-sonnet",
-        headless_mode=True
+        provider_name="anthropic", model="claude-3-5-sonnet", headless_mode=True
     )
     doc = builder.build_document()
-    
+
     # Check if the block exists
     headless_block = doc.get_block("headless_mode")
     assert headless_block is not None

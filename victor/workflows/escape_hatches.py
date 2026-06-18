@@ -471,6 +471,7 @@ TRANSFORMS = {
     "format_implementation_plan": format_implementation_plan,
 }
 
+
 def register_escape_hatches(registry: Any) -> None:
     """Register these generic conditions/transforms into the global namespace.
 

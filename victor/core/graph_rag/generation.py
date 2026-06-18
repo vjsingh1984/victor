@@ -484,14 +484,18 @@ class GraphAwarePromptBuilder:
         """
         lines = []
         for section_name, section_text in context.sections.items():
-            if section_name not in {
-                "Functions",
-                "Methods",
-                "Classes",
-                "Control Flow",
-                "Data Dependencies",
-                "Call Graph",
-            } and "Test" not in section_name:
+            if (
+                section_name
+                not in {
+                    "Functions",
+                    "Methods",
+                    "Classes",
+                    "Control Flow",
+                    "Data Dependencies",
+                    "Call Graph",
+                }
+                and "Test" not in section_name
+            ):
                 lines.append(section_text)
         return "\n\n".join(lines) if lines else "No related symbols found."
 

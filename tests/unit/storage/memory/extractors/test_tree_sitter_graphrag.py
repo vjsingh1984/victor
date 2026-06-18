@@ -17,6 +17,7 @@ from unittest.mock import MagicMock, patch
 from victor.storage.memory.extractors.tree_sitter_extractor import TreeSitterEntityExtractor
 from victor.storage.memory.entity_types import RelationType
 
+
 @pytest.mark.asyncio
 async def test_extract_graphrag_edges():
     # Mock symbols and edges returned by the underlying extractor
@@ -46,18 +47,21 @@ async def test_extract_graphrag_edges():
     extractor = TreeSitterEntityExtractor()
     mock_provider = MagicMock()
     mock_provider.detect_language.return_value = "python"
-    mock_provider.extract_all.return_value = ([mock_symbol], [mock_edge_call, mock_edge_data, mock_edge_control])
-    
+    mock_provider.extract_all.return_value = (
+        [mock_symbol],
+        [mock_edge_call, mock_edge_data, mock_edge_control],
+    )
+
     with patch.object(extractor, "_get_extractor", return_value=mock_provider):
         result = await extractor.extract("dummy code", source="test.py")
-        
+
         # Check relations
         relations = {r.relation_type: r for r in result.relations}
-        
+
         assert RelationType.CALLS in relations
         assert RelationType.DATA_DEP in relations
         assert RelationType.CONTROL_DEP in relations
-        
+
         assert relations[RelationType.CALLS].relation_type == RelationType.CALLS
         assert relations[RelationType.DATA_DEP].relation_type == RelationType.DATA_DEP
         assert relations[RelationType.CONTROL_DEP].relation_type == RelationType.CONTROL_DEP

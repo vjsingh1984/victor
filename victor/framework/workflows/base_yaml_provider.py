@@ -370,8 +370,8 @@ class BaseYAMLWorkflowProvider(WorkflowProviderProtocol, ABC):
                 )
 
                 ensure_global_escape_hatches_registered()
-                global_conditions, global_transforms = get_escape_hatch_registry().get_registry_for_vertical(
-                    "", include_global=True
+                global_conditions, global_transforms = (
+                    get_escape_hatch_registry().get_registry_for_vertical("", include_global=True)
                 )
                 conditions = {**global_conditions, **conditions}
                 transforms = {**global_transforms, **transforms}

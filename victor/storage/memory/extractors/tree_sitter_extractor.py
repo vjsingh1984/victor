@@ -82,9 +82,7 @@ class TreeSitterEntityExtractor(EntityExtractor):
             if provider is not None and registry.is_enhanced(TreeSitterExtractorProtocol):
                 self._extractor = provider
             else:
-                logger.debug(
-                    "Tree-sitter extractor not available: no enhanced provider registered"
-                )
+                logger.debug("Tree-sitter extractor not available: no enhanced provider registered")
                 return None
         return self._extractor
 

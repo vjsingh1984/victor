@@ -22,18 +22,19 @@ from victor.workflows.escape_hatches import (
     ensure_global_escape_hatches_registered,
 )
 
+
 def test_tests_passing():
     # Scenario: No tests
     assert tests_passing({}) == "no_tests"
-    
+
     # Scenario: Failing tests
     ctx = {"test_results": {"passed": 5, "failed": 1, "coverage": 0.9}}
     assert tests_passing(ctx) == "failing"
-    
+
     # Scenario: Low coverage
     ctx = {"test_results": {"passed": 5, "failed": 0, "coverage": 0.5}, "min_coverage": 0.8}
     assert tests_passing(ctx) == "failing"
-    
+
     # Scenario: Passing tests
     ctx = {"test_results": {"passed": 5, "failed": 0, "coverage": 0.9}}
     assert tests_passing(ctx) == "passing"
@@ -56,36 +57,38 @@ def test_tests_passing():
     }
     assert tests_passing(ctx) == "passing"
 
+
 def test_should_continue_fixing():
     # Scenario: Max iterations reached
     ctx = {"fix_iterations": 5, "max_iterations": 5}
     assert should_continue_fixing(ctx) == "submit_best_effort"
-    
+
     # Scenario: High pass rate
     ctx = {"fix_iterations": 1, "test_results": {"passed": 95, "failed": 0}}
     assert should_continue_fixing(ctx) == "submit_best_effort"
-    
+
     # Scenario: Making progress
     ctx = {"fix_iterations": 1, "progress_made": True, "test_results": {"passed": 5, "failed": 5}}
     assert should_continue_fixing(ctx) == "continue_fixing"
-    
+
     # Scenario: No progress, escalate
     ctx = {"fix_iterations": 3, "progress_made": False, "test_results": {"passed": 5, "failed": 5}}
     assert should_continue_fixing(ctx) == "escalate"
+
 
 def test_complexity_check():
     # Scenario: String analysis - complex
     ctx = {"task_analysis": "This is a very complex task involving major changes."}
     assert complexity_check(ctx) == "complex"
-    
+
     # Scenario: String analysis - simple
     ctx = {"task_analysis": "Just a minor tweak, very straightforward."}
     assert complexity_check(ctx) == "simple"
-    
+
     # Scenario: Dict analysis - medium
     ctx = {"task_analysis": {"complexity": "medium"}}
     assert complexity_check(ctx) == "medium"
-    
+
     # Scenario: Team size - complex
     ctx = {"task_analysis": {"team_size": 4}}
     assert complexity_check(ctx) == "complex"
