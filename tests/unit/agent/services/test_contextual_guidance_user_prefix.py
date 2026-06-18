@@ -31,7 +31,9 @@ def test_builder_exposes_contextual_guidance_text():
         provider_name="ollama", model="qwen3", contextual_guidance="CTX-GUIDE"
     )
     assert builder.get_contextual_guidance_text() == "CTX-GUIDE"
-    assert SystemPromptBuilder(provider_name="ollama", model="q").get_contextual_guidance_text() == ""
+    assert (
+        SystemPromptBuilder(provider_name="ollama", model="q").get_contextual_guidance_text() == ""
+    )
 
 
 def test_combine_dynamic_guidance_merges_task_and_contextual():

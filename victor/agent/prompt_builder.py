@@ -864,7 +864,12 @@ class SystemPromptBuilder:
             "completion",
             "tool_guidance",
         }
-        baseline_sections = {"mode_guidance", "task_guidance", "tool_constraint", "contextual_guidance"}
+        baseline_sections = {
+            "mode_guidance",
+            "task_guidance",
+            "tool_constraint",
+            "contextual_guidance",
+        }
         all_sections = baseline_sections | optional_sections
 
         service = getattr(self, "_llm_decision_service", None)

@@ -18,38 +18,29 @@ from victor.core.graph_rag.generation import GraphAwarePromptBuilder
 from victor.core.graph_rag.config import PromptConfig
 from victor.storage.graph.protocol import GraphNode, GraphEdge
 
+
 def test_impact_analysis_generation():
     # Setup config
     config = PromptConfig(format_style="hierarchical")
     builder = GraphAwarePromptBuilder(config)
-    
+
     # Mock nodes: a function and its test
     node_func = GraphNode(
-        node_id="func1",
-        name="my_function",
-        type="function",
-        file="src/logic.py",
-        line=10
+        node_id="func1", name="my_function", type="function", file="src/logic.py", line=10
     )
     node_test = GraphNode(
-        node_id="test1",
-        name="test_my_function",
-        type="test",
-        file="tests/test_logic.py",
-        line=5
+        node_id="test1", name="test_my_function", type="test", file="tests/test_logic.py", line=5
     )
-    
+
     # Mock retrieval result
     mock_result = MagicMock()
     mock_result.nodes = [node_func, node_test]
-    mock_result.edges = [
-        GraphEdge(src="test1", dst="func1", type="CALLS")
-    ]
+    mock_result.edges = [GraphEdge(src="test1", dst="func1", type="CALLS")]
     mock_result.hop_distances = {"func1": 0, "test1": 1}
-    
+
     # Build prompt
     prompt = builder.build_prompt("How to fix my_function?", mock_result)
-    
+
     # Assertions
     assert "### Impact & Potential Regressions" in prompt
     assert "test_my_function" in prompt
