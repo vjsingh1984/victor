@@ -404,12 +404,14 @@ class GraphAwarePromptBuilder:
         # For hierarchical format, organize by categories
         if self.config.format_style == "hierarchical":
             direct_matches = self._extract_direct_matches(context)
+            impact_analysis = self._extract_impact_analysis(context)
             related_symbols = self._extract_related_symbols(context)
             data_flow = self._extract_data_flow(context)
             control_flow = self._extract_control_flow(context)
 
             return template.format(
                 direct_matches=direct_matches,
+                impact_analysis=impact_analysis,
                 related_symbols=related_symbols,
                 data_flow=data_flow,
                 control_flow=control_flow,
@@ -420,6 +422,22 @@ class GraphAwarePromptBuilder:
         else:  # compact
             compact_context = self._make_compact(context)
             return template.format(compact_context=compact_context)
+
+    def _extract_impact_analysis(self, context: FormattedContext) -> str:
+        """Extract impact analysis and regression information (e.g. tests).
+
+        Args:
+            context: Formatted context
+
+        Returns:
+            Formatted impact analysis section
+        """
+        lines = []
+        for section_name, section_text in context.sections.items():
+            # Include anything that looks like a test or an incoming call flow
+            if "Test" in section_name or section_name == "Call Graph":
+                lines.append(section_text)
+        return "\n\n".join(lines) if lines else "No immediate regression risks identified via graph."
 
     def _extract_direct_matches(self, context: FormattedContext) -> str:
         """Extract directly matching symbols.
@@ -454,7 +472,8 @@ class GraphAwarePromptBuilder:
                 "Classes",
                 "Control Flow",
                 "Data Dependencies",
-            }:
+                "Call Graph",
+            } and "Test" not in section_name:
                 lines.append(section_text)
         return "\n\n".join(lines) if lines else "No related symbols found."
 
