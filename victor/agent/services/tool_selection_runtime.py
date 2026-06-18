@@ -13,6 +13,60 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 
+# --- E3-TIR experience-replay exploration (opt-in via USE_E3_TIR_EXPLORATION) ---------
+# The experience STORE holds user-global RL data, so it is shared across sessions and fed
+# by a single idempotent TOOL_EXECUTED hook. The per-session SELECTOR (which owns the
+# exploration-phase warm-up schedule) reads that shared store. Keeping the store shared
+# but the selector per-session avoids cross-session contamination while still letting each
+# session run its own demonstration -> self-play -> exploration ramp.
+_e3tir_shared_store: Any = None
+_e3tir_hook_subscribed: bool = False
+
+
+def _get_e3tir_shared_store() -> Any:
+    """Return the process-shared ToolExperienceStore, subscribing the outcome hook once."""
+    global _e3tir_shared_store, _e3tir_hook_subscribed
+    if _e3tir_shared_store is None:
+        from victor.tools.experience_store import ToolExperienceStore
+
+        _e3tir_shared_store = ToolExperienceStore()
+    if not _e3tir_hook_subscribed:
+        from victor.framework.rl.hooks import RLEventType, get_rl_hooks
+
+        store = _e3tir_shared_store
+
+        def _record(event: Any) -> None:
+            try:
+                tool = getattr(event, "tool_name", None)
+                if not tool:
+                    return
+                success = event.success if event.success is not None else True
+                reward = (
+                    float(event.quality_score)
+                    if event.quality_score is not None
+                    else (1.0 if success else 0.3)
+                )
+                store.record_outcome(
+                    tool_name=tool,
+                    task_type=getattr(event, "task_type", None) or "general",
+                    success=bool(success),
+                    reward=reward,
+                )
+            except Exception:
+                logger.debug("E3-TIR outcome recording failed", exc_info=True)
+
+        get_rl_hooks().add_handler(RLEventType.TOOL_EXECUTED, _record)
+        _e3tir_hook_subscribed = True
+    return _e3tir_shared_store
+
+
+def _reset_e3tir_state_for_tests() -> None:
+    """Reset the process-shared E3-TIR store/hook flag (test isolation only)."""
+    global _e3tir_shared_store, _e3tir_hook_subscribed
+    _e3tir_shared_store = None
+    _e3tir_hook_subscribed = False
+
+
 class ToolSelectionRuntime:
     """Bridge orchestrator runtime state to the canonical tool-selection path."""
 
@@ -76,8 +130,76 @@ class ToolSelectionRuntime:
         )
         tools = self._ensure_write_tools_for_write_intent(tools, current_intent)
         tools = self._prioritize_explicit_database_tools(tools, user_message_anchor)
+        tools = self._apply_e3tir_exploration(tools, user_message_anchor)
         tools = runtime._apply_kv_tool_strategy(tools)
         return runtime._sort_tools_for_kv_stability(tools)
+
+    def _get_e3tir_reranker(self) -> Any:
+        """Lazily build the per-session E3-TIR reranker when enabled, else None.
+
+        Cached on the runtime (sentinel-distinguished from "disabled") so the flag is
+        checked once and the exploration-phase schedule persists for the session. Reads
+        the process-shared experience store fed by the TOOL_EXECUTED hook.
+        """
+        runtime = self._runtime
+        cached = getattr(runtime, "_e3tir_reranker", "unset")
+        if cached != "unset":
+            return cached
+        reranker = None
+        try:
+            from victor.core.feature_flags import FeatureFlag, is_feature_enabled
+
+            if is_feature_enabled(FeatureFlag.USE_E3_TIR_EXPLORATION) and is_feature_enabled(
+                FeatureFlag.USE_LEARNING_FROM_EXECUTION
+            ):
+                from victor.tools.e3_tir_selector import E3TIRToolSelector
+
+                reranker = E3TIRToolSelector(store=_get_e3tir_shared_store())
+        except Exception:
+            logger.debug("E3-TIR reranker unavailable", exc_info=True)
+            reranker = None
+        runtime._e3tir_reranker = reranker
+        return reranker
+
+    def _apply_e3tir_exploration(self, tools: Any, user_message: str) -> Any:
+        """Rerank the selected tools via E3-TIR experience-based exploration.
+
+        No-op when the reranker is disabled, or when KV tool-stability applies — E3-TIR's
+        per-turn reordering would break the byte-stable tool prefix that KV-prefix-caching
+        providers depend on (``_sort_tools_for_kv_stability`` only sorts in that case).
+        """
+        if not tools:
+            return tools
+        runtime = self._runtime
+        if getattr(runtime, "_kv_optimization_enabled", False):
+            return tools
+        reranker = self._get_e3tir_reranker()
+        if reranker is None:
+            return tools
+        try:
+            by_name = {self._tool_name(t): t for t in tools}
+            base_ranking = [name for name in by_name if name]
+            if not base_ranking:
+                return tools
+            reranked = reranker.select(
+                available_tools=base_ranking,
+                task_type=str(getattr(runtime, "_current_task_type", "") or "general"),
+                user_message=user_message or "",
+                base_ranking=base_ranking,
+                max_tools=len(base_ranking),
+            )
+            seen = set()
+            reordered = []
+            for name in reranked:
+                if name in by_name and name not in seen:
+                    reordered.append(by_name[name])
+                    seen.add(name)
+            # Preserve any tools E3-TIR dropped/omitted at the tail (never lose tools).
+            reordered.extend(tool for name, tool in by_name.items() if name not in seen)
+            return reordered
+        except Exception:
+            logger.debug("E3-TIR rerank failed; using base order", exc_info=True)
+            return tools
 
     @staticmethod
     def _tool_name(tool: Any) -> str:
