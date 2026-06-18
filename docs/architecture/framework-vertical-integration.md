@@ -250,6 +250,43 @@ AgentOrchestrator.set_vertical_context()        ◀─── ContextStepHandler
 Response
 ```
 
+## Cancellation-Aware Tool Discovery
+
+`VerticalLoader`'s tool-discovery path accepts an optional cooperative
+cancellation token (`threading.Event`) so callers can abort an in-flight
+entry-point scan without forcing a blocking operation to run to completion.
+
+The token is threaded down the full call chain:
+
+```
+discover_tool_plugins(cancel_event)          # module-level convenience fn
+    └── VerticalLoader.discover_tools(cancel_event=...)        # public API
+            └── VerticalLoader._discover_tools_internal(*, cancel_event=...)  # scan
+
+async discover_tool_plugins_async(cancel_event)
+    └── VerticalLoader.discover_tools_async(cancel_event=...)  # offloaded via asyncio.to_thread
+            └── VerticalLoader._discover_tools_internal(*, cancel_event=...)  # scan
+```
+
+**Cancellation semantics:**
+
+- The token is optional everywhere (`None` by default), preserving full
+  backward compatibility for existing callers.
+- When `cancel_event.is_set()` is observed *before* the entry-point scan,
+  the scan is skipped and the current (possibly empty) cached result is
+  returned without performing any entry-point I/O.
+- When the token is set *after* the entry-point scan completes but before
+  tool classes are loaded, loading is aborted and the partial result is
+  returned. This bounds the worst case to one entry-point scan.
+- Cancellation does not raise; it returns whatever is available so far.
+  Callers that need a hard-failure signal must inspect `cancel_event`
+  themselves after the call returns.
+
+This is especially relevant for the async path, which runs the scan in a
+worker thread via `asyncio.to_thread` — a blocking entry-point scan cannot
+be interrupted by `asyncio` cancellation, so the cooperative token is the
+only way to short-circuit it.
+
 ## Key Files Reference
 
 | Component | File |
@@ -258,5 +295,6 @@ Response
 | Step Handlers | [`victor/framework/step_handlers.py`](../../../victor/framework/step_handlers.py) |
 | Protocols | [`victor/framework/protocols.py`](../../../victor/framework/protocols.py) |
 | Vertical Base | [`victor/core/verticals/base.py`](../../../victor/core/verticals/base.py) |
+| Vertical Loader | [`victor/core/verticals/vertical_loader.py`](../../../victor/core/verticals/vertical_loader.py) |
 | Framework Capabilities | [`victor/framework/capabilities/`](../../../victor/framework/capabilities/) |
 | WorkflowEngine | [`victor/framework/workflow_engine.py`](../../../victor/framework/workflow_engine.py) |

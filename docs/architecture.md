@@ -267,9 +267,9 @@ authority for chat. It runs: **PERCEIVE → PLAN → ACT → EVALUATE → DECIDE
 
 ```mermaid
 flowchart TB
-    START([AgenticLoop.run]) --> PERCEIVE["PERCEIVE\nPerceptionIntegration\nvictor/agent/perception_integration.py"]
+    START([AgenticLoop.run]) --> PERCEIVE["PERCEIVE\nPerceptionIntegration\nvictor/framework/perception_integration.py"]
     PERCEIVE --> PLAN["PLAN\nTaskAnalyzer\nvictor/agent/task_analyzer.py"]
-    PLAN --> ACT["ACT\nExecutionCoordinator\nvictor/agent/execution_coordinator.py"]
+    PLAN --> ACT["ACT\nAgenticLoop + TurnExecutor\nvictor/framework/agentic_loop.py"]
     ACT --> EVALUATE["EVALUATE\nEvaluationNode\nvictor/framework/evaluation_nodes.py"]
     EVALUATE --> DECIDE{"DECIDE\nFulfillmentDetector\nvictor/framework/fulfillment.py"}
     DECIDE -->|Complete| DONE([Return Result])
@@ -417,7 +417,7 @@ and human-in-the-loop.
 
 ```mermaid
 flowchart LR
-    YAML["YAML DSL\nvictor/workflows/"] --> COMP["UnifiedCompiler\nvictor/workflows/compiler.py"]
+    YAML["YAML DSL\nvictor/workflows/"] --> COMP["UnifiedCompiler\nvictor/workflows/unified_compiler.py"]
     COMP --> SG["StateGraph\nvictor/framework/graph.py"]
     SG --> EXEC["WorkflowExecutor\nvictor/framework/workflow_engine.py"]
 
