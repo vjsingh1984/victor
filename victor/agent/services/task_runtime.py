@@ -427,25 +427,25 @@ class TaskCoordinator:
                     intent_result.intent.value,
                 )
             elif intent_result.prompt_guard:
-                conversation_controller.add_message(
-                    "user", f"[INTENT-GUARD: {intent_result.prompt_guard.strip()}]"
+                # NEW: Inject via system prompt instead of user message (Phase 3D Optimization)
+                self.prompt_builder.contextual_guidance = (
+                    f"INTENT CONSTRAINT: {intent_result.prompt_guard.strip()}"
                 )
-                logger.info(f"Intent: {intent_result.intent.value}, injected prompt guard")
+                logger.info(f"Intent: {intent_result.intent.value}, applied contextual guidance")
         elif intent_result.intent == ActionIntent.WRITE_ALLOWED:
             logger.info("Intent: write_allowed, no prompt guard needed")
 
         if has_explicit_readonly_shell_request(user_message):
-            conversation_controller.add_message(
-                "user",
-                (
-                    "[TASK-HINT: The user explicitly wants direct database/SQLite inspection. "
-                    "Prefer the db tool first. If SQLite CLI inspection is more direct, use a "
-                    "focused readonly shell command. Do not substitute repo/code inspection for "
-                    "the requested database query step.]"
-                ),
-                metadata=build_internal_history_metadata("task_hint"),
+            # NEW: Aggregate with existing guidance
+            existing = self.prompt_builder.contextual_guidance or ""
+            db_hint = (
+                "DATABASE INSPECTION: The user explicitly wants direct database/SQLite inspection. "
+                "Prefer the db tool first. If SQLite CLI inspection is more direct, use a "
+                "focused readonly shell command. Do not substitute repo/code inspection for "
+                "the requested database query step."
             )
-            logger.info("Injected direct database inspection task hint")
+            self.prompt_builder.contextual_guidance = f"{existing}\n\n{db_hint}".strip()
+            logger.info("Applied database inspection contextual guidance")
 
     # =====================================================================
     # Task Guidance
