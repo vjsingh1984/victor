@@ -34,9 +34,23 @@ class TestWeightedCosineSimilarity:
         """
         service = EmbeddingService.get_instance()
         try:
-            service.embed_text_sync("warmup")
+            # use_cache=False forces a live model computation — a cached warmup
+            # from an earlier test could otherwise mask a now-unloaded model.
+            warm = service.embed_text_sync("structural analysis warmup probe", use_cache=False)
         except Exception as exc:  # pragma: no cover - network/offline dependent
             pytest.skip(f"embedding model unavailable: {exc}")
+        # embed_text_sync returns a zero-vector fallback (WITHOUT raising) when
+        # the sentence-transformers model could not be loaded — e.g. offline CI
+        # with no cached model, or after the reset_embedding_singleton autouse
+        # fixture nulls the model and it cannot reload. Cosine similarity is
+        # identically 0.0 on zero vectors, which makes these ordering assertions
+        # fail spuriously on CI runners while passing locally. Skip when the
+        # model is not actually producing embeddings.
+        if getattr(service, "_model", None) is None or float(np.linalg.norm(warm)) == 0.0:
+            pytest.skip(
+                "embedding model not loaded (zero-vector fallback); "
+                "cosine-similarity assertions cannot run meaningfully"
+            )
         return service
 
     @pytest.fixture
