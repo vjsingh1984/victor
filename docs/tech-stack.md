@@ -31,7 +31,7 @@
 | HTTP Client | httpx | >=0.27 | `victor/providers/` |
 | CLI | Typer | >=0.12 | `victor/ui/cli.py` |
 | Rich Output | Rich | >=13.7 | `victor/ui/` |
-| TUI | Textual | >=0.89 | `victor/ui/tui.py` |
+| TUI | Textual | >=0.89 | `victor/observability/dashboard/app.py` |
 | Async | asyncio (stdlib) | — | All I/O paths |
 | Tokenizer | tiktoken | — | `victor/processing/` |
 | YAML | PyYAML | — | `victor/workflows/` |
@@ -77,7 +77,7 @@ Fallback: `_NATIVE_AVAILABLE` pattern with Python fallback.
 | Surface | Technology | Module |
 |---------|-----------|--------|
 | CLI | Typer + Rich | `victor/ui/cli.py` |
-| TUI | Textual | `victor/ui/tui.py` |
+| TUI | Textual | `victor/observability/dashboard/app.py` |
 | HTTP API | FastAPI + Uvicorn | `victor/integrations/api/server.py` |
 | MCP Server | FastMCP | `victor/integrations/mcp/` |
 | VS Code | TypeScript | `vscode-victor/` |
@@ -224,7 +224,7 @@ erDiagram
 |----|------|-------------|----------|--------|--------|
 | TD-1 | API Server | `victor/integrations/api/server.py` hotspot decomposition | High | Planned | `victor/integrations/` |
 | TD-2 | Vertical Integration | `victor/framework/vertical_integration.py` cleanup | Medium | Planned | `victor/framework/` |
-| TD-3 | Conversation Memory | `victor/agent/conversation_memory.py` refactoring | Medium | Planned | `victor/agent/` |
+| TD-3 | Conversation Memory | `victor/agent/conversation/store.py` refactoring | Medium | Planned | `victor/agent/` |
 | TD-4 | Secret Handling | Normalize across provider, server, session settings | High | In Progress | `victor/providers/` |
 | TD-5 | Observability | Decide: prototype or supported surface | Medium | Pending | `victor/core/` |
 | TD-6 | Benchmark Publication | Publish SWE-bench results publicly | High | Planned | `benchmarks/` |
