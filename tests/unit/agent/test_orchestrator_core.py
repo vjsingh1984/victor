@@ -3184,15 +3184,21 @@ class TestPrepareStream:
         from victor.framework.task import DEFAULT_BUDGETS, TaskClassification, TaskComplexity
         from victor.agent.action_authorizer import ActionIntent, IntentClassification
 
-        # This test verifies the write-followup -> ACTION promotion logic, which depends on
-        # THREE platform-sensitive classifiers for a deliberately-ambiguous follow-up. On
-        # macOS they happen to land on the promoting path; on CI-Linux the semantic/
-        # complexity classifiers flip (e.g. complexity falls back to MEDIUM), so the
-        # promotion never fires. Pin all three so the test exercises the promotion logic
-        # deterministically rather than the fuzzy classifier boundaries:
-        #   1. task TYPE -> GENERAL  (chat_stream promotes a write-authorized follow-up to EDIT)
-        #   2. base COMPLEXITY -> SIMPLE  (prepare_task gates the ACTION promotion on SIMPLE)
-        #   3. INTENT -> WRITE_ALLOWED  (required for the SIMPLE -> ACTION promotion)
+        # This test verifies the write-followup -> ACTION promotion *logic*. The
+        # promotion chain has FOUR inputs, all of which run platform-sensitive
+        # classifiers for a deliberately-ambiguous follow-up. On macOS they land
+        # on the promoting path; on CI-Linux they flip and the promotion never
+        # fires (manifesting as a non-ACTION complexity). Pin all four so the
+        # test exercises the deterministic promotion logic, not fuzzy classifier
+        # boundaries:
+        #   1. task TYPE -> GENERAL  (so chat_stream considers promoting to EDIT)
+        #   2. the GENERAL->EDIT gate _should_promote_general_task_to_edit -> True.
+        #      This is the real culprit behind the CI flake: it calls the
+        #      MODULE-LEVEL detect_intent + is_ambiguous_write_followup_request,
+        #      NOT the analyzer mocked below, so pinning the analyzer alone is
+        #      insufficient.
+        #   3. base COMPLEXITY -> SIMPLE  (prepare_task gates ACTION promotion on SIMPLE)
+        #   4. analyzer INTENT -> WRITE_ALLOWED  (required for SIMPLE -> ACTION)
         orchestrator.unified_tracker.detect_task_type = MagicMock(
             return_value=TrackerTaskType.GENERAL
         )
@@ -3215,7 +3221,11 @@ class TestPrepareStream:
             )
         )
 
-        result = await orchestrator._get_chat_stream_adapter()._prepare_stream(
+        adapter = orchestrator._get_chat_stream_adapter()
+        # Pin the write-authorized-followup gate (uses module-level classifiers).
+        adapter._should_promote_general_task_to_edit = MagicMock(return_value=True)
+
+        result = await adapter._prepare_stream(
             "Are you able to address them. if yes please address them comprehensively."
         )
 
