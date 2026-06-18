@@ -414,6 +414,17 @@ def isolate_global_victor_db():
 
     sandbox = tempfile.mkdtemp(prefix="victor_test_home_")
     (Path(sandbox) / ".victor").mkdir(parents=True, exist_ok=True)
+    # ``global_logs_dir`` resolves via the (deliberately unpatched)
+    # GLOBAL_VICTOR_DIR, not $HOME. Redirecting HOME means nothing creates the
+    # real global logs dir during the session, so on a fresh CI runner tests that
+    # assert it exists would fail. Ensure it exists (idempotent; matches what the
+    # production bootstrap would have created).
+    try:
+        from victor.config.settings import GLOBAL_VICTOR_DIR
+
+        (GLOBAL_VICTOR_DIR / "logs").mkdir(parents=True, exist_ok=True)
+    except Exception:
+        pass
     saved = {k: os.environ.get(k) for k in ("HOME", "USERPROFILE")}
     os.environ["HOME"] = sandbox
     os.environ["USERPROFILE"] = sandbox  # Windows
