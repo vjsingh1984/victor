@@ -19,7 +19,7 @@ async def test_acquire_lock_releases_file_lock_after_context(tmp_path, monkeypat
         lambda _path: types.SimpleNamespace(project_victor_dir=root / ".victor"),
     )
 
-    def _fake_acquire(self, timeout=300.0):
+    def _fake_acquire(self, timeout=300.0, shared=False):
         acquire_calls.append((self.lock_file, timeout))
         self._lock_fd = 1
         return True
@@ -54,7 +54,7 @@ async def test_acquire_lock_marks_usage_on_context_exit(tmp_path, monkeypatch):
         lambda _path: types.SimpleNamespace(project_victor_dir=root / ".victor"),
     )
 
-    def _fake_acquire_noop(self, timeout=300.0):
+    def _fake_acquire_noop(self, timeout=300.0, shared=False):
         self._lock_fd = 1
         return True
 
@@ -84,6 +84,9 @@ def test_file_lock_closes_fd_between_retry_attempts(tmp_path, monkeypatch):
         lambda *args, **kwargs: next(opened_fds),
     )
     monkeypatch.setattr("victor.core.indexing.index_lock.os.write", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        "victor.core.indexing.index_lock.os.ftruncate", lambda *args, **kwargs: None
+    )
     monkeypatch.setattr(
         "victor.core.indexing.index_lock.os.close", lambda fd: closed_fds.append(fd)
     )

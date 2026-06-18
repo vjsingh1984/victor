@@ -69,14 +69,13 @@ class FileLock:
         self.lock_file.parent.mkdir(parents=True, exist_ok=True)
         self._lock_fd: Optional[int] = None
 
-    def acquire(self, timeout: float = 300.0) -> bool:
-        """Acquire exclusive lock on file (reentrant for same process).
-
-        If the lock is already held by the current process (same PID),
-        this method succeeds immediately without blocking.
+    def acquire(self, timeout: float = 300.0, shared: bool = False) -> bool:
+        """Acquire lock on file.
 
         Args:
             timeout: Maximum time to wait for lock (default: 5 minutes)
+            shared: If True, acquire a shared lock (multiple readers allowed).
+                    If False, acquire an exclusive lock (one writer).
 
         Returns:
             True if lock acquired, False if timeout
@@ -87,53 +86,53 @@ class FileLock:
         start_time = time.time()
         current_pid = os.getpid()
 
+        lock_op = fcntl.LOCK_SH if shared else fcntl.LOCK_EX
+        retries = 0
         while True:
             try:
-                # Check if lock file exists and is held by same process (reentrant)
-                if self.lock_file.exists():
-                    try:
-                        with open(self.lock_file, "r") as f:
-                            lock_pid = f.read().strip()
-                            if lock_pid and int(lock_pid) == current_pid:
-                                logger.debug(
-                                    f"[FileLock] Lock already held by same process {self.lock_file} (PID: {current_pid})"
-                                )
-                                # Reentrant: same process already holds the lock
-                                self._lock_fd = None  # No FD needed for reentrant case
-                                return True
-                    except (ValueError, IOError):
-                        pass  # Lock file corrupt or unreadable, continue to acquire
-
-                # Open file (create if needed)
+                # Open file (create if needed).
+                # Note: shared locks on newly created files are always successful,
+                # but they won't block exclusive locks unless the file exists.
                 self._lock_fd = os.open(
                     self.lock_file,
-                    os.O_CREAT | os.O_WRONLY | os.O_TRUNC,
+                    os.O_CREAT | os.O_RDWR,
                     0o644,
                 )
 
-                # Try to acquire exclusive lock (non-blocking)
-                fcntl.flock(self._lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                # Try to acquire lock (non-blocking)
+                fcntl.flock(self._lock_fd, lock_op | fcntl.LOCK_NB)
 
-                # Write PID to lock file for debugging
-                os.write(self._lock_fd, str(current_pid).encode())
+                # Write PID to lock file if exclusive
+                if not shared:
+                    os.ftruncate(self._lock_fd, 0)
+                    os.write(self._lock_fd, str(current_pid).encode())
 
-                logger.debug(f"[FileLock] Acquired lock {self.lock_file} (PID: {current_pid})")
+                if retries > 0:
+                    mode = "shared" if shared else "exclusive"
+                    logger.debug(
+                        f"[FileLock] Acquired {mode} lock {self.lock_file} after {retries} retries (PID: {current_pid})"
+                    )
                 return True
 
             except IOError as e:
                 # Lock is held by another process
-                if e.errno == errno.EWOULDBLOCK:
+                if e.errno in (errno.EWOULDBLOCK, errno.EAGAIN):
                     if self._lock_fd is not None:
                         os.close(self._lock_fd)
                         self._lock_fd = None
 
-                    # Check timeout
+                    # If we've waited longer than timeout, give up
                     if time.time() - start_time >= timeout:
-                        logger.warning(f"[FileLock] Timeout waiting for lock {self.lock_file}")
+                        mode = "shared" if shared else "exclusive"
+                        logger.warning(
+                            f"[FileLock] Timeout waiting for {mode} lock {self.lock_file} after {time.time() - start_time:.1f}s"
+                        )
                         return False
 
-                    # Wait a bit and retry
-                    time.sleep(0.1)
+                    # Back off exponentially, max 1s
+                    sleep_time = min(0.1 * (1.5**retries), 1.0)
+                    time.sleep(sleep_time)
+                    retries += 1
                     continue
 
                 # Other error
@@ -143,10 +142,14 @@ class FileLock:
                 raise IOError(f"Failed to acquire lock: {e}")
 
     def release(self) -> None:
-        """Release the lock and close file descriptor.
+        """Release the lock and close the file descriptor.
 
-        For reentrant locks (same process), this is a no-op since the
-        lock will be released when the outermost acquire is released.
+        The lock file itself is intentionally left on disk. Unlinking a contended
+        lock file races with other holders: a second process can create and lock
+        a fresh inode for the same path while a first holder still locks the
+        now-orphaned inode, so both believe they hold the lock. Leaving the (tiny)
+        file in place keeps the inode stable — essential now that shared/exclusive
+        locks coexist.
         """
         if self._lock_fd is not None:
             try:
@@ -157,13 +160,6 @@ class FileLock:
                 logger.warning(f"[FileLock] Error releasing lock: {e}")
             finally:
                 self._lock_fd = None
-
-                # Try to remove lock file
-                try:
-                    if self.lock_file.exists():
-                        self.lock_file.unlink()
-                except Exception:
-                    pass  # Lock file may be in use by another process
 
     def __enter__(self):
         """Context manager entry."""
@@ -179,6 +175,55 @@ class FileLock:
         self.release()
 
 
+class _AsyncRWLock:
+    """In-process readers-writer lock with writer preference.
+
+    Multiple readers may hold the lock concurrently; a writer holds it
+    exclusively. Writer-preference (new readers wait while a writer is queued)
+    prevents writer starvation under a steady stream of readers. This is the
+    in-process counterpart to the cross-process shared/exclusive ``FileLock`` so
+    a "shared" acquisition is genuinely concurrent at both levels.
+    """
+
+    def __init__(self) -> None:
+        self._cond = asyncio.Condition()
+        self._readers = 0
+        self._writer_active = False
+        self._writers_waiting = 0
+
+    async def acquire_read(self) -> None:
+        async with self._cond:
+            while self._writer_active or self._writers_waiting > 0:
+                await self._cond.wait()
+            self._readers += 1
+
+    async def release_read(self) -> None:
+        async with self._cond:
+            if self._readers > 0:
+                self._readers -= 1
+            if self._readers == 0:
+                self._cond.notify_all()
+
+    async def acquire_write(self) -> None:
+        async with self._cond:
+            self._writers_waiting += 1
+            try:
+                while self._writer_active or self._readers > 0:
+                    await self._cond.wait()
+            finally:
+                self._writers_waiting -= 1
+            self._writer_active = True
+
+    async def release_write(self) -> None:
+        async with self._cond:
+            self._writer_active = False
+            self._cond.notify_all()
+
+    def is_held(self) -> bool:
+        """Whether the lock is currently held by any reader or a writer."""
+        return self._writer_active or self._readers > 0
+
+
 class _PathLockHandle:
     """Async context manager that combines in-process and file locking per use."""
 
@@ -186,26 +231,40 @@ class _PathLockHandle:
         self,
         registry: "IndexLockRegistry",
         path_str: str,
-        in_process_lock: asyncio.Lock,
+        rw_lock: "_AsyncRWLock",
         lock_file: Optional[Path],
         timeout_seconds: float,
+        shared: bool = False,
     ) -> None:
         self._registry = registry
         self._path_str = path_str
-        self._in_process_lock = in_process_lock
+        self._rw_lock = rw_lock
         self._lock_file = lock_file
         self._timeout_seconds = timeout_seconds
+        self._shared = shared
         self._file_lock: Optional[FileLock] = None
 
-    async def __aenter__(self) -> asyncio.Lock:
-        await self._in_process_lock.acquire()
+    async def _acquire_in_process(self) -> None:
+        if self._shared:
+            await self._rw_lock.acquire_read()
+        else:
+            await self._rw_lock.acquire_write()
+
+    async def _release_in_process(self) -> None:
+        if self._shared:
+            await self._rw_lock.release_read()
+        else:
+            await self._rw_lock.release_write()
+
+    async def __aenter__(self) -> None:
+        await self._acquire_in_process()
         try:
             if self._lock_file is not None:
                 file_lock = FileLock(self._lock_file)
                 loop = asyncio.get_running_loop()
                 acquired = await loop.run_in_executor(
                     None,
-                    lambda: file_lock.acquire(timeout=self._timeout_seconds),
+                    lambda: file_lock.acquire(timeout=self._timeout_seconds, shared=self._shared),
                 )
                 if not acquired:
                     raise TimeoutError(
@@ -215,12 +274,13 @@ class _PathLockHandle:
                     )
                 self._file_lock = file_lock
                 logger.info(
-                    "[IndexLockRegistry] Acquired cross-process lock for %s",
+                    "[IndexLockRegistry] Acquired cross-process %s lock for %s",
+                    "shared" if self._shared else "exclusive",
                     self._path_str,
                 )
-            return self._in_process_lock
+            return None
         except Exception:
-            self._in_process_lock.release()
+            await self._release_in_process()
             raise
 
     async def __aexit__(self, exc_type, exc_val, exc_tb) -> bool:
@@ -230,7 +290,7 @@ class _PathLockHandle:
                 self._file_lock = None
         finally:
             self._registry._mark_lock_used_path(self._path_str)
-            self._in_process_lock.release()
+            await self._release_in_process()
         return False
 
 
@@ -263,7 +323,7 @@ class IndexLockRegistry:
 
     def __init__(self):
         """Initialize IndexLockRegistry."""
-        self._path_locks: Dict[str, asyncio.Lock] = {}
+        self._path_locks: Dict[str, _AsyncRWLock] = {}
         self._lock_files: Dict[str, Path] = {}
         self._registry_lock = asyncio.Lock()
         self._lock_stats: Dict[str, Dict] = {}  # Track lock usage stats
@@ -284,6 +344,7 @@ class IndexLockRegistry:
         path: Path,
         use_file_lock: bool = True,
         timeout_seconds: float = 300.0,
+        shared: bool = False,
     ) -> _PathLockHandle:
         """Acquire or create lock for specific path.
 
@@ -316,6 +377,7 @@ class IndexLockRegistry:
                 self._path_locks[path_str],
                 self._lock_files.get(path_str) if use_file_lock else None,
                 timeout_seconds,
+                shared=shared,
             )
 
         # Slow path - acquire registry lock
@@ -341,7 +403,7 @@ class IndexLockRegistry:
                 self._lock_files[path_str] = lock_file
 
             # Create new in-process lock
-            self._path_locks[path_str] = asyncio.Lock()
+            self._path_locks[path_str] = _AsyncRWLock()
 
             # Initialize stats
             self._lock_stats[path_str] = {
@@ -399,7 +461,7 @@ class IndexLockRegistry:
             # Remove idle locks
             for path_str in idle_paths:
                 lock = self._path_locks.get(path_str)
-                if lock is not None and lock.locked():
+                if lock is not None and lock.is_held():
                     continue
 
                 del self._path_locks[path_str]
