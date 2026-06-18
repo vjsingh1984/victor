@@ -266,9 +266,12 @@ class TestIntentDetection:
         message = "Show me the code"
         task_coordinator.apply_intent_guard(message, mock_conversation_controller)
 
-        # Verify prompt guard was injected as user message with [INTENT-GUARD:] prefix
-        mock_conversation_controller.add_message.assert_called_with(
-            "user", "[INTENT-GUARD: READ ONLY MODE: Do not modify files.]"
+        # The guard is now delivered via the prompt builder's contextual guidance
+        # ("INTENT CONSTRAINT: ..."), not injected as a visible user message.
+        mock_conversation_controller.add_message.assert_not_called()
+        assert (
+            task_coordinator.prompt_builder.contextual_guidance
+            == "INTENT CONSTRAINT: READ ONLY MODE: Do not modify files."
         )
 
         # Verify current intent was set
@@ -308,9 +311,11 @@ class TestIntentDetection:
         message = "Analyze the codebase"
         task_coordinator.apply_intent_guard(message, mock_conversation_controller)
 
-        # Verify prompt guard was injected as user message with [INTENT-GUARD:] prefix
-        mock_conversation_controller.add_message.assert_called_with(
-            "user", "[INTENT-GUARD: This is read-only analysis.]"
+        # The guard is delivered via prompt builder contextual guidance, not add_message.
+        mock_conversation_controller.add_message.assert_not_called()
+        assert (
+            task_coordinator.prompt_builder.contextual_guidance
+            == "INTENT CONSTRAINT: This is read-only analysis."
         )
 
     def test_apply_intent_guard_continuation_carries_forward_write_intent(
@@ -353,11 +358,12 @@ class TestIntentDetection:
         )
 
         assert task_coordinator.current_intent == ActionIntent.READ_ONLY
-        mock_conversation_controller.add_message.assert_called_once()
-        role, content = mock_conversation_controller.add_message.call_args.args
-        assert role == "user"
-        assert content.startswith("[INTENT-GUARD:")
-        assert "read-only query" in content
+        # Carried-forward read-only intent guard is delivered via contextual guidance.
+        mock_conversation_controller.add_message.assert_not_called()
+        guidance = task_coordinator.prompt_builder.contextual_guidance
+        assert guidance is not None
+        assert guidance.startswith("INTENT CONSTRAINT:")
+        assert "read-only query" in guidance
 
     def test_apply_intent_guard_bare_continue_uses_prior_intent(
         self, task_coordinator, mock_task_analyzer, mock_conversation_controller
@@ -375,7 +381,10 @@ class TestIntentDetection:
         task_coordinator.apply_intent_guard("continue", mock_conversation_controller)
 
         assert task_coordinator.current_intent == ActionIntent.READ_ONLY
-        mock_conversation_controller.add_message.assert_called_once()
+        # Prior read-only intent is resumed and its guard delivered via contextual guidance.
+        mock_conversation_controller.add_message.assert_not_called()
+        assert task_coordinator.prompt_builder.contextual_guidance is not None
+        assert task_coordinator.prompt_builder.contextual_guidance.startswith("INTENT CONSTRAINT:")
 
     def test_apply_intent_guard_injects_database_task_hint_for_explicit_sqlite_request(
         self, task_coordinator, mock_task_analyzer, mock_conversation_controller
@@ -393,14 +402,12 @@ class TestIntentDetection:
             mock_conversation_controller,
         )
 
-        task_hint_calls = [
-            call
-            for call in mock_conversation_controller.add_message.call_args_list
-            if len(call[0]) >= 2 and call[0][0] == "user" and "[TASK-HINT:" in str(call[0][1])
-        ]
-        assert len(task_hint_calls) == 1
-        assert "Prefer the db tool first" in task_hint_calls[0][0][1]
-        assert task_hint_calls[0].kwargs["metadata"] == build_internal_history_metadata("task_hint")
+        # The database-inspection hint is appended to contextual guidance, not injected
+        # as a separate [TASK-HINT:] user message.
+        guidance = task_coordinator.prompt_builder.contextual_guidance
+        assert guidance is not None
+        assert "DATABASE INSPECTION" in guidance
+        assert "Prefer the db tool first" in guidance
 
 
 class TestTaskGuidance:
