@@ -797,3 +797,64 @@ def test_refresh_plugins_logs_structured_telemetry(monkeypatch, caplog):
     assert record.duration_ms == 4.2
     assert record.entry_point_groups_cached == 0
     assert record.refresh_stats == {"count": 1, "last_refresh_ms": 4.2}
+
+
+def test_discover_tools_internal_cancellation_aborts_scan(monkeypatch):
+    """A pre-set cancel_event should abort the tool entry-point scan."""
+    import threading
+
+    loader = VerticalLoader()
+    loader._emit_observability_event = lambda *args, **kwargs: None
+
+    scan_calls: list[str] = []
+
+    def _get_values(group: str, *, force: bool = False):
+        scan_calls.append(group)
+        return {"tool_a": "fake.module:ToolA"}
+
+    monkeypatch.setattr(
+        "victor.core.verticals.vertical_loader.get_entry_point_values",
+        _get_values,
+    )
+
+    # A load hook that would otherwise populate tools; if cancellation is
+    # honored, this must never run.
+    def _load_tool_entries(ep_entries):
+        raise AssertionError("_load_tool_entries should not run when cancelled")
+
+    monkeypatch.setattr(loader, "_load_tool_entries", _load_tool_entries)
+
+    cancel_event = threading.Event()
+    cancel_event.set()
+
+    result = loader._discover_tools_internal(force_refresh=True, cancel_event=cancel_event)
+
+    discovered, cache_hit, duration_ms = result
+    # Scan was aborted before any entry point values were fetched.
+    assert scan_calls == []
+    assert discovered == {}
+    assert cache_hit is False
+    assert duration_ms >= 0.0
+
+
+def test_discover_tools_propagates_cancel_event(monkeypatch):
+    """discover_tools should forward cancel_event to the internal helper."""
+    import threading
+
+    loader = VerticalLoader()
+    loader._emit_observability_event = lambda *args, **kwargs: None
+
+    received: dict[str, object] = {}
+
+    def _stub(force_refresh=False, *, cancel_event=None):
+        received["force_refresh"] = force_refresh
+        received["cancel_event"] = cancel_event
+        return {"tool_a": type("ToolA", (), {})}, False, 1.0
+
+    monkeypatch.setattr(loader, "_discover_tools_internal", _stub)
+
+    cancel_event = threading.Event()
+    loader.discover_tools(force_refresh=True, cancel_event=cancel_event)
+
+    assert received["force_refresh"] is True
+    assert received["cancel_event"] is cancel_event
