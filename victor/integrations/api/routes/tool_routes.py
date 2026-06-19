@@ -21,8 +21,16 @@ from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 
 from victor.integrations.api.fastapi_server import ToolApprovalRequest
+
+
+class ToolCancelRequest(BaseModel):
+    """Body for POST /tools/cancel."""
+
+    tool_call_id: str
+
 
 if TYPE_CHECKING:
     from victor.integrations.api.fastapi_server import VictorFastAPIServer
@@ -122,5 +130,40 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
         ]
 
         return JSONResponse({"pending": pending, "count": len(pending)})
+
+    @router.post("/tools/cancel")
+    async def cancel_tool(request: ToolCancelRequest) -> JSONResponse:
+        """Cancel a pending tool execution by its tool_call_id (or approval_id)."""
+        target = request.tool_call_id
+        match_id = None
+        for aid, info in server._pending_tool_approvals.items():
+            if aid == target or info.get("tool_call_id") == target:
+                match_id = aid
+                break
+
+        if match_id is None:
+            return JSONResponse({"tool_call_id": target, "cancelled": False, "reason": "not_found"})
+
+        approval = server._pending_tool_approvals.pop(match_id)
+        approval["approved"] = False
+        approval["resolved"] = True
+        # Unblock any waiter, mirroring how an approval resolves.
+        event = approval.get("event")
+        if event is not None and hasattr(event, "set"):
+            event.set()
+
+        try:
+            await server._broadcast_ws(
+                {
+                    "type": "tool_cancelled",
+                    "approval_id": match_id,
+                    "tool_call_id": target,
+                    "tool_name": approval.get("tool_name"),
+                }
+            )
+        except Exception:
+            logger.debug("broadcast tool_cancelled failed", exc_info=True)
+
+        return JSONResponse({"tool_call_id": target, "cancelled": True})
 
     return router
