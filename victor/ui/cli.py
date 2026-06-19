@@ -78,6 +78,7 @@ from victor.ui.commands.profiles import profiles_app
 from victor.ui.commands.providers import providers_app
 from victor.ui.commands.security import security_app
 from victor.ui.commands.serve import serve_app
+from victor.ui.commands.ui import ui_app
 from victor.ui.commands.tools import tools_app
 from victor.ui.commands.scaffold import scaffold_app
 from victor.ui.commands.scheduler import scheduler_app
@@ -366,6 +367,7 @@ app.add_typer(auth_app, name="auth", help="Manage authentication and provider ac
 app.add_typer(init_app)
 app.add_typer(models_app)
 app.add_typer(profiles_app, name="profiles")
+app.add_typer(ui_app, name="ui", help="Launch the Victor web chat UI (Chainlit).")
 
 # --- Development ---
 app.add_typer(tools_app, rich_help_panel="Development")
