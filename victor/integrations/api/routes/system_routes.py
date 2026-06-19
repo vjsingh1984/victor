@@ -23,6 +23,7 @@ from typing import TYPE_CHECKING, List, Optional
 
 from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 
 from victor.integrations.api.event_bridge import EventBroadcaster
 from victor.integrations.api.fastapi_server import HealthResponse, StatusResponse
@@ -31,6 +32,29 @@ if TYPE_CHECKING:
     from victor.integrations.api.fastapi_server import VictorFastAPIServer
 
 logger = logging.getLogger(__name__)
+
+
+class CredentialSetRequest(BaseModel):
+    """Body for POST /credentials/set."""
+
+    provider: str
+    api_key: str
+
+
+def _keyring_status() -> tuple[bool, str]:
+    """Return (available, backend_name) for the system keyring.
+
+    The ``keyring`` library falls back to a ``fail.Keyring`` backend when no real
+    secure store is available — that is reported as unavailable.
+    """
+    try:
+        import keyring
+
+        backend = keyring.get_keyring()
+        name = type(backend).__name__
+        return ("fail" not in name.lower()), name
+    except Exception:
+        return False, "unavailable"
 
 
 def create_router(server: "VictorFastAPIServer") -> APIRouter:
@@ -101,8 +125,54 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
 
     @router.get("/credentials/get")
     async def credentials_get(provider: str = Query("")) -> JSONResponse:
-        """Placeholder credentials endpoint."""
-        return JSONResponse({"provider": provider, "api_key": None})
+        """Return the stored API key for *provider* (or null), for local key sync."""
+        from victor.config.api_keys import get_api_key
+
+        try:
+            key = get_api_key(provider) if provider else None
+        except Exception:
+            logger.debug("credentials_get failed for %s", provider, exc_info=True)
+            key = None
+        return JSONResponse({"provider": provider, "api_key": key})
+
+    @router.post("/credentials/set")
+    async def credentials_set(request: CredentialSetRequest) -> JSONResponse:
+        """Store an API key for a provider (system keyring when available)."""
+        from victor.config.api_keys import set_api_key
+
+        try:
+            success = bool(set_api_key(request.provider, request.api_key, use_keyring=True))
+        except Exception as exc:
+            logger.warning("credentials_set failed: %s", exc)
+            return JSONResponse({"provider": request.provider, "success": False, "error": str(exc)})
+        return JSONResponse({"provider": request.provider, "success": success})
+
+    @router.delete("/credentials/delete")
+    async def credentials_delete(provider: str = Query("")) -> JSONResponse:
+        """Delete a provider's API key from the system keyring."""
+        from victor.config.api_keys import clear_api_key_cache, delete_api_key_from_keyring
+
+        try:
+            success = bool(delete_api_key_from_keyring(provider)) if provider else False
+            clear_api_key_cache()
+        except Exception as exc:
+            logger.warning("credentials_delete failed: %s", exc)
+            return JSONResponse({"provider": provider, "success": False, "error": str(exc)})
+        return JSONResponse({"provider": provider, "success": success})
+
+    @router.get("/credentials/status")
+    async def credentials_status() -> JSONResponse:
+        """Report whether the system keyring is available and which backend is in use."""
+        available, backend = _keyring_status()
+        try:
+            from victor.config.api_keys import APIKeyManager
+
+            configured = APIKeyManager().list_configured_providers()
+        except Exception:
+            configured = []
+        return JSONResponse(
+            {"available": available, "backend": backend, "configured_providers": configured}
+        )
 
     @router.post("/session/token")
     async def session_token() -> JSONResponse:
