@@ -114,6 +114,11 @@ langchain = [
 # Interactive examples and playground (typer, rich already in main deps)
 examples = []
 
+# Web chat UI: a pure-Python Chainlit surface bound to VictorClient (`victor ui`)
+chat-ui = [
+    "chainlit>=1.3,<3",
+]
+
 dev = [
     # Embeddings (required for full test coverage)
     "numpy>=1.24,<2.3",  # Required by victor.storage.embeddings.service; numba-compatible
