@@ -96,31 +96,3 @@ async def chainlit_approval_handler(request: ApprovalRequest) -> ApprovalResult:
         return ApprovalStatus.REJECTED, "Approval prompt failed", _RESPONDER
 
     return decision_from_action(action)
-
-
-def register_chat_ui_approval_handler(container: Any) -> bool:
-    """Register :func:`chainlit_approval_handler` as the container's PolicyApprovalHandler.
-
-    Idempotent and defensive: returns ``True`` if a handler is registered (or already
-    present), ``False`` if registration was not possible (e.g. the container is frozen and
-    no handler is registered yet). Must be called before the agent builds its middleware
-    (i.e. before the first ``VictorClient.stream``), while the container is still mutable.
-    """
-    try:
-        from victor.framework.policies import PolicyApprovalHandler
-    except Exception:  # policy engine not available
-        logger.debug("PolicyApprovalHandler unavailable; approval not registered", exc_info=True)
-        return False
-
-    try:
-        if container.get_optional(PolicyApprovalHandler) is not None:
-            return True  # already registered (e.g. a prior session in this process)
-    except Exception:
-        pass
-
-    try:
-        container.register(PolicyApprovalHandler, PolicyApprovalHandler(chainlit_approval_handler))
-        return True
-    except Exception:
-        logger.debug("Could not register chat UI approval handler", exc_info=True)
-        return False

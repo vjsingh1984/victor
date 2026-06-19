@@ -26,11 +26,8 @@ from types import SimpleNamespace
 import pytest
 
 from victor.framework.hitl import ApprovalRequest, ApprovalStatus
-from victor.ui.chat_app.approval import (
-    chainlit_approval_handler,
-    decision_from_action,
-    register_chat_ui_approval_handler,
-)
+from victor.framework.policies import register_policy_approval_handler
+from victor.ui.chat_app.approval import chainlit_approval_handler, decision_from_action
 
 
 def _request() -> ApprovalRequest:
@@ -134,7 +131,7 @@ def test_register_handler_into_container():
     from victor.framework.policies import PolicyApprovalHandler
 
     container = _FakeContainer()
-    assert register_chat_ui_approval_handler(container) is True
+    assert register_policy_approval_handler(chainlit_approval_handler, container) is True
     holder = container.get_optional(PolicyApprovalHandler)
     assert holder is not None and callable(holder.handler)
 
@@ -144,11 +141,11 @@ def test_register_is_idempotent_when_already_present():
 
     existing = PolicyApprovalHandler(lambda req: None)
     container = _FakeContainer(existing=existing)
-    assert register_chat_ui_approval_handler(container) is True
+    assert register_policy_approval_handler(chainlit_approval_handler, container) is True
     # Did not overwrite the pre-existing holder.
     assert container.get_optional(PolicyApprovalHandler) is existing
 
 
 def test_register_returns_false_on_frozen_container():
     container = _FakeContainer(frozen=True)
-    assert register_chat_ui_approval_handler(container) is False
+    assert register_policy_approval_handler(chainlit_approval_handler, container) is False

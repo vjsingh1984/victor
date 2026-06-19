@@ -32,7 +32,7 @@ import chainlit as cl
 
 from victor.framework.client import VictorClient
 from victor.framework.session_config import SessionConfig
-from victor.ui.chat_app.approval import register_chat_ui_approval_handler
+from victor.ui.chat_app.approval import chainlit_approval_handler
 from victor.ui.chat_app.event_mapping import RenderKind, map_event
 
 logger = logging.getLogger(__name__)
@@ -75,11 +75,11 @@ def _build_client() -> VictorClient:
 async def on_chat_start() -> None:
     """Create a per-session VictorClient and greet the user."""
     # Register the approval handler before any stream triggers agent/middleware build,
-    # while the global container is still mutable.
+    # while the container is still mutable. The framework owns the container access.
     try:
-        from victor.core import get_container
+        from victor.framework.policies import register_policy_approval_handler
 
-        register_chat_ui_approval_handler(get_container())
+        register_policy_approval_handler(chainlit_approval_handler)
     except Exception:  # approval is best-effort; chat still works without it
         logger.debug("Approval handler registration skipped", exc_info=True)
 
