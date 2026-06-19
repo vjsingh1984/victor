@@ -381,6 +381,77 @@ def isolate_project_victor_storage(isolated_project_victor_dir):
         yield
 
 
+@pytest.fixture(autouse=True, scope="session")
+def isolate_global_victor_db():
+    """Redirect the GLOBAL ``~/.victor`` database to a temp dir for the session.
+
+    The global database (``~/.victor/victor.db``) holds user-wide RL data —
+    ``rl_outcomes`` and the ``*_q_values`` tables that drive model/tool routing,
+    including the chat banner's "Routing hint". Only the *project* database and
+    API keys were isolated previously, so any test exercising the RL or session
+    code paths wrote outcomes straight into the developer's real DB, skewing the
+    learned routing (e.g. surfacing ``fake:fake`` / ``test-profile`` providers).
+
+    ``DatabaseManager`` resolves ``Path.home()/.victor/victor.db`` at runtime via
+    stdlib ``Path.home()`` (which honors ``$HOME``), so pointing ``HOME`` at a
+    temp dir sandboxes every global-DB write without changing production code.
+
+    Session-scoped on purpose: a per-test redirect re-created the full victor.db
+    schema for every test, which both slowed the suite and produced thousands of
+    throwaway temp DBs (a local disk blowout). One sandbox home per session keeps
+    isolation while paying the schema cost once. Tests that need a pristine global
+    DB already create their own (see the RL coordinator fixtures).
+
+    Note: ``GLOBAL_VICTOR_DIR`` is deliberately left untouched. ``secure_paths``
+    resolves the victor dir from the passwd database (anti-``$HOME``-spoofing), so
+    patching the constant would diverge from ``get_victor_dir()`` and the security
+    invariants. Only the database (which uses ``Path.home()``) needs redirecting.
+    """
+    import os
+    import shutil
+    import tempfile
+    from pathlib import Path
+
+    sandbox = tempfile.mkdtemp(prefix="victor_test_home_")
+    (Path(sandbox) / ".victor").mkdir(parents=True, exist_ok=True)
+    # ``global_logs_dir`` resolves via the (deliberately unpatched)
+    # GLOBAL_VICTOR_DIR, not $HOME. Redirecting HOME means nothing creates the
+    # real global logs dir during the session, so on a fresh CI runner tests that
+    # assert it exists would fail. Ensure it exists (idempotent; matches what the
+    # production bootstrap would have created).
+    try:
+        from victor.config.settings import GLOBAL_VICTOR_DIR
+
+        (GLOBAL_VICTOR_DIR / "logs").mkdir(parents=True, exist_ok=True)
+    except Exception:
+        pass
+    saved = {k: os.environ.get(k) for k in ("HOME", "USERPROFILE")}
+    os.environ["HOME"] = sandbox
+    os.environ["USERPROFILE"] = sandbox  # Windows
+
+    try:
+        from victor.core.database import reset_database
+
+        reset_database()
+    except Exception:
+        pass
+
+    yield
+
+    for key, value in saved.items():
+        if value is None:
+            os.environ.pop(key, None)
+        else:
+            os.environ[key] = value
+    try:
+        from victor.core.database import reset_database
+
+        reset_database()
+    except Exception:
+        pass
+    shutil.rmtree(sandbox, ignore_errors=True)
+
+
 @pytest.fixture(autouse=True)
 def reset_extension_cache():
     """Reset VerticalExtensionLoader caches between tests."""

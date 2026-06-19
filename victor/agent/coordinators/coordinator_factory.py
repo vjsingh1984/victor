@@ -71,7 +71,7 @@ class CoordinatorFactory:
         - ExplorationCoordinator: Canonical read-only exploration runtime
         - ExplorationStatePassedCoordinator: Snapshot/transition exploration wrapper
         - SystemPromptStatePassedCoordinator: Canonical state-passed prompt classification
-        - MetricsCoordinator: Metrics collection
+        - AgentMetricsService: Metrics collection
         - SafetyCoordinator: SDK-owned compatibility / extension surface
         - SafetyStatePassedCoordinator: Canonical state-passed safety wrapper
         - ConversationCoordinator: SDK-owned compatibility / extension surface
@@ -173,31 +173,31 @@ class CoordinatorFactory:
             )
             raise RuntimeError(f"Failed to create SystemPromptStatePassedCoordinator: {e}") from e
 
-    def create_metrics_coordinator(self) -> Any:
+    def create_agent_metrics_service(self) -> Any:
         """
         Create metrics coordinator with protocol dependencies.
 
         Returns:
-            MetricsCoordinator instance
+            AgentMetricsService instance
 
         Raises:
             RuntimeError: If coordinator creation fails
         """
         try:
-            from victor.agent.services.metrics_service import MetricsCoordinator
+            from victor.agent.services.metrics_service import AgentMetricsService
 
             # Resolve orchestrator for metrics access
             orchestrator = self._resolve_orchestrator()
 
             # Create coordinator
-            coordinator = MetricsCoordinator(orchestrator=orchestrator)
+            coordinator = AgentMetricsService(orchestrator=orchestrator)
 
-            logger.debug("CoordinatorFactory: Created MetricsCoordinator")
+            logger.debug("CoordinatorFactory: Created AgentMetricsService")
             return coordinator
 
         except Exception as e:
-            logger.error(f"CoordinatorFactory: Failed to create MetricsCoordinator: {e}")
-            raise RuntimeError(f"Failed to create MetricsCoordinator: {e}") from e
+            logger.error(f"CoordinatorFactory: Failed to create AgentMetricsService: {e}")
+            raise RuntimeError(f"Failed to create AgentMetricsService: {e}") from e
 
     def create_safety_coordinator(self) -> Any:
         """

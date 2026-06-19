@@ -216,83 +216,33 @@ class MissingParameterHandler(ErrorRecoveryHandler):
         if set(args.keys()) != {"value"}:
             return None
 
-        payload = args.get("value")
-        payload_size = len(str(payload)) if isinstance(payload, str) else 0
-
-        if isinstance(payload, str):
-            # Log large payload attempts for debugging
-            if payload_size > 5000:
-                self._logger.info(
-                    "Attempting to recover large value envelope (%d chars) for tool '%s' with missing params: %s",
-                    payload_size,
-                    tool_name,
-                    missing_params,
-                )
-
-            # Try multiple parsing strategies with detailed logging
-            parse_attempts = []
-            for parser_name, parser in [
-                ("json", json.loads),
-                ("ast", ast.literal_eval),
-            ]:
-                try:
-                    payload = parser(payload)
-                    parse_attempts.append(f"{parser_name}=success")
-                    break
-                except Exception as exc:
-                    parse_attempts.append(f"{parser_name}=failed({str(exc)[:50]})")
-                    continue
-
-            if payload_size > 5000:
-                self._logger.debug(
-                    "Parse attempts for large payload: %s",
-                    ", ".join(parse_attempts),
-                )
-
-        if not isinstance(payload, dict):
-            # For large payloads that failed to parse, try heuristic extraction
-            if payload_size > 10000 and tool_name == "write" and isinstance(args.get("value"), str):
-                import re
-
-                raw_value = args.get("value", "")
-                path_match = re.search(r'"path"\s*:\s*"([^"]+)"', raw_value)
-                if path_match and "path" in missing_params:
-                    self._logger.warning(
-                        "Partial recovery: extracted path from malformed write payload (size=%d)",
-                        payload_size,
-                    )
-                    return {"path": path_match.group(1)}
-
-            self._logger.debug(
-                "Value envelope payload is not a dict after parsing (type=%s), cannot recover",
-                type(payload).__name__,
-            )
-            return None
+        # Single authority: coercion + schema-aware value-envelope recovery +
+        # alias normalization all happen in ArgumentNormalizer.parse_tool_arguments
+        # (no duplicate json/ast/greedy ladder here).
+        from victor.agent.argument_normalizer import ArgumentNormalizer
 
         try:
-            from victor.agent.argument_normalizer import ArgumentNormalizer
-
-            payload, _ = ArgumentNormalizer(provider_name="recovery").normalize_parameter_aliases(
-                payload,
-                tool_name,
+            recovered, _ = ArgumentNormalizer(provider_name="recovery").parse_tool_arguments(
+                args.get("value"), tool_name
             )
-        except Exception:
-            payload = dict(payload)
-
-        if not all(param in payload for param in missing_params):
-            self._logger.debug(
-                "Recovered payload missing required params: have=%s, need=%s",
-                list(payload.keys()),
-                missing_params,
-            )
+        except Exception as exc:
+            self._logger.debug("Value envelope recovery failed: %s", str(exc)[:100])
             return None
 
-        self._logger.info(
-            "Recovered wrapped value envelope for %s with params: %s",
-            tool_name,
-            ", ".join(sorted(payload.keys())),
+        if isinstance(recovered, dict) and all(param in recovered for param in missing_params):
+            self._logger.info(
+                "Recovered wrapped value envelope for %s with params: %s",
+                tool_name,
+                ", ".join(sorted(recovered.keys())),
+            )
+            return recovered
+
+        self._logger.debug(
+            "Recovered payload missing required params: have=%s, need=%s",
+            list(recovered.keys()) if isinstance(recovered, dict) else type(recovered).__name__,
+            missing_params,
         )
-        return payload
+        return None
 
     def can_handle(self, error: Exception, tool_name: str, args: Dict[str, Any]) -> bool:
         error_str = str(error).lower()

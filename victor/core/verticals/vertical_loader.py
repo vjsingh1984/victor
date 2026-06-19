@@ -766,6 +766,7 @@ class VerticalLoader:
         self,
         force_refresh: bool = False,
         emit_event: bool = True,
+        cancel_event: Optional[threading.Event] = None,
     ) -> Dict[str, Type]:
         """Discover tools from installed packages via entry points.
 
@@ -775,6 +776,11 @@ class VerticalLoader:
 
         Args:
             force_refresh: Force re-scan of entry points (bypass cache)
+            emit_event: Whether to emit an observability discovery event
+            cancel_event: Optional ``threading.Event`` used to cooperatively
+                cancel discovery. When set before/during discovery, the
+                internal scan is aborted early and a cached or empty result
+                may be returned. Propagated down to ``_discover_tools_internal``.
 
         Returns:
             Dictionary mapping tool names to their classes
@@ -788,7 +794,10 @@ class VerticalLoader:
             tools = loader.discover_tools()
             # {'code_search': <class 'victor_coding.tools.CodeSearchTool'>}
         """
-        discovered, cache_hit, duration_ms = self._discover_tools_internal(force_refresh)
+        discovered, cache_hit, duration_ms = self._discover_tools_internal(
+            force_refresh,
+            cancel_event=cancel_event,
+        )
         payload = self._build_discovery_event_payload(
             kind="tools",
             count=len(discovered),
@@ -807,8 +816,18 @@ class VerticalLoader:
     def _discover_tools_internal(
         self,
         force_refresh: bool = False,
+        *,
+        cancel_event: Optional[threading.Event] = None,
     ) -> Tuple[Dict[str, Type], bool, float]:
-        """Discover tools and return result with cache/duration metadata."""
+        """Discover tools and return result with cache/duration metadata.
+
+        Args:
+            force_refresh: Force re-scan of entry points (bypass cache)
+            cancel_event: Optional ``threading.Event`` for cooperative
+                cancellation. When set, discovery aborts early: if a cached
+                result exists it is returned (cache hit), otherwise the
+                current (possibly empty) discovery result is returned.
+        """
         with self._lock:
             self._tool_discovery_calls += 1
             if self._discovered_tools is not None and not force_refresh:
@@ -819,8 +838,22 @@ class VerticalLoader:
             self._tool_discovery_scans += 1
             self._discovered_tools = {}
 
+            # Bail out early if cancellation was requested before the scan.
+            if cancel_event is not None and cancel_event.is_set():
+                logger.debug("Tool discovery cancelled before scan")
+                self._tool_last_discovery_ms = max(
+                    0.0,
+                    (time.perf_counter() - start) * 1000.0,
+                )
+                return self._discovered_tools, False, self._tool_last_discovery_ms
+
             try:
                 ep_entries = get_entry_point_values("victor.tools", force=force_refresh)
+                # Abort after the (potentially slow) entry point scan if the
+                # caller requested cancellation. Return whatever we have so far.
+                if cancel_event is not None and cancel_event.is_set():
+                    logger.debug("Tool discovery cancelled after entry point scan")
+                    return self._discovered_tools, False, self._tool_last_discovery_ms
                 self._load_tool_entries(ep_entries)
             except Exception as e:
                 logger.warning("Failed to discover tool entry points: %s", e)
@@ -835,6 +868,7 @@ class VerticalLoader:
     async def discover_tools_async(
         self,
         force_refresh: bool = False,
+        cancel_event: Optional[threading.Event] = None,
     ) -> Dict[str, Type]:
         """Discover tools asynchronously (non-blocking).
 
@@ -843,6 +877,8 @@ class VerticalLoader:
 
         Args:
             force_refresh: Force re-scan of entry points (bypass cache)
+            cancel_event: Optional ``threading.Event`` for cooperative
+                cancellation, propagated down to ``_discover_tools_internal``.
 
         Returns:
             Dictionary mapping tool names to their classes
@@ -850,6 +886,7 @@ class VerticalLoader:
         discovered, cache_hit, duration_ms = await asyncio.to_thread(
             self._discover_tools_internal,
             force_refresh,
+            cancel_event=cancel_event,
         )
 
         payload = self._build_discovery_event_payload(
@@ -1452,13 +1489,19 @@ def discover_vertical_plugins() -> Dict[str, Type[VerticalBase]]:
     return get_vertical_loader().discover_verticals()
 
 
-def discover_tool_plugins() -> Dict[str, Type]:
+def discover_tool_plugins(
+    cancel_event: Optional[threading.Event] = None,
+) -> Dict[str, Type]:
     """Discover tool plugins from entry points (convenience function).
+
+    Args:
+        cancel_event: Optional ``threading.Event`` for cooperative
+            cancellation, propagated down to ``VerticalLoader.discover_tools``.
 
     Returns:
         Dictionary mapping tool names to their classes
     """
-    return get_vertical_loader().discover_tools()
+    return get_vertical_loader().discover_tools(cancel_event=cancel_event)
 
 
 async def discover_vertical_plugins_async() -> Dict[str, Type[VerticalBase]]:
@@ -1472,15 +1515,21 @@ async def discover_vertical_plugins_async() -> Dict[str, Type[VerticalBase]]:
     return await get_vertical_loader().discover_verticals_async()
 
 
-async def discover_tool_plugins_async() -> Dict[str, Type]:
+async def discover_tool_plugins_async(
+    cancel_event: Optional[threading.Event] = None,
+) -> Dict[str, Type]:
     """Discover tool plugins asynchronously (convenience function).
 
     Non-blocking version that offloads entry point scanning to thread pool.
 
+    Args:
+        cancel_event: Optional ``threading.Event`` for cooperative
+            cancellation, propagated down to ``VerticalLoader.discover_tools_async``.
+
     Returns:
         Dictionary mapping tool names to their classes
     """
-    return await get_vertical_loader().discover_tools_async()
+    return await get_vertical_loader().discover_tools_async(cancel_event=cancel_event)
 
 
 __all__ = [

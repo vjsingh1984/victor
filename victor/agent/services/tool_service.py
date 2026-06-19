@@ -1446,18 +1446,17 @@ class ToolService:
 
         _failed = failed_signatures if failed_signatures is not None else set()
 
-        tool_args = raw_args
-        if isinstance(tool_args, str):
-            try:
-                tool_args = json.loads(tool_args)
-            except Exception:
-                try:
-                    tool_args = ast.literal_eval(tool_args)
-                except Exception:
-                    tool_args = {"value": tool_args}
-        elif tool_args is None:
-            tool_args = {}
+        # Coerce via the single shared ladder (json/ast/native-repair/{value:...}),
+        # then delegate to the INJECTED normalizer's normalize_arguments — preserving
+        # the dependency-injection seam (callers may pass a custom/mock normalizer).
+        from victor.agent.argument_normalizer import ArgumentNormalizer
 
+        if isinstance(raw_args, str):
+            tool_args = ArgumentNormalizer.coerce_arg_string(raw_args)
+        elif raw_args is None:
+            tool_args = {}
+        else:
+            tool_args = raw_args
         normalized_args, strategy = argument_normalizer.normalize_arguments(tool_args, tool_name)
         normalized_args = tool_adapter.normalize_arguments(normalized_args, tool_name)
         normalized_args = infer_git_operation(original_name, tool_name, normalized_args)
@@ -1895,16 +1894,12 @@ class ToolService:
             self._tool_call_parser = parser
 
         if tool_calls:
+            from victor.agent.argument_normalizer import ArgumentNormalizer
+
             for tc in tool_calls:
                 args = tc.get("arguments")
                 if isinstance(args, str):
-                    try:
-                        tc["arguments"] = json.loads(args)
-                    except Exception:
-                        try:
-                            tc["arguments"] = ast.literal_eval(args)
-                        except Exception:
-                            tc["arguments"] = {"value": args}
+                    tc["arguments"] = ArgumentNormalizer.coerce_arg_string(args)
                 elif args is None:
                     tc["arguments"] = {}
 
@@ -2675,7 +2670,7 @@ class ToolService:
         3. Semantic selection within budget for small local models.
 
         Does NOT emit tool-strategy events — that responsibility stays with the
-        orchestrator shim to preserve ``MetricsCoordinator`` ownership.
+        orchestrator shim to preserve ``AgentMetricsService`` ownership.
         """
         from victor.config.tool_tiers import get_provider_category
 

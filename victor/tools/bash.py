@@ -439,18 +439,195 @@ def _split_compound_command(cmd: str) -> List[str]:
     return components if components else [cmd.strip()]
 
 
-def _validate_readonly_command(cmd: str) -> tuple[bool, str]:
-    """Validate if a command is readonly and return (is_valid, failing_cmd)."""
-    # Split compound commands and validate each component
-    components = _split_compound_command(cmd)
+# Shell control-flow keywords are structural — they run no command themselves.
+_SHELL_CONTROL_FLOW_KEYWORDS = frozenset(
+    {
+        "for",
+        "while",
+        "until",
+        "if",
+        "then",
+        "elif",
+        "else",
+        "fi",
+        "do",
+        "done",
+        "case",
+        "esac",
+        "select",
+        "time",
+        "function",
+        "!",
+        "{",
+        "}",
+    }
+)
+# Keywords that introduce a word-list/header (not a command) after them.
+_SHELL_LOOP_HEADER_KEYWORDS = frozenset({"for", "select", "case"})
+# Read-only shell builtins that aren't external binaries in the allowlist.
+_SHELL_SAFE_BUILTINS = frozenset(
+    {
+        "read",
+        "echo",
+        "printf",
+        "test",
+        "true",
+        "false",
+        ":",
+        "pwd",
+        "shift",
+        "break",
+        "continue",
+        "return",
+        "local",
+    }
+)
+_ASSIGNMENT_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
 
+
+def _scan_substitutions(text: str) -> "tuple[List[str], str]":
+    """Quote-aware scan for command substitutions.
+
+    Returns ``(subs, stripped)`` where ``subs`` are the inner command strings of
+    genuine ``$(...)`` / backtick substitutions — which execute during expansion
+    and must be validated against the read-only allowlist — and ``stripped`` is
+    ``text`` with those substitutions replaced by the benign ``true`` builtin so
+    the surrounding command can be parsed without their spaces/operators leaking
+    into structural parsing.
+
+    Shell quoting is respected, which is the whole point: inside **single quotes**
+    everything is literal, so backticks/``$()`` in a grep pattern such as
+    ``'^```mermaid'`` or ``'```\\|```'`` are NOT substitutions and are left intact.
+    Inside double quotes and unquoted text, ``$(...)`` and backticks are active,
+    matching shell semantics. (The previous regex-based extractor ignored quoting
+    and mis-read literal backticks as substitutions, rejecting valid commands.)
+    """
+    subs: List[str] = []
+    out: List[str] = []
+    i, n = 0, len(text)
+    in_single = False
+    in_double = False
+    while i < n:
+        ch = text[i]
+        # Backslash escapes the next char (not inside single quotes).
+        if ch == "\\" and i + 1 < n and not in_single:
+            out.append(ch)
+            out.append(text[i + 1])
+            i += 2
+            continue
+        if ch == "'" and not in_double:
+            in_single = not in_single
+            out.append(ch)
+            i += 1
+            continue
+        if ch == '"' and not in_single:
+            in_double = not in_double
+            out.append(ch)
+            i += 1
+            continue
+        if not in_single:
+            # $(...) — depth-balanced so nested parens don't end it early.
+            if ch == "$" and i + 1 < n and text[i + 1] == "(":
+                depth, j = 1, i + 2
+                start = j
+                while j < n and depth:
+                    if text[j] == "(":
+                        depth += 1
+                    elif text[j] == ")":
+                        depth -= 1
+                    j += 1
+                if depth == 0:
+                    subs.append(text[start : j - 1])
+                    out.append("true")
+                    i = j
+                    continue
+                out.append(text[i:])  # unbalanced — keep the rest literal
+                break
+            # `...` backtick substitution
+            if ch == "`":
+                j = text.find("`", i + 1)
+                if j != -1:
+                    subs.append(text[i + 1 : j])
+                    out.append("true")
+                    i = j + 1
+                    continue
+                # unbalanced backtick — treat literally
+        out.append(ch)
+        i += 1
+    return subs, "".join(out)
+
+
+def _strip_structural_prefix(component: str) -> Optional[str]:
+    """Strip leading control-flow keywords and variable assignments.
+
+    Returns the residual simple command, or ``None`` if the component is purely
+    structural (a loop/case header, a bare keyword like ``do``/``done``/``then``/
+    ``fi``, or only ``VAR=value`` assignments) and runs no command itself.
+    """
+    s = component.strip()
+    if not s:
+        return None
+    try:
+        tokens = shlex.split(s)
+    except ValueError:
+        tokens = s.split()
+    if not tokens:
+        return None
+    # A loop/case header (`for VAR in WORDS`, `case WORD in`) runs no command.
+    if tokens[0].lower() in _SHELL_LOOP_HEADER_KEYWORDS:
+        return None
+    idx = 0
+    while idx < len(tokens) and tokens[idx].lower() in _SHELL_CONTROL_FLOW_KEYWORDS:
+        idx += 1
+    while idx < len(tokens) and _ASSIGNMENT_RE.match(tokens[idx]):
+        idx += 1
+    if idx >= len(tokens):
+        return None
+    return " ".join(tokens[idx:])
+
+
+def _validate_readonly_command(cmd: str) -> tuple[bool, str]:
+    """Validate if a command is readonly and return (is_valid, failing_cmd).
+
+    Shell control-flow (``for``/``while``/``if`` ... ``do``/``then``/``done``) is
+    supported: the structural keywords are stripped and every *actual* command —
+    loop bodies, command substitutions, and assignment RHS — is validated against
+    the read-only allowlist. A read-only loop is allowed, but a mutation in a loop
+    body (``rm``) or a header substitution (``$(curl ...)``) is still rejected.
+    """
+    # 1. Quote-aware substitution scan: extract genuine $(...) / backtick subs
+    #    (validated below) and strip them so their inner spaces/operators don't
+    #    confuse structural parsing. Literal backticks inside quotes are kept.
+    subs, sanitized = _scan_substitutions(cmd)
+    for sub in subs:
+        sub = sub.strip()
+        if not sub:
+            continue
+        valid, failing = _validate_readonly_command(sub)
+        if not valid:
+            return False, failing
+
+    # 3. Split compound commands and validate each simple command.
+    components = _split_compound_command(sanitized)
     if len(components) > 1:
-        # Compound command: all components must be readonly
         for comp in components:
-            valid, failing = _validate_readonly_command(comp.strip())
+            valid, failing = _validate_single_readonly_command(comp.strip())
             if not valid:
                 return False, failing
         return True, ""
+
+    return _validate_single_readonly_command(sanitized.strip())
+
+
+def _validate_single_readonly_command(cmd: str) -> tuple[bool, str]:
+    """Validate a single (already split, substitution-free) shell command."""
+    # Strip leading control-flow keywords, loop headers, and assignments. What
+    # remains is the actual command to validate (or nothing, for a structural
+    # fragment like `do` / `done` / `for x in ...`).
+    residual = _strip_structural_prefix(cmd)
+    if residual is None:
+        return True, ""
+    cmd = residual
 
     readonly_commands = _get_readonly_commands()
     base_cmd = _extract_base_command(cmd)
@@ -458,8 +635,10 @@ def _validate_readonly_command(cmd: str) -> tuple[bool, str]:
     if not base_cmd:
         return False, cmd
 
-    # Check if base command is in readonly set
-    if base_cmd not in readonly_commands:
+    # Read-only shell builtins (read, printf, test, true, ...) aren't external
+    # binaries in the allowlist; accept them past the allowlist gate but still
+    # apply the redirect / pipe-to-shell checks below (so `echo x > f` is caught).
+    if base_cmd not in readonly_commands and base_cmd not in _SHELL_SAFE_BUILTINS:
         return False, base_cmd
 
     # Special handling for commands with subcommands
@@ -889,6 +1068,44 @@ def _is_dangerous(command: str) -> bool:
     return _is_dangerous_consolidated(command)
 
 
+_PROGRESS_TOOL_NAME = "shell"
+
+
+async def _stream_subprocess_output(process: Any, tool_name: str) -> tuple[bytes, bytes]:
+    """Read a subprocess's stdout/stderr concurrently, emitting live progress.
+
+    Returns the full accumulated (stdout, stderr) bytes so the existing result
+    contract (truncation, caching) is unchanged. Used only when a UI progress
+    sink is active; otherwise the caller uses the cheaper ``communicate()``.
+    """
+    from victor.framework.tool_progress import emit_tool_progress
+
+    out_buf = bytearray()
+    err_buf = bytearray()
+
+    async def _drain(stream: Any, buf: bytearray, is_stderr: bool) -> None:
+        if stream is None:
+            return
+        while True:
+            chunk = await stream.read(4096)
+            if not chunk:
+                break
+            buf.extend(chunk)
+            text = chunk.decode("utf-8", "replace")
+            emit_tool_progress(
+                name=tool_name,
+                stdout="" if is_stderr else text,
+                stderr=text if is_stderr else "",
+            )
+
+    await asyncio.gather(
+        _drain(process.stdout, out_buf, False),
+        _drain(process.stderr, err_buf, True),
+    )
+    await process.wait()
+    return bytes(out_buf), bytes(err_buf)
+
+
 @tool(
     category="execution",
     priority=Priority.CRITICAL,  # Always available
@@ -1015,7 +1232,7 @@ async def shell(
         # Detect command substitution in the file path (e.g. "$(python -c '...')/file.py")
         _has_cmd_sub = bool(_re.search(r"\$\(", _base_cmd))
 
-        if not _targets_external and (not _targets_file or _is_recursive):
+        if not _targets_external and (not _targets_file or _is_recursive) and not readonly:
             if _has_cmd_sub:
                 error_msg = (
                     "Command substitution in file paths is not supported for grep. "
@@ -1140,12 +1357,23 @@ async def shell(
                 cwd=cwd,
             )
 
-        # Wait for completion with timeout
+        # Wait for completion with timeout. When a live progress sink is active,
+        # stream stdout/stderr incrementally so the UI shows output as it is
+        # produced; otherwise use the cheaper single communicate() call.
+        from victor.framework.tool_progress import emit_tool_progress, has_progress_sink
+
+        _streaming_progress = has_progress_sink()
         try:
-            stdout, stderr = await asyncio.wait_for(
-                process.communicate(),
-                timeout=timeout,
-            )
+            if _streaming_progress:
+                stdout, stderr = await asyncio.wait_for(
+                    _stream_subprocess_output(process, _PROGRESS_TOOL_NAME),
+                    timeout=timeout,
+                )
+            else:
+                stdout, stderr = await asyncio.wait_for(
+                    process.communicate(),
+                    timeout=timeout,
+                )
         except asyncio.TimeoutError:
             process.kill()
             await process.wait()
@@ -1156,6 +1384,9 @@ async def shell(
                 "stderr": "",
                 "return_code": -1,
             }
+
+        if _streaming_progress:
+            emit_tool_progress(name=_PROGRESS_TOOL_NAME, is_final=True)
 
         stdout_str = stdout.decode("utf-8") if stdout else ""
         stderr_str = stderr.decode("utf-8") if stderr else ""

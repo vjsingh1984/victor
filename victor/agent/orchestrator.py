@@ -66,7 +66,7 @@ from rich.console import Console
 # Coordinators (Phase 2 refactoring - being integrated)
 # NOTE: These are runtime imports, not type-checking only
 from victor.agent.services.metrics_service import (
-    MetricsCoordinator,
+    AgentMetricsService,
 )  # noqa: F401  # imported for runtime use
 
 if TYPE_CHECKING:
@@ -2210,7 +2210,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
     ) -> Optional[StreamMetrics]:
         """Finalize stream metrics at end of streaming session.
 
-        Delegates to MetricsCoordinator (Phase 2 refactoring).
+        Delegates to AgentMetricsService (Phase 2 refactoring).
 
         Args:
             usage_data: Optional cumulative token usage from provider API.
@@ -2221,7 +2221,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
     def get_last_stream_metrics(self) -> Optional[StreamMetrics]:
         """Get metrics from the last streaming session.
 
-        Delegates to MetricsCoordinator (Phase 2 refactoring).
+        Delegates to AgentMetricsService (Phase 2 refactoring).
 
         Returns:
             StreamMetrics from the last session or None if no metrics available
@@ -2231,7 +2231,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
     def get_streaming_metrics_summary(self) -> Optional[Dict[str, Any]]:
         """Get comprehensive streaming metrics summary.
 
-        Delegates to MetricsCoordinator (Phase 2 refactoring).
+        Delegates to AgentMetricsService (Phase 2 refactoring).
 
         Returns:
             Dictionary with aggregated metrics or None if metrics disabled.
@@ -2241,7 +2241,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
     def get_streaming_metrics_history(self, limit: int = 10) -> List[Dict[str, Any]]:
         """Get recent streaming metrics history.
 
-        Delegates to MetricsCoordinator (Phase 2 refactoring).
+        Delegates to AgentMetricsService (Phase 2 refactoring).
 
         Args:
             limit: Maximum number of recent metrics to return
@@ -2254,7 +2254,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
     def get_session_cost_summary(self) -> Dict[str, Any]:
         """Get session cost summary.
 
-        Delegates to MetricsCoordinator (Phase 2 refactoring).
+        Delegates to AgentMetricsService (Phase 2 refactoring).
 
         Returns:
             Dictionary with session cost statistics
@@ -2264,7 +2264,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
     def get_session_cost_formatted(self) -> str:
         """Get formatted session cost string.
 
-        Delegates to MetricsCoordinator (Phase 2 refactoring).
+        Delegates to AgentMetricsService (Phase 2 refactoring).
 
         Returns:
             Cost string like "$0.0123" or "cost n/a"
@@ -2282,7 +2282,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
     def export_session_costs(self, path: str, format: str = "json") -> None:
         """Export session costs to file.
 
-        Delegates to MetricsCoordinator (Phase 2 refactoring).
+        Delegates to AgentMetricsService (Phase 2 refactoring).
 
         Args:
             path: Output file path
@@ -2680,7 +2680,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         elapsed_ms: float,
         error_type: Optional[str] = None,
     ) -> None:
-        """Record tool execution statistics. Delegates to MetricsCoordinator."""
+        """Record tool execution statistics. Delegates to AgentMetricsService."""
         self._metrics_coordinator.record_tool_execution_full(
             tool_name=tool_name,
             success=success,
@@ -2700,7 +2700,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
     def get_tool_usage_stats(self) -> Dict[str, Any]:
         """Get comprehensive tool usage statistics.
 
-        Delegates to MetricsCoordinator (Phase 2 refactoring).
+        Delegates to AgentMetricsService (Phase 2 refactoring).
 
         Returns:
             Dictionary with usage analytics including:
@@ -2716,7 +2716,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
     def get_token_usage(self) -> "TokenUsage":
         """Get cumulative token usage for evaluation tracking.
 
-        Delegates to MetricsCoordinator (Phase 2 refactoring).
+        Delegates to AgentMetricsService (Phase 2 refactoring).
 
         Returns cumulative tokens used across all stream_chat calls.
         Used by VictorAgentAdapter for benchmark token tracking.
@@ -2729,7 +2729,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
     def reset_token_usage(self) -> None:
         """Reset cumulative token usage tracking.
 
-        Delegates to MetricsCoordinator (Phase 2 refactoring).
+        Delegates to AgentMetricsService (Phase 2 refactoring).
 
         Call this at the start of a new evaluation task to get fresh counts.
         """
@@ -2756,7 +2756,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
     def get_optimization_status(self) -> Dict[str, Any]:
         """Get comprehensive status of all integrated optimization components.
 
-        Delegates to MetricsCoordinator which owns the reporting logic.
+        Delegates to AgentMetricsService which owns the reporting logic.
         """
         return self._metrics_coordinator.get_optimization_status(
             context_compactor=self._context_compactor,
@@ -2769,7 +2769,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         )
 
     def flush_analytics(self) -> Dict[str, bool]:
-        """Flush all analytics and cached data. Delegates to MetricsCoordinator."""
+        """Flush all analytics and cached data. Delegates to AgentMetricsService."""
         return self._metrics_coordinator.flush_analytics(
             usage_analytics=getattr(self, "_usage_analytics", None),
             sequence_tracker=getattr(self, "_sequence_tracker", None),
@@ -3903,7 +3903,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         reason: str,
         tools=None,
     ):
-        """Emit tool strategy selection event via MetricsCoordinator.
+        """Emit tool strategy selection event via AgentMetricsService.
 
         Args:
             strategy: Strategy name (session_lock, semantic_selection, etc.)

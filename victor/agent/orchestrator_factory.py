@@ -436,6 +436,7 @@ class OrchestratorFactory(
             prompt_contributors=prompt_contributors,
             provider_caches=provider_caches,
             provider_has_kv_cache=provider_has_kv_cache,
+            headless_mode=self.settings.headless.headless_mode,
         )
 
     def create_project_context(self) -> "ProjectContext":
@@ -536,6 +537,7 @@ class OrchestratorFactory(
             prompt_contributors=prompt_contributors,
             provider_caches=provider_caches,
             provider_has_kv_cache=provider_has_kv_cache,
+            headless_mode=self.settings.headless.headless_mode,
         )
 
         logger.debug(f"SystemPromptBuilder created for {provider_name}/{model}")

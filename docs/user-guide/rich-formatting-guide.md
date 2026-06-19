@@ -127,6 +127,45 @@ tool_settings:
 
 ## Features
 
+### Progressive Tool Output Streaming
+
+Long-running tools (`shell`, `code_search`) can stream their stdout/stderr into a
+live, updating terminal block **while they run**, instead of the UI waiting for
+the final result. This makes long operations feel responsive rather than stalled.
+
+**How it works (architecture):**
+
+```
+tool (e.g. shell)                  rendering layer
+  emit_tool_progress(...)  ──►  framework/tool_progress.py (process-global sink)
+                                        │  registered around a turn by
+                                        ▼  ui/rendering/handler.stream_response()
+                                 renderer.on_tool_progress(name, stdout, stderr, …)
+                                        │
+                                        ▼  LiveDisplayRenderer renders a throttled
+                                           Rich panel; torn down on on_tool_result
+```
+
+Key properties:
+
+- **UI-ephemeral.** Progress is for human visibility only. It is **never** added
+  to the conversation, persisted, or sent to the model, so it is fully decoupled
+  from the LLM message stream and from `OutputPruner`.
+- **Best-effort & safe.** When no sink is registered (API/server path, headless,
+  tests) `emit_tool_progress` is a no-op; a failing renderer never breaks a tool.
+- **The `shell` tool** streams via incremental subprocess reads only when a sink
+  is active; otherwise it uses the cheaper single `communicate()` call, and
+  cached read-only commands are unaffected.
+- Non-live renderers (`BufferedRenderer`, `FormatterRenderer`) implement
+  `on_tool_progress` as a no-op.
+
+**Configuration** — `tool_progress_streaming_enabled` (default: `true`) under
+tool settings. Set to `false` to disable the live block (tools still produce
+their normal final output).
+
+The corresponding event type is `EventType.TOOL_PROGRESS`
+(`victor/framework/events.py`), carrying `metadata["tool_progress"]`.
+
 ### Color-Coded Status Indicators
 
 - **✓ Green** - Success (tests passed, commands succeeded, hosts reachable)

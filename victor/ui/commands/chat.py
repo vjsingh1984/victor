@@ -746,6 +746,12 @@ def chat(
         "--thinking/--no-thinking",
         help="Enable extended thinking/reasoning mode (Claude models). Shows model's reasoning process.",
     ),
+    headless: bool = typer.Option(
+        False,
+        "--headless",
+        help="Run without prompts, auto-approve safe actions.",
+        rich_help_panel="Advanced Agent Behavior",
+    ),
     # Output options
     json_output: bool = typer.Option(
         False,

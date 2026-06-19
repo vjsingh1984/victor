@@ -56,8 +56,8 @@ from victor.agent.services.exploration_runtime import (
     ExplorationResult,
 )
 from victor.agent.services.metrics_service import (
-    MetricsCoordinator,
-    create_metrics_coordinator,
+    AgentMetricsService,
+    create_agent_metrics_service,
 )
 from victor.agent.services.provider_service import ProviderService
 from victor.agent.services.runtime_intelligence import (
@@ -140,7 +140,7 @@ __all__ = [
     "ExplorationResult",
     "LLMDecisionService",
     "LLMDecisionServiceConfig",
-    "MetricsCoordinator",
+    "AgentMetricsService",
     "PlanningConfig",
     "PlanningCoordinator",
     "PlanningMode",
@@ -183,7 +183,7 @@ __all__ = [
     "TurnResult",
     "create_transition_strategy",
     "create_streaming_chat_executor",
-    "create_metrics_coordinator",
+    "create_agent_metrics_service",
     "analyze_prompt_rollout_experiment",
     "analyze_prompt_rollout_experiment_async",
     "apply_prompt_rollout_recommendation",

@@ -335,25 +335,43 @@ victor/research/escape_hatches.py
 def tests_passing(ctx: Dict[str, Any]) -> str:
     """Check if tests are passing.
 
+    In strict mode (``ctx["strict"] = True``) the presence of ANY warning
+    causes the result to be treated as ``"failing"``, even when every test
+    passes and coverage is sufficient. This is useful for CI gates that must
+    block on a clean run with zero deprecation/usage warnings.
+
     Args:
         ctx: Workflow context with keys:
-            - test_results (dict): Test execution results
-            - min_coverage (float): Minimum coverage threshold
+            - test_results (dict): Test execution results, which may include:
+                - passed (int): Number of passing tests
+                - failed (int): Number of failing tests
+                - warnings (int): Number of warnings emitted by the run
+                - coverage (float): Code coverage ratio in ``[0.0, 1.0]``
+            - min_coverage (float): Minimum coverage threshold (default 0.8)
+            - strict (bool): When True, ANY warning counts as failing
+                (default False)
 
     Returns:
         "passing", "failing", or "no_tests"
     """
     test_results = ctx.get("test_results", {})
     min_coverage = ctx.get("min_coverage", 0.8)
+    strict = ctx.get("strict", False)
 
     if not test_results:
         return "no_tests"
 
     passed = test_results.get("passed", 0)
     failed = test_results.get("failed", 0)
+    warnings = test_results.get("warnings", 0)
     coverage = test_results.get("coverage", 0)
 
     if failed > 0:
+        return "failing"
+
+    # Strict mode: any warning is treated as a failure so a clean run is
+    # required (e.g. to fail CI on deprecation/usage warnings).
+    if strict and warnings > 0:
         return "failing"
 
     if coverage < min_coverage:

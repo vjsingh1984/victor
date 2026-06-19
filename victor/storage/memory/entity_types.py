@@ -90,6 +90,17 @@ class RelationType(str, Enum):
     REFERENCES = "references"  # A references B
     USED_BY = "used_by"  # A is used by B
 
+    # Code relationships.
+    # NOTE: these values are intentionally UPPERCASE (unlike the lowercase semantic
+    # relations above). They mirror the canonical program-analysis edge-type vocabulary
+    # in ``victor/storage/graph/edge_types.py`` (EdgeType.CALLS="CALLS", CDG="CDG",
+    # DDG_DEF_USE="DDG_DEF_USE") that the graph index emits and graph/code_search edge
+    # filters match on. Do NOT lowercase them — that would break alignment with the graph
+    # edge vocabulary and silently drop these relations from edge-type-filtered queries.
+    CALLS = "CALLS"  # Function A calls function B (== EdgeType.CALLS)
+    DATA_DEP = "DDG_DEF_USE"  # B depends on data from A (== EdgeType.DDG_DEF_USE)
+    CONTROL_DEP = "CDG"  # B execution depends on A (== EdgeType.CDG)
+
     # Ownership/authorship
     CREATED_BY = "created_by"
     OWNED_BY = "owned_by"

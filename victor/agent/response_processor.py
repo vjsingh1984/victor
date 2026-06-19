@@ -318,16 +318,12 @@ class ResponseProcessor:
         if not tool_calls:
             return None
 
+        from victor.agent.argument_normalizer import ArgumentNormalizer
+
         for tc in tool_calls:
             args = tc.get("arguments")
             if isinstance(args, str):
-                try:
-                    tc["arguments"] = json.loads(args)
-                except Exception:
-                    try:
-                        tc["arguments"] = ast.literal_eval(args)
-                    except Exception:
-                        tc["arguments"] = {"value": args}
+                tc["arguments"] = ArgumentNormalizer.coerce_arg_string(args)
             elif args is None:
                 tc["arguments"] = {}
 

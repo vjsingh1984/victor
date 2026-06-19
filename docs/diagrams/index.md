@@ -57,7 +57,7 @@ Provider abstraction and switching mechanism.
 **Shows**:
 - Provider Registry
 - Base Provider Protocol
-- 21 Provider Implementations
+- 24 Provider Implementations
 - Circuit Breaker
 - Resilient Provider Wrapper
 

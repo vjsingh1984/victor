@@ -116,44 +116,6 @@ def _model_supports_tools(model: str) -> bool:
     return any(pattern in model_lower for pattern in TOOL_CAPABLE_PATTERNS)
 
 
-def _extract_tool_calls_from_content(content: str) -> Tuple[List[Dict[str, Any]], str]:
-    """Extract tool calls from content when MLX doesn't parse them.
-
-    Handles cases where model outputs tool calls as JSON text.
-
-    Args:
-        content: Response content that may contain tool calls
-
-    Returns:
-        Tuple of (parsed_tool_calls, remaining_content)
-    """
-    tool_calls = []
-    remaining = content
-
-    # Pattern: JSON code block with tool call
-    json_block_pattern = r"```json\s*\n?\s*(\{[^`]*\"name\"\s*:\s*\"[^\"]+\"[^`]*\})\s*\n?```"
-    import json
-
-    matches = re.findall(json_block_pattern, content, re.DOTALL)
-    for match in matches:
-        try:
-            data = json.loads(match)
-            if "name" in data:
-                arguments = data.get("arguments", {})
-                tool_calls.append(
-                    {
-                        "id": f"mlx_{len(tool_calls)}",
-                        "name": data.get("name", ""),
-                        "arguments": arguments,
-                    }
-                )
-                remaining = remaining.replace(f"```json\n{match}\n```", "").strip()
-        except json.JSONDecodeError:
-            pass
-
-    return tool_calls, remaining
-
-
 class MLXProvider(BaseProvider):
     """Provider for MLX LM (Apple Silicon optimized inference).
 
@@ -390,7 +352,9 @@ class MLXProvider(BaseProvider):
                 raise ProviderError(f"MLX generation failed: {e}")
 
         # Extract tool calls if present
-        tool_calls, content = _extract_tool_calls_from_content(response_text)
+        from victor.providers.openai_compat import extract_tool_calls_from_content
+
+        tool_calls, content = extract_tool_calls_from_content(response_text, id_prefix="mlx")
 
         return CompletionResponse(
             content=content,

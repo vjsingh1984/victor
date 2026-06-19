@@ -176,6 +176,16 @@ class FeatureFlag(Enum):
     # Default: False (opt-in, enable with VICTOR_USE_POLICY_ENGINE=true)
     USE_POLICY_ENGINE = "use_policy_engine"
 
+    # Phase 19 - E3-TIR Experience-Replay Tool Exploration
+    # Gates the E3-TIR post-selection reranker (victor/tools/e3_tir_selector.py),
+    # which reranks the per-turn tool set using experience-based exploration phases
+    # (demonstration warm-up -> self-play -> targeted exploration) with mode-collapse
+    # prevention. Applied only for non-KV/per-turn providers (it reorders tools per
+    # turn, which conflicts with KV-prefix-stable tool ordering). Requires
+    # USE_LEARNING_FROM_EXECUTION to also be enabled.
+    # Default: False (opt-in, enable with VICTOR_USE_E3_TIR_EXPLORATION=true)
+    USE_E3_TIR_EXPLORATION = "use_e3_tir_exploration"
+
     def get_env_var_name(self) -> str:
         """Get the environment variable name for this flag.
 
@@ -215,6 +225,8 @@ class FeatureFlag(Enum):
             FeatureFlag.USE_TIERED_CLASSIFICATION,
             # Phase 18: Governance Policy Engine (opt-in, off by default)
             FeatureFlag.USE_POLICY_ENGINE,
+            # Phase 19: E3-TIR experience-replay tool exploration (opt-in, off by default)
+            FeatureFlag.USE_E3_TIR_EXPLORATION,
         }
 
     def get_default_enabled(self, fallback: bool) -> bool:

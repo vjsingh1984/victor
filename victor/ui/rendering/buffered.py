@@ -54,6 +54,16 @@ class BufferedRenderer:
         """Record tool execution start."""
         self._tool_calls.append({"name": name, "arguments": arguments, "result": None})
 
+    def on_tool_progress(
+        self,
+        name: str,
+        stdout: str = "",
+        stderr: str = "",
+        progress: float = 0.0,
+        is_final: bool = False,
+    ) -> None:
+        """No-op: buffered mode shows only final output, not live progress."""
+
     def on_tool_result(
         self,
         name: str,

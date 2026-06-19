@@ -9,11 +9,11 @@ from unittest.mock import MagicMock
 import pytest
 
 from victor.agent.session_cost_tracker import SessionCostTracker
-from victor.agent.services.metrics_service import MetricsCoordinator
+from victor.agent.services.metrics_service import AgentMetricsService
 
 
-def _make_metrics_coordinator() -> MetricsCoordinator:
-    return MetricsCoordinator(
+def _make_metrics_coordinator() -> AgentMetricsService:
+    return AgentMetricsService(
         metrics_collector=MagicMock(),
         session_cost_tracker=MagicMock(),
         cumulative_token_usage={
@@ -94,7 +94,7 @@ def test_task_report_captures_token_deltas_and_success_average():
         "cached_tokens": 10,
     }
     tracker = SessionCostTracker(provider="unknown", model="test-model")
-    coordinator = MetricsCoordinator(
+    coordinator = AgentMetricsService(
         metrics_collector=MagicMock(),
         session_cost_tracker=tracker,
         cumulative_token_usage=cumulative,
@@ -146,7 +146,7 @@ def test_task_report_captures_token_deltas_and_success_average():
 
 
 def test_task_report_promotes_workspace_policy_and_diagnostics():
-    coordinator = MetricsCoordinator(
+    coordinator = AgentMetricsService(
         metrics_collector=MagicMock(),
         session_cost_tracker=SessionCostTracker(provider="unknown", model="test-model"),
         cumulative_token_usage={
@@ -191,7 +191,7 @@ def test_task_report_promotes_workspace_policy_and_diagnostics():
 
 def test_task_report_history_respects_limit():
     tracker = SessionCostTracker(provider="unknown", model="test-model")
-    coordinator = MetricsCoordinator(
+    coordinator = AgentMetricsService(
         metrics_collector=MagicMock(),
         session_cost_tracker=tracker,
         cumulative_token_usage={

@@ -15,6 +15,10 @@
 """Canonical shared grounding text used across prompt systems."""
 
 GROUNDING_RULES = """
+SDLC 3.0 MANDATES:
+1. IMPACT ANALYSIS (MANDATORY): Before applying any code change, you MUST use `graph(mode="impact", node="...")` to identify potential regressions and relevant test suites.
+2. DOCUMENTATION PARITY (MANDATORY): At the end of every refactoring or feature implementation, you MUST bring the project documentation into parity with the code changes using the `docs` tool or manual edits.
+
 GROUNDING: Base ALL responses strictly on tool output only. Never assume, invent, or fabricate file paths, line numbers, content, or any information not explicitly present in tool responses. Treat tool outputs as raw data structures and verify field existence and types before accessing attributes or nested keys. If information is missing, call an appropriate tool to obtain it rather than guessing. Before each tool call, verify that all arguments strictly conform to the expected schema as documented or demonstrated by prior tool outputs. Always verify file existence with a dedicated ls() or targeted code_search() call before attempting to read or operate on files to prevent file_not_found errors. Favor narrowly scoped searches, filters, and limits over broad directory scans or large data reads. If a tool call fails, carefully read and interpret the error message; do not repeat the same call without adjusting parameters or approach based on the error diagnosis. Limit shell commands to essential, small-scope operations to reduce timeouts and shell errors. Quote code and outputs exactly as provided by the tools, without modification. For audit/review findings, only label an item verified when the specific file path, symbol or snippet, and cited line number have been confirmed by tool output; otherwise label it unverified or needs follow-up. Do not infer exact line numbers from truncated output or from memory. If more information is needed, call another tool rather than making assumptions.
 """.strip()
 

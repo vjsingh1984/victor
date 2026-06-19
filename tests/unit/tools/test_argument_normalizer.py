@@ -1442,3 +1442,129 @@ embedded newlines and "quotes" that aren't escaped.
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
+
+class TestGreedyWriteEnvelopeRecovery:
+    """Recover large/malformed `write` value-envelopes (glm-5.1 regression).
+
+    Reproduces the docs-audit failure: a 15KB BLUEPRINT.md write was emitted as
+    a single `value` string whose `content` had unescaped quotes, mermaid braces
+    and a possibly-truncated tail, so strict + lookahead parsers recovered only
+    `path` -> the write retried with no content and failed.
+    """
+
+    def _malformed_envelope(self, content: str) -> str:
+        # Mimic a model that wrapped {path, content} in a `value` string but did
+        # NOT escape the inner double-quotes/newlines in `content`.
+        return '{"path":"docs/architecture/BLUEPRINT.md","content":"' + content + '"}'
+
+    def test_greedy_recovers_content_with_quotes_and_mermaid_braces(self):
+        content = (
+            "# Victor Blueprint\n\n"
+            '```mermaid\nflowchart TD\n  A{"decision?"} -->|yes| B[run]\n```\n\n'
+            'See the "tools" guide and the {config} block.\n'
+        )
+        payload = self._malformed_envelope(content)
+        out = ArgumentNormalizer.extract_write_payload_greedy(payload)
+        assert out is not None
+        assert out["path"] == "docs/architecture/BLUEPRINT.md"
+        # Full content recovered (not truncated at the first inner `}` or `"`).
+        assert out["content"] == content
+
+    def test_greedy_recovers_truncated_tail_without_closing_brace(self):
+        # Model truncated mid-content: no closing `"}`.
+        content = "# Victor\n\nLots of text ... [workflows]()"
+        payload = '{"path":"docs/x.md","content":"' + content
+        out = ArgumentNormalizer.extract_write_payload_greedy(payload)
+        assert out is not None
+        assert out["path"] == "docs/x.md"
+        assert out["content"] == content
+
+    def test_greedy_returns_none_without_content_marker(self):
+        # Never fabricate empty content (would clobber the file).
+        assert ArgumentNormalizer.extract_write_payload_greedy('{"path":"a.md"}') is None
+        assert ArgumentNormalizer.extract_write_payload_greedy("no json here") is None
+
+    def test_normalize_arguments_unwraps_malformed_write_envelope(self):
+        content = '# Doc\n\nA{node} and a "quoted" word.\n' * 50  # large + bracey + quotes
+        payload = self._malformed_envelope(content)
+        normalizer = ArgumentNormalizer(provider_name="zai")
+        result, _strategy = normalizer.normalize_arguments({"value": payload}, "write")
+        # The value envelope must be unwrapped into path + content (not left as
+        # {"value": ...}, which fails the write tool's required-arg validation).
+        assert result.get("path") == "docs/architecture/BLUEPRINT.md"
+        assert result.get("content") == content
+        assert "value" not in result
+
+    def test_escapes_are_decoded(self):
+        payload = r'{"path":"a.md","content":"line1\nline2\ttabbed and a \"quote\""}'
+        out = ArgumentNormalizer.extract_write_payload_greedy(payload)
+        assert out is not None
+        assert out["content"] == 'line1\nline2\ttabbed and a "quote"'
+
+    def test_greedy_recovers_content_first_field_order(self):
+        # glm-5.1 also emits {content, path} — content must NOT swallow the
+        # trailing `","path":"..."` (the failure seen in the docs-audit run).
+        content = '# Victor\n\nA{node} and "quotes" everywhere.\n' * 20
+        payload = '{"content":"' + content + '","path":"docs/architecture/BLUEPRINT.md"}'
+        out = ArgumentNormalizer.extract_write_payload_greedy(payload)
+        assert out is not None
+        assert out["path"] == "docs/architecture/BLUEPRINT.md"
+        assert out["content"] == content  # path suffix not swallowed into the body
+
+    def test_greedy_sanitizes_newline_in_path(self):
+        # A stray newline in the path must not create a corrupt filename
+        # (transcript: docs/javascripts/mermaid-init.js\n).
+        payload = '{"path":"docs/javascripts/mermaid-init.js\\n","content":"x = 1;\\n"}'
+        out = ArgumentNormalizer.extract_write_payload_greedy(payload)
+        assert out is not None
+        assert out["path"] == "docs/javascripts/mermaid-init.js"
+        assert "\n" not in out["path"]
+
+
+class TestParseToolArgumentsUnifiedEntry:
+    """End-to-end coverage of the single authority parse_tool_arguments().
+
+    All tool-call entry points now route raw model args through this one method
+    (coercion ladder + schema-aware value-envelope recovery + normalization),
+    replacing six duplicated json/ast/{value:...} blocks and the duplicate
+    recovery in error_recovery.
+    """
+
+    def _norm(self):
+        return ArgumentNormalizer(provider_name="zai")
+
+    def test_well_formed_json_string(self):
+        out, _ = self._norm().parse_tool_arguments('{"path": "a.md", "content": "hi"}', "write")
+        assert out["path"] == "a.md" and out["content"] == "hi"
+
+    def test_dict_passthrough(self):
+        out, _ = self._norm().parse_tool_arguments({"path": "a.md", "content": "x"}, "write")
+        assert out["path"] == "a.md"
+
+    def test_none_becomes_empty(self):
+        out, _ = self._norm().parse_tool_arguments(None, "read")
+        assert out == {} or isinstance(out, dict)
+
+    def test_malformed_write_path_first(self):
+        body = '# Doc\n\nA{node} and "quotes".\n' * 30
+        raw = '{"path":"docs/BLUEPRINT.md","content":"' + body + '"}'
+        out, _ = self._norm().parse_tool_arguments(raw, "write")
+        assert out["path"] == "docs/BLUEPRINT.md"
+        assert out["content"] == body
+
+    def test_malformed_write_content_first(self):
+        body = '# Doc\n\nA{node} and "quotes".\n' * 30
+        raw = '{"content":"' + body + '","path":"docs/BLUEPRINT.md"}'
+        out, _ = self._norm().parse_tool_arguments(raw, "write")
+        assert out["path"] == "docs/BLUEPRINT.md"
+        assert out["content"] == body
+
+    def test_extract_by_schema_shell_cmd(self):
+        raw = '{"cmd":"cat > f << \'EOF\'\nhello "world"\nEOF"}'
+        out = ArgumentNormalizer._extract_by_schema(raw, ["cmd"])
+        assert out is not None and out["cmd"].startswith("cat > f")
+
+    def test_extract_by_schema_requires_all_fields(self):
+        # Only content present; path required -> None (never fabricates a path).
+        assert ArgumentNormalizer._extract_by_schema('{"content":"x"}', ["path", "content"]) is None

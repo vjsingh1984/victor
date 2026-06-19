@@ -73,9 +73,9 @@ def create_metrics_runtime_components(
     )
 
     def _build_metrics_coordinator() -> Any:
-        from victor.agent.services.metrics_service import MetricsCoordinator
+        from victor.agent.services.metrics_service import AgentMetricsService
 
-        return MetricsCoordinator(
+        return AgentMetricsService(
             metrics_collector=metrics_collector.get_instance(),
             session_cost_tracker=session_cost_tracker.get_instance(),
             cumulative_token_usage=cumulative_token_usage,

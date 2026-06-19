@@ -358,6 +358,26 @@ class BaseYAMLWorkflowProvider(WorkflowProviderProtocol, ABC):
             from victor.workflows.yaml_loader import YAMLWorkflowConfig
 
             conditions, transforms = self._load_escape_hatches()
+
+            # Merge globally-registered generic escape hatches beneath the
+            # provider-specific ones so they are available to every YAML workflow
+            # while provider-specific hatches still take precedence (provider wins
+            # on name conflicts). Best-effort: never fail config creation on this.
+            try:
+                from victor.framework.escape_hatch_registry import get_escape_hatch_registry
+                from victor.workflows.escape_hatches import (
+                    ensure_global_escape_hatches_registered,
+                )
+
+                ensure_global_escape_hatches_registered()
+                global_conditions, global_transforms = (
+                    get_escape_hatch_registry().get_registry_for_vertical("", include_global=True)
+                )
+                conditions = {**global_conditions, **conditions}
+                transforms = {**global_transforms, **transforms}
+            except Exception as exc:  # pragma: no cover - defensive
+                logger.debug("Skipped merging global escape hatches: %s", exc)
+
             workflows_dir = self._get_workflows_directory()
 
             self._config = YAMLWorkflowConfig(

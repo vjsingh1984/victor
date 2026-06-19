@@ -71,7 +71,7 @@ class _FakeIndexLockRegistry:
     def __init__(self) -> None:
         self.used_paths: list[Path] = []
 
-    async def acquire_lock(self, root: Path) -> _NoOpAsyncLock:
+    async def acquire_lock(self, root: Path, **kwargs) -> _NoOpAsyncLock:
         return _NoOpAsyncLock()
 
     def mark_lock_used(self, root: Path) -> None:
@@ -83,7 +83,7 @@ class _TrackingIndexLockRegistry(_FakeIndexLockRegistry):
         super().__init__()
         self.in_lock = False
 
-    async def acquire_lock(self, root: Path) -> _TrackingAsyncLock:
+    async def acquire_lock(self, root: Path, **kwargs) -> _TrackingAsyncLock:
         self.used_paths.append(root)
         return _TrackingAsyncLock(self)
 
@@ -93,9 +93,25 @@ class _SerialIndexLockRegistry(_FakeIndexLockRegistry):
         super().__init__()
         self._lock = asyncio.Lock()
 
-    async def acquire_lock(self, root: Path) -> asyncio.Lock:
+    async def acquire_lock(self, root: Path, **kwargs) -> asyncio.Lock:
         self.used_paths.append(root)
         return self._lock
+
+
+class _TimeoutAsyncLock:
+    """A lock handle that times out on acquisition (background refresh busy)."""
+
+    async def __aenter__(self):
+        raise TimeoutError("index lock busy")
+
+    async def __aexit__(self, exc_type, exc, tb):
+        return False
+
+
+class _TimeoutIndexLockRegistry(_FakeIndexLockRegistry):
+    async def acquire_lock(self, root: Path, **kwargs) -> _TimeoutAsyncLock:
+        self.used_paths.append(root)
+        return _TimeoutAsyncLock()
 
 
 class _FakeCapabilityRegistry:
@@ -1296,6 +1312,66 @@ class TestStructuralIndexPersistence:
         probe_mock.assert_awaited_once_with(replacement_index)
         assert fake_cache[str(root)]["index"] is replacement_index
         assert fake_cache[str(root)]["index_manifest"] == new_manifest
+
+    @pytest.mark.asyncio
+    async def test_get_or_build_index_serves_stale_cache_when_lock_busy(
+        self, tmp_path, monkeypatch
+    ):
+        """A1: when the lock is held by a background refresh, serve the stale
+        cache instead of blocking for the full timeout or raising."""
+        root = tmp_path / "repo"
+        root.mkdir()
+        (root / "main.py").write_text("print('hi')\n", encoding="utf-8")
+
+        settings = SimpleNamespace(
+            codebase_graph_store="sqlite",
+            codebase_graph_path=None,
+            unified_embedding_model="BAAI/bge-small-en-v1.5",
+        )
+
+        cached_index = SimpleNamespace(incremental_reindex=AsyncMock())
+        index_manifest = build_codebase_index_manifest(
+            _build_codebase_embedding_config(settings, root)
+        )
+        fake_cache: dict[str, dict[str, object]] = {
+            str(root): {
+                "index": cached_index,
+                "latest_mtime": _latest_mtime(root),
+                "indexed_at": time.time(),
+                "index_manifest": index_manifest,
+                "watcher_subscribed": True,
+                "stale": True,  # forces fall-through to the (busy) lock
+            }
+        }
+        fake_factory = SimpleNamespace(create=lambda **kwargs: cached_index)
+
+        import victor.core.capability_registry as capability_registry_module
+        import victor.core.indexing.index_lock as index_lock_module
+        import victor.tools.code_search_tool as code_search_tool_module
+
+        monkeypatch.setattr(
+            capability_registry_module.CapabilityRegistry,
+            "get_instance",
+            staticmethod(lambda: _FakeCapabilityRegistry(fake_factory)),
+        )
+        monkeypatch.setattr(
+            index_lock_module.IndexLockRegistry,
+            "get_instance",
+            staticmethod(lambda: _TimeoutIndexLockRegistry()),
+        )
+        monkeypatch.setattr(
+            code_search_tool_module,
+            "_get_index_cache",
+            lambda exec_ctx=None: fake_cache,
+        )
+
+        clear_index_cache()
+        index, rebuilt = await _get_or_build_index(root=root, settings=settings)
+
+        # Stale cache served; no rebuild attempted under the busy lock.
+        assert index is cached_index
+        assert rebuilt is False
+        cached_index.incremental_reindex.assert_not_awaited()
 
     @pytest.mark.asyncio
     async def test_get_or_build_index_rebuilds_stale_cache_inside_lock(self, tmp_path, monkeypatch):

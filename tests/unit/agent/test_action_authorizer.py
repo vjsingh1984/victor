@@ -1036,3 +1036,29 @@ class TestReadonlyShellSignals:
         )
 
         assert blocked is False
+
+
+class TestGitReadonlySignalSourcedFromBash:
+    """The git read-only intent signal is derived from bash.py's authoritative
+    GIT_READONLY_SUBCOMMANDS set, so it cannot drift from actual command validation."""
+
+    def test_git_signal_covers_subcommands_beyond_the_old_hardcoded_six(self):
+        # blame / rev-parse are read-only in bash.py but were missing from the
+        # previous hardcoded (status|log|show|branch|tag|diff) regex.
+        assert has_explicit_readonly_shell_request("can you git blame this file")
+        assert has_explicit_readonly_shell_request("please git rev-parse HEAD")
+
+    def test_git_signal_still_matches_core_subcommands(self):
+        assert has_explicit_readonly_shell_request("run git status")
+        assert has_explicit_readonly_shell_request("show me the git log")
+
+    def test_git_write_subcommands_do_not_signal_readonly(self):
+        assert not has_explicit_readonly_shell_request("git push the branch")
+        assert not has_explicit_readonly_shell_request("git commit the changes")
+
+    def test_signal_set_matches_bash_authority(self):
+        from victor.tools.bash import GIT_READONLY_SUBCOMMANDS
+
+        # Every bash read-only git subcommand should be recognized as a readonly signal.
+        for sub in sorted(GIT_READONLY_SUBCOMMANDS):
+            assert has_explicit_readonly_shell_request(f"run git {sub} now"), sub

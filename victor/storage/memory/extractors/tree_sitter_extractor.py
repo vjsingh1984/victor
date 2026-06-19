@@ -66,7 +66,13 @@ class TreeSitterEntityExtractor(EntityExtractor):
         }
 
     def _get_extractor(self):
-        """Lazily initialize Tree-sitter extractor."""
+        """Lazily resolve the Tree-sitter extractor capability.
+
+        Returns the enhanced provider, or ``None`` when the capability is not
+        registered. Returning ``None`` (rather than raising) keeps the absence of an
+        optional dependency on the normal control-flow path — the graceful-degradation
+        pattern — so genuine extraction errors are not conflated with "not installed".
+        """
         if self._extractor is None:
             from victor.core.capability_registry import CapabilityRegistry
             from victor.framework.vertical_protocols import TreeSitterExtractorProtocol
@@ -76,11 +82,13 @@ class TreeSitterEntityExtractor(EntityExtractor):
             if provider is not None and registry.is_enhanced(TreeSitterExtractorProtocol):
                 self._extractor = provider
             else:
-                logger.warning(
-                    "Tree-sitter extractor not available: " "no enhanced provider registered"
-                )
-                raise ImportError("Tree-sitter extractor capability not registered")
+                logger.debug("Tree-sitter extractor not available: no enhanced provider registered")
+                return None
         return self._extractor
+
+    def is_available(self) -> bool:
+        """Return whether the Tree-sitter extractor capability is registered."""
+        return self._get_extractor() is not None
 
     async def extract(
         self,
@@ -110,9 +118,14 @@ class TreeSitterEntityExtractor(EntityExtractor):
             # Fall back to parsing content inline (limited support)
             return await self._extract_inline(content, context)
 
-        try:
-            extractor = self._get_extractor()
+        # Optional-dependency check on the normal path: if the capability is not
+        # registered, degrade to an empty result instead of routing through an exception.
+        extractor = self._get_extractor()
+        if extractor is None:
+            logger.debug("Tree-sitter extractor unavailable; returning empty result")
+            return ExtractionResult(entities=[], relations=[])
 
+        try:
             # Determine language
             file_path = Path(source)
             language = context.get("language") if context else None
@@ -261,6 +274,9 @@ class TreeSitterEntityExtractor(EntityExtractor):
 
             try:
                 extractor = self._get_extractor()
+                if extractor is None:
+                    logger.debug("Tree-sitter extractor unavailable; returning empty result")
+                    return ExtractionResult(entities=[], relations=[])
                 symbols, edges = extractor.extract_all(temp_path, language)
 
                 entities = []
@@ -304,8 +320,10 @@ class TreeSitterEntityExtractor(EntityExtractor):
     def _edge_type_to_relation_type(self, edge_type: str) -> Optional[RelationType]:
         """Convert Tree-sitter edge type to RelationType."""
         mapping = {
-            "CALLS": RelationType.REFERENCES,  # CALLS maps to REFERENCES
-            "INHERITS": RelationType.EXTENDS,  # INHERITS maps to EXTENDS
+            "CALLS": RelationType.CALLS,
+            "DATA_DEP": RelationType.DATA_DEP,
+            "CONTROL_DEP": RelationType.CONTROL_DEP,
+            "INHERITS": RelationType.EXTENDS,
             "IMPLEMENTS": RelationType.IMPLEMENTS,
             "COMPOSITION": RelationType.CONTAINS,
         }

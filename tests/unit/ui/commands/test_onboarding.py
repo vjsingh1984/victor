@@ -27,8 +27,12 @@ class TestOnboardingWizard:
 
     def test_init(self):
         """Wizard initialization works."""
+        from victor.ui.commands.onboarding import get_project_paths
+
         wizard = OnboardingWizard()
-        assert wizard.config_dir == Path.home() / ".victor"
+        # config_dir resolves through centralized Victor paths (secure, $HOME-independent),
+        # not Path.home() directly — assert against the same resolver the wizard uses.
+        assert wizard.config_dir == get_project_paths().global_victor_dir
         assert wizard.state["step"] == 0
 
     def test_init_uses_global_victor_dir(self, tmp_path):

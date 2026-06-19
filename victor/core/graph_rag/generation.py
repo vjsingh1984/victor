@@ -404,12 +404,14 @@ class GraphAwarePromptBuilder:
         # For hierarchical format, organize by categories
         if self.config.format_style == "hierarchical":
             direct_matches = self._extract_direct_matches(context)
+            impact_analysis = self._extract_impact_analysis(context)
             related_symbols = self._extract_related_symbols(context)
             data_flow = self._extract_data_flow(context)
             control_flow = self._extract_control_flow(context)
 
             return template.format(
                 direct_matches=direct_matches,
+                impact_analysis=impact_analysis,
                 related_symbols=related_symbols,
                 data_flow=data_flow,
                 control_flow=control_flow,
@@ -420,6 +422,40 @@ class GraphAwarePromptBuilder:
         else:  # compact
             compact_context = self._make_compact(context)
             return template.format(compact_context=compact_context)
+
+    # Sections whose names are derived from impact-propagating edge types (see
+    # _get_section_name): callers (CALLS -> "Call Graph") plus control- and
+    # data-dependence dependents (CDG/DDG). A change to a node propagates to all of
+    # these, so all are regression-relevant — not just callers.
+    _IMPACT_SECTION_NAMES = ("Call Graph", "Control Dependencies", "Data Dependencies")
+
+    def _extract_impact_analysis(self, context: FormattedContext) -> str:
+        """Extract impact/regression information driven by the graph edge vocabulary.
+
+        Impact is selected from the edge-type-derived sections rather than ad hoc string
+        matching: callers + control/data-dependence dependents capture how a change
+        propagates, and any test/spec section captures the suites that exercise the node
+        (matched case-insensitively so "UnitTests"/"regression_tests" are not missed).
+
+        Args:
+            context: Formatted context
+
+        Returns:
+            Formatted impact analysis section
+        """
+        lines = []
+        for section_name, section_text in context.sections.items():
+            lowered = section_name.lower()
+            is_test_section = "test" in lowered or "spec" in lowered
+            if section_name in self._IMPACT_SECTION_NAMES or is_test_section:
+                lines.append(section_text)
+        if lines:
+            return "\n\n".join(lines)
+        # Be explicit that an empty result means "nothing indexed/retrieved", NOT "safe".
+        return (
+            "No impacted callers, dependents, or tests were found in the graph context "
+            "(none were indexed or retrieved — this is not a guarantee the change is safe)."
+        )
 
     def _extract_direct_matches(self, context: FormattedContext) -> str:
         """Extract directly matching symbols.
@@ -448,13 +484,18 @@ class GraphAwarePromptBuilder:
         """
         lines = []
         for section_name, section_text in context.sections.items():
-            if section_name not in {
-                "Functions",
-                "Methods",
-                "Classes",
-                "Control Flow",
-                "Data Dependencies",
-            }:
+            if (
+                section_name
+                not in {
+                    "Functions",
+                    "Methods",
+                    "Classes",
+                    "Control Flow",
+                    "Data Dependencies",
+                    "Call Graph",
+                }
+                and "Test" not in section_name
+            ):
                 lines.append(section_text)
         return "\n\n".join(lines) if lines else "No related symbols found."
 

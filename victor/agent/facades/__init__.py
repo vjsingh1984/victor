@@ -12,38 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Domain facades for orchestrator decomposition.
+"""Domain facade for orchestrator decomposition.
 
-These facades are grouping, property-access, and compatibility surfaces for the
-agent runtime. They may expose already-initialized components behind a coherent
-domain boundary, but they must not become behavior-owning runtime layers.
+``OrchestrationFacade`` is the one live runtime-facing migration boundary,
+exposing already-initialized components behind a coherent domain boundary
+(service-first surfaces ``chat_service``/``tool_service``/``session_service`` and
+state-passed surfaces ``exploration_state_passed``/``system_prompt_state_passed``/
+``safety_state_passed``). It is read by ``framework/agent.py`` and the turn
+execution runtime via ``orchestrator._orchestration_facade``.
 
-The AgentOrchestrator delegates property access through these facades rather
-than managing individual references directly.
-
-``OrchestrationFacade`` is the canonical migration boundary for runtime-facing
-callers:
-- service-first surfaces: ``chat_service``, ``tool_service``, ``session_service``
-- state-passed surfaces: ``exploration_state_passed``,
-  ``system_prompt_state_passed``, ``safety_state_passed``
+The seven per-domain facades (Chat/Tool/Session/Provider/Resilience/Workflow/
+Metrics) were removed: they were constructed lazily in the bootstrapper but had
+zero production readers (the orchestrator never delegated through them), so they
+were dead parallel views. The orchestrator owns its component properties directly.
 """
 
-from victor.agent.facades.chat_facade import ChatFacade
-from victor.agent.facades.metrics_facade import MetricsFacade
 from victor.agent.facades.orchestration_facade import OrchestrationFacade
-from victor.agent.facades.provider_facade import ProviderFacade
-from victor.agent.facades.resilience_facade import ResilienceFacade
-from victor.agent.facades.session_facade import SessionFacade
-from victor.agent.facades.tool_facade import ToolFacade
-from victor.agent.facades.workflow_facade import WorkflowFacade
 
 __all__ = [
-    "ChatFacade",
-    "MetricsFacade",
     "OrchestrationFacade",
-    "ProviderFacade",
-    "ResilienceFacade",
-    "SessionFacade",
-    "ToolFacade",
-    "WorkflowFacade",
 ]

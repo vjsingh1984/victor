@@ -70,18 +70,6 @@ def orchestrator(mock_provider, orchestrator_settings):
 class TestFacadeCreation:
     """Tests that orchestrator creates facade instances."""
 
-    def test_chat_facade_created(self, orchestrator):
-        """Orchestrator creates a lazy chat-facade compatibility proxy."""
-        assert hasattr(orchestrator, "_chat_facade")
-        assert isinstance(orchestrator._chat_facade, LazyRuntimeProxy)
-        assert orchestrator._chat_facade.initialized is False
-
-    def test_tool_facade_created(self, orchestrator):
-        """Orchestrator creates a lazy tool-facade compatibility proxy."""
-        assert hasattr(orchestrator, "_tool_facade")
-        assert isinstance(orchestrator._tool_facade, LazyRuntimeProxy)
-        assert orchestrator._tool_facade.initialized is False
-
     def test_orchestration_facade_has_state_passed_handles(self, orchestrator):
         """OrchestrationFacade should expose state-passed coordinator surfaces."""
         assert isinstance(
@@ -114,114 +102,6 @@ class TestFacadeCreation:
             "unified_chat_coordinator",
         ):
             assert hasattr(facade, attr) is False
-
-
-class TestChatFacadeDelegation:
-    """Tests that orchestrator properties delegate through ChatFacade."""
-
-    def test_conversation_controller_delegates(self, orchestrator):
-        """conversation_controller property returns same object via facade."""
-        direct = orchestrator._conversation_controller
-        via_facade = orchestrator._chat_facade.conversation_controller
-        via_property = orchestrator.conversation_controller
-        assert direct is via_facade
-        assert via_property is via_facade
-
-    def test_context_compactor_delegates(self, orchestrator):
-        """context_compactor property returns same object via facade."""
-        direct = orchestrator._context_compactor
-        via_facade = orchestrator._chat_facade.context_compactor
-        via_property = orchestrator.context_compactor
-        assert direct is via_facade
-        assert via_property is via_facade
-
-    def test_chat_facade_has_conversation(self, orchestrator):
-        """ChatFacade exposes the conversation (MessageHistory)."""
-        assert orchestrator._chat_facade.conversation is orchestrator.conversation
-
-    def test_chat_facade_has_conversation_state(self, orchestrator):
-        """ChatFacade exposes the conversation state machine."""
-        assert orchestrator._chat_facade.conversation_state is orchestrator.conversation_state
-
-    def test_chat_facade_has_memory_manager(self, orchestrator):
-        """ChatFacade exposes the memory manager."""
-        assert orchestrator._chat_facade.memory_manager is orchestrator.memory_manager
-
-    def test_chat_facade_has_intent_classifier(self, orchestrator):
-        """ChatFacade exposes the intent classifier."""
-        assert orchestrator._chat_facade.intent_classifier is orchestrator.intent_classifier
-
-    def test_chat_facade_has_reminder_manager(self, orchestrator):
-        """ChatFacade exposes the reminder manager."""
-        assert orchestrator._chat_facade.reminder_manager is orchestrator.reminder_manager
-
-
-class TestToolFacadeDelegation:
-    """Tests that orchestrator properties delegate through ToolFacade."""
-
-    def test_tool_pipeline_delegates(self, orchestrator):
-        """tool_pipeline property returns same object via facade."""
-        direct = orchestrator._tool_pipeline
-        via_facade = orchestrator._tool_facade.tool_pipeline
-        via_property = orchestrator.tool_pipeline
-        assert direct is via_facade
-        assert via_property is via_facade
-
-    def test_tool_output_formatter_delegates(self, orchestrator):
-        """tool_output_formatter property returns same object via facade."""
-        direct = orchestrator._tool_output_formatter
-        via_facade = orchestrator._tool_facade.tool_output_formatter
-        via_property = orchestrator.tool_output_formatter
-        assert direct is via_facade
-        assert via_property is via_facade
-
-    def test_sequence_tracker_delegates(self, orchestrator):
-        """sequence_tracker property returns same object via facade."""
-        direct = orchestrator._sequence_tracker
-        via_facade = orchestrator._tool_facade.sequence_tracker
-        via_property = orchestrator.sequence_tracker
-        assert direct is via_facade
-        assert via_property is via_facade
-
-    def test_code_correction_middleware_delegates(self, orchestrator):
-        """code_correction_middleware property returns same object via facade."""
-        direct = orchestrator._code_correction_middleware
-        via_facade = orchestrator._tool_facade.code_correction_middleware
-        via_property = orchestrator.code_correction_middleware
-        assert direct is via_facade
-        assert via_property is via_facade
-
-    def test_tool_facade_has_tools(self, orchestrator):
-        """ToolFacade exposes the tool registry."""
-        assert orchestrator._tool_facade.tools is orchestrator.tools
-
-    def test_tool_facade_has_tool_executor(self, orchestrator):
-        """ToolFacade exposes the tool executor."""
-        assert orchestrator._tool_facade.tool_executor is orchestrator.tool_executor
-
-    def test_tool_facade_has_tool_selector(self, orchestrator):
-        """ToolFacade exposes the tool selector."""
-        assert orchestrator._tool_facade.tool_selector is orchestrator.tool_selector
-
-    def test_tool_facade_has_tool_cache(self, orchestrator):
-        """ToolFacade exposes the tool cache."""
-        assert orchestrator._tool_facade.tool_cache is orchestrator.tool_cache
-
-    def test_tool_facade_has_tool_budget(self, orchestrator):
-        """ToolFacade exposes the tool budget."""
-        assert orchestrator._tool_facade.tool_budget == orchestrator.tool_budget
-
-    def test_tool_facade_has_safety_checker(self, orchestrator):
-        """ToolFacade exposes the safety checker."""
-        assert orchestrator._tool_facade.safety_checker is orchestrator._safety_checker
-
-    def test_tool_facade_has_search_router(self, orchestrator):
-        """ToolFacade exposes the search router."""
-        assert orchestrator._tool_facade.search_router is orchestrator.search_router
-
-    def test_tool_facade_has_semantic_selector(self, orchestrator):
-        """ToolFacade exposes the semantic selector."""
-        assert orchestrator._tool_facade.semantic_selector is orchestrator.semantic_selector
 
 
 class TestBackwardCompatibility:

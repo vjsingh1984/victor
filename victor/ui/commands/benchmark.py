@@ -199,6 +199,29 @@ def _resolve_benchmark_target(benchmark: str, dataset_path: Optional[Path]):
         raise typer.Exit(1)
 
     bench_type, runner_factory = benchmark_map[benchmark_key]
+
+    # SWE-bench/HumanEval/MBPP/browser-task runners were extracted to the
+    # optional `victor-coding` package and soft-load to None when it is absent
+    # (victor.evaluation.benchmarks). Fail fast with an actionable message
+    # instead of a NoneType/TypeError deep inside execution.
+    _extracted_runner = {
+        "swe-bench": SWEBenchRunner,
+        "swe-bench-lite": SWEBenchRunner,
+        "humaneval": HumanEvalRunner,
+        "mbpp": MBPPRunner,
+        "mbpp-test": MBPPRunner,
+        "clawbench": BrowserTaskBenchmarkRunner,
+        "guide": BrowserTaskBenchmarkRunner,
+        "vlaa-gui": BrowserTaskBenchmarkRunner,
+    }
+    if benchmark_key in _extracted_runner and _extracted_runner[benchmark_key] is None:
+        console.print(
+            f"[bold red]Error:[/] Benchmark '{metadata.name}' requires the optional "
+            "'victor-coding' package, which is not installed.\n"
+            "  Install it with: [bold]pip install victor-coding[/]"
+        )
+        raise typer.Exit(1)
+
     runner = runner_factory() if callable(runner_factory) else runner_factory
     return metadata, bench_type, runner
 

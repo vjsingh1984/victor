@@ -25,19 +25,10 @@ import ast
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
-FACADE_SPECS = (
-    ("victor/agent/facades/chat_facade.py", "ChatFacade"),
-    ("victor/agent/facades/metrics_facade.py", "MetricsFacade"),
-    ("victor/agent/facades/orchestration_facade.py", "OrchestrationFacade"),
-    ("victor/agent/facades/provider_facade.py", "ProviderFacade"),
-    ("victor/agent/facades/resilience_facade.py", "ResilienceFacade"),
-    ("victor/agent/facades/session_facade.py", "SessionFacade"),
-    ("victor/agent/facades/tool_facade.py", "ToolFacade"),
-    ("victor/agent/facades/workflow_facade.py", "WorkflowFacade"),
-)
-ALLOWED_PRIVATE_HELPERS = {
-    ("victor/agent/facades/provider_facade.py", "ProviderFacade"): set(),
-}
+# Only OrchestrationFacade remains: the seven per-domain facades were removed as
+# dead parallel views (zero production readers).
+FACADE_SPECS = (("victor/agent/facades/orchestration_facade.py", "OrchestrationFacade"),)
+ALLOWED_PRIVATE_HELPERS: dict = {}
 
 
 def _load_class_node(relative_path: str, class_name: str) -> ast.ClassDef:

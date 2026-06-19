@@ -56,6 +56,18 @@ OUTPUT STYLE: CONCISE
 - Check command syntax before reporting a blocker.
 """.strip()
 
+HEADLESS_MODE_GUIDANCE = """
+HEADLESS MODE: AUTOMATED EXECUTION
+- You are running in an automated, non-interactive environment (CI/CD or batch).
+- Favor autonomous decision-making. If an action is safe and necessary, perform it.
+- Do not ask for user confirmation for safe (read-only or LOW risk) operations.
+- Avoid using `grep` or `shell` search commands for project code; the `graph` and `code_search` tools are your primary architectural and semantic navigation tools.
+- If multiple paths are possible, select the most likely successful one based on codebase evidence.
+- Signal completion clearly when the objective is met or if a fatal error occurs.
+- Be extremely surgical and precise to avoid unnecessary file churn.
+- LOOP PREVENTION: If a tool call fails, analyze why and change your approach. DO NOT repeat the same failing command or narration verbatim. Progress the task or signal a blocker.
+""".strip()
+
 COMPLETION_GUIDANCE = f"""
 TASK COMPLETION (MANDATORY):
 When you complete a task, you MUST signal completion using these EXACT markers.

@@ -145,9 +145,24 @@ GENERATION_TOOLS: frozenset[str] = frozenset(
     }
 )
 
+# Git read-only subcommands are sourced from bash.py — the authority for actual
+# command-level read-only validation — so this intent signal cannot drift from what the
+# shell tool will actually permit. (The binary/test signals below are intentionally a
+# narrow NL-intent subset, NOT bash's full read-only set, whose common-word entries like
+# "file"/"find"/"test" would false-positive when scanning natural-language messages.)
+try:
+    from victor.tools.bash import GIT_READONLY_SUBCOMMANDS as _GIT_READONLY_SUBCOMMANDS
+except Exception:  # pragma: no cover - defensive fallback if bash is unavailable at import
+    _GIT_READONLY_SUBCOMMANDS = {"status", "log", "show", "branch", "tag", "diff"}
+
+_GIT_READONLY_SIGNAL = r"\bgit\s+(" + "|".join(sorted(_GIT_READONLY_SUBCOMMANDS)) + r")\b"
+
 # Signals that indicate the user explicitly wants readonly shell/SQLite inspection.
 READONLY_SHELL_SIGNALS: List[Tuple[str, str]] = [
     (r"\b(sqlite|sqlite3|sqllite|sqllite3)\b", "sqlite"),
+    (r"\b(ls|list|dir|find|grep|cat|head|tail|wc|stat|file)\b", "read_only_binary"),
+    (_GIT_READONLY_SIGNAL, "git_read_only"),
+    (r"\b(pytest|npm\s+test|cargo\s+test|go\s+test|tox)\b", "test_execution"),
     (
         r"\b(use|run|query|inspect|review|check|look\s+at)\b.*\b(shell|bash|terminal|sqlite3?)\b",
         "explicit_shell_request",

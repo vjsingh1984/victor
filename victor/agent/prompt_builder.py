@@ -29,6 +29,7 @@ from victor.agent.prompt_section_texts import (
     CONCISE_MODE_GUIDANCE,
     GROUNDING_RULES,
     GROUNDING_RULES_EXTENDED,
+    HEADLESS_MODE_GUIDANCE,
     LARGE_FILE_PAGINATION_GUIDANCE,
     PARALLEL_READ_GUIDANCE,
 )
@@ -157,6 +158,8 @@ class SystemPromptBuilder:
         enrichment_service: Optional["PromptEnrichmentService"] = None,
         vertical: Optional[str] = None,
         concise_mode: bool = False,
+        headless_mode: bool = False,
+        contextual_guidance: Optional[str] = None,
         query_classification: Optional["QueryClassification"] = None,
         mode_prompt_addition: str = "",
         provider_caches: bool = False,
@@ -217,6 +220,8 @@ class SystemPromptBuilder:
         self.enrichment_service = enrichment_service
         self.vertical = vertical or DEFAULT_VERTICAL
         self.concise_mode = concise_mode
+        self.headless_mode = headless_mode
+        self.contextual_guidance = contextual_guidance
         self.query_classification = query_classification
         self.mode_prompt_addition = mode_prompt_addition.strip()
         self.provider_caches = provider_caches
@@ -375,6 +380,16 @@ class SystemPromptBuilder:
     def get_task_guidance_text(self) -> str:
         """Expose task guidance for runtimes that inject it outside the system prompt."""
         return self._get_task_guidance_section()
+
+    def get_contextual_guidance_text(self) -> str:
+        """Expose per-turn contextual guidance for user-prefix injection.
+
+        Mirrors :meth:`get_task_guidance_text`: lets KV-cache runtimes inject the
+        guidance into the per-turn user message instead of the frozen system
+        prompt, so the system prefix stays stable across turns (otherwise this
+        per-turn content would be silently dropped once the prompt is frozen).
+        """
+        return self.contextual_guidance or ""
 
     def get_stable_prompt_tools(self) -> List[str]:
         """Return the stable tool set used in the system-prompt surface."""
@@ -687,6 +702,32 @@ class SystemPromptBuilder:
             )
             logger.debug("Concise mode enabled - added brevity guidance to prompt")
 
+        if "headless_mode" in sections_to_include and self.headless_mode:
+            document.upsert(
+                PromptBlock(
+                    name="headless_mode",
+                    content=self._resolve_optional_prompt_section(
+                        "HEADLESS_MODE_GUIDANCE",
+                        HEADLESS_MODE_GUIDANCE,
+                    ),
+                    priority=25,
+                    header="",
+                    kind="guidance",
+                )
+            )
+            logger.debug("Headless mode enabled - added automated execution guidance to prompt")
+
+        if "contextual_guidance" in sections_to_include and self.contextual_guidance:
+            document.upsert(
+                PromptBlock(
+                    name="contextual_guidance",
+                    content=self.contextual_guidance,
+                    priority=28,
+                    header="### Contextual Constraints & Guidance",
+                    kind="guidance",
+                )
+            )
+
         if "mode_guidance" in sections_to_include:
             mode_guidance = self._get_mode_guidance_section()
             if mode_guidance:
@@ -819,10 +860,16 @@ class SystemPromptBuilder:
         """
         optional_sections = {
             "concise_mode",
+            "headless_mode",
             "completion",
             "tool_guidance",
         }
-        baseline_sections = {"mode_guidance", "task_guidance", "tool_constraint"}
+        baseline_sections = {
+            "mode_guidance",
+            "task_guidance",
+            "tool_constraint",
+            "contextual_guidance",
+        }
         all_sections = baseline_sections | optional_sections
 
         service = getattr(self, "_llm_decision_service", None)
@@ -871,6 +918,8 @@ class SystemPromptBuilder:
             }
             if self.concise_mode:
                 reduced.add("concise_mode")
+            if self.headless_mode:
+                reduced.add("headless_mode")
             logger.debug(
                 f"Non-caching provider: using reduced sections {len(reduced)}/{len(all_sections)}"
             )

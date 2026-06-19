@@ -238,3 +238,77 @@ class TestModelSelectorLearner:
         # for a small number of selections and high difference, X should win.
         # For simplicity, we'll just check it returns one of them.
         assert rec.value in ["provider_X", "provider_Y"]
+
+
+class TestModelSelectorMultiProviderABTesting:
+    """A/B coverage proving the router is provider-agnostic.
+
+    Motivation: the chat banner's "Routing hint" was anthropic-only because the
+    only training data came from runs that always used anthropic. These tests
+    feed BALANCED, multi-provider outcomes and assert the learner picks the best
+    provider on merit — never a hardcoded default, and symmetric under provider
+    name/order — so a single-provider dev/test habit can't bias the routing.
+    """
+
+    # Deliberately mix non-anthropic winners so a default-to-anthropic bug fails.
+    @pytest.mark.parametrize(
+        "providers, best",
+        [
+            (["anthropic", "openai", "ollama", "zai"], "openai"),
+            (["anthropic", "openai", "ollama", "zai"], "ollama"),
+            (["anthropic", "openai", "ollama", "zai"], "zai"),
+            (["openai", "anthropic"], "anthropic"),
+            (["deepseek", "groq", "mistral"], "groq"),
+        ],
+    )
+    def test_router_picks_best_provider_on_merit(
+        self, learner: ModelSelectorLearner, providers, best
+    ):
+        import json
+
+        # Deterministic merit-based selection (no exploration noise).
+        learner.strategy = SelectionStrategy.EXPLOIT_ONLY
+
+        # Give the `best` provider clearly higher quality; others clearly lower.
+        for _ in range(8):
+            for p in providers:
+                _record_selection_outcome(
+                    learner,
+                    provider=p,
+                    task_type="coding",
+                    quality_score=0.95 if p == best else 0.2,
+                    success=(p == best),
+                )
+
+        rec = learner.get_recommendation(json.dumps(providers), "", "coding")
+        assert rec is not None
+        assert rec.value == best, f"expected {best}, got {rec.value} for {providers}"
+
+    def test_recommendation_is_symmetric_under_provider_order(self, learner: ModelSelectorLearner):
+        import json
+
+        learner.strategy = SelectionStrategy.EXPLOIT_ONLY
+        # `success` is what drives the learned Q-value; give openai a clear edge.
+        for _ in range(8):
+            _record_selection_outcome(
+                learner, provider="openai", success=True, quality_score=0.9, task_type="coding"
+            )
+            _record_selection_outcome(
+                learner, provider="anthropic", success=False, quality_score=0.2, task_type="coding"
+            )
+
+        rec_a = learner.get_recommendation(json.dumps(["anthropic", "openai"]), "", "coding")
+        rec_b = learner.get_recommendation(json.dumps(["openai", "anthropic"]), "", "coding")
+        # Order of the available list must not change the merit-based winner.
+        assert rec_a.value == rec_b.value == "openai"
+
+    def test_cold_start_does_not_default_to_anthropic(self, learner: ModelSelectorLearner):
+        import json
+
+        # No outcomes recorded for anyone: the learner must not confidently
+        # recommend a specific provider (which previously surfaced anthropic).
+        rec = learner.get_recommendation(json.dumps(["anthropic", "openai", "ollama"]), "", "chat")
+        if rec is not None:
+            # Any cold-start pick must be low-confidence (untrained), never a
+            # high-Q anthropic suggestion like the polluted banner showed.
+            assert rec.confidence < 0.6

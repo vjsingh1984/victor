@@ -654,17 +654,20 @@ def extract_thinking_content(response: str) -> Tuple[str, str]:
     return (thinking, content)
 
 
-def extract_tool_calls_from_content(content: str) -> Tuple[List[Dict[str, Any]], str]:
+def extract_tool_calls_from_content(
+    content: str, id_prefix: str = "fallback"
+) -> Tuple[List[Dict[str, Any]], str]:
     """Extract tool calls embedded as JSON text when the server didn't parse them.
 
     Shared fallback for OpenAI-compatible local providers (e.g. vLLM not started
-    with ``--enable-auto-tool-choice``). Recognizes three shapes:
+    with ``--enable-auto-tool-choice``, MLX). Recognizes three shapes:
     ``` ```json {...}``` ```, ``<TOOL_OUTPUT>{...}</TOOL_OUTPUT>``, and a bare
     inline ``{"name": ..., "arguments": {...}}``. Planning-style JSON (which also
     has ``name`` but different structure) is rejected via keyword heuristics.
 
     Args:
         content: Response content that may contain tool calls.
+        id_prefix: Synthetic tool-call id prefix (e.g. ``"mlx"`` -> ``mlx_0``).
 
     Returns:
         Tuple of ``(parsed_tool_calls, remaining_content)``.
@@ -688,7 +691,7 @@ def extract_tool_calls_from_content(content: str) -> Tuple[List[Dict[str, Any]],
                 ):
                     tool_calls.append(
                         {
-                            "id": f"fallback_{len(tool_calls)}",
+                            "id": f"{id_prefix}_{len(tool_calls)}",
                             "name": data.get("name", ""),
                             "arguments": arguments,
                         }
@@ -711,7 +714,7 @@ def extract_tool_calls_from_content(content: str) -> Tuple[List[Dict[str, Any]],
                 ):
                     tool_calls.append(
                         {
-                            "id": f"fallback_{len(tool_calls)}",
+                            "id": f"{id_prefix}_{len(tool_calls)}",
                             "name": data.get("name", ""),
                             "arguments": arguments,
                         }
@@ -735,7 +738,7 @@ def extract_tool_calls_from_content(content: str) -> Tuple[List[Dict[str, Any]],
                 ):
                     tool_calls.append(
                         {
-                            "id": "fallback_0",
+                            "id": f"{id_prefix}_0",
                             "name": data.get("name", ""),
                             "arguments": arguments,
                         }

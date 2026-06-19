@@ -27,143 +27,13 @@ class AgentRuntimeBootstrapper:
 
     @staticmethod
     def create_facades(orchestrator: AgentOrchestrator) -> None:
-        """Create all 8 domain facades and set them on the orchestrator."""
-        from victor.agent.facades import (
-            ChatFacade,
-            MetricsFacade,
-            OrchestrationFacade,
-            ProviderFacade,
-            ResilienceFacade,
-            SessionFacade,
-            ToolFacade,
-            WorkflowFacade,
-        )
+        """Create the live OrchestrationFacade and set it on the orchestrator.
 
-        orchestrator._chat_facade = LazyRuntimeProxy(
-            factory=lambda: ChatFacade(
-                conversation=orchestrator.conversation,
-                conversation_controller=orchestrator._conversation_controller,
-                conversation_state=orchestrator.conversation_state,
-                memory_manager=orchestrator.memory_manager,
-                memory_session_id=orchestrator._memory_session_id,
-                runtime_state_host=orchestrator,
-                embedding_store=getattr(orchestrator, "_conversation_embedding_store", None),
-                intent_classifier=orchestrator.intent_classifier,
-                intent_detector=orchestrator.intent_detector,
-                reminder_manager=orchestrator.reminder_manager,
-                system_prompt=orchestrator._system_prompt,
-                response_completer=orchestrator.response_completer,
-                context_compactor=orchestrator._context_compactor,
-                task_completion_detector=orchestrator._task_completion_detector,
-            ),
-            name="chat_facade",
-        )
-
-        orchestrator._tool_facade = LazyRuntimeProxy(
-            factory=lambda: ToolFacade(
-                tools=orchestrator.tools,
-                tool_pipeline=orchestrator._tool_pipeline,
-                tool_executor=orchestrator.tool_executor,
-                tool_selector=orchestrator.tool_selector,
-                tool_cache=orchestrator.tool_cache,
-                tool_graph=orchestrator.tool_graph,
-                tool_registrar=orchestrator.tool_registrar,
-                tool_budget=orchestrator.tool_budget,
-                runtime_state_host=orchestrator,
-                tool_output_formatter=orchestrator._tool_output_formatter,
-                deduplication_tracker=orchestrator._deduplication_tracker,
-                argument_normalizer=orchestrator.argument_normalizer,
-                parallel_executor=orchestrator.parallel_executor,
-                safety_checker=orchestrator._safety_checker,
-                auto_committer=orchestrator._auto_committer,
-                middleware_chain=orchestrator._middleware_chain,
-                code_correction_middleware=(orchestrator._code_correction_middleware),
-                tool_access_controller=orchestrator._tool_access_controller,
-                budget_manager=orchestrator._budget_manager,
-                search_router=orchestrator.search_router,
-                semantic_selector=orchestrator.semantic_selector,
-                task_classifier=orchestrator.task_classifier,
-                sequence_tracker=orchestrator._sequence_tracker,
-                unified_tracker=orchestrator.unified_tracker,
-                plugin_manager=orchestrator.plugin_manager,
-            ),
-            name="tool_facade",
-        )
-
-        orchestrator._provider_facade = LazyRuntimeProxy(
-            factory=lambda: ProviderFacade(
-                provider=orchestrator.provider,
-                model=orchestrator.model,
-                provider_name=orchestrator.provider_name,
-                temperature=orchestrator.temperature,
-                max_tokens=orchestrator.max_tokens,
-                thinking=orchestrator.thinking,
-                runtime_state_host=orchestrator,
-                provider_manager=orchestrator._provider_manager,
-                provider_runtime=orchestrator._provider_runtime,
-                provider_service=getattr(orchestrator, "_provider_service", None),
-            ),
-            name="provider_facade",
-        )
-
-        orchestrator._session_facade = LazyRuntimeProxy(
-            factory=lambda: SessionFacade(
-                session_state=orchestrator._session_state,
-                session_accessor=orchestrator._session_accessor,
-                session_ledger=orchestrator._session_ledger,
-                lifecycle_manager=orchestrator._lifecycle_manager,
-                active_session_id=orchestrator.active_session_id,
-                memory_session_id=orchestrator._memory_session_id,
-                runtime_state_host=orchestrator,
-                profile_name=orchestrator._profile_name,
-                checkpoint_manager=orchestrator._checkpoint_manager,
-            ),
-            name="session_facade",
-        )
-
-        orchestrator._metrics_facade = LazyRuntimeProxy(
-            factory=lambda: MetricsFacade(
-                metrics_runtime=orchestrator._metrics_runtime,
-                metrics_collector=orchestrator._metrics_collector,
-                usage_analytics=orchestrator._usage_analytics,
-                usage_logger=orchestrator.usage_logger,
-                streaming_metrics_collector=(orchestrator.streaming_metrics_collector),
-                session_cost_tracker=orchestrator._session_cost_tracker,
-                metrics_coordinator=orchestrator._metrics_coordinator,
-                debug_logger=orchestrator.debug_logger,
-                callback_coordinator=orchestrator._callback_coordinator,
-            ),
-            name="metrics_facade",
-        )
-
-        orchestrator._resilience_facade = LazyRuntimeProxy(
-            factory=lambda: ResilienceFacade(
-                resilience_runtime=orchestrator._resilience_runtime,
-                recovery_handler=orchestrator._recovery_handler,
-                recovery_integration=orchestrator._recovery_integration,
-                recovery_coordinator=orchestrator._recovery_coordinator,
-                chunk_generator=orchestrator._chunk_generator,
-                context_manager=orchestrator._context_manager,
-                rl_coordinator=orchestrator._rl_coordinator,
-                code_manager=orchestrator.code_manager,
-                background_tasks=orchestrator._background_tasks,
-                cancel_event=orchestrator._cancel_event,
-                is_streaming=orchestrator._is_streaming,
-                runtime_state_host=orchestrator,
-            ),
-            name="resilience_facade",
-        )
-
-        orchestrator._workflow_facade = LazyRuntimeProxy(
-            factory=lambda: WorkflowFacade(
-                workflow_registry=orchestrator._workflow_registry,
-                workflow_runtime=orchestrator._workflow_runtime,
-                workflow_optimization=orchestrator._workflow_optimization,
-                coordination_advisor=(orchestrator._coordination_advisor),
-                runtime_state_host=orchestrator,
-            ),
-            name="workflow_facade",
-        )
+        The seven per-domain facades (Chat/Tool/Session/Provider/Resilience/
+        Workflow/Metrics) were removed as dead parallel views (zero production
+        readers). OrchestrationFacade is the one runtime-facing boundary.
+        """
+        from victor.agent.facades import OrchestrationFacade
 
         orchestrator._orchestration_facade = LazyRuntimeProxy(
             factory=lambda: OrchestrationFacade(
@@ -217,11 +87,7 @@ class AgentRuntimeBootstrapper:
             name="orchestration_facade",
         )
 
-        logger.debug(
-            "Domain facades created: ChatFacade, ToolFacade, ProviderFacade, "
-            "SessionFacade, MetricsFacade, ResilienceFacade, WorkflowFacade, "
-            "OrchestrationFacade"
-        )
+        logger.debug("OrchestrationFacade created")
 
     @staticmethod
     def wire_lifecycle(orchestrator: AgentOrchestrator) -> None:

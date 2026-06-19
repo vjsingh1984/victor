@@ -157,6 +157,122 @@ def normalize_edit_operations(ops: List[Dict[str, Any]]) -> List[Dict[str, Any]]
     return [normalize_edit_operation(op) if isinstance(op, dict) else op for op in ops]
 
 
+def _normalize_edit_line(line: str) -> str:
+    """Collapse a line's internal whitespace and strip ends (CRLF-tolerant)."""
+    return " ".join(line.split())
+
+
+def _find_unique_fuzzy_span(content: str, old_str: str) -> Optional[str]:
+    """Locate ``old_str`` in ``content`` tolerating per-line whitespace differences.
+
+    Matches whole-line spans only (the common "indentation / line-ending drifted"
+    case) and returns the *exact* substring from ``content`` so the replacement
+    stays byte-precise. Returns ``None`` unless exactly one span matches — never
+    guesses when the match is absent or ambiguous.
+    """
+    old_lines = old_str.split("\n")
+    n = len(old_lines)
+    if n == 0:
+        return None
+    target = [_normalize_edit_line(line) for line in old_lines]
+    content_lines = content.split("\n")
+    spans: List[str] = []
+    for i in range(0, len(content_lines) - n + 1):
+        window = content_lines[i : i + n]
+        if [_normalize_edit_line(line) for line in window] == target:
+            # Re-joining a contiguous slice on the same separator reproduces the
+            # original substring exactly, preserving CRLF / trailing whitespace.
+            spans.append("\n".join(window))
+        if len(spans) > 1:
+            return None  # ambiguous — bail early
+    return spans[0] if len(spans) == 1 else None
+
+
+def _replace_not_found_detail(current_content: str, old_str: str, path: str) -> str:
+    """Build a rich, actionable 'old_str not found' message.
+
+    Surfaces the actual surrounding file content when the first line matches but
+    the block drifted — the exact feedback that stops a model re-guessing
+    ``old_str`` from memory.
+    """
+    old_str_preview = old_str[:80] + "..." if len(old_str) > 80 else old_str
+    old_str_first_line = old_str.split("\n")[0][:60]
+
+    hint = ""
+    context_str = ""
+    suggestion = ""
+
+    if old_str_first_line in current_content:
+        hint = (
+            f" The first line '{old_str_first_line}' exists in file but "
+            f"subsequent lines don't match. Check line endings and indentation."
+        )
+        file_lines = current_content.splitlines()
+        for i, line in enumerate(file_lines):
+            if old_str_first_line in line:
+                start = max(0, i - 3)
+                end = min(len(file_lines), i + 8)
+                numbered = [f"{start + j + 1}: {file_lines[start + j]}" for j in range(end - start)]
+                context_str = "\n\nActual file content around match:\n" + "\n".join(numbered)
+                break
+    elif old_str.rstrip() in current_content:
+        hint = " Found match without trailing whitespace. Remove trailing newlines from old_str."
+    elif old_str.lstrip() in current_content:
+        hint = " Found match without leading whitespace. Check indentation at start of old_str."
+    else:
+        file_lines = current_content.splitlines()
+        old_str_words = old_str_first_line.split()[:3]
+        for line in file_lines:
+            line_words = line.split()
+            if len(set(old_str_words) & set(line_words)) >= 2:
+                suggestion = f"\n\nDid you mean: '{line.strip()}'?"
+                break
+
+    return (
+        f"Replace operation failed: old_str not found in {path}.{hint} "
+        f"Searched for: {repr(old_str_preview)}{suggestion}{context_str}"
+        + (
+            "\n\nTo fix: Copy the EXACT text from the file content above "
+            "as your old_str. Do NOT type it from memory."
+            if context_str
+            else ""
+        )
+    )
+
+
+def _resolve_replace(current_content: str, old_str: str, new_str: str, path: str) -> Dict[str, Any]:
+    """Resolve a ``replace`` op to concrete new content.
+
+    Tries an exact unique match first, then a single unambiguous whitespace-
+    tolerant span. Returns a dict with ``ok`` plus either ``new_content`` (and
+    whether a ``fuzzy`` match was used) or a human-readable ``reason``.
+    """
+    occurrences = current_content.count(old_str)
+    if occurrences == 1:
+        return {
+            "ok": True,
+            "new_content": current_content.replace(old_str, new_str, 1),
+            "fuzzy": False,
+        }
+    if occurrences > 1:
+        return {
+            "ok": False,
+            "reason": (
+                f"Replace operation failed: old_str found {occurrences} times in "
+                f"{path}. Ambiguous match - provide more context to make the match unique."
+            ),
+        }
+    # Exact match missing — attempt a single whitespace-tolerant span.
+    span = _find_unique_fuzzy_span(current_content, old_str)
+    if span is not None and span != new_str:
+        return {
+            "ok": True,
+            "new_content": current_content.replace(span, new_str, 1),
+            "fuzzy": True,
+        }
+    return {"ok": False, "reason": _replace_not_found_detail(current_content, old_str, path)}
+
+
 from victor.tools.base import AccessMode, DangerLevel, Priority
 
 # =============================================================================
@@ -448,6 +564,100 @@ async def edit(
                 "error": f"Rename operation {i} missing required field: new_path",
             }
 
+    # ------------------------------------------------------------------
+    # Per-file validation pre-pass (isolation + structured reporting).
+    #
+    # Group ops by target file and validate each group independently so a
+    # failure in one file (e.g. a stale old_str) never discards a valid edit to
+    # a *different* file. Only fully-valid file groups are queued/committed; the
+    # rest are reported back so the model can retry just those. Same-file ops
+    # stay all-or-nothing (a later op may depend on an earlier one).
+    # ------------------------------------------------------------------
+    from collections import OrderedDict as _OrderedDict
+
+    def _op_file_key(_op: Dict[str, Any]) -> str:
+        try:
+            return str(Path(_op["path"]).expanduser().resolve())
+        except Exception:
+            return str(_op.get("path"))
+
+    _groups: Dict[str, List[tuple]] = _OrderedDict()
+    for _idx, _op in enumerate(ops):
+        _groups.setdefault(_op_file_key(_op), []).append((_idx, _op))
+
+    failed_files: List[Dict[str, Any]] = []
+    _applicable_keys: Set[str] = set()
+    for _key, _group in _groups.items():
+        _working: Optional[str] = None  # lazy per-file working copy
+        _group_ok = True
+        for _idx, _op in _group:
+            _otype = _op.get("type")
+            _path = _op.get("path")
+            _fp = Path(_path).expanduser().resolve()
+            if _working is None:
+                _working = _fp.read_text(encoding="utf-8") if _fp.exists() else ""
+            if _otype == "replace":
+                _old = _op.get("old_str")
+                _new = _op.get("new_str")
+                if _old is None:
+                    _reason = f"Replace operation for {_path} missing required field: old_str"
+                elif _new is None:
+                    _reason = f"Replace operation for {_path} missing required field: new_str"
+                elif _old == _new:
+                    _reason = "no-op edit rejected: old_str and new_str are identical"
+                elif not _fp.exists() and not _working:
+                    _reason = f"file {_path} does not exist"
+                else:
+                    _res = _resolve_replace(_working, _old, _new, _path)
+                    if _res["ok"]:
+                        _working = _res["new_content"]
+                        # Hand resolved content to the queue loop so fuzzy matches
+                        # apply deterministically (its exact match would miss).
+                        _op["__resolved_new_content__"] = _res["new_content"]
+                        _reason = None
+                    else:
+                        _reason = _res["reason"]
+                if _reason is not None:
+                    failed_files.append({"path": _path, "op_index": _idx, "error": _reason})
+                    _group_ok = False
+                    break
+            elif _otype == "modify":
+                _content = _op.get("new_content")
+                if _content is None:
+                    _content = _op.get("content")
+                if _content is None:
+                    failed_files.append(
+                        {
+                            "path": _path,
+                            "op_index": _idx,
+                            "error": "modify op missing content / new_content",
+                        }
+                    )
+                    _group_ok = False
+                    break
+                _working = _content
+            elif _otype == "create":
+                _working = _op.get("content", "")
+            # delete / rename: no text content to validate at this stage
+        if _group_ok:
+            _applicable_keys.add(_key)
+
+    if failed_files:
+        # Drop ops belonging to any failed file group; keep the rest.
+        ops = [op for op in ops if _op_file_key(op) in _applicable_keys]
+
+    if not ops:
+        # Nothing applicable — surface the first failure as the primary error
+        # while still returning the full structured list for retry.
+        _first = failed_files[0] if failed_files else {}
+        return {
+            "success": False,
+            "error": _first.get("error", "No applicable operations"),
+            "failed": failed_files,
+            "operations_queued": 0,
+            "operations_applied": 0,
+        }
+
     from victor.agent.change_tracker import ChangeType, get_change_tracker
     from victor.config.settings import get_project_paths
 
@@ -599,96 +809,26 @@ async def edit(
                 # Read current content (from pending state if already modified in this call)
                 current_content = _get_current_content(path, file_path)
 
-                if not file_path.exists() and path not in pending_contents:
-                    return {
-                        "success": False,
-                        "error": f"Replace operation failed: file {path} does not exist",
-                    }
-
-                # Reject no-op edits (old_str == new_str)
-                if old_str == new_str:
-                    return {
-                        "success": False,
-                        "error": (
-                            f"No-op edit rejected: old_str and new_str are identical "
-                            f"for {path}. Provide a different new_str to make an "
-                            f"actual change."
-                        ),
-                    }
-
-                # Check if old_str exists in content
-                occurrences = current_content.count(old_str)
-                if occurrences == 0:
-                    old_str_preview = old_str[:80] + "..." if len(old_str) > 80 else old_str
-                    old_str_first_line = old_str.split("\n")[0][:60]
-
-                    # Try to find similar content to help debug
-                    hint = ""
-                    context_str = ""
-                    suggestion = ""
-
-                    if old_str_first_line in current_content:
-                        hint = (
-                            f" The first line '{old_str_first_line}' exists in file but "
-                            f"subsequent lines don't match. Check line endings and indentation."
-                        )
-                        # Show surrounding file content to help model retry
-                        file_lines = current_content.splitlines()
-                        for i, line in enumerate(file_lines):
-                            if old_str_first_line in line:
-                                start = max(0, i - 3)
-                                end = min(len(file_lines), i + 8)
-                                numbered = [
-                                    f"{start + j + 1}: {file_lines[start + j]}"
-                                    for j in range(end - start)
-                                ]
-                                context_str = "\n\nActual file content around match:\n" + "\n".join(
-                                    numbered
-                                )
-                                break
-                    elif old_str.rstrip() in current_content:
-                        hint = " Found match without trailing whitespace. Remove trailing newlines from old_str."
-                    elif old_str.lstrip() in current_content:
-                        hint = " Found match without leading whitespace. Check indentation at start of old_str."
-                    else:
-                        # Try to find similar content using fuzzy matching
-                        import difflib
-
-                        file_lines = current_content.splitlines()
-                        # Get first few words from old_str to find potential matches
-                        old_str_words = old_str_first_line.split()[:3]
-                        for line in file_lines:
-                            line_words = line.split()
-                            # Check if 2+ words match
-                            if len(set(old_str_words) & set(line_words)) >= 2:
-                                suggestion = f"\n\nDid you mean: '{line.strip()}'?"
-                                break
-
-                    return {
-                        "success": False,
-                        "error": (
-                            f"Replace operation failed: old_str not found in {path}.{hint} "
-                            f"Searched for: {repr(old_str_preview)}{suggestion}{context_str}"
-                            + (
-                                "\n\nTo fix: Copy the EXACT text from the file content above "
-                                "as your old_str. Do NOT type it from memory."
-                                if context_str
-                                else ""
-                            )
-                        ),
-                    }
-                if occurrences > 1:
-                    return {
-                        "success": False,
-                        "error": f"Replace operation failed: old_str found {occurrences} times in {path}. "
-                        f"Ambiguous match - provide more context to make the match unique.",
-                    }
+                # The validation pre-pass already resolved this op (including any
+                # whitespace-tolerant fuzzy match) into concrete new content.
+                resolved = op.pop("__resolved_new_content__", None)
+                if resolved is not None:
+                    new_content = resolved
+                else:
+                    # Defensive path (pre-pass should have caught any failure).
+                    if not file_path.exists() and path not in pending_contents:
+                        return {
+                            "success": False,
+                            "error": f"Replace operation failed: file {path} does not exist",
+                        }
+                    res = _resolve_replace(current_content, old_str, new_str, path)
+                    if not res["ok"]:
+                        return {"success": False, "error": res["reason"]}
+                    new_content = res["new_content"]
 
                 # Read original content for undo (true disk state)
                 tracker_original = _get_tracker_original(path, file_path)
 
-                # Perform replacement
-                new_content = current_content.replace(old_str, new_str, 1)
                 pending_contents[path] = new_content
 
                 # Queue as a modify operation (overwrites previous add_modify for this path)
@@ -859,14 +999,25 @@ async def edit(
             except (ImportError, Exception) as e:
                 logger.debug(f"Failed to invalidate file cache: {e}")
 
+            _msg = f"Successfully applied {operations_queued} operations. Use /undo to revert."
+            if failed_files:
+                _bad = ", ".join(sorted({str(f["path"]) for f in failed_files}))
+                _msg = (
+                    f"Applied {operations_queued} operation(s); skipped "
+                    f"{len(failed_files)} that failed validation ({_bad}). "
+                    "Other files were committed — retry only the failed ones."
+                )
             result = {
                 "success": True,
                 "operations_queued": operations_queued,
                 "operations_applied": operations_queued,
                 "by_type": by_type,
-                "message": f"Successfully applied {operations_queued} operations. Use /undo to revert.",
+                "message": _msg,
                 "transaction_id": transaction_id,
             }
+            if failed_files:
+                result["partial"] = True
+                result["failed"] = failed_files
 
             # Include diff if available (for preview renderer)
             if diff_output:

@@ -12,16 +12,16 @@ from victor.agent.runtime.metrics_runtime import create_metrics_runtime_componen
 def test_legacy_metrics_module_reexports_service_runtime():
     """Legacy coordinator path should re-export service-owned metrics runtime."""
     from victor.agent.services.metrics_service import (
-        MetricsCoordinator as legacy_metrics_coordinator,
-        create_metrics_coordinator as legacy_create_metrics_coordinator,
+        AgentMetricsService as legacy_metrics_coordinator,
+        create_agent_metrics_service as legacy_create_agent_metrics_service,
     )
     from victor.agent.services.metrics_service import (
-        MetricsCoordinator as service_metrics_coordinator,
-        create_metrics_coordinator as service_create_metrics_coordinator,
+        AgentMetricsService as service_metrics_coordinator,
+        create_agent_metrics_service as service_create_agent_metrics_service,
     )
 
     assert legacy_metrics_coordinator is service_metrics_coordinator
-    assert legacy_create_metrics_coordinator is service_create_metrics_coordinator
+    assert legacy_create_agent_metrics_service is service_create_agent_metrics_service
 
 
 def test_create_metrics_runtime_components_lazy_materialization():
@@ -56,7 +56,7 @@ def test_create_metrics_runtime_components_lazy_materialization():
 
     with patch("victor.agent.session_cost_tracker.SessionCostTracker") as session_cost_tracker_cls:
         with patch(
-            "victor.agent.services.metrics_service.MetricsCoordinator"
+            "victor.agent.services.metrics_service.AgentMetricsService"
         ) as metrics_coordinator_cls:
             session_cost_tracker = MagicMock()
             session_cost_tracker_cls.return_value = session_cost_tracker

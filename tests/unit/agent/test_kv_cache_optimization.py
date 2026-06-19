@@ -541,6 +541,7 @@ class TestPromptBuilderKVAwareness:
         builder.provider_caches = False
         builder.provider_has_kv_cache = True
         builder.concise_mode = False
+        builder.headless_mode = False
         builder._rl_coordinator = None
         builder._decision_service = None
 
@@ -557,6 +558,7 @@ class TestPromptBuilderKVAwareness:
         builder.provider_caches = True
         builder.provider_has_kv_cache = True
         builder.concise_mode = False
+        builder.headless_mode = False
         builder._rl_coordinator = None
         builder._decision_service = None
 
@@ -902,6 +904,7 @@ class TestBuilderKVCacheWiredUp:
         builder.provider_caches = False
         builder.provider_has_kv_cache = True
         builder.concise_mode = False
+        builder.headless_mode = False
         builder._rl_coordinator = None
         builder._decision_service = None
 
