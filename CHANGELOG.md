@@ -5,7 +5,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased] (develop)
 
+_No changes yet._
+
+## [0.7.0] - 2026-06-19
+
 ### Added
+- **`victor ui`** — a pure-Python Chainlit web chat surface bound to `VictorClient` (streams tokens, renders reasoning and tool calls as steps); behind the optional `chat-ui` extra
+- **Human-in-the-loop tool approval** for non-TTY surfaces — `SessionConfig.tool_approval` turns on the governance ASK path for named tools; `register_policy_approval_handler()` registers a surface's approval handler in the DI container
+- **Single FastAPI HTTP server** — `/lsp/*` ported onto the core server and new `/credentials/{set,delete,status}` + `/tools/cancel` routes, so the full IDE/extension API surface lives on one server
+- **VS Code extension ↔ FastAPI contract test** — guards endpoint drift between the extension client and backend routes
+- **VS Code extension** unit harness — vitest + c8 coverage with a `vscode` mock (21 logic-module tests), wired into CI
 - **ExtensionManifest** and **ExtensionType** in victor-contracts for vertical capability declaration
 - **CapabilityNegotiator** for manifest validation during vertical activation
 - **API versioning** (`CURRENT_API_VERSION=2`, `MIN_SUPPORTED_API_VERSION=1`)
@@ -21,6 +30,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - TODO/FIXME triage document (81 markers categorized)
 
 ### Changed
+- **Consolidated to a single HTTP server** — the legacy aiohttp `VictorAPIServer` was removed; `VictorFastAPIServer` is now the sole server and its routers own the full API surface
+- **VS Code extension** upgraded to Node 22, TypeScript 5.9, and typescript-eslint 8
 - **Orchestrator** reduced from 4,514 to 3,940 LOC via property/callback extraction
 - **Extension loader** reduced from 2,049 to 1,897 LOC via resolver/cache extraction
 - **protocols.py** decomposed from 3,703 LOC monolith into 9 domain modules with lazy `__getattr__` loading
@@ -33,21 +44,21 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Deprecated
 - **`FrameworkShim` compatibility surface**
-  - Deprecated in: `Unreleased` on `2026-04-30`
+  - Deprecated in: `0.7.0` on `2026-04-30`
   - To be removed in: `v1.0.0`
   - Target removal date: `2027-06-30`
   - Replacement: `Agent.create()` for public callers or `AgentFactory` / `AgentCreationFactory` for internal composition
   - Migration path: `docs/architecture/migration.md`
   - Compatibility shim status: warning-backed shim remains supported through `v1.0.0`
 - **`TeamNode*` workflow compatibility aliases** (`TeamNode`, `TeamNodeConfig`, `TeamNodeWorkflow`, `TeamNodeExecutor`)
-  - Deprecated in: `Unreleased` on `2026-04-30`
+  - Deprecated in: `0.7.0` on `2026-04-30`
   - To be removed in: `v0.9.0`
   - Target removal date: `2027-03-31`
   - Replacement: `TeamStep*` workflow names
   - Migration path: `docs/architecture/migration.md`
   - Compatibility shim status: warning-backed aliases remain supported through `v0.9.0`
 - **`WorkflowGraph` alias from `victor.workflows.graph`**
-  - Deprecated in: `Unreleased` on `2026-04-30`
+  - Deprecated in: `0.7.0` on `2026-04-30`
   - To be removed in: `v0.8.0`
   - Target removal date: `2026-12-31`
   - Replacement: `BasicWorkflowGraph` for the simple container or `victor.workflows.graph_dsl.WorkflowGraph` for the typed DSL
@@ -55,6 +66,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   - Compatibility shim status: warning-backed alias remains supported through `v0.8.0`
 
 ### Fixed
+- **Release pipeline** — the SBOM job installs the in-repo `victor-contracts` before victor-ai (it is not on PyPI), and the native-wheel build passes `--find-interpreter` so maturin finds a CPython under `manylinux: auto`
 - Bare `except:` in `experiments.py` → `except (ValueError, TypeError)`
 - `_send_rl_reward_signal` test updated for CallbackCoordinator delegation
 
