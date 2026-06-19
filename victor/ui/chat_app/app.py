@@ -32,26 +32,57 @@ import chainlit as cl
 
 from victor.framework.client import VictorClient
 from victor.framework.session_config import SessionConfig
+from victor.ui.chat_app.approval import register_chat_ui_approval_handler
 from victor.ui.chat_app.event_mapping import RenderKind, map_event
 
 logger = logging.getLogger(__name__)
 
 _CLIENT_KEY = "victor_client"
 
+# Tools that mutate state or run code require explicit approval in the web UI, where a
+# user is one click away. Read-only tools stay friction-free.
+_ASK_ON_TOOLS = [
+    "bash",
+    "shell",
+    "run_shell",
+    "execute_command",
+    "exec_command",
+    "code_execution",
+    "write_file",
+    "edit_file",
+    "delete_file",
+    "git_commit",
+    "git_push",
+]
+
 
 def _build_client() -> VictorClient:
-    """Construct a VictorClient from default settings (provider/model from config/env).
+    """Construct a VictorClient with human-in-the-loop approval for mutating tools.
 
     Overrides are intentionally minimal here; richer per-session controls (provider, model,
     tool budget) can be surfaced later via Chainlit ``ChatSettings``.
     """
-    config = SessionConfig.from_cli_flags(tool_preview=True)
+    config = SessionConfig.from_cli_flags(
+        tool_preview=True,
+        tool_approval_enabled=True,
+        ask_on_tools=_ASK_ON_TOOLS,
+        ask_fallback="deny",
+    )
     return VictorClient(config)
 
 
 @cl.on_chat_start
 async def on_chat_start() -> None:
     """Create a per-session VictorClient and greet the user."""
+    # Register the approval handler before any stream triggers agent/middleware build,
+    # while the global container is still mutable.
+    try:
+        from victor.core import get_container
+
+        register_chat_ui_approval_handler(get_container())
+    except Exception:  # approval is best-effort; chat still works without it
+        logger.debug("Approval handler registration skipped", exc_info=True)
+
     cl.user_session.set(_CLIENT_KEY, _build_client())
     await cl.Message(
         content="**Victor** is ready. Ask me to write code, search the repo, run tools — "
