@@ -116,10 +116,43 @@ class PolicyApprovalHandler:
         self.handler = handler
 
 
+def register_policy_approval_handler(
+    handler: ApprovalHandlerFn, container: Optional[object] = None
+) -> bool:
+    """Register *handler* as the DI container's policy ASK approval handler.
+
+    This is the framework seam any surface (web chat, TUI, API) uses to answer ASK
+    verdicts without reaching into the container itself. Must be called before the agent
+    builds its middleware (i.e. before the first turn), while the container is mutable.
+
+    Idempotent and defensive: returns ``True`` when a handler is registered (or already
+    present), ``False`` when registration isn't possible (e.g. the container is frozen and
+    none is registered yet). When *container* is ``None`` the global container is used.
+    """
+    if container is None:
+        from victor.core import get_container
+
+        container = get_container()
+
+    try:
+        if container.get_optional(PolicyApprovalHandler) is not None:
+            return True  # already registered (e.g. a prior session in this process)
+    except Exception:
+        pass
+
+    try:
+        container.register(PolicyApprovalHandler, PolicyApprovalHandler(handler))
+        return True
+    except Exception:
+        logger.debug("Could not register policy approval handler", exc_info=True)
+        return False
+
+
 __all__ = [
     "ConfirmFn",
     "ApprovalHandlerFn",
     "make_console_approval_handler",
     "console_approval_handler",
     "PolicyApprovalHandler",
+    "register_policy_approval_handler",
 ]
