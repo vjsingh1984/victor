@@ -186,9 +186,13 @@ class CompactionConfig:
     # P1 FIX: Fast pruning before LLM compaction (OpenDev finding)
     enable_fast_pruning: bool = True
     enable_proactive: bool = False
-    # L1: reference-aware tool-result pruning (default OFF — flip on C0 trace evidence).
-    # Prunes old, large tool results that no later assistant turn cites; preserves the rest.
-    enable_reference_aware_pruning: bool = False
+    # L1: reference-aware tool-result pruning. Prunes old, large tool results that no later
+    # assistant turn cites; preserves the rest. Default ON — flipped after the evidence sweep
+    # showed it is lossless (drops 0 cited results vs size-based pruning dropping every cited
+    # result) and recovers most of the savings (-62% to -78% in the realistic read-many/cite-few
+    # regime), while fixing the reference-blind size-based path that silently dropped cited tool
+    # output at compaction. Replaces size-based fast-pruning when active (see ContextCompactor).
+    enable_reference_aware_pruning: bool = True
     reference_window_turns: int = 3
 
 
