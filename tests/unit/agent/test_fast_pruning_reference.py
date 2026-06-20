@@ -134,3 +134,28 @@ def test_estimate_matches_reference_aware_pruning():
     out = pruner.prune_old_tool_results(msgs, current_turn=len(msgs))
     assert out[0].content.startswith("[pruned]")
     assert out[2].content == msgs[2].content
+
+
+def test_reference_aware_pruning_is_on_by_default():
+    # The flip: evidence showed L1 is lossless (0 cited dropped) and recovers most savings in
+    # the realistic read-many/cite-few regime, so it is now the default fast-pruning path.
+    from victor.agent.context_compactor import CompactorConfig
+    from victor.config.orchestrator_constants import CompactionConfig
+
+    assert CompactionConfig().enable_reference_aware_pruning is True
+    assert CompactorConfig().enable_reference_aware_pruning is True
+
+
+def test_default_pruner_preserves_cited_results_losslessly():
+    # End-to-end with the shipped default window: a cited result survives, an uncited one is
+    # pruned. This is the property that makes the default-on flip safe.
+    cfg = FastPruningConfig(enable_reference_tracking=True, reference_window_turns=1)
+    msgs = [
+        _tool(_blob("cited_unit")),
+        _tool(_blob("orphan_unit")),
+        _assistant("cited_unit is the one that matters."),
+        _tool(_blob("recent"), "c_recent"),
+    ]
+    out = FastPruner(cfg).prune_old_tool_results(msgs, current_turn=len(msgs))
+    assert out[0].content == msgs[0].content  # cited -> preserved (lossless)
+    assert out[1].content.startswith("[pruned]")  # uncited -> pruned
