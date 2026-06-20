@@ -1475,6 +1475,22 @@ class ChatStreamHelperMixin:
                 )
 
             waiting_since = time.monotonic()
+            # Accumulate token usage from the RAW chunk BEFORE garbage-filtering. Providers
+            # routinely attach the turn's usage to the final, empty-content chunk (Ollama's
+            # `done` chunk, OpenAI-compat's terminal usage chunk). That chunk has no content,
+            # so `_handle_stream_chunk` drops it as garbage — and with it the entire turn's
+            # token accounting, leaving total_tokens=0. Reading usage here makes the dominant
+            # cost term observable regardless of whether the chunk survives the filter.
+            raw_usage = getattr(chunk, "usage", None)
+            if raw_usage:
+                for key in stream_ctx.cumulative_usage:
+                    stream_ctx.cumulative_usage[key] += raw_usage.get(key, 0)
+                logger.debug(
+                    f"Chunk usage: in={raw_usage.get('prompt_tokens', 0)} "
+                    f"out={raw_usage.get('completion_tokens', 0)} "
+                    f"cache_read={raw_usage.get('cache_read_input_tokens', 0)}"
+                )
+
             chunk, consecutive_garbage_chunks, garbage_detected = self._handle_stream_chunk(
                 chunk,
                 consecutive_garbage_chunks,
@@ -1495,15 +1511,6 @@ class ChatStreamHelperMixin:
                 logger.debug(f"Received tool_calls in chunk: {chunk.tool_calls}")
                 tool_calls = chunk.tool_calls
                 stream_ctx.stream_metrics.tool_calls_count += len(chunk.tool_calls)
-
-            if chunk.usage:
-                for key in stream_ctx.cumulative_usage:
-                    stream_ctx.cumulative_usage[key] += chunk.usage.get(key, 0)
-                logger.debug(
-                    f"Chunk usage: in={chunk.usage.get('prompt_tokens', 0)} "
-                    f"out={chunk.usage.get('completion_tokens', 0)} "
-                    f"cache_read={chunk.usage.get('cache_read_input_tokens', 0)}"
-                )
 
             if tool_calls:
                 # Tool calls signal the end of this turn — the SSE stream is done.
