@@ -29,7 +29,9 @@ Architecture:
 
 from __future__ import annotations
 
+import asyncio
 import logging
+import time
 from dataclasses import dataclass, field, replace
 from typing import Any, AsyncIterator, Dict, List, Optional, TYPE_CHECKING
 
@@ -49,6 +51,10 @@ if TYPE_CHECKING:
     from victor.core.container import ServiceContainer
 
 logger = logging.getLogger(__name__)
+
+# Max seconds close() waits for in-flight stream() calls to drain before forcing
+# shutdown. Module-level so tests can shorten it.
+_CLOSE_DRAIN_TIMEOUT_SECONDS = 10.0
 
 
 class _StreamEvent:
@@ -237,6 +243,13 @@ class VictorClient:
         self._agent: Optional["Agent"] = None
         self._context: Optional["RuntimeExecutionContext"] = None
         self._initialized = False
+        # Close-guard: keep close() from tearing down the agent/provider while a
+        # stream() is still iterating. Without this, a UI on_chat_end firing on a
+        # WebSocket disconnect mid-run closes the provider's httpx client and the
+        # in-flight stream fails with "Cannot send a request, as the client has been
+        # closed." close() drains active streams (bounded) before shutting down.
+        self._active_streams = 0
+        self._closing = False
 
     # ─────────────────────────────────────────────────────────────────────────
     # Lifecycle
@@ -421,18 +434,25 @@ class VictorClient:
         Yields:
             StreamEvent instances (content, thinking, tool_call, etc.)
         """
-        agent = await self._ensure_initialized()
-        if hasattr(agent, "get_orchestrator"):
-            async for event in stream_message_events(
-                orchestrator=agent.get_orchestrator(),
-                execution_context=self._context,
-                user_message=message,
-            ):
-                yield _to_stream_event(event)
-            return
+        if self._closing:
+            raise RuntimeError("VictorClient is closing; cannot start a new stream")
 
-        async for event in iter_runtime_stream_events(agent, message):
-            yield _to_stream_event(event)
+        agent = await self._ensure_initialized()
+        self._active_streams += 1
+        try:
+            if hasattr(agent, "get_orchestrator"):
+                async for event in stream_message_events(
+                    orchestrator=agent.get_orchestrator(),
+                    execution_context=self._context,
+                    user_message=message,
+                ):
+                    yield _to_stream_event(event)
+                return
+
+            async for event in iter_runtime_stream_events(agent, message):
+                yield _to_stream_event(event)
+        finally:
+            self._active_streams = max(0, self._active_streams - 1)
 
     async def stream_chat(self, message: str) -> AsyncIterator[_RenderChunk]:
         """Yield renderer-compatible chunks for legacy UI streaming helpers."""
@@ -620,7 +640,25 @@ class VictorClient:
     # ─────────────────────────────────────────────────────────────────────────
 
     async def close(self) -> None:
-        """Clean up agent and container resources."""
+        """Clean up agent and container resources.
+
+        Waits (bounded) for any in-flight ``stream()`` to finish before tearing down
+        the agent/provider, so a close() racing an active stream (e.g. a UI on_chat_end
+        on a mid-run WebSocket disconnect) does not close the provider out from under it.
+        """
+        self._closing = True
+
+        if self._active_streams > 0:
+            deadline = time.monotonic() + _CLOSE_DRAIN_TIMEOUT_SECONDS
+            while self._active_streams > 0 and time.monotonic() < deadline:
+                await asyncio.sleep(0.1)
+            if self._active_streams > 0:
+                logger.warning(
+                    "VictorClient.close(): %d stream(s) still active after drain timeout; "
+                    "proceeding with shutdown",
+                    self._active_streams,
+                )
+
         if self._agent is not None:
             await self._agent.close()
             self._agent = None

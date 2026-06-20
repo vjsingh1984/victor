@@ -1036,12 +1036,22 @@ class GraphAnalyzer:
             return []
 
         matches: List[str] = []
+        basename_matches: List[str] = []
+        file_base = Path(normalized_file).name
         for node in self.nodes.values():
             if node.name.lower() != symbol_lower:
                 continue
             node_file = _normalize_relpath(node.file)
             if node_file == normalized_file or node_file.endswith(normalized_file):
                 matches.append(node.node_id)
+            elif file_base and node_file and Path(node_file).name == file_base:
+                basename_matches.append(node.node_id)
+
+        # Fall back to a basename-only match (correct symbol, differently-formatted file
+        # path) only when it is unambiguous — otherwise we'd risk resolving to a
+        # same-named symbol in a different directory.
+        if not matches and len(basename_matches) == 1:
+            matches = basename_matches
 
         if preferred_types:
             matches.sort(
@@ -2502,7 +2512,50 @@ def _find_similar_node_names(
     """
     # Use the analyzer's search method to find similar nodes
     results = analyzer.search(node_ref, limit=max_suggestions)
-    return [r["name"] for r in results]
+    names: List[str] = [r["name"] for r in results]
+
+    # For compound `file:Symbol` references (a common shape) the symbol is often
+    # misremembered or hallucinated — e.g. `tool_selection.py:ToolSelectionService`
+    # when the file actually defines `ToolSelector`. Surface the symbols that ARE
+    # defined in that file so the caller can self-correct.
+    if ":" in node_ref:
+        file_ref = node_ref.rpartition(":")[0]
+        for name in _symbols_in_file(analyzer, file_ref, limit=max_suggestions):
+            if name not in names:
+                names.append(name)
+
+    return names[:max_suggestions]
+
+
+def _symbols_in_file(analyzer: GraphAnalyzer, file_ref: str, *, limit: int = 8) -> List[str]:
+    """Return symbol names defined in ``file_ref`` (for "did you mean" suggestions).
+
+    Resolves the file via the analyzer's file index (exact then suffix match) and
+    returns the names of symbol-typed nodes in it.
+    """
+    normalized_file = _normalize_relpath(file_ref)
+    if not normalized_file:
+        return []
+
+    file_index = getattr(analyzer, "_file_index", {}) or {}
+    node_ids = list(file_index.get(normalized_file, ()))
+    if not node_ids:
+        for indexed_file, ids in file_index.items():
+            if indexed_file.endswith(normalized_file):
+                node_ids = list(ids)
+                break
+
+    names: List[str] = []
+    for node_id in node_ids:
+        node = analyzer.nodes.get(node_id)
+        if node is None or getattr(node, "type", None) not in _SYMBOL_TYPES:
+            continue
+        name = getattr(node, "name", None)
+        if name and name not in names:
+            names.append(name)
+            if len(names) >= limit:
+                break
+    return names
 
 
 def _resolve_query_match_for_node_mode(

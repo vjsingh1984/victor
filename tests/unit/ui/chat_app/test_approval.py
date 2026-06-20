@@ -40,13 +40,25 @@ def _request() -> ApprovalRequest:
     )
 
 
-def test_decision_approve():
+def test_decision_approve_legacy_value_shape():
+    # Chainlit 1.x flat {"value": ...}
     status, _, responder = decision_from_action({"value": "approve"})
     assert status is ApprovalStatus.APPROVED
     assert responder == "chat_ui_user"
 
 
-def test_decision_reject():
+def test_decision_approve_2x_payload_shape():
+    # Chainlit 2.x returns the chosen action as name + payload
+    status, _, _ = decision_from_action({"name": "approve", "payload": {"value": "approve"}})
+    assert status is ApprovalStatus.APPROVED
+
+
+def test_decision_reject_2x_payload_shape():
+    status, _, _ = decision_from_action({"name": "reject", "payload": {"value": "reject"}})
+    assert status is ApprovalStatus.REJECTED
+
+
+def test_decision_reject_legacy_value_shape():
     status, _, _ = decision_from_action({"value": "reject"})
     assert status is ApprovalStatus.REJECTED
 
@@ -64,8 +76,9 @@ def test_decision_unknown_value_fails_safe_to_reject():
 @pytest.mark.parametrize(
     "click,expected",
     [
+        ({"name": "approve", "payload": {"value": "approve"}}, ApprovalStatus.APPROVED),
+        ({"name": "reject", "payload": {"value": "reject"}}, ApprovalStatus.REJECTED),
         ({"value": "approve"}, ApprovalStatus.APPROVED),
-        ({"value": "reject"}, ApprovalStatus.REJECTED),
         (None, ApprovalStatus.TIMEOUT),
     ],
 )

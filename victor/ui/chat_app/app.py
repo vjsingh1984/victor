@@ -27,6 +27,7 @@ mapping in :mod:`victor.ui.chat_app.event_mapping`.
 from __future__ import annotations
 
 import logging
+import os
 
 import chainlit as cl
 
@@ -38,6 +39,10 @@ from victor.ui.chat_app.event_mapping import RenderKind, map_event
 logger = logging.getLogger(__name__)
 
 _CLIENT_KEY = "victor_client"
+
+# Agent profile (from ~/.victor/profiles.yaml) selected via `victor ui --profile`,
+# passed through the chainlit subprocess as an env var.
+_PROFILE_ENV = "VICTOR_UI_PROFILE"
 
 # Tools that mutate state or run code require explicit approval in the web UI, where a
 # user is one click away. Read-only tools stay friction-free.
@@ -59,10 +64,13 @@ _ASK_ON_TOOLS = [
 def _build_client() -> VictorClient:
     """Construct a VictorClient with human-in-the-loop approval for mutating tools.
 
-    Overrides are intentionally minimal here; richer per-session controls (provider, model,
-    tool budget) can be surfaced later via Chainlit ``ChatSettings``.
+    The agent profile (provider/model/etc.) comes from ``victor ui --profile`` via the
+    ``VICTOR_UI_PROFILE`` env var; ``None`` uses the default profile. Richer per-session
+    controls can be surfaced later via Chainlit ``ChatSettings``.
     """
+    profile = os.environ.get(_PROFILE_ENV) or None
     config = SessionConfig.from_cli_flags(
+        agent_profile=profile,
         tool_preview=True,
         tool_approval_enabled=True,
         ask_on_tools=_ASK_ON_TOOLS,

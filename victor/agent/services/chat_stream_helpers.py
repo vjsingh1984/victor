@@ -1366,6 +1366,7 @@ class ChatStreamHelperMixin:
         )
         waiting_since = time.monotonic()
         first_chunk_received = False
+        pending_next = None
 
         while True:
             pending_next = asyncio.create_task(provider_iterator.__anext__())
@@ -1519,6 +1520,25 @@ class ChatStreamHelperMixin:
                 )
                 logger.debug("Tool calls received, breaking stream loop")
                 break
+
+        # Close the provider stream in THIS task. Breaking early on tool_calls (the
+        # common case) leaves the underlying httpx SSE async generator open; if it is
+        # finalized later by GC it runs off-task and raises "async generator ignored
+        # GeneratorExit" / "Attempted to exit cancel scope in a different task". Draining
+        # the in-flight task and aclose()-ing here keeps that cleanup on-task. aclose() on
+        # an already-exhausted generator (StopAsyncIteration path) is a safe no-op.
+        if pending_next is not None and not pending_next.done():
+            pending_next.cancel()
+            try:
+                await pending_next
+            except (asyncio.CancelledError, Exception):
+                pass
+        _stream_aclose = getattr(provider_iterator, "aclose", None)
+        if callable(_stream_aclose):
+            try:
+                await _stream_aclose()
+            except Exception:
+                logger.debug("Failed closing provider stream iterator", exc_info=True)
 
         if garbage_detected and not tool_calls:
             logger.info("Setting force_completion due to garbage detection")

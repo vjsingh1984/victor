@@ -256,3 +256,8 @@ victor/workflows/models/__pycache__/
 # Documentation Archive
 docs/archive/sessions/*.md
 
+
+# Chainlit web chat UI auto-generated files (victor ui)
+.chainlit/
+chainlit.md
+.files/
