@@ -167,7 +167,7 @@ class PolicyEngineMiddleware(MiddlewareProtocol):
             )
 
         if verdict.is_ask:
-            approved = await self._resolve_ask(tool_name, verdict)
+            approved = await self._resolve_ask(tool_name, verdict, arguments)
             if not approved:
                 return MiddlewareResult(
                     proceed=False,
@@ -214,15 +214,28 @@ class PolicyEngineMiddleware(MiddlewareProtocol):
             logger.debug("Policy context provider failed; using empty context", exc_info=True)
             return PolicyContext()
 
-    async def _resolve_ask(self, tool_name: str, verdict: PolicyVerdict) -> bool:
-        """Resolve an ASK verdict to a boolean approval decision."""
+    async def _resolve_ask(
+        self,
+        tool_name: str,
+        verdict: PolicyVerdict,
+        arguments: Optional[Dict[str, Any]] = None,
+    ) -> bool:
+        """Resolve an ASK verdict to a boolean approval decision.
+
+        Includes the tool ``arguments`` in the approval context so surfaces can show the
+        exact command/diff being approved (informed approval) rather than just the name.
+        """
         return await resolve_policy_ask(
             self._approval_handler,
             ask_fallback=self._ask_fallback,
             ask_timeout_seconds=self._ask_timeout_seconds,
             title=f"Approve tool: {tool_name}",
             description=verdict.reason or f"Policy requests approval to run '{tool_name}'.",
-            context={"tool_name": tool_name, "policy": verdict.policy_name},
+            context={
+                "tool_name": tool_name,
+                "policy": verdict.policy_name,
+                "arguments": arguments or {},
+            },
         )
 
     @staticmethod
