@@ -44,18 +44,35 @@ _APPROVE_VALUE = "approve"
 _REJECT_VALUE = "reject"
 
 
-def decision_from_action(action: Optional[Any]) -> ApprovalResult:
-    """Map a Chainlit action payload (or ``None`` on timeout) to an approval result.
+def _decision_token(action: Any) -> Optional[str]:
+    """Pull the approve/reject token from an AskActionMessage response, version-robustly.
 
-    ``action`` is the value returned by ``AskActionMessage.send()``: a dict-like with a
-    ``"value"`` key, or ``None`` when the user did not respond before the timeout. Anything
-    that isn't an explicit approve maps to a non-approval (fail-safe).
+    Chainlit 2.x returns the chosen action as a dict with ``name`` + ``payload`` (``value``
+    was renamed to ``payload``); 1.x used a flat ``value``. Prefer the stable action
+    ``name`` ("approve"/"reject"), then ``payload['value']``, then legacy ``value``.
+    """
+    if action is None:
+        return None
+    if hasattr(action, "get"):
+        name = action.get("name")
+        if name:
+            return name
+        payload = action.get("payload")
+        if isinstance(payload, dict) and payload.get("value"):
+            return payload.get("value")
+        return action.get("value")
+    return getattr(action, "name", None) or getattr(action, "value", None)
+
+
+def decision_from_action(action: Optional[Any]) -> ApprovalResult:
+    """Map a Chainlit AskActionMessage response (or ``None`` on timeout) to an approval result.
+
+    Anything that isn't an explicit approve maps to a non-approval (fail-safe).
     """
     if action is None:
         return ApprovalStatus.TIMEOUT, "No response before timeout", _RESPONDER
 
-    value = action.get("value") if hasattr(action, "get") else getattr(action, "value", None)
-    if value == _APPROVE_VALUE:
+    if _decision_token(action) == _APPROVE_VALUE:
         return ApprovalStatus.APPROVED, "Approved in chat UI", _RESPONDER
     return ApprovalStatus.REJECTED, "Rejected in chat UI", _RESPONDER
 
@@ -86,8 +103,9 @@ async def chainlit_approval_handler(request: ApprovalRequest) -> ApprovalResult:
         action = await cl.AskActionMessage(
             content=_format_prompt(request),
             actions=[
-                cl.Action(name="approve", value=_APPROVE_VALUE, label="✅ Approve"),
-                cl.Action(name="reject", value=_REJECT_VALUE, label="🚫 Reject"),
+                # Chainlit 2.x: payload (dict) replaced the 1.x `value` kwarg.
+                cl.Action(name="approve", payload={"value": _APPROVE_VALUE}, label="✅ Approve"),
+                cl.Action(name="reject", payload={"value": _REJECT_VALUE}, label="🚫 Reject"),
             ],
             timeout=request.timeout_seconds or 120,
         ).send()
