@@ -1007,12 +1007,26 @@ class OllamaProvider(BaseProvider):
                 # Clear content since it was a tool call, not actual text response
                 content = ""
 
+        # Surface token usage on the final chunk: Ollama returns prompt_eval_count /
+        # eval_count on the `done:true` chunk (same fields the non-streaming path reads).
+        # Without this the streaming cost trace (C0) stays at total_tokens=0 for Ollama.
+        usage = None
+        if is_done and ("prompt_eval_count" in chunk_data or "eval_count" in chunk_data):
+            prompt_tokens = chunk_data.get("prompt_eval_count", 0)
+            completion_tokens = chunk_data.get("eval_count", 0)
+            usage = {
+                "prompt_tokens": prompt_tokens,
+                "completion_tokens": completion_tokens,
+                "total_tokens": prompt_tokens + completion_tokens,
+            }
+
         return StreamChunk(
             content=content,
             tool_calls=tool_calls,
             stop_reason=chunk_data.get("done_reason") if is_done else None,
             is_final=is_done,
             metadata=metadata,
+            usage=usage,
         )
 
     async def list_models(self) -> List[Dict[str, Any]]:
