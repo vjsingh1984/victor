@@ -256,8 +256,12 @@ class GraphMode(str, Enum):
     SEMANTIC = "semantic"  # Semantic relationship discovery
     QUERY = "query"  # Direct SQL query mode
     SCHEMA = "schema"  # Discover supported graph modes and relationship filters
-    DYNAMIC_IMPORTS = "dynamic_imports"  # Analyze dynamic imports and exports
-    DEAD_CODE = "dead_code"  # Find dead code with dynamic-aware analysis
+    # NOTE: do not add a mode here without a corresponding handler in the dispatch
+    # chain below. `dead_code` and `dynamic_imports` were advertised (in the schema +
+    # "supported modes" error) but had no dispatch handler, so calling them passed
+    # validation then hit the "Unsupported graph mode" fallback. A dynamic-import
+    # tracker exists (victor/tools/graph_dynamic_import_tracker.py) and could be wired
+    # as a real mode in a follow-up; dead-code analysis is unimplemented.
 
 
 _GRAPH_MODE_ALIAS_NOTES = {
