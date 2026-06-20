@@ -430,6 +430,17 @@ class ServiceStreamingRuntime(ChatStreamHelperMixin):
                             + cumulative_usage["completion_tokens"]
                         )
 
+                    # Close the cost-measurement wire (C0): the service streaming runtime
+                    # never finalized stream metrics, so per-turn tokens/cost stayed 0 and the
+                    # canonical cost record (SessionCostTracker + usage.jsonl "stream_completed")
+                    # was never emitted — the *dominant* cost term went unmeasured. Finalize
+                    # once here (this finally runs once per turn; the continuation runtime owns
+                    # its own finalize on the legacy path), reusing the existing pipeline.
+                    try:
+                        self._orchestrator._finalize_stream_metrics(ctx.cumulative_usage)
+                    except Exception:
+                        logger.debug("C0 stream-metrics finalize failed", exc_info=True)
+
                     prompt_tokens = ctx.cumulative_usage.get("prompt_tokens", 0)
                     if prompt_tokens > 0:
                         try:
