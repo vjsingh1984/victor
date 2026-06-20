@@ -18,18 +18,19 @@ Provides REST API endpoints for IDE integrations (VS Code, JetBrains, etc.)
 and external tool access.
 
 Components:
-- VictorAPIServer: Legacy aiohttp-based server
-- VictorFastAPIServer: Modern FastAPI-based server (recommended, requires fastapi)
+- VictorFastAPIServer: The single canonical FastAPI-based server (requires fastapi)
 - APIMiddlewareStack: Authentication, rate limiting, and CORS middleware
 - EventBridge: Real-time event streaming to WebSocket clients
 - Router plugins: Entry-point based FastAPI router extensions
+
+The legacy aiohttp-based ``VictorAPIServer`` was removed; FastAPI is now the sole HTTP
+server and its routers (``victor/integrations/api/routes/``) own the full API surface.
 """
 
 from typing import TYPE_CHECKING
 
 # Lazy imports for optional dependencies
 if TYPE_CHECKING:
-    from victor.integrations.api.server import VictorAPIServer
     from victor.integrations.api.fastapi_server import VictorFastAPIServer
     from victor.integrations.api.middleware import (
         APIMiddlewareStack,
@@ -51,11 +52,7 @@ if TYPE_CHECKING:
 
 def __getattr__(name: str):
     """Lazy import for optional dependencies."""
-    if name == "VictorAPIServer":
-        from victor.integrations.api.server import VictorAPIServer
-
-        return VictorAPIServer
-    elif name == "VictorFastAPIServer":
+    if name == "VictorFastAPIServer":
         from victor.integrations.api.fastapi_server import VictorFastAPIServer
 
         return VictorFastAPIServer
@@ -79,8 +76,7 @@ def __getattr__(name: str):
 
 
 __all__ = [
-    # Servers
-    "VictorAPIServer",
+    # Server
     "VictorFastAPIServer",
     # Middleware
     "APIMiddlewareStack",

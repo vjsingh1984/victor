@@ -182,7 +182,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: npm
           cache-dependency-path: vscode-victor/package-lock.json
 
@@ -202,6 +202,17 @@ jobs:
       - name: Compile
         working-directory: vscode-victor
         run: npm run compile
+
+      - name: Unit tests + coverage (vitest/c8)
+        working-directory: vscode-victor
+        run: npm run coverage
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: vscode-coverage
+          path: vscode-victor/coverage
+          if-no-files-found: ignore
 
       - name: Run tests
         working-directory: vscode-victor

@@ -45,7 +45,7 @@ Migration Path:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import List, Optional
 
 from victor.framework.bayesian_config import BayesianConfig
 
@@ -201,6 +201,28 @@ class ProviderOverrideConfig:
 
 
 @dataclass(frozen=True)
+class ToolApprovalConfig:
+    """Human-in-the-loop tool-approval overrides for a session.
+
+    When ``enabled`` is set, ``apply_to_settings`` turns on the governance policy
+    engine (``governance.enabled`` + the ``USE_POLICY_ENGINE`` flag) and routes the
+    named tools through the ASK path, so a surface that has registered a
+    ``PolicyApprovalHandler`` is prompted before those tools run. This is the
+    framework seam any non-TTY surface (web chat, TUI, API) consumes — it does not
+    by itself register a handler.
+
+    Attributes:
+        enabled: Gate ASK-based tool approval for this session.
+        ask_on_tools: Tool names that must be approved before executing.
+        ask_fallback: Decision when no handler answers ("deny" | "allow").
+    """
+
+    enabled: bool = False
+    ask_on_tools: tuple = ()
+    ask_fallback: str = "deny"
+
+
+@dataclass(frozen=True)
 class SessionConfig:
     """Immutable capture of all CLI/runtime session overrides.
 
@@ -253,6 +275,7 @@ class SessionConfig:
     tool_output: ToolOutputConfig = field(default_factory=ToolOutputConfig)
     provider_override: ProviderOverrideConfig = field(default_factory=ProviderOverrideConfig)
     bayesian: BayesianConfig = field(default_factory=BayesianConfig)
+    tool_approval: ToolApprovalConfig = field(default_factory=ToolApprovalConfig)
 
     # --- Convenience shorthands (populate sub-configs) ---
 
@@ -322,6 +345,10 @@ class SessionConfig:
         enable_voi: bool = True,
         enable_correlation: bool = True,
         min_agents_for_bayesian: int = 2,
+        # Human-in-the-loop tool approval
+        tool_approval_enabled: bool = False,
+        ask_on_tools: Optional[List[str]] = None,
+        ask_fallback: str = "deny",
     ) -> "SessionConfig":
         """Create a ``SessionConfig`` from flat CLI flags.
 
@@ -411,6 +438,11 @@ class SessionConfig:
                 enable_voi=enable_voi,
                 enable_correlation=enable_correlation,
                 min_agents_for_bayesian=min_agents_for_bayesian,
+            ),
+            tool_approval=ToolApprovalConfig(
+                enabled=tool_approval_enabled,
+                ask_on_tools=tuple(ask_on_tools or ()),
+                ask_fallback=ask_fallback,
             ),
         )
 
@@ -541,3 +573,29 @@ class SessionConfig:
                     object.__setattr__(routing, "profile", self.smart_routing.profile)
                 if hasattr(routing, "fallback_chain") and self.smart_routing.fallback_chain:
                     object.__setattr__(routing, "fallback_chain", self.smart_routing.fallback_chain)
+
+        # Human-in-the-loop tool approval: turn on the governance policy engine and
+        # route the named tools through the ASK path. A surface still has to register a
+        # PolicyApprovalHandler in the container to answer the prompt; without one, ASK
+        # resolves via ask_fallback (default "deny").
+        if self.tool_approval.enabled:
+            governance = getattr(settings, "governance", None)
+            if governance is not None:
+                if hasattr(governance, "enabled"):
+                    object.__setattr__(governance, "enabled", True)
+                if hasattr(governance, "ask_fallback"):
+                    object.__setattr__(governance, "ask_fallback", self.tool_approval.ask_fallback)
+                if hasattr(governance, "ask_on_tools"):
+                    # Union with any pre-configured tools, preserving order.
+                    existing = list(getattr(governance, "ask_on_tools", []) or [])
+                    merged = existing + [
+                        t for t in self.tool_approval.ask_on_tools if t not in existing
+                    ]
+                    object.__setattr__(governance, "ask_on_tools", merged)
+                # The policy engine is feature-flag gated; requesting approval implies it.
+                try:
+                    from victor.core.feature_flags import FeatureFlag, enable_feature
+
+                    enable_feature(FeatureFlag.USE_POLICY_ENGINE)
+                except Exception:  # pragma: no cover - defensive
+                    pass

@@ -68,11 +68,17 @@ def test_router_registration_can_define_expected_lsp_routes() -> None:
     assert "/lsp/diagnostics" in paths
 
 
-def test_fastapi_server_has_no_lsp_routes_without_router_plugins(
+def test_fastapi_server_includes_core_lsp_routes_without_router_plugins(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
-    """Core server should not register fallback LSP routes."""
+    """Core server registers the LSP routes itself (consolidated from the old aiohttp server).
+
+    Previously LSP was provided only by external router plugins; after consolidating the
+    two HTTP servers, ``/lsp/*`` is a first-class core surface that degrades gracefully when
+    no LSPManager capability is registered. The ``lsp`` capability is therefore reported even
+    with no router plugins present.
+    """
     monkeypatch.setattr(
         fastapi_server,
         "load_fastapi_router_registrations",
@@ -84,12 +90,12 @@ def test_fastapi_server_has_no_lsp_routes_without_router_plugins(
         enable_graphql=False,
     )
 
-    assert "/lsp/completions" not in _route_paths(server.app)
+    assert "/lsp/completions" in _route_paths(server.app)
     with TestClient(server.app) as client:
         response = client.get("/status")
     assert response.status_code == 200
     capabilities = response.json().get("capabilities", [])
-    assert "lsp" not in capabilities
+    assert "lsp" in capabilities
 
 
 def test_fastapi_server_includes_lsp_routes_from_router_plugin(

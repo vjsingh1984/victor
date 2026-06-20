@@ -45,21 +45,6 @@ def test_api_chat_surfaces_use_canonical_runtime_resolution() -> None:
         "VictorFastAPIServer",
         "_handle_ws_message",
     )
-    aiohttp_stream_source = _method_source(
-        "victor/integrations/api/server.py",
-        "VictorAPIServer",
-        "_chat_stream",
-    )
-    aiohttp_ws_source = _method_source(
-        "victor/integrations/api/server.py",
-        "VictorAPIServer",
-        "_handle_ws_message",
-    )
-    aiohttp_agent_source = _method_source(
-        "victor/integrations/api/server.py",
-        "VictorAPIServer",
-        "_start_agent",
-    )
 
     assert "await server._get_victor_client()" in fastapi_chat_source
     assert (
@@ -78,12 +63,6 @@ def test_api_chat_surfaces_use_canonical_runtime_resolution() -> None:
     assert "orchestrator._chat_service" not in fastapi_agent_source
     assert "await self._get_victor_client()" in fastapi_ws_source
     assert "orchestrator._chat_service" not in fastapi_ws_source
-    assert "resolve_chat_runtime" in aiohttp_stream_source
-    assert "orchestrator._chat_service" not in aiohttp_stream_source
-    assert "resolve_chat_runtime" in aiohttp_ws_source
-    assert "orchestrator._chat_service" not in aiohttp_ws_source
-    assert "resolve_chat_runtime" in aiohttp_agent_source
-    assert "orchestrator._chat_service" not in aiohttp_agent_source
 
 
 def test_fastapi_server_uses_framework_client_factory_for_conversation_helpers() -> None:

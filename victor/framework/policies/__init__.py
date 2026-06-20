@@ -50,6 +50,7 @@ from victor.framework.policies.handlers import (
     PolicyApprovalHandler,
     console_approval_handler,
     make_console_approval_handler,
+    register_policy_approval_handler,
 )
 from victor.framework.policies.middleware import (
     ContextProvider,
@@ -89,6 +90,7 @@ __all__ = [
     "console_approval_handler",
     "make_console_approval_handler",
     "PolicyApprovalHandler",
+    "register_policy_approval_handler",
     "ApprovalHandlerFn",
     "resolve_policy_ask",
     # Aliases

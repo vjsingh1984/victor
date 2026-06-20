@@ -173,7 +173,10 @@ jobs:
         with:
           working-directory: rust
           target: ${{ matrix.target }}
-          args: --release --out dist
+          # --find-interpreter: scan the manylinux image for all available CPythons
+          # instead of only maturin's invoking interpreter (which the container lacks,
+          # producing "Couldn't find any python interpreters from 'python3'").
+          args: --release --out dist --find-interpreter
           manylinux: auto
 
       - name: Upload wheels
@@ -377,7 +380,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
           cache-dependency-path: vscode-victor/package-lock.json
 
@@ -517,6 +520,9 @@ jobs:
 
       - name: Generate CycloneDX SBOM
         run: |
+          # victor-contracts is an in-repo package (not on PyPI); install it first so
+          # victor-ai's `victor-contracts>=0.6.0,<1.0` dependency resolves locally.
+          pip install -e ./victor-contracts
           pip install -e ".[embeddings]"
           cyclonedx-py environment -o sbom.json --output-format json
           cyclonedx-py environment -o sbom.xml --output-format xml
