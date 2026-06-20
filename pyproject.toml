@@ -116,7 +116,7 @@ examples = []
 
 # Web chat UI: a pure-Python Chainlit surface bound to VictorClient (`victor ui`)
 chat-ui = [
-    "chainlit>=1.3,<3",
+    "chainlit>=2,<3",  # 2.x cl.Action uses payload= (the 1.x value= kwarg was removed)
 ]
 
 dev = [
