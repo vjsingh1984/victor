@@ -640,8 +640,9 @@ extend-exclude = [
     "victor_test",
     "demo_workspace",
     "src",
-    "ui",
-    "web/ui",
+    # Legacy UI command modules carry pre-existing lint debt; excluded here as
+    # before (the old bare "ui" entry also matched victor/ui). Tracked separately.
+    "victor/ui",
     "htmlcov",
     "venv",
     "game_app.py",
