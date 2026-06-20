@@ -9,7 +9,7 @@ To keep the runner queue free and feature work merging fast, CI is split by the 
 
 | Trigger | Workflows that run | Intent |
 |---------|-------------------|--------|
-| **PR → `develop`** (and pushes to `develop`) | `ci-fast` only (Black, Ruff, repo-hygiene, MyPy advisory) + `fep-validation` if `feps/**` changed | **Lightweight** — fast feedback, unblock development |
+| **PR → `develop`** (and pushes to `develop`) | `ci-fast` only — Black, Ruff, repo-hygiene, MyPy (advisory + strict), import checks, guards, and **quick unit tests** (`pytest -m "not slow"`, single job) + `fep-validation` if `feps/**` changed | **Lightweight** — fast feedback + a unit regression signal, unblock development |
 | **PR → `main`** (the `develop` → `main` promotion PR) and pushes to `main` | The full battery: `ci`, `ci-test` (sharded units), `ci-integration`, `build`, `security`, `performance-tests`, `validation`, `vertical-validation`, `external-vertical-compat` | **Extensive** — full verification before promoting to the protected branch |
 
 This is enforced by the `branches:` filter on each workflow's `push`/`pull_request`
