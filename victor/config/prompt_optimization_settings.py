@@ -94,6 +94,12 @@ class PromptOptimizationSettings(BaseModel):
     # Master switch — gates ALL prompt optimization
     enabled: bool = True
 
+    # Perf: cache the per-iteration learning-trace collection (JSONL + conversation merge)
+    # for this many seconds within a task. The traces are stable across iterations of one
+    # turn-sequence, so a short TTL avoids re-reading + re-merging them every iteration with
+    # an identical result. 0 disables (default — behavior-preserving). 30–60s is typical.
+    cache_traces_ttl_seconds: float = 0.0
+
     # Default strategy list applied to all evolvable sections.
     # Strategies are applied in order (layered).
     default_strategies: List[str] = Field(default_factory=lambda: ["gepa"])
