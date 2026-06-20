@@ -206,6 +206,10 @@ class CompactorConfig:
     enable_tool_truncation: bool = True
     enable_phase_aware: bool = True
     enable_fast_pruning: bool = COMPACTION_CONFIG.enable_fast_pruning
+    # L1: reference-aware tool-result pruning (default OFF). When on, fast pruning preserves
+    # tool results still cited by later assistant turns and prunes only the unreferenced rest.
+    enable_reference_aware_pruning: bool = COMPACTION_CONFIG.enable_reference_aware_pruning
+    reference_window_turns: int = COMPACTION_CONFIG.reference_window_turns
     # Wave 6: shrink threshold by this factor when task complexity is "high"
     high_complexity_threshold_factor: float = 0.85
     # Phase-specific thresholds (75% conservative to avoid overflows due to token estimation inaccuracy)
@@ -952,7 +956,19 @@ class ContextCompactor:
             try:
                 from victor.agent.fast_pruning import get_fast_pruner
 
-                fast_pruner = get_fast_pruner()
+                # L1: when reference-aware pruning is enabled, use a config-bearing pruner that
+                # preserves still-cited tool results. Default off → identical to the singleton.
+                if self.config.enable_reference_aware_pruning:
+                    from victor.agent.fast_pruning import FastPruner, FastPruningConfig
+
+                    fast_pruner = FastPruner(
+                        FastPruningConfig(
+                            enable_reference_tracking=True,
+                            reference_window_turns=self.config.reference_window_turns,
+                        )
+                    )
+                else:
+                    fast_pruner = get_fast_pruner()
                 messages_before = self.controller.get_messages()
 
                 # Estimate if fast pruning would help
