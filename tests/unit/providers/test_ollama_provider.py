@@ -537,6 +537,27 @@ class TestStreamChunkParsing:
         assert chunk.is_final is True
         assert chunk.stop_reason == "stop"
 
+    def test_parse_stream_chunk_final_captures_usage(self, ollama_provider):
+        """The done chunk's eval counts surface as usage (feeds the C0 cost trace)."""
+        chunk = ollama_provider._parse_stream_chunk(
+            {
+                "message": {"content": ""},
+                "done": True,
+                "done_reason": "stop",
+                "prompt_eval_count": 120,
+                "eval_count": 40,
+            }
+        )
+        assert chunk.usage == {
+            "prompt_tokens": 120,
+            "completion_tokens": 40,
+            "total_tokens": 160,
+        }
+
+    def test_parse_stream_chunk_non_final_has_no_usage(self, ollama_provider):
+        chunk = ollama_provider._parse_stream_chunk({"message": {"content": "Hi"}, "done": False})
+        assert chunk.usage is None
+
     def test_parse_stream_chunk_with_tool_calls(self, ollama_provider):
         """Test stream chunk with native tool calls."""
         chunk_data = {
