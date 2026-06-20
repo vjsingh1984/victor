@@ -5,7 +5,7 @@ name: Build Artifacts
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main]
     paths:
       - '.github/workflows/build.yml'
       - 'victor/**'
@@ -19,7 +19,7 @@ on:
       - 'docker/**'
       - 'docker-compose*.yml'
   pull_request:
-    branches: [main, develop]
+    branches: [main]
     paths:
       - '.github/workflows/build.yml'
       - 'victor/**'

@@ -5,7 +5,7 @@ name: Security Scanning
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main]
     paths:
       - '.github/workflows/security.yml'
       - 'victor/**'
@@ -19,7 +19,7 @@ on:
       - 'docker/**'
       - 'docker-compose*.yml'
   pull_request:
-    branches: [main, develop]
+    branches: [main]
     paths:
       - '.github/workflows/security.yml'
       - 'victor/**'
