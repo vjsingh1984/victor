@@ -6,7 +6,7 @@ name: CI - Tests
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main]
     paths:
       - '.github/workflows/ci-test.yml'
       - 'victor/**'
@@ -17,7 +17,7 @@ on:
       - 'Makefile'
       - 'MANIFEST.in'
   pull_request:
-    branches: [main, develop]
+    branches: [main]
     paths:
       - '.github/workflows/ci-test.yml'
       - 'victor/**'

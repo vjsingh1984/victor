@@ -2,7 +2,7 @@ name: Performance Regression Tests
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main]
     paths:
       - '.github/workflows/performance-tests.yml'
       - 'victor/**'
@@ -14,7 +14,7 @@ on:
       - 'pyproject.toml'
       - 'requirements*.txt'
   pull_request:
-    branches: [main, develop]
+    branches: [main]
     paths:
       - '.github/workflows/performance-tests.yml'
       - 'victor/**'

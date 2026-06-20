@@ -2,7 +2,7 @@ name: External Vertical Compatibility
 
 on:
   push:
-    branches: [develop, main]
+    branches: [main]
     paths:
       - '.github/workflows/external-vertical-compat.yml'
       - 'victor/**'

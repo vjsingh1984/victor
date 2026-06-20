@@ -424,3 +424,28 @@ jobs:
         if: always()
         with:
           sarif_file: 'trivy-results.sarif'
+
+  quick-tests:
+    name: Quick Unit Tests (not slow)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          # victor-contracts first (provides constants), then victor-ai with dev extras
+          pip install -e ./victor-contracts
+          pip install -e ".[dev]"
+
+      - name: Run quick unit tests (excludes slow)
+        # Single-job, non-slow unit subset: a fast regression signal on every develop PR.
+        # The full sharded suite, integration, build, security and perf run on the
+        # develop -> main promotion PR (see workflows/README.md CI Gating Strategy).
+        run: pytest tests/unit -m "not slow" --tb=short -q --timeout=120
