@@ -9,8 +9,10 @@ To keep the runner queue free and feature work merging fast, CI is split by the 
 
 | Trigger | Workflows that run | Intent |
 |---------|-------------------|--------|
-| **PR → `develop`** (and pushes to `develop`) | `ci-fast` only — Black, Ruff, repo-hygiene, MyPy (advisory + strict), import checks, guards, and **quick unit tests** (`pytest -m "not slow"`, single job) + `fep-validation` if `feps/**` changed | **Lightweight** — fast feedback + a unit regression signal, unblock development |
+| **PR → `develop`** (and pushes to `develop`) | `ci-fast` only — Black, Ruff, repo-hygiene, MyPy (advisory + strict), import checks, guards, and **changed-file unit tests** (only the mirror tests for files the PR touches — see `scripts/ci/select_changed_tests.py`) + `fep-validation` if `feps/**` changed | **Lightweight** — fast feedback + a regression signal proportional to the change, unblock development |
 | **PR → `main`** (the `develop` → `main` promotion PR) and pushes to `main` | The full battery: `ci`, `ci-test` (sharded units), `ci-integration`, `build`, `security`, `performance-tests`, `validation`, `vertical-validation`, `external-vertical-compat` | **Extensive** — full verification before promoting to the protected branch |
+
+> The develop gate runs only the unit tests **relevant to the PR's changed files**, not the whole suite: the full non-slow unit suite is ~7h single-process (26.8k tests) and hours even sharded, so it can't gate every PR. Full coverage runs once at **develop → main**.
 
 This is enforced by the `branches:` filter on each workflow's `push`/`pull_request`
 triggers: heavy workflows target `[main]`; `ci-fast` targets `[main, develop]`. `main`
