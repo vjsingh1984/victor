@@ -107,9 +107,6 @@ async def on_message(message: cl.Message) -> None:
         client = _build_client()
         cl.user_session.set(_CLIENT_KEY, client)
 
-    answer = cl.Message(content="")
-    await answer.send()
-
     # P1.4 first-token feedback: a transient "Thinking…" message so the user never stares at
     # a blank bubble; removed the instant any real output (token/reasoning/tool) arrives.
     thinking = cl.Message(content="🔄 _Thinking…_")
@@ -124,12 +121,52 @@ async def on_message(message: cl.Message) -> None:
             except Exception:
                 logger.debug("thinking placeholder removal failed", exc_info=True)
 
-    # P1.2 correlate tool steps by call_id (fallback to name) so parallel/duplicate calls
-    # don't overwrite each other's arguments.
-    pending: dict[str, dict] = {}
-    # P1.3 one accumulating reasoning step per turn (not a new box per chunk).
+    # Natural per-iteration flow (terminal-like): instead of one long message with all tool
+    # steps piling at the end, stream each iteration's text into its OWN message segment and
+    # group that iteration's tool calls under one collapsible parent step between segments —
+    # timeline reads text → tools → text → tools …. Contract: event_mapping.segment_turn.
+    phase = "text"  # "text" | "tools"
+    current_msg: cl.Message | None = None
+    tool_group: cl.Step | None = None
+    pending: dict[str, dict] = {}  # call_id -> {tool_name, arguments}
     reasoning_step: cl.Step | None = None
     reasoning_text = ""
+
+    async def _finalize_text() -> None:
+        nonlocal current_msg
+        if current_msg is not None:
+            try:
+                await current_msg.update()
+            except Exception:
+                logger.debug("text segment finalize failed", exc_info=True)
+            current_msg = None
+
+    async def _close_tool_group() -> None:
+        nonlocal tool_group
+        if tool_group is not None:
+            try:
+                await tool_group.__aexit__(None, None, None)
+            except Exception:
+                logger.debug("tool group finalize failed", exc_info=True)
+            tool_group = None
+
+    async def _open_tool_group() -> None:
+        nonlocal tool_group
+        if tool_group is None:
+            tool_group = cl.Step(name="🔧 tools", type="tool")
+            await tool_group.__aenter__()
+
+    async def _emit_text(text: str) -> None:
+        nonlocal current_msg, phase
+        # Text resuming after a tool run begins a new iteration segment.
+        if phase == "tools":
+            await _close_tool_group()
+            await _finalize_text()
+            phase = "text"
+        if current_msg is None:
+            current_msg = cl.Message(content="")
+            await current_msg.send()
+        await current_msg.stream_token(text)
 
     try:
         async for event in client.stream(message.content):
@@ -137,7 +174,7 @@ async def on_message(message: cl.Message) -> None:
 
             if action.kind is RenderKind.TOKEN:
                 await _clear_thinking()
-                await answer.stream_token(action.text)
+                await _emit_text(action.text)
 
             elif action.kind is RenderKind.THINKING:
                 await _clear_thinking()
@@ -151,6 +188,8 @@ async def on_message(message: cl.Message) -> None:
 
             elif action.kind is RenderKind.TOOL_START:
                 await _clear_thinking()
+                phase = "tools"
+                await _open_tool_group()
                 key = action.call_id or action.tool_name or "tool"
                 pending[key] = {
                     "tool_name": action.tool_name or "tool",
@@ -159,13 +198,15 @@ async def on_message(message: cl.Message) -> None:
 
             elif action.kind is RenderKind.TOOL_END:
                 await _clear_thinking()
+                phase = "tools"
+                await _open_tool_group()
                 key = action.call_id or action.tool_name or "tool"
                 info = pending.pop(key, {})
                 tool_name = info.get("tool_name") or action.tool_name or "tool"
                 args = info.get("arguments", {})
+                # Child step nests under the iteration's "🔧 tools" group (parallel calls grouped).
                 async with cl.Step(name=tool_call_summary(tool_name, args), type="tool") as step:
                     step.input = args
-                    # P2.5 rich, CLI-parity result preview (diffs/file reads/search/shell).
                     step.output = tool_result_markdown(
                         tool_name, args, action.text, success=action.success
                     )
@@ -174,20 +215,20 @@ async def on_message(message: cl.Message) -> None:
 
             elif action.kind is RenderKind.ERROR:
                 await _clear_thinking()
-                await answer.stream_token(f"\n\n⚠️ {action.text}")
+                await _emit_text(f"\n\n⚠️ {action.text}")
 
     except Exception as exc:  # surface failures in-chat instead of a blank message
         logger.exception("Victor chat turn failed")
-        await answer.stream_token(f"\n\n⚠️ Victor hit an error: {exc}")
+        await _emit_text(f"\n\n⚠️ Victor hit an error: {exc}")
     finally:
         await _clear_thinking()
+        await _close_tool_group()
         if reasoning_step is not None:
             try:
                 await reasoning_step.__aexit__(None, None, None)
             except Exception:
                 logger.debug("reasoning step finalize failed", exc_info=True)
-
-    await answer.update()
+        await _finalize_text()
 
 
 @cl.on_chat_end

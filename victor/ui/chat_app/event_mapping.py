@@ -25,7 +25,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Iterable, List, Optional
 
 
 class RenderKind(str, Enum):
@@ -131,3 +131,29 @@ def map_event(event: Any) -> RenderAction:
         )
 
     return RenderAction(RenderKind.IGNORE)
+
+
+def segment_turn(kinds: Iterable["RenderKind"]) -> List[str]:
+    """Return the ordered render-segment types for a turn — the natural-flow contract.
+
+    A turn's events interleave per agent iteration: [text][tool_call/result…][text]…. To
+    render that like the terminal (instead of all tool steps piling at the end), the UI emits
+    a NEW text message segment whenever text resumes after a tool run, and groups each
+    iteration's tool calls into one tool segment. This pure helper encodes that contract so it
+    can be unit-tested; ``app.py`` mirrors it online while streaming.
+
+    Returns a list like ``["text", "tools", "text", "tools", "text"]``. THINKING/IGNORE do not
+    open a segment (reasoning renders in its own step; lifecycle events are no-ops).
+    """
+    segments: List[str] = []
+    phase: Optional[str] = None
+    for kind in kinds:
+        if kind in (RenderKind.TOKEN, RenderKind.ERROR):
+            if phase != "text":
+                segments.append("text")
+                phase = "text"
+        elif kind in (RenderKind.TOOL_START, RenderKind.TOOL_END):
+            if phase != "tools":
+                segments.append("tools")
+                phase = "tools"
+    return segments
