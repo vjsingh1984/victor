@@ -31,6 +31,7 @@ import logging
 from typing import Any, Optional, Tuple
 
 from victor.framework.hitl import ApprovalRequest, ApprovalStatus
+from victor.ui.rendering.markdown_presenters import tool_call_summary
 
 logger = logging.getLogger(__name__)
 
@@ -77,16 +78,39 @@ def decision_from_action(action: Optional[Any]) -> ApprovalResult:
     return ApprovalStatus.REJECTED, "Rejected in chat UI", _RESPONDER
 
 
+def _argument_preview(tool: str, args: Any) -> str:
+    """Render the consequential argument (command / content / diff) as a fenced block.
+
+    Informed approval: the user should see *what* will run, not just the tool name.
+    """
+    if not isinstance(args, dict) or not args:
+        return ""
+    name = (tool or "").lower()
+    command = args.get("command") or args.get("cmd") or args.get("script")
+    if command:
+        return f"```bash\n{str(command)[:2000]}\n```"
+    diff = args.get("diff") or args.get("patch")
+    if diff:
+        return f"```diff\n{str(diff)[:2000]}\n```"
+    content = args.get("content") or args.get("text")
+    if content and ("write" in name or "create" in name or "edit" in name):
+        return f"```\n{str(content)[:2000]}\n```"
+    # Generic tools: a compact one-line `tool(args)` summary.
+    return f"`{tool_call_summary(tool, args)}`"
+
+
 def _format_prompt(request: ApprovalRequest) -> str:
-    """Build the approval prompt markdown from the request."""
-    lines = [f"**Tool approval required** — {request.title}"]
+    """Build the approval prompt markdown — with the exact command/diff being approved."""
+    ctx = request.context or {}
+    tool = ctx.get("tool_name") or "tool"
+    lines = [f"**Approve tool: `{tool}`?**"]
     if request.description:
         lines.append("")
         lines.append(request.description)
-    tool = (request.context or {}).get("tool_name")
-    if tool:
+    preview = _argument_preview(tool, ctx.get("arguments"))
+    if preview:
         lines.append("")
-        lines.append(f"`{tool}`")
+        lines.append(preview)
     return "\n".join(lines)
 
 

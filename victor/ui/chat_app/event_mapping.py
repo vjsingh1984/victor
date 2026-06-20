@@ -46,8 +46,22 @@ class RenderAction:
     kind: RenderKind
     text: str = ""
     tool_name: Optional[str] = None
+    call_id: Optional[str] = None  # correlates TOOL_START/TOOL_END for parallel calls
     success: bool = True
     metadata: Dict[str, Any] = field(default_factory=dict)
+
+
+def _extract_call_id(event: Any, metadata: Dict[str, Any]) -> Optional[str]:
+    """Best-effort tool call id (correlates a tool_call to its tool_result)."""
+    for key in ("tool_call_id", "id", "call_id"):
+        value = metadata.get(key)
+        if value:
+            return str(value)
+    for attr in ("tool_call_id", "call_id"):
+        value = getattr(event, attr, None)
+        if value:
+            return str(value)
+    return None
 
 
 def _normalize_event_type(event_type: Any) -> str:
@@ -95,6 +109,7 @@ def map_event(event: Any) -> RenderAction:
         return RenderAction(
             RenderKind.TOOL_START,
             tool_name=getattr(event, "tool_name", None) or "tool",
+            call_id=_extract_call_id(event, metadata),
             metadata={"arguments": metadata.get("arguments", {})},
         )
 
@@ -104,6 +119,7 @@ def map_event(event: Any) -> RenderAction:
             RenderKind.TOOL_END,
             text=content or str(payload.get("result", "")),
             tool_name=getattr(event, "tool_name", None) or "tool",
+            call_id=_extract_call_id(event, payload) or _extract_call_id(event, metadata),
             success=event_type != "tool_error" and bool(payload.get("success", True)),
             metadata={"arguments": payload.get("arguments", {})},
         )
