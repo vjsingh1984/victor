@@ -35,7 +35,11 @@ from victor.framework.client import VictorClient
 from victor.framework.session_config import SessionConfig
 from victor.ui.chat_app.approval import chainlit_approval_handler
 from victor.ui.chat_app.event_mapping import RenderKind, map_event
-from victor.ui.rendering.markdown_presenters import tool_call_summary, tool_result_markdown
+from victor.ui.rendering.markdown_presenters import (
+    tool_call_summary,
+    tool_result_markdown,
+    turn_cost_footer,
+)
 from victor.ui.rendering.utils import format_duration
 
 logger = logging.getLogger(__name__)
@@ -261,6 +265,14 @@ async def on_message(message: cl.Message) -> None:
             except Exception:
                 logger.debug("reasoning step finalize failed", exc_info=True)
         await _finalize_text()
+        # L3: surface the C0 per-turn cost/latency record as a compact footer (tokens ×
+        # round-trips, $, latency) so the savings from L1/L2 are visible. Best-effort.
+        try:
+            footer = turn_cost_footer(client.get_last_turn_cost())
+            if footer:
+                await cl.Message(content=footer).send()
+        except Exception:
+            logger.debug("cost footer render failed", exc_info=True)
 
 
 @cl.on_chat_end

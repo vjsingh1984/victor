@@ -91,3 +91,42 @@ def tool_result_markdown(
     if not success:
         return f"⚠️ **failed**\n\n{body}" if body else "⚠️ **failed**"
     return body
+
+
+def turn_cost_footer(report: Optional[Dict[str, Any]]) -> str:
+    """Compact per-turn cost/latency footer from a C0 ``TaskExecutionReport`` dict.
+
+    Surfaces the dominant cost term (tokens × round-trips) and latency/$ so the user can see
+    what each turn cost — fed by ``VictorClient.get_last_turn_cost()``. Returns ``""`` when the
+    record is empty or carries no measured usage (e.g. a turn that made no provider call), so
+    callers can skip rendering an empty footer.
+    """
+    if not isinstance(report, dict) or not report:
+        return ""
+
+    total = int(report.get("api_total_tokens", 0) or 0)
+    prompt = int(report.get("api_prompt_tokens", 0) or 0)
+    completion = int(report.get("api_completion_tokens", 0) or 0)
+    duration = float(report.get("duration_seconds", 0.0) or 0.0)
+    requests = int(report.get("request_count", 0) or 0)
+    cost = float(report.get("total_cost_usd", 0.0) or 0.0)
+    cache_hit = float(report.get("cache_hit_rate", 0.0) or 0.0)
+
+    # Nothing measured -> no footer (avoids a misleading "0 tok" line).
+    if total == 0 and duration == 0.0 and requests == 0:
+        return ""
+
+    parts: List[str] = []
+    if duration > 0:
+        parts.append(f"⏱ {duration:.1f}s")
+    if total > 0:
+        parts.append(f"🔢 {total:,} tok ({prompt:,}↑ {completion:,}↓)")
+    if requests > 0:
+        parts.append(f"🔁 {requests} call{'s' if requests != 1 else ''}")
+    if cost > 0:
+        # Sub-cent costs still matter over a session; show enough precision to be non-zero.
+        parts.append(f"💵 ${cost:.4f}" if cost < 0.01 else f"💵 ${cost:.2f}")
+    if cache_hit > 0:
+        parts.append(f"⚡ {cache_hit:.0%} cached")
+
+    return "— " + " · ".join(parts) if parts else ""
