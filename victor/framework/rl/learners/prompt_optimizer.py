@@ -44,6 +44,7 @@ import json
 import logging
 import random
 import re
+import time
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
@@ -897,8 +898,34 @@ class PromptOptimizerLearner(BaseLearner):
             return list(self._extra_strategies[section_name])
         return [self._strategy]
 
+    def _trace_cache_ttl_seconds(self) -> float:
+        """TTL (seconds) for caching the learning-trace merge; 0 disables (memoized read)."""
+        ttl = getattr(self, "_traces_cache_ttl_cached", None)
+        if ttl is None:
+            try:
+                from victor.config.settings import load_settings
+
+                ttl = float(
+                    getattr(load_settings().prompt_optimization, "cache_traces_ttl_seconds", 0.0)
+                )
+            except Exception:  # settings unavailable -> disabled (current behavior)
+                ttl = 0.0
+            self._traces_cache_ttl_cached = ttl
+        return ttl
+
     def _collect_learning_traces(self, limit: int = 50) -> List[ExecutionTrace]:
-        """Collect and merge traces for prompt optimization."""
+        """Collect and merge traces for prompt optimization.
+
+        Within a task the JSONL + conversation traces are stable across iterations, so when
+        ``prompt_optimization.cache_traces_ttl_seconds`` > 0 the merged result is memoized for
+        that window — avoiding the repeated read+merge every iteration with an identical result.
+        """
+        ttl = self._trace_cache_ttl_seconds()
+        if ttl > 0:
+            cached = getattr(self, "_traces_cache", None)
+            if cached is not None and cached[0] == limit and time.monotonic() < cached[2]:
+                return cached[1]
+
         if self._use_pareto:
             jsonl_traces = self._collect_traces_v2(limit=limit)
         else:
@@ -914,6 +941,9 @@ class PromptOptimizerLearner(BaseLearner):
                 len(conv_traces),
                 len(traces),
             )
+
+        if ttl > 0:
+            self._traces_cache = (limit, traces, time.monotonic() + ttl)
         return traces
 
     def _apply_section_strategies(
