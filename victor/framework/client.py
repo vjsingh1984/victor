@@ -369,6 +369,28 @@ class VictorClient:
                 return metrics
         return {}
 
+    def get_last_turn_cost(self) -> Dict[str, Any]:
+        """Return the most recent per-turn cost/latency record (the C0 TaskExecutionReport).
+
+        Surfaces the canonical per-turn record — tokens, cost, duration, request count, cache
+        hit rate — so UI surfaces can render a cost/latency footer without reaching into the
+        orchestrator directly (UI-layer mandate). Returns ``{}`` when no turn has completed or
+        the record is unavailable.
+        """
+        agent = self._agent
+        if agent is None:
+            return {}
+        orchestrator = getattr(agent, "_orchestrator", None)
+        getter = getattr(orchestrator, "get_last_task_report", None)
+        if callable(getter):
+            try:
+                report = getter()
+                if isinstance(report, dict):
+                    return report
+            except Exception:
+                logger.debug("get_last_turn_cost failed", exc_info=True)
+        return {}
+
     def _bootstrap_container(self) -> "ServiceContainer":
         """Bootstrap the DI container with core services."""
         try:

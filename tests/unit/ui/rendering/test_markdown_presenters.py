@@ -21,6 +21,7 @@ from victor.ui.rendering.markdown_presenters import (
     strip_rich_markup,
     tool_call_summary,
     tool_result_markdown,
+    turn_cost_footer,
 )
 from victor.ui.rendering.tool_preview import RenderedPreview
 
@@ -81,3 +82,63 @@ def test_tool_result_markdown_never_raises_on_bad_result():
     # A non-string, non-dict result must not crash the presenter.
     md = tool_result_markdown("weird", None, object(), success=True)
     assert isinstance(md, str) and md
+
+
+def test_turn_cost_footer_renders_tokens_latency_cost():
+    footer = turn_cost_footer(
+        {
+            "api_total_tokens": 1728,
+            "api_prompt_tokens": 1675,
+            "api_completion_tokens": 53,
+            "duration_seconds": 4.2,
+            "request_count": 3,
+            "total_cost_usd": 0.0012,
+            "cache_hit_rate": 0.0,
+        }
+    )
+    assert "1,728 tok" in footer
+    assert "1,675↑" in footer and "53↓" in footer
+    assert "4.2s" in footer
+    assert "3 calls" in footer
+    assert "$0.0012" in footer
+
+
+def test_turn_cost_footer_empty_when_nothing_measured():
+    # A turn with no provider call (e.g. a Q&A bypass) must not render a misleading "0 tok".
+    assert (
+        turn_cost_footer({"api_total_tokens": 0, "duration_seconds": 0.0, "request_count": 0}) == ""
+    )
+    assert turn_cost_footer({}) == ""
+    assert turn_cost_footer(None) == ""
+
+
+def test_turn_cost_footer_omits_zero_fields_and_singular_call():
+    footer = turn_cost_footer(
+        {
+            "api_total_tokens": 500,
+            "api_prompt_tokens": 480,
+            "api_completion_tokens": 20,
+            "duration_seconds": 1.0,
+            "request_count": 1,
+            "total_cost_usd": 0.0,
+        }
+    )
+    assert "1 call" in footer and "calls" not in footer  # singular
+    assert "💵" not in footer  # zero cost omitted
+    assert "cached" not in footer  # zero cache omitted
+
+
+def test_turn_cost_footer_shows_cache_and_dollar_precision():
+    footer = turn_cost_footer(
+        {
+            "api_total_tokens": 100,
+            "api_prompt_tokens": 90,
+            "api_completion_tokens": 10,
+            "duration_seconds": 2.0,
+            "request_count": 1,
+            "total_cost_usd": 0.25,
+            "cache_hit_rate": 0.9,
+        }
+    )
+    assert "$0.25" in footer  # >= 1c uses 2dp
+    assert "90% cached" in footer
