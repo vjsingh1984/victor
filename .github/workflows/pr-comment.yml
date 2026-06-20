@@ -36,9 +36,10 @@ jobs:
 
       - name: Detect PR type
         id: detect-type
+        env:
+          BASE_BRANCH: ${{ github.base_ref }}
         run: |
-          BASE_BRANCH="${{ github.base_ref }}"
-          CHANGED_FILES=$(git diff --name-only origin/${BASE_BRANCH}...HEAD)
+          CHANGED_FILES=$(git diff --name-only "origin/${BASE_BRANCH}...HEAD")
 
           # Initialize flags
           HAS_FEP_CHANGES=false

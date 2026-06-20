@@ -58,9 +58,10 @@ jobs:
 
       - name: Find modified FEP files
         id: find-feps
+        env:
+          BASE_BRANCH: ${{ github.base_ref || github.event.repository.default_branch }}
         run: |
-          BASE_BRANCH="${{ github.base_ref || github.event.repository.default_branch }}"
-          FEP_FILES=$(git diff --name-only --diff-filter=AM origin/${BASE_BRANCH}...HEAD | grep '^feps/fep-.*\.md$' || true)
+          FEP_FILES=$(git diff --name-only --diff-filter=AM "origin/${BASE_BRANCH}...HEAD" | grep '^feps/fep-.*\.md$' || true)
 
           if [ -z "$FEP_FILES" ]; then
             echo "No FEP files modified"
@@ -124,9 +125,10 @@ jobs:
 
       - name: Find modified vertical directories
         id: find-verticals
+        env:
+          BASE_BRANCH: ${{ github.base_ref || github.event.repository.default_branch }}
         run: |
-          BASE_BRANCH="${{ github.base_ref || github.event.repository.default_branch }}"
-          CHANGED_FILES=$(git diff --name-only --diff-filter=AM origin/${BASE_BRANCH}...HEAD || true)
+          CHANGED_FILES=$(git diff --name-only --diff-filter=AM "origin/${BASE_BRANCH}...HEAD" || true)
           VERTICAL_DIRS=$(printf '%s\n' "$CHANGED_FILES" | python scripts/ci/find_modified_vertical_dirs.py)
 
           if [ -z "$VERTICAL_DIRS" ]; then

@@ -51,6 +51,7 @@ Example:
 from __future__ import annotations
 
 import asyncio
+import html
 import logging
 import os
 from abc import ABC, abstractmethod
@@ -508,19 +509,25 @@ class EmailTransport(BaseTransport):
         urls: Dict[str, str],
     ) -> str:
         """Build HTML email body."""
+        # Escape all caller/request-controlled values to prevent HTML/script
+        # injection in the rendered email body.
         context_html = ""
         if request.context:
             context_items = "".join(
-                f"<li><strong>{k}:</strong> {v}</li>" for k, v in request.context.items()
+                f"<li><strong>{html.escape(str(k))}:</strong> {html.escape(str(v))}</li>"
+                for k, v in request.context.items()
             )
             context_html = f"<ul>{context_items}</ul>"
+
+        safe_workflow_id = html.escape(str(workflow_id))
+        safe_prompt = html.escape(str(request.prompt))
 
         return f"""
         <html>
         <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
             <h2>Approval Required</h2>
-            <p><strong>Workflow:</strong> {workflow_id}</p>
-            <p><strong>Request:</strong> {request.prompt}</p>
+            <p><strong>Workflow:</strong> {safe_workflow_id}</p>
+            <p><strong>Request:</strong> {safe_prompt}</p>
             {context_html}
             <div style="margin: 20px 0;">
                 <a href="{urls.get('approve_url', '#')}"
@@ -781,6 +788,8 @@ class GitHubPRTransport(BaseTransport):
                 )
 
         logger.info(f"Created GitHub PR comment for {request.request_id}")
+        # Internal opaque reference string (not an HTTP response body).
+        # nosemgrep: python.flask.security.audit.directly-returned-format-string.directly-returned-format-string
         return f"github:pr:{pr_number}:comment:{comment_id}"
 
     async def poll(
@@ -922,6 +931,8 @@ class GitHubCheckTransport(BaseTransport):
                 check_run_id = data.get("id")
 
         logger.info(f"Created GitHub Check Run {check_run_id} for {request.request_id}")
+        # Internal opaque reference string (not an HTTP response body).
+        # nosemgrep: python.flask.security.audit.directly-returned-format-string.directly-returned-format-string
         return f"github:check:{check_run_id}"
 
     async def poll(

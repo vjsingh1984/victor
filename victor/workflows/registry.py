@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import importlib
 import logging
+import re
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -376,7 +377,14 @@ class WorkflowRegistry:
         if module_name in self._loaded_modules:
             return 0
 
+        # Validate the module name as a dotted Python identifier before import
+        # so a caller-supplied string cannot reach unexpected import machinery.
+        if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*", module_name):
+            logger.error(f"Refusing to import invalid module name: {module_name!r}")
+            return 0
+
         try:
+            # nosemgrep: python.lang.security.audit.non-literal-import.non-literal-import
             importlib.import_module(module_name)
             self._loaded_modules.add(module_name)
             return self.load_decorator_registered()
