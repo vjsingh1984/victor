@@ -35,6 +35,7 @@ from victor.framework.client import VictorClient
 from victor.framework.session_config import SessionConfig
 from victor.ui.chat_app.approval import chainlit_approval_handler
 from victor.ui.chat_app.event_mapping import RenderKind, map_event
+from victor.ui.rendering.markdown_presenters import tool_call_summary, tool_result_markdown
 
 logger = logging.getLogger(__name__)
 
@@ -109,38 +110,82 @@ async def on_message(message: cl.Message) -> None:
     answer = cl.Message(content="")
     await answer.send()
 
-    # Arguments captured at tool_call time, replayed when the matching result arrives.
-    pending_args: dict[str, dict] = {}
+    # P1.4 first-token feedback: a transient "Thinking…" message so the user never stares at
+    # a blank bubble; removed the instant any real output (token/reasoning/tool) arrives.
+    thinking = cl.Message(content="🔄 _Thinking…_")
+    await thinking.send()
+    state = {"thinking_cleared": False}
+
+    async def _clear_thinking() -> None:
+        if not state["thinking_cleared"]:
+            state["thinking_cleared"] = True
+            try:
+                await thinking.remove()
+            except Exception:
+                logger.debug("thinking placeholder removal failed", exc_info=True)
+
+    # P1.2 correlate tool steps by call_id (fallback to name) so parallel/duplicate calls
+    # don't overwrite each other's arguments.
+    pending: dict[str, dict] = {}
+    # P1.3 one accumulating reasoning step per turn (not a new box per chunk).
+    reasoning_step: cl.Step | None = None
+    reasoning_text = ""
 
     try:
         async for event in client.stream(message.content):
             action = map_event(event)
 
             if action.kind is RenderKind.TOKEN:
+                await _clear_thinking()
                 await answer.stream_token(action.text)
 
             elif action.kind is RenderKind.THINKING:
+                await _clear_thinking()
                 if action.text:
-                    async with cl.Step(name="reasoning", type="llm") as step:
-                        step.output = action.text
+                    reasoning_text += action.text
+                    if reasoning_step is None:
+                        reasoning_step = cl.Step(name="reasoning", type="llm")
+                        await reasoning_step.__aenter__()
+                    reasoning_step.output = reasoning_text
+                    await reasoning_step.update()
 
             elif action.kind is RenderKind.TOOL_START:
-                pending_args[action.tool_name or "tool"] = action.metadata.get("arguments", {})
+                await _clear_thinking()
+                key = action.call_id or action.tool_name or "tool"
+                pending[key] = {
+                    "tool_name": action.tool_name or "tool",
+                    "arguments": action.metadata.get("arguments", {}),
+                }
 
             elif action.kind is RenderKind.TOOL_END:
-                name = action.tool_name or "tool"
-                async with cl.Step(name=name, type="tool") as step:
-                    step.input = pending_args.pop(name, {})
-                    step.output = action.text
+                await _clear_thinking()
+                key = action.call_id or action.tool_name or "tool"
+                info = pending.pop(key, {})
+                tool_name = info.get("tool_name") or action.tool_name or "tool"
+                args = info.get("arguments", {})
+                async with cl.Step(name=tool_call_summary(tool_name, args), type="tool") as step:
+                    step.input = args
+                    # P2.5 rich, CLI-parity result preview (diffs/file reads/search/shell).
+                    step.output = tool_result_markdown(
+                        tool_name, args, action.text, success=action.success
+                    )
                     if not action.success:
                         step.is_error = True
 
             elif action.kind is RenderKind.ERROR:
+                await _clear_thinking()
                 await answer.stream_token(f"\n\n⚠️ {action.text}")
 
     except Exception as exc:  # surface failures in-chat instead of a blank message
         logger.exception("Victor chat turn failed")
         await answer.stream_token(f"\n\n⚠️ Victor hit an error: {exc}")
+    finally:
+        await _clear_thinking()
+        if reasoning_step is not None:
+            try:
+                await reasoning_step.__aexit__(None, None, None)
+            except Exception:
+                logger.debug("reasoning step finalize failed", exc_info=True)
 
     await answer.update()
 
