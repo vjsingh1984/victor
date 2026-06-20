@@ -22,6 +22,7 @@ with an actionable message when it is absent.
 from __future__ import annotations
 
 import logging
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -49,19 +50,32 @@ def ui(
     watch: bool = typer.Option(
         False, "--watch", "-w", help="Auto-reload the app on file changes (development)"
     ),
+    profile: Optional[str] = typer.Option(
+        None,
+        "--profile",
+        help="Agent profile from ~/.victor/profiles.yaml (e.g. 'zai-coding'). Defaults to 'default'.",
+    ),
 ) -> None:
     """Start the Victor web chat UI.
 
     Examples:
-        victor ui                 # open the chat UI in your browser
-        victor ui -p 9000         # custom port
-        victor ui --headless      # serve without launching a browser
+        victor ui                          # open the chat UI in your browser
+        victor ui -p 9000                  # custom port
+        victor ui --headless               # serve without launching a browser
+        victor ui --profile zai-coding     # use a specific agent profile
     """
     if ctx.invoked_subcommand is None:
-        _launch(host=host, port=port, headless=headless, watch=watch)
+        _launch(host=host, port=port, headless=headless, watch=watch, profile=profile)
 
 
-def _launch(*, host: str, port: int, headless: bool, watch: bool) -> None:
+# The chat app (run in a separate `chainlit run` process) reads the profile from this env
+# var, since chainlit does not forward CLI args to the app.
+_PROFILE_ENV = "VICTOR_UI_PROFILE"
+
+
+def _launch(
+    *, host: str, port: int, headless: bool, watch: bool, profile: Optional[str] = None
+) -> None:
     if not _chainlit_available():
         console.print(
             "[red]Chainlit is not installed.[/red] The web chat UI is an optional extra.\n"
@@ -86,8 +100,13 @@ def _launch(*, host: str, port: int, headless: bool, watch: bool) -> None:
     if watch:
         cmd.append("--watch")
 
-    console.print(f"[green]Starting Victor chat UI[/green] on http://{host}:{port}")
-    raise typer.Exit(code=subprocess.call(cmd))
+    env = os.environ.copy()
+    if profile:
+        env[_PROFILE_ENV] = profile
+
+    profile_note = f" (profile: {profile})" if profile else ""
+    console.print(f"[green]Starting Victor chat UI[/green]{profile_note} on http://{host}:{port}")
+    raise typer.Exit(code=subprocess.call(cmd, env=env))
 
 
 def _chainlit_available() -> bool:
