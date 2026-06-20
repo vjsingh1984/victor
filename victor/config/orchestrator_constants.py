@@ -186,6 +186,10 @@ class CompactionConfig:
     # P1 FIX: Fast pruning before LLM compaction (OpenDev finding)
     enable_fast_pruning: bool = True
     enable_proactive: bool = False
+    # L1: reference-aware tool-result pruning (default OFF — flip on C0 trace evidence).
+    # Prunes old, large tool results that no later assistant turn cites; preserves the rest.
+    enable_reference_aware_pruning: bool = False
+    reference_window_turns: int = 3
 
 
 # Task-specific compaction configurations

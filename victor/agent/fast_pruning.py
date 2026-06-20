@@ -17,12 +17,19 @@ and cost.
 """
 
 import logging
+import re
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import List, Optional, Set
 
 from victor.providers.base import Message
 
 logger = logging.getLogger(__name__)
+
+# Distinctive tokens used to detect whether a later assistant message *references* a tool
+# result: file paths, dotted names, snake/kebab identifiers, and long words. Common short prose
+# is intentionally excluded so matching errs toward "referenced" (keep) — never the reverse.
+_ANCHOR_RE = re.compile(r"[A-Za-z0-9_./-]{4,}")
+_MAX_ANCHORS_PER_MESSAGE = 200
 
 
 @dataclass
@@ -44,6 +51,12 @@ class FastPruningConfig:
     prune_user_messages: bool = False  # Never prune user messages (P0: preserve intent)
     tool_result_size_threshold: int = 1000  # Min size for tool result pruning
     assistant_message_threshold: int = 2000  # Min size for assistant pruning
+    # L1 (reference-aware pruning): when enabled, prune a tool result only if it is beyond the
+    # recency window AND no *later* assistant message cites a distinctive anchor from it. This
+    # attacks the context leak (full tool history re-sent every turn) without dropping output
+    # the model still uses. Default OFF — flip only on C0 trace evidence (lossless + cheaper).
+    enable_reference_tracking: bool = False
+    reference_window_turns: int = 3  # Most-recent N tool results are always preserved
 
 
 class FastPruner:
@@ -93,6 +106,28 @@ class FastPruner:
             return messages
 
         self._pruned_count = 0
+
+        # L1: reference-aware pruning replaces the size-only rule with "prune unreferenced,
+        # out-of-window tool results" — preserving anything a later assistant turn still cites.
+        if self.config.enable_reference_tracking:
+            to_prune = self._reference_prune_indices(messages)
+            pruned_messages = []
+            for i, msg in enumerate(messages):
+                if i in to_prune:
+                    pruned_messages.append(self._create_pruned_marker(msg))
+                    self._pruned_count += 1
+                    logger.debug(
+                        f"Reference-pruned unreferenced tool result ({len(msg.content)} chars)"
+                    )
+                else:
+                    pruned_messages.append(msg)
+            if self._pruned_count > 0:
+                logger.info(
+                    f"Reference-aware pruning: {self._pruned_count} unreferenced tool "
+                    f"results pruned (turn {current_turn})"
+                )
+            return pruned_messages
+
         pruned_messages = []
 
         for msg in messages:
@@ -111,6 +146,66 @@ class FastPruner:
             )
 
         return pruned_messages
+
+    def _extract_anchors(self, content: str) -> Set[str]:
+        """Extract distinctive tokens (paths, dotted names, identifiers, long words).
+
+        These are the signals that a later assistant message *used* a tool result — it cites a
+        symbol, file, or value the tool surfaced. Common short prose is excluded so a match
+        means "very likely referenced", and a non-match is the only thing that permits pruning.
+
+        Args:
+            content: Message content to scan.
+
+        Returns:
+            Lowercased set of anchor tokens (capped for performance).
+        """
+        anchors: Set[str] = set()
+        for token in _ANCHOR_RE.findall(content or ""):
+            if any(sep in token for sep in "_./-") or len(token) >= 6:
+                anchors.add(token.lower())
+                if len(anchors) >= _MAX_ANCHORS_PER_MESSAGE:
+                    break
+        return anchors
+
+    def _reference_prune_indices(self, messages: List[Message]) -> Set[int]:
+        """Indices of tool results safe to prune: out-of-window AND unreferenced afterwards.
+
+        A tool result is preserved if it is among the most recent
+        ``reference_window_turns`` tool results, OR if any assistant message *after* it shares a
+        distinctive anchor with it. Only the remainder — old, large, and never cited again — is
+        pruned. This is the safe-by-construction core of L1.
+
+        Args:
+            messages: The full message list (not mutated).
+
+        Returns:
+            Set of message indices to replace with pruned markers.
+        """
+        assistant_anchors = {
+            i: self._extract_anchors(m.content)
+            for i, m in enumerate(messages)
+            if m.role == "assistant"
+        }
+        tool_indices = [i for i, m in enumerate(messages) if m.role == "tool"]
+        window = max(0, self.config.reference_window_turns)
+        protected = set(tool_indices[-window:]) if window else set()
+
+        to_prune: Set[int] = set()
+        for i in tool_indices:
+            if i in protected:
+                continue
+            msg = messages[i]
+            if len(msg.content) <= self.config.max_pruned_chars:
+                continue  # too small to be worth pruning
+            tool_anchors = self._extract_anchors(msg.content)
+            referenced = bool(tool_anchors) and any(
+                j > i and (tool_anchors & later_anchors)
+                for j, later_anchors in assistant_anchors.items()
+            )
+            if not referenced:
+                to_prune.add(i)
+        return to_prune
 
     def _should_prune(self, msg: Message, current_turn: int) -> bool:
         """Determine if a message should be pruned.
@@ -204,8 +299,20 @@ class FastPruner:
         would_prune = 0
         pruned_size = 0
 
-        for msg in messages:
-            if self._should_prune(msg, current_turn):
+        # Mirror the active pruning rule so the caller's savings gate reflects reality.
+        reference_prune = (
+            self._reference_prune_indices(messages)
+            if self.config.enable_reference_tracking
+            else None
+        )
+
+        for i, msg in enumerate(messages):
+            prune = (
+                i in reference_prune
+                if reference_prune is not None
+                else self._should_prune(msg, current_turn)
+            )
+            if prune:
                 # Estimate pruned marker size
                 marker_size = len(f"[pruned] Original was {len(msg.content)} chars: ...")
                 pruned_size += marker_size
