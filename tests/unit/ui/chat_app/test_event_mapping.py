@@ -124,3 +124,60 @@ def test_dotted_repr_event_type_is_normalized() -> None:
 def test_missing_tool_name_defaults_to_tool() -> None:
     assert map_event(FakeEvent("tool_call")).tool_name == "tool"
     assert map_event(FakeEvent("tool_result", content="x")).tool_name == "tool"
+
+
+def test_tool_result_carries_telemetry_fields() -> None:
+    action = map_event(
+        FakeEvent(
+            "tool_result",
+            tool_name="read",
+            result={
+                "success": True,
+                "elapsed": 0.012,
+                "was_pruned": True,
+                "follow_up_suggestions": [{"tool": "ls", "suggestion": "Check the dir"}],
+                "arguments": {"path": "x.py"},
+            },
+        )
+    )
+    assert action.kind is RenderKind.TOOL_END
+    assert action.elapsed == 0.012
+    assert action.was_pruned is True
+    assert action.follow_up_suggestions == [{"tool": "ls", "suggestion": "Check the dir"}]
+
+
+def test_tool_result_prefers_original_result_over_placeholder() -> None:
+    action = map_event(
+        FakeEvent(
+            "tool_result",
+            tool_name="read",
+            content="Tool completed successfully. Use /expand …",
+            result={
+                "success": True,
+                "result": "Tool completed successfully. Use /expand …",
+                "original_result": "the real file contents",
+            },
+        )
+    )
+    assert action.text == "the real file contents"
+
+
+def test_tool_result_telemetry_from_nested_metadata_fallback() -> None:
+    # Un-flattened event: payload nested under metadata["tool_result"].
+    action = map_event(
+        FakeEvent(
+            "tool_result",
+            tool_name="grep",
+            metadata={"tool_result": {"success": True, "elapsed": 1.5, "result": "ok"}},
+        )
+    )
+    assert action.kind is RenderKind.TOOL_END
+    assert action.elapsed == 1.5
+    assert action.text == "ok"
+
+
+def test_tool_result_defaults_when_no_telemetry() -> None:
+    action = map_event(FakeEvent("tool_result", tool_name="grep", result={"success": True}))
+    assert action.elapsed == 0.0
+    assert action.was_pruned is False
+    assert action.follow_up_suggestions is None

@@ -48,6 +48,9 @@ class RenderAction:
     tool_name: Optional[str] = None
     call_id: Optional[str] = None  # correlates TOOL_START/TOOL_END for parallel calls
     success: bool = True
+    elapsed: float = 0.0
+    was_pruned: bool = False
+    follow_up_suggestions: Optional[list[dict[str, Any]]] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
 
 
@@ -79,12 +82,22 @@ def _normalize_event_type(event_type: Any) -> str:
 
 
 def _tool_result_payload(event: Any) -> Dict[str, Any]:
-    """Best-effort extraction of the tool-result dict from an event."""
+    """Best-effort extraction of the flat tool-result dict from an event.
+
+    ``VictorClient._to_stream_event`` flattens the payload onto ``event.result``;
+    fall back to a nested ``metadata['tool_result']`` (or bare ``metadata``) so the
+    mapping still works if an event arrives un-flattened.
+    """
     result = getattr(event, "result", None)
     if isinstance(result, dict):
         return result
     metadata = getattr(event, "metadata", None)
-    return metadata if isinstance(metadata, dict) else {}
+    if isinstance(metadata, dict):
+        nested = metadata.get("tool_result")
+        if isinstance(nested, dict):
+            return nested
+        return metadata
+    return {}
 
 
 def map_event(event: Any) -> RenderAction:
@@ -115,12 +128,18 @@ def map_event(event: Any) -> RenderAction:
 
     if event_type in ("tool_result", "tool_error"):
         payload = _tool_result_payload(event)
+        # Prefer the full output for direct display; the bare ``result`` is a CLI
+        # "/expand" placeholder, so it is the last resort behind the real output.
+        text = payload.get("original_result") or content or payload.get("result") or ""
         return RenderAction(
             RenderKind.TOOL_END,
-            text=content or str(payload.get("result", "")),
+            text=str(text),
             tool_name=getattr(event, "tool_name", None) or "tool",
             call_id=_extract_call_id(event, payload) or _extract_call_id(event, metadata),
             success=event_type != "tool_error" and bool(payload.get("success", True)),
+            elapsed=float(payload.get("elapsed", 0.0) or 0.0),
+            was_pruned=bool(payload.get("was_pruned", False)),
+            follow_up_suggestions=payload.get("follow_up_suggestions") or None,
             metadata={"arguments": payload.get("arguments", {})},
         )
 

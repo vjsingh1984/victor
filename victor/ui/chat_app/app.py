@@ -36,8 +36,28 @@ from victor.framework.session_config import SessionConfig
 from victor.ui.chat_app.approval import chainlit_approval_handler
 from victor.ui.chat_app.event_mapping import RenderKind, map_event
 from victor.ui.rendering.markdown_presenters import tool_call_summary, tool_result_markdown
+from victor.ui.rendering.utils import format_duration
 
 logger = logging.getLogger(__name__)
+
+
+def _format_follow_ups(suggestions: list[dict]) -> str:
+    """Render follow-up suggestions as a compact markdown hint block.
+
+    Suggestion dicts carry a human ``suggestion`` and/or a ``command``/``tool``
+    (see ``victor/agent/tool_pipeline.py``); show the most human-readable field.
+    """
+    lines = []
+    for suggestion in suggestions[:3]:
+        if not isinstance(suggestion, dict):
+            continue
+        text = suggestion.get("suggestion") or suggestion.get("command") or suggestion.get("tool")
+        if text:
+            lines.append(f"- {text}")
+    if not lines:
+        return ""
+    return "\n\n💡 **Next steps:**\n" + "\n".join(lines)
+
 
 _CLIENT_KEY = "victor_client"
 
@@ -204,12 +224,24 @@ async def on_message(message: cl.Message) -> None:
                 info = pending.pop(key, {})
                 tool_name = info.get("tool_name") or action.tool_name or "tool"
                 args = info.get("arguments", {})
+                # Append duration to the step label so the user sees how long it took
+                # (e.g. "read(path=…) · 12ms").
+                label = tool_call_summary(tool_name, args)
+                if action.elapsed:
+                    label = f"{label} · {format_duration(action.elapsed)}"
                 # Child step nests under the iteration's "🔧 tools" group (parallel calls grouped).
-                async with cl.Step(name=tool_call_summary(tool_name, args), type="tool") as step:
+                async with cl.Step(name=label, type="tool") as step:
                     step.input = args
-                    step.output = tool_result_markdown(
+                    output = tool_result_markdown(
                         tool_name, args, action.text, success=action.success
                     )
+                    if action.was_pruned:
+                        output = f"{output}\n\n_(output truncated for length)_"
+                    # Keep follow-up hints grouped with the tool that produced them.
+                    follow_ups = _format_follow_ups(action.follow_up_suggestions or [])
+                    if follow_ups:
+                        output = f"{output}{follow_ups}"
+                    step.output = output
                     if not action.success:
                         step.is_error = True
 
