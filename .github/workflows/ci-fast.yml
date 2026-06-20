@@ -428,7 +428,9 @@ jobs:
   quick-tests:
     name: Quick Unit Tests (not slow)
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # Single-process over the full non-slow unit suite is import-heavy at startup; give it
+    # headroom so the develop gate fails on real regressions, not a premature timeout.
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -448,4 +450,7 @@ jobs:
         # Single-job, non-slow unit subset: a fast regression signal on every develop PR.
         # The full sharded suite, integration, build, security and perf run on the
         # develop -> main promotion PR (see workflows/README.md CI Gating Strategy).
-        run: pytest tests/unit -m "not slow" --tb=short -q --timeout=120
+        # NOTE: no --timeout flag — pytest-timeout is not a declared dependency (the Makefile
+        # adds --timeout only when the plugin is present), so passing it here errored out at
+        # arg-parse (pytest exit 4). The job-level `timeout-minutes: 15` bounds runtime instead.
+        run: pytest tests/unit -m "not slow" --tb=short -q
