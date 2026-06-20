@@ -134,7 +134,9 @@ GENERIC_BEARER_PATTERN = r"(?i)bearer\s+[a-zA-Z0-9\-_\.]{20,}"
 
 # Private Keys
 PRIVATE_KEY_PATTERN = r"-----BEGIN (?:RSA |DSA |EC |OPENSSH )?PRIVATE KEY-----"
-PGP_PRIVATE_PATTERN = r"-----BEGIN PGP PRIVATE KEY BLOCK-----"
+# This is the detection regex used by the secret scanner itself, not an
+# actual private key. nosemgrep: generic.secrets.security.detected-pgp-private-key-block.detected-pgp-private-key-block
+PGP_PRIVATE_PATTERN = r"-----BEGIN PGP PRIVATE KEY BLOCK-----"  # nosemgrep
 
 # Database Connection Strings
 POSTGRES_URI_PATTERN = r"postgres(?:ql)?://[^:]+:[^@]+@[^/]+"

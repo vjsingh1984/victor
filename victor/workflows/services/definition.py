@@ -50,6 +50,7 @@ Example:
 from __future__ import annotations
 
 import logging
+import secrets
 import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
@@ -964,6 +965,16 @@ class ServiceDependencyError(ServiceError):
 # =============================================================================
 
 
+def _generate_dev_password() -> str:
+    """Generate a strong random password for an ephemeral dev service.
+
+    Used as the default for service presets so no credential is hardcoded.
+    Callers that need a fixed password (e.g. to connect from another process)
+    should pass ``password=`` explicitly.
+    """
+    return secrets.token_urlsafe(16)
+
+
 class ServicePresets:
     """Factory methods for common service configurations."""
 
@@ -973,10 +984,11 @@ class ServicePresets:
         version: str = "15",
         database: str = "app",
         user: str = "postgres",
-        password: str = "postgres",
+        password: Optional[str] = None,
         port: int = 5432,
     ) -> ServiceConfig:
         """PostgreSQL database preset."""
+        password = password or _generate_dev_password()
         return ServiceConfig(
             name=name,
             provider="docker",
@@ -1033,11 +1045,13 @@ class ServicePresets:
         version: str = "8",
         database: str = "app",
         user: str = "app",
-        password: str = "password",
-        root_password: str = "rootpassword",
+        password: Optional[str] = None,
+        root_password: Optional[str] = None,
         port: int = 3306,
     ) -> ServiceConfig:
         """MySQL database preset."""
+        password = password or _generate_dev_password()
+        root_password = root_password or _generate_dev_password()
         return ServiceConfig(
             name=name,
             provider="docker",
@@ -1063,10 +1077,11 @@ class ServicePresets:
         version: str = "6",
         database: str = "app",
         user: str = "app",
-        password: str = "password",
+        password: Optional[str] = None,
         port: int = 27017,
     ) -> ServiceConfig:
         """MongoDB database preset."""
+        password = password or _generate_dev_password()
         return ServiceConfig(
             name=name,
             provider="docker",
@@ -1232,9 +1247,10 @@ class ServicePresets:
         port: int = 5672,
         management_port: int = 15672,
         user: str = "guest",
-        password: str = "guest",
+        password: Optional[str] = None,
     ) -> ServiceConfig:
         """RabbitMQ message broker preset."""
+        password = password or _generate_dev_password()
         return ServiceConfig(
             name=name,
             provider="docker",

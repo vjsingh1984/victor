@@ -76,8 +76,9 @@ from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Tuple
-from urllib.request import Request, urlopen
 from urllib.error import URLError
+from urllib.parse import urlparse
+from urllib.request import Request, urlopen
 import base64
 import zlib
 import shutil
@@ -136,6 +137,18 @@ class RenderBackend(str, Enum):
 
 # Kroki configuration
 KROKI_URL = "https://kroki.io"  # Free public instance
+
+
+def _validated_kroki_request(url: str, accept: str) -> Request:
+    """Build a Kroki HTTP request, asserting the URL is https on the configured
+    Kroki host. This prevents the rendered URL from being redirected to an
+    unexpected scheme/host (SSRF / local-file access) before it is fetched.
+    """
+    parsed = urlparse(url)
+    expected = urlparse(KROKI_URL)
+    if parsed.scheme != "https" or parsed.hostname != expected.hostname:
+        raise ValueError(f"Refusing to fetch non-Kroki/insecure URL: {url!r}")
+    return Request(url, headers={"Accept": accept})
 
 
 @dataclass
@@ -884,8 +897,9 @@ class WorkflowVisualizer:
         url = f"{KROKI_URL}/{diagram_type}/svg/{encoded}"
 
         try:
-            request = Request(url, headers={"Accept": "image/svg+xml"})
-            with urlopen(request, timeout=30) as response:
+            request = _validated_kroki_request(url, "image/svg+xml")
+            # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected
+            with urlopen(request, timeout=30) as response:  # noqa: S310
                 svg_content = response.read().decode("utf-8")
 
             if output_path:
@@ -1052,8 +1066,9 @@ class WorkflowVisualizer:
         url = f"{KROKI_URL}/{diagram_type}/png/{encoded}"
 
         try:
-            request = Request(url, headers={"Accept": "image/png"})
-            with urlopen(request, timeout=30) as response:
+            request = _validated_kroki_request(url, "image/png")
+            # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected
+            with urlopen(request, timeout=30) as response:  # noqa: S310
                 png_content = response.read()
 
             with open(output_path, "wb") as f:
