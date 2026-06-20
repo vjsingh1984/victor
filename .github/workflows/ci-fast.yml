@@ -426,11 +426,17 @@ jobs:
           sarif_file: 'trivy-results.sarif'
 
   quick-tests:
-    name: Quick Unit Tests (not slow)
+    name: Quick Unit Tests (changed files)
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # Runs ONLY the unit tests relevant to the PR's changed files (mirror mapping), so the
+    # develop gate stays proportional to the change. The full non-slow suite is ~7h
+    # single-process / ~hours even sharded, so it can't be a per-PR gate — it runs sharded at
+    # develop -> main instead (see workflows/README.md CI Gating Strategy).
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # need history to diff against the base branch
 
       - uses: actions/setup-python@v5
         with:
@@ -444,8 +450,21 @@ jobs:
           pip install -e ./victor-contracts
           pip install -e ".[dev]"
 
-      - name: Run quick unit tests (excludes slow)
-        # Single-job, non-slow unit subset: a fast regression signal on every develop PR.
-        # The full sharded suite, integration, build, security and perf run on the
-        # develop -> main promotion PR (see workflows/README.md CI Gating Strategy).
-        run: pytest tests/unit -m "not slow" --tb=short -q --timeout=120
+      - name: Run unit tests for changed files
+        # Map changed files -> mirror unit tests (scripts/ci/select_changed_tests.py). No mapped
+        # tests (docs/CI-only changes, or source with no mirror test) => nothing to run = pass.
+        run: |
+          if [ -n "${{ github.base_ref }}" ]; then
+            git fetch origin "${{ github.base_ref }}" --quiet
+            CHANGED=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD")
+          else
+            CHANGED=$(git diff --name-only HEAD~1 HEAD)
+          fi
+          echo "Changed files:"; echo "$CHANGED" | sed 's/^/  /'
+          mapfile -t TARGETS < <(python scripts/ci/select_changed_tests.py $CHANGED)
+          if [ ${#TARGETS[@]} -eq 0 ]; then
+            echo "No mapped unit tests for the changed files — nothing to run (full suite runs at develop->main)."
+            exit 0
+          fi
+          echo "Running ${#TARGETS[@]} changed-file test target(s):"; printf '  %s\n' "${TARGETS[@]}"
+          pytest "${TARGETS[@]}" -m "not slow" --tb=short -q
