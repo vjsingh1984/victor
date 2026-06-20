@@ -9,7 +9,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 import logging
 import re
-from typing import Any
+from typing import Any, Optional, TypedDict
 
 from rich.console import Console
 from rich.panel import Panel
@@ -29,6 +29,42 @@ _REASONING_PREFIX_MARKERS = (
 )
 
 _THINKING_STATUS_PREFIXES = ("💭", "🤔", "◌")
+
+# Canonical field list for a tool-result payload. This is the single source of
+# truth shared by the producer (``ChunkGenerator.generate_tool_result_chunk``),
+# the ``StreamRenderer.on_tool_result`` protocol, the Chainlit event mapping, and
+# ``extract_tool_result_payload`` below — keep them in sync via this tuple.
+TOOL_RESULT_FIELDS = (
+    "name",
+    "success",
+    "elapsed",
+    "arguments",
+    "error",
+    "follow_up_suggestions",
+    "result",
+    "original_result",
+    "was_pruned",
+)
+
+
+class ToolResultPayload(TypedDict, total=False):
+    """Normalized, flat tool-result payload carried on a stream event.
+
+    Every key is optional; consumers read with ``.get(...)`` and sensible
+    defaults. ``result`` is the (possibly truncated/placeholder) preview output;
+    ``original_result`` is the full output for surfaces that render it directly
+    (e.g. the web UI) or expand it on demand (the Rich CLI).
+    """
+
+    name: str
+    success: bool
+    elapsed: float
+    arguments: dict[str, Any]
+    error: Optional[str]
+    follow_up_suggestions: Optional[list[dict[str, Any]]]
+    result: Any
+    original_result: Any
+    was_pruned: bool
 
 
 class StreamDeltaNormalizer:
@@ -197,21 +233,7 @@ def extract_tool_result_payload(event: Any) -> dict[str, Any]:
     if isinstance(nested_payload, Mapping):
         payload.update(dict(nested_payload))
 
-    top_level_payload = {
-        key: metadata[key]
-        for key in (
-            "success",
-            "elapsed",
-            "arguments",
-            "error",
-            "follow_up_suggestions",
-            "result",
-            "original_result",
-            "was_pruned",
-            "name",
-        )
-        if key in metadata
-    }
+    top_level_payload = {key: metadata[key] for key in TOOL_RESULT_FIELDS if key in metadata}
     payload.update(top_level_payload)
 
     if isinstance(result_payload, Mapping):

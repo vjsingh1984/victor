@@ -168,19 +168,26 @@ def _to_stream_event(event: Any) -> _StreamEvent:
             },
         )
     if event.type == EventType.TOOL_RESULT:
-        result_payload = {
-            **getattr(event, "metadata", {}),
-            "result": getattr(event, "result", None),
-            "success": getattr(event, "success", True),
-            "arguments": getattr(event, "arguments", {}),
-        }
+        event_metadata = getattr(event, "metadata", {}) or {}
+        # The producer nests the rich payload under ``metadata["tool_result"]``
+        # (name, success, elapsed, arguments, error, follow_up_suggestions,
+        # was_pruned, result, original_result). Flatten it to the top level so every
+        # consumer — the Rich renderer and the Chainlit event mapping — reads one
+        # predictable, flat shape instead of digging through nested dicts.
+        nested = event_metadata.get("tool_result")
+        result_payload: Dict[str, Any] = {**event_metadata}
+        if isinstance(nested, dict):
+            result_payload.update(nested)
+        result_payload.setdefault("result", getattr(event, "result", None))
+        result_payload["success"] = result_payload.get("success", getattr(event, "success", True))
+        result_payload.setdefault("arguments", getattr(event, "arguments", {}) or {})
         return _StreamEvent(
             EventType.TOOL_RESULT,
             tool_name=getattr(event, "tool_name", None),
             content=getattr(event, "result", None) or getattr(event, "content", None),
-            arguments=getattr(event, "arguments", {}),
+            arguments=result_payload.get("arguments", {}),
             result=result_payload,
-            success=getattr(event, "success", True),
+            success=bool(result_payload.get("success", True)),
             metadata=result_payload,
         )
     if event.type == EventType.ERROR:
@@ -477,12 +484,24 @@ class VictorClient:
 
             if event.event_type == "tool_result":
                 result_payload = event.result if isinstance(event.result, dict) else metadata
-                metadata["tool_result"] = {
+                tool_result: Dict[str, Any] = {
                     "name": event.tool_name or "unknown",
                     "result": event.content or result_payload.get("result", ""),
                     "success": result_payload.get("success", True),
                     "arguments": result_payload.get("arguments", {}),
                 }
+                # Preserve the telemetry the Rich renderer expects rather than
+                # cherry-picking 4 keys — see StreamRenderer.on_tool_result.
+                for key in (
+                    "elapsed",
+                    "error",
+                    "follow_up_suggestions",
+                    "was_pruned",
+                    "original_result",
+                ):
+                    if key in result_payload:
+                        tool_result[key] = result_payload[key]
+                metadata["tool_result"] = tool_result
                 yield _RenderChunk(metadata=metadata)
                 continue
 
