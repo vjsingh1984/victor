@@ -640,8 +640,6 @@ extend-exclude = [
     "victor_test",
     "demo_workspace",
     "src",
-    "ui",
-    "web/ui",
     "htmlcov",
     "venv",
     "game_app.py",

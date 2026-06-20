@@ -29,7 +29,6 @@ EXCLUDE_DIRS: Set[str] = {
     "venv",
     ".venv",
     "__pycache__",
-    "web/ui/node_modules",
     ".tox",
     ".pytest_cache",
     ".mypy_cache",
