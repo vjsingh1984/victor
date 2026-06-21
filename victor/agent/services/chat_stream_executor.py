@@ -994,6 +994,59 @@ class StreamingChatExecutor:
             )
         return goals
 
+    async def _stream_provider_turn(
+        self,
+        orch: Any,
+        runtime_owner: Any,
+        stream_ctx: Any,
+        goals: Any,
+    ) -> tuple[Any, str, Any, bool]:
+        """Resolve this turn's tools and stream the provider response.
+
+        The ACT provider sub-step of run()'s per-turn body (FEP-0007 Phase 2, toward a
+        shared stream_turn() boundary). Plans tools, resolves the active tool set, builds
+        provider kwargs, and streams the provider response for ONE turn. Sets
+        stream_ctx.planned_tools and returns the ``(tools, full_content, tool_calls,
+        garbage_detected)`` tuple (tools is needed by run() for empty-response recovery).
+        Token streaming happens inside ``_stream_provider_response``; this helper yields
+        nothing.
+        """
+        planned_tools = None
+        if goals:
+            available_inputs = ["query"]
+            if orch.observed_files:
+                available_inputs.append("file_contents")
+            planned_tools = orch._tool_planner.plan_tools(goals, available_inputs)
+        stream_ctx.planned_tools = planned_tools
+
+        if getattr(stream_ctx, "is_qa_task", False):
+            tools = None
+        elif orch.get_session_tools() is not None:
+            tools = orch.get_session_tools()
+        else:
+            tools = await self._get_tools_cached(
+                orch,
+                stream_ctx.context_msg,
+                goals,
+                planned_tools=planned_tools,
+            )
+
+        provider_kwargs = dict(getattr(stream_ctx, "provider_kwargs", {}) or {})
+        if orch.thinking or provider_kwargs.get("execution_mode") == "escalated_single_agent":
+            provider_kwargs["thinking"] = {
+                "type": "enabled",
+                "budget_tokens": 10000,
+            }
+
+        full_content, tool_calls, _, garbage_detected = (
+            await runtime_owner._stream_provider_response(
+                tools=tools,
+                provider_kwargs=provider_kwargs,
+                stream_ctx=stream_ctx,
+            )
+        )
+        return tools, full_content, tool_calls, garbage_detected
+
     async def run(self, user_message: str, **kwargs: Any) -> AsyncIterator[StreamChunk]:
         """Run the streaming executor for the provided message."""
         runtime_owner = self._runtime_owner
@@ -1200,39 +1253,8 @@ class StreamingChatExecutor:
             if handled:
                 break
 
-            planned_tools = None
-            if goals:
-                available_inputs = ["query"]
-                if orch.observed_files:
-                    available_inputs.append("file_contents")
-                planned_tools = orch._tool_planner.plan_tools(goals, available_inputs)
-            stream_ctx.planned_tools = planned_tools
-
-            if getattr(stream_ctx, "is_qa_task", False):
-                tools = None
-            elif orch.get_session_tools() is not None:
-                tools = orch.get_session_tools()
-            else:
-                tools = await self._get_tools_cached(
-                    orch,
-                    stream_ctx.context_msg,
-                    goals,
-                    planned_tools=planned_tools,
-                )
-
-            provider_kwargs = dict(getattr(stream_ctx, "provider_kwargs", {}) or {})
-            if orch.thinking or provider_kwargs.get("execution_mode") == "escalated_single_agent":
-                provider_kwargs["thinking"] = {
-                    "type": "enabled",
-                    "budget_tokens": 10000,
-                }
-
-            full_content, tool_calls, _, garbage_detected = (
-                await runtime_owner._stream_provider_response(
-                    tools=tools,
-                    provider_kwargs=provider_kwargs,
-                    stream_ctx=stream_ctx,
-                )
+            tools, full_content, tool_calls, garbage_detected = await self._stream_provider_turn(
+                orch, runtime_owner, stream_ctx, goals
             )
 
             if self._confidence_monitor is not None and not tool_calls:
