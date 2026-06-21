@@ -1,9 +1,9 @@
 # Victor AI Framework — Documentation
 
 > **Contract-first, service-first agentic AI framework** for building agents that reason,
-> call tools, execute DAG workflows, and coordinate multi-agent teams across 24+ LLM providers.
+> call tools, execute DAG workflows, and coordinate multi-agent teams across 24 LLM providers.
 
-**Version**: 0.7.0 | **License**: Apache-2.0 | **Python**: 3.10+
+**Version**: 0.7.1 | **License**: Apache-2.0 | **Python**: 3.10+
 
 ---
 
@@ -46,7 +46,7 @@ flowchart TB
         AL["AgenticLoop"]
         TP["ToolPipeline"]
     end
-    subgraph Providers["PROVIDERS (24+)"]
+    subgraph Providers["PROVIDERS (24)"]
         Prov["Anthropic, OpenAI, Gemini, Ollama, Bedrock + 19"]
     end
     subgraph ToolModules["TOOLS (34 modules)"]
@@ -130,7 +130,7 @@ flowchart TB
 | [Settings Reference](reference/settings-reference.md) | All 26+ config groups |
 | [Configuration Options](reference/configuration-options.md) | Detailed config options |
 | [Environment Variables](reference/environment-variables.md) | All env vars |
-| [Provider Comparison](reference/providers-comparison.md) | Feature matrix for 24+ providers |
+| [Provider Comparison](reference/providers-comparison.md) | Feature matrix for 24 providers |
 | [CLI Commands](reference/cli-commands.md) | CLI command reference |
 | [Skills](reference/skills.md) | Skill registry and YAML definitions |
 | [Embeddings](reference/embeddings.md) | Embedding backends and configuration |
