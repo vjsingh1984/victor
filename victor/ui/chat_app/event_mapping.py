@@ -189,3 +189,30 @@ def provider_switch_hint(current: Optional[str], available: Iterable[str]) -> st
     if not others:
         return ""
     return "_Try another provider:_ " + ", ".join(others)
+
+
+def history_messages(messages: Iterable[Any]) -> List[tuple[str, str]]:
+    """Normalize ``VictorClient.get_messages()`` objects into ``(author, content)`` pairs.
+
+    Used to replay a reconnected session's visible turns. Only user/assistant messages with
+    content are kept (system/tool messages are internal orchestration); the author is ``"You"``
+    for user turns and ``"Victor"`` for assistant turns. Accepts message objects (``.role`` /
+    ``.content``, where ``role`` may be a str or an enum with ``.value``) or plain dicts. Pure +
+    Chainlit-free for unit testing.
+    """
+    pairs: List[tuple[str, str]] = []
+    for msg in messages or []:
+        raw_role = getattr(msg, "role", None)
+        if raw_role is None and isinstance(msg, dict):
+            raw_role = msg.get("role")
+        role = str(getattr(raw_role, "value", raw_role) or "").lower()
+
+        content = getattr(msg, "content", None)
+        if content is None and isinstance(msg, dict):
+            content = msg.get("content")
+        content = str(content or "").strip()
+
+        if not content or role not in ("user", "assistant"):
+            continue
+        pairs.append(("You" if role == "user" else "Victor", content))
+    return pairs
