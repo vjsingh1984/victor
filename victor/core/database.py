@@ -583,6 +583,36 @@ class _DatabaseManagerBase:
             self._local.conn.close()
             self._local.conn = None
 
+    def maintain(self) -> Dict[str, Any]:
+        """Checkpoint the WAL and reclaim free pages.
+
+        Long-lived databases (especially the project graph DB) accumulate a large WAL and
+        many free pages after deletes/re-indexing; with ``auto_vacuum`` off the file never
+        shrinks. This truncates the WAL and runs ``VACUUM`` to reclaim space (which also
+        applies any ``auto_vacuum`` mode going forward). Idempotent and safe to rerun.
+
+        Returns a dict with ``path``, ``size_before``, and ``size_after`` (bytes).
+        """
+        before = self.db_path.stat().st_size if self.db_path.exists() else 0
+        conn = self._get_raw_connection()
+        # Order matters in WAL mode: VACUUM rebuilds the compacted database into the WAL, and
+        # the main file is only rewritten/shrunk by a subsequent checkpoint. So VACUUM first,
+        # then wal_checkpoint(TRUNCATE) to flush the compacted pages back and truncate the WAL.
+        conn.execute("VACUUM")  # must run outside an explicit transaction
+        try:
+            conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        except sqlite3.Error:
+            logger.debug("wal_checkpoint(TRUNCATE) failed", exc_info=True)
+        conn.commit()
+        after = self.db_path.stat().st_size if self.db_path.exists() else 0
+        logger.info(
+            "Database maintained: %s (%.1f MB -> %.1f MB)",
+            self.db_path,
+            before / 1024 / 1024,
+            after / 1024 / 1024,
+        )
+        return {"path": str(self.db_path), "size_before": before, "size_after": after}
+
 
 class DatabaseManager(_DatabaseManagerBase):
     """Unified database manager for Victor.
@@ -1535,6 +1565,11 @@ class ProjectDatabaseManager(_DatabaseManagerBase):
         The larger auto-checkpoint threshold keeps large graph-indexing writes
         from triggering frequent WAL checkpoints on small default page budgets.
         """
+        # auto_vacuum must be set before tables are created to take effect without a VACUUM;
+        # on a fresh project DB this lets incremental_vacuum/maintain() reclaim deleted graph
+        # rows so the file does not grow unbounded. On an existing DB it is a no-op until the
+        # next VACUUM (which maintain() runs).
+        conn.execute("PRAGMA auto_vacuum=INCREMENTAL")
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA synchronous=NORMAL")
         conn.execute("PRAGMA foreign_keys=ON")

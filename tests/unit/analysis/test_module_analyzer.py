@@ -105,6 +105,47 @@ def _seed_graph(conn, modules, edges):
     conn.commit()
 
 
+class TestModuleMetricHistoryRetention:
+    """persist() must bound graph_module_metric_history growth."""
+
+    def test_history_is_capped_per_module(self, in_memory_db):
+        analyzer = ModuleAnalyzer(db=FakeDB(in_memory_db))
+        cap = ModuleAnalyzer._HISTORY_RETENTION_PER_MODULE
+
+        # Persist many snapshots for the same module (each persist appends one history row).
+        for i in range(cap + 25):
+            analyzer.persist([ModuleMetrics(module_path="a.py", hotspot_score=float(i))])
+
+        rows = in_memory_db.execute(
+            "SELECT COUNT(*) FROM graph_module_metric_history WHERE module_path = 'a.py'"
+        ).fetchone()[0]
+        assert rows == cap  # capped, not cap + 25
+
+        # The retained rows are the most recent ones (highest hotspot_score / id).
+        kept = in_memory_db.execute(
+            "SELECT MIN(hotspot_score), MAX(hotspot_score) "
+            "FROM graph_module_metric_history WHERE module_path = 'a.py'"
+        ).fetchone()
+        assert kept[1] == float(cap + 24)  # newest retained
+        assert kept[0] == float(25)  # oldest 25 pruned
+
+    def test_history_retention_is_per_module(self, in_memory_db):
+        analyzer = ModuleAnalyzer(db=FakeDB(in_memory_db))
+        for i in range(5):
+            analyzer.persist(
+                [
+                    ModuleMetrics(module_path="a.py", hotspot_score=float(i)),
+                    ModuleMetrics(module_path="b.py", hotspot_score=float(i)),
+                ]
+            )
+        for module in ("a.py", "b.py"):
+            count = in_memory_db.execute(
+                "SELECT COUNT(*) FROM graph_module_metric_history WHERE module_path = ?",
+                (module,),
+            ).fetchone()[0]
+            assert count == 5  # under the cap: nothing pruned
+
+
 class TestModuleAnalyzer:
     """Tests for ModuleAnalyzer."""
 
