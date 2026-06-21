@@ -164,6 +164,54 @@ def test_controller_clean_turn_continues():
     assert decision.nudge_message is None
 
 
+def _saturating_search_obs(iteration):
+    same_hits = [{"path": f"a{i}.py", "qualified_name": f"f{i}"} for i in range(5)]
+    return TurnObservation(
+        content=f"searching, iteration {iteration}",
+        has_tool_calls=True,
+        tool_count=1,
+        tool_results=[{"tool_name": "code_search", "success": True, "result_items": same_hits}],
+        iteration=iteration,
+        max_iterations=12,
+    )
+
+
+def test_controller_force_completes_on_search_saturation():
+    c = TurnEvaluationController(enable_budget_warning=False)
+    decision = None
+    for i in range(1, 7):
+        decision = c.evaluate(_saturating_search_obs(i))
+    assert decision.stop is True
+    assert decision.terminal_success is True  # synthesize, not fail
+    assert decision.stop_reason == "search_saturated"
+
+
+def test_controller_nudges_to_synthesize_before_force_complete():
+    c = TurnEvaluationController(enable_budget_warning=False)
+    decisions = [c.evaluate(_saturating_search_obs(i)) for i in range(1, 5)]
+    # A synthesize nudge appears before the force-complete.
+    assert any(d.nudge_kind == "synthesize" for d in decisions if not d.stop)
+
+
+def test_controller_distinct_searches_do_not_force_complete():
+    c = TurnEvaluationController(enable_budget_warning=False)
+    forced = False
+    for i in range(1, 12):
+        fresh = [{"path": f"f{i}_{j}.py", "qualified_name": f"s{i}_{j}"} for j in range(4)]
+        d = c.evaluate(
+            TurnObservation(
+                content=f"distinct search {i}",
+                has_tool_calls=True,
+                tool_count=1,
+                tool_results=[{"tool_name": "code_search", "success": True, "result_items": fresh}],
+                iteration=i,
+                max_iterations=12,
+            )
+        )
+        forced = forced or (d.stop and d.stop_reason == "search_saturated")
+    assert not forced
+
+
 def test_controller_reset_clears_state():
     c = TurnEvaluationController()
     same = "Repeating the same narration sentence over and over and over again now."

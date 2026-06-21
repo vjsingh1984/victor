@@ -982,9 +982,16 @@ class StreamingChatExecutor:
             nudge_policy=_nudge_policy,
             enable_plateau_nudge=False,
             enable_budget_warning=False,
+            # Novelty is fed below (after tools), not at the content-rep call, so disable it on
+            # the controller and run a dedicated tracker at the post-tool point.
+            enable_search_novelty=False,
         )
         # Shared productivity-weighted plateau detector (replaces this loop's inline formula).
         _plateau = PlateauDetector()
+        # Shared search-novelty safety-net (diminishing-returns on re-search loops).
+        from victor.framework.search_novelty import SearchNoveltyTracker, synthesize_nudge_message
+
+        _novelty = SearchNoveltyTracker()
 
         _perception = None
         conversation_history = self._get_conversation_history(runtime_owner, orch, user_message)
@@ -1866,6 +1873,43 @@ class StreamingChatExecutor:
                     orch.add_message(
                         "system",
                         plateau_nudge_message(_is_write),
+                        metadata={MESSAGE_SOURCE_METADATA_KEY: MessageSource.SYSTEM_INJECTED.value},
+                    )
+
+                # Search-novelty safety-net: if successive searches stop surfacing new files,
+                # synthesize instead of thrashing. Skip when actively editing (real work).
+                from victor.tools.tool_names import get_canonical_name
+
+                _nov_results = getattr(tool_exec_result, "tool_results", None) or []
+                _nov = _novelty.record_turn(_nov_results)
+                _editing = any(
+                    get_canonical_name(r.get("tool_name") or r.get("name") or "")
+                    in {"edit", "write", "create_file", "replace_in_file"}
+                    for r in _nov_results
+                    if isinstance(r, dict)
+                )
+                _iter_no = getattr(stream_ctx, "total_iterations", 0)
+                if _nov.should_force_complete and not _editing and _iter_no >= 2:
+                    logger.info(
+                        "[search-novelty] %d consecutive low-novelty searches — synthesizing.",
+                        _nov.consecutive_low_novelty,
+                    )
+                    stream_ctx.force_completion = True
+                    stream_ctx.skip_continuation = True
+                    yield orch._chunk_generator.generate_content_chunk(
+                        "\n\n[Enough context gathered — synthesizing the answer.]",
+                        is_final=True,
+                    )
+                    return
+                if _nov.should_nudge:
+                    from victor.agent.conversation.types import (
+                        MESSAGE_SOURCE_METADATA_KEY,
+                        MessageSource,
+                    )
+
+                    orch.add_message(
+                        "system",
+                        synthesize_nudge_message(),
                         metadata={MESSAGE_SOURCE_METADATA_KEY: MessageSource.SYSTEM_INJECTED.value},
                     )
 

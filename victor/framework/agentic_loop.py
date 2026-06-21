@@ -1055,24 +1055,40 @@ class AgenticLoop:
                     },
                     tool_count=int(getattr(action_result, "tool_calls_count", 0) or 0),
                     tool_signatures=getattr(action_result, "tool_signatures", None),
+                    tool_results=_tool_results,
                     iteration=i,
                     max_iterations=effective_max,
                 )
                 turn_decision = self.turn_evaluation_controller.evaluate(
                     _turn_obs, record_spin=False
                 )
-                if turn_decision.stop:
+                if turn_decision.stop and turn_decision.terminal_success:
+                    # Search-saturation (or other clean stop) -> COMPLETE so the loop synthesizes
+                    # the gathered context instead of thrashing to the iteration cap.
+                    logger.info(
+                        "Converged at iteration %d (%s) - completing to synthesize",
+                        i,
+                        turn_decision.stop_reason,
+                    )
+                    evaluation = EvaluationResult(
+                        decision=EvaluationDecision.COMPLETE,
+                        score=evaluation.score,
+                        reason=f"Converged: {turn_decision.stop_reason} (iteration {i})",
+                    )
+                elif turn_decision.stop:
                     state.setdefault("degradation_events", []).append(
                         {
                             "source": "agentic_loop",
-                            "kind": "content_repetition",
+                            "kind": turn_decision.stop_reason or "content_repetition",
                             "failure_type": "STUCK_LOOP",
                             "iteration": i,
                             "task_type": state.get("task_type"),
                             "post_degraded": True,
                             "recovered": False,
                             "adaptation_cost": float(i),
-                            "degradation_reasons": ["content_repetition"],
+                            "degradation_reasons": [
+                                turn_decision.stop_reason or "content_repetition"
+                            ],
                         }
                     )
                     logger.warning(
