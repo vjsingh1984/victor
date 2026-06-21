@@ -12,26 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Deterministic streaming-loop parity harness — the FEP-0007 Phase 3→4 gate.
+"""Deterministic streaming-loop characterization harness — the FEP-0007 regression gate.
 
-FEP-0007 ("Unified Agentic Loop") replaces ``StreamingChatExecutor.run()`` with
-``AgenticLoop.run_streaming()`` behind ``USE_UNIFIED_STREAMING_LOOP``. The acceptance
-criterion is that the new loop yields ``StreamChunk``s *equivalent* to the old one across a
-fixed QA battery (S1/S2/M1/M2/C1/W1–W4/U1) — same answers, same tool sequence, no streaming
-tracebacks — before the flag flips ON.
-
-This module is that gate, buildable today against the legacy loop:
+FEP-0007 ("Unified Agentic Loop") decomposed ``StreamingChatExecutor.run()`` into a single
+``_stream_turn()`` per-turn primitive driven by a thin loop. There is one streaming path — no
+feature flag, no legacy fallback — so the way we guard the refactor is to pin the loop's observable
+behavior across a fixed QA battery (S1/S2/M1/M2/C1/W1–W4/U1): same answers, same tool sequence, no
+streaming tracebacks. Every Phase 2 helper extraction and the ``_stream_turn`` assembly was checked
+against this battery.
 
 * :class:`ScriptedProvider` / :class:`ScriptedTool` drive the **real** streaming loop
   deterministically (no network, no real model) via ``orchestrator.stream_chat()``.
 * :func:`capture_transcript` runs a scenario and normalizes the streamed output into a
   :class:`StreamTranscript` (content with the non-deterministic cost/token footer stripped,
   ordered tool-execution names, error flag).
-* :data:`SCENARIOS` is the battery; :func:`assert_parity` compares two transcripts.
-
-Because the legacy loop is what runs today, the characterization tests pin the **baseline**.
-The legacy-vs-unified parity test activates automatically once ``AgenticLoop.run_streaming``
-exists (see :func:`unified_streaming_available`), so the gate is live the moment Phase 3 lands.
+* :data:`SCENARIOS` is the battery.
 """
 
 from __future__ import annotations
@@ -261,19 +256,6 @@ async def capture_transcript(orch: AgentOrchestrator, message: str) -> StreamTra
     )
 
 
-def assert_parity(legacy: StreamTranscript, unified: StreamTranscript) -> None:
-    """Assert two transcripts are equivalent (the Phase 3→4 acceptance check)."""
-    assert (
-        legacy.errored == unified.errored
-    ), f"error-state diverged: legacy={legacy.error!r} unified={unified.error!r}"
-    assert (
-        legacy.tool_calls == unified.tool_calls
-    ), f"tool sequence diverged: legacy={legacy.tool_calls} unified={unified.tool_calls}"
-    assert (
-        legacy.content == unified.content
-    ), f"content diverged:\n  legacy={legacy.content!r}\n  unified={unified.content!r}"
-
-
 # ---------------------------------------------------------------------------
 # The QA battery (FEP-0007 S1/S2/M1/M2/C1/W1–W4/U1)
 # ---------------------------------------------------------------------------
@@ -448,7 +430,7 @@ SCENARIOS: List[Scenario] = [
 
 
 def build_for_scenario(scenario: Scenario) -> AgentOrchestrator:
-    """Build a fresh orchestrator for a scenario (legacy loop / flag OFF)."""
+    """Build a fresh orchestrator for a scenario (the single canonical streaming loop)."""
     provider = ScriptedProvider(list(scenario.turns))
     return build_streaming_orchestrator(
         provider,
@@ -456,12 +438,3 @@ def build_for_scenario(scenario: Scenario) -> AgentOrchestrator:
         max_iterations=scenario.max_iterations,
         failing_tool_names=scenario.failing_tools,
     )
-
-
-def unified_streaming_available() -> bool:
-    """True once FEP-0007 Phase 3 lands ``AgenticLoop.run_streaming`` (activates parity tests)."""
-    try:
-        from victor.framework.agentic_loop import AgenticLoop
-    except Exception:
-        return False
-    return hasattr(AgenticLoop, "run_streaming")
