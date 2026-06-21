@@ -3,7 +3,7 @@
 > **Single source of truth** for Victor system architecture.
 > Supersedes: `ARCHITECTURE.md`, `docs/architecture/overview.md`, `docs/diagrams/`
 
-**Version**: 0.7.1 | **Last Updated**: 2026-06 | **Status**: Canonical
+**Version**: {{ victor_version }} | **Last Updated**: 2026-06 | **Status**: Canonical
 
 ---
 

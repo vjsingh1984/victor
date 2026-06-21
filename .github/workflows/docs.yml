@@ -58,6 +58,11 @@ jobs:
           pip install mkdocstrings[python]
           pip install mkdocs-git-revision-date-localized-plugin
           pip install pymdown-extensions
+          # Pin Pygments < 2.19: 2.19 escapes the formatter filename, and pymdownx passes
+          # filename=None for mkdocstrings' block signatures -> html.escape(None) crash.
+          # mkdocstrings runs as static griffe analysis (allow_inspection:false, paths:[.]),
+          # so the victor package source is read directly — no victor install / runtime deps needed.
+          pip install "Pygments<2.19"
 
       - name: Build documentation
         run: mkdocs build

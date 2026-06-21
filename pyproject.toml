@@ -207,12 +207,17 @@ ci = [
     "mkdocs>=1.5",
     "mkdocs-material>=9.5",
     "mkdocstrings[python]>=0.24",
+    # Pygments 2.19 escapes the formatter filename; pymdownx passes filename=None for
+    # mkdocstrings' block signatures -> html.escape(None) crash. Cap until upstream fixes it.
+    "pygments<2.19",
 ]
 
 docs = [
     "mkdocs>=1.5",
     "mkdocs-material>=9.5",
     "mkdocstrings[python]>=0.24",
+    # See note in [dev]: cap Pygments to avoid the mkdocstrings signature-render crash.
+    "pygments<2.19",
 ]
 
 sphinx-docs = [
