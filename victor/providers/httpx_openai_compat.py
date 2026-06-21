@@ -536,5 +536,11 @@ class HttpxOpenAICompatProvider(BaseProvider):
             raise self.classify_error(e) from e
 
     async def close(self) -> None:
-        """Close the underlying httpx client."""
-        await self.client.aclose()
+        """Close the underlying httpx client (idempotent)."""
+        client = getattr(self, "client", None)
+        if client is None or getattr(client, "is_closed", False):
+            return
+        try:
+            await client.aclose()
+        except Exception:
+            logger.debug("Provider httpx client close failed (already closed?)", exc_info=True)

@@ -41,10 +41,11 @@ jobs:
 
       - name: Find modified FEP files
         id: find-feps
+        env:
+          BASE_BRANCH: ${{ github.base_ref || github.event.repository.default_branch }}
         run: |
           # Get list of modified/added FEP files in this PR
-          BASE_BRANCH="${{ github.base_ref || github.event.repository.default_branch }}"
-          FEP_FILES=$(git diff --name-only --diff-filter=AM origin/${BASE_BRANCH}...HEAD | grep '^feps/fep-.*\.md$' || true)
+          FEP_FILES=$(git diff --name-only --diff-filter=AM "origin/${BASE_BRANCH}...HEAD" | grep '^feps/fep-.*\.md$' || true)
 
           if [ -z "$FEP_FILES" ]; then
             echo "No FEP files modified or added in this PR"
@@ -159,16 +160,22 @@ jobs:
 
       - name: Generate validation report
         if: always() && steps.find-feps.outputs.fep_files != ''
+        env:
+          GH_WORKFLOW: ${{ github.workflow }}
+          GH_RUN_ID: ${{ github.run_id }}
+          GH_REF_NAME: ${{ github.ref_name }}
+          GH_PR_NUMBER: ${{ github.event.pull_request.number }}
+          FEP_FILES_OUTPUT: ${{ steps.find-feps.outputs.fep_files }}
         run: |
           mkdir -p validation-reports
 
-          cat > validation-reports/fep-validation.md << 'EOF'
+          cat > validation-reports/fep-validation.md << EOF
           # FEP Validation Report
 
-          **Workflow**: ${{ github.workflow }}
-          **Run ID**: ${{ github.run_id }}
-          **Branch**: ${{ github.ref_name }}
-          **PR**: ${{ github.event.pull_request.number }}
+          **Workflow**: ${GH_WORKFLOW}
+          **Run ID**: ${GH_RUN_ID}
+          **Branch**: ${GH_REF_NAME}
+          **PR**: ${GH_PR_NUMBER}
 
           ## Summary
 
@@ -178,7 +185,7 @@ jobs:
 
           EOF
 
-          FEP_FILES="${{ steps.find-feps.outputs.fep_files }}"
+          FEP_FILES="$FEP_FILES_OUTPUT"
           for fep_file in $FEP_FILES; do
             filename=$(basename "$fep_file")
             echo "- [$filename]($fep_file)" >> validation-reports/fep-validation.md

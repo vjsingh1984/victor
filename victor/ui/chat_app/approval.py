@@ -31,6 +31,7 @@ import logging
 from typing import Any, Optional, Tuple
 
 from victor.framework.hitl import ApprovalRequest, ApprovalStatus
+from victor.ui.rendering.markdown_presenters import tool_call_summary
 
 logger = logging.getLogger(__name__)
 
@@ -44,32 +45,72 @@ _APPROVE_VALUE = "approve"
 _REJECT_VALUE = "reject"
 
 
-def decision_from_action(action: Optional[Any]) -> ApprovalResult:
-    """Map a Chainlit action payload (or ``None`` on timeout) to an approval result.
+def _decision_token(action: Any) -> Optional[str]:
+    """Pull the approve/reject token from an AskActionMessage response, version-robustly.
 
-    ``action`` is the value returned by ``AskActionMessage.send()``: a dict-like with a
-    ``"value"`` key, or ``None`` when the user did not respond before the timeout. Anything
-    that isn't an explicit approve maps to a non-approval (fail-safe).
+    Chainlit 2.x returns the chosen action as a dict with ``name`` + ``payload`` (``value``
+    was renamed to ``payload``); 1.x used a flat ``value``. Prefer the stable action
+    ``name`` ("approve"/"reject"), then ``payload['value']``, then legacy ``value``.
+    """
+    if action is None:
+        return None
+    if hasattr(action, "get"):
+        name = action.get("name")
+        if name:
+            return name
+        payload = action.get("payload")
+        if isinstance(payload, dict) and payload.get("value"):
+            return payload.get("value")
+        return action.get("value")
+    return getattr(action, "name", None) or getattr(action, "value", None)
+
+
+def decision_from_action(action: Optional[Any]) -> ApprovalResult:
+    """Map a Chainlit AskActionMessage response (or ``None`` on timeout) to an approval result.
+
+    Anything that isn't an explicit approve maps to a non-approval (fail-safe).
     """
     if action is None:
         return ApprovalStatus.TIMEOUT, "No response before timeout", _RESPONDER
 
-    value = action.get("value") if hasattr(action, "get") else getattr(action, "value", None)
-    if value == _APPROVE_VALUE:
+    if _decision_token(action) == _APPROVE_VALUE:
         return ApprovalStatus.APPROVED, "Approved in chat UI", _RESPONDER
     return ApprovalStatus.REJECTED, "Rejected in chat UI", _RESPONDER
 
 
+def _argument_preview(tool: str, args: Any) -> str:
+    """Render the consequential argument (command / content / diff) as a fenced block.
+
+    Informed approval: the user should see *what* will run, not just the tool name.
+    """
+    if not isinstance(args, dict) or not args:
+        return ""
+    name = (tool or "").lower()
+    command = args.get("command") or args.get("cmd") or args.get("script")
+    if command:
+        return f"```bash\n{str(command)[:2000]}\n```"
+    diff = args.get("diff") or args.get("patch")
+    if diff:
+        return f"```diff\n{str(diff)[:2000]}\n```"
+    content = args.get("content") or args.get("text")
+    if content and ("write" in name or "create" in name or "edit" in name):
+        return f"```\n{str(content)[:2000]}\n```"
+    # Generic tools: a compact one-line `tool(args)` summary.
+    return f"`{tool_call_summary(tool, args)}`"
+
+
 def _format_prompt(request: ApprovalRequest) -> str:
-    """Build the approval prompt markdown from the request."""
-    lines = [f"**Tool approval required** — {request.title}"]
+    """Build the approval prompt markdown — with the exact command/diff being approved."""
+    ctx = request.context or {}
+    tool = ctx.get("tool_name") or "tool"
+    lines = [f"**Approve tool: `{tool}`?**"]
     if request.description:
         lines.append("")
         lines.append(request.description)
-    tool = (request.context or {}).get("tool_name")
-    if tool:
+    preview = _argument_preview(tool, ctx.get("arguments"))
+    if preview:
         lines.append("")
-        lines.append(f"`{tool}`")
+        lines.append(preview)
     return "\n".join(lines)
 
 
@@ -86,8 +127,9 @@ async def chainlit_approval_handler(request: ApprovalRequest) -> ApprovalResult:
         action = await cl.AskActionMessage(
             content=_format_prompt(request),
             actions=[
-                cl.Action(name="approve", value=_APPROVE_VALUE, label="✅ Approve"),
-                cl.Action(name="reject", value=_REJECT_VALUE, label="🚫 Reject"),
+                # Chainlit 2.x: payload (dict) replaced the 1.x `value` kwarg.
+                cl.Action(name="approve", payload={"value": _APPROVE_VALUE}, label="✅ Approve"),
+                cl.Action(name="reject", payload={"value": _REJECT_VALUE}, label="🚫 Reject"),
             ],
             timeout=request.timeout_seconds or 120,
         ).send()

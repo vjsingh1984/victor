@@ -2,7 +2,7 @@ name: External Vertical Compatibility
 
 on:
   push:
-    branches: [develop, main]
+    branches: [main]
     paths:
       - '.github/workflows/external-vertical-compat.yml'
       - 'victor/**'
@@ -68,18 +68,24 @@ jobs:
 
       - name: Skip dispatch when PAT is unavailable
         if: env.HAS_EXTERNAL_VERTICAL_PAT != 'true'
+        env:
+          REPO: ${{ matrix.repo }}
         run: |
-          echo "Skipping dispatch to ${{ matrix.repo }} because EXTERNAL_VERTICAL_PAT is not configured."
+          echo "Skipping dispatch to ${REPO} because EXTERNAL_VERTICAL_PAT is not configured."
 
       - name: Log dispatch
+        env:
+          REPO: ${{ matrix.repo }}
+          VICTOR_SHA: ${{ github.sha }}
+          VICTOR_REF_NAME: ${{ github.ref_name }}
         run: |
           if [ "${HAS_EXTERNAL_VERTICAL_PAT}" = "true" ]; then
-            echo "Dispatched core-compat-check to ${{ matrix.repo }}"
+            echo "Dispatched core-compat-check to ${REPO}"
           else
-            echo "Skipped core-compat-check for ${{ matrix.repo }} (missing EXTERNAL_VERTICAL_PAT)"
+            echo "Skipped core-compat-check for ${REPO} (missing EXTERNAL_VERTICAL_PAT)"
           fi
-          echo "  Victor ref: ${{ github.sha }}"
-          echo "  Victor branch: ${{ github.ref_name }}"
+          echo "  Victor ref: ${VICTOR_SHA}"
+          echo "  Victor branch: ${VICTOR_REF_NAME}"
 
   report-status:
     name: Report Dispatch Status

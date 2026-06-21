@@ -25,7 +25,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Iterable, List, Optional
 
 
 class RenderKind(str, Enum):
@@ -46,8 +46,25 @@ class RenderAction:
     kind: RenderKind
     text: str = ""
     tool_name: Optional[str] = None
+    call_id: Optional[str] = None  # correlates TOOL_START/TOOL_END for parallel calls
     success: bool = True
+    elapsed: float = 0.0
+    was_pruned: bool = False
+    follow_up_suggestions: Optional[list[dict[str, Any]]] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
+
+
+def _extract_call_id(event: Any, metadata: Dict[str, Any]) -> Optional[str]:
+    """Best-effort tool call id (correlates a tool_call to its tool_result)."""
+    for key in ("tool_call_id", "id", "call_id"):
+        value = metadata.get(key)
+        if value:
+            return str(value)
+    for attr in ("tool_call_id", "call_id"):
+        value = getattr(event, attr, None)
+        if value:
+            return str(value)
+    return None
 
 
 def _normalize_event_type(event_type: Any) -> str:
@@ -65,12 +82,22 @@ def _normalize_event_type(event_type: Any) -> str:
 
 
 def _tool_result_payload(event: Any) -> Dict[str, Any]:
-    """Best-effort extraction of the tool-result dict from an event."""
+    """Best-effort extraction of the flat tool-result dict from an event.
+
+    ``VictorClient._to_stream_event`` flattens the payload onto ``event.result``;
+    fall back to a nested ``metadata['tool_result']`` (or bare ``metadata``) so the
+    mapping still works if an event arrives un-flattened.
+    """
     result = getattr(event, "result", None)
     if isinstance(result, dict):
         return result
     metadata = getattr(event, "metadata", None)
-    return metadata if isinstance(metadata, dict) else {}
+    if isinstance(metadata, dict):
+        nested = metadata.get("tool_result")
+        if isinstance(nested, dict):
+            return nested
+        return metadata
+    return {}
 
 
 def map_event(event: Any) -> RenderAction:
@@ -95,16 +122,24 @@ def map_event(event: Any) -> RenderAction:
         return RenderAction(
             RenderKind.TOOL_START,
             tool_name=getattr(event, "tool_name", None) or "tool",
+            call_id=_extract_call_id(event, metadata),
             metadata={"arguments": metadata.get("arguments", {})},
         )
 
     if event_type in ("tool_result", "tool_error"):
         payload = _tool_result_payload(event)
+        # Prefer the full output for direct display; the bare ``result`` is a CLI
+        # "/expand" placeholder, so it is the last resort behind the real output.
+        text = payload.get("original_result") or content or payload.get("result") or ""
         return RenderAction(
             RenderKind.TOOL_END,
-            text=content or str(payload.get("result", "")),
+            text=str(text),
             tool_name=getattr(event, "tool_name", None) or "tool",
+            call_id=_extract_call_id(event, payload) or _extract_call_id(event, metadata),
             success=event_type != "tool_error" and bool(payload.get("success", True)),
+            elapsed=float(payload.get("elapsed", 0.0) or 0.0),
+            was_pruned=bool(payload.get("was_pruned", False)),
+            follow_up_suggestions=payload.get("follow_up_suggestions") or None,
             metadata={"arguments": payload.get("arguments", {})},
         )
 
@@ -115,3 +150,69 @@ def map_event(event: Any) -> RenderAction:
         )
 
     return RenderAction(RenderKind.IGNORE)
+
+
+def segment_turn(kinds: Iterable["RenderKind"]) -> List[str]:
+    """Return the ordered render-segment types for a turn — the natural-flow contract.
+
+    A turn's events interleave per agent iteration: [text][tool_call/result…][text]…. To
+    render that like the terminal (instead of all tool steps piling at the end), the UI emits
+    a NEW text message segment whenever text resumes after a tool run, and groups each
+    iteration's tool calls into one tool segment. This pure helper encodes that contract so it
+    can be unit-tested; ``app.py`` mirrors it online while streaming.
+
+    Returns a list like ``["text", "tools", "text", "tools", "text"]``. THINKING/IGNORE do not
+    open a segment (reasoning renders in its own step; lifecycle events are no-ops).
+    """
+    segments: List[str] = []
+    phase: Optional[str] = None
+    for kind in kinds:
+        if kind in (RenderKind.TOKEN, RenderKind.ERROR):
+            if phase != "text":
+                segments.append("text")
+                phase = "text"
+        elif kind in (RenderKind.TOOL_START, RenderKind.TOOL_END):
+            if phase != "tools":
+                segments.append("tools")
+                phase = "tools"
+    return segments
+
+
+def provider_switch_hint(current: Optional[str], available: Iterable[str]) -> str:
+    """One-line hint suggesting other providers to switch to after a turn fails (Chainlit-free).
+
+    Lists available providers other than the current one (order-preserving, deduped), so a
+    failure card can nudge the user toward an alternative. Returns ``""`` when there is no
+    alternative to suggest. ``app.py`` renders this; kept pure here so it is unit-testable.
+    """
+    others = [p for p in dict.fromkeys(available) if p and p != current]
+    if not others:
+        return ""
+    return "_Try another provider:_ " + ", ".join(others)
+
+
+def history_messages(messages: Iterable[Any]) -> List[tuple[str, str]]:
+    """Normalize ``VictorClient.get_messages()`` objects into ``(author, content)`` pairs.
+
+    Used to replay a reconnected session's visible turns. Only user/assistant messages with
+    content are kept (system/tool messages are internal orchestration); the author is ``"You"``
+    for user turns and ``"Victor"`` for assistant turns. Accepts message objects (``.role`` /
+    ``.content``, where ``role`` may be a str or an enum with ``.value``) or plain dicts. Pure +
+    Chainlit-free for unit testing.
+    """
+    pairs: List[tuple[str, str]] = []
+    for msg in messages or []:
+        raw_role = getattr(msg, "role", None)
+        if raw_role is None and isinstance(msg, dict):
+            raw_role = msg.get("role")
+        role = str(getattr(raw_role, "value", raw_role) or "").lower()
+
+        content = getattr(msg, "content", None)
+        if content is None and isinstance(msg, dict):
+            content = msg.get("content")
+        content = str(content or "").strip()
+
+        if not content or role not in ("user", "assistant"):
+            continue
+        pairs.append(("You" if role == "user" else "Victor", content))
+    return pairs

@@ -2,6 +2,24 @@
 
 This directory contains GitHub Actions workflows for automated validation, testing, and CI/CD.
 
+## CI Gating Strategy (lightweight `develop`, extensive `develop` → `main`)
+
+To keep the runner queue free and feature work merging fast, CI is split by the PR's
+**target branch**:
+
+| Trigger | Workflows that run | Intent |
+|---------|-------------------|--------|
+| **PR → `develop`** (and pushes to `develop`) | `ci-fast` only — Black, Ruff, repo-hygiene, MyPy (advisory + strict), import checks, guards, and **changed-file unit tests** (only the mirror tests for files the PR touches — see `scripts/ci/select_changed_tests.py`) + `fep-validation` if `feps/**` changed | **Lightweight** — fast feedback + a regression signal proportional to the change, unblock development |
+| **PR → `main`** (the `develop` → `main` promotion PR) and pushes to `main` | The full battery: `ci`, `ci-test` (sharded units), `ci-integration`, `build`, `security`, `performance-tests`, `validation`, `vertical-validation`, `external-vertical-compat` | **Extensive** — full verification before promoting to the protected branch |
+
+> The develop gate runs only the unit tests **relevant to the PR's changed files**, not the whole suite: the full non-slow unit suite is ~7h single-process (26.8k tests) and hours even sharded, so it can't gate every PR. Full coverage runs once at **develop → main**.
+
+This is enforced by the `branches:` filter on each workflow's `push`/`pull_request`
+triggers: heavy workflows target `[main]`; `ci-fast` targets `[main, develop]`. `main`
+remains the strict, protected branch (required checks + admin enforcement), so the extensive
+suite always gates a release-bound merge. To run a heavy workflow against a `develop` PR on
+demand, use its **workflow_dispatch** entry.
+
 ## Validation Workflows
 
 ### FEP Validation (`fep-validation.yml`)
@@ -90,7 +108,7 @@ Main continuous integration workflow:
 - VS Code extension build
 - Package build
 
-**Triggers:** Push to main/develop, pull requests
+**Triggers:** Push to `main`, pull requests targeting `main` (the `develop` → `main` promotion PR). See [CI Gating Strategy](#ci-gating-strategy-lightweight-develop-extensive-develop--main).
 
 ### Packages CI (`packages.yml`)
 

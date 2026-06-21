@@ -2,6 +2,9 @@ name: Vertical Package Validation
 
 on:
   pull_request:
+    # Extensive validation runs on the develop -> main promotion PR; develop PRs
+    # stay lightweight (ci-fast only) so the runner queue keeps merging fast.
+    branches: [main]
     paths:
       - 'victor/**'
   workflow_dispatch:  # Allow manual triggering
@@ -41,9 +44,10 @@ jobs:
 
       - name: Find modified vertical directories
         id: find-verticals
+        env:
+          BASE_BRANCH: ${{ github.base_ref || github.event.repository.default_branch }}
         run: |
-          BASE_BRANCH="${{ github.base_ref || github.event.repository.default_branch }}"
-          CHANGED_FILES=$(git diff --name-only --diff-filter=AM origin/${BASE_BRANCH}...HEAD || true)
+          CHANGED_FILES=$(git diff --name-only --diff-filter=AM "origin/${BASE_BRANCH}...HEAD" || true)
 
           echo "Changed files:"
           echo "$CHANGED_FILES"
@@ -268,16 +272,22 @@ jobs:
 
       - name: Generate validation report
         if: always() && steps.find-verticals.outputs.vertical_dirs != ''
+        env:
+          GH_WORKFLOW: ${{ github.workflow }}
+          GH_RUN_ID: ${{ github.run_id }}
+          GH_REF_NAME: ${{ github.ref_name }}
+          GH_PR_NUMBER: ${{ github.event.pull_request.number }}
+          VERTICAL_DIRS_OUTPUT: ${{ steps.find-verticals.outputs.vertical_dirs }}
         run: |
           mkdir -p validation-reports
 
-          cat > validation-reports/vertical-validation.md << 'EOF'
+          cat > validation-reports/vertical-validation.md << EOF
           # Vertical Package Validation Report
 
-          **Workflow**: ${{ github.workflow }}
-          **Run ID**: ${{ github.run_id }}
-          **Branch**: ${{ github.ref_name }}
-          **PR**: ${{ github.event.pull_request.number }}
+          **Workflow**: ${GH_WORKFLOW}
+          **Run ID**: ${GH_RUN_ID}
+          **Branch**: ${GH_REF_NAME}
+          **PR**: ${GH_PR_NUMBER}
 
           ## Summary
 
@@ -287,7 +297,7 @@ jobs:
 
           EOF
 
-          VERTICAL_DIRS="${{ steps.find-verticals.outputs.vertical_dirs }}"
+          VERTICAL_DIRS="${VERTICAL_DIRS_OUTPUT}"
           for vertical_dir in $VERTICAL_DIRS; do
             VERTICAL_NAME=$(basename "$vertical_dir")
             echo "- [$VERTICAL_NAME]($vertical_dir)" >> validation-reports/vertical-validation.md

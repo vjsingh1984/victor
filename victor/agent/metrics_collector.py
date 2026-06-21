@@ -261,12 +261,20 @@ class MetricsCollector:
         self._current_stream_metrics.end_time = time.time()
         metrics = self._current_stream_metrics
 
-        # Log stream metrics including cost if available
+        # Log stream metrics including cost if available. Token fields are the dominant cost
+        # term — emit them on the canonical "stream_completed" record so the usage sink (which
+        # the RL trace-miner and cost analysis read) actually carries per-turn token accounting,
+        # not just timing.
         log_data: Dict[str, Any] = {
             "ttft": metrics.time_to_first_token,
             "total_duration": metrics.total_duration,
             "tokens_per_second": metrics.tokens_per_second,
             "total_chunks": metrics.total_chunks,
+            "prompt_tokens": metrics.prompt_tokens,
+            "completion_tokens": metrics.completion_tokens,
+            "total_tokens": metrics.prompt_tokens + metrics.completion_tokens,
+            "cache_read_tokens": metrics.cache_read_tokens,
+            "cache_write_tokens": metrics.cache_write_tokens,
         }
         if metrics.cost_calculated:
             log_data["total_cost"] = metrics.total_cost

@@ -12,6 +12,10 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
+# Read-oriented task types: WRITE_ALLOWED is a *permission*, not an intent to write, so we
+# do not force mutation tools (edit/write/shell) onto these pure analysis/search turns.
+_READ_ORIENTED_TASK_TYPES = frozenset({"analyze", "search", "research"})
+
 
 # --- E3-TIR experience-replay exploration (opt-in via USE_E3_TIR_EXPLORATION) ---------
 # The experience STORE holds user-global RL data, so it is shared across sessions and fed
@@ -259,6 +263,14 @@ class ToolSelectionRuntime:
 
         intent_value = getattr(current_intent, "value", current_intent)
         if intent_value != ActionIntent.WRITE_ALLOWED.value:
+            return tools
+
+        # WRITE_ALLOWED only means writes aren't blocked — not that the user wants to write.
+        # Don't force edit/write/shell onto read-oriented analysis/search/research turns every
+        # iteration; let semantic selection decide (the agent can still surface them if needed).
+        task_type_raw = getattr(self._runtime, "_current_task_type", None)
+        task_type = str(getattr(task_type_raw, "value", task_type_raw) or "").lower()
+        if task_type in _READ_ORIENTED_TASK_TYPES:
             return tools
 
         selected = list(tools)

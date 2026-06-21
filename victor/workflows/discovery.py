@@ -114,6 +114,7 @@ def discover_workflows(
     workflows: List[BaseWorkflow] = []
 
     try:
+        # nosemgrep: python.lang.security.audit.non-literal-import.non-literal-import
         package = importlib.import_module(package_path)
         package_dir = Path(package.__file__).parent
 
@@ -122,6 +123,9 @@ def discover_workflows(
                 continue
 
             try:
+                # Module names come from scanning our own package directory,
+                # not from user input.
+                # nosemgrep: python.lang.security.audit.non-literal-import.non-literal-import
                 module = importlib.import_module(f"{package_path}.{module_name}")
 
                 # Find all BaseWorkflow subclasses

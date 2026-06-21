@@ -67,6 +67,11 @@ LOCAL_PROVIDER_HINTS = {
     "local",
 }
 
+# L4: when the recent per-turn cost trace (C0 TaskExecutionReport) exceeds these, routing biases
+# toward cheaper/faster local providers. Only consulted when a cost_trace is passed to decide().
+_COST_TRACE_USD_THRESHOLD = 0.05  # a turn costing > 5¢ is "expensive"
+_COST_TRACE_LATENCY_THRESHOLD_S = 30.0  # a turn slower than 30s is "slow"
+
 
 @dataclass
 class RoutingDecision:
@@ -174,6 +179,7 @@ class RoutingDecisionEngine:
         task_type: str = "default",
         model_hint: Optional[str] = None,
         preferred_providers: Optional[List[str]] = None,
+        cost_trace: Optional[Dict[str, Any]] = None,
     ) -> RoutingDecision:
         """Make routing decision based on multiple factors.
 
@@ -181,6 +187,9 @@ class RoutingDecisionEngine:
             task_type: Type of task (default, coding, chat, etc.)
             model_hint: Suggested model (can influence provider choice)
             preferred_providers: User-suggested providers (respected if provided)
+            cost_trace: Optional recent per-turn cost record (C0 TaskExecutionReport). When it
+                shows recent turns are expensive/slow, routing is biased toward cheaper/faster
+                local providers (L4). Omitted -> behavior unchanged.
 
         Returns:
             RoutingDecision with selected provider and fallback chain
@@ -208,6 +217,7 @@ class RoutingDecisionEngine:
             score, factors = await self._score_provider(
                 provider=provider,
                 task_type=task_type,
+                cost_trace=cost_trace,
             )
             scored_providers.append((provider, score, factors))
 
@@ -322,12 +332,14 @@ class RoutingDecisionEngine:
         self,
         provider: str,
         task_type: str,
+        cost_trace: Optional[Dict[str, Any]] = None,
     ) -> tuple[float, Dict[str, Any]]:
         """Score a provider based on multiple factors.
 
         Args:
             provider: Provider name
             task_type: Type of task
+            cost_trace: Optional recent per-turn cost record (L4) used to bias the cost factor.
 
         Returns:
             Tuple of (score, factors_dict)
@@ -350,7 +362,7 @@ class RoutingDecisionEngine:
         weight_sum += 0.25
 
         # Factor 3: Cost preference (weight: 0.15)
-        cost_score = await self._score_cost(provider)
+        cost_score = await self._score_cost(provider, cost_trace=cost_trace)
         factors["cost"] = cost_score
         total_score += 0.15 * cost_score
         weight_sum += 0.15
@@ -470,17 +482,39 @@ class RoutingDecisionEngine:
         # Cloud providers don't have resource constraints
         return 1.0
 
-    async def _score_cost(self, provider: str) -> float:
+    async def _score_cost(
+        self, provider: str, cost_trace: Optional[Dict[str, Any]] = None
+    ) -> float:
         """Score cost preference alignment (0.0 to 1.0).
+
+        L4: when a per-turn cost trace (the C0 ``TaskExecutionReport``) is supplied and shows
+        recent turns are expensive or slow, the static profile preference is overridden to bias
+        routing toward cheaper/faster local providers — closing the cost loop with measured data
+        instead of a fixed preference. Without a trace, behavior is unchanged.
 
         Args:
             provider: Provider name
+            cost_trace: Optional recent per-turn cost record (``total_cost_usd``,
+                ``duration_seconds``); when over threshold, biases toward local providers.
 
         Returns:
             Cost score
         """
-        # Local providers are free
         local_providers = {"ollama", "lmstudio", "vllm"}
+
+        # L4 trace-driven override: recent turns are over budget / too slow -> prefer local.
+        if cost_trace:
+            over_budget = (
+                float(cost_trace.get("total_cost_usd", 0.0) or 0.0) > _COST_TRACE_USD_THRESHOLD
+            )
+            over_latency = (
+                float(cost_trace.get("duration_seconds", 0.0) or 0.0)
+                > _COST_TRACE_LATENCY_THRESHOLD_S
+            )
+            if over_budget or over_latency:
+                return 1.0 if provider in local_providers else 0.2
+
+        # Local providers are free
         if provider in local_providers:
             if self.profile.cost_preference == "low":
                 return 1.0  # Perfect match

@@ -1366,6 +1366,7 @@ class ChatStreamHelperMixin:
         )
         waiting_since = time.monotonic()
         first_chunk_received = False
+        pending_next = None
 
         while True:
             pending_next = asyncio.create_task(provider_iterator.__anext__())
@@ -1474,6 +1475,22 @@ class ChatStreamHelperMixin:
                 )
 
             waiting_since = time.monotonic()
+            # Accumulate token usage from the RAW chunk BEFORE garbage-filtering. Providers
+            # routinely attach the turn's usage to the final, empty-content chunk (Ollama's
+            # `done` chunk, OpenAI-compat's terminal usage chunk). That chunk has no content,
+            # so `_handle_stream_chunk` drops it as garbage — and with it the entire turn's
+            # token accounting, leaving total_tokens=0. Reading usage here makes the dominant
+            # cost term observable regardless of whether the chunk survives the filter.
+            raw_usage = getattr(chunk, "usage", None)
+            if raw_usage:
+                for key in stream_ctx.cumulative_usage:
+                    stream_ctx.cumulative_usage[key] += raw_usage.get(key, 0)
+                logger.debug(
+                    f"Chunk usage: in={raw_usage.get('prompt_tokens', 0)} "
+                    f"out={raw_usage.get('completion_tokens', 0)} "
+                    f"cache_read={raw_usage.get('cache_read_input_tokens', 0)}"
+                )
+
             chunk, consecutive_garbage_chunks, garbage_detected = self._handle_stream_chunk(
                 chunk,
                 consecutive_garbage_chunks,
@@ -1495,15 +1512,6 @@ class ChatStreamHelperMixin:
                 tool_calls = chunk.tool_calls
                 stream_ctx.stream_metrics.tool_calls_count += len(chunk.tool_calls)
 
-            if chunk.usage:
-                for key in stream_ctx.cumulative_usage:
-                    stream_ctx.cumulative_usage[key] += chunk.usage.get(key, 0)
-                logger.debug(
-                    f"Chunk usage: in={chunk.usage.get('prompt_tokens', 0)} "
-                    f"out={chunk.usage.get('completion_tokens', 0)} "
-                    f"cache_read={chunk.usage.get('cache_read_input_tokens', 0)}"
-                )
-
             if tool_calls:
                 # Tool calls signal the end of this turn — the SSE stream is done.
                 # Break immediately; do NOT start a new stream call with the same
@@ -1519,6 +1527,25 @@ class ChatStreamHelperMixin:
                 )
                 logger.debug("Tool calls received, breaking stream loop")
                 break
+
+        # Close the provider stream in THIS task. Breaking early on tool_calls (the
+        # common case) leaves the underlying httpx SSE async generator open; if it is
+        # finalized later by GC it runs off-task and raises "async generator ignored
+        # GeneratorExit" / "Attempted to exit cancel scope in a different task". Draining
+        # the in-flight task and aclose()-ing here keeps that cleanup on-task. aclose() on
+        # an already-exhausted generator (StopAsyncIteration path) is a safe no-op.
+        if pending_next is not None and not pending_next.done():
+            pending_next.cancel()
+            try:
+                await pending_next
+            except (asyncio.CancelledError, Exception):
+                pass
+        _stream_aclose = getattr(provider_iterator, "aclose", None)
+        if callable(_stream_aclose):
+            try:
+                await _stream_aclose()
+            except Exception:
+                logger.debug("Failed closing provider stream iterator", exc_info=True)
 
         if garbage_detected and not tool_calls:
             logger.info("Setting force_completion due to garbage detection")

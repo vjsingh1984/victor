@@ -65,6 +65,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import re
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -442,6 +443,15 @@ class SQLiteHITLStore:
             db_path = str(default_db_path)
 
         self.db_path = db_path
+        # SQLite cannot parameterize identifiers, and the table name is
+        # interpolated into DDL/DML below. Validate it as a plain SQL
+        # identifier so the f-string interpolation cannot be used for
+        # injection (the only non-parameterized value in every query).
+        if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", table_name):
+            raise ValueError(
+                f"Invalid table_name {table_name!r}: must be a valid SQL "
+                "identifier (letters, digits, underscores; not starting with a digit)"
+            )
         self.table_name = table_name
         self._events: Dict[str, asyncio.Event] = {}
         self._subscribers: Dict[str, Set[Callable]] = {}
@@ -462,6 +472,9 @@ class SQLiteHITLStore:
         """Initialize database schema."""
         conn = self._get_connection()
         try:
+            # table_name validated as a SQL identifier in __init__; no other
+            # value is interpolated (all data uses bound ? params).
+            # nosemgrep
             conn.execute(f"""
                 CREATE TABLE IF NOT EXISTS {self.table_name} (
                     id TEXT PRIMARY KEY,
@@ -482,10 +495,12 @@ class SQLiteHITLStore:
                     responded_at TEXT
                 )
             """)
+            # nosemgrep
             conn.execute(f"""
                 CREATE INDEX IF NOT EXISTS idx_{self.table_name}_status
                 ON {self.table_name}(status)
             """)
+            # nosemgrep
             conn.execute(f"""
                 CREATE INDEX IF NOT EXISTS idx_{self.table_name}_workflow
                 ON {self.table_name}(workflow_id)
@@ -566,7 +581,7 @@ class SQLiteHITLStore:
 
             conn = self._get_connection()
             try:
-                conn.execute(
+                conn.execute(  # nosemgrep  # table_name validated as identifier; values bound
                     f"""
                     INSERT INTO {self.table_name} (
                         id, workflow_id, thread_id, node_id, hitl_type,
@@ -625,7 +640,7 @@ class SQLiteHITLStore:
         """
         conn = self._get_connection()
         try:
-            row = conn.execute(
+            row = conn.execute(  # nosemgrep  # table_name validated as identifier; values bound
                 f"SELECT * FROM {self.table_name} WHERE id = ?",
                 (request_id,),
             ).fetchone()
@@ -645,7 +660,7 @@ class SQLiteHITLStore:
         conn = self._get_connection()
         try:
             # Update expired requests
-            conn.execute(
+            conn.execute(  # nosemgrep  # table_name validated as identifier; values bound
                 f"""
                 UPDATE {self.table_name}
                 SET status = 'expired'
@@ -656,7 +671,7 @@ class SQLiteHITLStore:
             conn.commit()
 
             # Fetch pending
-            rows = conn.execute(
+            rows = conn.execute(  # nosemgrep  # table_name validated as identifier; values bound
                 f"SELECT * FROM {self.table_name} WHERE status = 'pending' ORDER BY created_at"
             ).fetchall()
             return [self._row_to_stored_request(row) for row in rows]
@@ -689,7 +704,7 @@ class SQLiteHITLStore:
             conn = self._get_connection()
             try:
                 # Check request exists and is pending
-                row = conn.execute(
+                row = conn.execute(  # nosemgrep  # table_name validated as identifier; values bound
                     f"SELECT * FROM {self.table_name} WHERE id = ? AND status = 'pending'",
                     (request_id,),
                 ).fetchone()
@@ -718,7 +733,7 @@ class SQLiteHITLStore:
                 )
 
                 # Update database
-                conn.execute(
+                conn.execute(  # nosemgrep  # table_name validated as identifier; values bound
                     f"""
                     UPDATE {self.table_name}
                     SET status = ?, response = ?, responded_at = ?
@@ -741,7 +756,7 @@ class SQLiteHITLStore:
                 logger.info(f"HITL response submitted for {request_id}: {status.value}")
 
                 stored = self._row_to_stored_request(
-                    conn.execute(
+                    conn.execute(  # nosemgrep  # table_name validated as identifier; values bound
                         f"SELECT * FROM {self.table_name} WHERE id = ?",
                         (request_id,),
                     ).fetchone()
@@ -792,10 +807,12 @@ class SQLiteHITLStore:
             async with self._lock:
                 conn = self._get_connection()
                 try:
+                    # table_name validated as identifier in __init__; id is bound.
                     sql = (
-                        f"UPDATE {self.table_name} "
+                        f"UPDATE {self.table_name} "  # nosemgrep
                         "SET status = 'timeout' WHERE id = ? AND status = 'pending'"
                     )
+                    # nosemgrep
                     conn.execute(sql, (request_id,))
                     conn.commit()
                 finally:
@@ -847,7 +864,7 @@ class SQLiteHITLStore:
 
         conn = self._get_connection()
         try:
-            cursor = conn.execute(
+            cursor = conn.execute(  # nosemgrep  # table_name validated as identifier; values bound
                 f"""
                 DELETE FROM {self.table_name}
                 WHERE status != 'pending'
@@ -877,7 +894,7 @@ class SQLiteHITLStore:
         conn = self._get_connection()
         try:
             if workflow_id:
-                rows = conn.execute(
+                rows = conn.execute(  # nosemgrep  # table_name validated as identifier; values bound
                     f"""
                     SELECT * FROM {self.table_name}
                     WHERE workflow_id = ?
@@ -887,7 +904,7 @@ class SQLiteHITLStore:
                     (workflow_id, limit),
                 ).fetchall()
             else:
-                rows = conn.execute(
+                rows = conn.execute(  # nosemgrep  # table_name validated as identifier; values bound
                     f"""
                     SELECT * FROM {self.table_name}
                     ORDER BY created_at DESC
@@ -2500,6 +2517,7 @@ def create_hitl_app(
     require_auth: bool = False,
     auth_token: Optional[str] = None,
     title: str = "Victor HITL API",
+    allowed_origins: Optional[List[str]] = None,
 ):
     """Create a standalone FastAPI app for HITL service.
 
@@ -2508,6 +2526,10 @@ def create_hitl_app(
         require_auth: Whether to require authentication
         auth_token: Bearer token for authentication
         title: API title
+        allowed_origins: Explicit list of CORS origins permitted to call the
+            API. Defaults to localhost dev origins. A wildcard ``"*"`` is only
+            honored when credentials are not required; combining ``"*"`` with
+            credentialed requests is insecure and disallowed by browsers.
 
     Returns:
         FastAPI application
@@ -2539,11 +2561,20 @@ def create_hitl_app(
         lifespan=lifespan,
     )
 
-    # CORS for web UI
+    # CORS for web UI. Default to localhost dev origins rather than a wildcard.
+    # The wildcard "*" combined with credentials is rejected by browsers and is
+    # a security risk, so only enable credentials for an explicit origin list.
+    origins = allowed_origins or [
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:5173",
+    ]
+    allow_credentials = "*" not in origins
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
+        allow_origins=origins,
+        allow_credentials=allow_credentials,
         allow_methods=["*"],
         allow_headers=["*"],
     )

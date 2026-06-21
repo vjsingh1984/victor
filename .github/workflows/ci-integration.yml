@@ -5,14 +5,14 @@ name: CI - Integration Tests
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main]
     paths:
       - 'victor/**'
       - 'tests/integration/**'
       - 'tests/e2e/**'
       - 'pyproject.toml'
   pull_request:
-    branches: [main, develop]
+    branches: [main]
     paths:
       - 'victor/**'
       - 'tests/integration/**'

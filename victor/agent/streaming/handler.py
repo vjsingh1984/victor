@@ -1268,7 +1268,10 @@ class StreamingChatHandler:
                 follow_up_suggestions=follow_up_suggestions,
                 was_pruned=was_pruned,
                 result=tool_output,  # Pass result for preview
-                original_result=full_tool_output if was_pruned else None,
+                # Always carry the full output so non-CLI surfaces (web) can render
+                # the real result instead of the CLI "/expand" placeholder. The Rich
+                # CLI still shows the placeholder inline and uses this only for /expand.
+                original_result=full_tool_output,
             )
         )
 

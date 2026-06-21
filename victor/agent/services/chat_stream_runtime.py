@@ -420,15 +420,34 @@ class ServiceStreamingRuntime(ChatStreamHelperMixin):
             if ctx is not None:
                 state_dict = bindings.state_dict
                 if hasattr(ctx, "cumulative_usage"):
-                    cumulative_usage = state_dict.get("_cumulative_token_usage")
-                    for key in cumulative_usage or {}:
-                        if key in ctx.cumulative_usage:
-                            cumulative_usage[key] += ctx.cumulative_usage[key]
-                    if isinstance(cumulative_usage, dict) and cumulative_usage["total_tokens"] == 0:
-                        cumulative_usage["total_tokens"] = (
-                            cumulative_usage["prompt_tokens"]
-                            + cumulative_usage["completion_tokens"]
-                        )
+                    # Fold this turn's usage into the orchestrator's session-cumulative dict —
+                    # the SAME object the metrics service snapshots for task-report token deltas
+                    # (orchestrator passes it as `cumulative_token_usage=`). The prior code
+                    # accumulated into `state_dict["_cumulative_token_usage"]`, which is absent
+                    # (None) on the service path, so the loop was a silent no-op and every task
+                    # report read total_tokens=0 despite real usage on `ctx.cumulative_usage`.
+                    cumulative_usage = getattr(self._orchestrator, "_cumulative_token_usage", None)
+                    if not isinstance(cumulative_usage, dict):
+                        cumulative_usage = state_dict.get("_cumulative_token_usage")
+                    if isinstance(cumulative_usage, dict):
+                        for key, value in ctx.cumulative_usage.items():
+                            if key in cumulative_usage:
+                                cumulative_usage[key] += value
+                        if cumulative_usage.get("total_tokens", 0) == 0:
+                            cumulative_usage["total_tokens"] = cumulative_usage.get(
+                                "prompt_tokens", 0
+                            ) + cumulative_usage.get("completion_tokens", 0)
+
+                    # Close the cost-measurement wire (C0): the service streaming runtime
+                    # never finalized stream metrics, so per-turn tokens/cost stayed 0 and the
+                    # canonical cost record (SessionCostTracker + usage.jsonl "stream_completed")
+                    # was never emitted — the *dominant* cost term went unmeasured. Finalize
+                    # once here (this finally runs once per turn; the continuation runtime owns
+                    # its own finalize on the legacy path), reusing the existing pipeline.
+                    try:
+                        self._orchestrator._finalize_stream_metrics(ctx.cumulative_usage)
+                    except Exception:
+                        logger.debug("C0 stream-metrics finalize failed", exc_info=True)
 
                     prompt_tokens = ctx.cumulative_usage.get("prompt_tokens", 0)
                     if prompt_tokens > 0:

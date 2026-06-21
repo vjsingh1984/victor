@@ -29,7 +29,9 @@ Architecture:
 
 from __future__ import annotations
 
+import asyncio
 import logging
+import time
 from dataclasses import dataclass, field, replace
 from typing import Any, AsyncIterator, Dict, List, Optional, TYPE_CHECKING
 
@@ -49,6 +51,10 @@ if TYPE_CHECKING:
     from victor.core.container import ServiceContainer
 
 logger = logging.getLogger(__name__)
+
+# Max seconds close() waits for in-flight stream() calls to drain before forcing
+# shutdown. Module-level so tests can shorten it.
+_CLOSE_DRAIN_TIMEOUT_SECONDS = 10.0
 
 
 class _StreamEvent:
@@ -162,19 +168,26 @@ def _to_stream_event(event: Any) -> _StreamEvent:
             },
         )
     if event.type == EventType.TOOL_RESULT:
-        result_payload = {
-            **getattr(event, "metadata", {}),
-            "result": getattr(event, "result", None),
-            "success": getattr(event, "success", True),
-            "arguments": getattr(event, "arguments", {}),
-        }
+        event_metadata = getattr(event, "metadata", {}) or {}
+        # The producer nests the rich payload under ``metadata["tool_result"]``
+        # (name, success, elapsed, arguments, error, follow_up_suggestions,
+        # was_pruned, result, original_result). Flatten it to the top level so every
+        # consumer — the Rich renderer and the Chainlit event mapping — reads one
+        # predictable, flat shape instead of digging through nested dicts.
+        nested = event_metadata.get("tool_result")
+        result_payload: Dict[str, Any] = {**event_metadata}
+        if isinstance(nested, dict):
+            result_payload.update(nested)
+        result_payload.setdefault("result", getattr(event, "result", None))
+        result_payload["success"] = result_payload.get("success", getattr(event, "success", True))
+        result_payload.setdefault("arguments", getattr(event, "arguments", {}) or {})
         return _StreamEvent(
             EventType.TOOL_RESULT,
             tool_name=getattr(event, "tool_name", None),
             content=getattr(event, "result", None) or getattr(event, "content", None),
-            arguments=getattr(event, "arguments", {}),
+            arguments=result_payload.get("arguments", {}),
             result=result_payload,
-            success=getattr(event, "success", True),
+            success=bool(result_payload.get("success", True)),
             metadata=result_payload,
         )
     if event.type == EventType.ERROR:
@@ -237,6 +250,13 @@ class VictorClient:
         self._agent: Optional["Agent"] = None
         self._context: Optional["RuntimeExecutionContext"] = None
         self._initialized = False
+        # Close-guard: keep close() from tearing down the agent/provider while a
+        # stream() is still iterating. Without this, a UI on_chat_end firing on a
+        # WebSocket disconnect mid-run closes the provider's httpx client and the
+        # in-flight stream fails with "Cannot send a request, as the client has been
+        # closed." close() drains active streams (bounded) before shutting down.
+        self._active_streams = 0
+        self._closing = False
 
     # ─────────────────────────────────────────────────────────────────────────
     # Lifecycle
@@ -349,6 +369,28 @@ class VictorClient:
                 return metrics
         return {}
 
+    def get_last_turn_cost(self) -> Dict[str, Any]:
+        """Return the most recent per-turn cost/latency record (the C0 TaskExecutionReport).
+
+        Surfaces the canonical per-turn record — tokens, cost, duration, request count, cache
+        hit rate — so UI surfaces can render a cost/latency footer without reaching into the
+        orchestrator directly (UI-layer mandate). Returns ``{}`` when no turn has completed or
+        the record is unavailable.
+        """
+        agent = self._agent
+        if agent is None:
+            return {}
+        orchestrator = getattr(agent, "_orchestrator", None)
+        getter = getattr(orchestrator, "get_last_task_report", None)
+        if callable(getter):
+            try:
+                report = getter()
+                if isinstance(report, dict):
+                    return report
+            except Exception:
+                logger.debug("get_last_turn_cost failed", exc_info=True)
+        return {}
+
     def _bootstrap_container(self) -> "ServiceContainer":
         """Bootstrap the DI container with core services."""
         try:
@@ -421,18 +463,25 @@ class VictorClient:
         Yields:
             StreamEvent instances (content, thinking, tool_call, etc.)
         """
-        agent = await self._ensure_initialized()
-        if hasattr(agent, "get_orchestrator"):
-            async for event in stream_message_events(
-                orchestrator=agent.get_orchestrator(),
-                execution_context=self._context,
-                user_message=message,
-            ):
-                yield _to_stream_event(event)
-            return
+        if self._closing:
+            raise RuntimeError("VictorClient is closing; cannot start a new stream")
 
-        async for event in iter_runtime_stream_events(agent, message):
-            yield _to_stream_event(event)
+        agent = await self._ensure_initialized()
+        self._active_streams += 1
+        try:
+            if hasattr(agent, "get_orchestrator"):
+                async for event in stream_message_events(
+                    orchestrator=agent.get_orchestrator(),
+                    execution_context=self._context,
+                    user_message=message,
+                ):
+                    yield _to_stream_event(event)
+                return
+
+            async for event in iter_runtime_stream_events(agent, message):
+                yield _to_stream_event(event)
+        finally:
+            self._active_streams = max(0, self._active_streams - 1)
 
     async def stream_chat(self, message: str) -> AsyncIterator[_RenderChunk]:
         """Yield renderer-compatible chunks for legacy UI streaming helpers."""
@@ -457,12 +506,24 @@ class VictorClient:
 
             if event.event_type == "tool_result":
                 result_payload = event.result if isinstance(event.result, dict) else metadata
-                metadata["tool_result"] = {
+                tool_result: Dict[str, Any] = {
                     "name": event.tool_name or "unknown",
                     "result": event.content or result_payload.get("result", ""),
                     "success": result_payload.get("success", True),
                     "arguments": result_payload.get("arguments", {}),
                 }
+                # Preserve the telemetry the Rich renderer expects rather than
+                # cherry-picking 4 keys — see StreamRenderer.on_tool_result.
+                for key in (
+                    "elapsed",
+                    "error",
+                    "follow_up_suggestions",
+                    "was_pruned",
+                    "original_result",
+                ):
+                    if key in result_payload:
+                        tool_result[key] = result_payload[key]
+                metadata["tool_result"] = tool_result
                 yield _RenderChunk(metadata=metadata)
                 continue
 
@@ -620,7 +681,25 @@ class VictorClient:
     # ─────────────────────────────────────────────────────────────────────────
 
     async def close(self) -> None:
-        """Clean up agent and container resources."""
+        """Clean up agent and container resources.
+
+        Waits (bounded) for any in-flight ``stream()`` to finish before tearing down
+        the agent/provider, so a close() racing an active stream (e.g. a UI on_chat_end
+        on a mid-run WebSocket disconnect) does not close the provider out from under it.
+        """
+        self._closing = True
+
+        if self._active_streams > 0:
+            deadline = time.monotonic() + _CLOSE_DRAIN_TIMEOUT_SECONDS
+            while self._active_streams > 0 and time.monotonic() < deadline:
+                await asyncio.sleep(0.1)
+            if self._active_streams > 0:
+                logger.warning(
+                    "VictorClient.close(): %d stream(s) still active after drain timeout; "
+                    "proceeding with shutdown",
+                    self._active_streams,
+                )
+
         if self._agent is not None:
             await self._agent.close()
             self._agent = None

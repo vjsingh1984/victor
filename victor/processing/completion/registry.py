@@ -246,8 +246,11 @@ class CompletionProviderRegistry:
             if path.name.startswith("_"):
                 continue
 
+            # Module name is derived from scanning our own providers/ directory,
+            # not from user input.
             module_name = f"victor.processing.completion.providers.{path.stem}"
             try:
+                # nosemgrep: python.lang.security.audit.non-literal-import.non-literal-import
                 module = importlib.import_module(module_name)
 
                 # Look for provider classes

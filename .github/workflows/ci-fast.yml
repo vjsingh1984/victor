@@ -349,9 +349,10 @@ jobs:
 
       - name: Check archive/victor-legacy guard
         if: github.event_name == 'pull_request'
+        env:
+          BASE_BRANCH: ${{ github.base_ref }}
         run: |
-          BASE_BRANCH="${{ github.base_ref }}"
-          ADDED_OR_MODIFIED=$(git diff --name-only --diff-filter=AM origin/${BASE_BRANCH}...HEAD | grep '^archive/victor-legacy/' || true)
+          ADDED_OR_MODIFIED=$(git diff --name-only --diff-filter=AM "origin/${BASE_BRANCH}...HEAD" | grep '^archive/victor-legacy/' || true)
           if [ -n "$ADDED_OR_MODIFIED" ]; then
             echo "❌ Additions/modifications under archive/victor-legacy/ are not allowed."
             echo "Found: $ADDED_OR_MODIFIED"
@@ -424,3 +425,51 @@ jobs:
         if: always()
         with:
           sarif_file: 'trivy-results.sarif'
+
+  quick-tests:
+    name: Quick Unit Tests (changed files)
+    runs-on: ubuntu-latest
+    # Runs ONLY the unit tests relevant to the PR's changed files (mirror mapping), so the
+    # develop gate stays proportional to the change. The full non-slow suite is ~7h
+    # single-process / ~hours even sharded, so it can't be a per-PR gate — it runs sharded at
+    # develop -> main instead (see workflows/README.md CI Gating Strategy).
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # need history to diff against the base branch
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          # victor-contracts first (provides constants), then victor-ai with dev extras
+          pip install -e ./victor-contracts
+          pip install -e ".[dev]"
+
+      - name: Run unit tests for changed files
+        # Map changed files -> mirror unit tests (scripts/ci/select_changed_tests.py). No mapped
+        # tests (docs/CI-only changes, or source with no mirror test) => nothing to run = pass.
+        # base_ref is passed via env (not inline ${{…}} in run:) to avoid shell injection from
+        # untrusted context interpolation (Semgrep run-shell-injection).
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          if [ -n "$BASE_REF" ]; then
+            git fetch origin "$BASE_REF" --quiet
+            CHANGED=$(git diff --name-only "origin/$BASE_REF...HEAD")
+          else
+            CHANGED=$(git diff --name-only HEAD~1 HEAD)
+          fi
+          echo "Changed files:"; echo "$CHANGED" | sed 's/^/  /'
+          mapfile -t TARGETS < <(python scripts/ci/select_changed_tests.py $CHANGED)
+          if [ ${#TARGETS[@]} -eq 0 ]; then
+            echo "No mapped unit tests for the changed files — nothing to run (full suite runs at develop->main)."
+            exit 0
+          fi
+          echo "Running ${#TARGETS[@]} changed-file test target(s):"; printf '  %s\n' "${TARGETS[@]}"
+          pytest "${TARGETS[@]}" -m "not slow" --tb=short -q

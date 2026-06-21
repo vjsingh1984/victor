@@ -32,6 +32,13 @@ services:
     container_name: victor-mcp-server
     stdin_open: true
     tty: true
+    # Hardening: drop privilege escalation and make the root FS read-only.
+    # Writes go to the mounted volumes below and the tmpfs scratch space.
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
     volumes:
       # Mount workspace for file operations
       - ${VICTOR_WORKSPACE:-../../}:/workspace:rw
@@ -62,6 +69,11 @@ services:
     container_name: victor-mcp-coding
     stdin_open: true
     tty: true
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
     profiles:
       - coding
     volumes:
@@ -84,6 +96,11 @@ services:
     container_name: victor-mcp-safe
     stdin_open: true
     tty: true
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
     profiles:
       - safe
     volumes:
@@ -109,13 +126,20 @@ services:
     container_name: victor-mcp-devops
     stdin_open: true
     tty: true
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
     profiles:
       - devops
     volumes:
       - ${VICTOR_WORKSPACE:-../../}:/workspace:rw
       - victor-config:/home/victor/.victor
-      # Mount Docker socket for Docker tools
-      - /var/run/docker.sock:/var/run/docker.sock
+      # Mount Docker socket read-only for Docker tools. NOTE: even read-only,
+      # access to the Docker socket is equivalent to host root; only enable
+      # this profile in trusted environments.
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
       - VICTOR_MCP_VERTICALS=devops
       - VICTOR_MCP_LOG_LEVEL=${VICTOR_MCP_LOG_LEVEL:-WARNING}
@@ -133,12 +157,19 @@ services:
     container_name: victor-mcp-full
     stdin_open: true
     tty: true
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
     profiles:
       - full
     volumes:
       - ${VICTOR_WORKSPACE:-../../}:/workspace:rw
       - victor-config:/home/victor/.victor
-      - /var/run/docker.sock:/var/run/docker.sock
+      # Mount Docker socket read-only. NOTE: even read-only, access to the
+      # Docker socket is equivalent to host root; only enable in trusted envs.
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
       - VICTOR_MCP_LOG_LEVEL=${VICTOR_MCP_LOG_LEVEL:-INFO}
     restart: unless-stopped

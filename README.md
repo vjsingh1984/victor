@@ -158,8 +158,6 @@ make check-repo-hygiene
 Subprojects are scoped:
 
 ```bash
-npm --prefix ui run build
-npm --prefix web/ui run build
 npm --prefix vscode-victor run compile
 cd rust && cargo test
 ```
