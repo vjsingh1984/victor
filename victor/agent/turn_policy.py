@@ -32,10 +32,13 @@ import logging
 import re
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Tuple
 
 from victor.core.loop_thresholds import DEFAULT_BLOCKED_CONSECUTIVE_THRESHOLD
 from victor.tools.tool_names import get_canonical_name
+
+if TYPE_CHECKING:
+    from victor.framework.search_novelty import SearchNoveltyTracker
 
 logger = logging.getLogger(__name__)
 
@@ -667,6 +670,7 @@ class TurnObservation:
     max_iterations: int = 1
     intent_is_write: bool = False
     intent: Optional[Any] = None
+    tool_results: Optional[List[Dict[str, Any]]] = None
 
 
 @dataclass(frozen=True)
@@ -712,25 +716,47 @@ class TurnEvaluationController:
         nudge_policy: Optional[NudgePolicy] = None,
         content_repetition: Optional[ContentRepetitionDetector] = None,
         plateau: Optional[PlateauDetector] = None,
+        search_novelty: Optional["SearchNoveltyTracker"] = None,
         *,
         enable_budget_warning: bool = True,
         enable_plateau_nudge: bool = True,
+        enable_search_novelty: bool = True,
+        min_iterations_before_force_complete: int = 2,
+        enable_fulfillment_complete: bool = True,
+        fulfillment_summary_min_chars: int = 800,
+        fulfillment_min_findings: int = 3,
+        min_iterations_before_fulfillment: int = 4,
     ) -> None:
+        from victor.framework.search_novelty import SearchNoveltyTracker
+
         self.spin_detector = spin_detector or SpinDetector()
         self.nudge_policy = nudge_policy or NudgePolicy()
         self.content_repetition = content_repetition or ContentRepetitionDetector()
         self.plateau = plateau or PlateauDetector()
+        self.search_novelty = search_novelty or SearchNoveltyTracker()
         # Per-loop preservation of genuine current differences: the headless loop owns plateau
         # via its own adaptive-termination (FAIL/extend) and emits budget warnings; the streaming
         # loop nudges on plateau and never warned on budget. Flags keep each exact until a
         # deliberate convergence pass.
         self._enable_budget_warning = enable_budget_warning
         self._enable_plateau_nudge = enable_plateau_nudge
+        self._enable_search_novelty = enable_search_novelty
+        self._min_iterations_before_force_complete = min_iterations_before_force_complete
+        # Fulfillment-complete: stop the redundant turns once a substantial answer exists AND
+        # enough findings were gathered AND the latest search is no longer adding much. The
+        # large summary threshold + findings floor + low-novelty gate keep it conservative.
+        self._enable_fulfillment_complete = enable_fulfillment_complete
+        self._fulfillment_summary_min_chars = fulfillment_summary_min_chars
+        self._fulfillment_min_findings = fulfillment_min_findings
+        self._min_iterations_before_fulfillment = min_iterations_before_fulfillment
+        self._best_content_len = 0
 
     def reset(self) -> None:
         self.spin_detector.reset()
         self.content_repetition.reset()
         self.plateau.reset()
+        self.search_novelty.reset()
+        self._best_content_len = 0
 
     def evaluate(self, observation: TurnObservation, *, record_spin: bool = True) -> TurnDecision:
         """Run the shared per-turn guards and return a single decision.
@@ -766,11 +792,67 @@ class TurnEvaluationController:
                 metadata={"repetition_action": action},
             )
 
+        # 2.5 Search novelty — diminishing returns on successive searches. After persistent
+        # saturation, force-complete so the agent SYNTHESIZES the gathered context (a clean
+        # finish, not a failure) instead of thrashing distinct queries to the iteration cap.
+        novelty = self.search_novelty.record_turn(observation.tool_results)
+        _editing = bool(
+            {get_canonical_name(t) for t in (observation.tool_names or set())}
+            & {"edit", "write", "create_file", "replace_in_file"}
+        )
+        if (
+            self._enable_search_novelty
+            and novelty.should_force_complete
+            and not _editing  # never cut short a turn that is actively making edits
+            and observation.iteration >= self._min_iterations_before_force_complete
+        ):
+            logger.info(
+                "[search-novelty] %d consecutive low-novelty searches (ratio=%.2f) — "
+                "force-completing to synthesize.",
+                novelty.consecutive_low_novelty,
+                novelty.novelty_ratio,
+            )
+            return TurnDecision(
+                stop=True,
+                terminal_success=True,
+                stop_reason="search_saturated",
+                stop_message="\n\n[Enough context gathered — synthesizing the answer.]",
+                metadata={"novelty_ratio": novelty.novelty_ratio},
+            )
+
+        # 2.6 Fulfillment-complete — stop redundant turns once a SUBSTANTIAL answer has been
+        # produced AND enough findings gathered AND the latest search is no longer adding much.
+        # Fires earlier than pure saturation (1 low-novelty turn vs N) but only when a real
+        # answer already exists, so it trims over-verification without cutting analysis short.
+        self._best_content_len = max(self._best_content_len, len(observation.content or ""))
+        if (
+            self._enable_fulfillment_complete
+            and not _editing
+            and self._best_content_len >= self._fulfillment_summary_min_chars
+            and novelty.total_distinct_hits >= self._fulfillment_min_findings
+            and novelty.had_search
+            and novelty.consecutive_low_novelty >= 1
+            and observation.iteration >= self._min_iterations_before_fulfillment
+        ):
+            logger.info(
+                "[fulfillment] answer produced (%d chars) + %d findings + low-novelty search "
+                "— finalizing.",
+                self._best_content_len,
+                novelty.total_distinct_hits,
+            )
+            return TurnDecision(
+                stop=True,
+                terminal_success=True,
+                stop_reason="fulfilled",
+                stop_message="\n\n[Sufficient findings and an answer produced — finalizing.]",
+                metadata={"findings": novelty.total_distinct_hits},
+            )
+
         # 3. Plateau (productivity-weighted) — may warrant a nudge (when enabled for this loop).
         plateau = self.plateau.record(observation.productive_count, len(observation.content or ""))
         plateau_should_nudge = plateau.should_nudge and self._enable_plateau_nudge
 
-        # 4. Nudge selection: spin nudge first, then plateau nudge, then budget warning.
+        # 4. Nudge selection: spin > synthesize (search saturation) > plateau > budget warning.
         nudge_message: Optional[str] = None
         nudge_role = "system"
         nudge_kind: Optional[str] = None
@@ -784,6 +866,11 @@ class TurnEvaluationController:
         if spin_nudge.should_inject:
             nudge_message, nudge_role = spin_nudge.message, spin_nudge.role
             nudge_kind = spin_nudge.nudge_type.value
+        elif self._enable_search_novelty and novelty.should_nudge:
+            from victor.framework.search_novelty import synthesize_nudge_message
+
+            nudge_message = synthesize_nudge_message()
+            nudge_kind = "synthesize"
         elif plateau_should_nudge:
             nudge_message = self._plateau_message(observation.intent_is_write)
             nudge_kind = "plateau"
@@ -804,13 +891,17 @@ class TurnEvaluationController:
 
     @staticmethod
     def _plateau_message(intent_is_write: bool) -> str:
-        if intent_is_write:
-            return (
-                "Progress stalled. You have enough context — stop reading and apply the change "
-                'now with edit(ops=[{"type": "replace", "path": "file", "old_str": "exact text", '
-                '"new_str": "replacement"}]).'
-            )
+        return plateau_nudge_message(intent_is_write)
+
+
+def plateau_nudge_message(intent_is_write: bool) -> str:
+    """The shared plateau nudge text (write-intent aware) used by both loops."""
+    if intent_is_write:
         return (
-            "Progress seems stalled. Try a different approach or summarize what you've found "
-            "so far."
+            "Progress stalled. You have enough context — stop reading and apply the change "
+            'now with edit(ops=[{"type": "replace", "path": "file", "old_str": "exact text", '
+            '"new_str": "replacement"}]).'
         )
+    return (
+        "Progress seems stalled. Try a different approach or summarize what you've found " "so far."
+    )

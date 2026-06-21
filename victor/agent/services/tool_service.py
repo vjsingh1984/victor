@@ -100,6 +100,38 @@ def normalize_tool_result_arguments(arguments: Any) -> Dict[str, Any]:
     return {}
 
 
+def _extract_result_items(output: Any, limit: int = 50) -> Optional[List[Dict[str, Any]]]:
+    """Compact structured hits from a search-tool output for novelty/fulfillment accounting.
+
+    Returns a small ``[{path, qualified_name, score}]`` list when ``output`` is a dict with a
+    ``results`` list (the code_search/grep shape); otherwise ``None``. The formatted result
+    strings carry no structured hits, so this is the only place they can be captured. Bounded
+    to ``limit`` items to keep the per-turn payload small.
+    """
+    if not isinstance(output, dict):
+        return None
+    results = output.get("results")
+    if not isinstance(results, list) or not results:
+        return None
+    items: List[Dict[str, Any]] = []
+    for entry in results[:limit]:
+        if not isinstance(entry, dict):
+            continue
+        path = entry.get("path") or entry.get("file_path")
+        if not path:
+            continue
+        items.append(
+            {
+                "path": str(path),
+                "qualified_name": str(
+                    entry.get("qualified_name") or entry.get("symbol_type") or ""
+                ),
+                "score": entry.get("score") or entry.get("combined_score"),
+            }
+        )
+    return items or None
+
+
 def _extract_tool_diagnostics(output: Any) -> List[str]:
     """Extract concise model-visible diagnostics from structured tool metadata."""
     if not isinstance(output, dict):
@@ -424,6 +456,10 @@ def process_tool_results_with_context(
                         "args": normalized_args,
                         "result": preview_output,
                         "full_result": full_output,
+                        # Compact structured hits (path/symbol) for downstream novelty +
+                        # fulfillment accounting — the formatted result/full_result are strings,
+                        # so the raw search hits are only recoverable here from `output`.
+                        "result_items": _extract_result_items(output),
                         "follow_up_suggestions": follow_up_suggestions,
                         "tool_diagnostics": tool_diagnostics,
                         "was_pruned": was_pruned,

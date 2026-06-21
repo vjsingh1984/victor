@@ -145,7 +145,6 @@ class StreamingChatExecutor:
         self._perception = perception
         self._fulfillment = fulfillment
         self._confidence_monitor = confidence_monitor
-        self._progress_scores: List[float] = []
         self._last_tool_context: Optional[str] = None
         self._last_tools: Optional[Any] = None
         self._visible_output_deduplicator = OutputDeduplicator(min_block_length=40)
@@ -966,10 +965,12 @@ class StreamingChatExecutor:
 
         from victor.agent.turn_policy import (
             NudgePolicy,
+            PlateauDetector,
             SpinDetector,
             SpinState,
             TurnEvaluationController,
             TurnObservation,
+            plateau_nudge_message,
         )
 
         _spin = SpinDetector()
@@ -981,7 +982,16 @@ class StreamingChatExecutor:
             nudge_policy=_nudge_policy,
             enable_plateau_nudge=False,
             enable_budget_warning=False,
+            # Novelty is fed below (after tools), not at the content-rep call, so disable it on
+            # the controller and run a dedicated tracker at the post-tool point.
+            enable_search_novelty=False,
         )
+        # Shared productivity-weighted plateau detector (replaces this loop's inline formula).
+        _plateau = PlateauDetector()
+        # Shared search-novelty safety-net (diminishing-returns on re-search loops).
+        from victor.framework.search_novelty import SearchNoveltyTracker, synthesize_nudge_message
+
+        _novelty = SearchNoveltyTracker()
 
         _perception = None
         conversation_history = self._get_conversation_history(runtime_owner, orch, user_message)
@@ -1045,7 +1055,6 @@ class StreamingChatExecutor:
             except Exception as exc:
                 logger.debug("Perception phase skipped: %s", exc)
 
-        self._progress_scores.clear()
         _prev_iteration_had_content = False
 
         _turn_eval.reset()  # resets spin_detector + shared content-repetition detector
@@ -1835,61 +1844,74 @@ class StreamingChatExecutor:
                     except Exception as exc:
                         logger.debug("Streaming fulfillment check skipped: %s", exc)
 
-                # Credit *productive* tool calls toward progress, not raw count: a turn
-                # full of failed/blocked/empty tool calls is not progress and must not mask
-                # a plateau (the observed loop ran 2 tool calls/turn that returned nothing).
+                # Plateau detection via the shared PlateauDetector (same productivity-weighted
+                # formula and "nudge only when unproductive" rule the headless loop uses).
                 productive_count = _count_productive_tools(tool_exec_result)
                 content_len = len(full_content) if full_content else 0
-                progress = min(1.0, (productive_count * 0.3 + min(content_len / 2000, 0.7)))
-                self._progress_scores.append(progress)
+                _plateau_res = _plateau.record(productive_count, content_len)
+                if _plateau_res.is_plateau and not _plateau_res.should_nudge:
+                    logger.info(
+                        "Skipping plateau nudge: agent made %d productive tool call(s) "
+                        "this iteration",
+                        productive_count,
+                    )
+                elif _plateau_res.should_nudge:
+                    logger.info(
+                        "Streaming progress plateau detected (scores=%s), injecting nudge",
+                        [f"{score:.2f}" for score in _plateau_res.recent_scores],
+                    )
+                    _plateau_intent = getattr(orch, "_current_intent", None)
+                    _is_write = (
+                        _plateau_intent is not None
+                        and getattr(_plateau_intent, "value", None) == "write_allowed"
+                    )
+                    from victor.agent.conversation.types import (
+                        MESSAGE_SOURCE_METADATA_KEY,
+                        MessageSource,
+                    )
 
-                if len(self._progress_scores) >= 3:
-                    recent = self._progress_scores[-3:]
-                    if max(recent) - min(recent) < 0.05 and recent[-1] < 0.8:
-                        # Don't nudge if the agent is making *productive* tool calls — the
-                        # progress score may flatten during real work (read → search → edit).
-                        # But unproductive turns (all tools failed/blocked) still get nudged.
-                        if productive_count > 0:
-                            logger.info(
-                                "Skipping plateau nudge: agent made %d productive tool call(s) "
-                                "this iteration",
-                                productive_count,
-                            )
-                        else:
-                            logger.info(
-                                "Streaming progress plateau detected (scores=%s), injecting nudge",
-                                [f"{score:.2f}" for score in recent],
-                            )
-                            _plateau_intent = getattr(orch, "_current_intent", None)
-                            _is_write = (
-                                _plateau_intent is not None
-                                and hasattr(_plateau_intent, "value")
-                                and _plateau_intent.value == "write_allowed"
-                            )
-                            if _is_write:
-                                _plateau_msg = (
-                                    "Progress stalled. You have enough context — stop reading "
-                                    'and apply the change now with edit(ops=[{"type": "replace", '
-                                    '"path": "file", "old_str": "exact text", '
-                                    '"new_str": "replacement"}]).'
-                                )
-                            else:
-                                _plateau_msg = (
-                                    "Progress seems stalled. Try a different approach or "
-                                    "summarize what you've found so far."
-                                )
-                            from victor.agent.conversation.types import (
-                                MESSAGE_SOURCE_METADATA_KEY,
-                                MessageSource,
-                            )
+                    orch.add_message(
+                        "system",
+                        plateau_nudge_message(_is_write),
+                        metadata={MESSAGE_SOURCE_METADATA_KEY: MessageSource.SYSTEM_INJECTED.value},
+                    )
 
-                            orch.add_message(
-                                "system",
-                                _plateau_msg,
-                                metadata={
-                                    MESSAGE_SOURCE_METADATA_KEY: MessageSource.SYSTEM_INJECTED.value
-                                },
-                            )
+                # Search-novelty safety-net: if successive searches stop surfacing new files,
+                # synthesize instead of thrashing. Skip when actively editing (real work).
+                from victor.tools.tool_names import get_canonical_name
+
+                _nov_results = getattr(tool_exec_result, "tool_results", None) or []
+                _nov = _novelty.record_turn(_nov_results)
+                _editing = any(
+                    get_canonical_name(r.get("tool_name") or r.get("name") or "")
+                    in {"edit", "write", "create_file", "replace_in_file"}
+                    for r in _nov_results
+                    if isinstance(r, dict)
+                )
+                _iter_no = getattr(stream_ctx, "total_iterations", 0)
+                if _nov.should_force_complete and not _editing and _iter_no >= 2:
+                    logger.info(
+                        "[search-novelty] %d consecutive low-novelty searches — synthesizing.",
+                        _nov.consecutive_low_novelty,
+                    )
+                    stream_ctx.force_completion = True
+                    stream_ctx.skip_continuation = True
+                    yield orch._chunk_generator.generate_content_chunk(
+                        "\n\n[Enough context gathered — synthesizing the answer.]",
+                        is_final=True,
+                    )
+                    return
+                if _nov.should_nudge:
+                    from victor.agent.conversation.types import (
+                        MESSAGE_SOURCE_METADATA_KEY,
+                        MessageSource,
+                    )
+
+                    orch.add_message(
+                        "system",
+                        synthesize_nudge_message(),
+                        metadata={MESSAGE_SOURCE_METADATA_KEY: MessageSource.SYSTEM_INJECTED.value},
+                    )
 
 
 def create_streaming_chat_executor(

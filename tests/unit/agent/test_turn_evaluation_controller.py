@@ -164,6 +164,123 @@ def test_controller_clean_turn_continues():
     assert decision.nudge_message is None
 
 
+def _saturating_search_obs(iteration):
+    same_hits = [{"path": f"a{i}.py", "qualified_name": f"f{i}"} for i in range(5)]
+    return TurnObservation(
+        content=f"searching, iteration {iteration}",
+        has_tool_calls=True,
+        tool_count=1,
+        tool_results=[{"tool_name": "code_search", "success": True, "result_items": same_hits}],
+        iteration=iteration,
+        max_iterations=12,
+    )
+
+
+def test_controller_force_completes_on_search_saturation():
+    c = TurnEvaluationController(enable_budget_warning=False)
+    decision = None
+    for i in range(1, 7):
+        decision = c.evaluate(_saturating_search_obs(i))
+    assert decision.stop is True
+    assert decision.terminal_success is True  # synthesize, not fail
+    assert decision.stop_reason == "search_saturated"
+
+
+def test_controller_nudges_to_synthesize_before_force_complete():
+    c = TurnEvaluationController(enable_budget_warning=False)
+    decisions = [c.evaluate(_saturating_search_obs(i)) for i in range(1, 5)]
+    # A synthesize nudge appears before the force-complete.
+    assert any(d.nudge_kind == "synthesize" for d in decisions if not d.stop)
+
+
+def test_controller_distinct_searches_do_not_force_complete():
+    c = TurnEvaluationController(enable_budget_warning=False)
+    forced = False
+    for i in range(1, 12):
+        fresh = [{"path": f"f{i}_{j}.py", "qualified_name": f"s{i}_{j}"} for j in range(4)]
+        d = c.evaluate(
+            TurnObservation(
+                content=f"distinct search {i}",
+                has_tool_calls=True,
+                tool_count=1,
+                tool_results=[{"tool_name": "code_search", "success": True, "result_items": fresh}],
+                iteration=i,
+                max_iterations=12,
+            )
+        )
+        forced = forced or (d.stop and d.stop_reason == "search_saturated")
+    assert not forced
+
+
+def _obs(files, content, iteration, editing=False):
+    names = {"code_search"} | ({"edit"} if editing else set())
+    results = [
+        {
+            "tool_name": "code_search",
+            "success": True,
+            "result_items": [{"path": p, "qualified_name": ""} for p in files],
+        }
+    ]
+    if editing:
+        results.append({"tool_name": "edit", "success": True})
+    return TurnObservation(
+        content=content,
+        has_tool_calls=True,
+        tool_count=1,
+        tool_names=names,
+        tool_results=results,
+        iteration=iteration,
+        max_iterations=20,
+    )
+
+
+_LONG_ANSWER = "The architecture is as follows. " * 40  # ~> 800 chars
+
+
+# Two SUBSTANTIAL but lexically distinct answers (avoid tripping content-repetition,
+# which compares consecutive turns, before reaching the fulfillment check).
+_ANSWER_A = "The orchestrator coordinates services, tools, workflows, and shared state. " * 12
+_ANSWER_B = "Initialization runs nine phases wiring chat recovery session perception fulfillment. " * 12
+
+
+def _run_fulfillment_scenario(answer, editing=False):
+    c = TurnEvaluationController(enable_budget_warning=False)
+    decisions = []
+    decisions.append(c.evaluate(_obs(["a.py", "b.py", "c.py"], "short", 1)))  # warm-up
+    decisions.append(c.evaluate(_obs(["d.py", "e.py", "f.py"], "short", 2)))  # warm-up
+    a3 = answer if answer == "still just a short note" else _ANSWER_A
+    a4 = answer if answer == "still just a short note" else _ANSWER_B
+    decisions.append(c.evaluate(_obs(["a.py", "b.py", "c.py"], a3, 3, editing)))  # low-novelty
+    decisions.append(c.evaluate(_obs(["a.py", "b.py", "c.py"], a4, 4, editing)))  # iteration >= 4
+    return decisions
+
+
+def test_fulfillment_completes_when_answer_and_findings():
+    decisions = _run_fulfillment_scenario(_LONG_ANSWER)
+    assert decisions[-1].stop is True
+    assert decisions[-1].terminal_success is True
+    assert decisions[-1].stop_reason == "fulfilled"
+
+
+def test_fulfillment_does_not_fire_without_substantial_answer():
+    decisions = _run_fulfillment_scenario("still just a short note")
+    assert not any(d.stop and d.stop_reason == "fulfilled" for d in decisions)
+
+
+def test_fulfillment_does_not_fire_while_editing():
+    decisions = _run_fulfillment_scenario(_LONG_ANSWER, editing=True)
+    assert not any(d.stop and d.stop_reason == "fulfilled" for d in decisions)
+
+
+def test_fulfillment_respects_min_iterations():
+    # Substantial answer + findings + low novelty, but all at early iterations (< 4) -> no fire.
+    c = TurnEvaluationController(enable_budget_warning=False)
+    c.evaluate(_obs(["a.py", "b.py", "c.py"], "short", 1))
+    c.evaluate(_obs(["d.py", "e.py", "f.py"], "short", 2))
+    d3 = c.evaluate(_obs(["a.py", "b.py", "c.py"], _LONG_ANSWER, 3))  # iteration 3 < 4
+    assert not (d3.stop and d3.stop_reason == "fulfilled")
+
+
 def test_controller_reset_clears_state():
     c = TurnEvaluationController()
     same = "Repeating the same narration sentence over and over and over again now."
