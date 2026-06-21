@@ -901,38 +901,15 @@ class StreamingChatExecutor:
                 },
             )
 
-    async def run(self, user_message: str, **kwargs: Any) -> AsyncIterator[StreamChunk]:
-        """Run the streaming executor for the provided message."""
-        runtime_owner = self._runtime_owner
-        orch = runtime_owner._orchestrator
-        recovery = getattr(orch, "_recovery_service", None) or orch._recovery_coordinator
-        create_recovery_context = orch.create_recovery_context
+    @staticmethod
+    def _apply_run_guidance(
+        orch: Any, stream_ctx: Any, user_message: str, max_exploration_iterations: int
+    ) -> None:
+        """Apply intent guard + task-type guidance + action-task guidance for one run.
 
-        # Governance REQUEST phase: gate/redact the user message before any state
-        # is set up or the LLM is called. A block short-circuits the stream with
-        # a single refusal chunk; a redaction substitutes the message text used
-        # downstream (and stored in history).
-        _gate = getattr(orch, "_message_policy_gate", None)
-        if _gate is not None:
-            _req = await _gate.gate_request(user_message)
-            if not _req.allowed:
-                yield orch._chunk_generator.generate_content_chunk(
-                    _req.reason or "Your message was blocked by policy.",
-                    is_final=True,
-                )
-                return
-            user_message = _req.content
-
-        self._reset_streaming_turn_state(orch)
-
-        stream_ctx = await runtime_owner._create_stream_context(user_message, **kwargs)
-        orch._current_stream_context = stream_ctx
-
-        await self._extract_task_requirements(orch, user_message)
-
-        max_total_iterations = stream_ctx.max_total_iterations
-        max_exploration_iterations = stream_ctx.max_exploration_iterations
-
+        A cohesive piece of run()'s preamble (FEP-0007 Phase 2 decomposition). Mutates orch
+        (guards + guidance messages); yields nothing.
+        """
         orch._apply_intent_guard(user_message)
 
         if stream_ctx.is_analysis_task and stream_ctx.unified_task_type.value in (
@@ -995,6 +972,40 @@ class StreamingChatExecutor:
                     "Only explore if absolutely necessary to complete the task.]",
                     metadata=_guidance_meta,
                 )
+
+    async def run(self, user_message: str, **kwargs: Any) -> AsyncIterator[StreamChunk]:
+        """Run the streaming executor for the provided message."""
+        runtime_owner = self._runtime_owner
+        orch = runtime_owner._orchestrator
+        recovery = getattr(orch, "_recovery_service", None) or orch._recovery_coordinator
+        create_recovery_context = orch.create_recovery_context
+
+        # Governance REQUEST phase: gate/redact the user message before any state
+        # is set up or the LLM is called. A block short-circuits the stream with
+        # a single refusal chunk; a redaction substitutes the message text used
+        # downstream (and stored in history).
+        _gate = getattr(orch, "_message_policy_gate", None)
+        if _gate is not None:
+            _req = await _gate.gate_request(user_message)
+            if not _req.allowed:
+                yield orch._chunk_generator.generate_content_chunk(
+                    _req.reason or "Your message was blocked by policy.",
+                    is_final=True,
+                )
+                return
+            user_message = _req.content
+
+        self._reset_streaming_turn_state(orch)
+
+        stream_ctx = await runtime_owner._create_stream_context(user_message, **kwargs)
+        orch._current_stream_context = stream_ctx
+
+        await self._extract_task_requirements(orch, user_message)
+
+        max_total_iterations = stream_ctx.max_total_iterations
+        max_exploration_iterations = stream_ctx.max_exploration_iterations
+
+        self._apply_run_guidance(orch, stream_ctx, user_message, max_exploration_iterations)
 
         goals = orch._tool_planner.infer_goals_from_message(user_message)
         if hasattr(stream_ctx, "set_task_intent"):

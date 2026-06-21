@@ -75,3 +75,45 @@ async def test_extract_task_requirements_sets_orch_state():
     assert isinstance(orch._required_outputs, list)
     assert orch._read_files_session == set()  # cleared
     assert orch._all_files_read_nudge_sent is False
+
+
+def _guidance_orch(messages):
+    return SimpleNamespace(
+        _apply_intent_guard=lambda msg: messages.setdefault("intent", []).append(msg),
+        _apply_task_guidance=lambda *a: messages.setdefault("task_guidance", []).append(a),
+        add_message=lambda role, content, metadata=None: messages.setdefault("msg", []).append(
+            content
+        ),
+    )
+
+
+def test_apply_run_guidance_action_task_injects_guidance():
+    messages = {}
+    stream_ctx = SimpleNamespace(
+        is_analysis_task=False,
+        unified_task_type=SimpleNamespace(value="create"),
+        coarse_task_type="action",
+        is_action_task=True,
+        needs_execution=True,
+    )
+    StreamingChatExecutor._apply_run_guidance(
+        _guidance_orch(messages), stream_ctx, "build a script", 12
+    )
+    assert messages["intent"] == ["build a script"]
+    assert len(messages["task_guidance"]) == 1
+    assert any("ACTION-GUIDANCE" in c for c in messages.get("msg", []))
+
+
+def test_apply_run_guidance_non_action_skips_message():
+    messages = {}
+    stream_ctx = SimpleNamespace(
+        is_analysis_task=True,
+        unified_task_type=SimpleNamespace(value="analyze"),
+        coarse_task_type="analysis",
+        is_action_task=False,
+        needs_execution=False,
+    )
+    StreamingChatExecutor._apply_run_guidance(
+        _guidance_orch(messages), stream_ctx, "explain the code", 50
+    )
+    assert messages.get("msg", []) == []  # no action-guidance for non-action tasks
