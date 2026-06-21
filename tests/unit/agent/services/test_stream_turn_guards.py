@@ -62,3 +62,16 @@ def test_create_stream_turn_guards_applies_novelty_thresholds():
     guards = StreamingChatExecutor._create_stream_turn_guards(orch)
     assert guards.novelty._config.consecutive_low_novelty_limit == 2
     assert guards.novelty._config.min_search_turns == 1
+
+
+async def test_extract_task_requirements_sets_orch_state():
+    # A plain prompt yields no required files/outputs -> no event emit, no bus needed.
+    orch = SimpleNamespace(
+        _read_files_session={"stale.py"},
+        _all_files_read_nudge_sent=True,
+    )
+    await StreamingChatExecutor._extract_task_requirements(orch, "hello there")
+    assert isinstance(orch._required_files, list)
+    assert isinstance(orch._required_outputs, list)
+    assert orch._read_files_session == set()  # cleared
+    assert orch._all_files_read_nudge_sent is False

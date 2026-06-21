@@ -870,6 +870,37 @@ class StreamingChatExecutor:
 
         return orch._chunk_generator.generate_content_chunk(final_output, is_final=True)
 
+    @staticmethod
+    async def _extract_task_requirements(orch: Any, user_message: str) -> None:
+        """Extract required files/outputs from the prompt onto orch + emit a state event.
+
+        A cohesive piece of run()'s preamble (FEP-0007 Phase 2 decomposition). Mutates orch
+        run-state; yields nothing.
+        """
+        orch._required_files = _extract_required_files_from_prompt(user_message)
+        orch._required_outputs = _extract_required_outputs_from_prompt(user_message)
+        orch._read_files_session.clear()
+        orch._all_files_read_nudge_sent = False
+        logger.debug(
+            "Task requirements extracted - files: %s, outputs: %s",
+            orch._required_files,
+            orch._required_outputs,
+        )
+        if orch._required_files or orch._required_outputs:
+            from victor.core.events import get_observability_bus
+
+            event_bus = get_observability_bus()
+            await event_bus.emit(
+                topic="state.task.requirements_extracted",
+                data={
+                    "required_files": orch._required_files,
+                    "required_outputs": orch._required_outputs,
+                    "file_count": len(orch._required_files),
+                    "output_count": len(orch._required_outputs),
+                    "category": "state",
+                },
+            )
+
     async def run(self, user_message: str, **kwargs: Any) -> AsyncIterator[StreamChunk]:
         """Run the streaming executor for the provided message."""
         runtime_owner = self._runtime_owner
@@ -897,30 +928,7 @@ class StreamingChatExecutor:
         stream_ctx = await runtime_owner._create_stream_context(user_message, **kwargs)
         orch._current_stream_context = stream_ctx
 
-        orch._required_files = _extract_required_files_from_prompt(user_message)
-        orch._required_outputs = _extract_required_outputs_from_prompt(user_message)
-        orch._read_files_session.clear()
-        orch._all_files_read_nudge_sent = False
-        logger.debug(
-            "Task requirements extracted - files: %s, outputs: %s",
-            orch._required_files,
-            orch._required_outputs,
-        )
-
-        if orch._required_files or orch._required_outputs:
-            from victor.core.events import get_observability_bus
-
-            event_bus = get_observability_bus()
-            await event_bus.emit(
-                topic="state.task.requirements_extracted",
-                data={
-                    "required_files": orch._required_files,
-                    "required_outputs": orch._required_outputs,
-                    "file_count": len(orch._required_files),
-                    "output_count": len(orch._required_outputs),
-                    "category": "state",
-                },
-            )
+        await self._extract_task_requirements(orch, user_message)
 
         max_total_iterations = stream_ctx.max_total_iterations
         max_exploration_iterations = stream_ctx.max_exploration_iterations
