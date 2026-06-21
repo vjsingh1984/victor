@@ -714,28 +714,40 @@ class TurnEvaluationController:
         plateau: Optional[PlateauDetector] = None,
         *,
         enable_budget_warning: bool = True,
+        enable_plateau_nudge: bool = True,
     ) -> None:
         self.spin_detector = spin_detector or SpinDetector()
         self.nudge_policy = nudge_policy or NudgePolicy()
         self.content_repetition = content_repetition or ContentRepetitionDetector()
         self.plateau = plateau or PlateauDetector()
+        # Per-loop preservation of genuine current differences: the headless loop owns plateau
+        # via its own adaptive-termination (FAIL/extend) and emits budget warnings; the streaming
+        # loop nudges on plateau and never warned on budget. Flags keep each exact until a
+        # deliberate convergence pass.
         self._enable_budget_warning = enable_budget_warning
+        self._enable_plateau_nudge = enable_plateau_nudge
 
     def reset(self) -> None:
         self.spin_detector.reset()
         self.content_repetition.reset()
         self.plateau.reset()
 
-    def evaluate(self, observation: TurnObservation) -> TurnDecision:
-        """Run the shared per-turn guards and return a single decision."""
+    def evaluate(self, observation: TurnObservation, *, record_spin: bool = True) -> TurnDecision:
+        """Run the shared per-turn guards and return a single decision.
+
+        ``record_spin`` lets a caller that already feeds its own ``SpinDetector`` (both loops do
+        today) skip the re-recording and have the controller read the current spin state — so
+        wiring the controller in doesn't double-count turns.
+        """
         # 1. Spin detection (shared component; already fed by both loops today).
-        self.spin_detector.record_turn(
-            has_tool_calls=observation.has_tool_calls,
-            all_blocked=observation.all_blocked,
-            tool_names=observation.tool_names,
-            tool_count=observation.tool_count,
-            tool_signatures=observation.tool_signatures,
-        )
+        if record_spin:
+            self.spin_detector.record_turn(
+                has_tool_calls=observation.has_tool_calls,
+                all_blocked=observation.all_blocked,
+                tool_names=observation.tool_names,
+                tool_count=observation.tool_count,
+                tool_signatures=observation.tool_signatures,
+            )
 
         # 2. Content repetition — a hard stop (degraded) when the agent repeats itself.
         action = self.content_repetition.record(observation.content)
@@ -754,8 +766,9 @@ class TurnEvaluationController:
                 metadata={"repetition_action": action},
             )
 
-        # 3. Plateau (productivity-weighted) — may warrant a nudge.
+        # 3. Plateau (productivity-weighted) — may warrant a nudge (when enabled for this loop).
         plateau = self.plateau.record(observation.productive_count, len(observation.content or ""))
+        plateau_should_nudge = plateau.should_nudge and self._enable_plateau_nudge
 
         # 4. Nudge selection: spin nudge first, then plateau nudge, then budget warning.
         nudge_message: Optional[str] = None
@@ -771,7 +784,7 @@ class TurnEvaluationController:
         if spin_nudge.should_inject:
             nudge_message, nudge_role = spin_nudge.message, spin_nudge.role
             nudge_kind = spin_nudge.nudge_type.value
-        elif plateau.should_nudge:
+        elif plateau_should_nudge:
             nudge_message = self._plateau_message(observation.intent_is_write)
             nudge_kind = "plateau"
         elif self._enable_budget_warning:

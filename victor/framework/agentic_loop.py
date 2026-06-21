@@ -77,6 +77,8 @@ from victor.agent.turn_policy import (
     NudgePolicy,
     SpinDetector,
     SpinState,
+    TurnEvaluationController,
+    TurnObservation,
 )
 from victor.agent.topology_contract import TopologyAction
 from victor.agent.topology_grounder import GroundedTopologyPlan, TopologyGrounder
@@ -579,6 +581,14 @@ class AgenticLoop:
         self.spin_detector = SpinDetector()
         self.nudge_policy = NudgePolicy()
         self.criteria_builder = FulfillmentCriteriaBuilder()
+        # Shared per-turn content-repetition + nudge decision (also used by the streaming loop).
+        # Plateau stays owned by this loop's _check_adaptive_termination (FAIL/extend), so the
+        # controller's plateau-nudge is disabled here to preserve current behavior.
+        self.turn_evaluation_controller = TurnEvaluationController(
+            spin_detector=self.spin_detector,
+            nudge_policy=self.nudge_policy,
+            enable_plateau_nudge=False,
+        )
 
         # Initialize canonical runtime intelligence boundary
         if runtime_intelligence is None:
@@ -701,7 +711,7 @@ class AgenticLoop:
         iterations: List[LoopIteration] = []
         state: Dict[str, Any] = {"query": query, **(context or {})}
         self._progress_scores = []
-        self.spin_detector.reset()
+        self.turn_evaluation_controller.reset()  # resets spin_detector + content-repetition + plateau
         self.criteria_builder.reset()
         effective_max = self.max_iterations
 
@@ -1023,76 +1033,59 @@ class AgenticLoop:
                 # Track progress (SubSearch intermediate rewards)
                 self._progress_scores.append(evaluation.score)
 
-                # AGENTIC LOOP FIX: Content degradation detection
-                # Detect if agent is looping without making progress (same content repeated)
-                if len(self._progress_scores) >= 3:
-                    # Check content lengths from recent iterations
-                    recent_lengths = []
-                    recent_tool_counts = []
-                    for iter_obj in iterations[-3:]:
-                        if iter_obj.action_result and hasattr(iter_obj.action_result, "content"):
-                            content_length = len(iter_obj.action_result.content)
-                            recent_lengths.append(content_length)
-                        elif iter_obj.action_result and hasattr(iter_obj.action_result, "response"):
-                            content_length = len(iter_obj.action_result.response)
-                            recent_lengths.append(content_length)
-
-                        # Track tool usage to distinguish "no progress" from "tool progress but no text"
-                        if iter_obj.action_result and hasattr(
-                            iter_obj.action_result, "tool_calls_count"
-                        ):
-                            recent_tool_counts.append(iter_obj.action_result.tool_calls_count)
-                        elif iter_obj.action_result and hasattr(
-                            iter_obj.action_result, "has_tool_calls"
-                        ):
-                            recent_tool_counts.append(
-                                1 if iter_obj.action_result.has_tool_calls else 0
-                            )
-
-                    # If all 3 recent iterations have same content length, likely looping
-                    if (
-                        len(recent_lengths) >= 3 and len(set(recent_lengths)) == 1 and i >= 5
-                    ):  # Only check after 5 iterations to avoid false positives
-                        # Check for evidence of tool progress to avoid false positives
-                        # when agent is actively reading/analyzing but not generating text yet
-                        has_tool_progress = getattr(evaluation, "metadata", {}).get(
-                            "successful_tool_progress"
-                        ) or (
-                            len(recent_tool_counts) >= 3 and sum(recent_tool_counts) >= 3
-                        )  # At least 3 tools across last 3 iterations
-
-                        if has_tool_progress:
-                            logger.debug(
-                                "Deferring content-repetition degradation because this iteration "
-                                "produced successful tool progress (tool_count=%d)",
-                                sum(recent_tool_counts) if recent_tool_counts else 0,
-                            )
-                        else:
-                            state.setdefault("degradation_events", []).append(
-                                {
-                                    "source": "agentic_loop",
-                                    "kind": "content_repetition",
-                                    "failure_type": "STUCK_LOOP",
-                                    "iteration": i,
-                                    "task_type": state.get("task_type"),
-                                    "post_degraded": True,
-                                    "recovered": False,
-                                    "adaptation_cost": float(len(recent_lengths)),
-                                    "degradation_reasons": ["content_repetition"],
-                                }
-                            )
-                            logger.warning(
-                                f"Content degradation detected: same content length "
-                                f"({recent_lengths[0]}) repeated for 3 iterations - stopping loop"
-                            )
-                            evaluation = EvaluationResult(
-                                decision=EvaluationDecision.FAIL,
-                                score=evaluation.score,
-                                reason=(
-                                    f"Content degradation: same length repeated 3x (iteration {i})"
-                                ),
-                            )
-                            # Continue to exit logic below
+                # Content-repetition detection via the shared TurnEvaluationController (the same
+                # hash/overlap detector the streaming loop uses — replaces the cruder
+                # content-length heuristic). The loop already fed the spin detector in _act, so
+                # don't re-record. Plateau/nudge stay owned by this loop below.
+                _action_content = (
+                    getattr(action_result, "content", None)
+                    or getattr(action_result, "response", "")
+                    or ""
+                )
+                _tool_results = getattr(action_result, "tool_results", None) or []
+                _turn_obs = TurnObservation(
+                    content=_action_content,
+                    productive_count=int(getattr(action_result, "successful_tool_count", 0) or 0),
+                    has_tool_calls=bool(getattr(action_result, "has_tool_calls", False)),
+                    all_blocked=bool(getattr(action_result, "all_tools_blocked", False)),
+                    tool_names={
+                        (r.get("tool_name") or r.get("name") or "")
+                        for r in _tool_results
+                        if isinstance(r, dict)
+                    },
+                    tool_count=int(getattr(action_result, "tool_calls_count", 0) or 0),
+                    tool_signatures=getattr(action_result, "tool_signatures", None),
+                    iteration=i,
+                    max_iterations=effective_max,
+                )
+                turn_decision = self.turn_evaluation_controller.evaluate(
+                    _turn_obs, record_spin=False
+                )
+                if turn_decision.stop:
+                    state.setdefault("degradation_events", []).append(
+                        {
+                            "source": "agentic_loop",
+                            "kind": "content_repetition",
+                            "failure_type": "STUCK_LOOP",
+                            "iteration": i,
+                            "task_type": state.get("task_type"),
+                            "post_degraded": True,
+                            "recovered": False,
+                            "adaptation_cost": float(i),
+                            "degradation_reasons": ["content_repetition"],
+                        }
+                    )
+                    logger.warning(
+                        "Content degradation detected (%s) at iteration %d - stopping loop",
+                        turn_decision.stop_reason,
+                        i,
+                    )
+                    evaluation = EvaluationResult(
+                        decision=EvaluationDecision.FAIL,
+                        score=evaluation.score,
+                        reason=f"Content repetition detected (iteration {i})",
+                    )
+                    # Continue to exit logic below
 
                 # FULFILLMENT CHECK (optional)
                 if self.enable_fulfillment_check:
@@ -1387,7 +1380,7 @@ class AgenticLoop:
             StreamChunk objects from the streaming executor
         """
         # Reset spin detector for this conversation turn
-        self.spin_detector.reset()
+        self.turn_evaluation_controller.reset()  # resets spin_detector + content-repetition + plateau
         self.criteria_builder.reset()
 
         # PERCEIVE (before streaming — understands task before LLM call)
