@@ -21,7 +21,7 @@ second parallel runtime layer.
 
 The current `AgentOrchestrator` still has too much composition and
 compatibility logic:
-1. **Large composition root**: `victor/agent/orchestrator.py` is still 4,720 LOC
+1. **Large composition root**: `victor/agent/orchestrator.py` is still ~4,593 LOC
 2. **Compatibility drag**: Deprecated coordinator shims still exist for some seams
 3. **Testing difficulties**: Some decision-heavy flows are still easier to test via explicit snapshots than host-object reach-through
 4. **Architecture risk**: Without discipline, state-passed and service patterns can become parallel layers instead of complementary ones
@@ -500,7 +500,7 @@ tests/unit/agent/coordinators/
 | Exploration / system prompt / safety | ✅ Canonical selective seams | State-passed is the preferred pattern here |
 | Coordination recommendation | ✅ Canonical selective seam | `coordination_state_passed.py` |
 | Blanket coordinator rewrites | 🚫 Not the goal | Do not create a second parallel runtime layer |
-| Remaining orchestrator shrink work | ⏳ In progress | `AgentOrchestrator` is still 4,720 LOC |
+| Remaining orchestrator shrink work | ⏳ In progress | `AgentOrchestrator` is still ~4,593 LOC |
 
 **Overall Progress**: State-passed is now an established selective pattern inside
 the broader service-first runtime. Future work should target seams that still
