@@ -1058,7 +1058,7 @@ class TestFormatCompletionMetrics:
                 "cache_read_input_tokens": 0,
                 "cache_creation_input_tokens": 0,
             },
-            total_tokens=100,  # Should be ignored
+            estimated_content_tokens=100,  # Should be ignored
         )
 
         result = handler.format_completion_metrics(ctx, elapsed_time=10.0)
@@ -1130,7 +1130,7 @@ class TestFormatCompletionMetrics:
                 "completion_tokens": 0,
                 "total_tokens": 0,
             },
-            total_tokens=1500.0,
+            estimated_content_tokens=1500.0,
         )
 
         result = handler.format_completion_metrics(ctx, elapsed_time=10.0)
@@ -1162,7 +1162,7 @@ class TestFormatBudgetExhaustedMetrics:
         """Basic metrics format without TTFT."""
         ctx = StreamingChatContext(
             user_message="test",
-            total_tokens=2000.0,
+            estimated_content_tokens=2000.0,
         )
 
         result = handler.format_budget_exhausted_metrics(ctx, elapsed_time=20.0)
@@ -1176,7 +1176,7 @@ class TestFormatBudgetExhaustedMetrics:
         """Includes TTFT when provided."""
         ctx = StreamingChatContext(
             user_message="test",
-            total_tokens=2000.0,
+            estimated_content_tokens=2000.0,
         )
 
         result = handler.format_budget_exhausted_metrics(
@@ -1190,7 +1190,7 @@ class TestFormatBudgetExhaustedMetrics:
         """Handles zero elapsed time without division error."""
         ctx = StreamingChatContext(
             user_message="test",
-            total_tokens=1000.0,
+            estimated_content_tokens=1000.0,
         )
 
         result = handler.format_budget_exhausted_metrics(ctx, elapsed_time=0.0)
@@ -1201,7 +1201,7 @@ class TestFormatBudgetExhaustedMetrics:
         """TTFT of 0 or None is not included."""
         ctx = StreamingChatContext(
             user_message="test",
-            total_tokens=1000.0,
+            estimated_content_tokens=1000.0,
         )
 
         result = handler.format_budget_exhausted_metrics(

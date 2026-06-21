@@ -24,7 +24,7 @@ class DummyStreamContext:
         self.total_iterations = 0
         self.last_quality_score = 1.0
         self.pending_grounding_feedback: Optional[str] = None
-        self.total_tokens = 0
+        self.estimated_content_tokens = 0
         self.total_accumulated_chars = 0
         self.force_completion = False
         self.provider_kwargs = {}

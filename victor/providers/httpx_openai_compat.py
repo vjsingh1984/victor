@@ -219,12 +219,17 @@ class HttpxOpenAICompatProvider(BaseProvider):
         stream_context = self.client.stream("POST", "/chat/completions", json=payload)
         response = await stream_context.__aenter__()
 
-        if response.status_code != 200:
-            try:
+        # Once __aenter__ has opened the httpx stream, ANY failure before we hand the
+        # context back to stream() (a non-200 body read, or task cancellation) must close it
+        # here — otherwise the open response is orphaned and finalized off-task by GC, raising
+        # "async generator ignored GeneratorExit" / "exit cancel scope in a different task".
+        try:
+            if response.status_code != 200:
                 await response.aread()
-            finally:
-                await stream_context.__aexit__(None, None, None)
-            response.raise_for_status()
+                response.raise_for_status()
+        except BaseException:
+            await stream_context.__aexit__(None, None, None)
+            raise
         return stream_context, response
 
     def _build_request_payload(

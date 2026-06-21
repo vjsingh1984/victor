@@ -24,10 +24,36 @@ Covers two defects that let a pure-analysis run spin for 15 iterations:
 from types import SimpleNamespace
 
 from victor.agent.action_authorizer import ActionIntent
-from victor.agent.services.chat_stream_executor import _tool_call_signatures
+from victor.agent.services.chat_stream_executor import (
+    _count_productive_tools,
+    _tool_call_signatures,
+)
 from victor.agent.services.orchestrator_protocol_adapter import OrchestratorProtocolAdapter
 from victor.agent.services.tool_selection_runtime import ToolSelectionRuntime
+from victor.agent.streaming.tool_execution import ToolExecutionResult
 from victor.agent.turn_policy import SpinDetector, SpinState
+
+# --- plateau accounting reads the streaming ToolExecutionResult shape ------------------
+
+
+def test_count_productive_tools_from_streaming_result():
+    """Regression: the streaming ToolExecutionResult exposes tool_results, NOT a
+    successful_tool_count property — counting must not raise AttributeError."""
+    result = ToolExecutionResult()
+    result.tool_results = [{"success": True}, {"success": False}, {"success": True}]
+    result.tool_calls_executed = 3
+    assert _count_productive_tools(result) == 2  # only the successful results
+
+
+def test_count_productive_tools_empty_and_none():
+    assert _count_productive_tools(None) == 0
+    assert _count_productive_tools(ToolExecutionResult()) == 0  # no tools ran
+
+
+def test_count_productive_tools_falls_back_to_executed_count():
+    """When no per-result detail is available, fall back to whether any tool executed."""
+    obj = SimpleNamespace(tool_calls_executed=2)  # no tool_results attribute
+    assert _count_productive_tools(obj) == 2
 
 
 def _runtime(**host_attrs) -> ToolSelectionRuntime:
