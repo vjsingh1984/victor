@@ -46,7 +46,6 @@ from __future__ import annotations
 
 import json
 import logging
-import inspect
 from abc import abstractmethod
 from typing import Any, AsyncIterator, Dict, List, Optional
 
@@ -203,16 +202,22 @@ class HttpxOpenAICompatProvider(BaseProvider):
         response.raise_for_status()
         return response
 
-    async def _open_chat_completion_stream(self, payload: Dict[str, Any]) -> httpx.Response:
+    async def _open_chat_completion_stream(
+        self, payload: Dict[str, Any]
+    ) -> "tuple[Any, httpx.Response]":
         """Open a streaming chat-completions response with status validation.
 
-        For non-200 responses we eagerly read the body so the raised
-        ``HTTPStatusError`` carries the provider's error payload and can be
-        retried/classified consistently by the shared resilience layer.
+        Returns ``(stream_context, response)``. The caller (``stream()``) owns closing the
+        context in its own ``finally`` so enter and exit are lexically paired in the same
+        task — avoiding the "exit cancel scope in a different task" / "ignored GeneratorExit"
+        errors that the previous response-attribute readback hack allowed.
+
+        For non-200 responses we eagerly read the body so the raised ``HTTPStatusError``
+        carries the provider's error payload and can be retried/classified consistently by
+        the shared resilience layer.
         """
         stream_context = self.client.stream("POST", "/chat/completions", json=payload)
         response = await stream_context.__aenter__()
-        response._victor_stream_context = stream_context  # type: ignore[attr-defined]
 
         if response.status_code != 200:
             try:
@@ -220,7 +225,7 @@ class HttpxOpenAICompatProvider(BaseProvider):
             finally:
                 await stream_context.__aexit__(None, None, None)
             response.raise_for_status()
-        return response
+        return stream_context, response
 
     def _build_request_payload(
         self,
@@ -462,7 +467,7 @@ class HttpxOpenAICompatProvider(BaseProvider):
             payload = self._build_request_payload(
                 messages, model, temperature, max_tokens, tools, True, **kwargs
             )
-            response = await self._execute_with_circuit_breaker(
+            stream_context, response = await self._execute_with_circuit_breaker(
                 self._open_chat_completion_stream, payload
             )
             try:
@@ -500,13 +505,9 @@ class HttpxOpenAICompatProvider(BaseProvider):
                             line[:100],
                         )
             finally:
-                stream_context = getattr(response, "_victor_stream_context", None)
-                if stream_context is not None:
-                    await stream_context.__aexit__(None, None, None)
-                else:
-                    close_result = response.aclose()
-                    if inspect.isawaitable(close_result):
-                        await close_result
+                # Close the stream context here — lexically paired with the __aenter__ in
+                # _open_chat_completion_stream, in whatever task drives this generator.
+                await stream_context.__aexit__(None, None, None)
 
         except httpx.TimeoutException as e:
             raise ProviderTimeoutError(
