@@ -2645,7 +2645,15 @@ async def _get_or_build_index(
             return index, False
         except Exception as e:
             logger.warning("[code_search] Read-only index load failed: %s", e)
-            raise TimeoutError(f"Index lock for {root} busy and no usable cache found.")
+            # If the indexing provider is simply absent (victor-coding not installed), surface
+            # that as-is — NOT as a timeout. Masking it as TimeoutError made the caller log a
+            # bogus "build timed out after 600s", classify it as semantic_index_timeout instead
+            # of provider_unavailable, and skip caching the failure — so parallel/subsequent
+            # code_search calls kept re-racing the lock. Re-raising the provider error lets the
+            # caller classify + cache it and fall back to literal search in <1s.
+            if _is_missing_semantic_provider_error(str(e)):
+                raise
+            raise TimeoutError(f"Index lock for {root} busy and no usable cache found.") from e
     finally:
         if _lock_entered:
             await path_lock.__aexit__(None, None, None)

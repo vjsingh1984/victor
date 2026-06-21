@@ -1374,6 +1374,61 @@ class TestStructuralIndexPersistence:
         cached_index.incremental_reindex.assert_not_awaited()
 
     @pytest.mark.asyncio
+    async def test_get_or_build_index_surfaces_missing_provider_not_timeout(
+        self, tmp_path, monkeypatch
+    ):
+        """Lock busy + no usable cache + absent indexing provider must surface the provider
+        error (fast literal fallback), NOT be masked as a TimeoutError — which previously
+        logged a bogus 600s build timeout and re-raced the lock on every call."""
+        root = tmp_path / "repo"
+        root.mkdir()
+        (root / "main.py").write_text("print('hi')\n", encoding="utf-8")
+
+        settings = SimpleNamespace(
+            codebase_graph_store="sqlite",
+            codebase_graph_path=None,
+            unified_embedding_model="BAAI/bge-small-en-v1.5",
+        )
+
+        missing_provider_msg = (
+            "CodebaseIndex requires a codebase indexing provider "
+            "(e.g., pip install victor-coding)."
+        )
+
+        def _raise_missing(**kwargs):
+            raise ImportError(missing_provider_msg)
+
+        fake_factory = SimpleNamespace(create=_raise_missing)
+
+        import victor.core.capability_registry as capability_registry_module
+        import victor.core.indexing.index_lock as index_lock_module
+
+        monkeypatch.setattr(
+            capability_registry_module.CapabilityRegistry,
+            "get_instance",
+            staticmethod(lambda: _FakeCapabilityRegistry(fake_factory)),
+        )
+        monkeypatch.setattr(
+            index_lock_module.IndexLockRegistry,
+            "get_instance",
+            staticmethod(lambda: _TimeoutIndexLockRegistry()),
+        )
+        # Empty cache -> the busy-lock branch has no stale index to serve and falls to the
+        # read-only load, where create() raises the missing-provider error.
+        monkeypatch.setattr(
+            code_search_tool_module,
+            "_get_index_cache",
+            lambda exec_ctx=None: {},
+        )
+
+        clear_index_cache()
+        with pytest.raises(ImportError) as excinfo:
+            await _get_or_build_index(root=root, settings=settings)
+        # Re-raised as the provider error, not masked as a (Timeout)Error.
+        assert "indexing provider" in str(excinfo.value)
+        assert not isinstance(excinfo.value, TimeoutError)
+
+    @pytest.mark.asyncio
     async def test_get_or_build_index_rebuilds_stale_cache_inside_lock(self, tmp_path, monkeypatch):
         root = tmp_path / "repo"
         root.mkdir()
