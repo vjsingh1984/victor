@@ -758,6 +758,45 @@ class TurnEvaluationController:
         self.search_novelty.reset()
         self._best_content_len = 0
 
+    @classmethod
+    def from_exploration_settings(
+        cls,
+        exploration: Any = None,
+        *,
+        spin_detector: Optional[SpinDetector] = None,
+        nudge_policy: Optional[NudgePolicy] = None,
+        enable_plateau_nudge: bool = True,
+        enable_budget_warning: bool = True,
+        enable_search_novelty: bool = True,
+    ) -> "TurnEvaluationController":
+        """Build a controller with convergence thresholds from ``ExplorationSettings``.
+
+        ``exploration`` is an ``ExplorationSettings`` (or ``None`` for defaults). Read
+        defensively via getattr so a partial/old settings object still works. Per-loop flags
+        (plateau/budget/novelty) stay caller-controlled; the numeric thresholds and the
+        guard on/off switches come from settings.
+        """
+        from victor.framework.search_novelty import NoveltyConfig, SearchNoveltyTracker
+
+        def _g(name: str, default: Any) -> Any:
+            return getattr(exploration, name, default) if exploration is not None else default
+
+        novelty_cfg = NoveltyConfig.from_exploration(exploration)
+        return cls(
+            spin_detector=spin_detector,
+            nudge_policy=nudge_policy,
+            search_novelty=SearchNoveltyTracker(novelty_cfg),
+            enable_plateau_nudge=enable_plateau_nudge,
+            enable_budget_warning=enable_budget_warning,
+            enable_search_novelty=enable_search_novelty
+            and bool(_g("search_novelty_guard_enabled", True)),
+            min_iterations_before_force_complete=_g("min_iterations_before_force_complete", 2),
+            enable_fulfillment_complete=bool(_g("fulfillment_completion_enabled", True)),
+            fulfillment_summary_min_chars=_g("fulfillment_summary_min_chars", 800),
+            fulfillment_min_findings=_g("fulfillment_min_findings", 3),
+            min_iterations_before_fulfillment=_g("min_iterations_before_fulfillment", 4),
+        )
+
     def evaluate(self, observation: TurnObservation, *, record_spin: bool = True) -> TurnDecision:
         """Run the shared per-turn guards and return a single decision.
 

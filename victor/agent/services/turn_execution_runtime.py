@@ -1041,6 +1041,7 @@ class TurnExecutor:
             max_iterations=iteration_budget,
             enable_fulfillment_check=True,  # Auto-derived criteria via FulfillmentCriteriaBuilder
             enable_adaptive_iterations=True,
+            exploration_settings=getattr(self._chat_context.settings, "exploration", None),
         )
 
         # Inject task classification into state for execute_turn()

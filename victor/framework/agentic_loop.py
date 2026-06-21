@@ -523,6 +523,7 @@ class AgenticLoop:
         enable_adaptive_iterations: bool = True,
         plateau_window: int = 3,
         plateau_tolerance: float = 0.02,
+        exploration_settings: Optional[Any] = None,
         config: "Union[AgenticLoopConfig, Dict[str, Any], None]" = None,
     ):
         """Initialize agentic loop.
@@ -584,7 +585,8 @@ class AgenticLoop:
         # Shared per-turn content-repetition + nudge decision (also used by the streaming loop).
         # Plateau stays owned by this loop's _check_adaptive_termination (FAIL/extend), so the
         # controller's plateau-nudge is disabled here to preserve current behavior.
-        self.turn_evaluation_controller = TurnEvaluationController(
+        self.turn_evaluation_controller = TurnEvaluationController.from_exploration_settings(
+            exploration_settings,
             spin_detector=self.spin_detector,
             nudge_policy=self.nudge_policy,
             enable_plateau_nudge=False,

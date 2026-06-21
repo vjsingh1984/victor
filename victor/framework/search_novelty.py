@@ -50,6 +50,19 @@ class NoveltyConfig:
     min_search_turns: int = 2
     """Warm-up: ignore the first N search turns before counting low novelty."""
 
+    @classmethod
+    def from_exploration(cls, exploration: Any = None) -> "NoveltyConfig":
+        """Build from an ``ExplorationSettings`` (or ``None`` -> defaults), read defensively."""
+        if exploration is None:
+            return cls()
+        g = exploration
+        return cls(
+            novelty_ratio_threshold=getattr(g, "novelty_ratio_threshold", 0.34),
+            consecutive_low_novelty_limit=getattr(g, "novelty_consecutive_low_limit", 3),
+            nudge_after_low_novelty=getattr(g, "novelty_nudge_after_low", 2),
+            min_search_turns=getattr(g, "novelty_min_search_turns", 2),
+        )
+
 
 @dataclass
 class NoveltyResult:
