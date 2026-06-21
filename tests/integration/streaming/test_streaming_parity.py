@@ -12,12 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Streaming-loop parity battery — FEP-0007 Phase 3→4 acceptance gate.
+"""Streaming-loop characterization battery — the FEP-0007 regression gate.
 
-The characterization tests pin the **legacy** ``StreamingChatExecutor.run()`` behavior on the
-QA battery (the baseline). ``test_legacy_vs_unified_parity`` activates automatically once
-``AgenticLoop.run_streaming`` lands (Phase 3), proving the unified loop is equivalent before
-``USE_UNIFIED_STREAMING_LOOP`` flips ON (Phase 4).
+These tests pin the canonical streaming loop (``StreamingChatExecutor.run()`` driving the unified
+``_stream_turn()`` primitive) on the QA battery: each scenario must yield the expected answer +
+tool sequence with no streaming traceback. There is a single streaming path — no feature flag and
+no legacy fallback — so these characterization transcripts ARE the regression gate: any refactor of
+the loop (e.g. the Phase 2 helper extractions and the ``_stream_turn`` assembly) must keep them
+byte-stable.
 """
 
 from __future__ import annotations
@@ -28,7 +30,6 @@ from .parity_harness import (
     SCENARIOS,
     build_for_scenario,
     capture_transcript,
-    unified_streaming_available,
 )
 
 pytestmark = [pytest.mark.integration, pytest.mark.agents]
@@ -37,10 +38,10 @@ _SCENARIO_IDS = [s.id for s in SCENARIOS]
 
 
 @pytest.mark.parametrize("scenario", SCENARIOS, ids=_SCENARIO_IDS)
-async def test_legacy_loop_characterization(scenario):
-    """Each battery scenario runs through the real legacy loop without a streaming traceback,
-    producing the expected answer + tool sequence. This is the baseline the unified loop must
-    reproduce."""
+async def test_streaming_loop_characterization(scenario):
+    """Each battery scenario runs through the real streaming loop without a streaming traceback,
+    producing the expected answer + tool sequence. This is the regression baseline the loop must
+    preserve across refactors."""
     orch = build_for_scenario(scenario)
     transcript = await capture_transcript(orch, scenario.message)
 
@@ -71,19 +72,3 @@ async def test_spin_scenario_terminates():
         f"spin guard did not converge: {len(transcript.tool_calls)} tool calls "
         f"(max_iterations={scenario.max_iterations})"
     )
-
-
-@pytest.mark.skipif(
-    not unified_streaming_available(),
-    reason="FEP-0007 Phase 3 (AgenticLoop.run_streaming) not landed yet",
-)
-@pytest.mark.parametrize("scenario", SCENARIOS, ids=_SCENARIO_IDS)
-async def test_legacy_vs_unified_parity(scenario):
-    """Once Phase 3 lands: the unified loop must yield an equivalent transcript to the legacy
-    loop on every battery scenario before the flag flips ON.
-
-    Wiring note for Phase 3: build the orchestrator under ``USE_UNIFIED_STREAMING_LOOP`` ON for
-    the second capture and compare with :func:`parity_harness.assert_parity`. Left as the
-    activation point so this file lands as the gate without depending on unbuilt code.
-    """
-    pytest.skip("Enable when run_streaming + USE_UNIFIED_STREAMING_LOOP land (Phase 3).")
