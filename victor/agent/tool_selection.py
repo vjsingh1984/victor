@@ -2227,6 +2227,9 @@ class ToolSelector(ModeAwareMixin):
                 "schema_promotion_threshold", 0.8
             ),
             max_schema_tokens=self.tool_selection_config.get("max_tool_schema_tokens", 0),
+            # Protect deliberately-selected web tools from the order-blind edge filter /
+            # truncation so web_search survives to dispatch for research-flavored tasks.
+            web_tools=frozenset(self._get_web_tools_cached()),
         )
 
     def _finalize_semantic_selection(

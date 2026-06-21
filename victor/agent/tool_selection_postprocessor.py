@@ -16,10 +16,36 @@ class ToolSelectionPostProcessContext:
     max_mcp_tools: int
     schema_promotion_threshold: float
     max_schema_tokens: int
+    # Canonical web-tool names (e.g. web_search). The order-blind edge filter / truncation
+    # below must not drop a web tool the selector deliberately included — for a research-
+    # flavored task that ranked web_search just below the cap, dropping it leaves the model
+    # told about a tool it can't call. Empty by default (no protection).
+    web_tools: frozenset[str] = frozenset()
 
 
 class ToolSelectionPostProcessor:
     """Apply post-selection transforms after semantic/keyword selection."""
+
+    @staticmethod
+    def _truncate_preserving_web(
+        tools: list[ToolDefinition],
+        max_tools: int,
+        web_tools: frozenset[str],
+    ) -> list[ToolDefinition]:
+        """Truncate to ``max_tools`` without dropping a selected web tool.
+
+        The base ``tools[:max_tools]`` is order-blind, so a web tool ranked just below the
+        cap is sliced off. Keep every candidate web tool, fill the remaining budget with the
+        top-ranked non-web tools, and preserve the original ordering. If web tools alone
+        exceed ``max_tools`` (rare — there are only a few), they are all kept.
+        """
+        if not web_tools or not any(t.name in web_tools for t in tools):
+            return tools[:max_tools]
+        web = [t for t in tools if t.name in web_tools]
+        non_web = [t for t in tools if t.name not in web_tools]
+        keep_non_web = max(0, max_tools - len(web))
+        keep_names = {t.name for t in web} | {t.name for t in non_web[:keep_non_web]}
+        return [t for t in tools if t.name in keep_names]
 
     def apply(
         self,
@@ -48,14 +74,20 @@ class ToolSelectionPostProcessor:
         ) = None,
     ) -> list[ToolDefinition]:
         result = list(tools)
+        web_tools = context.web_tools or frozenset()
 
         if len(result) > 8 and should_use_edge_filter and apply_edge_filter is not None:
+            pre_web = [t for t in result if t.name in web_tools]
             result = apply_edge_filter(result, context.user_message, context.stage)
+            # Re-attach any deliberately-selected web tool the relevance filter dropped; the
+            # budget-aware truncation below makes room for it.
+            have = {t.name for t in result}
+            result = result + [t for t in pre_web if t.name not in have]
 
         result = cap_mcp_tools(result, context.max_mcp_tools)
 
         if len(result) > context.fallback_max_tools:
-            result = result[: context.fallback_max_tools]
+            result = self._truncate_preserving_web(result, context.fallback_max_tools, web_tools)
 
         if (
             selection_scores
