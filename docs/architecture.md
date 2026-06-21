@@ -518,6 +518,22 @@ flowchart TB
 
 ---
 
+## Governance, Isolation & Cost
+
+Cross-cutting runtime subsystems layered over tool execution and the provider path
+(see [Features](features.md) for the user-facing summary):
+
+- **Policy engine** (`victor/framework/policies/`) — evaluates **ALLOW / DENY / ASK** verdicts over
+  tool calls across REQUEST and RESPONSE phases (streaming and non-streaming). ASK routes to a
+  container-registered approval handler. Gated by `USE_POLICY_ENGINE` + `governance.enabled`.
+- **Sandbox isolation** (`victor/tools/sandbox/`) — wraps subprocess/code-execution tools in an OS
+  sandbox (bwrap on Linux, seatbelt on macOS), gated by `settings.sandbox.sandbox_enabled`
+  (off by default, fail-open).
+- **Cost co-design** — the dominant cost term (provider round-trips × context size) is measured and
+  acted on: per-turn cost trace (**C0**, surfaced in the chat UI footer), reference-aware
+  tool-result pruning (**L1**), per-task prompt-recompute caching (**L2**), and cost/latency-aware
+  routing (**L4**, with `USE_SMART_ROUTING`).
+
 ## Database Architecture
 
 Victor uses a canonical two-database architecture (schema v7).

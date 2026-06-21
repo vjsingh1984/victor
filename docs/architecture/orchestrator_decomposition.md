@@ -2,12 +2,12 @@
 
 ## Overview
 
-The `AgentOrchestrator` (3,940 LOC) is a thin facade coordinating extracted components. It was decomposed from a 4,514 LOC monolith through multiple refactoring phases.
+The `AgentOrchestrator` (~4,593 LOC) is a facade coordinating extracted components, decomposed from a larger monolith through multiple refactoring phases. Ongoing work continues to shrink the facade.
 
 ## Component Topology
 
 ```
-AgentOrchestrator (3,940 LOC facade)
+AgentOrchestrator (~4,593 LOC facade)
 ├── CallbackCoordinator (96 LOC)    ← tool/streaming lifecycle callbacks
 │   ├── MetricsCoordinator          ← metrics collection + RL reward signals
 │   ├── ToolCoordinator             ← tool completion handling + file tracking
@@ -17,9 +17,9 @@ AgentOrchestrator (3,940 LOC facade)
 │   ├── Lazy coordinators (8)       ← protocol_adapter, execution_coordinator, etc.
 │   ├── Recovery properties (2)     ← recovery_handler, recovery_integration
 │   └── Session state (10)          ← tool_calls_used, observed_files, etc. (with setters)
-├── InitializationPhaseManager (153 LOC) ← 8-phase structured init
+├── InitializationPhaseManager (153 LOC) ← 9-phase structured init
 ├── SessionStateAccessor            ← session state delegation to SessionStateManager
-├── Runtime Boundaries (8 modules in victor/agent/runtime/)
+├── Runtime Boundaries (12 modules in victor/agent/runtime/)
 │   ├── ProviderRuntime             ← provider coordinator + ProviderPool (feature-flagged)
 │   ├── MetricsRuntime              ← usage logger, streaming metrics, cost tracker
 │   ├── WorkflowRuntime             ← lazy workflow registry
@@ -28,7 +28,7 @@ AgentOrchestrator (3,940 LOC facade)
 │   ├── CoordinationRuntime         ← recovery/chunk/planner/task coordinators
 │   ├── InteractionRuntime          ← service-first chat/tool/session surfaces + compat shims
 │   └── ServicesRuntime             ← DI service layer (Strangler Fig pattern)
-├── 21 Coordinators (victor/agent/coordinators/)
+├── 15 Coordinators (victor/agent/coordinators/)
 │   ├── ExecutionCoordinator        ← agentic loop execution
 │   ├── SyncChatCoordinator         ← deprecated non-streaming compatibility shim
 │   ├── StreamingChatCoordinator    ← deprecated streaming compatibility shim
@@ -37,7 +37,7 @@ AgentOrchestrator (3,940 LOC facade)
 │   ├── MetricsCoordinator          ← centralized metrics
 │   ├── SafetyCoordinator           ← safety rule evaluation
 │   ├── ConversationCoordinator     ← conversation management
-│   └── ... (13 more)
+│   └── ... (7 more)
 └── Vertical Integration
     ├── VerticalContext              ← unified vertical state container
     ├── VerticalIntegrationAdapter   ← single-source vertical method delegation
