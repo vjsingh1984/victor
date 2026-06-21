@@ -24,6 +24,7 @@ from typing import Any, Dict, Optional
 
 from victor.ui.chat_app.event_mapping import (
     RenderKind,
+    history_messages,
     map_event,
     provider_switch_hint,
 )
@@ -197,3 +198,34 @@ def test_provider_switch_hint_empty_when_no_alternative() -> None:
     assert provider_switch_hint("ollama", ["ollama"]) == ""
     assert provider_switch_hint("ollama", []) == ""
     assert provider_switch_hint(None, []) == ""
+
+
+def test_history_messages_keeps_user_and_assistant_with_content() -> None:
+    msgs = [
+        FakeEvent("ignored"),  # has no role/content -> skipped
+        _RoleMsg("user", "hello"),
+        _RoleMsg("assistant", "hi there"),
+        _RoleMsg("system", "you are…"),  # internal -> skipped
+        _RoleMsg("assistant", "   "),  # empty -> skipped
+    ]
+    assert history_messages(msgs) == [("You", "hello"), ("Victor", "hi there")]
+
+
+def test_history_messages_handles_dicts_and_enum_roles() -> None:
+    enum_role = type("Role", (), {"value": "assistant"})()
+    msgs = [
+        {"role": "user", "content": "from a dict"},
+        _RoleMsg(enum_role, "from an enum role"),
+    ]
+    assert history_messages(msgs) == [("You", "from a dict"), ("Victor", "from an enum role")]
+
+
+def test_history_messages_empty_input() -> None:
+    assert history_messages([]) == []
+    assert history_messages(None) == []
+
+
+class _RoleMsg:
+    def __init__(self, role, content: str) -> None:
+        self.role = role
+        self.content = content

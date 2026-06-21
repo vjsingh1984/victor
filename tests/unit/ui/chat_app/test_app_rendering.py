@@ -106,13 +106,24 @@ def app_module(monkeypatch):
         on_chat_start=lambda f: f,
         on_message=lambda f: f,
         on_chat_end=lambda f: f,
+        on_settings_update=lambda f: f,
         action_callback=lambda name: (lambda f: f),
         Message=_FakeMessage,
         Step=_FakeStep,
         Action=lambda **kwargs: SimpleNamespace(**kwargs),
+        ChatSettings=lambda inputs: SimpleNamespace(send=lambda: None),
         user_session=_FakeUserSession(),
     )
     monkeypatch.setitem(sys.modules, "chainlit", fake_cl)
+    monkeypatch.setitem(
+        sys.modules,
+        "chainlit.input_widget",
+        SimpleNamespace(
+            Select=lambda **k: SimpleNamespace(**k),
+            Switch=lambda **k: SimpleNamespace(**k),
+            TextInput=lambda **k: SimpleNamespace(**k),
+        ),
+    )
     sys.modules.pop("victor.ui.chat_app.app", None)
     module = importlib.import_module("victor.ui.chat_app.app")
     return module, fake_cl

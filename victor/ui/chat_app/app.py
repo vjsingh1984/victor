@@ -31,11 +31,17 @@ import logging
 import os
 
 import chainlit as cl
+from chainlit.input_widget import Select, Switch, TextInput
 
 from victor.framework.client import VictorClient
 from victor.framework.session_config import SessionConfig
 from victor.ui.chat_app.approval import chainlit_approval_handler
-from victor.ui.chat_app.event_mapping import RenderKind, map_event, provider_switch_hint
+from victor.ui.chat_app.event_mapping import (
+    RenderKind,
+    history_messages,
+    map_event,
+    provider_switch_hint,
+)
 from victor.ui.rendering.markdown_presenters import (
     tool_call_summary,
     tool_result_markdown,
@@ -90,22 +96,68 @@ _ASK_ON_TOOLS = [
 ]
 
 
-def _build_client() -> VictorClient:
-    """Construct a VictorClient with human-in-the-loop approval for mutating tools.
+def _session_config(
+    profile: str | None,
+    provider: str | None = None,
+    model: str | None = None,
+    approval: bool = True,
+) -> SessionConfig:
+    """Build a SessionConfig from chat controls — shared by startup and ChatSettings updates.
 
-    The agent profile (provider/model/etc.) comes from ``victor ui --profile`` via the
-    ``VICTOR_UI_PROFILE`` env var; ``None`` uses the default profile. Richer per-session
-    controls can be surfaced later via Chainlit ``ChatSettings``.
+    Tool approval gating is coupled to the toggle: when off, ``ask_on_tools`` is emptied so no
+    tool prompts fire. Empty provider/model/profile fall back to the active defaults.
     """
-    profile = os.environ.get(_PROFILE_ENV) or None
-    config = SessionConfig.from_cli_flags(
-        agent_profile=profile,
+    return SessionConfig.from_cli_flags(
+        agent_profile=profile or None,
+        provider=provider or None,
+        model=model or None,
         tool_preview=True,
-        tool_approval_enabled=True,
-        ask_on_tools=_ASK_ON_TOOLS,
+        tool_approval_enabled=approval,
+        ask_on_tools=_ASK_ON_TOOLS if approval else [],
         ask_fallback="deny",
     )
-    return VictorClient(config)
+
+
+def _build_client() -> VictorClient:
+    """Construct the default per-session VictorClient (profile from ``victor ui --profile``)."""
+    return VictorClient(_session_config(os.environ.get(_PROFILE_ENV) or None))
+
+
+def _profile_names() -> list[str]:
+    """List configured agent-profile names for the settings dropdown (best-effort)."""
+    try:
+        from victor.framework.runtime_discovery import list_runtime_profiles
+
+        names = [p.name for p in list_runtime_profiles() if getattr(p, "name", None)]
+        return names or ["default"]
+    except Exception:  # profile listing is best-effort
+        logger.debug("profile listing failed", exc_info=True)
+        return ["default"]
+
+
+async def _send_settings(client: VictorClient) -> None:
+    """Render the ChatSettings panel (provider / profile / model / approval)."""
+    try:
+        providers = client.get_available_providers()
+    except Exception:
+        providers = []
+    current_provider = client.provider_name
+    if current_provider and current_provider not in providers:
+        providers = [current_provider, *providers]
+    profiles = _profile_names()
+    await cl.ChatSettings(
+        [
+            Select(
+                id="provider",
+                label="Provider",
+                values=providers or [current_provider or "default"],
+                initial=current_provider or (providers[0] if providers else ""),
+            ),
+            Select(id="profile", label="Profile", values=profiles, initial=profiles[0]),
+            TextInput(id="model", label="Model (override)", initial=client.model or ""),
+            Switch(id="tool_approval", label="Require approval for risky tools", initial=True),
+        ]
+    ).send()
 
 
 def _get_client() -> VictorClient:
@@ -129,10 +181,68 @@ async def on_chat_start() -> None:
     except Exception:  # approval is best-effort; chat still works without it
         logger.debug("Approval handler registration skipped", exc_info=True)
 
-    cl.user_session.set(_CLIENT_KEY, _build_client())
+    client = _get_client()
+
+    # Best-effort session-restore seam: a reconnected session whose client already holds history
+    # replays its prior turns; a fresh client raises (uninitialized) and we greet normally. Full
+    # cross-visit resume is a deferred FEP (needs a Chainlit data layer + history-by-id API).
+    restored = False
+    try:
+        for author, content in history_messages(await client.get_messages(limit=50)):
+            await cl.Message(content=content, author=author).send()
+            restored = True
+    except Exception:
+        logger.debug("no prior session history to restore", exc_info=True)
+
+    if not restored:
+        await cl.Message(
+            content="**Victor** is ready. Ask me to write code, search the repo, run tools — "
+            "I'll stream my reasoning and tool calls as I work."
+        ).send()
+
+    await _send_settings(client)
+
+
+@cl.on_settings_update
+async def on_settings_update(settings: dict) -> None:
+    """Rebuild the session's VictorClient from the ChatSettings panel selections."""
+    # Drain any in-flight turn first (PR3 guard), then release the old client.
+    task = cl.user_session.get(_TASK_KEY)
+    if task is not None and not task.done():
+        task.cancel()
+        try:
+            await task
+        except (asyncio.CancelledError, Exception):
+            logger.debug("active turn drained on settings update", exc_info=True)
+        finally:
+            cl.user_session.set(_TASK_KEY, None)
+
+    old = cl.user_session.get(_CLIENT_KEY)
+    if old is not None:
+        try:
+            await old.close()
+        except Exception:
+            logger.debug("old client close failed on settings update", exc_info=True)
+
+    approval = bool(settings.get("tool_approval", True))
+    client = VictorClient(
+        _session_config(
+            profile=settings.get("profile") or None,
+            provider=settings.get("provider") or None,
+            model=settings.get("model") or None,
+            approval=approval,
+        )
+    )
+    cl.user_session.set(_CLIENT_KEY, client)
     await cl.Message(
-        content="**Victor** is ready. Ask me to write code, search the repo, run tools — "
-        "I'll stream my reasoning and tool calls as I work."
+        content=(
+            "⚙️ Settings applied — provider: **{provider}**, profile: **{profile}**, "
+            "approval: **{approval}**.".format(
+                provider=settings.get("provider") or "default",
+                profile=settings.get("profile") or "default",
+                approval="on" if approval else "off",
+            )
+        )
     ).send()
 
 
