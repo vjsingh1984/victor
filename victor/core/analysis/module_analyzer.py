@@ -37,6 +37,12 @@ class ModuleMetrics:
 class ModuleAnalyzer:
     """Compute and persist module-level metrics from the code graph."""
 
+    #: Max history rows retained per module. Every persist() appends one history row per
+    #: module; without a cap graph_module_metric_history grows unbounded (observed at 360k+
+    #: rows / hundreds of MB on a long-lived project DB). The latest N snapshots are enough
+    #: for trend/hotspot analysis.
+    _HISTORY_RETENTION_PER_MODULE = 50
+
     def __init__(self, db=None, project_path: Optional[Path] = None):
         self._db = db
         self._project_path = project_path or Path.cwd()
@@ -143,6 +149,18 @@ class ModuleAnalyzer:
                    (module_path, hotspot_score, tdd_priority)
                    VALUES (?, ?, ?)""",
                 (m.module_path, m.hotspot_score, m.tdd_priority),
+            )
+            # Bound history growth: keep only the most recent N snapshots per module.
+            conn.execute(
+                """DELETE FROM graph_module_metric_history
+                   WHERE module_path = ?
+                     AND id NOT IN (
+                         SELECT id FROM graph_module_metric_history
+                         WHERE module_path = ?
+                         ORDER BY id DESC
+                         LIMIT ?
+                     )""",
+                (m.module_path, m.module_path, self._HISTORY_RETENTION_PER_MODULE),
             )
         conn.commit()
 
