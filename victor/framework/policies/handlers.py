@@ -141,7 +141,12 @@ def register_policy_approval_handler(
         pass
 
     try:
-        container.register(PolicyApprovalHandler, PolicyApprovalHandler(handler))
+        # Register a pre-built instance — NOT register(), whose second argument is a
+        # factory Callable[[container], T]. PolicyApprovalHandler is not callable, so
+        # register() would store it as a factory and raise TypeError on resolution (then
+        # get swallowed to None), silently defeating the handler. register_instance binds
+        # the instance directly.
+        container.register_instance(PolicyApprovalHandler, PolicyApprovalHandler(handler))
         return True
     except Exception:
         logger.debug("Could not register policy approval handler", exc_info=True)
