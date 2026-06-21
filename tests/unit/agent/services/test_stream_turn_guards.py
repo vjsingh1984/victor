@@ -16,6 +16,7 @@
 
 from types import SimpleNamespace
 
+from victor.agent.services import chat_stream_executor
 from victor.agent.services.chat_stream_executor import StreamingChatExecutor
 from victor.agent.turn_policy import (
     NudgePolicy,
@@ -229,3 +230,116 @@ async def test_stream_provider_turn_qa_task_skips_tools_and_enables_thinking():
         "budget_tokens": 10000,
     }
     assert garbage is True
+
+
+class _FakeToolExecResult:
+    def __init__(self, *, tool_calls_executed=0, should_return=False, chunks=None):
+        self.tool_calls_executed = tool_calls_executed
+        self.should_return = should_return
+        self.chunks = chunks or []
+        self.tool_results = []
+
+
+def _tools_turn_orch(seen):
+    return SimpleNamespace(
+        observed_files={"a.py"},
+        tool_calls_used=3,
+        tool_budget=50,
+    )
+
+
+async def test_execute_tools_turn_streams_and_records_outcome():
+    seen = {}
+    orch = _tools_turn_orch(seen)
+    stream_ctx = SimpleNamespace(
+        tool_calls_used=0,
+        record_iteration_tool_count=lambda n: seen.__setitem__("recorded", n),
+    )
+
+    class _StreamingHandler:
+        def update_observed_files(self, files):
+            seen["observed"] = files
+
+        async def execute_tools_streaming(self, **kwargs):
+            seen["exec_kwargs"] = kwargs
+            kwargs["result"].tool_calls_executed = 2
+            kwargs["result"].should_return = False
+            for c in ("chunk-a", "chunk-b"):
+                yield c
+
+    runtime_owner = SimpleNamespace(_tool_execution_handler=_StreamingHandler())
+    executor = _provider_turn_executor()
+
+    guard_calls = []
+    executor._maybe_inject_write_action_guard = (
+        lambda o, ctx, *, user_message, tool_calls_used: guard_calls.append(tool_calls_used)
+    )
+
+    holder = chat_stream_executor._ToolTurnOutcome()
+    chunks = [
+        c
+        async for c in executor._execute_tools_turn(
+            orch,
+            runtime_owner,
+            stream_ctx,
+            user_message="do it",
+            tool_calls=[{"name": "edit"}],
+            full_content="content",
+            result_holder=holder,
+        )
+    ]
+
+    # Tool chunks streamed verbatim.
+    assert chunks == ["chunk-a", "chunk-b"]
+    # observed files snapshot passed to the handler.
+    assert seen["observed"] == {"a.py"}
+    # Post-exec bookkeeping: tool-call accounting + record + write-action guard.
+    assert orch.tool_calls_used == 5  # 3 + 2 executed
+    assert stream_ctx.tool_calls_used == 5
+    assert seen["recorded"] == 2
+    assert guard_calls == [5]
+    # Result written to the holder for run() to read.
+    assert holder.result.tool_calls_executed == 2
+    assert holder.result.should_return is False
+
+
+async def test_execute_tools_turn_buffered_handler_yields_result_chunks():
+    seen = {}
+    orch = _tools_turn_orch(seen)
+    stream_ctx = SimpleNamespace(tool_calls_used=0)  # no record_iteration_tool_count
+
+    buffered = _FakeToolExecResult(tool_calls_executed=1, should_return=True, chunks=["buf-1"])
+
+    class _BufferedHandler:
+        def update_observed_files(self, files):
+            seen["observed"] = files
+
+        async def execute_tools(self, **kwargs):
+            return buffered
+
+    # Buffered handler must NOT expose execute_tools_streaming.
+    handler = _BufferedHandler()
+    assert not hasattr(handler, "execute_tools_streaming")
+    runtime_owner = SimpleNamespace(_tool_execution_handler=handler)
+
+    executor = _provider_turn_executor()
+    executor._maybe_inject_write_action_guard = lambda *a, **k: None
+
+    holder = chat_stream_executor._ToolTurnOutcome()
+    chunks = [
+        c
+        async for c in executor._execute_tools_turn(
+            orch,
+            runtime_owner,
+            stream_ctx,
+            user_message="do it",
+            tool_calls=[{"name": "edit"}],
+            full_content="content",
+            result_holder=holder,
+        )
+    ]
+
+    assert chunks == ["buf-1"]
+    assert orch.tool_calls_used == 4  # 3 + 1
+    # should_return propagated via the holder (loop control stays in run()).
+    assert holder.result.should_return is True

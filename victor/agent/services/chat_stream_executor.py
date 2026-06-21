@@ -121,6 +121,19 @@ class _StreamTurnGuards:
     novelty_enabled: bool
 
 
+@dataclass
+class _ToolTurnOutcome:
+    """Single-slot mutable holder for the tool-execution ACT sub-step's result.
+
+    An async generator can't ``return`` a value, so ``_execute_tools_turn`` yields tool
+    chunks and writes its ``ToolExecutionResult`` here for ``run()`` to read — both for
+    loop control (``should_return``) and downstream evaluation (fulfillment / plateau /
+    search-novelty). Part of FEP-0007 Phase 2's move toward a shared ``stream_turn()``.
+    """
+
+    result: Any = None
+
+
 class StreamingChatExecutor:
     """Canonical streaming chat executor bound to a runtime owner."""
 
@@ -1047,6 +1060,77 @@ class StreamingChatExecutor:
         )
         return tools, full_content, tool_calls, garbage_detected
 
+    async def _execute_tools_turn(
+        self,
+        orch: Any,
+        runtime_owner: Any,
+        stream_ctx: Any,
+        *,
+        user_message: str,
+        tool_calls: Any,
+        full_content: str,
+        result_holder: _ToolTurnOutcome,
+    ) -> AsyncIterator[StreamChunk]:
+        """Execute this turn's tool calls, streaming chunks; record the result on the holder.
+
+        The ACT tool-execution sub-step of run()'s per-turn body (FEP-0007 Phase 2, toward a
+        shared stream_turn() boundary). Lazily builds the tool-execution handler, streams (or
+        buffers) tool-result chunks, then applies post-execution bookkeeping (tool-call
+        accounting + write-action guard). Because an async generator can't return a value, the
+        produced ``ToolExecutionResult`` is written to ``result_holder.result`` for run() to read
+        (``should_return`` loop control + downstream fulfillment/plateau/novelty evaluation).
+        """
+        if not runtime_owner._tool_execution_handler:
+            from victor.agent.streaming import create_tool_execution_handler
+
+            runtime_owner._tool_execution_handler = create_tool_execution_handler(orch)
+
+        runtime_owner._tool_execution_handler.update_observed_files(
+            set(orch.observed_files) if orch.observed_files else set()
+        )
+
+        if hasattr(runtime_owner._tool_execution_handler, "execute_tools_streaming"):
+            from victor.agent.streaming.tool_execution import (
+                ToolExecutionResult,
+            )
+
+            tool_exec_result = ToolExecutionResult()
+            async for chunk in runtime_owner._tool_execution_handler.execute_tools_streaming(
+                stream_ctx=stream_ctx,
+                tool_calls=tool_calls,
+                user_message=user_message,
+                full_content=full_content,
+                tool_calls_used=orch.tool_calls_used,
+                tool_budget=orch.tool_budget,
+                result=tool_exec_result,
+            ):
+                yield chunk
+        else:
+            tool_exec_result = await runtime_owner._tool_execution_handler.execute_tools(
+                stream_ctx=stream_ctx,
+                tool_calls=tool_calls,
+                user_message=user_message,
+                full_content=full_content,
+                tool_calls_used=orch.tool_calls_used,
+                tool_budget=orch.tool_budget,
+            )
+            for chunk in tool_exec_result.chunks:
+                yield chunk
+
+        orch.tool_calls_used += tool_exec_result.tool_calls_executed
+        stream_ctx.tool_calls_used = orch.tool_calls_used
+        _record = getattr(stream_ctx, "record_iteration_tool_count", None)
+        if callable(_record):
+            _record(tool_exec_result.tool_calls_executed)
+        self._maybe_inject_write_action_guard(
+            orch,
+            stream_ctx,
+            user_message=user_message,
+            tool_calls_used=orch.tool_calls_used,
+        )
+
+        result_holder.result = tool_exec_result
+
     async def run(self, user_message: str, **kwargs: Any) -> AsyncIterator[StreamChunk]:
         """Run the streaming executor for the provided message."""
         runtime_owner = self._runtime_owner
@@ -1843,56 +1927,18 @@ class StreamingChatExecutor:
                             yield self._build_final_marker_chunk(orch)
                         return
 
-                if not runtime_owner._tool_execution_handler:
-                    from victor.agent.streaming import create_tool_execution_handler
-
-                    runtime_owner._tool_execution_handler = create_tool_execution_handler(orch)
-
-                runtime_owner._tool_execution_handler.update_observed_files(
-                    set(orch.observed_files) if orch.observed_files else set()
-                )
-
-                if hasattr(runtime_owner._tool_execution_handler, "execute_tools_streaming"):
-                    from victor.agent.streaming.tool_execution import (
-                        ToolExecutionResult,
-                    )
-
-                    tool_exec_result = ToolExecutionResult()
-                    async for (
-                        chunk
-                    ) in runtime_owner._tool_execution_handler.execute_tools_streaming(
-                        stream_ctx=stream_ctx,
-                        tool_calls=tool_calls,
-                        user_message=user_message,
-                        full_content=full_content,
-                        tool_calls_used=orch.tool_calls_used,
-                        tool_budget=orch.tool_budget,
-                        result=tool_exec_result,
-                    ):
-                        yield chunk
-                else:
-                    tool_exec_result = await runtime_owner._tool_execution_handler.execute_tools(
-                        stream_ctx=stream_ctx,
-                        tool_calls=tool_calls,
-                        user_message=user_message,
-                        full_content=full_content,
-                        tool_calls_used=orch.tool_calls_used,
-                        tool_budget=orch.tool_budget,
-                    )
-                    for chunk in tool_exec_result.chunks:
-                        yield chunk
-
-                orch.tool_calls_used += tool_exec_result.tool_calls_executed
-                stream_ctx.tool_calls_used = orch.tool_calls_used
-                _record = getattr(stream_ctx, "record_iteration_tool_count", None)
-                if callable(_record):
-                    _record(tool_exec_result.tool_calls_executed)
-                self._maybe_inject_write_action_guard(
+                _tool_outcome = _ToolTurnOutcome()
+                async for chunk in self._execute_tools_turn(
                     orch,
+                    runtime_owner,
                     stream_ctx,
                     user_message=user_message,
-                    tool_calls_used=orch.tool_calls_used,
-                )
+                    tool_calls=tool_calls,
+                    full_content=full_content,
+                    result_holder=_tool_outcome,
+                ):
+                    yield chunk
+                tool_exec_result = _tool_outcome.result
 
                 if tool_exec_result.should_return:
                     return
