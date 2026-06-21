@@ -53,6 +53,24 @@ def _tool_call_signatures(tool_calls: Optional[List[dict]]) -> set:
     return signatures
 
 
+def _count_productive_tools(tool_exec_result: Any) -> int:
+    """Count tool calls that succeeded with output for progress/plateau accounting.
+
+    The streaming ``ToolExecutionResult`` (victor/agent/streaming/tool_execution.py) exposes
+    ``tool_results`` (a list of dicts) and ``tool_calls_executed`` — it does NOT have the
+    ``successful_tool_count`` property of the single-turn ``TurnToolExecutionResult``. Derive
+    the count from ``tool_results`` so a turn whose tools all failed/were blocked/returned
+    nothing does not count as progress (and still gets nudged). When no per-result detail is
+    available, fall back to whether any tool executed at all.
+    """
+    if not tool_exec_result:
+        return 0
+    results = getattr(tool_exec_result, "tool_results", None)
+    if isinstance(results, list) and results:
+        return sum(1 for r in results if isinstance(r, dict) and r.get("success"))
+    return int(getattr(tool_exec_result, "tool_calls_executed", 0) or 0)
+
+
 def _evaluate_overlap_repetition(overlap: float, repetition_count: int) -> Tuple[int, str]:
     """Decide repetition handling from word-overlap between consecutive turns.
 
@@ -1890,7 +1908,7 @@ class StreamingChatExecutor:
                 # Credit *productive* tool calls toward progress, not raw count: a turn
                 # full of failed/blocked/empty tool calls is not progress and must not mask
                 # a plateau (the observed loop ran 2 tool calls/turn that returned nothing).
-                productive_count = tool_exec_result.successful_tool_count if tool_exec_result else 0
+                productive_count = _count_productive_tools(tool_exec_result)
                 content_len = len(full_content) if full_content else 0
                 progress = min(1.0, (productive_count * 0.3 + min(content_len / 2000, 0.7)))
                 self._progress_scores.append(progress)
