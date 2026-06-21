@@ -136,7 +136,20 @@ class ToolSelectionRuntime:
         tools = self._prioritize_explicit_database_tools(tools, user_message_anchor)
         tools = self._apply_e3tir_exploration(tools, user_message_anchor)
         tools = runtime._apply_kv_tool_strategy(tools)
-        return runtime._sort_tools_for_kv_stability(tools)
+        final_tools = runtime._sort_tools_for_kv_stability(tools)
+        # Log the tools actually dispatched to the provider. The selector's earlier
+        # "Selected N tools" line is emitted before stage pruning / intent filtering and
+        # can overstate the callable set (a tool can be selected then pruned away). This
+        # post-transform line is the source of truth for what the model receives.
+        try:
+            logger.info(
+                "Tools dispatched to provider (%d): %s",
+                len(final_tools),
+                ", ".join(getattr(t, "name", "?") for t in final_tools),
+            )
+        except Exception:  # logging must never break tool selection
+            logger.debug("dispatched-tools log failed", exc_info=True)
+        return final_tools
 
     def _get_e3tir_reranker(self) -> Any:
         """Lazily build the per-session E3-TIR reranker when enabled, else None.
