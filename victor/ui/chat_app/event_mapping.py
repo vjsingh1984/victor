@@ -176,3 +176,16 @@ def segment_turn(kinds: Iterable["RenderKind"]) -> List[str]:
                 segments.append("tools")
                 phase = "tools"
     return segments
+
+
+def provider_switch_hint(current: Optional[str], available: Iterable[str]) -> str:
+    """One-line hint suggesting other providers to switch to after a turn fails (Chainlit-free).
+
+    Lists available providers other than the current one (order-preserving, deduped), so a
+    failure card can nudge the user toward an alternative. Returns ``""`` when there is no
+    alternative to suggest. ``app.py`` renders this; kept pure here so it is unit-testable.
+    """
+    others = [p for p in dict.fromkeys(available) if p and p != current]
+    if not others:
+        return ""
+    return "_Try another provider:_ " + ", ".join(others)

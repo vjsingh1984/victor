@@ -22,7 +22,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
-from victor.ui.chat_app.event_mapping import RenderKind, map_event
+from victor.ui.chat_app.event_mapping import (
+    RenderKind,
+    map_event,
+    provider_switch_hint,
+)
 
 
 @dataclass
@@ -181,3 +185,15 @@ def test_tool_result_defaults_when_no_telemetry() -> None:
     assert action.elapsed == 0.0
     assert action.was_pruned is False
     assert action.follow_up_suggestions is None
+
+
+def test_provider_switch_hint_lists_others_excluding_current() -> None:
+    hint = provider_switch_hint("ollama", ["ollama", "anthropic", "openai"])
+    assert "anthropic" in hint and "openai" in hint
+    assert "ollama" not in hint  # current provider is excluded
+
+
+def test_provider_switch_hint_empty_when_no_alternative() -> None:
+    assert provider_switch_hint("ollama", ["ollama"]) == ""
+    assert provider_switch_hint("ollama", []) == ""
+    assert provider_switch_hint(None, []) == ""

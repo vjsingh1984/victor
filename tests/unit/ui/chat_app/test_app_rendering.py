@@ -40,8 +40,9 @@ class _FakeEvent:
 
 
 class _FakeMessage:
-    def __init__(self, content: str = "") -> None:
+    def __init__(self, content: str = "", actions: Optional[list] = None) -> None:
         self.content = content
+        self.actions = actions or []
         self.tokens: List[str] = []
 
     async def send(self) -> "_FakeMessage":
@@ -105,8 +106,10 @@ def app_module(monkeypatch):
         on_chat_start=lambda f: f,
         on_message=lambda f: f,
         on_chat_end=lambda f: f,
+        action_callback=lambda name: (lambda f: f),
         Message=_FakeMessage,
         Step=_FakeStep,
+        Action=lambda **kwargs: SimpleNamespace(**kwargs),
         user_session=_FakeUserSession(),
     )
     monkeypatch.setitem(sys.modules, "chainlit", fake_cl)
