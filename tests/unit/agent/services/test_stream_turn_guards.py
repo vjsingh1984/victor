@@ -691,3 +691,134 @@ async def test_evaluate_post_tool_turn_novelty_disabled_skips_force_complete():
     assert outcome.should_return is False
     assert chunks == []
     assert messages == []
+
+
+def _completion_orch(messages, *, detector=None, controller=None):
+    return SimpleNamespace(
+        _task_completion_detector=detector,
+        _conversation_controller=controller,
+        add_message=lambda role, content, metadata=None: messages.append((role, content)),
+    )
+
+
+def _detector(confidence, *, last_summary=""):
+    from victor.agent.task_completion import CompletionConfidence
+
+    calls = {"analyzed": []}
+    detector = SimpleNamespace(
+        analyze_response=lambda c: calls["analyzed"].append(c),
+        get_completion_confidence=lambda: confidence,
+        _state=SimpleNamespace(last_summary=last_summary),
+    )
+    detector.calls = calls
+    return CompletionConfidence, detector
+
+
+def test_detect_completion_high_confidence_no_tools_forces_completion():
+    from victor.agent.task_completion import CompletionConfidence
+
+    _, detector = _detector(CompletionConfidence.HIGH, last_summary="all done")
+    persisted = {}
+    controller = SimpleNamespace(
+        persist_compaction_summary=lambda summary, msgs: persisted.update(summary=summary),
+        inject_compaction_context=lambda: persisted.update(injected=True),
+    )
+    messages = []
+    orch = _completion_orch(messages, detector=detector, controller=controller)
+    stream_ctx = SimpleNamespace()
+    executor = _provider_turn_executor()
+
+    forced, mentions = executor._detect_task_completion_and_mentions(
+        orch,
+        stream_ctx,
+        full_content="The task is complete.",
+        tool_calls=None,
+        spin=_spin("ACTIVE"),
+    )
+
+    assert forced is True
+    assert stream_ctx.force_completion is True
+    assert stream_ctx.skip_continuation is True
+    # HIGH + no tool calls -> summary persisted for next-turn context.
+    assert persisted.get("summary") == "all done"
+    assert persisted.get("injected") is True
+    # forced completion short-circuits tool-mention detection.
+    assert mentions == []
+
+
+def test_detect_completion_high_confidence_with_tools_defers():
+    from victor.agent.task_completion import CompletionConfidence
+
+    _, detector = _detector(CompletionConfidence.HIGH)
+    cleared = {}
+    messages = []
+    orch = _completion_orch(messages, detector=detector)
+    executor = _provider_turn_executor()
+    executor._clear_deferred_active_completion_signal = lambda d: cleared.update(done=True)
+
+    forced, mentions = executor._detect_task_completion_and_mentions(
+        orch,
+        SimpleNamespace(),
+        full_content="Done, but still calling a tool.",
+        tool_calls=[{"name": "edit"}],
+        spin=_spin("ACTIVE"),
+    )
+
+    # HIGH confidence but tool calls present -> defer, not forced.
+    assert forced is False
+    assert cleared.get("done") is True
+
+
+def test_detect_completion_injects_tool_format_hint_on_mention(monkeypatch):
+    from victor.agent.task_completion import CompletionConfidence
+
+    _, detector = _detector(CompletionConfidence.LOW)
+    messages = []
+    orch = _completion_orch(messages, detector=detector)
+    executor = _provider_turn_executor()
+
+    # Patch the mention-detection heuristic so this test exercises the hint-injection wiring
+    # deterministically (the detection algorithm has its own coverage).
+    from victor.agent import continuation_strategy
+
+    monkeypatch.setattr(
+        continuation_strategy.ContinuationStrategy,
+        "detect_mentioned_tools",
+        staticmethod(lambda content, names, aliases: ["edit"]),
+        raising=True,
+    )
+
+    # spin reports a prior no-tool turn so the format hint fires.
+    spin = _spin("ACTIVE")
+    spin.consecutive_no_tool_turns = 1
+
+    forced, mentions = executor._detect_task_completion_and_mentions(
+        orch,
+        SimpleNamespace(),
+        full_content="I will use edit to change the file.",
+        tool_calls=None,
+        spin=spin,
+    )
+
+    assert forced is False
+    assert "edit" in mentions
+    # A TOOL-FORMAT-HINT user message is injected.
+    assert any("TOOL-FORMAT-HINT" in content for role, content in messages if role == "user")
+
+
+def test_detect_completion_no_detector_returns_defaults():
+    executor = _provider_turn_executor()
+    messages = []
+    orch = _completion_orch(messages, detector=None)
+
+    forced, mentions = executor._detect_task_completion_and_mentions(
+        orch,
+        SimpleNamespace(),
+        full_content="just some prose with no tool names",
+        tool_calls=None,
+        spin=_spin("ACTIVE"),
+    )
+
+    assert forced is False
+    assert mentions == []
+    assert messages == []
