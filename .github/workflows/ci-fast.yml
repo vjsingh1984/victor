@@ -454,10 +454,14 @@ jobs:
       - name: Run unit tests for changed files
         # Map changed files -> mirror unit tests (scripts/ci/select_changed_tests.py). No mapped
         # tests (docs/CI-only changes, or source with no mirror test) => nothing to run = pass.
+        # base_ref is passed via env (not inline ${{…}} in run:) to avoid shell injection from
+        # untrusted context interpolation (Semgrep run-shell-injection).
+        env:
+          BASE_REF: ${{ github.base_ref }}
         run: |
-          if [ -n "${{ github.base_ref }}" ]; then
-            git fetch origin "${{ github.base_ref }}" --quiet
-            CHANGED=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD")
+          if [ -n "$BASE_REF" ]; then
+            git fetch origin "$BASE_REF" --quiet
+            CHANGED=$(git diff --name-only "origin/$BASE_REF...HEAD")
           else
             CHANGED=$(git diff --name-only HEAD~1 HEAD)
           fi
