@@ -16,6 +16,7 @@ import hashlib
 import logging
 import re
 from types import SimpleNamespace
+from dataclasses import dataclass
 from typing import Any, AsyncIterator, List, Optional, Tuple
 
 from victor.agent.output_deduplicator import OutputDeduplicator
@@ -102,8 +103,63 @@ def _get_decision_service(orchestrator: object) -> object | None:
     return None
 
 
+@dataclass
+class _StreamTurnGuards:
+    """Per-turn guard components built once per streaming run.
+
+    Bundling these makes the per-turn evaluation boundary explicit — the first step of
+    FEP-0007 Phase 2 toward a ``stream_turn()`` primitive that both loops can share. The
+    streaming loop reads/feeds these each iteration (content-repetition via ``turn_eval``,
+    plateau via ``plateau``, search-novelty via ``novelty``, spin via ``spin``).
+    """
+
+    spin: Any
+    nudge_policy: Any
+    turn_eval: Any
+    plateau: Any
+    novelty: Any
+    novelty_enabled: bool
+
+
 class StreamingChatExecutor:
     """Canonical streaming chat executor bound to a runtime owner."""
+
+    @staticmethod
+    def _create_stream_turn_guards(orch: Any) -> "_StreamTurnGuards":
+        """Build the per-turn guard components for one streaming run from settings.
+
+        Mirrors the headless loop's controller setup: content-repetition + spin go through the
+        shared ``TurnEvaluationController`` (plateau/budget/novelty disabled on it because this
+        loop checks plateau/novelty at the post-tool point); plateau and search-novelty run as
+        dedicated trackers fed after tool execution. Thresholds + the novelty on/off come from
+        ``ExplorationSettings``.
+        """
+        from victor.agent.turn_policy import (
+            NudgePolicy,
+            PlateauDetector,
+            SpinDetector,
+            TurnEvaluationController,
+        )
+        from victor.framework.search_novelty import NoveltyConfig, SearchNoveltyTracker
+
+        spin = SpinDetector()
+        nudge_policy = NudgePolicy()
+        turn_eval = TurnEvaluationController(
+            spin_detector=spin,
+            nudge_policy=nudge_policy,
+            enable_plateau_nudge=False,
+            enable_budget_warning=False,
+            enable_search_novelty=False,
+        )
+        explore = getattr(getattr(orch, "settings", None), "exploration", None)
+        return _StreamTurnGuards(
+            spin=spin,
+            nudge_policy=nudge_policy,
+            turn_eval=turn_eval,
+            plateau=PlateauDetector(),
+            novelty=SearchNoveltyTracker(NoveltyConfig.from_exploration(explore)),
+            novelty_enabled=bool(getattr(explore, "search_novelty_guard_enabled", True)),
+        )
 
     _WRITE_MUTATION_TOOL_NAMES = {
         "apply_patch",
@@ -963,42 +1019,19 @@ class StreamingChatExecutor:
             if decision_service is not None and hasattr(decision_service, "reset_budget"):
                 decision_service.reset_budget()
 
-        from victor.agent.turn_policy import (
-            NudgePolicy,
-            PlateauDetector,
-            SpinDetector,
-            SpinState,
-            TurnEvaluationController,
-            TurnObservation,
-            plateau_nudge_message,
-        )
+        # Loop-scoped names used in the per-turn body below.
+        from victor.agent.turn_policy import SpinState, TurnObservation, plateau_nudge_message
+        from victor.framework.search_novelty import synthesize_nudge_message
 
-        _spin = SpinDetector()
-        _nudge_policy = NudgePolicy()
-        # Shared content-repetition detection (same detector the headless loop uses). Plateau
-        # and budget nudges stay owned by this loop below, so they're disabled on the controller.
-        _turn_eval = TurnEvaluationController(
-            spin_detector=_spin,
-            nudge_policy=_nudge_policy,
-            enable_plateau_nudge=False,
-            enable_budget_warning=False,
-            # Novelty is fed below (after tools), not at the content-rep call, so disable it on
-            # the controller and run a dedicated tracker at the post-tool point.
-            enable_search_novelty=False,
-        )
-        # Shared productivity-weighted plateau detector (replaces this loop's inline formula).
-        _plateau = PlateauDetector()
-        # Shared search-novelty safety-net (diminishing-returns on re-search loops), with
-        # thresholds and on/off from ExplorationSettings.
-        from victor.framework.search_novelty import (
-            NoveltyConfig,
-            SearchNoveltyTracker,
-            synthesize_nudge_message,
-        )
-
-        _explore = getattr(getattr(orch, "settings", None), "exploration", None)
-        _novelty_enabled = bool(getattr(_explore, "search_novelty_guard_enabled", True))
-        _novelty = SearchNoveltyTracker(NoveltyConfig.from_exploration(_explore))
+        # Per-turn guard components (built once per run via the extracted factory — the first
+        # step of FEP-0007 Phase 2 toward a shared stream_turn() boundary).
+        _guards = self._create_stream_turn_guards(orch)
+        _spin = _guards.spin
+        _nudge_policy = _guards.nudge_policy
+        _turn_eval = _guards.turn_eval
+        _plateau = _guards.plateau
+        _novelty = _guards.novelty
+        _novelty_enabled = _guards.novelty_enabled
 
         _perception = None
         conversation_history = self._get_conversation_history(runtime_owner, orch, user_message)
