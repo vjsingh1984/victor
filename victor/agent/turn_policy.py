@@ -722,6 +722,10 @@ class TurnEvaluationController:
         enable_plateau_nudge: bool = True,
         enable_search_novelty: bool = True,
         min_iterations_before_force_complete: int = 2,
+        enable_fulfillment_complete: bool = True,
+        fulfillment_summary_min_chars: int = 800,
+        fulfillment_min_findings: int = 3,
+        min_iterations_before_fulfillment: int = 4,
     ) -> None:
         from victor.framework.search_novelty import SearchNoveltyTracker
 
@@ -738,12 +742,21 @@ class TurnEvaluationController:
         self._enable_plateau_nudge = enable_plateau_nudge
         self._enable_search_novelty = enable_search_novelty
         self._min_iterations_before_force_complete = min_iterations_before_force_complete
+        # Fulfillment-complete: stop the redundant turns once a substantial answer exists AND
+        # enough findings were gathered AND the latest search is no longer adding much. The
+        # large summary threshold + findings floor + low-novelty gate keep it conservative.
+        self._enable_fulfillment_complete = enable_fulfillment_complete
+        self._fulfillment_summary_min_chars = fulfillment_summary_min_chars
+        self._fulfillment_min_findings = fulfillment_min_findings
+        self._min_iterations_before_fulfillment = min_iterations_before_fulfillment
+        self._best_content_len = 0
 
     def reset(self) -> None:
         self.spin_detector.reset()
         self.content_repetition.reset()
         self.plateau.reset()
         self.search_novelty.reset()
+        self._best_content_len = 0
 
     def evaluate(self, observation: TurnObservation, *, record_spin: bool = True) -> TurnDecision:
         """Run the shared per-turn guards and return a single decision.
@@ -805,6 +818,34 @@ class TurnEvaluationController:
                 stop_reason="search_saturated",
                 stop_message="\n\n[Enough context gathered — synthesizing the answer.]",
                 metadata={"novelty_ratio": novelty.novelty_ratio},
+            )
+
+        # 2.6 Fulfillment-complete — stop redundant turns once a SUBSTANTIAL answer has been
+        # produced AND enough findings gathered AND the latest search is no longer adding much.
+        # Fires earlier than pure saturation (1 low-novelty turn vs N) but only when a real
+        # answer already exists, so it trims over-verification without cutting analysis short.
+        self._best_content_len = max(self._best_content_len, len(observation.content or ""))
+        if (
+            self._enable_fulfillment_complete
+            and not _editing
+            and self._best_content_len >= self._fulfillment_summary_min_chars
+            and novelty.total_distinct_hits >= self._fulfillment_min_findings
+            and novelty.had_search
+            and novelty.consecutive_low_novelty >= 1
+            and observation.iteration >= self._min_iterations_before_fulfillment
+        ):
+            logger.info(
+                "[fulfillment] answer produced (%d chars) + %d findings + low-novelty search "
+                "— finalizing.",
+                self._best_content_len,
+                novelty.total_distinct_hits,
+            )
+            return TurnDecision(
+                stop=True,
+                terminal_success=True,
+                stop_reason="fulfilled",
+                stop_message="\n\n[Sufficient findings and an answer produced — finalizing.]",
+                metadata={"findings": novelty.total_distinct_hits},
             )
 
         # 3. Plateau (productivity-weighted) — may warrant a nudge (when enabled for this loop).
