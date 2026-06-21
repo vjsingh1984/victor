@@ -17,7 +17,7 @@ import logging
 import re
 from types import SimpleNamespace
 from dataclasses import dataclass
-from typing import Any, AsyncIterator, List, Optional, Tuple
+from typing import Any, AsyncIterator, List, Optional, Protocol, Tuple
 
 from victor.agent.output_deduplicator import OutputDeduplicator
 from victor.agent.services.protocols.streaming_runtime import (
@@ -28,7 +28,7 @@ from victor.core.completion_markers import (
     strip_active_completion_markers,
 )
 from victor.framework.runtime_evaluation_policy import RuntimeEvaluationPolicy
-from victor.providers.base import StreamChunk
+from victor.providers.base import CompletionResponse, StreamChunk
 
 logger = logging.getLogger(__name__)
 
@@ -230,6 +230,68 @@ class _TurnOutcome:
 
     should_stop: bool = False
     prev_iteration_had_content: bool = False
+
+
+@dataclass
+class StreamingActResult:
+    """ACT-phase output of one streaming turn (FEP-0007 Addendum A, the streaming-ACT seam).
+
+    ``execute_turn_streaming`` runs ONE turn's ACT sub-steps (provider response → assistant
+    emit → tool execution) and yields that turn's ``StreamChunk``s. Because an async generator
+    can't ``return`` a value, it writes its outcome here for the caller — the buffered shape the
+    shared EVALUATE/DECIDE phases consume:
+
+    - ``turn_result``: the ``TurnResult`` (same primitive ``turn_executor.execute_turn`` returns
+      for the buffered path) built from this turn's content + tool results.
+    - ``full_content`` / ``tool_calls`` / ``tools``: the raw provider outputs, surfaced for the
+      caller's evaluation (``tools`` is needed for empty-response recovery).
+    - ``tool_exec_result``: the streaming ``ToolExecutionResult`` (``None`` when no tools ran).
+    - ``garbage_detected`` / ``assistant_content_yielded``: per-turn signals the streaming
+      EVALUATE band reads (garbage→force completion; whether visible content was streamed).
+    - ``emit_should_return`` / ``emit_should_continue``: loop-control hints surfaced by the
+      assistant-emit / empty-response sub-step, for the future ``run_streaming`` driver.
+
+    This carries ACT output only; it deliberately runs none of the EVALUATE/DECIDE bands that
+    ``_stream_turn`` interleaves today — those move up to the shared ``AgenticLoop`` phases at
+    cutover. Until then this primitive is additive and unwired; ``run()``/``_stream_turn`` are
+    the live path.
+    """
+
+    turn_result: Optional[Any] = None
+    full_content: str = ""
+    tool_calls: Any = None
+    tools: Any = None
+    tool_exec_result: Any = None
+    garbage_detected: bool = False
+    assistant_content_yielded: bool = False
+    emit_should_return: bool = False
+    emit_should_continue: bool = False
+
+
+class StreamingActPort(Protocol):
+    """The streaming ACT seam consumed by the unified loop (FEP-0007 Addendum A).
+
+    Symmetric with the buffered ACT (``turn_executor.execute_turn() -> TurnResult``): a single
+    turn's provider + emit + tool sub-steps, yielding ``StreamChunk``s for live delivery while
+    producing the same ``TurnResult`` the shared EVALUATE phase consumes. Lets ``AgenticLoop``
+    own PERCEIVE/PLAN/EVALUATE/DECIDE once and differ only in the ACT call between modes.
+    """
+
+    def execute_turn_streaming(
+        self,
+        orch: Any,
+        runtime_owner: Any,
+        stream_ctx: Any,
+        *,
+        user_message: str,
+        goals: Any,
+        recovery: Any,
+        create_recovery_context: Any,
+        forced_task_completion: bool = False,
+        result: StreamingActResult,
+    ) -> AsyncIterator[StreamChunk]:
+        """Run one turn's ACT, yielding chunks and writing the outcome to ``result``."""
+        ...
 
 
 class StreamingChatExecutor:
@@ -2293,6 +2355,124 @@ class StreamingChatExecutor:
             if _post_tool.should_return:
                 outcome.should_stop = True
                 return
+
+    @staticmethod
+    def _build_streaming_turn_result(
+        stream_ctx: Any,
+        *,
+        full_content: str,
+        tool_calls: Any,
+        tool_exec_result: Any,
+    ) -> Any:
+        """Assemble a ``TurnResult`` from one streaming turn's ACT output.
+
+        Produces the same primitive ``turn_executor.execute_turn`` returns for the buffered
+        path, so the shared EVALUATE phase is mode-agnostic: the streamed ``full_content`` /
+        ``tool_calls`` become the ``CompletionResponse``, and the streaming
+        ``ToolExecutionResult.tool_results`` (if any) become ``TurnResult.tool_results``.
+        """
+        from victor.agent.services.turn_execution_runtime import TurnResult
+
+        response = CompletionResponse(
+            content=full_content or "",
+            tool_calls=list(tool_calls) if tool_calls else None,
+        )
+        tool_results = (
+            list(getattr(tool_exec_result, "tool_results", None) or [])
+            if tool_exec_result is not None
+            else []
+        )
+        return TurnResult(
+            response=response,
+            tool_results=tool_results,
+            has_tool_calls=bool(tool_calls),
+            tool_calls_count=len(tool_calls) if tool_calls else 0,
+            is_qa_response=bool(getattr(stream_ctx, "is_qa_task", False)),
+        )
+
+    async def execute_turn_streaming(
+        self,
+        orch: Any,
+        runtime_owner: Any,
+        stream_ctx: Any,
+        *,
+        user_message: str,
+        goals: Any,
+        recovery: Any,
+        create_recovery_context: Any,
+        forced_task_completion: bool = False,
+        result: StreamingActResult,
+    ) -> AsyncIterator[StreamChunk]:
+        """Run ONE turn's ACT as a contiguous streaming primitive (FEP-0007 Addendum A).
+
+        The streaming counterpart of the buffered ACT (``turn_executor.execute_turn``): it runs
+        this turn's provider response, assistant-content emit, and tool execution in sequence —
+        reusing the existing ``_stream_provider_turn`` / ``_emit_assistant_turn`` /
+        ``_execute_tools_turn`` helpers — yielding every ``StreamChunk`` for live delivery and
+        writing the produced ``TurnResult`` (plus the raw signals the shared EVALUATE/DECIDE
+        phases need) onto ``result``.
+
+        This carries ACT only: it runs none of the per-turn EVALUATE/DECIDE bands that
+        ``_stream_turn`` interleaves today (early-stop, task-completion, continuation, nudge,
+        quality, post-tool fulfillment/plateau/novelty) — those move up to ``AgenticLoop`` at
+        cutover. It is additive and not yet wired into ``run()``; ``_stream_turn`` remains the
+        single live streaming loop body until then.
+        """
+        # ACT — provider response (token streaming happens inside _stream_provider_turn).
+        tools, full_content, tool_calls, garbage_detected = await self._stream_provider_turn(
+            orch, runtime_owner, stream_ctx, goals
+        )
+        tool_calls, full_content = orch._parse_and_validate_tool_calls(tool_calls, full_content)
+        result.tools = tools
+        result.garbage_detected = garbage_detected
+
+        # ACT — emit the assistant response (handles tool-call-only / empty-response recovery).
+        _emit = _EmitDecision()
+        async for chunk in self._emit_assistant_turn(
+            orch,
+            runtime_owner,
+            stream_ctx,
+            recovery=recovery,
+            create_recovery_context=create_recovery_context,
+            full_content=full_content,
+            tool_calls=tool_calls,
+            forced_task_completion=forced_task_completion,
+            user_message=user_message,
+            tools=tools,
+            decision=_emit,
+        ):
+            yield chunk
+        result.assistant_content_yielded = _emit.assistant_content_yielded
+        result.emit_should_return = _emit.should_return
+        result.emit_should_continue = _emit.should_continue
+        # Empty-response recovery may have replaced the tool calls.
+        tool_calls = _emit.tool_calls
+
+        # ACT — execute tools (only when this turn produced tool calls and emit did not exit).
+        tool_exec_result = None
+        if tool_calls and not (_emit.should_return or _emit.should_continue):
+            _tool_outcome = _ToolTurnOutcome()
+            async for chunk in self._execute_tools_turn(
+                orch,
+                runtime_owner,
+                stream_ctx,
+                user_message=user_message,
+                tool_calls=tool_calls,
+                full_content=full_content,
+                result_holder=_tool_outcome,
+            ):
+                yield chunk
+            tool_exec_result = _tool_outcome.result
+
+        result.full_content = full_content
+        result.tool_calls = tool_calls
+        result.tool_exec_result = tool_exec_result
+        result.turn_result = self._build_streaming_turn_result(
+            stream_ctx,
+            full_content=full_content,
+            tool_calls=tool_calls,
+            tool_exec_result=tool_exec_result,
+        )
 
     async def run(self, user_message: str, **kwargs: Any) -> AsyncIterator[StreamChunk]:
         """Run the streaming executor for the provided message."""

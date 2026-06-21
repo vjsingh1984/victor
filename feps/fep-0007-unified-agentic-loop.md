@@ -80,9 +80,11 @@ Shipped:
   byte-stable. The flag-gated comparison scaffolding was removed once the no-flag decision was made
   (PR #193).
 
-Remaining (optional): if deeper unification is desired, have the headless `AgenticLoop` drive the
-same `_stream_turn()` primitive as its streaming ACT — again as the single implementation, with no
-flag and no fallback.
+Remaining (now in progress): the full **capability-leveling** unification — make `AgenticLoop` the
+single PPAED loop for both modes via a symmetric streaming-ACT port, so the UI path gains
+PERCEIVE/PLAN/DECIDE and the research-rooted gates it currently lacks. The owner decided on
+2026-06-21 to pursue this (framing **B**) rather than close the FEP; the concrete architecture,
+phased plan, and the revised run/stream behavioral-parity acceptance bar are in **Addendum A**.
 
 ## Proposed Change
 
@@ -192,6 +194,159 @@ are unchanged throughout, so UI, API, and SDK consumers require no code changes.
   tool sequence, no streaming tracebacks. *(Met: the characterization battery passes byte-stable.)*
 - The streaming per-turn decision shares one `TurnEvaluationController` / `turn_policy` seam.
 - Single canonical streaming loop — no feature flag, no retained legacy path.
+
+## Addendum A — Decision: full capability-leveling unification (2026-06-21)
+
+Phases 1–2 met FEP-0007's *minimum* goal (one canonical streaming per-turn primitive + a shared
+per-turn decision). This addendum records the decision to pursue the **maximal** goal instead of
+closing the FEP: make the research-rooted `AgenticLoop` (PERCEIVE → PLAN → ACT → EVALUATE → DECIDE)
+the **single loop for both modes**, with streaming reduced to a pure I/O concern.
+
+> **Decision (owner, 2026-06-21): pursue framing (B), capability-leveling.** The phase loop is the
+> scientifically grounded execution model (it carries five arXiv-backed mechanisms; see below).
+> Streaming vs. buffered is a UI/UX delivery difference, **not** a behavioral one — the live UI path
+> should run the *same* PPAED loop and merely emit `StreamChunk`s as it goes. The streaming path's
+> current absence of PLAN / DECIDE / planning-gate / semantic-cache / routing is a capability gap to
+> *close*, not a behavior to preserve. Consequently the acceptance bar is **run/stream behavioral
+> parity**, not byte-stability of today's streaming output (see "Acceptance bar" below).
+
+This supersedes the earlier "leaning no-go" recommendation, which optimized for behavior-neutrality;
+the owner has explicitly chosen feature-completeness of the UI path over preserving its current
+(thinner) behavior.
+
+### Exploration findings (2026-06-21)
+
+A three-way read of `agentic_loop.py`, `chat_stream_executor.py`, and the I/O/caller surface
+established:
+
+| Concern | Headless `AgenticLoop.run()` | Streaming `StreamingChatExecutor.run()` |
+|---|---|---|
+| I/O shape | buffered `LoopResult` → `CompletionResponse` | `AsyncIterator[StreamChunk]` |
+| Phase methods | `_analyze_turn` / `_plan` / `_act` / `_evaluate` / DECIDE — **non-yielding**; only ACT does I/O | one procedural `_stream_turn()` async-gen |
+| ACT seam | **injected `turn_executor.execute_turn()` → `TurnResult`** (agentic_loop.py:2069) | inline `_stream_provider_turn` + `_emit_assistant_turn` + `_execute_tools_turn` |
+| EVALUATE/DECIDE | full structured phases (enhanced-completion, fulfillment, adaptive termination) | thin, re-implemented inline; emits a final chunk on terminal |
+| PERCEIVE | per-turn (`runtime_intelligence.analyze_turn`) | one-time upfront injection only |
+| PLAN / DECIDE / fast-slow gate / semantic cache / paradigm routing | present | **absent** |
+| Shared decision seam | `TurnEvaluationController.evaluate(TurnObservation)` | `TurnEvaluationController.evaluate(TurnObservation)` ✅ already shared |
+
+**The enabling insight:** `AgenticLoop` already takes `turn_executor` as an injected dependency and
+calls `turn_executor.execute_turn()` as its buffered ACT. Streaming ACT therefore slots into the
+**same injection seam** — symmetric with the buffered path — so the framework loop never has to
+absorb service-layer streaming plumbing (`orch._chunk_generator`, `stream_ctx`, governance gates).
+This keeps the CLAUDE.md layering intact: framework owns the phase loop + decision; the service
+owns the ACT *effect*.
+
+### Chosen architecture
+
+`AgenticLoop` owns iteration for both modes; the **only** per-turn difference is the ACT call:
+
+```python
+class AgenticLoop:
+    async def run(self, query, ...) -> LoopResult:                          # buffered (today)
+        ...
+        result = await self.turn_executor.execute_turn(...)                 # buffered ACT
+        evaluation = await self._evaluate(result, ...)                      # shared, non-yielding
+        decision   = self._decide(evaluation, ...)                          # shared
+        ...
+
+    async def run_streaming(self, query, ...) -> AsyncIterator[StreamChunk]:  # NEW
+        # SAME _analyze_turn / _plan / _evaluate / _decide calls — all non-yielding
+        result = None
+        async for item in self.turn_executor.execute_turn_streaming(...):    # streaming ACT
+            if isinstance(item, StreamChunk):
+                yield item
+            else:
+                result = item                                                # final TurnResult
+        evaluation = await self._evaluate(result, ...)                       # shared, non-yielding
+        decision   = self._decide(evaluation, ...)                          # shared
+        if decision.terminal:
+            yield self._final_chunk(decision); return
+        yield self._nudge_chunk(decision)                                    # DECIDE → emits a chunk
+```
+
+- **New ACT port:** `turn_executor.execute_turn_streaming(...)` — an async generator that yields
+  `StreamChunk`s for live token + tool output **and** produces the same `TurnResult` the EVALUATE
+  phase consumes (delivered as the terminal item, or via an out-param holder, mirroring the existing
+  `_stream_turn` holder pattern). It is assembled from today's streaming **ACT sub-steps only**:
+  `_stream_provider_turn` + assistant-content emit + `_execute_tools_turn` + per-turn recovery.
+- **What moves up into the shared phases:** the outer EVALUATE/DECIDE work `_stream_turn()` does
+  inline today — `_evaluate_provider_turn_stops`, `_detect_task_completion_and_mentions`,
+  `_evaluate_post_tool_turn`, `_handle_continuation_decision`, nudge emission — is **deleted from the
+  streaming path** and provided once by `AgenticLoop._evaluate` / `_decide`. Streaming-specific I/O
+  shrinks to: (a) ACT yields chunks, (b) DECIDE's terminal/nudge result is rendered as a chunk.
+- **`StreamingChatExecutor` shrinks** to the streaming-ACT primitive (provider SSE + emit + tools +
+  per-turn recovery) exposed via the `execute_turn_streaming` port; its outer `while`-driver is
+  removed. `ChatStreamRuntime.get_executor()` is repointed to drive `AgenticLoop.run_streaming()`,
+  and `ChatService.stream_chat()` consumes that iterator unchanged.
+- **Public contracts unchanged:** `Agent.run()` → `CompletionResponse` and `Agent.stream()` →
+  `AgentExecutionEvent`/`StreamChunk` are both preserved; only the *internal* driver behind
+  `stream_chat()` changes.
+
+### Capabilities the UI path gains (the "feature-complete" payoff)
+
+Per-turn, the streaming path inherits the headless loop's research-rooted mechanisms:
+
+- **Per-turn PERCEIVE** with calibrated confidence (truth-aligned uncertainty, arXiv:2604.00445).
+- **PLAN + fast-slow planning gate** (arXiv:2604.01681) — skips/!skips LLM planning per turn.
+- **Structured DECIDE** with enhanced-completion evaluation + fulfillment criteria.
+- **Adaptive iteration / plateau termination** (intermediate-reward progress, arXiv:2604.07415).
+- **Semantic response cache** (arXiv:2508.07675) and **paradigm routing** (arXiv:2604.06753).
+
+### Implementation plan (small, landable, single canonical path — no flag)
+
+Consistent with the FEP's no-flag rule, each step replaces behavior in place behind the
+behavioral-parity gate; there is no `run_streaming` feature toggle and no retained legacy streaming
+driver once cutover lands.
+
+1. **Define the streaming-ACT port.** Add `execute_turn_streaming(...)` to the turn-executor
+   protocol; implement it by lifting the ACT-only sub-steps out of `_stream_turn()` (provider +
+   emit + tools + per-turn recovery), returning chunks + a `TurnResult`. No outer-loop change yet;
+   `StreamingChatExecutor.run()` keeps driving it. Gate: characterization battery stays green.
+2. **Add `AgenticLoop.run_streaming()`.** Outer async-gen reusing the existing non-yielding
+   `_analyze_turn`/`_plan`/`_evaluate`/`_decide`, calling the new ACT port. Not yet wired to the
+   UI. Unit-test it against scripted turn-executors.
+3. **Cut the UI over.** Repoint `ChatStreamRuntime.get_executor()` to `AgenticLoop.run_streaming()`;
+   delete `StreamingChatExecutor.run()`'s outer `while`-driver and its now-duplicated inline
+   EVALUATE/DECIDE. This is the behavior-changing step — gated by the new parity battery + live zai.
+4. **Reconcile governance & recovery.** Keep the streaming REQUEST gate before the loop; render
+   DECIDE/recovery terminals as `is_final` chunks (streaming cannot post-gate a fully-buffered
+   response — preserve per-emit gating). Fold streaming recovery into the shared recovery seam.
+5. **StateGraph executor.** `run_streaming` initially targets the in-class while executor only;
+   streaming support for the `USE_STATEGRAPH_AGENTIC_LOOP` path is deferred (orthogonal).
+
+### Risks & mitigations
+
+- **Live-streaming hot path.** A regression breaks `victor ui`. Mitigate with the parity battery +
+  live zai in **both** modes each increment; watch for GeneratorExit / cancel-scope tracebacks
+  (the historical failure mode) since ACT is now an async-gen nested inside another async-gen.
+- **Token-granularity emission.** Live token streaming must stay inside the provider sub-step
+  (`_stream_provider_turn`); `run_streaming` re-yields, it does not buffer-then-dump.
+- **Behavior shift is intended but must be principled.** New phases (semantic cache, planning gate)
+  can legitimately change a scenario's tool sequence or short-circuit it. Any battery scenario whose
+  expectation changes is updated **with a written justification**, never silently.
+- **Governance asymmetry.** Streaming has a REQUEST gate but no RESPONSE post-gate (chunks already
+  sent); the unified loop must not assume a buffered post-gate exists.
+
+### Acceptance bar (revised for framing B)
+
+- **NEW — run/stream behavioral parity battery:** `Agent.run(p)` and `Agent.stream(p)` produce
+  equivalent final answer + tool sequence across the QA scenarios (S1/S2/M1/M2/C1/W1–W4/U1). This
+  is the precise encoding of "streaming is I/O, not behavior" and is the primary gate. *(Does not
+  exist yet — to be authored alongside step 2/3; agent-reported "parity" today is streaming-only
+  characterization.)*
+- The existing streaming characterization battery's **scenario-level invariants** (correct answer,
+  bounded/expected tool sequence, no traceback) continue to hold; expectations that move due to the
+  new phases are updated with justification.
+- The headless `AgenticLoop` unit suites stay green; `TurnObservation` / `TurnEvaluationController`
+  remain the one decision seam.
+- Live zai verification in **both** `--headless` and UI streaming: same answers, no streaming
+  tracebacks.
+- Single canonical loop — no `run_streaming` flag, no retained legacy streaming driver.
+
+### Out of scope / deferred
+
+Streaming under the StateGraph executor (`USE_STATEGRAPH_AGENTIC_LOOP`); changes to the public
+`StreamChunk` / `AgentExecutionEvent` types; any provider-level streaming changes.
 
 ## References
 
