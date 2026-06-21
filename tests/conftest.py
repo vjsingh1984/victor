@@ -33,6 +33,26 @@ def reset_write_path_policy():
         yield
 
 
+@pytest.fixture(autouse=True)
+def reset_tool_message_cleanup_stats():
+    """Keep openai_compat tool-history-repair stats from leaking between tests.
+
+    ``fix_orphaned_tool_messages`` records the last repair into a module ContextVar that a
+    later streaming turn consumes to emit a ``tool_history_repaired`` event. Sync tests that
+    call the repair directly leave that ContextVar set in the parent context, so an unrelated
+    streaming test could pick up a stale repair and emit a spurious event (an order-dependent
+    failure). Clear it around every test.
+    """
+    try:
+        from victor.providers.openai_compat import clear_last_tool_message_cleanup_stats
+
+        clear_last_tool_message_cleanup_stats()
+        yield
+        clear_last_tool_message_cleanup_stats()
+    except Exception:
+        yield
+
+
 def pytest_configure(config):
     """Configure pytest with custom markers."""
     config.addinivalue_line(

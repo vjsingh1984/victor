@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import time
 from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional
@@ -1338,8 +1339,6 @@ class ChatStreamHelperMixin:
             tools=tools,
             **provider_kwargs,
         )
-        provider_iterator = provider_stream.__aiter__()
-
         heartbeat_interval = max(
             1.0,
             float(getattr(orch.settings, "stream_provider_wait_heartbeat_seconds", 15.0)),
@@ -1366,186 +1365,201 @@ class ChatStreamHelperMixin:
         )
         waiting_since = time.monotonic()
         first_chunk_received = False
-        pending_next = None
 
-        while True:
-            pending_next = asyncio.create_task(provider_iterator.__anext__())
+        # Producer/consumer split for deterministic, on-task stream cleanup.
+        #
+        # The provider's httpx SSE generator must be entered, iterated, AND closed in a
+        # single asyncio task — otherwise httpcore/anyio raises "Attempted to exit cancel
+        # scope in a different task" / "async generator ignored GeneratorExit". The previous
+        # code spawned a fresh `create_task(provider_iterator.__anext__())` per chunk, so the
+        # generator's anyio cancel scope was entered in one child task and resumed/exited in
+        # later ones. Here a single producer task owns the whole generator lifecycle (via
+        # `aclosing`, so every exit path — normal end, tool-call break, stall, cancellation —
+        # closes it in the producer's own task). The consumer applies the heartbeat/stall
+        # timeouts against a bounded queue, which never cancels the in-flight read.
+        _DONE = object()
+        chunk_queue: asyncio.Queue = asyncio.Queue(maxsize=1)
+
+        async def _drain_provider_stream() -> None:
             try:
-                while True:
-                    try:
-                        wait_started_at = time.monotonic()
-                        chunk = await asyncio.wait_for(
-                            asyncio.shield(pending_next),
-                            timeout=heartbeat_interval,
-                        )
-                        break
-                    except asyncio.TimeoutError:
-                        now = time.monotonic()
-                        wait_overrun_seconds = max(0.0, now - wait_started_at - heartbeat_interval)
-                        if wait_overrun_seconds > loop_stall_grace:
-                            # The heartbeat wait overran by more than the grace
-                            # window: the local asyncio event loop was blocked
-                            # (host-side GC/CPU), not the provider. Attribute it to
-                            # the host and reset the timer so a responsive provider
-                            # (including cloud) is not penalized for local blocking.
-                            self._record_provider_status_event(
-                                stream_ctx,
-                                "local_runtime_stall",
-                                waited_seconds=round(now - waiting_since, 3),
-                                overrun_seconds=round(wait_overrun_seconds, 3),
-                                model=getattr(orch, "model", None),
-                            )
-                            logger.warning(
-                                "[provider-stream] Local event loop blocked for %.1fs "
-                                "(host-side GC/CPU, not the provider); not charging it "
-                                "against the provider stall timer",
-                                wait_overrun_seconds,
-                            )
-                            waiting_since = now
-                            continue
+                async with contextlib.aclosing(provider_stream):
+                    async for produced in provider_stream:
+                        await chunk_queue.put(("chunk", produced))
+                await chunk_queue.put(("done", _DONE))
+            except asyncio.CancelledError:
+                raise  # cleanup happens via aclosing.__aexit__ in THIS task
+            except Exception as exc:  # forward provider errors to the consumer in order
+                await chunk_queue.put(("error", exc))
 
-                        waited_seconds = now - waiting_since
-                        event_kind = (
-                            "provider_waiting" if not first_chunk_received else "still_generating"
+        producer_task = asyncio.create_task(_drain_provider_stream())
+        # Persistent queue-get task, re-awaited across heartbeats under asyncio.shield so a
+        # heartbeat timeout never cancels (and drops) an in-flight dequeue. Using a Task
+        # (not a bare coroutine) also keeps it driven independently of the wait_for wrapper.
+        pending_get: Optional[asyncio.Future] = None
+        try:
+            while True:
+                if pending_get is None:
+                    pending_get = asyncio.ensure_future(chunk_queue.get())
+                try:
+                    wait_started_at = time.monotonic()
+                    kind, payload = await asyncio.wait_for(
+                        asyncio.shield(pending_get), timeout=heartbeat_interval
+                    )
+                    pending_get = None
+                except asyncio.TimeoutError:
+                    now = time.monotonic()
+                    wait_overrun_seconds = max(0.0, now - wait_started_at - heartbeat_interval)
+                    if wait_overrun_seconds > loop_stall_grace:
+                        # The heartbeat wait overran by more than the grace window: the local
+                        # asyncio event loop was blocked (host-side GC/CPU), not the provider.
+                        # Attribute it to the host and reset the timer so a responsive provider
+                        # (including cloud) is not penalized for local blocking.
+                        self._record_provider_status_event(
+                            stream_ctx,
+                            "local_runtime_stall",
+                            waited_seconds=round(now - waiting_since, 3),
+                            overrun_seconds=round(wait_overrun_seconds, 3),
+                            model=getattr(orch, "model", None),
+                        )
+                        logger.warning(
+                            "[provider-stream] Local event loop blocked for %.1fs "
+                            "(host-side GC/CPU, not the provider); not charging it "
+                            "against the provider stall timer",
+                            wait_overrun_seconds,
+                        )
+                        waiting_since = now
+                        continue
+
+                    waited_seconds = now - waiting_since
+                    event_kind = (
+                        "provider_waiting" if not first_chunk_received else "still_generating"
+                    )
+                    self._record_provider_status_event(
+                        stream_ctx,
+                        event_kind,
+                        waited_seconds=round(waited_seconds, 3),
+                        model=getattr(orch, "model", None),
+                    )
+                    logger.info(
+                        "[provider-stream] %s after %.1fs (model=%s)",
+                        event_kind,
+                        waited_seconds,
+                        getattr(orch, "model", "unknown"),
+                    )
+                    if waited_seconds >= stall_timeout:
+                        logger.error(
+                            "[provider-stream] Stall timeout after %.1fs without provider chunk",
+                            waited_seconds,
                         )
                         self._record_provider_status_event(
                             stream_ctx,
-                            event_kind,
+                            "provider_stall_timeout",
                             waited_seconds=round(waited_seconds, 3),
                             model=getattr(orch, "model", None),
                         )
-                        logger.info(
-                            "[provider-stream] %s after %.1fs (model=%s)",
-                            event_kind,
-                            waited_seconds,
-                            getattr(orch, "model", "unknown"),
+                        # The finally below cancels the producer; its aclosing finalizes the
+                        # httpx stream in the producer task.
+                        raise ProviderTimeoutError(
+                            f"Provider stream stalled for {waited_seconds:.1f}s without chunks"
                         )
-                        if waited_seconds >= stall_timeout:
-                            logger.error(
-                                "[provider-stream] Stall timeout after %.1fs without provider chunk",
-                                waited_seconds,
-                            )
-                            self._record_provider_status_event(
-                                stream_ctx,
-                                "provider_stall_timeout",
-                                waited_seconds=round(waited_seconds, 3),
-                                model=getattr(orch, "model", None),
-                            )
-                            pending_next.cancel()
-                            try:
-                                await pending_next
-                            except (asyncio.CancelledError, Exception):
-                                pass
-                            close_stream = getattr(provider_stream, "aclose", None)
-                            if callable(close_stream):
-                                try:
-                                    await close_stream()
-                                except Exception:
-                                    logger.debug(
-                                        "Failed closing stalled provider stream",
-                                        exc_info=True,
-                                    )
-                            raise ProviderTimeoutError(
-                                f"Provider stream stalled for {waited_seconds:.1f}s without chunks"
-                            )
-            except StopAsyncIteration:
-                self._record_provider_status_event(
-                    stream_ctx,
-                    "completion_detected",
-                    waited_seconds=round(time.monotonic() - waiting_since, 3),
-                    model=getattr(orch, "model", None),
-                    reason="stream_end",
-                    content_length=len(full_content),
-                    tool_call_count=len(tool_calls) if tool_calls else 0,
+                    continue
+
+                if kind == "error":
+                    raise payload
+                if kind == "done":
+                    self._record_provider_status_event(
+                        stream_ctx,
+                        "completion_detected",
+                        waited_seconds=round(time.monotonic() - waiting_since, 3),
+                        model=getattr(orch, "model", None),
+                        reason="stream_end",
+                        content_length=len(full_content),
+                        tool_call_count=len(tool_calls) if tool_calls else 0,
+                    )
+                    break
+
+                chunk = payload
+
+                if hasattr(stream_ctx, "reset_activity_timer"):
+                    stream_ctx.reset_activity_timer()
+
+                if not first_chunk_received:
+                    first_chunk_received = True
+                    self._record_provider_status_event(
+                        stream_ctx,
+                        "first_token_received",
+                        waited_seconds=round(time.monotonic() - waiting_since, 3),
+                        model=getattr(orch, "model", None),
+                        has_content=bool(getattr(chunk, "content", "")),
+                        has_tool_calls=bool(getattr(chunk, "tool_calls", None)),
+                    )
+
+                waiting_since = time.monotonic()
+                # Accumulate token usage from the RAW chunk BEFORE garbage-filtering.
+                # Providers routinely attach the turn's usage to the final, empty-content
+                # chunk (Ollama's `done` chunk, OpenAI-compat's terminal usage chunk). That
+                # chunk has no content, so `_handle_stream_chunk` drops it as garbage — and
+                # with it the entire turn's token accounting, leaving total_tokens=0. Reading
+                # usage here makes the dominant cost term observable regardless of whether
+                # the chunk survives the filter.
+                raw_usage = getattr(chunk, "usage", None)
+                if raw_usage:
+                    for key in stream_ctx.cumulative_usage:
+                        stream_ctx.cumulative_usage[key] += raw_usage.get(key, 0)
+                    logger.debug(
+                        f"Chunk usage: in={raw_usage.get('prompt_tokens', 0)} "
+                        f"out={raw_usage.get('completion_tokens', 0)} "
+                        f"cache_read={raw_usage.get('cache_read_input_tokens', 0)}"
+                    )
+
+                chunk, consecutive_garbage_chunks, garbage_detected = self._handle_stream_chunk(
+                    chunk,
+                    consecutive_garbage_chunks,
+                    max_garbage_chunks,
+                    garbage_detected,
                 )
-                break
+                if chunk is None:
+                    continue
 
-            if hasattr(stream_ctx, "reset_activity_timer"):
-                stream_ctx.reset_activity_timer()
+                full_content += chunk.content
+                stream_ctx.stream_metrics.total_chunks += 1
+                if chunk.content:
+                    orch._metrics_collector.record_first_token()
+                    total_tokens += len(chunk.content) / 4
+                    stream_ctx.stream_metrics.total_content_length += len(chunk.content)
 
-            if not first_chunk_received:
-                first_chunk_received = True
-                self._record_provider_status_event(
-                    stream_ctx,
-                    "first_token_received",
-                    waited_seconds=round(time.monotonic() - waiting_since, 3),
-                    model=getattr(orch, "model", None),
-                    has_content=bool(getattr(chunk, "content", "")),
-                    has_tool_calls=bool(getattr(chunk, "tool_calls", None)),
-                )
+                if chunk.tool_calls:
+                    logger.debug(f"Received tool_calls in chunk: {chunk.tool_calls}")
+                    tool_calls = chunk.tool_calls
+                    stream_ctx.stream_metrics.tool_calls_count += len(chunk.tool_calls)
 
-            waiting_since = time.monotonic()
-            # Accumulate token usage from the RAW chunk BEFORE garbage-filtering. Providers
-            # routinely attach the turn's usage to the final, empty-content chunk (Ollama's
-            # `done` chunk, OpenAI-compat's terminal usage chunk). That chunk has no content,
-            # so `_handle_stream_chunk` drops it as garbage — and with it the entire turn's
-            # token accounting, leaving total_tokens=0. Reading usage here makes the dominant
-            # cost term observable regardless of whether the chunk survives the filter.
-            raw_usage = getattr(chunk, "usage", None)
-            if raw_usage:
-                for key in stream_ctx.cumulative_usage:
-                    stream_ctx.cumulative_usage[key] += raw_usage.get(key, 0)
-                logger.debug(
-                    f"Chunk usage: in={raw_usage.get('prompt_tokens', 0)} "
-                    f"out={raw_usage.get('completion_tokens', 0)} "
-                    f"cache_read={raw_usage.get('cache_read_input_tokens', 0)}"
-                )
-
-            chunk, consecutive_garbage_chunks, garbage_detected = self._handle_stream_chunk(
-                chunk,
-                consecutive_garbage_chunks,
-                max_garbage_chunks,
-                garbage_detected,
-            )
-            if chunk is None:
-                continue
-
-            full_content += chunk.content
-            stream_ctx.stream_metrics.total_chunks += 1
-            if chunk.content:
-                orch._metrics_collector.record_first_token()
-                total_tokens += len(chunk.content) / 4
-                stream_ctx.stream_metrics.total_content_length += len(chunk.content)
-
-            if chunk.tool_calls:
-                logger.debug(f"Received tool_calls in chunk: {chunk.tool_calls}")
-                tool_calls = chunk.tool_calls
-                stream_ctx.stream_metrics.tool_calls_count += len(chunk.tool_calls)
-
-            if tool_calls:
-                # Tool calls signal the end of this turn — the SSE stream is done.
-                # Break immediately; do NOT start a new stream call with the same
-                # messages (that would duplicate full_content).
-                self._record_provider_status_event(
-                    stream_ctx,
-                    "completion_detected",
-                    waited_seconds=0.0,
-                    model=getattr(orch, "model", None),
-                    reason="tool_calls",
-                    content_length=len(full_content),
-                    tool_call_count=len(tool_calls),
-                )
-                logger.debug("Tool calls received, breaking stream loop")
-                break
-
-        # Close the provider stream in THIS task. Breaking early on tool_calls (the
-        # common case) leaves the underlying httpx SSE async generator open; if it is
-        # finalized later by GC it runs off-task and raises "async generator ignored
-        # GeneratorExit" / "Attempted to exit cancel scope in a different task". Draining
-        # the in-flight task and aclose()-ing here keeps that cleanup on-task. aclose() on
-        # an already-exhausted generator (StopAsyncIteration path) is a safe no-op.
-        if pending_next is not None and not pending_next.done():
-            pending_next.cancel()
-            try:
-                await pending_next
-            except (asyncio.CancelledError, Exception):
-                pass
-        _stream_aclose = getattr(provider_iterator, "aclose", None)
-        if callable(_stream_aclose):
-            try:
-                await _stream_aclose()
-            except Exception:
-                logger.debug("Failed closing provider stream iterator", exc_info=True)
+                if tool_calls:
+                    # Tool calls signal the end of this turn — the SSE stream is done.
+                    # Break immediately; do NOT start a new stream call with the same
+                    # messages (that would duplicate full_content).
+                    self._record_provider_status_event(
+                        stream_ctx,
+                        "completion_detected",
+                        waited_seconds=0.0,
+                        model=getattr(orch, "model", None),
+                        reason="tool_calls",
+                        content_length=len(full_content),
+                        tool_call_count=len(tool_calls),
+                    )
+                    logger.debug("Tool calls received, breaking stream loop")
+                    break
+        finally:
+            # Deterministic, on-task cleanup. Cancelling the producer raises CancelledError
+            # inside _drain_provider_stream, whose `aclosing` __aexit__ then closes the httpx
+            # SSE generator in the producer's OWN task — never via GC and never across tasks.
+            # Covers every exit: stream end, tool-call break, stall timeout, provider error,
+            # and an outer cancellation (e.g. the UI's on_chat_end draining the turn).
+            if pending_get is not None and not pending_get.done():
+                pending_get.cancel()
+            if not producer_task.done():
+                producer_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError, Exception):
+                await producer_task
 
         if garbage_detected and not tool_calls:
             logger.info("Setting force_completion due to garbage detection")
@@ -1693,21 +1707,27 @@ class ChatStreamHelperMixin:
                     selected_tools=tools,
                     planned_tools=(stream_ctx.planned_tools if stream_ctx else None),
                 )
-                async for chunk in orch.provider.stream(
-                    messages=retry_assembled,
-                    model=orch.model,
-                    temperature=temp,
-                    max_tokens=orch.max_tokens,
-                    tools=tools,
-                    **provider_kwargs,
-                ):
-                    if hasattr(stream_ctx, "reset_activity_timer"):
-                        stream_ctx.reset_activity_timer()
-                    if chunk.content:
-                        full_content += chunk.content
-                    if chunk.tool_calls:
-                        recovered_tool_calls = chunk.tool_calls
-                        break
+                # aclosing guarantees the recovery stream is finalized in THIS task on the
+                # tool-call `break` below, rather than left to GC (which would close it
+                # off-task and raise "ignored GeneratorExit" / "no running event loop").
+                async with contextlib.aclosing(
+                    orch.provider.stream(
+                        messages=retry_assembled,
+                        model=orch.model,
+                        temperature=temp,
+                        max_tokens=orch.max_tokens,
+                        tools=tools,
+                        **provider_kwargs,
+                    )
+                ) as recovery_stream:
+                    async for chunk in recovery_stream:
+                        if hasattr(stream_ctx, "reset_activity_timer"):
+                            stream_ctx.reset_activity_timer()
+                        if chunk.content:
+                            full_content += chunk.content
+                        if chunk.tool_calls:
+                            recovered_tool_calls = chunk.tool_calls
+                            break
 
                 if recovered_tool_calls:
                     logger.info(f"Recovery at temperature {temp} produced tool calls")
