@@ -1300,11 +1300,17 @@ class StreamingChatExecutor:
                 except (ValueError, KeyError):
                     task_type = TaskType.UNKNOWN
 
-                criteria = FulfillmentCriteriaBuilder.from_tool_results(
+                # Auto-derive acceptance criteria from this turn's tool results, mirroring the
+                # headless AgenticLoop's canonical pattern (record_tool_result per result ->
+                # build -> to_dict). check_fulfillment expects a criteria dict.
+                criteria_builder = FulfillmentCriteriaBuilder()
+                for tool_result in (
                     tool_exec_result.tool_results
                     if hasattr(tool_exec_result, "tool_results")
                     else []
-                )
+                ):
+                    criteria_builder.record_tool_result(tool_result)
+                criteria = criteria_builder.build().to_dict()
                 fulfillment_result = await self._fulfillment.check_fulfillment(
                     task_type=task_type,
                     criteria=criteria,

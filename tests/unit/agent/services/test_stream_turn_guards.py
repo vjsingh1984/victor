@@ -543,38 +543,35 @@ async def _collect_post_tool(
     return chunks, outcome
 
 
-async def test_evaluate_post_tool_turn_fulfilled_returns(monkeypatch):
+async def test_evaluate_post_tool_turn_fulfilled_returns():
+    # Fulfillment now actually runs: criteria are auto-derived from this turn's tool results
+    # via the real FulfillmentCriteriaBuilder (record_tool_result -> build -> to_dict), with no
+    # patching needed. A fulfilled result ends the turn before plateau/novelty.
     executor = _provider_turn_executor()
+    captured = {}
 
     class _Fulfillment:
-        async def check_fulfillment(self, **kwargs):
+        async def check_fulfillment(self, *, task_type, criteria, context):
+            captured["criteria"] = criteria
+            captured["context"] = context
             return SimpleNamespace(is_fulfilled=True, score=0.9, reason="done")
 
     executor._fulfillment = _Fulfillment()
-    # NOTE: production run() calls FulfillmentCriteriaBuilder.from_tool_results, which does
-    # not exist (the real method is record_tool_result) — so the live fulfillment branch
-    # always raises AttributeError and is swallowed by its try/except. This extraction is
-    # behavior-neutral and preserves that. Patch the missing builder method here so the
-    # helper's intended fulfillment->return wiring is actually exercised.
-    from victor.agent import turn_policy
-
-    monkeypatch.setattr(
-        turn_policy.FulfillmentCriteriaBuilder,
-        "from_tool_results",
-        staticmethod(lambda results: SimpleNamespace()),
-        raising=False,
-    )
-
     messages = []
     orch = _post_tool_orch(messages)
     stream_ctx = SimpleNamespace(total_iterations=3)
+
+    tool_exec = _FakeToolExecResult()
+    tool_exec.tool_results = [
+        {"tool_name": "write", "args": {"file_path": "out.py"}, "success": True}
+    ]
 
     chunks, outcome = await _collect_post_tool(
         executor,
         orch=orch,
         stream_ctx=stream_ctx,
         perception=SimpleNamespace(task_analysis=None),
-        tool_exec_result=_FakeToolExecResult(),
+        tool_exec_result=tool_exec,
         plateau=SimpleNamespace(record=lambda *a: _PlateauRes()),
         novelty=SimpleNamespace(record_turn=lambda r: _NovRes()),
         novelty_enabled=True,
@@ -583,16 +580,19 @@ async def test_evaluate_post_tool_turn_fulfilled_returns(monkeypatch):
     # Fulfilled -> loop ends before plateau/novelty; no chunk emitted.
     assert outcome.should_return is True
     assert chunks == []
+    # criteria is the auto-derived dict (written file surfaced from the tool result).
+    assert isinstance(captured["criteria"], dict)
+    assert captured["criteria"].get("file_path") == "out.py"
 
 
-async def test_evaluate_post_tool_turn_fulfillment_error_is_swallowed():
-    # Faithful to current production behavior: the fulfillment branch raises (real builder
-    # has no from_tool_results) and is swallowed, so the loop proceeds to plateau/novelty.
+async def test_evaluate_post_tool_turn_not_fulfilled_proceeds():
+    # When the (now functional) fulfillment check reports not-fulfilled, the loop proceeds to
+    # plateau/novelty rather than returning early.
     executor = _provider_turn_executor()
 
     class _Fulfillment:
-        async def check_fulfillment(self, **kwargs):  # pragma: no cover - never reached
-            return SimpleNamespace(is_fulfilled=True, score=1.0, reason="done")
+        async def check_fulfillment(self, *, task_type, criteria, context):
+            return SimpleNamespace(is_fulfilled=False, score=0.2, reason="incomplete")
 
     executor._fulfillment = _Fulfillment()
     messages = []
@@ -610,7 +610,6 @@ async def test_evaluate_post_tool_turn_fulfillment_error_is_swallowed():
         novelty_enabled=True,
     )
 
-    # AttributeError swallowed -> no early return, falls through with no chunk.
     assert outcome.should_return is False
     assert chunks == []
 
