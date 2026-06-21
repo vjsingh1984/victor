@@ -124,7 +124,9 @@ class TrackerStopReason(Enum):
     """
 
     NONE = "none"
-    TOOL_BUDGET = "tool_budget"
+    # NOTE: there is intentionally no TOOL_BUDGET stop reason. ``tool_budget`` is advisory — it
+    # steers the model via the system prompt, planning fast-path decisions, and learned
+    # adherence, but never hard-stops execution. The hard bound is MAX_ITERATIONS.
     LOOP_DETECTED = "loop_detected"
     MAX_ITERATIONS = "max_iterations"
     GOAL_FORCING = "goal_forcing"
@@ -255,10 +257,9 @@ class UnifiedTaskProgress:
     # Manual stop
     forced_stop: Optional[str] = None
 
-    # Soft limit tracking (for lenient budget enforcement)
-    soft_limit_warning_given: bool = False
-    has_prompt_requirements: bool = False  # True if prompt had explicit file/fix counts
-    soft_limit_buffer: float = 1.2  # Allow 20% overage before hard stop
+    # True if the prompt had explicit file/fix counts (informational signal set by the
+    # prompt-requirement extractor; tool_budget itself is advisory and never hard-stops).
+    has_prompt_requirements: bool = False
 
     # Log deduplication - only log forcing completion once
     completion_forcing_logged: bool = False
@@ -970,10 +971,13 @@ class UnifiedTaskTracker(ModeAwareMixin):
 
         Checks in order:
         1. Manual force stop
-        2. Tool budget exceeded
-        3. True loop detected
-        4. Max iterations exceeded
-        5. Goal-based forcing (milestone-aware)
+        2. True loop detected
+        3. Max iterations exceeded
+        4. Goal-based forcing (milestone-aware)
+
+        Note: ``tool_budget`` is advisory (it steers the model via the prompt/planning and is
+        learned as adherence) and is deliberately *not* a stop condition here — the hard
+        execution bound is max iterations.
         """
         details = self._get_details()
 
@@ -986,32 +990,12 @@ class UnifiedTaskTracker(ModeAwareMixin):
                 details=details,
             )
 
-        # Tool budget check with soft limits
-        tool_budget = self._progress.tool_budget
-        tool_calls = self._progress.tool_calls
-
-        # Soft limit: warn at 80%, allow up to buffer (120% by default)
-        soft_warning_threshold = int(tool_budget * 0.8)
-        hard_stop_threshold = int(tool_budget * self._progress.soft_limit_buffer)
-
-        # If prompt had explicit requirements, be more lenient
-        if self._progress.has_prompt_requirements:
-            hard_stop_threshold = int(tool_budget * 1.5)  # Allow 50% overage
-
-        if tool_calls >= hard_stop_threshold:
-            return StopDecision(
-                should_stop=True,
-                reason=StopReason.TOOL_BUDGET,
-                hint=f"Tool budget exceeded ({tool_calls}/{tool_budget}, hard limit: {hard_stop_threshold})",
-                details=details,
-            )
-        elif tool_calls >= soft_warning_threshold and not self._progress.soft_limit_warning_given:
-            # Log soft limit warning but don't stop
-            self._progress.soft_limit_warning_given = True
-            logger.warning(
-                f"UnifiedTaskTracker: Approaching tool budget "
-                f"({tool_calls}/{tool_budget}). Consider wrapping up."
-            )
+        # NOTE: tool_budget is intentionally NOT enforced here. It is an *advisory* signal —
+        # surfaced to the model in the system prompt, used for planning fast-path decisions, and
+        # learned as adherence — but it never hard-stops execution. The hard execution bound is
+        # MAX_ITERATIONS (checked below), enforced by both the streaming and headless loops via
+        # max_total_iterations. (A soft-warn/hard-stop budget branch used to live here but was
+        # never wired into either loop's stop path, so it was dead code; removed to match reality.)
 
         # Loop check
         loop = self._check_loop()
