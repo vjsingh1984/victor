@@ -26,6 +26,7 @@ mapping in :mod:`victor.ui.chat_app.event_mapping`.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 
@@ -34,7 +35,7 @@ import chainlit as cl
 from victor.framework.client import VictorClient
 from victor.framework.session_config import SessionConfig
 from victor.ui.chat_app.approval import chainlit_approval_handler
-from victor.ui.chat_app.event_mapping import RenderKind, map_event
+from victor.ui.chat_app.event_mapping import RenderKind, map_event, provider_switch_hint
 from victor.ui.rendering.markdown_presenters import (
     tool_call_summary,
     tool_result_markdown,
@@ -64,6 +65,9 @@ def _format_follow_ups(suggestions: list[dict]) -> str:
 
 
 _CLIENT_KEY = "victor_client"
+# The in-flight turn's asyncio.Task, tracked per session so a Stop action can cancel it and
+# on_chat_end can drain it before closing the client.
+_TASK_KEY = "active_turn_task"
 
 # Agent profile (from ~/.victor/profiles.yaml) selected via `victor ui --profile`,
 # passed through the chainlit subprocess as an env var.
@@ -104,6 +108,15 @@ def _build_client() -> VictorClient:
     return VictorClient(config)
 
 
+def _get_client() -> VictorClient:
+    """Return the session's VictorClient, rebuilding one if the session was reset."""
+    client = cl.user_session.get(_CLIENT_KEY)
+    if client is None:
+        client = _build_client()
+        cl.user_session.set(_CLIENT_KEY, client)
+    return client
+
+
 @cl.on_chat_start
 async def on_chat_start() -> None:
     """Create a per-session VictorClient and greet the user."""
@@ -125,12 +138,54 @@ async def on_chat_start() -> None:
 
 @cl.on_message
 async def on_message(message: cl.Message) -> None:
-    """Stream a Victor turn, rendering tokens, reasoning, and tool calls."""
-    client: VictorClient | None = cl.user_session.get(_CLIENT_KEY)
-    if client is None:  # session expired / restarted
-        client = _build_client()
-        cl.user_session.set(_CLIENT_KEY, client)
+    """Stream a Victor turn as a cancellable task with a Stop control."""
+    await _start_turn(message.content)
 
+
+async def _start_turn(content: str) -> None:
+    """Run one turn as a tracked, cancellable asyncio task alongside a Stop control.
+
+    The turn body runs in ``_run_turn`` as a task stored in the session so the Stop action can
+    cancel it; cancellation propagates ``CancelledError`` into ``client.stream()``, whose in-task
+    ``aclose()`` drains the provider iterator cleanly.
+    """
+    client = _get_client()
+    task = asyncio.create_task(_run_turn(client, content))
+    cl.user_session.set(_TASK_KEY, task)
+    stop = cl.Message(content="", actions=[cl.Action(name="stop_turn", payload={}, label="⏹ Stop")])
+    await stop.send()
+    try:
+        await task
+    except asyncio.CancelledError:
+        await cl.Message(content="⏹ _Turn stopped._").send()
+    except Exception:  # _run_turn renders its own recovery card; this is a backstop
+        logger.debug("turn task raised after handling", exc_info=True)
+    finally:
+        cl.user_session.set(_TASK_KEY, None)
+        try:
+            await stop.remove()
+        except Exception:
+            logger.debug("stop control removal failed", exc_info=True)
+
+
+@cl.action_callback("stop_turn")
+async def _on_stop_turn(action: "cl.Action") -> None:
+    """Cancel the in-flight turn task for this session."""
+    task = cl.user_session.get(_TASK_KEY)
+    if task is not None and not task.done():
+        task.cancel()
+
+
+@cl.action_callback("retry_turn")
+async def _on_retry_turn(action: "cl.Action") -> None:
+    """Re-run the failed turn with its original message (carried on the action payload)."""
+    content = (getattr(action, "payload", None) or {}).get("content", "")
+    if content:
+        await _start_turn(content)
+
+
+async def _run_turn(client: VictorClient, content: str) -> None:
+    """Stream a Victor turn, rendering tokens, reasoning, and tool calls."""
     # P1.4 first-token feedback: a transient "Thinking…" message so the user never stares at
     # a blank bubble; removed the instant any real output (token/reasoning/tool) arrives.
     thinking = cl.Message(content="🔄 _Thinking…_")
@@ -193,7 +248,7 @@ async def on_message(message: cl.Message) -> None:
         await current_msg.stream_token(text)
 
     try:
-        async for event in client.stream(message.content):
+        async for event in client.stream(content):
             action = map_event(event)
 
             if action.kind is RenderKind.TOKEN:
@@ -253,9 +308,25 @@ async def on_message(message: cl.Message) -> None:
                 await _clear_thinking()
                 await _emit_text(f"\n\n⚠️ {action.text}")
 
-    except Exception as exc:  # surface failures in-chat instead of a blank message
+    except Exception as exc:  # surface failures in-chat with a recovery path
         logger.exception("Victor chat turn failed")
-        await _emit_text(f"\n\n⚠️ Victor hit an error: {exc}")
+        await _clear_thinking()
+        from victor.framework.contextual_errors import format_exception_for_user
+
+        friendly = format_exception_for_user(
+            exc, {"operation": "chat", "provider": client.provider_name}
+        )
+        body = f"⚠️ {friendly}"
+        try:
+            hint = provider_switch_hint(client.provider_name, client.get_available_providers())
+        except Exception:  # provider listing is best-effort
+            hint = ""
+        if hint:
+            body = f"{body}\n\n{hint}"
+        await cl.Message(
+            content=body,
+            actions=[cl.Action(name="retry_turn", payload={"content": content}, label="🔄 Retry")],
+        ).send()
     finally:
         await _clear_thinking()
         await _close_tool_group()
@@ -277,7 +348,19 @@ async def on_message(message: cl.Message) -> None:
 
 @cl.on_chat_end
 async def on_chat_end() -> None:
-    """Release the session's VictorClient resources."""
+    """Drain any in-flight turn, then release the session's VictorClient resources."""
+    # Cancel + await the active turn first so close() never races a live stream (it pairs with
+    # VictorClient.close()'s own _active_streams drain guard).
+    task = cl.user_session.get(_TASK_KEY)
+    if task is not None and not task.done():
+        task.cancel()
+        try:
+            await task
+        except (asyncio.CancelledError, Exception):
+            logger.debug("active turn drained on chat end", exc_info=True)
+        finally:
+            cl.user_session.set(_TASK_KEY, None)
+
     client: VictorClient | None = cl.user_session.get(_CLIENT_KEY)
     if client is not None:
         try:
