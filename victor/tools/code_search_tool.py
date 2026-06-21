@@ -973,16 +973,27 @@ def _decorate_literal_fallback_result(
         merged_metadata["filters_applied"] = filters_applied
     if metadata:
         merged_metadata.update(metadata)
-    if (
-        result.get("count") == 0
-        and isinstance(fallback, str)
-        and fallback.startswith("semantic_")
-        and result.get("mode") == "literal"
-    ):
-        merged_metadata["fallback_guidance"] = (
-            "Semantic search was unavailable and literal fallback found no matches. "
-            "Retry with concrete identifiers, symbols, or short tokens using mode='literal'."
-        )
+    if isinstance(fallback, str) and fallback.startswith("semantic_"):
+        # Surface a prominent, model-visible note (not just nested metadata) so the agent
+        # stops re-issuing natural-language semantic queries against a literal-only engine.
+        # In the failing session the model looped, unaware semantic search was unavailable.
+        if result.get("count") == 0 and result.get("mode") == "literal":
+            merged_metadata["fallback_guidance"] = (
+                "Semantic search was unavailable and literal fallback found no matches. "
+                "Retry with concrete identifiers, symbols, or short tokens using mode='literal'."
+            )
+            result["note"] = (
+                "Semantic code search is unavailable in this session (literal keyword search "
+                "only) and found no matches. Retry with exact identifiers, symbols, file names, "
+                "or short literal tokens — do not re-issue natural-language semantic queries. "
+                "Install victor-coding to enable semantic search."
+            )
+        else:
+            result.setdefault(
+                "note",
+                "Semantic code search is unavailable in this session; results are from literal "
+                "keyword search. Prefer exact identifiers, symbols, or file names over prose.",
+            )
     if merged_metadata:
         result["metadata"] = merged_metadata
     return result

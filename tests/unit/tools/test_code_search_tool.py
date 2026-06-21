@@ -3022,3 +3022,28 @@ def test_literal_fallback_result_adds_guidance_for_empty_semantic_fallback() -> 
     )
 
     assert result["metadata"]["fallback_guidance"].startswith("Semantic search was unavailable")
+    # A prominent, model-visible top-level note (not just nested metadata) tells the agent
+    # to stop re-issuing natural-language semantic queries against a literal-only engine.
+    assert "note" in result
+    assert "Semantic code search is unavailable" in result["note"]
+
+
+def test_literal_fallback_result_notes_semantic_unavailable_with_results() -> None:
+    """Even when literal fallback returns hits, a softer note flags that semantic was off."""
+    result = _decorate_literal_fallback_result(
+        {"success": True, "results": [{"file": "a.py"}], "count": 1, "mode": "literal"},
+        fallback="semantic_disabled",
+    )
+
+    assert "note" in result
+    assert "literal keyword search" in result["note"]
+
+
+def test_literal_fallback_result_no_note_for_non_semantic_fallback() -> None:
+    """Non-semantic fallbacks (e.g. plain literal mode) must not inject a semantic note."""
+    result = _decorate_literal_fallback_result(
+        {"success": True, "results": [], "count": 0, "mode": "literal"},
+        fallback="requested_literal",
+    )
+
+    assert "note" not in result

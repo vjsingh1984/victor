@@ -85,6 +85,33 @@ def test_prioritize_tools_stage_minimizes_broadcast(
     assert len(pruned) < len(tools)
 
 
+def test_prioritize_stage_keeps_selected_web_tool_without_web_keyword(
+    orchestrator: AgentOrchestrator,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A web tool the selector chose must survive stage pruning even when the prompt has
+    no 'search/web/online/http' keyword.
+
+    Regression: web_tools were only added to the stage keep-set when
+    needs_web_tools(user_message) matched a keyword, so a deliberately-selected web_search
+    was pruned out of the schema sent to the provider — the model then called a tool it was
+    never given and looped.
+    """
+    selector = orchestrator.tool_selector
+    # Pin the cached web-tool set so the test does not depend on the full registry.
+    monkeypatch.setattr(selector, "_get_web_tools_cached", lambda: {"web_search"})
+    tools = [
+        ToolDefinition(name="read", description="desc", parameters={}),
+        ToolDefinition(name="web_search", description="desc", parameters={}),
+        ToolDefinition(name="code_search", description="desc", parameters={}),
+    ]
+
+    # Prompt deliberately contains no web keyword (would set web_tools=set() under the bug).
+    pruned = selector.prioritize_by_stage("review the codebase architecture", tools)
+
+    assert "web_search" in {t.name for t in pruned}
+
+
 def test_prioritize_tools_stage_prefers_core_fallback(
     orchestrator: AgentOrchestrator,
 ) -> None:
