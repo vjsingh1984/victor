@@ -134,6 +134,23 @@ class _ToolTurnOutcome:
     result: Any = None
 
 
+@dataclass
+class _ProviderTurnEval:
+    """Single-slot mutable holder for the post-provider early-stop evaluation.
+
+    ``_evaluate_provider_turn_stops`` records per-turn spin signals and runs the early-stop
+    checks (TERMINATED spin, content-repetition, skip_continuation). Because it's an async
+    generator (it yields the final stop chunk), it writes its decision here for ``run()`` to
+    read: ``should_return`` drives loop exit, while ``content_length`` / ``has_tools`` are the
+    derived turn metrics the rest of the loop body reuses. Part of FEP-0007 Phase 2's move
+    toward a shared ``stream_turn()``.
+    """
+
+    should_return: bool = False
+    content_length: int = 0
+    has_tools: bool = False
+
+
 class StreamingChatExecutor:
     """Canonical streaming chat executor bound to a runtime owner."""
 
@@ -1131,6 +1148,108 @@ class StreamingChatExecutor:
 
         result_holder.result = tool_exec_result
 
+    async def _evaluate_provider_turn_stops(
+        self,
+        orch: Any,
+        stream_ctx: Any,
+        *,
+        full_content: str,
+        tool_calls: Any,
+        spin: Any,
+        turn_eval: Any,
+        outcome: _ProviderTurnEval,
+    ) -> AsyncIterator[StreamChunk]:
+        """Record per-turn spin signals and run the early-stop checks for the provider turn.
+
+        The EVALUATE sub-step that runs right after the provider response (FEP-0007 Phase 2,
+        toward a shared stream_turn() boundary). Feeds the SpinDetector this turn's tool
+        signatures, then applies the three early stops — TERMINATED spin, content-repetition
+        (shared TurnEvaluationController), and a pre-set ``skip_continuation`` — each of which
+        forces completion and ends the turn. Because this yields the final stop chunk, it can't
+        return a value: it writes ``should_return`` plus the derived ``content_length`` /
+        ``has_tools`` metrics onto ``outcome`` for run() to read.
+        """
+        from victor.agent.turn_policy import TurnObservation
+
+        # P1 FIX: Earlier spin state detection
+        # Move spin check earlier (before content repetition detection) so that spin state
+        # can influence continuation decisions. This helps detect stuck patterns sooner.
+        content_length = len(full_content.strip()) if full_content else 0
+        _has_tools = bool(tool_calls)
+        _no_progress = not _has_tools and content_length < 120
+        outcome.content_length = content_length
+        outcome.has_tools = _has_tools
+
+        tool_names_set = {tc.get("name", "") for tc in tool_calls} if tool_calls else set()
+        # Feed per-turn tool-call signatures so the SpinDetector's repeated-signature
+        # path is live in streaming. Without these it only tracked names/counts and
+        # never tripped on a model re-issuing the *same* tool call (same args) every
+        # turn — the exact shape of the observed code_search loop.
+        spin.record_turn(
+            has_tool_calls=_has_tools,
+            tool_names=tool_names_set,
+            tool_count=len(tool_calls) if tool_calls else 0,
+            tool_signatures=_tool_call_signatures(tool_calls) if tool_calls else None,
+        )
+
+        logger.debug(
+            "[spin-check] tool_calls=%s content_len=%s no_progress=%s state=%s",
+            len(tool_calls) if tool_calls else 0,
+            content_length,
+            _no_progress,
+            spin.state.value,
+        )
+
+        # P1 FIX: Check for terminated spin state early
+        # If already in TERMINATED state, we should force completion immediately
+        # instead of waiting for later checks
+        if spin.state.name == "TERMINATED":
+            logger.warning(
+                "[spin-detect-early] Spin state TERMINATED detected early - forcing completion"
+            )
+            stream_ctx.force_completion = True
+            stream_ctx.skip_continuation = True
+            outcome.should_return = True
+            yield orch._chunk_generator.generate_content_chunk(
+                "\n\n[Agent detected a response loop pattern — breaking to prevent wasted time.]",
+                is_final=True,
+            )
+            return
+
+        # Content-repetition detection via the shared TurnEvaluationController (same
+        # hash/overlap detector as the headless loop). The loop already fed the spin
+        # detector above, so don't re-record. On a repetition stop, force completion and
+        # emit a final chunk to break the feedback loop.
+        if full_content:
+            _decision = turn_eval.evaluate(TurnObservation(content=full_content), record_spin=False)
+            if _decision.stop:
+                logger.warning(
+                    "[content-repetition] %s (content_len=%s) — forcing completion.",
+                    _decision.stop_reason,
+                    len(full_content),
+                )
+                stream_ctx.force_completion = True
+                stream_ctx.skip_continuation = True
+                outcome.should_return = True
+                yield orch._chunk_generator.generate_content_chunk(
+                    _decision.stop_message
+                    or "\n\n[Content repetition detected — stopping to prevent "
+                    "infinite output loop.]",
+                    is_final=True,
+                )
+                return
+
+        # P0 FIX: Explicit exit check after content repetition detection
+        # This ensures that if skip_continuation was set by content repetition or any other
+        # reason, we exit the loop immediately instead of continuing to continuation handling
+        if getattr(stream_ctx, "skip_continuation", False):
+            logger.info(
+                "Exiting loop: skip_continuation flag set (content repetition or other forced "
+                "completion)"
+            )
+            outcome.should_return = True
+            return
+
     async def run(self, user_message: str, **kwargs: Any) -> AsyncIterator[StreamChunk]:
         """Run the streaming executor for the provided message."""
         runtime_owner = self._runtime_owner
@@ -1187,7 +1306,7 @@ class StreamingChatExecutor:
                 decision_service.reset_budget()
 
         # Loop-scoped names used in the per-turn body below.
-        from victor.agent.turn_policy import SpinState, TurnObservation, plateau_nudge_message
+        from victor.agent.turn_policy import SpinState, plateau_nudge_message
         from victor.framework.search_novelty import synthesize_nudge_message
 
         # Per-turn guard components (built once per run via the extracted factory — the first
@@ -1376,80 +1495,21 @@ class StreamingChatExecutor:
                 stream_ctx.force_completion = True
                 logger.info("Setting force_completion due to garbage detection")
 
-            # P1 FIX: Earlier spin state detection
-            # Move spin check earlier (before content repetition detection) so that spin state
-            # can influence continuation decisions. This helps detect stuck patterns sooner.
-            content_length = len(full_content.strip()) if full_content else 0
-            _has_tools = bool(tool_calls)
-            _no_progress = not _has_tools and content_length < 120
-
-            tool_names_set = {tc.get("name", "") for tc in tool_calls} if tool_calls else set()
-            # Feed per-turn tool-call signatures so the SpinDetector's repeated-signature
-            # path is live in streaming. Without these it only tracked names/counts and
-            # never tripped on a model re-issuing the *same* tool call (same args) every
-            # turn — the exact shape of the observed code_search loop.
-            _spin.record_turn(
-                has_tool_calls=_has_tools,
-                tool_names=tool_names_set,
-                tool_count=len(tool_calls) if tool_calls else 0,
-                tool_signatures=_tool_call_signatures(tool_calls) if tool_calls else None,
-            )
-
-            logger.debug(
-                "[spin-check] tool_calls=%s content_len=%s no_progress=%s state=%s",
-                len(tool_calls) if tool_calls else 0,
-                content_length,
-                _no_progress,
-                _spin.state.value,
-            )
-
-            # P1 FIX: Check for terminated spin state early
-            # If already in TERMINATED state, we should force completion immediately
-            # instead of waiting for later checks
-            if _spin.state.name == "TERMINATED":
-                logger.warning(
-                    "[spin-detect-early] Spin state TERMINATED detected early - forcing completion"
-                )
-                stream_ctx.force_completion = True
-                stream_ctx.skip_continuation = True
-                yield orch._chunk_generator.generate_content_chunk(
-                    "\n\n[Agent detected a response loop pattern — breaking to prevent wasted time.]",
-                    is_final=True,
-                )
+            _turn_stop = _ProviderTurnEval()
+            async for chunk in self._evaluate_provider_turn_stops(
+                orch,
+                stream_ctx,
+                full_content=full_content,
+                tool_calls=tool_calls,
+                spin=_spin,
+                turn_eval=_turn_eval,
+                outcome=_turn_stop,
+            ):
+                yield chunk
+            if _turn_stop.should_return:
                 return
-
-            # Content-repetition detection via the shared TurnEvaluationController (same
-            # hash/overlap detector as the headless loop). The loop already fed the spin
-            # detector above, so don't re-record. On a repetition stop, force completion and
-            # emit a final chunk to break the feedback loop.
-            if full_content:
-                _decision = _turn_eval.evaluate(
-                    TurnObservation(content=full_content), record_spin=False
-                )
-                if _decision.stop:
-                    logger.warning(
-                        "[content-repetition] %s (content_len=%s) — forcing completion.",
-                        _decision.stop_reason,
-                        len(full_content),
-                    )
-                    stream_ctx.force_completion = True
-                    stream_ctx.skip_continuation = True
-                    yield orch._chunk_generator.generate_content_chunk(
-                        _decision.stop_message
-                        or "\n\n[Content repetition detected — stopping to prevent "
-                        "infinite output loop.]",
-                        is_final=True,
-                    )
-                    return
-
-            # P0 FIX: Explicit exit check after content repetition detection
-            # This ensures that if skip_continuation was set by content repetition or any other reason,
-            # we exit the loop immediately instead of continuing to continuation handling
-            if getattr(stream_ctx, "skip_continuation", False):
-                logger.info(
-                    "Exiting loop: skip_continuation flag set (content repetition or other forced completion)"
-                )
-                return
+            content_length = _turn_stop.content_length
+            _has_tools = _turn_stop.has_tools
 
             tool_calls, full_content = orch._parse_and_validate_tool_calls(tool_calls, full_content)
 
