@@ -43,9 +43,7 @@ def test_create_stream_turn_guards_builds_expected_components():
 
 def test_create_stream_turn_guards_honors_novelty_off_switch():
     orch = SimpleNamespace(
-        settings=SimpleNamespace(
-            exploration=SimpleNamespace(search_novelty_guard_enabled=False)
-        )
+        settings=SimpleNamespace(exploration=SimpleNamespace(search_novelty_guard_enabled=False))
     )
     guards = StreamingChatExecutor._create_stream_turn_guards(orch)
     assert guards.novelty_enabled is False
