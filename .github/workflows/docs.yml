@@ -69,8 +69,11 @@ jobs:
 
   # Deploy job
   deploy:
-    # Only deploy on push to main (not on PRs)
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # Deploy on push to main, or on a manual workflow_dispatch (so docs can be (re)published
+    # on demand — e.g. to reconcile Pages with the current branch's reality). Never on PRs.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main')
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
