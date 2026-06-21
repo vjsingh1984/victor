@@ -25,3 +25,11 @@ victor/tools/**
 victor/ui/**
 victor-contracts/victor_contracts/**
 victor/__init__.py
+# HITL workflow API/transports/visualization: static SQL on a validated table-name identifier
+# with bound parameter values (formatted-sql / sqlalchemy-raw-query false positives), plus
+# raw-HTML and dynamic-urllib audit warnings. Same longstanding-debt rationale as above; the
+# blocking in-repo security workflows still scan these.
+victor/workflows/**
+# Secrets *detector* module: contains literal key-block patterns it must match against (the
+# detected-pgp-private-key-block hit is the detector's own signature, not a real secret).
+victor/security/**
