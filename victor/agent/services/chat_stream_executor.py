@@ -988,10 +988,17 @@ class StreamingChatExecutor:
         )
         # Shared productivity-weighted plateau detector (replaces this loop's inline formula).
         _plateau = PlateauDetector()
-        # Shared search-novelty safety-net (diminishing-returns on re-search loops).
-        from victor.framework.search_novelty import SearchNoveltyTracker, synthesize_nudge_message
+        # Shared search-novelty safety-net (diminishing-returns on re-search loops), with
+        # thresholds and on/off from ExplorationSettings.
+        from victor.framework.search_novelty import (
+            NoveltyConfig,
+            SearchNoveltyTracker,
+            synthesize_nudge_message,
+        )
 
-        _novelty = SearchNoveltyTracker()
+        _explore = getattr(getattr(orch, "settings", None), "exploration", None)
+        _novelty_enabled = bool(getattr(_explore, "search_novelty_guard_enabled", True))
+        _novelty = SearchNoveltyTracker(NoveltyConfig.from_exploration(_explore))
 
         _perception = None
         conversation_history = self._get_conversation_history(runtime_owner, orch, user_message)
@@ -1889,7 +1896,12 @@ class StreamingChatExecutor:
                     if isinstance(r, dict)
                 )
                 _iter_no = getattr(stream_ctx, "total_iterations", 0)
-                if _nov.should_force_complete and not _editing and _iter_no >= 2:
+                if (
+                    _novelty_enabled
+                    and _nov.should_force_complete
+                    and not _editing
+                    and _iter_no >= 2
+                ):
                     logger.info(
                         "[search-novelty] %d consecutive low-novelty searches — synthesizing.",
                         _nov.consecutive_low_novelty,
@@ -1901,7 +1913,7 @@ class StreamingChatExecutor:
                         is_final=True,
                     )
                     return
-                if _nov.should_nudge:
+                if _novelty_enabled and _nov.should_nudge:
                     from victor.agent.conversation.types import (
                         MESSAGE_SOURCE_METADATA_KEY,
                         MessageSource,

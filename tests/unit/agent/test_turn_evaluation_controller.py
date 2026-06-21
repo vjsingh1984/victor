@@ -240,7 +240,9 @@ _LONG_ANSWER = "The architecture is as follows. " * 40  # ~> 800 chars
 # Two SUBSTANTIAL but lexically distinct answers (avoid tripping content-repetition,
 # which compares consecutive turns, before reaching the fulfillment check).
 _ANSWER_A = "The orchestrator coordinates services, tools, workflows, and shared state. " * 12
-_ANSWER_B = "Initialization runs nine phases wiring chat recovery session perception fulfillment. " * 12
+_ANSWER_B = (
+    "Initialization runs nine phases wiring chat recovery session perception fulfillment. " * 12
+)
 
 
 def _run_fulfillment_scenario(answer, editing=False):
@@ -289,3 +291,44 @@ def test_controller_reset_clears_state():
     c.reset()
     # After reset, the same content starts fresh (no accumulated repetition).
     assert c.evaluate(TurnObservation(content=same)).stop is False
+
+
+# --------------------------------------------------------------------------- #
+# from_exploration_settings (tunable thresholds + off-switch)
+# --------------------------------------------------------------------------- #
+
+
+def test_from_exploration_settings_applies_thresholds():
+    from types import SimpleNamespace
+
+    settings = SimpleNamespace(
+        search_novelty_guard_enabled=True,
+        novelty_consecutive_low_limit=2,  # force-complete one turn sooner
+        novelty_min_search_turns=1,
+        fulfillment_completion_enabled=True,
+    )
+    c = TurnEvaluationController.from_exploration_settings(settings, enable_budget_warning=False)
+    decision = None
+    for i in range(1, 5):
+        decision = c.evaluate(_saturating_search_obs(i))
+    assert decision.stop and decision.stop_reason == "search_saturated"
+
+
+def test_from_exploration_settings_off_switch_disables_novelty():
+    from types import SimpleNamespace
+
+    settings = SimpleNamespace(search_novelty_guard_enabled=False)
+    c = TurnEvaluationController.from_exploration_settings(settings, enable_budget_warning=False)
+    forced = False
+    for i in range(1, 10):
+        d = c.evaluate(_saturating_search_obs(i))
+        forced = forced or (d.stop and d.stop_reason == "search_saturated")
+    assert not forced  # guard disabled -> never force-completes
+
+
+def test_from_exploration_settings_none_uses_defaults():
+    c = TurnEvaluationController.from_exploration_settings(None, enable_budget_warning=False)
+    decision = None
+    for i in range(1, 7):
+        decision = c.evaluate(_saturating_search_obs(i))
+    assert decision.stop and decision.stop_reason == "search_saturated"
