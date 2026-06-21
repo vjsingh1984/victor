@@ -1047,9 +1047,11 @@ class StreamingChatHandler:
             return " ".join(metrics_parts)
         else:
             # Fallback to estimate
-            tokens_per_second = ctx.total_tokens / elapsed_time if elapsed_time > 0 else 0
+            tokens_per_second = (
+                ctx.estimated_content_tokens / elapsed_time if elapsed_time > 0 else 0
+            )
             base = (
-                f"{self._presentation.icon('chart', with_color=False)} ~{ctx.total_tokens:.0f} tokens (est.) | "
+                f"{self._presentation.icon('chart', with_color=False)} ~{ctx.estimated_content_tokens:.0f} tokens (est.) | "
                 f"{elapsed_time:.1f}s | {tokens_per_second:.1f} tok/s"
             )
             if cost_str:
@@ -1076,14 +1078,14 @@ class StreamingChatHandler:
         Returns:
             Formatted metrics line string
         """
-        tokens_per_second = ctx.total_tokens / elapsed_time if elapsed_time > 0 else 0
+        tokens_per_second = ctx.estimated_content_tokens / elapsed_time if elapsed_time > 0 else 0
         ttft_info = ""
         if time_to_first_token:
             ttft_info = f" | TTFT: {time_to_first_token:.2f}s"
         cost_info = ""
         if cost_str:
             cost_info = f" | {cost_str}"
-        return f"{self._presentation.icon('chart', with_color=False)} {ctx.total_tokens:.0f} tokens | {elapsed_time:.1f}s | {tokens_per_second:.1f} tok/s{ttft_info}{cost_info}"
+        return f"{self._presentation.icon('chart', with_color=False)} {ctx.estimated_content_tokens:.0f} tokens | {elapsed_time:.1f}s | {tokens_per_second:.1f} tok/s{ttft_info}{cost_info}"
 
     def generate_tool_result_chunk(
         self,

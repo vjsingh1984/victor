@@ -1179,7 +1179,9 @@ class StreamingChatExecutor:
                     )
 
                     if is_feature_enabled(FeatureFlag.USE_CONFIDENCE_MONITOR):
-                        self._confidence_monitor.record(full_content or "", stream_ctx.total_tokens)
+                        self._confidence_monitor.record(
+                            full_content or "", stream_ctx.estimated_content_tokens
+                        )
                         if self._confidence_monitor.should_stop():
                             self._record_confidence_early_stop(stream_ctx)
                             logger.info(
@@ -1195,7 +1197,7 @@ class StreamingChatExecutor:
                 "tokens=%s, garbage=%s, content_preview=%r",
                 len(full_content) if full_content else 0,
                 len(tool_calls) if tool_calls else 0,
-                stream_ctx.total_tokens,
+                stream_ctx.estimated_content_tokens,
                 garbage_detected,
                 content_preview,
             )

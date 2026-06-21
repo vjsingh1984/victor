@@ -244,7 +244,7 @@ class ChatStreamHelperMixin:
 
         stream_metrics = orch._metrics_collector.init_stream_metrics()
         start_time = stream_metrics.start_time
-        total_tokens: float = 0
+        estimated_content_tokens: float = 0
 
         cumulative_usage: Dict[str, int] = {
             "prompt_tokens": 0,
@@ -411,7 +411,7 @@ class ChatStreamHelperMixin:
         return (
             stream_metrics,
             start_time,
-            total_tokens,
+            estimated_content_tokens,
             cumulative_usage,
             max_total_iterations,
             max_exploration_iterations,
@@ -432,7 +432,7 @@ class ChatStreamHelperMixin:
         (
             stream_metrics,
             start_time,
-            total_tokens,
+            estimated_content_tokens,
             cumulative_usage,
             max_total_iterations,
             max_exploration_iterations,
@@ -473,7 +473,7 @@ class ChatStreamHelperMixin:
 
         ctx.stream_metrics = stream_metrics
         ctx.start_time = start_time
-        ctx.total_tokens = total_tokens
+        ctx.estimated_content_tokens = estimated_content_tokens
         ctx.cumulative_usage = cumulative_usage
         ctx.total_iterations = total_iterations
         ctx.force_completion = force_completion
@@ -1323,7 +1323,7 @@ class ChatStreamHelperMixin:
         garbage_detected = False
         consecutive_garbage_chunks = 0
         max_garbage_chunks = 3
-        total_tokens: float = 0
+        estimated_content_tokens: float = 0
 
         assembled = orch.get_assembled_messages(
             current_query=stream_ctx.user_message if stream_ctx else None,
@@ -1499,9 +1499,9 @@ class ChatStreamHelperMixin:
                 # Providers routinely attach the turn's usage to the final, empty-content
                 # chunk (Ollama's `done` chunk, OpenAI-compat's terminal usage chunk). That
                 # chunk has no content, so `_handle_stream_chunk` drops it as garbage — and
-                # with it the entire turn's token accounting, leaving total_tokens=0. Reading
-                # usage here makes the dominant cost term observable regardless of whether
-                # the chunk survives the filter.
+                # with it the turn's real token accounting, leaving the api_*_tokens at 0.
+                # Reading usage here makes the dominant cost term observable regardless of
+                # whether the chunk survives the filter.
                 raw_usage = getattr(chunk, "usage", None)
                 if raw_usage:
                     for key in stream_ctx.cumulative_usage:
@@ -1525,7 +1525,11 @@ class ChatStreamHelperMixin:
                 stream_ctx.stream_metrics.total_chunks += 1
                 if chunk.content:
                     orch._metrics_collector.record_first_token()
-                    total_tokens += len(chunk.content) / 4
+                    # Rough chars/4 ESTIMATE for the live "~N tokens (est.)" readout and
+                    # confidence monitoring only — NOT billing. The authoritative counts are
+                    # the provider's usage accumulated into stream_ctx.cumulative_usage above
+                    # (surfaced as api_*_tokens on the task report / cost footer).
+                    estimated_content_tokens += len(chunk.content) / 4
                     stream_ctx.stream_metrics.total_content_length += len(chunk.content)
 
                 if chunk.tool_calls:
@@ -1616,8 +1620,8 @@ class ChatStreamHelperMixin:
             len(tool_calls) if tool_calls else 0,
         )
 
-        stream_ctx.total_tokens = total_tokens
-        return full_content, tool_calls, total_tokens, garbage_detected
+        stream_ctx.estimated_content_tokens = estimated_content_tokens
+        return full_content, tool_calls, estimated_content_tokens, garbage_detected
 
     @staticmethod
     def _record_provider_status_event(
