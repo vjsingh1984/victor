@@ -483,3 +483,212 @@ async def test_evaluate_provider_turn_stops_preset_skip_continuation_returns_no_
     # skip_continuation already set upstream -> return with no emitted chunk.
     assert outcome.should_return is True
     assert chunks == []
+
+
+class _PlateauRes:
+    def __init__(self, *, is_plateau=False, should_nudge=False, recent_scores=None):
+        self.is_plateau = is_plateau
+        self.should_nudge = should_nudge
+        self.recent_scores = recent_scores or []
+
+
+class _NovRes:
+    def __init__(
+        self, *, should_force_complete=False, should_nudge=False, consecutive_low_novelty=0
+    ):
+        self.should_force_complete = should_force_complete
+        self.should_nudge = should_nudge
+        self.consecutive_low_novelty = consecutive_low_novelty
+
+
+def _post_tool_orch(messages):
+    return SimpleNamespace(
+        _current_intent=None,
+        _chunk_generator=SimpleNamespace(
+            generate_content_chunk=lambda text, is_final=False: SimpleNamespace(
+                content=text, is_final=is_final
+            )
+        ),
+        add_message=lambda role, content, metadata=None: messages.append((role, content)),
+    )
+
+
+async def _collect_post_tool(
+    executor,
+    *,
+    orch,
+    stream_ctx,
+    perception,
+    tool_exec_result,
+    plateau,
+    novelty,
+    novelty_enabled,
+):
+    outcome = chat_stream_executor._PostToolEval()
+    chunks = [
+        c
+        async for c in executor._evaluate_post_tool_turn(
+            orch,
+            stream_ctx,
+            perception=perception,
+            tool_exec_result=tool_exec_result,
+            full_content="content",
+            user_message="do it",
+            plateau=plateau,
+            novelty=novelty,
+            novelty_enabled=novelty_enabled,
+            outcome=outcome,
+        )
+    ]
+    return chunks, outcome
+
+
+async def test_evaluate_post_tool_turn_fulfilled_returns(monkeypatch):
+    executor = _provider_turn_executor()
+
+    class _Fulfillment:
+        async def check_fulfillment(self, **kwargs):
+            return SimpleNamespace(is_fulfilled=True, score=0.9, reason="done")
+
+    executor._fulfillment = _Fulfillment()
+    # NOTE: production run() calls FulfillmentCriteriaBuilder.from_tool_results, which does
+    # not exist (the real method is record_tool_result) — so the live fulfillment branch
+    # always raises AttributeError and is swallowed by its try/except. This extraction is
+    # behavior-neutral and preserves that. Patch the missing builder method here so the
+    # helper's intended fulfillment->return wiring is actually exercised.
+    from victor.agent import turn_policy
+
+    monkeypatch.setattr(
+        turn_policy.FulfillmentCriteriaBuilder,
+        "from_tool_results",
+        staticmethod(lambda results: SimpleNamespace()),
+        raising=False,
+    )
+
+    messages = []
+    orch = _post_tool_orch(messages)
+    stream_ctx = SimpleNamespace(total_iterations=3)
+
+    chunks, outcome = await _collect_post_tool(
+        executor,
+        orch=orch,
+        stream_ctx=stream_ctx,
+        perception=SimpleNamespace(task_analysis=None),
+        tool_exec_result=_FakeToolExecResult(),
+        plateau=SimpleNamespace(record=lambda *a: _PlateauRes()),
+        novelty=SimpleNamespace(record_turn=lambda r: _NovRes()),
+        novelty_enabled=True,
+    )
+
+    # Fulfilled -> loop ends before plateau/novelty; no chunk emitted.
+    assert outcome.should_return is True
+    assert chunks == []
+
+
+async def test_evaluate_post_tool_turn_fulfillment_error_is_swallowed():
+    # Faithful to current production behavior: the fulfillment branch raises (real builder
+    # has no from_tool_results) and is swallowed, so the loop proceeds to plateau/novelty.
+    executor = _provider_turn_executor()
+
+    class _Fulfillment:
+        async def check_fulfillment(self, **kwargs):  # pragma: no cover - never reached
+            return SimpleNamespace(is_fulfilled=True, score=1.0, reason="done")
+
+    executor._fulfillment = _Fulfillment()
+    messages = []
+    orch = _post_tool_orch(messages)
+    stream_ctx = SimpleNamespace(total_iterations=3)
+
+    chunks, outcome = await _collect_post_tool(
+        executor,
+        orch=orch,
+        stream_ctx=stream_ctx,
+        perception=SimpleNamespace(task_analysis=None),
+        tool_exec_result=_FakeToolExecResult(),
+        plateau=SimpleNamespace(record=lambda *a: _PlateauRes()),
+        novelty=SimpleNamespace(record_turn=lambda r: _NovRes()),
+        novelty_enabled=True,
+    )
+
+    # AttributeError swallowed -> no early return, falls through with no chunk.
+    assert outcome.should_return is False
+    assert chunks == []
+
+
+async def test_evaluate_post_tool_turn_plateau_injects_nudge_no_return():
+    executor = _provider_turn_executor()
+    executor._fulfillment = None  # skip fulfillment branch
+    messages = []
+    orch = _post_tool_orch(messages)
+    stream_ctx = SimpleNamespace(total_iterations=3)
+
+    chunks, outcome = await _collect_post_tool(
+        executor,
+        orch=orch,
+        stream_ctx=stream_ctx,
+        perception=None,
+        tool_exec_result=_FakeToolExecResult(),
+        plateau=SimpleNamespace(
+            record=lambda *a: _PlateauRes(is_plateau=True, should_nudge=True, recent_scores=[0.1])
+        ),
+        novelty=SimpleNamespace(record_turn=lambda r: _NovRes()),
+        novelty_enabled=True,
+    )
+
+    # Plateau nudge injected as a system message; loop continues (no return, no chunk).
+    assert outcome.should_return is False
+    assert chunks == []
+    assert any(role == "system" for role, _ in messages)
+
+
+async def test_evaluate_post_tool_turn_search_novelty_force_complete_emits_final():
+    executor = _provider_turn_executor()
+    executor._fulfillment = None
+    messages = []
+    orch = _post_tool_orch(messages)
+    stream_ctx = SimpleNamespace(total_iterations=3)
+
+    chunks, outcome = await _collect_post_tool(
+        executor,
+        orch=orch,
+        stream_ctx=stream_ctx,
+        perception=None,
+        tool_exec_result=_FakeToolExecResult(),
+        plateau=SimpleNamespace(record=lambda *a: _PlateauRes()),
+        novelty=SimpleNamespace(
+            record_turn=lambda r: _NovRes(should_force_complete=True, consecutive_low_novelty=3)
+        ),
+        novelty_enabled=True,
+    )
+
+    # Low-novelty safety-net forces synthesis: final chunk + return.
+    assert outcome.should_return is True
+    assert stream_ctx.force_completion is True
+    assert stream_ctx.skip_continuation is True
+    assert len(chunks) == 1 and chunks[0].is_final is True
+    assert "synthesizing the answer" in chunks[0].content
+
+
+async def test_evaluate_post_tool_turn_novelty_disabled_skips_force_complete():
+    executor = _provider_turn_executor()
+    executor._fulfillment = None
+    messages = []
+    orch = _post_tool_orch(messages)
+    stream_ctx = SimpleNamespace(total_iterations=3)
+
+    chunks, outcome = await _collect_post_tool(
+        executor,
+        orch=orch,
+        stream_ctx=stream_ctx,
+        perception=None,
+        tool_exec_result=_FakeToolExecResult(),
+        plateau=SimpleNamespace(record=lambda *a: _PlateauRes()),
+        novelty=SimpleNamespace(
+            record_turn=lambda r: _NovRes(should_force_complete=True, should_nudge=True)
+        ),
+        novelty_enabled=False,  # guard off -> neither force-complete nor nudge fires
+    )
+
+    assert outcome.should_return is False
+    assert chunks == []
+    assert messages == []
