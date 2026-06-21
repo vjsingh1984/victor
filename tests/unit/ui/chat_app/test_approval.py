@@ -134,7 +134,17 @@ class _FakeContainer:
     def get_optional(self, t):
         return self._store.get(t)
 
-    def register(self, t, instance):
+    def register_instance(self, t, instance):
+        # Mirror ServiceContainer.register_instance — the method
+        # register_policy_approval_handler() actually calls (register() treats its 2nd arg as a
+        # factory, which would mis-store the non-callable PolicyApprovalHandler instance).
+        if self._frozen:
+            raise RuntimeError("frozen")
+        self._store[t] = instance
+
+    def register_instance(self, t, instance):
+        # Mirror the real ServiceContainer API: register_policy_approval_handler binds a
+        # pre-built instance via register_instance (not register, whose 2nd arg is a factory).
         if self._frozen:
             raise RuntimeError("frozen")
         self._store[t] = instance

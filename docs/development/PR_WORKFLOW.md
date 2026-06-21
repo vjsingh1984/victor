@@ -11,10 +11,15 @@ This document describes the new PR-based development workflow for the Victor pro
 - ❌ No code review process
 - ❌ Risk of breaking main branch
 
-**New State**: All changes go through PRs with full CI/CD validation.
-- ✅ All status checks must pass (Lint, Tests, Security Scan, Build)
-- ✅ Code review through pull requests
-- ✅ Protected main branch
+**New State**: All changes go through PRs with **branch-targeted** CI/CD validation.
+- ✅ **PR → `develop`** runs a lightweight gate (`ci-fast`: Black, Ruff, repo-hygiene, MyPy,
+  import checks, guards, plus **changed-file unit tests** via `scripts/ci/select_changed_tests.py`
+  — only the mirror tests for the files the PR touches). Fast feedback that keeps the runner
+  queue moving.
+- ✅ **PR → `main`** (the `develop` → `main` promotion) runs the **extensive** battery: sharded
+  unit tests, integration, build, security, performance, and validation workflows.
+- ✅ `main` is strict — required checks **and `enforce_admins=true`** (no admin bypass); merges
+  only when every required check passes. See `.github/workflows/README.md` for the full gating map.
 
 ## Branch Structure
 

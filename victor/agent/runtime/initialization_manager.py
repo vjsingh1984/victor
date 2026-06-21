@@ -1,6 +1,6 @@
 """Initialization phase manager for orchestrator runtime boundaries.
 
-Coordinates the 8 runtime initialization phases in the correct order,
+Coordinates the 9 runtime initialization phases in the correct order,
 providing structured results and error reporting for each phase.
 Supports fail-fast for critical phases and dependency-based skipping.
 """

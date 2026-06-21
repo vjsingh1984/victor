@@ -48,7 +48,12 @@ class StreamingChatContext:
 
     # Metrics
     stream_metrics: StreamMetrics = field(default_factory=StreamMetrics)
-    total_tokens: float = 0.0
+    # Rough content-length/4 token ESTIMATE, used only for the live "~N tokens (est.)"
+    # streaming readout and confidence monitoring. NOT the billed token count — the
+    # authoritative per-turn counts are api_prompt/completion/total_tokens on the
+    # TaskExecutionReport, sourced from the provider's reported usage. See cumulative_usage
+    # below for the real provider numbers accumulated during the stream.
+    estimated_content_tokens: float = 0.0
     cumulative_usage: Dict[str, int] = field(
         default_factory=lambda: {
             "prompt_tokens": 0,

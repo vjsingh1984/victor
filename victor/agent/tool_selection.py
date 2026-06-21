@@ -2227,6 +2227,9 @@ class ToolSelector(ModeAwareMixin):
                 "schema_promotion_threshold", 0.8
             ),
             max_schema_tokens=self.tool_selection_config.get("max_tool_schema_tokens", 0),
+            # Protect deliberately-selected web tools from the order-blind edge filter /
+            # truncation so web_search survives to dispatch for research-flavored tasks.
+            web_tools=frozenset(self._get_web_tools_cached()),
         )
 
     def _finalize_semantic_selection(
@@ -2572,9 +2575,14 @@ class ToolSelector(ModeAwareMixin):
                 current_stage=current_stage,
                 stage_tools=stage_tools,
                 core_tools=self._get_stage_core_tools(current_stage),
-                web_tools=(
-                    self._get_web_tools_cached() if needs_web_tools(user_message) else set()
-                ),
+                # Always protect web tools the selector already chose. Gating this on
+                # needs_web_tools(user_message) (a keyword heuristic) caused a tool the
+                # semantic selector deliberately included — e.g. web_search — to be pruned
+                # out of the schema sent to the provider whenever the prompt lacked a
+                # literal "search/web/online/http" keyword, leaving the model to call a
+                # tool it was never given. Web tool names not present in the candidate set
+                # are simply ignored, so this does not broadcast unrelated tools.
+                web_tools=self._get_web_tools_cached(),
                 mandatory_tools=set(getattr(tiered_config, "mandatory", set())),
                 vertical_core_tools=set(getattr(tiered_config, "vertical_core", set())),
             ),

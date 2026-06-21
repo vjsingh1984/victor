@@ -1,6 +1,6 @@
 <div align="center">
 
-![Victor Banner](../docs/assets/victor-banner.png)
+![Victor Banner](../docs/assets/victor-banner.svg)
 
 # Victor Docker - Air-gapped Deployment
 

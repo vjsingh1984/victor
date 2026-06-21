@@ -136,7 +136,20 @@ class ToolSelectionRuntime:
         tools = self._prioritize_explicit_database_tools(tools, user_message_anchor)
         tools = self._apply_e3tir_exploration(tools, user_message_anchor)
         tools = runtime._apply_kv_tool_strategy(tools)
-        return runtime._sort_tools_for_kv_stability(tools)
+        final_tools = runtime._sort_tools_for_kv_stability(tools)
+        # Log the tools actually dispatched to the provider. The selector's earlier
+        # "Selected N tools" line is emitted before stage pruning / intent filtering and
+        # can overstate the callable set (a tool can be selected then pruned away). This
+        # post-transform line is the source of truth for what the model receives.
+        try:
+            logger.info(
+                "Tools dispatched to provider (%d): %s",
+                len(final_tools),
+                ", ".join(getattr(t, "name", "?") for t in final_tools),
+            )
+        except Exception:  # logging must never break tool selection
+            logger.debug("dispatched-tools log failed", exc_info=True)
+        return final_tools
 
     def _get_e3tir_reranker(self) -> Any:
         """Lazily build the per-session E3-TIR reranker when enabled, else None.
@@ -252,6 +265,29 @@ class ToolSelectionRuntime:
             )
         return reordered
 
+    def _current_task_type(self) -> str:
+        """Resolve the current turn's task type from a *populated* source.
+
+        The prior guard read ``self._runtime._current_task_type``, an attribute that is
+        never assigned anywhere — so it was always empty and the read-oriented guard below
+        never fired, forcing edit/write/shell onto pure analysis turns every iteration. The
+        UnifiedTaskTracker's ``task_type`` is the canonical per-turn classification
+        (e.g. "analyze"/"search"/"research"); fall back to a runtime-level attribute if a
+        future path sets one.
+        """
+        runtime = self._runtime
+        tracker = getattr(runtime, "unified_tracker", None)
+        for candidate in (
+            getattr(tracker, "task_type", None),
+            getattr(runtime, "_current_task_type", None),
+        ):
+            if candidate is None:
+                continue
+            value = str(getattr(candidate, "value", candidate) or "").lower()
+            if value:
+                return value
+        return ""
+
     def _ensure_write_tools_for_write_intent(self, tools: Any, current_intent: Any) -> Any:
         """Ensure semantic selection does not omit edit/write on write-authorized turns."""
         if not tools:
@@ -268,9 +304,7 @@ class ToolSelectionRuntime:
         # WRITE_ALLOWED only means writes aren't blocked — not that the user wants to write.
         # Don't force edit/write/shell onto read-oriented analysis/search/research turns every
         # iteration; let semantic selection decide (the agent can still surface them if needed).
-        task_type_raw = getattr(self._runtime, "_current_task_type", None)
-        task_type = str(getattr(task_type_raw, "value", task_type_raw) or "").lower()
-        if task_type in _READ_ORIENTED_TASK_TYPES:
+        if self._current_task_type() in _READ_ORIENTED_TASK_TYPES:
             return tools
 
         selected = list(tools)

@@ -7,7 +7,8 @@ Usage:
     victor db stats                              # Show table sizes and DB file size
     victor db prune --group rl --older-than 30d  # Prune RL tables older than 30 days
     victor db prune --table rl_outcome --keep-last 10000
-    victor db vacuum                             # Reclaim disk space
+    victor db vacuum                             # Reclaim disk space (global DB)
+    victor db maintain                           # Checkpoint WAL + reclaim global & project DB
     victor db archive --group rl --before 2026-03-01
 """
 
@@ -219,6 +220,43 @@ def db_vacuum() -> None:
         f"[green]Done.[/green] {before / 1024 / 1024:.1f} MB → "
         f"{after / 1024 / 1024:.1f} MB (saved {saved / 1024 / 1024:.1f} MB)"
     )
+
+
+@db_app.command("maintain")
+def db_maintain(
+    project: bool = typer.Option(
+        True, "--project/--no-project", help="Also maintain the project graph DB"
+    ),
+) -> None:
+    """Checkpoint the WAL and reclaim space on the global (and project) databases.
+
+    The project graph DB in particular accumulates a large WAL and free pages after
+    re-indexing; this truncates the WAL and VACUUMs so the files shrink toward their live
+    size. Safe to rerun.
+    """
+    from victor.core.database import get_database, get_project_database
+
+    managers = [("global", get_database())]
+    if project:
+        try:
+            managers.append(("project", get_project_database()))
+        except Exception:
+            console.print(
+                "[yellow]No project database found; skipping project maintenance.[/yellow]"
+            )
+
+    for label, db in managers:
+        if not db.db_path.exists():
+            console.print(f"[dim]{label}: {db.db_path} does not exist, skipping.[/dim]")
+            continue
+        console.print(f"Maintaining {label} DB: {db.db_path}...")
+        stats = db.maintain()
+        before_mb = stats["size_before"] / 1024 / 1024
+        after_mb = stats["size_after"] / 1024 / 1024
+        console.print(
+            f"[green]{label}:[/green] {before_mb:.1f} MB → {after_mb:.1f} MB "
+            f"(saved {before_mb - after_mb:.1f} MB)"
+        )
 
 
 @db_app.command("archive")

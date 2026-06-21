@@ -32,6 +32,45 @@ from victor.providers.base import StreamChunk
 logger = logging.getLogger(__name__)
 
 
+def _tool_call_signatures(tool_calls: Optional[List[dict]]) -> set:
+    """Stable per-turn tool-call signatures for spin detection.
+
+    Mirrors ``TurnToolExecutionResult.tool_signatures`` (name + sorted, stringified args)
+    so the streaming path can feed the SpinDetector the same signature scheme the
+    single-turn primitive uses. Repeated identical signatures across turns (e.g. the same
+    ``code_search(query=...)`` issued every iteration) are how a tool-call loop is detected
+    early, instead of waiting for assistant content to become near-identical.
+    """
+    signatures: set = set()
+    for tc in tool_calls or []:
+        name = tc.get("name", "unknown")
+        args = tc.get("arguments", {})
+        if isinstance(args, dict):
+            args_str = str([(k, str(v)) for k, v in sorted(args.items())])
+        else:
+            args_str = str(args)
+        signatures.add(f"{name}:{args_str}")
+    return signatures
+
+
+def _count_productive_tools(tool_exec_result: Any) -> int:
+    """Count tool calls that succeeded with output for progress/plateau accounting.
+
+    The streaming ``ToolExecutionResult`` (victor/agent/streaming/tool_execution.py) exposes
+    ``tool_results`` (a list of dicts) and ``tool_calls_executed`` — it does NOT have the
+    ``successful_tool_count`` property of the single-turn ``TurnToolExecutionResult``. Derive
+    the count from ``tool_results`` so a turn whose tools all failed/were blocked/returned
+    nothing does not count as progress (and still gets nudged). When no per-result detail is
+    available, fall back to whether any tool executed at all.
+    """
+    if not tool_exec_result:
+        return 0
+    results = getattr(tool_exec_result, "tool_results", None)
+    if isinstance(results, list) and results:
+        return sum(1 for r in results if isinstance(r, dict) and r.get("success"))
+    return int(getattr(tool_exec_result, "tool_calls_executed", 0) or 0)
+
+
 def _evaluate_overlap_repetition(overlap: float, repetition_count: int) -> Tuple[int, str]:
     """Decide repetition handling from word-overlap between consecutive turns.
 
@@ -1140,7 +1179,9 @@ class StreamingChatExecutor:
                     )
 
                     if is_feature_enabled(FeatureFlag.USE_CONFIDENCE_MONITOR):
-                        self._confidence_monitor.record(full_content or "", stream_ctx.total_tokens)
+                        self._confidence_monitor.record(
+                            full_content or "", stream_ctx.estimated_content_tokens
+                        )
                         if self._confidence_monitor.should_stop():
                             self._record_confidence_early_stop(stream_ctx)
                             logger.info(
@@ -1156,7 +1197,7 @@ class StreamingChatExecutor:
                 "tokens=%s, garbage=%s, content_preview=%r",
                 len(full_content) if full_content else 0,
                 len(tool_calls) if tool_calls else 0,
-                stream_ctx.total_tokens,
+                stream_ctx.estimated_content_tokens,
                 garbage_detected,
                 content_preview,
             )
@@ -1173,10 +1214,15 @@ class StreamingChatExecutor:
             _no_progress = not _has_tools and content_length < 120
 
             tool_names_set = {tc.get("name", "") for tc in tool_calls} if tool_calls else set()
+            # Feed per-turn tool-call signatures so the SpinDetector's repeated-signature
+            # path is live in streaming. Without these it only tracked names/counts and
+            # never tripped on a model re-issuing the *same* tool call (same args) every
+            # turn — the exact shape of the observed code_search loop.
             _spin.record_turn(
                 has_tool_calls=_has_tools,
                 tool_names=tool_names_set,
                 tool_count=len(tool_calls) if tool_calls else 0,
+                tool_signatures=_tool_call_signatures(tool_calls) if tool_calls else None,
             )
 
             logger.debug(
@@ -1861,24 +1907,25 @@ class StreamingChatExecutor:
                     except Exception as exc:
                         logger.debug("Streaming fulfillment check skipped: %s", exc)
 
-                tool_count = tool_exec_result.tool_calls_executed if tool_exec_result else 0
+                # Credit *productive* tool calls toward progress, not raw count: a turn
+                # full of failed/blocked/empty tool calls is not progress and must not mask
+                # a plateau (the observed loop ran 2 tool calls/turn that returned nothing).
+                productive_count = _count_productive_tools(tool_exec_result)
                 content_len = len(full_content) if full_content else 0
-                progress = min(1.0, (tool_count * 0.3 + min(content_len / 2000, 0.7)))
+                progress = min(1.0, (productive_count * 0.3 + min(content_len / 2000, 0.7)))
                 self._progress_scores.append(progress)
 
                 if len(self._progress_scores) >= 3:
                     recent = self._progress_scores[-3:]
                     if max(recent) - min(recent) < 0.05 and recent[-1] < 0.8:
-                        # Don't nudge if the agent is actively making tool calls —
-                        # progress score is a heuristic and may flatten while the
-                        # agent is doing real work (read → search → edit cycles).
-                        _recent_tools = (
-                            tool_exec_result.tool_calls_executed if tool_exec_result else 0
-                        )
-                        if _recent_tools > 0:
+                        # Don't nudge if the agent is making *productive* tool calls — the
+                        # progress score may flatten during real work (read → search → edit).
+                        # But unproductive turns (all tools failed/blocked) still get nudged.
+                        if productive_count > 0:
                             logger.info(
-                                "Skipping plateau nudge: agent made %d tool calls this iteration",
-                                _recent_tools,
+                                "Skipping plateau nudge: agent made %d productive tool call(s) "
+                                "this iteration",
+                                productive_count,
                             )
                         else:
                             logger.info(

@@ -973,16 +973,27 @@ def _decorate_literal_fallback_result(
         merged_metadata["filters_applied"] = filters_applied
     if metadata:
         merged_metadata.update(metadata)
-    if (
-        result.get("count") == 0
-        and isinstance(fallback, str)
-        and fallback.startswith("semantic_")
-        and result.get("mode") == "literal"
-    ):
-        merged_metadata["fallback_guidance"] = (
-            "Semantic search was unavailable and literal fallback found no matches. "
-            "Retry with concrete identifiers, symbols, or short tokens using mode='literal'."
-        )
+    if isinstance(fallback, str) and fallback.startswith("semantic_"):
+        # Surface a prominent, model-visible note (not just nested metadata) so the agent
+        # stops re-issuing natural-language semantic queries against a literal-only engine.
+        # In the failing session the model looped, unaware semantic search was unavailable.
+        if result.get("count") == 0 and result.get("mode") == "literal":
+            merged_metadata["fallback_guidance"] = (
+                "Semantic search was unavailable and literal fallback found no matches. "
+                "Retry with concrete identifiers, symbols, or short tokens using mode='literal'."
+            )
+            result["note"] = (
+                "Semantic code search is unavailable in this session (literal keyword search "
+                "only) and found no matches. Retry with exact identifiers, symbols, file names, "
+                "or short literal tokens — do not re-issue natural-language semantic queries. "
+                "Install victor-coding to enable semantic search."
+            )
+        else:
+            result.setdefault(
+                "note",
+                "Semantic code search is unavailable in this session; results are from literal "
+                "keyword search. Prefer exact identifiers, symbols, or file names over prose.",
+            )
     if merged_metadata:
         result["metadata"] = merged_metadata
     return result
@@ -2634,7 +2645,15 @@ async def _get_or_build_index(
             return index, False
         except Exception as e:
             logger.warning("[code_search] Read-only index load failed: %s", e)
-            raise TimeoutError(f"Index lock for {root} busy and no usable cache found.")
+            # If the indexing provider is simply absent (victor-coding not installed), surface
+            # that as-is — NOT as a timeout. Masking it as TimeoutError made the caller log a
+            # bogus "build timed out after 600s", classify it as semantic_index_timeout instead
+            # of provider_unavailable, and skip caching the failure — so parallel/subsequent
+            # code_search calls kept re-racing the lock. Re-raising the provider error lets the
+            # caller classify + cache it and fall back to literal search in <1s.
+            if _is_missing_semantic_provider_error(str(e)):
+                raise
+            raise TimeoutError(f"Index lock for {root} busy and no usable cache found.") from e
     finally:
         if _lock_entered:
             await path_lock.__aexit__(None, None, None)

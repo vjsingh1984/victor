@@ -7,6 +7,69 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 _No changes yet._
 
+## [0.7.1] - 2026-06-21
+
+A hardening and chat-UX release: the new `victor ui` chat surface gained controls and
+resilience, per-turn cost/token accounting was finished end-to-end, and a sweep of
+streaming, tool-selection, governance, and indexing bugs surfaced by live use were fixed.
+`victor-contracts` stays at 0.7.0 (no protocol changes).
+
+### Added
+- **Chat UI controls & resilience** — stop/cancel an in-flight turn, close-guard so a
+  mid-stream disconnect can't tear down the provider, and error recovery (#144)
+- **Chat settings panel + session-restore seam** — provider/profile/model/approval controls
+  and best-effort replay of a reconnected session's history (#146)
+- **`victor ui --profile`** to select an agent profile for the chat surface
+- **Informed tool approvals** — the policy ASK prompt now carries tool args and a human
+  summary; per-call tool steps, accumulating reasoning, and first-token feedback in the UI (#135)
+- **Tool telemetry in chat** — per-call duration, real output, output pruning, and follow-up
+  suggestions surfaced as steps (#135)
+- **Per-turn cost trace (C0)** — a cost/latency/token footer (L3) and cost-aware model
+  routing that biases toward cheaper/faster providers on expensive turns (L4) (#139)
+- **Reference-aware tool-result pruning** — context compaction that keeps referenced results,
+  enabled by default (L1) (#137, #138)
+- **`victor db maintain`** — checkpoint the WAL and reclaim space on the global and project
+  databases (#153)
+- RL learning-trace merge caching within a task (L2, flag-gated)
+
+### Changed
+- **CI split** — lightweight fast checks on `develop`, extensive gating reserved for
+  `develop → main`; develop quick-tests scoped to changed-file unit tests (#136, #142)
+- Scheduled security scan runs weekly instead of nightly (#145)
+- Docs Pages deploy can be triggered on-demand via `workflow_dispatch` (#156)
+- New project databases open with `auto_vacuum=INCREMENTAL`; `graph_module_metric_history`
+  is capped per module to stop unbounded growth (#153)
+
+### Fixed
+- **Streaming cleanup** — the provider SSE stream is now closed on-task across the full
+  consumer → resilience → provider decorator chain, eliminating "async generator ignored
+  GeneratorExit" / "exit cancel scope in a different task" spam; also corrected the streaming
+  `ToolExecutionResult` shape used for plateau/progress accounting (#152, #154, #155)
+- **`web_search` reaches the model** — a deliberately-selected web tool is no longer dropped
+  by stage pruning or the order-blind post-selection truncation on research-flavored tasks
+  (#149, #157)
+- **Governance approval in the chat UI** — the interactive ASK approval handler now survives
+  the DI container bootstrap (and is registered via the correct API), so ASK-gated tools
+  prompt instead of silently denying (#150)
+- **No mutation tools forced onto read-only tasks** — write-intent no longer injects
+  edit/write/shell on analyze/search/research turns; tool-call loops are detected earlier (#151)
+- **`code_search` fails fast** when the semantic indexing provider is absent — falls back to
+  literal search in <1s instead of a ~600s index-lock hang (#158)
+- **Token accounting** — per-turn input/output tokens are measured end-to-end from provider
+  usage and finalized on the service path; Ollama usage surfaced on the streaming done chunk
+  (#134)
+- **Graph tool** — stop advertising unimplemented modes (`dead_code`, `dynamic_imports`);
+  suggest same-file symbols with an unambiguous basename fallback for `file:Symbol` (#125)
+- Chainlit 2.x compatibility for chat-UI tool approval
+
+### Security
+- Remediated Semgrep SAST findings across workflows, CI, and Docker, and cleared the
+  remaining Semgrep OSS findings blocking `develop → main` (#140, #148)
+- Upgraded vulnerable dependencies (FastAPI/Starlette, transformers) to clear CVEs (#143)
+
+### Removed
+- Superseded standalone Vite UIs (`web/ui`, `ui/`) in favor of the Chainlit `victor ui` (#141)
+
 ## [0.7.0] - 2026-06-19
 
 ### Added
