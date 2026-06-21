@@ -343,3 +343,143 @@ async def test_execute_tools_turn_buffered_handler_yields_result_chunks():
     assert orch.tool_calls_used == 4  # 3 + 1
     # should_return propagated via the holder (loop control stays in run()).
     assert holder.result.should_return is True
+
+
+def _spin(state_name, *, state_value="active"):
+    record_calls = []
+    spin = SimpleNamespace(
+        state=SimpleNamespace(name=state_name, value=state_value),
+        record_turn=lambda **kw: record_calls.append(kw),
+    )
+    spin.record_calls = record_calls
+    return spin
+
+
+def _chunk_gen_orch():
+    return SimpleNamespace(
+        _chunk_generator=SimpleNamespace(
+            generate_content_chunk=lambda text, is_final=False: SimpleNamespace(
+                content=text, is_final=is_final
+            )
+        )
+    )
+
+
+async def _collect_turn_stops(
+    executor, *, orch, stream_ctx, full_content, tool_calls, spin, turn_eval
+):
+    outcome = chat_stream_executor._ProviderTurnEval()
+    chunks = [
+        c
+        async for c in executor._evaluate_provider_turn_stops(
+            orch,
+            stream_ctx,
+            full_content=full_content,
+            tool_calls=tool_calls,
+            spin=spin,
+            turn_eval=turn_eval,
+            outcome=outcome,
+        )
+    ]
+    return chunks, outcome
+
+
+async def test_evaluate_provider_turn_stops_normal_records_metrics_no_stop():
+    executor = _provider_turn_executor()
+    orch = _chunk_gen_orch()
+    stream_ctx = SimpleNamespace()  # no skip_continuation preset
+    spin = _spin("ACTIVE", state_value="active")
+    turn_eval = SimpleNamespace(evaluate=lambda obs, record_spin: SimpleNamespace(stop=False))
+
+    chunks, outcome = await _collect_turn_stops(
+        executor,
+        orch=orch,
+        stream_ctx=stream_ctx,
+        full_content="  hello world  ",
+        tool_calls=[{"name": "edit"}],
+        spin=spin,
+        turn_eval=turn_eval,
+    )
+
+    # No stop -> no chunks, loop continues.
+    assert chunks == []
+    assert outcome.should_return is False
+    # Derived metrics surfaced for the rest of the loop body.
+    assert outcome.content_length == len("hello world")
+    assert outcome.has_tools is True
+    # Spin fed this turn's signatures.
+    assert spin.record_calls[0]["has_tool_calls"] is True
+    assert spin.record_calls[0]["tool_count"] == 1
+
+
+async def test_evaluate_provider_turn_stops_terminated_spin_emits_final_and_returns():
+    executor = _provider_turn_executor()
+    orch = _chunk_gen_orch()
+    stream_ctx = SimpleNamespace()
+    spin = _spin("TERMINATED")
+    turn_eval = SimpleNamespace(evaluate=lambda obs, record_spin: SimpleNamespace(stop=False))
+
+    chunks, outcome = await _collect_turn_stops(
+        executor,
+        orch=orch,
+        stream_ctx=stream_ctx,
+        full_content="stuck",
+        tool_calls=None,
+        spin=spin,
+        turn_eval=turn_eval,
+    )
+
+    assert outcome.should_return is True
+    assert stream_ctx.force_completion is True
+    assert stream_ctx.skip_continuation is True
+    assert len(chunks) == 1 and chunks[0].is_final is True
+    assert "response loop pattern" in chunks[0].content
+
+
+async def test_evaluate_provider_turn_stops_content_repetition_emits_final_and_returns():
+    executor = _provider_turn_executor()
+    orch = _chunk_gen_orch()
+    stream_ctx = SimpleNamespace()
+    spin = _spin("ACTIVE")
+    turn_eval = SimpleNamespace(
+        evaluate=lambda obs, record_spin: SimpleNamespace(
+            stop=True, stop_reason="repeat", stop_message="STOP-MSG"
+        )
+    )
+
+    chunks, outcome = await _collect_turn_stops(
+        executor,
+        orch=orch,
+        stream_ctx=stream_ctx,
+        full_content="repeated content",
+        tool_calls=None,
+        spin=spin,
+        turn_eval=turn_eval,
+    )
+
+    assert outcome.should_return is True
+    assert stream_ctx.skip_continuation is True
+    assert chunks[0].content == "STOP-MSG"
+    assert chunks[0].is_final is True
+
+
+async def test_evaluate_provider_turn_stops_preset_skip_continuation_returns_no_chunk():
+    executor = _provider_turn_executor()
+    orch = _chunk_gen_orch()
+    stream_ctx = SimpleNamespace(skip_continuation=True)
+    spin = _spin("ACTIVE")
+    turn_eval = SimpleNamespace(evaluate=lambda obs, record_spin: SimpleNamespace(stop=False))
+
+    chunks, outcome = await _collect_turn_stops(
+        executor,
+        orch=orch,
+        stream_ctx=stream_ctx,
+        full_content="some content",
+        tool_calls=None,
+        spin=spin,
+        turn_eval=turn_eval,
+    )
+
+    # skip_continuation already set upstream -> return with no emitted chunk.
+    assert outcome.should_return is True
+    assert chunks == []
