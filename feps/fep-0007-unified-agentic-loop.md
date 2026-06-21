@@ -55,6 +55,35 @@ PR #170 extracted the per-turn EVALUATE guards (content-repetition, plateau, spi
 a shared `TurnEvaluationController` in `victor/agent/turn_policy.py` that **both** loops call.
 This FEP builds on that controller as the shared decision seam.
 
+## Implementation Status & Decision (2026-06-21)
+
+Phases 1–2 have landed, and a key delivery decision was made that **supersedes the flag-gated
+Phase 3/4 rollout originally drafted below**:
+
+> **Decision: no feature flag, no legacy fallback.** The unified per-turn primitive is the
+> *single canonical* streaming loop body, on by default. A `USE_UNIFIED_STREAMING_LOOP` flag
+> with the old loop retained as a fallback would be exactly the branch-proliferation / dual-path
+> tech debt the runtime guidance pushes against (cf. the W3 service-layer flag removal). We
+> guard the refactor with a byte-stable characterization battery instead of a runtime A/B.
+
+Shipped:
+
+- **Phase 1 (EVALUATE consolidation)** — the streaming loop's per-turn decision (content-repetition,
+  plateau, spin, nudge, search-novelty, fulfillment) routes through the shared
+  `TurnEvaluationController` / `turn_policy` seam.
+- **Phase 2 (`stream_turn()` extraction + assembly)** — the per-turn body of
+  `StreamingChatExecutor.run()` was decomposed into named ACT/EVALUATE/emit/recovery/continuation
+  helpers (PRs #176–#190) and then **assembled into a single `_stream_turn()` async-generator
+  primitive** (PR #192); `run()` is now a thin while-driver over it. A deterministic, offline
+  streaming **characterization battery** (`tests/integration/streaming/`, PRs #186/#188) pins the
+  loop's observable behavior on the QA scenarios (S1/S2/M1/M2/C1/W1–W4/U1) and gated every step
+  byte-stable. The flag-gated comparison scaffolding was removed once the no-flag decision was made
+  (PR #193).
+
+Remaining (optional): if deeper unification is desired, have the headless `AgenticLoop` drive the
+same `_stream_turn()` primitive as its streaming ACT — again as the single implementation, with no
+flag and no fallback.
+
 ## Proposed Change
 
 Make `AgenticLoop` own the iteration for both modes:
@@ -87,17 +116,19 @@ Each phase is independently landable and revertible.
   so the *entire* per-turn decision is shared, not just content-repetition. Unify the
   perception injection so both loops perceive via the same path. *No FEP gate — extends PR
   #170.*
-- **Phase 2 — extract `stream_turn()`.** Pull the per-turn streaming (one provider stream +
-  tool execution + recovery, yielding chunks and returning a `TurnObservation`) out of
-  `StreamingChatExecutor.run()` as a method. Behavior-neutral: `run()` calls it. Locked by the
-  existing streaming tests.
-- **Phase 3 — `AgenticLoop.run_streaming()` behind a flag.** New method drives
-  PERCEIVE → ACT(`stream_turn`) → EVALUATE(controller) → DECIDE, yielding chunks. Gated by
-  `USE_UNIFIED_STREAMING_LOOP` (default OFF). `ChatStreamRuntime` chooses old `executor.run()`
-  vs `AgenticLoop.run_streaming()` on the flag, with the old path as fallback.
-- **Phase 4 — cut over and remove the old loop.** After the QA battery confirms parity
-  (streaming UI + `Agent.stream()`), flip the flag default ON, then delete
-  `StreamingChatExecutor.run()`'s iteration loop, leaving only `stream_turn()` + the adapter.
+- **Phase 2 — extract and assemble `stream_turn()`. ✅ Done.** Pull the per-turn streaming (one
+  provider stream + tool execution + recovery, yielding chunks and signalling the per-turn outcome)
+  out of `StreamingChatExecutor.run()`, first as named helpers and then as a single `_stream_turn()`
+  primitive. Behavior-neutral: `run()` is a thin while-driver that calls it. Locked byte-stable by
+  the streaming characterization battery.
+- **Phase 3 — drive the single per-turn primitive (no flag, no fallback).** The unified
+  `_stream_turn()` is the one canonical streaming loop body, on by default — there is no
+  `USE_UNIFIED_STREAMING_LOOP` gate and no retained legacy loop. (Optional deeper unification: have
+  `AgenticLoop` drive `_stream_turn()` as its streaming ACT so PERCEIVE/EVALUATE/DECIDE live once
+  across both modes — still as the single implementation, no flag, no fallback.)
+- **Phase 4 — n/a (folded into the no-flag approach).** There is no separate "flip the flag /
+  delete the old loop" step: the old iteration loop was replaced in place by the `_stream_turn()`
+  driver rather than kept behind a flag, so there is no dual path to cut over from.
 
 ## Benefits
 
@@ -107,8 +138,10 @@ Each phase is independently landable and revertible.
 
 ## Drawbacks and Alternatives
 
-- **Risk.** Phases 3–4 touch the live UI streaming path; a regression breaks `victor ui`.
-  Mitigated by the feature flag + fallback + QA-battery parity gate before cutover.
+- **Risk.** The refactor touches the live UI streaming path; a regression breaks `victor ui`.
+  Mitigated **not** by a feature flag + fallback, but by a deterministic, offline characterization
+  battery that drives the real loop and pins every QA scenario byte-stable, plus live-provider
+  verification, on each incremental change.
 - **Alternative (rejected): leave two loops, share only guards.** PR #170 already did the
   cheap part; leaving the structural split keeps two iteration controls, the missing
   PLAN/DECIDE in streaming, and ongoing drift risk.
@@ -117,50 +150,55 @@ Each phase is independently landable and revertible.
 
 ## Unresolved Questions
 
-- **Chunk granularity.** `AgenticLoop.run_streaming()` must yield at token/segment granularity
-  (matching today's `StreamingChatExecutor`), not at loop-iteration granularity like the
-  existing `AgenticLoop.stream()` (which yields `LoopIteration`). The exact boundary between
-  the `stream_turn()` primitive and the loop's per-iteration yielding needs to be settled in
-  Phase 2 against the current chunk-emission points.
-- **Recovery placement.** The streaming loop's recovery/continuation handling (empty-response
-  fallback, stall-timeout, `on_chat_end` cancel drain) is entangled with its iteration today.
-  Phase 2 must decide which parts belong to the per-turn `stream_turn()` primitive and which
-  remain loop-level, without regressing the cross-task cleanup hardened in PR #155.
-- **StateGraph mode interaction.** `USE_STATEGRAPH_AGENTIC_LOOP` swaps the inner executor;
-  whether `run_streaming()` supports the StateGraph executor in Phase 3 or only the in-class
-  while-loop is open and can be deferred.
+- **Chunk granularity. ✅ Resolved in Phase 2.** Token/segment-granularity emission stayed inside
+  the provider/tool helpers (`_stream_provider_turn`, `_execute_tools_turn`); `_stream_turn()` is one
+  loop iteration that re-yields those chunks. Loop control crosses the generator boundary via a
+  small mutable `_TurnOutcome` holder (`should_stop` + the inter-turn separator state) rather than a
+  return value.
+- **Recovery placement. ✅ Resolved in Phase 2.** Per-turn recovery (`_apply_turn_recovery`) and the
+  empty-response ladder (`_emit_assistant_turn`) live inside the per-turn primitive; loop-level
+  control (continue/stop) is signalled out via the helper holders. The cross-task cleanup hardened
+  in PR #155 stays loop-level and was kept byte-stable by the characterization battery.
+- **StateGraph mode interaction.** `USE_STATEGRAPH_AGENTIC_LOOP` swaps the inner *headless* executor
+  and is independent of the streaming primitive. Only relevant if optional deeper unification routes
+  the headless loop through `_stream_turn()`; can be deferred.
 
 ## Migration Path
 
-The change is additive and flag-gated, so there is no breaking step for callers:
+The change is behavior-neutral and in-place (no flag, no parallel path), so there is no breaking
+step for callers:
 
-1. Phases 1–2 land with no behavior change (consolidation + a behavior-neutral `stream_turn()`
-   extraction); existing streaming tests are the regression gate.
-2. Phase 3 introduces `AgenticLoop.run_streaming()` behind `USE_UNIFIED_STREAMING_LOOP`
-   (default OFF). `ChatStreamRuntime.get_executor()` selects the old `executor.run()` by
-   default; opting in routes through the unified loop. The old path remains the fallback.
-3. The QA battery (S1/S2/M1/M2/C1/W1–W4/U1) plus `Agent.stream()` integration tests must show
-   parity (same answers, no streaming tracebacks) before the flag default flips to ON.
-4. Phase 4 removes `StreamingChatExecutor.run()`'s iteration loop only after the flag has
-   defaulted ON across a release with no regressions reported; `StreamChunk` and the public
-   `Agent.stream()` signature never change, so downstream consumers need no migration.
+1. Phases 1–2 landed with no behavior change (EVALUATE consolidation + the `_stream_turn()`
+   extraction and assembly); the streaming characterization battery is the regression gate.
+2. The unified `_stream_turn()` primitive replaced `StreamingChatExecutor.run()`'s iteration body
+   **in place** — `run()` became a thin driver over it. There is no dual path and nothing to opt
+   into: the single canonical streaming loop is always active.
+3. Each incremental change was held byte-stable by the QA battery (S1/S2/M1/M2/C1/W1–W4/U1) plus
+   live-provider verification (same answers, no streaming tracebacks).
+4. `StreamChunk` (the public streaming type) and the `Agent.stream()` async-iterator contract are
+   unchanged throughout, so UI, API, and SDK consumers need no migration.
 
 ## Compatibility
 
-`AgenticLoop.run()` and the buffered path are unchanged. `run_streaming()` is additive and the
-cutover is flag-gated, so existing callers keep the current streaming path until the flag flips.
-`StreamChunk` (the public streaming type) and the `Agent.stream()` async-iterator contract are
-unchanged throughout, so UI, API, and SDK consumers require no code changes at any phase.
+`AgenticLoop.run()` and the buffered path are unchanged. The streaming refactor is internal to
+`StreamingChatExecutor` and behavior-neutral, so existing callers keep the current streaming
+behavior. `StreamChunk` (the public streaming type) and the `Agent.stream()` async-iterator contract
+are unchanged throughout, so UI, API, and SDK consumers require no code changes.
 
 ## Acceptance Criteria
 
-- `AgenticLoop.run_streaming()` yields `StreamChunk`s equivalent to `StreamingChatExecutor.run()`
-  on the QA battery (S1/S2/M1/M2/C1/W1–W4/U1) — same answers, no streaming tracebacks.
-- Both modes share one `TurnEvaluationController` and one perceive path.
-- Behind-flag rollout with the old path intact until parity is proven; old loop removed only in
-  Phase 4.
+- The unified `_stream_turn()` primitive yields `StreamChunk`s byte-identical to the pre-refactor
+  `StreamingChatExecutor.run()` on the QA battery (S1/S2/M1/M2/C1/W1–W4/U1) — same answers, same
+  tool sequence, no streaming tracebacks. *(Met: the characterization battery passes byte-stable.)*
+- The streaming per-turn decision shares one `TurnEvaluationController` / `turn_policy` seam.
+- Single canonical streaming loop — no feature flag, no retained legacy path.
 
 ## References
 
 - PR #170 — shared `TurnEvaluationController` (prerequisite).
+- PRs #176–#190 — Phase 2 per-turn helper extractions (ACT / EVALUATE / emit / recovery /
+  continuation), plus #184 (streaming fulfillment fix).
+- PR #192 — Phase 2 assembly: the single `_stream_turn()` primitive + thin `run()` driver.
+- PRs #186/#188 — streaming characterization battery (`tests/integration/streaming/`);
+  PR #193 — removal of the flag-gated comparison scaffolding after the no-flag decision.
 - CLAUDE.md — Agentic Loop (Phase 10), Agent Runtime Target State.
