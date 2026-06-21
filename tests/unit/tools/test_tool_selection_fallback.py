@@ -112,6 +112,48 @@ def test_prioritize_stage_keeps_selected_web_tool_without_web_keyword(
     assert "web_search" in {t.name for t in pruned}
 
 
+def test_web_search_survives_full_selection_to_dispatch_pipeline(
+    orchestrator: AgentOrchestrator,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """End-to-end guard: a selected web tool must survive BOTH post-selection truncation
+    (#157) and stage prioritization (#149) to reach the dispatched set.
+
+    Reproduces the live failure where `Selected 15 tools … web_search` became
+    `Tools dispatched to provider (8): …` with web_search dropped — leaving the model to
+    loop on a tool it was never given. A regression in either stage fails this test.
+    """
+    selector = orchestrator.tool_selector
+    monkeypatch.setattr(selector, "_get_web_tools_cached", lambda: {"web_search"})
+
+    # 15 candidates with web_search ranked at index 8 (just past fallback_max_tools=8) —
+    # the exact shape the semantic selector produced for the research-flavored prompt.
+    candidates = [ToolDefinition(name=f"t{i}", description="d", parameters={}) for i in range(8)]
+    candidates += [ToolDefinition(name="web_search", description="d", parameters={})]
+    candidates += [
+        ToolDefinition(name=f"t{i}", description="d", parameters={}) for i in range(8, 14)
+    ]
+
+    prompt = "research the Google SDLC 3.0 white paper and cite the source URL"
+
+    # Stage 1 — post-selection truncation (#157), via the REAL context builder so the
+    # web_tools plumbing (tool_selection.py) is exercised, not just the truncation helper.
+    ctx = selector._build_semantic_postprocess_context(user_message=prompt, stage=None)
+    assert "web_search" in ctx.web_tools  # #157 plumbing wired through
+    pruned = selector._post_processor.apply(
+        candidates,
+        context=ctx,
+        should_use_edge_filter=False,
+        cap_mcp_tools=lambda current, _max: current,
+    )
+    assert "web_search" in [t.name for t in pruned], "dropped at post-selection truncation (#157)"
+    assert len(pruned) <= selector.fallback_max_tools
+
+    # Stage 2 — stage prioritization (#149).
+    final = selector.prioritize_by_stage(prompt, pruned)
+    assert "web_search" in [t.name for t in final], "dropped at stage prioritization (#149)"
+
+
 def test_prioritize_tools_stage_prefers_core_fallback(
     orchestrator: AgentOrchestrator,
 ) -> None:
