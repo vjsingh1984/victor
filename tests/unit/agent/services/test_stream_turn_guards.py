@@ -822,3 +822,146 @@ def test_detect_completion_no_detector_returns_defaults():
     assert forced is False
     assert mentions == []
     assert messages == []
+
+
+def _recovery_executor():
+    executor = _provider_turn_executor()
+    # Focus these tests on recovery control flow, not the metadata-recording internals.
+    executor._record_recovery_action = lambda ctx, action: None
+    return executor
+
+
+def _recovery_orch(*, recovery_action, recovery_chunk=None, outcomes=None):
+    sink = outcomes if outcomes is not None else []
+
+    async def _handle(**kwargs):
+        return recovery_action
+
+    return SimpleNamespace(
+        _handle_recovery_with_integration=_handle,
+        _apply_recovery_action=lambda action, ctx: recovery_chunk,
+        _recovery_integration=SimpleNamespace(
+            record_outcome=lambda *, success: sink.append(success)
+        ),
+    )
+
+
+async def _collect_recovery(
+    executor, *, orch, full_content="content", tool_calls=None, forced_task_completion=False
+):
+    decision = chat_stream_executor._RecoveryDecision()
+    chunks = [
+        c
+        async for c in executor._apply_turn_recovery(
+            orch,
+            SimpleNamespace(),
+            full_content=full_content,
+            tool_calls=tool_calls,
+            forced_task_completion=forced_task_completion,
+            mentioned_tools_detected=None,
+            decision=decision,
+        )
+    ]
+    return chunks, decision
+
+
+async def test_apply_turn_recovery_continue_action_falls_through():
+    executor = _recovery_executor()
+    orch = _recovery_orch(recovery_action=SimpleNamespace(action="continue"))
+
+    chunks, decision = await _collect_recovery(executor, orch=orch)
+
+    # "continue" action -> no chunk, neither flag (run() proceeds to emit).
+    assert chunks == []
+    assert decision.should_return is False
+    assert decision.should_continue is False
+
+
+async def test_apply_turn_recovery_forced_completion_skips_integration():
+    called = {"handled": False}
+
+    async def _handle(**kwargs):  # pragma: no cover - must not be called
+        called["handled"] = True
+        return SimpleNamespace(action="retry")
+
+    orch = SimpleNamespace(
+        _handle_recovery_with_integration=_handle,
+        _apply_recovery_action=lambda action, ctx: None,
+        _recovery_integration=SimpleNamespace(record_outcome=lambda *, success: None),
+    )
+    executor = _recovery_executor()
+
+    chunks, decision = await _collect_recovery(
+        executor, orch=orch, tool_calls=None, forced_task_completion=True
+    )
+
+    # forced completion + no tool calls -> recovery integration is skipped entirely.
+    assert called["handled"] is False
+    assert chunks == []
+    assert decision.should_return is False
+    assert decision.should_continue is False
+
+
+async def test_apply_turn_recovery_final_chunk_returns_and_records_outcome():
+    outcomes = []
+    final_chunk = SimpleNamespace(content="recovered", is_final=True)
+    orch = _recovery_orch(
+        recovery_action=SimpleNamespace(action="fallback"),
+        recovery_chunk=final_chunk,
+        outcomes=outcomes,
+    )
+    executor = _recovery_executor()
+
+    chunks, decision = await _collect_recovery(executor, orch=orch)
+
+    # Final recovery chunk -> yielded, outcome recorded, loop ends.
+    assert chunks == [final_chunk]
+    assert decision.should_return is True
+    assert decision.should_continue is False
+    assert outcomes == [False]
+
+
+async def test_apply_turn_recovery_retry_action_continues():
+    nonfinal_chunk = SimpleNamespace(content="retrying", is_final=False)
+    orch = _recovery_orch(
+        recovery_action=SimpleNamespace(action="retry"),
+        recovery_chunk=nonfinal_chunk,
+    )
+    executor = _recovery_executor()
+
+    chunks, decision = await _collect_recovery(executor, orch=orch)
+
+    # Non-final chunk + retry action -> yielded, loop restarts.
+    assert chunks == [nonfinal_chunk]
+    assert decision.should_return is False
+    assert decision.should_continue is True
+
+
+async def test_apply_turn_recovery_force_summary_continues_without_chunk():
+    orch = _recovery_orch(
+        recovery_action=SimpleNamespace(action="force_summary"),
+        recovery_chunk=None,
+    )
+    executor = _recovery_executor()
+
+    chunks, decision = await _collect_recovery(executor, orch=orch)
+
+    # force_summary with no chunk -> loop restarts, nothing emitted.
+    assert chunks == []
+    assert decision.should_continue is True
+
+
+async def test_apply_turn_recovery_nonfinal_other_action_falls_through():
+    nonfinal_chunk = SimpleNamespace(content="hint", is_final=False)
+    orch = _recovery_orch(
+        recovery_action=SimpleNamespace(action="inject"),
+        recovery_chunk=nonfinal_chunk,
+    )
+    executor = _recovery_executor()
+
+    chunks, decision = await _collect_recovery(executor, orch=orch)
+
+    # Non-final chunk + action that isn't retry/force_summary -> emit chunk, fall through.
+    assert chunks == [nonfinal_chunk]
+    assert decision.should_return is False
+    assert decision.should_continue is False
