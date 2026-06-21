@@ -164,6 +164,21 @@ class _PostToolEval:
     should_return: bool = False
 
 
+@dataclass
+class _RecoveryDecision:
+    """Single-slot mutable holder for the per-turn recovery step.
+
+    ``_apply_turn_recovery`` consults the recovery integration and may yield a recovery chunk,
+    so it can't return its loop-control decision directly: ``should_return`` ends the stream
+    (a final recovery chunk) and ``should_continue`` restarts the loop (a retry / force_summary
+    action). When neither is set, run() falls through to assistant-content emit. Part of
+    FEP-0007 Phase 2's move toward a shared ``stream_turn()``.
+    """
+
+    should_return: bool = False
+    should_continue: bool = False
+
+
 class StreamingChatExecutor:
     """Canonical streaming chat executor bound to a runtime owner."""
 
@@ -1498,6 +1513,49 @@ class StreamingChatExecutor:
 
         return forced_task_completion, mentioned_tools_detected
 
+    async def _apply_turn_recovery(
+        self,
+        orch: Any,
+        stream_ctx: Any,
+        *,
+        full_content: str,
+        tool_calls: Any,
+        forced_task_completion: bool,
+        mentioned_tools_detected: Any,
+        decision: _RecoveryDecision,
+    ) -> AsyncIterator[StreamChunk]:
+        """Run this turn's recovery step and signal the resulting loop control.
+
+        A cohesive slice of run()'s per-turn body (FEP-0007 Phase 2, toward a shared
+        stream_turn() boundary). Consults the recovery integration (skipped when the turn already
+        forced completion with no pending tool calls) and, for a non-continue action, records and
+        applies it — yielding any recovery chunk. Because it yields, the loop control is written to
+        ``decision``: ``should_return`` on a final recovery chunk, ``should_continue`` on a
+        retry / force_summary action. When neither is set, run() proceeds to assistant-content emit.
+        """
+        if forced_task_completion and not tool_calls:
+            recovery_action = SimpleNamespace(action="continue")
+        else:
+            recovery_action = await orch._handle_recovery_with_integration(
+                stream_ctx=stream_ctx,
+                full_content=full_content,
+                tool_calls=tool_calls,
+                mentioned_tools=mentioned_tools_detected or None,
+            )
+
+        if recovery_action.action != "continue":
+            self._record_recovery_action(stream_ctx, recovery_action)
+            recovery_chunk = orch._apply_recovery_action(recovery_action, stream_ctx)
+            if recovery_chunk:
+                yield recovery_chunk
+                if recovery_chunk.is_final:
+                    orch._recovery_integration.record_outcome(success=False)
+                    decision.should_return = True
+                    return
+            if recovery_action.action in ("retry", "force_summary"):
+                decision.should_continue = True
+                return
+
     async def run(self, user_message: str, **kwargs: Any) -> AsyncIterator[StreamChunk]:
         """Run the streaming executor for the provided message."""
         runtime_owner = self._runtime_owner
@@ -1770,26 +1828,21 @@ class StreamingChatExecutor:
                 )
             )
 
-            if forced_task_completion and not tool_calls:
-                recovery_action = SimpleNamespace(action="continue")
-            else:
-                recovery_action = await orch._handle_recovery_with_integration(
-                    stream_ctx=stream_ctx,
-                    full_content=full_content,
-                    tool_calls=tool_calls,
-                    mentioned_tools=mentioned_tools_detected or None,
-                )
-
-            if recovery_action.action != "continue":
-                self._record_recovery_action(stream_ctx, recovery_action)
-                recovery_chunk = orch._apply_recovery_action(recovery_action, stream_ctx)
-                if recovery_chunk:
-                    yield recovery_chunk
-                    if recovery_chunk.is_final:
-                        orch._recovery_integration.record_outcome(success=False)
-                        return
-                if recovery_action.action in ("retry", "force_summary"):
-                    continue
+            _recovery = _RecoveryDecision()
+            async for chunk in self._apply_turn_recovery(
+                orch,
+                stream_ctx,
+                full_content=full_content,
+                tool_calls=tool_calls,
+                forced_task_completion=forced_task_completion,
+                mentioned_tools_detected=mentioned_tools_detected,
+                decision=_recovery,
+            ):
+                yield chunk
+            if _recovery.should_return:
+                return
+            if _recovery.should_continue:
+                continue
 
             assistant_content_yielded = False
             if full_content:
