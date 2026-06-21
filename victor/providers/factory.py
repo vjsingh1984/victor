@@ -46,6 +46,7 @@ Usage:
 """
 
 import asyncio
+import contextlib
 import logging
 from dataclasses import dataclass, field
 from typing import Any, AsyncIterator, Awaitable, Callable, Dict, List, Optional
@@ -258,7 +259,8 @@ class ManagedProvider:
             **kwargs,
         )
 
-        # Wrap with metrics collection if enabled
+        # Wrap with metrics collection if enabled. aclosing both paths finalizes the
+        # underlying provider/httpx generator on-task instead of leaving it to GC.
         if self._metrics_collector:
             wrapped = MetricsStreamWrapper(
                 stream=base_stream,
@@ -266,11 +268,13 @@ class ManagedProvider:
                 model=model or "unknown",
                 provider=self.name,
             )
-            async for chunk in wrapped:
-                yield chunk
+            async with contextlib.aclosing(wrapped) as inner_stream:
+                async for chunk in inner_stream:
+                    yield chunk
         else:
-            async for chunk in base_stream:
-                yield chunk
+            async with contextlib.aclosing(base_stream) as inner_stream:
+                async for chunk in inner_stream:
+                    yield chunk
 
     def get_metrics(self) -> Optional[Dict[str, Any]]:
         """Get collected metrics.

@@ -39,6 +39,7 @@ Usage:
 """
 
 import asyncio
+import contextlib
 import logging
 import random
 import re
@@ -952,9 +953,15 @@ class ResilientProvider:
                 _start_stream,
             )
 
-            async for chunk in stream:
-                partial_content.append(chunk)
-                yield chunk
+            # aclosing the inner stream is load-bearing: aclose() on THIS generator does not
+            # cascade GeneratorExit into a sub-generator iterated via `async for`, so an early
+            # consumer break would otherwise leave the underlying provider/httpx byte stream
+            # suspended and finalized off-task by GC — the source of "async generator ignored
+            # GeneratorExit" / "exit cancel scope in a different task" spam every turn.
+            async with contextlib.aclosing(stream) as inner_stream:
+                async for chunk in inner_stream:
+                    partial_content.append(chunk)
+                    yield chunk
 
             self._stats["primary_successes"] += 1
 
@@ -981,8 +988,9 @@ class ResilientProvider:
                 try:
                     logger.info(f"Trying fallback stream: {fb_name}")
                     stream = fallback.stream(fallback_messages, model=model, **kwargs)
-                    async for chunk in stream:
-                        yield chunk
+                    async with contextlib.aclosing(stream) as inner_stream:
+                        async for chunk in inner_stream:
+                            yield chunk
                     self._stats["fallback_successes"] += 1
                     if self.__class__._observability_bus is not None:
                         self.__class__._observability_bus.emit_lifecycle_event(

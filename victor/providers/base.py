@@ -14,6 +14,7 @@
 
 """Base provider interface for LLM providers."""
 
+import contextlib
 import logging
 import math
 import ssl
@@ -1021,15 +1022,19 @@ class BaseProvider(ABC):
         Yields:
             StreamChunk objects with incremental content
         """
-        async for chunk in self.stream(
+        # aclosing finalizes the underlying stream() generator on-task on an early break,
+        # avoiding GC-driven off-task cleanup of the httpx byte stream.
+        inner = self.stream(
             messages,
             model=model,
             temperature=temperature,
             max_tokens=max_tokens,
             tools=tools,
             **kwargs,
-        ):
-            yield chunk
+        )
+        async with contextlib.aclosing(inner) as inner_stream:
+            async for chunk in inner_stream:
+                yield chunk
 
     async def count_tokens(self, text: str) -> int:
         """Estimate token count for given text.
