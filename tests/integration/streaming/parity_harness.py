@@ -170,17 +170,20 @@ def build_streaming_orchestrator(
     *,
     max_iterations: int = 8,
     tool_budget: int = 50,
+    failing_tool_names: Optional[List[str]] = None,
 ) -> AgentOrchestrator:
     """Build a real orchestrator wired to the scripted provider + scripted tools.
 
     The returned orchestrator drives the genuine ``StreamingChatExecutor.run()`` loop. The
     ordered list of executed tool names is recorded on ``orch._parity_tool_log`` for the
     transcript. Semantic selection is bypassed (``_select_tools`` returns the scripted tools)
-    so behavior is deterministic and offline.
+    so behavior is deterministic and offline. Tools named in ``failing_tool_names`` return an
+    unsuccessful result, exercising the loop's tool-failure recovery.
     """
     tool_names = tool_names or []
+    failing = set(failing_tool_names or [])
     recorder: List[str] = []
-    tools = [ScriptedTool(n, recorder) for n in dict.fromkeys(tool_names)]
+    tools = [ScriptedTool(n, recorder, success=n not in failing) for n in dict.fromkeys(tool_names)]
 
     settings = _build_settings(tool_budget)
     with patch("victor.core.bootstrap_services.bootstrap_new_services"):
@@ -285,6 +288,7 @@ class Scenario:
     message: str
     turns: List[TurnScript]
     tools: List[str] = field(default_factory=list)
+    failing_tools: List[str] = field(default_factory=list)
     expect_content_contains: Optional[str] = None
     expect_tools: Optional[List[str]] = None
     max_iterations: int = 8
@@ -411,6 +415,35 @@ SCENARIOS: List[Scenario] = [
         expect_tools=None,  # exact count is guard-dependent; the assertion is "it terminated"
         max_iterations=20,
     ),
+    Scenario(
+        id="E1",
+        label="edge: garbage content handled without a streaming traceback",
+        message="Say something.",
+        turns=[TurnScript(content="<<<<garbage>>>>")],
+        expect_tools=[],
+        # The only invariant is graceful handling (no traceback); the loop returns the turn.
+    ),
+    Scenario(
+        id="E2",
+        label="edge: tool failure → loop recovers and answers",
+        message="Read the file.",
+        turns=[
+            _read_turn("read", path="missing.py"),
+            TurnScript(content="Recovered after the tool failure."),
+        ],
+        tools=["read"],
+        failing_tools=["read"],
+        expect_content_contains="recovered",
+        expect_tools=["read"],
+    ),
+    Scenario(
+        id="E4",
+        label="edge: empty model turn → loop continues to a real answer",
+        message="Answer me.",
+        turns=[TurnScript(content=""), TurnScript(content="Finally, a real answer.")],
+        expect_content_contains="real answer",
+        expect_tools=[],
+    ),
 ]
 
 
@@ -418,7 +451,10 @@ def build_for_scenario(scenario: Scenario) -> AgentOrchestrator:
     """Build a fresh orchestrator for a scenario (legacy loop / flag OFF)."""
     provider = ScriptedProvider(list(scenario.turns))
     return build_streaming_orchestrator(
-        provider, scenario.tools, max_iterations=scenario.max_iterations
+        provider,
+        scenario.tools,
+        max_iterations=scenario.max_iterations,
+        failing_tool_names=scenario.failing_tools,
     )
 
 
