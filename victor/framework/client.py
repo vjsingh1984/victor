@@ -257,6 +257,13 @@ class VictorClient:
         # closed." close() drains active streams (bounded) before shutting down.
         self._active_streams = 0
         self._closing = False
+        # Per-session policy ASK approval handler. Stored here and registered into the
+        # session's DI container during _ensure_initialized — AFTER _bootstrap_container()
+        # (which swaps/disposes the global container) and BEFORE Agent.create() builds the
+        # policy middleware. Registering into the global container earlier (e.g. from a UI
+        # on_chat_start) is lost when bootstrap disposes that container, which made every
+        # ASK-gated tool hit ask_fallback (deny) in the chat UI.
+        self._approval_handler: Optional[Any] = None
 
     # ─────────────────────────────────────────────────────────────────────────
     # Lifecycle
@@ -273,6 +280,18 @@ class VictorClient:
         # Bootstrap DI container if not provided
         if self._container is None:
             self._container = self._bootstrap_container()
+
+        # Register the per-session policy ASK approval handler into THIS container, after
+        # bootstrap (which may have swapped/disposed the previous global container) and
+        # before Agent.create() builds the policy middleware. This is the only point where
+        # the handler is guaranteed to land in the same container the middleware reads from.
+        if self._approval_handler is not None:
+            try:
+                from victor.framework.policies import register_policy_approval_handler
+
+                register_policy_approval_handler(self._approval_handler, container=self._container)
+            except Exception:  # approval is best-effort; chat still works without it
+                logger.debug("approval handler registration skipped", exc_info=True)
 
         # Load base settings
         settings = load_settings()
@@ -323,6 +342,30 @@ class VictorClient:
     async def initialize(self) -> "Agent":
         """Public initialization hook for UI surfaces."""
         return await self._ensure_initialized()
+
+    def set_approval_handler(self, handler: Any) -> None:
+        """Register a policy ASK approval handler for this session.
+
+        The handler (an async elicitation callable, e.g. a Chainlit Approve/Reject prompt)
+        is stored on the client and registered into the session's DI container during
+        initialization — after the container is bootstrapped and before the agent builds
+        its policy middleware — so ASK-gated tools resolve interactively instead of falling
+        back to ``ask_fallback``. Must be called before the first ``chat()``/``stream()``.
+
+        Idempotent: the latest handler set before initialization wins. Safe to call on
+        every UI ``on_chat_start`` (including reconnects), since registration is deferred
+        to ``_ensure_initialized``.
+        """
+        self._approval_handler = handler
+        # If the agent is already initialized (handler set late), register immediately into
+        # the live container so it still takes effect for subsequent turns.
+        if self._initialized and self._container is not None and handler is not None:
+            try:
+                from victor.framework.policies import register_policy_approval_handler
+
+                register_policy_approval_handler(handler, container=self._container)
+            except Exception:
+                logger.debug("late approval handler registration skipped", exc_info=True)
 
     @property
     def provider_name(self) -> Optional[str]:

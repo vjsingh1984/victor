@@ -172,16 +172,17 @@ def _get_client() -> VictorClient:
 @cl.on_chat_start
 async def on_chat_start() -> None:
     """Create a per-session VictorClient and greet the user."""
-    # Register the approval handler before any stream triggers agent/middleware build,
-    # while the container is still mutable. The framework owns the container access.
-    try:
-        from victor.framework.policies import register_policy_approval_handler
+    client = _get_client()
 
-        register_policy_approval_handler(chainlit_approval_handler)
+    # Hand the interactive approval handler to the client, which registers it into the DI
+    # container it actually builds (after bootstrap, before middleware build). Registering
+    # into the global container here instead would be lost: the first turn bootstraps a new
+    # container and disposes the one this handler lived in, so every ASK-gated tool would
+    # silently hit ask_fallback (deny). Safe to call on every on_chat_start / reconnect.
+    try:
+        client.set_approval_handler(chainlit_approval_handler)
     except Exception:  # approval is best-effort; chat still works without it
         logger.debug("Approval handler registration skipped", exc_info=True)
-
-    client = _get_client()
 
     # Best-effort session-restore seam: a reconnected session whose client already holds history
     # replays its prior turns; a fresh client raises (uninitialized) and we greet normally. Full
