@@ -965,3 +965,210 @@ async def test_apply_turn_recovery_nonfinal_other_action_falls_through():
     assert chunks == [nonfinal_chunk]
     assert decision.should_return is False
     assert decision.should_continue is False
+
+
+def _emit_orch(messages):
+    return SimpleNamespace(
+        sanitizer=SimpleNamespace(sanitize=lambda c: c, strip_markup=lambda c: c),
+        add_message=lambda role, content, **k: messages.append((role, content)),
+        _chunk_generator=SimpleNamespace(
+            generate_content_chunk=lambda text, is_final=False: SimpleNamespace(
+                content=text, is_final=is_final
+            )
+        ),
+        _record_runtime_intelligence_outcome=lambda **k: None,
+    )
+
+
+def _emit_executor():
+    executor = _provider_turn_executor()
+    executor._prepare_visible_content = lambda fc, *, user_message: fc
+
+    async def _govern(orch, text):
+        return text, False
+
+    executor._govern_final_response = _govern
+    return executor
+
+
+async def _collect_emit(
+    executor,
+    *,
+    orch,
+    full_content,
+    tool_calls,
+    forced_task_completion=False,
+    recovery=None,
+    create_recovery_context=lambda ctx: ctx,
+    runtime_owner=None,
+    tools=None,
+):
+    decision = chat_stream_executor._EmitDecision()
+    chunks = [
+        c
+        async for c in executor._emit_assistant_turn(
+            orch,
+            runtime_owner,
+            SimpleNamespace(user_message="q"),
+            recovery=recovery,
+            create_recovery_context=create_recovery_context,
+            full_content=full_content,
+            tool_calls=tool_calls,
+            forced_task_completion=forced_task_completion,
+            user_message="q",
+            tools=tools,
+            decision=decision,
+        )
+    ]
+    return chunks, decision
+
+
+async def test_emit_content_non_final_yields_and_falls_through():
+    messages = []
+    orch = _emit_orch(messages)
+    executor = _emit_executor()
+
+    chunks, decision = await _collect_emit(
+        executor, orch=orch, full_content="hello", tool_calls=[{"name": "edit"}]
+    )
+
+    # Tool calls present -> not a final emit; content yielded, loop continues.
+    assert len(chunks) == 1
+    assert chunks[0].content == "hello"
+    assert chunks[0].is_final is False
+    assert decision.assistant_content_yielded is True
+    assert decision.prev_iteration_had_content is True
+    assert decision.should_return is False
+    assert decision.tool_calls == [{"name": "edit"}]
+    assert ("assistant", "hello") in messages
+
+
+async def test_emit_content_forced_completion_is_final_returns():
+    messages = []
+    orch = _emit_orch(messages)
+    executor = _emit_executor()
+
+    chunks, decision = await _collect_emit(
+        executor,
+        orch=orch,
+        full_content="all done",
+        tool_calls=None,
+        forced_task_completion=True,
+    )
+
+    # forced completion + no tool calls -> final emit, ends the stream.
+    assert chunks[0].is_final is True
+    assert decision.assistant_content_yielded is True
+    assert decision.should_return is True
+
+
+async def test_emit_tool_calls_only_records_empty_assistant_message():
+    messages = []
+    orch = _emit_orch(messages)
+    executor = _emit_executor()
+
+    chunks, decision = await _collect_emit(
+        executor, orch=orch, full_content="", tool_calls=[{"name": "edit"}]
+    )
+
+    # No content but tool calls -> empty assistant message recorded, nothing yielded.
+    assert chunks == []
+    assert ("assistant", "") in messages
+    assert decision.should_return is False
+    assert decision.should_continue is False
+    assert decision.tool_calls == [{"name": "edit"}]
+
+
+async def test_emit_empty_natural_completion_returns():
+    messages = []
+    orch = _emit_orch(messages)
+    executor = _emit_executor()
+    final = SimpleNamespace(content="natural done", is_final=True)
+    recovery = SimpleNamespace(
+        check_natural_completion=lambda ctx, has_tool_calls, content_length: final
+    )
+
+    chunks, decision = await _collect_emit(
+        executor, orch=orch, full_content="", tool_calls=None, recovery=recovery
+    )
+
+    assert chunks == [final]
+    assert decision.should_return is True
+
+
+async def test_emit_empty_recovery_chunk_continues():
+    messages = []
+    orch = _emit_orch(messages)
+    executor = _emit_executor()
+    rchunk = SimpleNamespace(content="retry", is_final=False)
+    recovery = SimpleNamespace(
+        check_natural_completion=lambda ctx, has_tool_calls, content_length: None,
+        handle_empty_response=lambda ctx: (rchunk, False),
+    )
+
+    chunks, decision = await _collect_emit(
+        executor, orch=orch, full_content="", tool_calls=None, recovery=recovery
+    )
+
+    assert chunks == [rchunk]
+    assert decision.should_continue is True
+    assert decision.should_return is False
+
+
+async def test_emit_empty_recovery_recovers_tool_calls():
+    messages = []
+    orch = _emit_orch(messages)
+    executor = _emit_executor()
+    recovery = SimpleNamespace(
+        check_natural_completion=lambda ctx, has_tool_calls, content_length: None,
+        handle_empty_response=lambda ctx: (None, False),
+    )
+
+    async def _recover(ctx, tools):
+        return True, [{"name": "shell"}], None
+
+    runtime_owner = SimpleNamespace(_handle_empty_response_recovery=_recover)
+
+    chunks, decision = await _collect_emit(
+        executor,
+        orch=orch,
+        full_content="",
+        tool_calls=None,
+        recovery=recovery,
+        runtime_owner=runtime_owner,
+    )
+
+    # Recovery produced tool calls -> replace tool_calls, fall through (no return/continue).
+    assert chunks == []
+    assert decision.tool_calls == [{"name": "shell"}]
+    assert decision.should_return is False
+    assert decision.should_continue is False
+
+
+async def test_emit_empty_recovery_failure_yields_fallback_and_returns():
+    messages = []
+    orch = _emit_orch(messages)
+    executor = _emit_executor()
+    recovery = SimpleNamespace(
+        check_natural_completion=lambda ctx, has_tool_calls, content_length: None,
+        handle_empty_response=lambda ctx: (None, False),
+        get_recovery_fallback_message=lambda ctx: "fallback message",
+    )
+
+    async def _recover(ctx, tools):
+        return False, None, None
+
+    runtime_owner = SimpleNamespace(_handle_empty_response_recovery=_recover)
+
+    chunks, decision = await _collect_emit(
+        executor,
+        orch=orch,
+        full_content="",
+        tool_calls=None,
+        recovery=recovery,
+        runtime_owner=runtime_owner,
+    )
+
+    assert chunks[0].content == "fallback message"
+    assert chunks[0].is_final is True
+    assert decision.should_return is True

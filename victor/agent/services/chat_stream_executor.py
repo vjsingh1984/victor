@@ -179,6 +179,27 @@ class _RecoveryDecision:
     should_continue: bool = False
 
 
+@dataclass
+class _EmitDecision:
+    """Single-slot mutable holder for the assistant-content emit / empty-response band.
+
+    ``_emit_assistant_turn`` emits the assistant response (or handles tool-call-only and
+    empty-response recovery), yielding content/recovery chunks. Because it yields, it can't
+    return its outcome: ``should_return`` ends the stream, ``should_continue`` restarts the loop,
+    and the remaining fields propagate loop-local state run() needs afterward —
+    ``assistant_content_yielded`` (gates terminal-delivery fallback in continuation),
+    ``prev_iteration_had_content`` (drives the inter-iteration blank-line separator), and
+    ``tool_calls`` (empty-response recovery may replace it). Part of FEP-0007 Phase 2's move
+    toward a shared ``stream_turn()``.
+    """
+
+    should_return: bool = False
+    should_continue: bool = False
+    assistant_content_yielded: bool = False
+    prev_iteration_had_content: bool = False
+    tool_calls: Any = None
+
+
 class StreamingChatExecutor:
     """Canonical streaming chat executor bound to a runtime owner."""
 
@@ -1556,6 +1577,168 @@ class StreamingChatExecutor:
                 decision.should_continue = True
                 return
 
+    async def _emit_assistant_turn(
+        self,
+        orch: Any,
+        runtime_owner: Any,
+        stream_ctx: Any,
+        *,
+        recovery: Any,
+        create_recovery_context: Any,
+        full_content: str,
+        tool_calls: Any,
+        forced_task_completion: bool,
+        user_message: str,
+        tools: Any,
+        decision: _EmitDecision,
+    ) -> AsyncIterator[StreamChunk]:
+        """Emit the assistant response (or handle tool-call-only / empty-response recovery).
+
+        The emit + empty-response-recovery band of run()'s per-turn body (FEP-0007 Phase 2, toward
+        a shared stream_turn() boundary). Sanitizes and yields visible content (a forced-completion
+        turn with no pending tool calls is the final emit), records a tool-call-only assistant
+        message, or runs the empty-response recovery ladder. Because it yields, the loop control and
+        carried loop-local state are written to ``decision`` (``should_return`` / ``should_continue``,
+        plus ``assistant_content_yielded`` / ``prev_iteration_had_content`` / possibly-replaced
+        ``tool_calls``) for run() to read.
+        """
+        decision.tool_calls = tool_calls
+
+        if full_content:
+            visible_content = self._prepare_visible_content(
+                full_content,
+                user_message=getattr(stream_ctx, "user_message", ""),
+            )
+            if visible_content:
+                decision.prev_iteration_had_content = True
+            sanitized = orch.sanitizer.sanitize(visible_content)
+            if sanitized:
+                from victor.agent.conversation.types import (
+                    MESSAGE_SOURCE_METADATA_KEY,
+                    MessageSource,
+                )
+
+                # RESPONSE-phase governance only on the final emit; intermediate
+                # content turns continue the loop and must not be blocked.
+                _is_final_emit = forced_task_completion and not tool_calls
+                if _is_final_emit:
+                    sanitized, _ = await self._govern_final_response(orch, sanitized)
+                orch.add_message(
+                    "assistant",
+                    sanitized,
+                    tool_calls=tool_calls,
+                    persist_synchronously=_is_final_emit,
+                    metadata={MESSAGE_SOURCE_METADATA_KEY: MessageSource.AGENT_RESPONSE.value},
+                )
+                decision.assistant_content_yielded = True
+                yield orch._chunk_generator.generate_content_chunk(
+                    sanitized,
+                    is_final=_is_final_emit,
+                )
+                if _is_final_emit:
+                    decision.should_return = True
+                    return
+            else:
+                plain_text = orch.sanitizer.strip_markup(
+                    visible_content
+                    or self._normalize_visible_candidate(
+                        full_content,
+                        user_message=getattr(stream_ctx, "user_message", ""),
+                    )
+                )
+                if plain_text:
+                    from victor.agent.conversation.types import (
+                        MESSAGE_SOURCE_METADATA_KEY,
+                        MessageSource,
+                    )
+
+                    _is_final_emit = forced_task_completion and not tool_calls
+                    if _is_final_emit:
+                        plain_text, _ = await self._govern_final_response(orch, plain_text)
+                    orch.add_message(
+                        "assistant",
+                        plain_text,
+                        tool_calls=tool_calls,
+                        persist_synchronously=_is_final_emit,
+                        metadata={MESSAGE_SOURCE_METADATA_KEY: MessageSource.AGENT_RESPONSE.value},
+                    )
+                    decision.assistant_content_yielded = True
+                    yield orch._chunk_generator.generate_content_chunk(
+                        plain_text,
+                        is_final=_is_final_emit,
+                    )
+                    if _is_final_emit:
+                        decision.should_return = True
+                        return
+                elif forced_task_completion and not tool_calls:
+                    yield await self._build_terminal_delivery_chunk(
+                        orch,
+                        stream_ctx,
+                        full_content=full_content,
+                        user_message=user_message,
+                    )
+                    decision.should_return = True
+                    return
+        elif tool_calls:
+            from victor.agent.conversation.types import (
+                MESSAGE_SOURCE_METADATA_KEY,
+                MessageSource,
+            )
+
+            orch.add_message(
+                "assistant",
+                "",
+                tool_calls=tool_calls,
+                metadata={MESSAGE_SOURCE_METADATA_KEY: MessageSource.AGENT_RESPONSE.value},
+            )
+        else:
+            recovery_ctx = create_recovery_context(stream_ctx)
+            final_chunk = recovery.check_natural_completion(
+                recovery_ctx, has_tool_calls=False, content_length=0
+            )
+            if final_chunk:
+                yield final_chunk
+                decision.should_return = True
+                return
+
+            logger.warning("Model returned empty response - attempting aggressive recovery")
+
+            recovery_ctx = create_recovery_context(stream_ctx)
+            recovery_chunk, should_force = recovery.handle_empty_response(recovery_ctx)
+            _ = should_force
+            if recovery_chunk:
+                yield recovery_chunk
+                decision.should_continue = True
+                return
+
+            recovery_success, recovered_tool_calls, final_chunk = (
+                await runtime_owner._handle_empty_response_recovery(stream_ctx, tools)
+            )
+
+            if recovery_success:
+                if final_chunk:
+                    yield final_chunk
+                    decision.should_return = True
+                    return
+                if recovered_tool_calls:
+                    decision.tool_calls = recovered_tool_calls
+                    logger.info(
+                        "Recovery produced %s tool call(s) - continuing main loop",
+                        len(recovered_tool_calls),
+                    )
+            else:
+                recovery_ctx = create_recovery_context(stream_ctx)
+                fallback_msg = recovery.get_recovery_fallback_message(recovery_ctx)
+                orch._record_runtime_intelligence_outcome(
+                    success=False,
+                    quality_score=0.3,
+                    user_satisfied=False,
+                    completed=False,
+                )
+                yield orch._chunk_generator.generate_content_chunk(fallback_msg, is_final=True)
+                decision.should_return = True
+                return
+
     async def run(self, user_message: str, **kwargs: Any) -> AsyncIterator[StreamChunk]:
         """Run the streaming executor for the provided message."""
         runtime_owner = self._runtime_owner
@@ -1844,136 +2027,29 @@ class StreamingChatExecutor:
             if _recovery.should_continue:
                 continue
 
-            assistant_content_yielded = False
-            if full_content:
-                visible_content = self._prepare_visible_content(
-                    full_content,
-                    user_message=getattr(stream_ctx, "user_message", ""),
-                )
-                if visible_content:
-                    _prev_iteration_had_content = True
-                sanitized = orch.sanitizer.sanitize(visible_content)
-                if sanitized:
-                    from victor.agent.conversation.types import (
-                        MESSAGE_SOURCE_METADATA_KEY,
-                        MessageSource,
-                    )
-
-                    # RESPONSE-phase governance only on the final emit; intermediate
-                    # content turns continue the loop and must not be blocked.
-                    _is_final_emit = forced_task_completion and not tool_calls
-                    if _is_final_emit:
-                        sanitized, _ = await self._govern_final_response(orch, sanitized)
-                    orch.add_message(
-                        "assistant",
-                        sanitized,
-                        tool_calls=tool_calls,
-                        persist_synchronously=_is_final_emit,
-                        metadata={MESSAGE_SOURCE_METADATA_KEY: MessageSource.AGENT_RESPONSE.value},
-                    )
-                    assistant_content_yielded = True
-                    yield orch._chunk_generator.generate_content_chunk(
-                        sanitized,
-                        is_final=_is_final_emit,
-                    )
-                    if _is_final_emit:
-                        return
-                else:
-                    plain_text = orch.sanitizer.strip_markup(
-                        visible_content
-                        or self._normalize_visible_candidate(
-                            full_content,
-                            user_message=getattr(stream_ctx, "user_message", ""),
-                        )
-                    )
-                    if plain_text:
-                        from victor.agent.conversation.types import (
-                            MESSAGE_SOURCE_METADATA_KEY,
-                            MessageSource,
-                        )
-
-                        _is_final_emit = forced_task_completion and not tool_calls
-                        if _is_final_emit:
-                            plain_text, _ = await self._govern_final_response(orch, plain_text)
-                        orch.add_message(
-                            "assistant",
-                            plain_text,
-                            tool_calls=tool_calls,
-                            persist_synchronously=_is_final_emit,
-                            metadata={
-                                MESSAGE_SOURCE_METADATA_KEY: MessageSource.AGENT_RESPONSE.value
-                            },
-                        )
-                        assistant_content_yielded = True
-                        yield orch._chunk_generator.generate_content_chunk(
-                            plain_text,
-                            is_final=_is_final_emit,
-                        )
-                        if _is_final_emit:
-                            return
-                    elif forced_task_completion and not tool_calls:
-                        yield await self._build_terminal_delivery_chunk(
-                            orch,
-                            stream_ctx,
-                            full_content=full_content,
-                            user_message=user_message,
-                        )
-                        return
-            elif tool_calls:
-                from victor.agent.conversation.types import (
-                    MESSAGE_SOURCE_METADATA_KEY,
-                    MessageSource,
-                )
-
-                orch.add_message(
-                    "assistant",
-                    "",
-                    tool_calls=tool_calls,
-                    metadata={MESSAGE_SOURCE_METADATA_KEY: MessageSource.AGENT_RESPONSE.value},
-                )
-            else:
-                recovery_ctx = create_recovery_context(stream_ctx)
-                final_chunk = recovery.check_natural_completion(
-                    recovery_ctx, has_tool_calls=False, content_length=0
-                )
-                if final_chunk:
-                    yield final_chunk
-                    return
-
-                logger.warning("Model returned empty response - attempting aggressive recovery")
-
-                recovery_ctx = create_recovery_context(stream_ctx)
-                recovery_chunk, should_force = recovery.handle_empty_response(recovery_ctx)
-                _ = should_force
-                if recovery_chunk:
-                    yield recovery_chunk
-                    continue
-
-                recovery_success, recovered_tool_calls, final_chunk = (
-                    await runtime_owner._handle_empty_response_recovery(stream_ctx, tools)
-                )
-
-                if recovery_success:
-                    if final_chunk:
-                        yield final_chunk
-                        return
-                    if recovered_tool_calls:
-                        tool_calls = recovered_tool_calls
-                        logger.info(
-                            "Recovery produced %s tool call(s) - continuing main loop",
-                            len(tool_calls),
-                        )
-                else:
-                    recovery_ctx = create_recovery_context(stream_ctx)
-                    fallback_msg = recovery.get_recovery_fallback_message(recovery_ctx)
-                    orch._record_runtime_intelligence_outcome(
-                        success=False,
-                        quality_score=0.3,
-                        user_satisfied=False,
-                        completed=False,
-                    )
-                    yield orch._chunk_generator.generate_content_chunk(fallback_msg, is_final=True)
-                    return
+            _emit = _EmitDecision()
+            async for chunk in self._emit_assistant_turn(
+                orch,
+                runtime_owner,
+                stream_ctx,
+                recovery=recovery,
+                create_recovery_context=create_recovery_context,
+                full_content=full_content,
+                tool_calls=tool_calls,
+                forced_task_completion=forced_task_completion,
+                user_message=user_message,
+                tools=tools,
+                decision=_emit,
+            ):
+                yield chunk
+            if _emit.prev_iteration_had_content:
+                _prev_iteration_had_content = True
+            assistant_content_yielded = _emit.assistant_content_yielded
+            tool_calls = _emit.tool_calls
+            if _emit.should_return:
+                return
+            if _emit.should_continue:
+                continue
 
             for tc in tool_calls or []:
                 tool_name = tc.get("name", "")
