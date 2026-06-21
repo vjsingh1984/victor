@@ -215,6 +215,23 @@ class _ContinuationDecision:
     full_content: str = ""
 
 
+@dataclass
+class _TurnOutcome:
+    """Single-slot mutable holder for one streaming turn (``_stream_turn``).
+
+    ``_stream_turn`` is the canonical per-turn primitive: it runs exactly one iteration of the
+    streaming loop, yielding that turn's chunks. Because it yields, it can't return its loop
+    control — ``should_stop`` ends the run (a turn that hit a return/break), while leaving it
+    False means continue to the next turn. ``prev_iteration_had_content`` is the one piece of
+    loop-local state that crosses turns (drives the inter-turn blank-line separator); run()
+    carries the same holder across iterations. The shared per-turn boundary FEP-0007 Phase 2
+    builds toward — the single streaming loop body, no flag, no legacy fallback.
+    """
+
+    should_stop: bool = False
+    prev_iteration_had_content: bool = False
+
+
 class StreamingChatExecutor:
     """Canonical streaming chat executor bound to a runtime owner."""
 
@@ -1895,6 +1912,388 @@ class StreamingChatExecutor:
             decision.should_return = True
             return
 
+    async def _stream_turn(
+        self,
+        orch: Any,
+        runtime_owner: Any,
+        stream_ctx: Any,
+        *,
+        user_message: str,
+        goals: Any,
+        guards: _StreamTurnGuards,
+        perception: Any,
+        recovery: Any,
+        create_recovery_context: Any,
+        max_total_iterations: int,
+        outcome: _TurnOutcome,
+    ) -> AsyncIterator[StreamChunk]:
+        """Run exactly ONE streaming turn — the canonical per-turn primitive (FEP-0007 Phase 2/3).
+
+        Drives a single iteration of the streaming loop: pre-checks, context/iteration limits, the
+        provider ACT, early-stop and task-completion evaluation, recovery, assistant emit, nudge /
+        quality / loop-warning tracking, the continuation decision, the tool ACT, and post-tool
+        evaluation — each delegated to the extracted helpers. Yields that turn's chunks; loop control
+        is written to ``outcome``: ``should_stop`` ends the run (the turn hit a return/break), while
+        leaving it False continues to the next turn. ``outcome.prev_iteration_had_content`` carries
+        the inter-turn separator state across turns. This is the single streaming loop body — no flag,
+        no legacy fallback; run() is a thin driver over it.
+        """
+        from victor.agent.turn_policy import SpinState
+
+        _spin = guards.spin
+        _nudge_policy = guards.nudge_policy
+        _turn_eval = guards.turn_eval
+        _plateau = guards.plateau
+        _novelty = guards.novelty
+        _novelty_enabled = guards.novelty_enabled
+
+        if outcome.prev_iteration_had_content and stream_ctx.total_iterations > 1:
+            yield StreamChunk(content="\n\n")
+        outcome.prev_iteration_had_content = False
+
+        cancelled = False
+        async for pre_chunk in runtime_owner._run_iteration_pre_checks(stream_ctx, user_message):
+            yield pre_chunk
+            if pre_chunk.content == "" and getattr(pre_chunk, "is_final", False):
+                cancelled = True
+        if cancelled:
+            outcome.should_stop = True
+            return
+
+        unique_resources = orch.unified_tracker.unique_resources
+        logger.debug(
+            "Iteration %s/%s: tool_calls_used=%s/%s, unique_resources=%s, force_completion=%s",
+            stream_ctx.total_iterations,
+            max_total_iterations,
+            orch.tool_calls_used,
+            orch.tool_budget,
+            len(unique_resources),
+            stream_ctx.force_completion,
+        )
+        orch.debug_logger.log_iteration_start(
+            stream_ctx.total_iterations,
+            tool_calls=orch.tool_calls_used,
+            files_read=len(unique_resources),
+        )
+        orch.debug_logger.log_limits(
+            tool_budget=orch.tool_budget,
+            tool_calls_used=orch.tool_calls_used,
+            max_iterations=max_total_iterations,
+            current_iteration=stream_ctx.total_iterations,
+            is_analysis_task=stream_ctx.is_analysis_task,
+        )
+
+        max_context = orch._get_max_context_chars()
+        chat_service = getattr(orch, "_chat_service", None)
+        if chat_service is not None and hasattr(
+            chat_service, "handle_context_and_iteration_limits"
+        ):
+            handled, iter_chunk = await chat_service.handle_context_and_iteration_limits(
+                user_message,
+                max_total_iterations,
+                max_context,
+                stream_ctx.total_iterations,
+                stream_ctx.last_quality_score,
+            )
+        else:
+            handled, iter_chunk = await orch._handle_context_and_iteration_limits(
+                user_message,
+                max_total_iterations,
+                max_context,
+                stream_ctx.total_iterations,
+                stream_ctx.last_quality_score,
+            )
+        if iter_chunk:
+            yield iter_chunk
+        if handled:
+            outcome.should_stop = True
+            return
+
+        tools, full_content, tool_calls, garbage_detected = await self._stream_provider_turn(
+            orch, runtime_owner, stream_ctx, goals
+        )
+
+        if self._confidence_monitor is not None and not tool_calls:
+            try:
+                from victor.core.feature_flags import (
+                    FeatureFlag,
+                    is_feature_enabled,
+                )
+
+                if is_feature_enabled(FeatureFlag.USE_CONFIDENCE_MONITOR):
+                    self._confidence_monitor.record(
+                        full_content or "", stream_ctx.estimated_content_tokens
+                    )
+                    if self._confidence_monitor.should_stop():
+                        self._record_confidence_early_stop(stream_ctx)
+                        logger.info(
+                            "[ConfidenceMonitor] Stopping iteration early — confidence threshold met"
+                        )
+                        outcome.should_stop = True
+                        return
+            except Exception:
+                pass
+
+        content_preview = full_content[:200] if full_content else "(empty)"
+        logger.debug(
+            "_stream_provider_response returned: content_len=%s, native_tool_calls=%s, "
+            "tokens=%s, garbage=%s, content_preview=%r",
+            len(full_content) if full_content else 0,
+            len(tool_calls) if tool_calls else 0,
+            stream_ctx.estimated_content_tokens,
+            garbage_detected,
+            content_preview,
+        )
+
+        if garbage_detected and not tool_calls:
+            stream_ctx.force_completion = True
+            logger.info("Setting force_completion due to garbage detection")
+
+        _turn_stop = _ProviderTurnEval()
+        async for chunk in self._evaluate_provider_turn_stops(
+            orch,
+            stream_ctx,
+            full_content=full_content,
+            tool_calls=tool_calls,
+            spin=_spin,
+            turn_eval=_turn_eval,
+            outcome=_turn_stop,
+        ):
+            yield chunk
+        if _turn_stop.should_return:
+            outcome.should_stop = True
+            return
+        content_length = _turn_stop.content_length
+        _has_tools = _turn_stop.has_tools
+
+        tool_calls, full_content = orch._parse_and_validate_tool_calls(tool_calls, full_content)
+
+        forced_task_completion, mentioned_tools_detected = (
+            self._detect_task_completion_and_mentions(
+                orch,
+                stream_ctx,
+                full_content=full_content,
+                tool_calls=tool_calls,
+                spin=_spin,
+            )
+        )
+
+        _recovery = _RecoveryDecision()
+        async for chunk in self._apply_turn_recovery(
+            orch,
+            stream_ctx,
+            full_content=full_content,
+            tool_calls=tool_calls,
+            forced_task_completion=forced_task_completion,
+            mentioned_tools_detected=mentioned_tools_detected,
+            decision=_recovery,
+        ):
+            yield chunk
+        if _recovery.should_return:
+            outcome.should_stop = True
+            return
+        if _recovery.should_continue:
+            return
+
+        _emit = _EmitDecision()
+        async for chunk in self._emit_assistant_turn(
+            orch,
+            runtime_owner,
+            stream_ctx,
+            recovery=recovery,
+            create_recovery_context=create_recovery_context,
+            full_content=full_content,
+            tool_calls=tool_calls,
+            forced_task_completion=forced_task_completion,
+            user_message=user_message,
+            tools=tools,
+            decision=_emit,
+        ):
+            yield chunk
+        if _emit.prev_iteration_had_content:
+            outcome.prev_iteration_had_content = True
+        assistant_content_yielded = _emit.assistant_content_yielded
+        tool_calls = _emit.tool_calls
+        if _emit.should_return:
+            outcome.should_stop = True
+            return
+        if _emit.should_continue:
+            return
+
+        for tc in tool_calls or []:
+            tool_name = tc.get("name", "")
+            tool_args = tc.get("arguments", {})
+            orch.unified_tracker.record_tool_call(tool_name, tool_args)
+
+        # P1 FIX: Spin state already recorded earlier (before content repetition check)
+        # This section now only handles nudge policy and detailed termination messages
+        _no_progress = not _has_tools and content_length < 120
+
+        if _no_progress:
+            _intent = getattr(orch, "_current_intent", None)
+            nudge = _nudge_policy.evaluate(_spin, intent=_intent)
+            if nudge.should_inject:
+                from victor.agent.conversation.history_metadata import (
+                    build_internal_history_metadata,
+                )
+                from victor.agent.conversation.types import MessageSource
+
+                orch.add_message(
+                    nudge.role,
+                    nudge.message,
+                    metadata=build_internal_history_metadata(
+                        "nudge", source=MessageSource.AGENT_NUDGE
+                    ),
+                )
+                logger.info("[nudge] %s", nudge.nudge_type.value)
+
+            if _spin.state == SpinState.TERMINATED:
+                logger.warning(
+                    "[spin-detect] Terminated after no_tool=%s blocked=%s. Last response: %r",
+                    _spin.consecutive_no_tool_turns,
+                    _spin.consecutive_all_blocked,
+                    full_content[:100],
+                )
+                if getattr(stream_ctx, "is_action_task", False):
+                    loop_break_message = (
+                        "\n\n[Agent detected a repeated no-tool response loop while trying to "
+                        "resume an action task. The previous action did not recover cleanly. "
+                        "Start a follow-up turn or make one concrete tool call to continue.]"
+                    )
+                elif getattr(stream_ctx, "is_analysis_task", False):
+                    loop_break_message = (
+                        "\n\n[Agent detected a repeated no-tool response loop while trying to "
+                        "continue analysis. Start a follow-up turn or make one concrete discovery "
+                        "tool call to continue.]"
+                    )
+                else:
+                    loop_break_message = (
+                        "\n\n[Agent detected a response loop — breaking to prevent wasted time.]"
+                    )
+                yield orch._chunk_generator.generate_content_chunk(
+                    loop_break_message,
+                    is_final=True,
+                )
+                outcome.should_stop = True
+                return
+
+        orch.unified_tracker.record_iteration(content_length)
+
+        if (
+            full_content
+            and len(full_content.strip()) > 50
+            and not getattr(stream_ctx, "is_qa_task", False)
+        ):
+            quality_result = await orch._validate_runtime_intelligence_response(
+                response=full_content,
+                query=user_message,
+                tool_calls=orch.tool_calls_used,
+                task_type=stream_ctx.unified_task_type.value,
+            )
+            if quality_result and not quality_result.get("is_grounded", True):
+                issues = quality_result.get("grounding_issues", [])
+                if issues:
+                    logger.debug(
+                        "IntelligentPipeline detected grounding issues: %s",
+                        issues[:3],
+                    )
+                if quality_result.get("should_retry"):
+                    grounding_feedback = quality_result.get("grounding_feedback", "")
+                    if grounding_feedback:
+                        logger.info(
+                            "Injecting grounding feedback for retry: %s chars",
+                            len(grounding_feedback),
+                        )
+                        stream_ctx.pending_grounding_feedback = grounding_feedback
+
+            if quality_result:
+                new_score = quality_result.get("quality_score", stream_ctx.last_quality_score)
+                stream_ctx.update_quality_score(new_score)
+
+            if quality_result and quality_result.get("should_finalize"):
+                finalize_reason = quality_result.get("finalize_reason", "grounding limit exceeded")
+                logger.debug(
+                    "Force finalize triggered: %s. Stopping continuation to prevent "
+                    "infinite loop.",
+                    finalize_reason,
+                )
+                orch._force_finalize = True
+
+        unified_loop_warning = orch.unified_tracker.check_loop_warning()
+        loop_warning_chunk = orch._streaming_handler.handle_loop_warning(
+            stream_ctx, unified_loop_warning
+        )
+        if loop_warning_chunk:
+            logger.warning("UnifiedTaskTracker loop warning: %s", unified_loop_warning)
+            yield loop_warning_chunk
+        else:
+            recovery_ctx = create_recovery_context(stream_ctx)
+            was_triggered, hint = recovery.check_force_action(recovery_ctx)
+            if was_triggered:
+                logger.info(
+                    "UnifiedTaskTracker forcing action: %s, metrics=%s",
+                    hint,
+                    orch.unified_tracker.get_metrics(),
+                )
+
+            logger.debug("After streaming pass, tool_calls = %s", tool_calls)
+
+            _cont = _ContinuationDecision()
+            async for chunk in self._handle_continuation_decision(
+                orch,
+                runtime_owner,
+                stream_ctx,
+                full_content=full_content,
+                tool_calls=tool_calls,
+                mentioned_tools_detected=mentioned_tools_detected,
+                content_length=content_length,
+                assistant_content_yielded=assistant_content_yielded,
+                forced_task_completion=forced_task_completion,
+                spin=_spin,
+                user_message=user_message,
+                decision=_cont,
+            ):
+                yield chunk
+            full_content = _cont.full_content
+            if _cont.should_return:
+                outcome.should_stop = True
+                return
+
+            _tool_outcome = _ToolTurnOutcome()
+            async for chunk in self._execute_tools_turn(
+                orch,
+                runtime_owner,
+                stream_ctx,
+                user_message=user_message,
+                tool_calls=tool_calls,
+                full_content=full_content,
+                result_holder=_tool_outcome,
+            ):
+                yield chunk
+            tool_exec_result = _tool_outcome.result
+
+            if tool_exec_result.should_return:
+                outcome.should_stop = True
+                return
+
+            _post_tool = _PostToolEval()
+            async for chunk in self._evaluate_post_tool_turn(
+                orch,
+                stream_ctx,
+                perception=perception,
+                tool_exec_result=tool_exec_result,
+                full_content=full_content,
+                user_message=user_message,
+                plateau=_plateau,
+                novelty=_novelty,
+                novelty_enabled=_novelty_enabled,
+                outcome=_post_tool,
+            ):
+                yield chunk
+            if _post_tool.should_return:
+                outcome.should_stop = True
+                return
+
     async def run(self, user_message: str, **kwargs: Any) -> AsyncIterator[StreamChunk]:
         """Run the streaming executor for the provided message."""
         runtime_owner = self._runtime_owner
@@ -1950,18 +2349,9 @@ class StreamingChatExecutor:
             if decision_service is not None and hasattr(decision_service, "reset_budget"):
                 decision_service.reset_budget()
 
-        # Loop-scoped names used in the per-turn body below.
-        from victor.agent.turn_policy import SpinState
-
-        # Per-turn guard components (built once per run via the extracted factory — the first
-        # step of FEP-0007 Phase 2 toward a shared stream_turn() boundary).
+        # Per-turn guard components (built once per run via the extracted factory) and passed as a
+        # bundle into the per-turn primitive _stream_turn() — the shared boundary FEP-0007 builds.
         _guards = self._create_stream_turn_guards(orch)
-        _spin = _guards.spin
-        _nudge_policy = _guards.nudge_policy
-        _turn_eval = _guards.turn_eval
-        _plateau = _guards.plateau
-        _novelty = _guards.novelty
-        _novelty_enabled = _guards.novelty_enabled
 
         _perception = None
         conversation_history = self._get_conversation_history(runtime_owner, orch, user_message)
@@ -2027,7 +2417,7 @@ class StreamingChatExecutor:
 
         _prev_iteration_had_content = False
 
-        _turn_eval.reset()  # resets spin_detector + shared content-repetition detector
+        _guards.turn_eval.reset()  # resets spin_detector + shared content-repetition detector
         self._visible_output_deduplicator.reset()
         self._prev_visible_content = ""
 
@@ -2037,345 +2427,24 @@ class StreamingChatExecutor:
                 yield team_chunk
                 return
 
+        _turn_outcome = _TurnOutcome(prev_iteration_had_content=_prev_iteration_had_content)
         while True:
-            if _prev_iteration_had_content and stream_ctx.total_iterations > 1:
-                yield StreamChunk(content="\n\n")
-            _prev_iteration_had_content = False
-
-            cancelled = False
-            async for pre_chunk in runtime_owner._run_iteration_pre_checks(
-                stream_ctx, user_message
-            ):
-                yield pre_chunk
-                if pre_chunk.content == "" and getattr(pre_chunk, "is_final", False):
-                    cancelled = True
-            if cancelled:
-                return
-
-            unique_resources = orch.unified_tracker.unique_resources
-            logger.debug(
-                "Iteration %s/%s: tool_calls_used=%s/%s, unique_resources=%s, force_completion=%s",
-                stream_ctx.total_iterations,
-                max_total_iterations,
-                orch.tool_calls_used,
-                orch.tool_budget,
-                len(unique_resources),
-                stream_ctx.force_completion,
-            )
-            orch.debug_logger.log_iteration_start(
-                stream_ctx.total_iterations,
-                tool_calls=orch.tool_calls_used,
-                files_read=len(unique_resources),
-            )
-            orch.debug_logger.log_limits(
-                tool_budget=orch.tool_budget,
-                tool_calls_used=orch.tool_calls_used,
-                max_iterations=max_total_iterations,
-                current_iteration=stream_ctx.total_iterations,
-                is_analysis_task=stream_ctx.is_analysis_task,
-            )
-
-            max_context = orch._get_max_context_chars()
-            chat_service = getattr(orch, "_chat_service", None)
-            if chat_service is not None and hasattr(
-                chat_service, "handle_context_and_iteration_limits"
-            ):
-                handled, iter_chunk = await chat_service.handle_context_and_iteration_limits(
-                    user_message,
-                    max_total_iterations,
-                    max_context,
-                    stream_ctx.total_iterations,
-                    stream_ctx.last_quality_score,
-                )
-            else:
-                handled, iter_chunk = await orch._handle_context_and_iteration_limits(
-                    user_message,
-                    max_total_iterations,
-                    max_context,
-                    stream_ctx.total_iterations,
-                    stream_ctx.last_quality_score,
-                )
-            if iter_chunk:
-                yield iter_chunk
-            if handled:
-                break
-
-            tools, full_content, tool_calls, garbage_detected = await self._stream_provider_turn(
-                orch, runtime_owner, stream_ctx, goals
-            )
-
-            if self._confidence_monitor is not None and not tool_calls:
-                try:
-                    from victor.core.feature_flags import (
-                        FeatureFlag,
-                        is_feature_enabled,
-                    )
-
-                    if is_feature_enabled(FeatureFlag.USE_CONFIDENCE_MONITOR):
-                        self._confidence_monitor.record(
-                            full_content or "", stream_ctx.estimated_content_tokens
-                        )
-                        if self._confidence_monitor.should_stop():
-                            self._record_confidence_early_stop(stream_ctx)
-                            logger.info(
-                                "[ConfidenceMonitor] Stopping iteration early — confidence threshold met"
-                            )
-                            break
-                except Exception:
-                    pass
-
-            content_preview = full_content[:200] if full_content else "(empty)"
-            logger.debug(
-                "_stream_provider_response returned: content_len=%s, native_tool_calls=%s, "
-                "tokens=%s, garbage=%s, content_preview=%r",
-                len(full_content) if full_content else 0,
-                len(tool_calls) if tool_calls else 0,
-                stream_ctx.estimated_content_tokens,
-                garbage_detected,
-                content_preview,
-            )
-
-            if garbage_detected and not tool_calls:
-                stream_ctx.force_completion = True
-                logger.info("Setting force_completion due to garbage detection")
-
-            _turn_stop = _ProviderTurnEval()
-            async for chunk in self._evaluate_provider_turn_stops(
-                orch,
-                stream_ctx,
-                full_content=full_content,
-                tool_calls=tool_calls,
-                spin=_spin,
-                turn_eval=_turn_eval,
-                outcome=_turn_stop,
-            ):
-                yield chunk
-            if _turn_stop.should_return:
-                return
-            content_length = _turn_stop.content_length
-            _has_tools = _turn_stop.has_tools
-
-            tool_calls, full_content = orch._parse_and_validate_tool_calls(tool_calls, full_content)
-
-            forced_task_completion, mentioned_tools_detected = (
-                self._detect_task_completion_and_mentions(
-                    orch,
-                    stream_ctx,
-                    full_content=full_content,
-                    tool_calls=tool_calls,
-                    spin=_spin,
-                )
-            )
-
-            _recovery = _RecoveryDecision()
-            async for chunk in self._apply_turn_recovery(
-                orch,
-                stream_ctx,
-                full_content=full_content,
-                tool_calls=tool_calls,
-                forced_task_completion=forced_task_completion,
-                mentioned_tools_detected=mentioned_tools_detected,
-                decision=_recovery,
-            ):
-                yield chunk
-            if _recovery.should_return:
-                return
-            if _recovery.should_continue:
-                continue
-
-            _emit = _EmitDecision()
-            async for chunk in self._emit_assistant_turn(
+            async for chunk in self._stream_turn(
                 orch,
                 runtime_owner,
                 stream_ctx,
+                user_message=user_message,
+                goals=goals,
+                guards=_guards,
+                perception=_perception,
                 recovery=recovery,
                 create_recovery_context=create_recovery_context,
-                full_content=full_content,
-                tool_calls=tool_calls,
-                forced_task_completion=forced_task_completion,
-                user_message=user_message,
-                tools=tools,
-                decision=_emit,
+                max_total_iterations=max_total_iterations,
+                outcome=_turn_outcome,
             ):
                 yield chunk
-            if _emit.prev_iteration_had_content:
-                _prev_iteration_had_content = True
-            assistant_content_yielded = _emit.assistant_content_yielded
-            tool_calls = _emit.tool_calls
-            if _emit.should_return:
+            if _turn_outcome.should_stop:
                 return
-            if _emit.should_continue:
-                continue
-
-            for tc in tool_calls or []:
-                tool_name = tc.get("name", "")
-                tool_args = tc.get("arguments", {})
-                orch.unified_tracker.record_tool_call(tool_name, tool_args)
-
-            # P1 FIX: Spin state already recorded earlier (before content repetition check)
-            # This section now only handles nudge policy and detailed termination messages
-            _no_progress = not _has_tools and content_length < 120
-
-            if _no_progress:
-                _intent = getattr(orch, "_current_intent", None)
-                nudge = _nudge_policy.evaluate(_spin, intent=_intent)
-                if nudge.should_inject:
-                    from victor.agent.conversation.history_metadata import (
-                        build_internal_history_metadata,
-                    )
-                    from victor.agent.conversation.types import MessageSource
-
-                    orch.add_message(
-                        nudge.role,
-                        nudge.message,
-                        metadata=build_internal_history_metadata(
-                            "nudge", source=MessageSource.AGENT_NUDGE
-                        ),
-                    )
-                    logger.info("[nudge] %s", nudge.nudge_type.value)
-
-                if _spin.state == SpinState.TERMINATED:
-                    logger.warning(
-                        "[spin-detect] Terminated after no_tool=%s blocked=%s. Last response: %r",
-                        _spin.consecutive_no_tool_turns,
-                        _spin.consecutive_all_blocked,
-                        full_content[:100],
-                    )
-                    if getattr(stream_ctx, "is_action_task", False):
-                        loop_break_message = (
-                            "\n\n[Agent detected a repeated no-tool response loop while trying to "
-                            "resume an action task. The previous action did not recover cleanly. "
-                            "Start a follow-up turn or make one concrete tool call to continue.]"
-                        )
-                    elif getattr(stream_ctx, "is_analysis_task", False):
-                        loop_break_message = (
-                            "\n\n[Agent detected a repeated no-tool response loop while trying to "
-                            "continue analysis. Start a follow-up turn or make one concrete discovery "
-                            "tool call to continue.]"
-                        )
-                    else:
-                        loop_break_message = "\n\n[Agent detected a response loop — breaking to prevent wasted time.]"
-                    yield orch._chunk_generator.generate_content_chunk(
-                        loop_break_message,
-                        is_final=True,
-                    )
-                    return
-
-            orch.unified_tracker.record_iteration(content_length)
-
-            if (
-                full_content
-                and len(full_content.strip()) > 50
-                and not getattr(stream_ctx, "is_qa_task", False)
-            ):
-                quality_result = await orch._validate_runtime_intelligence_response(
-                    response=full_content,
-                    query=user_message,
-                    tool_calls=orch.tool_calls_used,
-                    task_type=stream_ctx.unified_task_type.value,
-                )
-                if quality_result and not quality_result.get("is_grounded", True):
-                    issues = quality_result.get("grounding_issues", [])
-                    if issues:
-                        logger.debug(
-                            "IntelligentPipeline detected grounding issues: %s",
-                            issues[:3],
-                        )
-                    if quality_result.get("should_retry"):
-                        grounding_feedback = quality_result.get("grounding_feedback", "")
-                        if grounding_feedback:
-                            logger.info(
-                                "Injecting grounding feedback for retry: %s chars",
-                                len(grounding_feedback),
-                            )
-                            stream_ctx.pending_grounding_feedback = grounding_feedback
-
-                if quality_result:
-                    new_score = quality_result.get("quality_score", stream_ctx.last_quality_score)
-                    stream_ctx.update_quality_score(new_score)
-
-                if quality_result and quality_result.get("should_finalize"):
-                    finalize_reason = quality_result.get(
-                        "finalize_reason", "grounding limit exceeded"
-                    )
-                    logger.debug(
-                        "Force finalize triggered: %s. Stopping continuation to prevent "
-                        "infinite loop.",
-                        finalize_reason,
-                    )
-                    orch._force_finalize = True
-
-            unified_loop_warning = orch.unified_tracker.check_loop_warning()
-            loop_warning_chunk = orch._streaming_handler.handle_loop_warning(
-                stream_ctx, unified_loop_warning
-            )
-            if loop_warning_chunk:
-                logger.warning("UnifiedTaskTracker loop warning: %s", unified_loop_warning)
-                yield loop_warning_chunk
-            else:
-                recovery_ctx = create_recovery_context(stream_ctx)
-                was_triggered, hint = recovery.check_force_action(recovery_ctx)
-                if was_triggered:
-                    logger.info(
-                        "UnifiedTaskTracker forcing action: %s, metrics=%s",
-                        hint,
-                        orch.unified_tracker.get_metrics(),
-                    )
-
-                logger.debug("After streaming pass, tool_calls = %s", tool_calls)
-
-                _cont = _ContinuationDecision()
-                async for chunk in self._handle_continuation_decision(
-                    orch,
-                    runtime_owner,
-                    stream_ctx,
-                    full_content=full_content,
-                    tool_calls=tool_calls,
-                    mentioned_tools_detected=mentioned_tools_detected,
-                    content_length=content_length,
-                    assistant_content_yielded=assistant_content_yielded,
-                    forced_task_completion=forced_task_completion,
-                    spin=_spin,
-                    user_message=user_message,
-                    decision=_cont,
-                ):
-                    yield chunk
-                full_content = _cont.full_content
-                if _cont.should_return:
-                    return
-
-                _tool_outcome = _ToolTurnOutcome()
-                async for chunk in self._execute_tools_turn(
-                    orch,
-                    runtime_owner,
-                    stream_ctx,
-                    user_message=user_message,
-                    tool_calls=tool_calls,
-                    full_content=full_content,
-                    result_holder=_tool_outcome,
-                ):
-                    yield chunk
-                tool_exec_result = _tool_outcome.result
-
-                if tool_exec_result.should_return:
-                    return
-
-                _post_tool = _PostToolEval()
-                async for chunk in self._evaluate_post_tool_turn(
-                    orch,
-                    stream_ctx,
-                    perception=_perception,
-                    tool_exec_result=tool_exec_result,
-                    full_content=full_content,
-                    user_message=user_message,
-                    plateau=_plateau,
-                    novelty=_novelty,
-                    novelty_enabled=_novelty_enabled,
-                    outcome=_post_tool,
-                ):
-                    yield chunk
-                if _post_tool.should_return:
-                    return
 
 
 def create_streaming_chat_executor(
