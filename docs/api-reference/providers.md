@@ -1,6 +1,6 @@
 # Providers API Reference
 
-This document provides comprehensive API documentation for Victor's LLM provider system, which supports 21 different providers with a unified interface.
+This document provides comprehensive API documentation for Victor's LLM provider system, which supports 24 different providers with a unified interface.
 
 ## Table of Contents
 

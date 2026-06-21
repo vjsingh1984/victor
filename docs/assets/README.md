@@ -174,7 +174,7 @@ cli-main-interface-0.6.0.png
 
 The following placeholder assets are recommended (create when ready):
 
-- `victor-banner.png` (1200x200) - For landing page header
+- `victor-banner.svg` (1200x200) - For landing page header
 - `victor-logo.png` (512x512) - Main logo for branding
 - `victor-logo-icon.png` (128x128) - Smaller icon version
 - `cli-screenshot.png` (1200x800) - CLI mode demonstration

@@ -3,7 +3,7 @@
 > Canonical technology reference for Victor AI Framework.
 > Supersedes scattered tech-debt and stack documents across docs/.
 
-**Version**: 0.7.0 | **Last Updated**: 2026-05 | **Status**: Canonical
+**Version**: 0.7.1 | **Last Updated**: 2026-06 | **Status**: Canonical
 
 ---
 

@@ -137,11 +137,12 @@ DOCKER_COMPLETE_SOLUTION.md
 DOCKER_DEPENDENCY_FIX.md
 DOCKER_ENVIRONMENT_SETUP.md
 
-# Internal architecture and design docs (keep in docs/ instead)
-DESIGN.md
-FEATURES.md
-GAP_ANALYSIS.md
-PACKAGE_STRUCTURE.md
+# Internal architecture and design scratch docs at the repo root (keep in docs/ instead).
+# Anchored to root so they don't shadow published pages like docs/features.md.
+/DESIGN.md
+/FEATURES.md
+/GAP_ANALYSIS.md
+/PACKAGE_STRUCTURE.md
 PROGRESS.md
 EMBEDDING_ARCHITECTURE.md
 

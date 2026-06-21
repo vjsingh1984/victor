@@ -10,7 +10,7 @@ Welcome to Victor! This guide will help you install, configure, and run Victor i
 - **24 LLM Providers**: Cloud (Anthropic, OpenAI, Google, Vertex) and local (Ollama, LM Studio, vLLM)
 - **Provider Switching**: Switch between any provider mid-conversation without losing context
 - **No API Key Required**: Use local models by default for privacy and cost savings
-- **33 Tool Modules**: File operations, code editing, git, testing, search, and more
+- **34 Tool Modules**: File operations, code editing, git, testing, search, and more
 - **9 Domain Verticals**: Coding, DevOps, RAG, Data Analysis, Research, Security, IaC, Classification, Benchmark
 - **YAML Workflows**: Define multi-step automation with scheduling and versioning
 - **Multi-Agent Teams**: Coordinate specialized AI agents for complex tasks

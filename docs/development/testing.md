@@ -119,28 +119,19 @@ def test_workflow_execution():
 
 Victor provides several fixtures in `tests/conftest.py` that handle common testing needs.
 
-### reset_singletons (Auto-applied)
+### Autouse fixtures (applied to every test)
 
-Resets singleton instances between tests to prevent test pollution:
+`tests/conftest.py` applies these automatically to every test to guarantee isolation:
 
-```python
-def test_first(reset_singletons):
-    # EmbeddingService, TaskTypeClassifier, IntentClassifier,
-    # SharedToolRegistry, EventBus are reset before this test
-    pass
+- `reset_api_keys_logger` — caplog propagation for the API-keys logger
+- `reset_embedding_singleton` — prevents a stale embedding model leaking across tests
+- `reset_global_state_manager` — resets the global state-manager singleton
+- `isolate_environment_variables` — no real API keys (`get_api_key()` → `None`); skips `.env`
+- `reset_service_container` — resets the DI container between tests
+- `isolate_conversation_database` — temp DB path so tests never touch the production conversation DB
 
-def test_second(reset_singletons):
-    # Singletons reset again - fresh state
-    pass
-```
-
-This fixture resets:
-- `EmbeddingService`
-- `TaskTypeClassifier`
-- `IntentClassifier`
-- `SharedToolRegistry`
-- `EventBus`
-- `ProgressiveToolsRegistry`
+Because they are autouse, you don't request them by name — they run for you. (Verify the
+current list against `tests/conftest.py`, which is the source of truth.)
 
 ### isolate_environment_variables (Auto-applied)
 

@@ -3,7 +3,7 @@
 > **Single source of truth** for Victor system architecture.
 > Supersedes: `ARCHITECTURE.md`, `docs/architecture/overview.md`, `docs/diagrams/`
 
-**Version**: 0.7.0 | **Last Updated**: 2026-05 | **Status**: Canonical
+**Version**: 0.7.1 | **Last Updated**: 2026-06 | **Status**: Canonical
 
 ---
 
@@ -30,7 +30,7 @@
 
 Victor is a contract-first agentic AI framework in Python 3.10+ providing a typed,
 service-first runtime for building agents that reason, call tools, execute DAG
-workflows, and coordinate multi-agent teams across 24+ LLM providers.
+workflows, and coordinate multi-agent teams across 24 LLM providers.
 
 ```mermaid
 flowchart TB
@@ -63,7 +63,7 @@ flowchart TB
         AL["AgenticLoop"]
     end
 
-    subgraph Providers["PROVIDERS (24+)"]
+    subgraph Providers["PROVIDERS (24)"]
         P1["Anthropic"]
         P2["OpenAI"]
         P3["Gemini"]
@@ -107,7 +107,7 @@ flowchart TB
 | Source files | 3,672 |
 | Lines of code | 1,166,724 |
 | Python packages | 294 |
-| Provider adapters | 24+ |
+| Provider adapters | 24 |
 | Tool modules | 34 |
 | Cargo crates | 5 |
 

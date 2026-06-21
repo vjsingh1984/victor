@@ -155,7 +155,7 @@
     <g transform="translate(350, 50)">
       <rect x="0" y="0" width="250" height="100" rx="5" fill="url(#componentGradient)" stroke="#388E3C" stroke-width="2"/>
       <text x="125" y="30" text-anchor="middle" font-size="14" font-weight="bold" fill="#333">Tools</text>
-      <text x="125" y="50" text-anchor="middle" font-size="12" fill="#666">33 Tool Modules</text>
+      <text x="125" y="50" text-anchor="middle" font-size="12" fill="#666">34 Tool Modules</text>
       <text x="125" y="70" text-anchor="middle" font-size="10" fill="#888">File, Git, Testing, Search,</text>
       <text x="125" y="85" text-anchor="middle" font-size="10" fill="#888">Web Scraping, Code Editing...</text>
     </g>

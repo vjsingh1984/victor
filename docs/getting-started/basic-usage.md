@@ -1,6 +1,6 @@
 <div align="center">
 
-![Victor Banner](../assets/victor-banner.png)
+![Victor Banner](../assets/victor-banner.svg)
 
 # Quick Start
 

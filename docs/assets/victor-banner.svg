@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 470 128" width="470" height="128" role="img" aria-label="Victor — contract-first agentic AI">
+  <defs>
+    <linearGradient id="vbg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#6366f1"/>
+      <stop offset="1" stop-color="#4f46e5"/>
+    </linearGradient>
+  </defs>
+
+  <!-- icon (same mark as victor-logo-icon.svg), scaled into the banner height -->
+  <g transform="translate(6,12) scale(0.8)">
+    <rect width="128" height="128" rx="26" fill="url(#vbg)"/>
+    <g fill="none" stroke="#c7d2fe" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.55">
+      <path d="M32 28 H22 V100 H32"/>
+      <path d="M96 28 H106 V100 H96"/>
+    </g>
+    <g fill="none" stroke="#ffffff" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M30 36 L64 86" stroke-width="4" opacity="0.65"/>
+      <path d="M98 36 L64 86" stroke-width="4" opacity="0.65"/>
+      <path d="M42 33 L64 86" stroke-width="6"/>
+      <path d="M86 33 L64 86" stroke-width="6"/>
+      <path d="M54 32 L64 86" stroke-width="6"/>
+      <path d="M74 32 L64 86" stroke-width="6"/>
+    </g>
+    <circle cx="64" cy="87" r="6" fill="#ffffff"/>
+    <g stroke="#a5b4fc" stroke-width="2" opacity="0.7">
+      <line x1="50" y1="105" x2="64" y2="110"/>
+      <line x1="64" y1="110" x2="78" y2="105"/>
+    </g>
+    <g fill="#a5b4fc">
+      <circle cx="50" cy="105" r="4"/>
+      <circle cx="64" cy="110" r="4.5"/>
+      <circle cx="78" cy="105" r="4"/>
+    </g>
+  </g>
+
+  <!-- wordmark + tagline -->
+  <text x="126" y="66" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif"
+        font-size="48" font-weight="800" fill="#312e81" letter-spacing="-1">Victor</text>
+  <text x="128" y="92" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif"
+        font-size="17" font-weight="500" fill="#6366f1">contract-first agentic AI</text>
+</svg>

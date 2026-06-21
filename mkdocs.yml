@@ -1,6 +1,6 @@
 # MkDocs Configuration for Victor Documentation
 site_name: Victor
-site_description: Contract-first agentic AI framework supporting 24 LLM providers with 34 tool modules across 5 domain verticals
+site_description: Contract-first agentic AI framework supporting 24 LLM providers with 34 tool modules across 9 verticals (5 domain + 4 utility)
 site_author: Vijaykumar Singh
 site_url: https://vjsingh1984.github.io/victor/
 repo_url: https://github.com/vjsingh1984/victor
@@ -38,7 +38,7 @@ theme:
       toggle:
         icon: material/brightness-4
         name: Switch to light mode
-  logo: assets/victor-banner.png
+  logo: assets/images/victor-logo-icon.svg
   favicon: assets/images/victor-logo-icon.svg
   icon:
     repo: fontawesome/brands/github
@@ -136,6 +136,7 @@ nav:
       - Configuration: getting-started/configuration.md
       - First Run: getting-started/first-run.md
       - Basic Usage: getting-started/basic-usage.md
+      - Web Chat UI: getting-started/web-chat-ui.md
   - User Guide:
       - user-guide/index.md
       - CLI Reference: user-guide/cli-reference.md

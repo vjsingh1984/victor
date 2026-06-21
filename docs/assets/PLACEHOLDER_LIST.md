@@ -6,11 +6,11 @@ This document lists the recommended placeholder assets to be created for the Vic
 
 ### 1. Branding Assets
 
-#### `victor-banner.png` (1200x200px)
+#### `victor-banner.svg` (1200x200px)
 - **Purpose**: Landing page header, README header
 - **Content**: Victor branding with tagline
 - **Style**: Clean, professional, dark theme compatible
-- **Location**: `docs/assets/images/victor-banner.png`
+- **Location**: `docs/assets/images/victor-banner.svg`
 
 #### `victor-logo.png` (512x512px)
 - **Purpose**: Main logo for documentation headers, favicon
@@ -183,7 +183,7 @@ This document lists the recommended placeholder assets to be created for the Vic
 
 Use the following checklist to track asset creation:
 
-- [ ] victor-banner.png
+- [ ] victor-banner.svg
 - [ ] victor-logo.png
 - [ ] victor-logo-icon.png
 - [ ] cli-screenshot.png
