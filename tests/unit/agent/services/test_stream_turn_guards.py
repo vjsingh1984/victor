@@ -135,3 +135,97 @@ def test_initialize_task_intent_returns_goals_and_seeds_ctx():
     assert seen["intent"] == "do the thing"
     assert seen["steps"] == ["goal1"]
     assert seen["event"] is True
+
+
+def _provider_turn_executor():
+    # Build an executor instance without running __init__ (we only exercise the
+    # extracted ACT provider sub-step, which depends on no constructor state).
+    return StreamingChatExecutor.__new__(StreamingChatExecutor)
+
+
+async def test_stream_provider_turn_plans_tools_and_streams(monkeypatch):
+    seen = {}
+
+    class _Planner:
+        def plan_tools(self, goals, available_inputs):
+            seen["plan"] = (goals, available_inputs)
+            return ["planned"]
+
+    orch = SimpleNamespace(
+        observed_files={"a.py"},
+        _tool_planner=_Planner(),
+        get_session_tools=lambda: None,
+        thinking=False,
+    )
+    stream_ctx = SimpleNamespace(
+        is_qa_task=False,
+        context_msg="ctx",
+        provider_kwargs={"execution_mode": "normal"},
+    )
+
+    async def _fake_stream(tools, provider_kwargs, stream_ctx):
+        seen["stream"] = (tools, provider_kwargs)
+        return ("hello", [{"name": "edit"}], 1.5, False)
+
+    runtime_owner = SimpleNamespace(_stream_provider_response=_fake_stream)
+
+    executor = _provider_turn_executor()
+
+    async def _fake_get_tools_cached(self, o, ctx_msg, g, planned_tools=None):
+        seen["tools_cached"] = (ctx_msg, g, planned_tools)
+        return ["resolved_tool"]
+
+    monkeypatch.setattr(
+        StreamingChatExecutor, "_get_tools_cached", _fake_get_tools_cached, raising=True
+    )
+
+    tools, full_content, tool_calls, garbage = await executor._stream_provider_turn(
+        orch, runtime_owner, stream_ctx, ["goal1"]
+    )
+
+    # planned tools seeded onto the context and used for tool resolution.
+    assert stream_ctx.planned_tools == ["planned"]
+    assert seen["plan"] == (["goal1"], ["query", "file_contents"])
+    assert seen["tools_cached"] == ("ctx", ["goal1"], ["planned"])
+    # provider response returned verbatim (the discarded float is the token estimate).
+    assert tools == ["resolved_tool"]
+    assert full_content == "hello"
+    assert tool_calls == [{"name": "edit"}]
+    assert garbage is False
+
+
+async def test_stream_provider_turn_qa_task_skips_tools_and_enables_thinking():
+    orch = SimpleNamespace(
+        observed_files=set(),
+        _tool_planner=SimpleNamespace(plan_tools=lambda *a: None),
+        get_session_tools=lambda: None,
+        thinking=True,
+    )
+    stream_ctx = SimpleNamespace(
+        is_qa_task=True,
+        context_msg="ctx",
+        provider_kwargs={},
+    )
+
+    captured = {}
+
+    async def _fake_stream(tools, provider_kwargs, stream_ctx):
+        captured["tools"] = tools
+        captured["provider_kwargs"] = provider_kwargs
+        return ("", None, 0.0, True)
+
+    runtime_owner = SimpleNamespace(_stream_provider_response=_fake_stream)
+    executor = _provider_turn_executor()
+
+    tools, full_content, tool_calls, garbage = await executor._stream_provider_turn(
+        orch, runtime_owner, stream_ctx, None
+    )
+
+    # QA tasks pass tools=None; thinking=True injects the thinking provider kwarg.
+    assert tools is None
+    assert captured["tools"] is None
+    assert captured["provider_kwargs"]["thinking"] == {
+        "type": "enabled",
+        "budget_tokens": 10000,
+    }
+    assert garbage is True
