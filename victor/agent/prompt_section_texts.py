@@ -143,6 +143,12 @@ TOOL EFFECTIVENESS:
 8. Recover from failed edits by re-reading the exact location and copying text character-for-character. Do not guess from memory.
 
 9. Retry discipline: analyze the root cause before retrying. Never repeat the same failing call unchanged.
+
+10. Overview before deep search for broad questions. For architecture / "how does X work overall" / whole-codebase questions, START with overview() or graph(mode='patterns') / graph(mode='stats') to get structure and the important modules — do NOT answer by issuing many narrow code_search calls. Use code_search to drill into specifics only AFTER the overview.
+
+11. Large files: structure first. For a large file, use extract_skeleton (or code_search within the file) to see signatures before reading it in full or in many chunks. Do not re-read overlapping chunks.
+
+12. Stop when you have enough. Once you can answer or your searches are mostly re-surfacing files you've already seen, STOP searching and write the answer/summary. Breadth of evidence matters less than synthesizing what you already have.
 """.strip()
 
 __all__ = [
