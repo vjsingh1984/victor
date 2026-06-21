@@ -78,7 +78,9 @@ the ACT primitive:
 + tool execution + recovery for ONE turn) and (b) a thin governance/adapter shell.
 `ChatStreamRuntime.get_executor()` is repointed to drive `AgenticLoop.run_streaming()`.
 
-## Phased implementation plan (each phase independently landable + revertible)
+## Implementation Plan
+
+Each phase is independently landable and revertible.
 
 - **Phase 1 — finish EVALUATE consolidation (no structural risk).** Route the streaming loop's
   remaining inline guards (plateau, and later fulfillment) through `TurnEvaluationController`
@@ -113,10 +115,42 @@ the ACT primitive:
 - **Alternative (rejected): make `StreamingChatExecutor` canonical.** It lacks the phase
   structure and is service-layer, not framework; CLAUDE.md designates `AgenticLoop` canonical.
 
+## Unresolved Questions
+
+- **Chunk granularity.** `AgenticLoop.run_streaming()` must yield at token/segment granularity
+  (matching today's `StreamingChatExecutor`), not at loop-iteration granularity like the
+  existing `AgenticLoop.stream()` (which yields `LoopIteration`). The exact boundary between
+  the `stream_turn()` primitive and the loop's per-iteration yielding needs to be settled in
+  Phase 2 against the current chunk-emission points.
+- **Recovery placement.** The streaming loop's recovery/continuation handling (empty-response
+  fallback, stall-timeout, `on_chat_end` cancel drain) is entangled with its iteration today.
+  Phase 2 must decide which parts belong to the per-turn `stream_turn()` primitive and which
+  remain loop-level, without regressing the cross-task cleanup hardened in PR #155.
+- **StateGraph mode interaction.** `USE_STATEGRAPH_AGENTIC_LOOP` swaps the inner executor;
+  whether `run_streaming()` supports the StateGraph executor in Phase 3 or only the in-class
+  while-loop is open and can be deferred.
+
+## Migration Path
+
+The change is additive and flag-gated, so there is no breaking step for callers:
+
+1. Phases 1–2 land with no behavior change (consolidation + a behavior-neutral `stream_turn()`
+   extraction); existing streaming tests are the regression gate.
+2. Phase 3 introduces `AgenticLoop.run_streaming()` behind `USE_UNIFIED_STREAMING_LOOP`
+   (default OFF). `ChatStreamRuntime.get_executor()` selects the old `executor.run()` by
+   default; opting in routes through the unified loop. The old path remains the fallback.
+3. The QA battery (S1/S2/M1/M2/C1/W1–W4/U1) plus `Agent.stream()` integration tests must show
+   parity (same answers, no streaming tracebacks) before the flag default flips to ON.
+4. Phase 4 removes `StreamingChatExecutor.run()`'s iteration loop only after the flag has
+   defaulted ON across a release with no regressions reported; `StreamChunk` and the public
+   `Agent.stream()` signature never change, so downstream consumers need no migration.
+
 ## Compatibility
 
-`AgenticLoop.run()` and the buffered path are unchanged. `run_streaming()` is additive. The
-cutover is flag-gated; `StreamChunk` (the public streaming type) is unchanged.
+`AgenticLoop.run()` and the buffered path are unchanged. `run_streaming()` is additive and the
+cutover is flag-gated, so existing callers keep the current streaming path until the flag flips.
+`StreamChunk` (the public streaming type) and the `Agent.stream()` async-iterator contract are
+unchanged throughout, so UI, API, and SDK consumers require no code changes at any phase.
 
 ## Acceptance Criteria
 
