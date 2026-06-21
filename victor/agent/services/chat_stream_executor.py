@@ -1401,6 +1401,103 @@ class StreamingChatExecutor:
                 metadata={MESSAGE_SOURCE_METADATA_KEY: MessageSource.SYSTEM_INJECTED.value},
             )
 
+    def _detect_task_completion_and_mentions(
+        self,
+        orch: Any,
+        stream_ctx: Any,
+        *,
+        full_content: str,
+        tool_calls: Any,
+        spin: Any,
+    ) -> tuple[bool, List[str]]:
+        """Detect HIGH-confidence task completion and unexecuted tool mentions for this turn.
+
+        A cohesive non-yielding slice of run()'s per-turn body (FEP-0007 Phase 2, toward a
+        shared stream_turn() boundary). Runs the task-completion detector (a HIGH-confidence
+        active signal with no pending tool calls forces completion and persists a VICTOR_SUMMARY
+        for next-turn context), then — only when the turn produced content but no tool calls and
+        completion wasn't forced — detects tools the model described but didn't call and injects a
+        format hint. Mutates orch/stream_ctx; yields nothing. Returns ``(forced_task_completion,
+        mentioned_tools_detected)`` for the recovery/continuation steps downstream.
+        """
+        forced_task_completion = False
+        if orch._task_completion_detector and full_content:
+            from victor.agent.task_completion import CompletionConfidence
+
+            orch._task_completion_detector.analyze_response(full_content)
+            confidence = orch._task_completion_detector.get_completion_confidence()
+
+            if confidence == CompletionConfidence.HIGH:
+                if tool_calls:
+                    logger.info(
+                        "Task completion: HIGH confidence marker deferred because response "
+                        "still contains %s tool call(s)",
+                        len(tool_calls),
+                    )
+                    self._clear_deferred_active_completion_signal(orch._task_completion_detector)
+                else:
+                    logger.info(
+                        "Task completion: HIGH confidence detected (active signal), "
+                        "forcing completion NOW (immediate stop, skip continuation)"
+                    )
+                    forced_task_completion = True
+                    stream_ctx.force_completion = True
+                    stream_ctx.skip_continuation = True
+                    last_summary = getattr(
+                        orch._task_completion_detector._state, "last_summary", ""
+                    )
+                    sanitized_summary = strip_active_completion_markers(last_summary).strip()
+                    if sanitized_summary and hasattr(orch, "_conversation_controller"):
+                        try:
+                            orch._conversation_controller.persist_compaction_summary(
+                                sanitized_summary, []
+                            )
+                            orch._conversation_controller.inject_compaction_context()
+                            logger.info("VICTOR_SUMMARY persisted for next-turn context injection")
+                        except Exception as exc:
+                            logger.debug("Failed to persist VICTOR_SUMMARY: %s", exc)
+            elif confidence == CompletionConfidence.MEDIUM:
+                logger.info(
+                    "Task completion: MEDIUM confidence detected (file mods + passive signal)"
+                )
+
+        mentioned_tools_detected: List[str] = []
+
+        from victor.agent.continuation_strategy import ContinuationStrategy
+        from victor.tools.tool_names import TOOL_ALIASES, get_all_canonical_names
+
+        if full_content and not tool_calls and not forced_task_completion:
+            all_tool_names = get_all_canonical_names() | set(TOOL_ALIASES.keys())
+            mentioned_tools_detected = ContinuationStrategy.detect_mentioned_tools(
+                full_content, list(all_tool_names), TOOL_ALIASES
+            )
+
+            if mentioned_tools_detected and spin.consecutive_no_tool_turns >= 1:
+                tool_hint = mentioned_tools_detected[0]
+                logger.info(
+                    "[tool-format-assist] Model mentioned '%s' without calling it "
+                    "(state=%s). Injecting format hint.",
+                    tool_hint,
+                    spin.state.value,
+                )
+                from victor.agent.conversation.history_metadata import (
+                    build_internal_history_metadata,
+                )
+                from victor.agent.conversation.types import MessageSource
+
+                orch.add_message(
+                    "user",
+                    f"[TOOL-FORMAT-HINT: You described wanting to use '{tool_hint}' but didn't "
+                    f"call it. Call the tool directly — don't describe what you want to do, "
+                    f"execute it. If you've already modified the file successfully, say "
+                    f"{FILE_DONE_MARKER}]",
+                    metadata=build_internal_history_metadata(
+                        "tool_format_hint", source=MessageSource.AGENT_GUIDANCE
+                    ),
+                )
+
+        return forced_task_completion, mentioned_tools_detected
+
     async def run(self, user_message: str, **kwargs: Any) -> AsyncIterator[StreamChunk]:
         """Run the streaming executor for the provided message."""
         runtime_owner = self._runtime_owner
@@ -1663,84 +1760,15 @@ class StreamingChatExecutor:
 
             tool_calls, full_content = orch._parse_and_validate_tool_calls(tool_calls, full_content)
 
-            forced_task_completion = False
-            if orch._task_completion_detector and full_content:
-                from victor.agent.task_completion import CompletionConfidence
-
-                orch._task_completion_detector.analyze_response(full_content)
-                confidence = orch._task_completion_detector.get_completion_confidence()
-
-                if confidence == CompletionConfidence.HIGH:
-                    if tool_calls:
-                        logger.info(
-                            "Task completion: HIGH confidence marker deferred because response "
-                            "still contains %s tool call(s)",
-                            len(tool_calls),
-                        )
-                        self._clear_deferred_active_completion_signal(
-                            orch._task_completion_detector
-                        )
-                    else:
-                        logger.info(
-                            "Task completion: HIGH confidence detected (active signal), "
-                            "forcing completion NOW (immediate stop, skip continuation)"
-                        )
-                        forced_task_completion = True
-                        stream_ctx.force_completion = True
-                        stream_ctx.skip_continuation = True
-                        last_summary = getattr(
-                            orch._task_completion_detector._state, "last_summary", ""
-                        )
-                        sanitized_summary = strip_active_completion_markers(last_summary).strip()
-                        if sanitized_summary and hasattr(orch, "_conversation_controller"):
-                            try:
-                                orch._conversation_controller.persist_compaction_summary(
-                                    sanitized_summary, []
-                                )
-                                orch._conversation_controller.inject_compaction_context()
-                                logger.info(
-                                    "VICTOR_SUMMARY persisted for next-turn context injection"
-                                )
-                            except Exception as exc:
-                                logger.debug("Failed to persist VICTOR_SUMMARY: %s", exc)
-                elif confidence == CompletionConfidence.MEDIUM:
-                    logger.info(
-                        "Task completion: MEDIUM confidence detected (file mods + passive signal)"
-                    )
-
-            mentioned_tools_detected: List[str] = []
-
-            from victor.agent.continuation_strategy import ContinuationStrategy
-            from victor.tools.tool_names import TOOL_ALIASES, get_all_canonical_names
-
-            if full_content and not tool_calls and not forced_task_completion:
-                all_tool_names = get_all_canonical_names() | set(TOOL_ALIASES.keys())
-                mentioned_tools_detected = ContinuationStrategy.detect_mentioned_tools(
-                    full_content, list(all_tool_names), TOOL_ALIASES
+            forced_task_completion, mentioned_tools_detected = (
+                self._detect_task_completion_and_mentions(
+                    orch,
+                    stream_ctx,
+                    full_content=full_content,
+                    tool_calls=tool_calls,
+                    spin=_spin,
                 )
-
-                if mentioned_tools_detected and _spin.consecutive_no_tool_turns >= 1:
-                    tool_hint = mentioned_tools_detected[0]
-                    logger.info(
-                        "[tool-format-assist] Model mentioned '%s' without calling it "
-                        "(state=%s). Injecting format hint.",
-                        tool_hint,
-                        _spin.state.value,
-                    )
-                    from victor.agent.conversation.history_metadata import (
-                        build_internal_history_metadata,
-                    )
-                    from victor.agent.conversation.types import MessageSource
-
-                    orch.add_message(
-                        "user",
-                        f"[TOOL-FORMAT-HINT: You described wanting to use '{tool_hint}' but didn't call it. "
-                        f"Call the tool directly — don't describe what you want to do, execute it. "
-                        f"If you've already modified the file successfully, say {FILE_DONE_MARKER}]",
-                        metadata=build_internal_history_metadata(
-                            "tool_format_hint", source=MessageSource.AGENT_GUIDANCE
-                        ),
-                    )
+            )
 
             if forced_task_completion and not tool_calls:
                 recovery_action = SimpleNamespace(action="continue")
