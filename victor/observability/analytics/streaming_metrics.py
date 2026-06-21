@@ -742,6 +742,17 @@ class MetricsStreamWrapper:
     def __aiter__(self) -> "MetricsStreamWrapper":
         return self
 
+    async def aclose(self) -> None:
+        """Propagate close to the wrapped stream.
+
+        Without this, closing the wrapper (e.g. via contextlib.aclosing on an early break)
+        would not finalize the underlying provider/httpx generator, leaving it to GC-driven
+        off-task cleanup ("async generator ignored GeneratorExit" / cross-task cancel scope).
+        """
+        inner_close = getattr(self.stream, "aclose", None)
+        if callable(inner_close):
+            await inner_close()
+
     async def __anext__(self) -> T:
         try:
             chunk = await self.stream.__anext__()

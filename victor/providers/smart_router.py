@@ -40,6 +40,7 @@ Usage:
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import time
 from dataclasses import dataclass, field
@@ -841,9 +842,11 @@ class SmartRoutingProvider:
         chunks_received = 0
 
         try:
-            async for chunk in primary_provider.stream(messages, model=model, **kwargs):
-                chunks_received += 1
-                yield chunk
+            inner = primary_provider.stream(messages, model=model, **kwargs)
+            async with contextlib.aclosing(inner) as inner_stream:
+                async for chunk in inner_stream:
+                    chunks_received += 1
+                    yield chunk
 
             success = True
 
