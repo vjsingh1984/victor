@@ -804,13 +804,17 @@ class TurnEvaluationController:
 
     @staticmethod
     def _plateau_message(intent_is_write: bool) -> str:
-        if intent_is_write:
-            return (
-                "Progress stalled. You have enough context — stop reading and apply the change "
-                'now with edit(ops=[{"type": "replace", "path": "file", "old_str": "exact text", '
-                '"new_str": "replacement"}]).'
-            )
+        return plateau_nudge_message(intent_is_write)
+
+
+def plateau_nudge_message(intent_is_write: bool) -> str:
+    """The shared plateau nudge text (write-intent aware) used by both loops."""
+    if intent_is_write:
         return (
-            "Progress seems stalled. Try a different approach or summarize what you've found "
-            "so far."
+            "Progress stalled. You have enough context — stop reading and apply the change "
+            'now with edit(ops=[{"type": "replace", "path": "file", "old_str": "exact text", '
+            '"new_str": "replacement"}]).'
         )
+    return (
+        "Progress seems stalled. Try a different approach or summarize what you've found " "so far."
+    )
