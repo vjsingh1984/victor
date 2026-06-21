@@ -200,6 +200,21 @@ class _EmitDecision:
     tool_calls: Any = None
 
 
+@dataclass
+class _ContinuationDecision:
+    """Single-slot mutable holder for the no-tool continuation decision.
+
+    ``_handle_continuation_decision`` classifies intent and runs the continuation handler for a
+    turn that produced no tool calls, yielding intent/continuation chunks. Because it yields, it
+    writes ``should_return`` (the continuation handler asked to end the stream) and the
+    possibly-cleared ``full_content`` (intent classification may clear it) for run() to read. Part
+    of FEP-0007 Phase 2's move toward a shared ``stream_turn()``.
+    """
+
+    should_return: bool = False
+    full_content: str = ""
+
+
 class StreamingChatExecutor:
     """Canonical streaming chat executor bound to a runtime owner."""
 
@@ -1739,6 +1754,147 @@ class StreamingChatExecutor:
                 decision.should_return = True
                 return
 
+    async def _handle_continuation_decision(
+        self,
+        orch: Any,
+        runtime_owner: Any,
+        stream_ctx: Any,
+        *,
+        full_content: str,
+        tool_calls: Any,
+        mentioned_tools_detected: Any,
+        content_length: int,
+        assistant_content_yielded: bool,
+        forced_task_completion: bool,
+        spin: Any,
+        user_message: str,
+        decision: _ContinuationDecision,
+    ) -> AsyncIterator[StreamChunk]:
+        """Classify intent and run the continuation handler for a no-tool turn.
+
+        The continuation decision band of run()'s per-turn body (FEP-0007 Phase 2, toward a shared
+        stream_turn() boundary). For a turn that produced no tool calls, classifies the intended
+        action, applies tracking-state updates, injects a post-compaction continuation prompt when
+        applicable, and runs the continuation handler — yielding intent + continuation chunks.
+        A no-op when there are tool calls to execute. Because it yields, ``should_return`` and the
+        possibly-cleared ``full_content`` are written to ``decision`` for run() to read.
+        """
+        decision.full_content = full_content
+        if tool_calls:
+            return
+
+        if not runtime_owner._intent_classification_handler:
+            from victor.agent.streaming import (
+                create_intent_classification_handler,
+            )
+
+            runtime_owner._intent_classification_handler = create_intent_classification_handler(
+                orch
+            )
+
+        from victor.agent.streaming import create_tracking_state
+
+        tracking_state = create_tracking_state(orch)
+
+        intent_result = runtime_owner._intent_classification_handler.classify_and_determine_action(
+            stream_ctx=stream_ctx,
+            full_content=full_content,
+            content_length=content_length,
+            mentioned_tools=mentioned_tools_detected,
+            tracking_state=tracking_state,
+        )
+
+        for chunk in intent_result.chunks:
+            yield chunk
+
+        if intent_result.content_cleared:
+            full_content = ""
+            decision.full_content = ""
+
+        force_finalize_used = tracking_state.force_finalize and intent_result.action == "finish"
+        from victor.agent.streaming import apply_tracking_state_updates
+
+        apply_tracking_state_updates(orch, intent_result.state_updates, force_finalize_used)
+
+        action_result = intent_result.action_result
+        action = intent_result.action
+
+        logger.info(
+            "[continuation] action=%s reason=%s content_len=%s tool_calls=%s "
+            "iteration=%s spin_state=%s",
+            action,
+            action_result.get("reason", "unknown"),
+            content_length,
+            len(tool_calls) if tool_calls else 0,
+            stream_ctx.total_iterations,
+            spin.state.value,
+        )
+
+        if (
+            stream_ctx.compaction_occurred
+            and not stream_ctx.force_completion
+            and not forced_task_completion
+        ):
+            turns_since_compaction = stream_ctx.total_iterations - stream_ctx.last_compaction_turn
+            if turns_since_compaction <= 2:
+                is_asking_input = action_result.get("is_asking_input", False)
+                is_completion = action_result.get("is_completion", False)
+
+                if not is_asking_input and not is_completion:
+                    logger.info(
+                        "[post-compaction-continuation] Forcing continuation after "
+                        "compaction (turn %s, %s messages removed)",
+                        stream_ctx.total_iterations,
+                        stream_ctx.compaction_message_removed_count,
+                    )
+                    post_compaction_prompt = self._build_post_compaction_continuation_prompt(
+                        orch,
+                        stream_ctx,
+                    )
+                    orch.add_message(
+                        "user",
+                        post_compaction_prompt,
+                    )
+                    if turns_since_compaction == 2:
+                        stream_ctx.compaction_occurred = False
+
+        if not runtime_owner._continuation_handler:
+            from victor.agent.streaming import create_continuation_handler
+
+            runtime_owner._continuation_handler = create_continuation_handler(orch)
+
+        action_result = action_result.with_action(action)
+
+        continuation_result = await runtime_owner._continuation_handler.handle_action(
+            action_result=action_result,
+            stream_ctx=stream_ctx,
+            full_content=full_content,
+        )
+
+        for chunk in continuation_result.chunks:
+            yield chunk
+
+        if "cumulative_prompt_interventions" in continuation_result.state_updates:
+            orch._cumulative_prompt_interventions = continuation_result.state_updates[
+                "cumulative_prompt_interventions"
+            ]
+
+        if continuation_result.should_return:
+            continuation_visible = any(
+                bool(getattr(chunk, "content", "").strip()) for chunk in continuation_result.chunks
+            )
+            if not tool_calls and not assistant_content_yielded and not continuation_visible:
+                yield await self._build_terminal_delivery_chunk(
+                    orch,
+                    stream_ctx,
+                    full_content=full_content,
+                    user_message=user_message,
+                )
+            elif not continuation_result.chunks:
+                yield self._build_final_marker_chunk(orch)
+            decision.should_return = True
+            return
+
     async def run(self, user_message: str, **kwargs: Any) -> AsyncIterator[StreamChunk]:
         """Run the streaming executor for the provided message."""
         runtime_owner = self._runtime_owner
@@ -2168,131 +2324,25 @@ class StreamingChatExecutor:
 
                 logger.debug("After streaming pass, tool_calls = %s", tool_calls)
 
-                if not tool_calls:
-                    if not runtime_owner._intent_classification_handler:
-                        from victor.agent.streaming import (
-                            create_intent_classification_handler,
-                        )
-
-                        runtime_owner._intent_classification_handler = (
-                            create_intent_classification_handler(orch)
-                        )
-
-                    from victor.agent.streaming import create_tracking_state
-
-                    tracking_state = create_tracking_state(orch)
-
-                    intent_result = (
-                        runtime_owner._intent_classification_handler.classify_and_determine_action(
-                            stream_ctx=stream_ctx,
-                            full_content=full_content,
-                            content_length=content_length,
-                            mentioned_tools=mentioned_tools_detected,
-                            tracking_state=tracking_state,
-                        )
-                    )
-
-                    for chunk in intent_result.chunks:
-                        yield chunk
-
-                    if intent_result.content_cleared:
-                        full_content = ""
-
-                    force_finalize_used = (
-                        tracking_state.force_finalize and intent_result.action == "finish"
-                    )
-                    from victor.agent.streaming import apply_tracking_state_updates
-
-                    apply_tracking_state_updates(
-                        orch, intent_result.state_updates, force_finalize_used
-                    )
-
-                    action_result = intent_result.action_result
-                    action = intent_result.action
-
-                    logger.info(
-                        "[continuation] action=%s reason=%s content_len=%s tool_calls=%s "
-                        "iteration=%s spin_state=%s",
-                        action,
-                        action_result.get("reason", "unknown"),
-                        content_length,
-                        len(tool_calls) if tool_calls else 0,
-                        stream_ctx.total_iterations,
-                        _spin.state.value,
-                    )
-
-                    if (
-                        stream_ctx.compaction_occurred
-                        and not stream_ctx.force_completion
-                        and not forced_task_completion
-                    ):
-                        turns_since_compaction = (
-                            stream_ctx.total_iterations - stream_ctx.last_compaction_turn
-                        )
-                        if turns_since_compaction <= 2:
-                            is_asking_input = action_result.get("is_asking_input", False)
-                            is_completion = action_result.get("is_completion", False)
-
-                            if not is_asking_input and not is_completion:
-                                logger.info(
-                                    "[post-compaction-continuation] Forcing continuation after "
-                                    "compaction (turn %s, %s messages removed)",
-                                    stream_ctx.total_iterations,
-                                    stream_ctx.compaction_message_removed_count,
-                                )
-                                post_compaction_prompt = (
-                                    self._build_post_compaction_continuation_prompt(
-                                        orch,
-                                        stream_ctx,
-                                    )
-                                )
-                                orch.add_message(
-                                    "user",
-                                    post_compaction_prompt,
-                                )
-                                if turns_since_compaction == 2:
-                                    stream_ctx.compaction_occurred = False
-
-                    if not runtime_owner._continuation_handler:
-                        from victor.agent.streaming import create_continuation_handler
-
-                        runtime_owner._continuation_handler = create_continuation_handler(orch)
-
-                    action_result = action_result.with_action(action)
-
-                    continuation_result = await runtime_owner._continuation_handler.handle_action(
-                        action_result=action_result,
-                        stream_ctx=stream_ctx,
-                        full_content=full_content,
-                    )
-
-                    for chunk in continuation_result.chunks:
-                        yield chunk
-
-                    if "cumulative_prompt_interventions" in continuation_result.state_updates:
-                        orch._cumulative_prompt_interventions = continuation_result.state_updates[
-                            "cumulative_prompt_interventions"
-                        ]
-
-                    if continuation_result.should_return:
-                        continuation_visible = any(
-                            bool(getattr(chunk, "content", "").strip())
-                            for chunk in continuation_result.chunks
-                        )
-                        if (
-                            not tool_calls
-                            and not assistant_content_yielded
-                            and not continuation_visible
-                        ):
-                            yield await self._build_terminal_delivery_chunk(
-                                orch,
-                                stream_ctx,
-                                full_content=full_content,
-                                user_message=user_message,
-                            )
-                        elif not continuation_result.chunks:
-                            yield self._build_final_marker_chunk(orch)
-                        return
+                _cont = _ContinuationDecision()
+                async for chunk in self._handle_continuation_decision(
+                    orch,
+                    runtime_owner,
+                    stream_ctx,
+                    full_content=full_content,
+                    tool_calls=tool_calls,
+                    mentioned_tools_detected=mentioned_tools_detected,
+                    content_length=content_length,
+                    assistant_content_yielded=assistant_content_yielded,
+                    forced_task_completion=forced_task_completion,
+                    spin=_spin,
+                    user_message=user_message,
+                    decision=_cont,
+                ):
+                    yield chunk
+                full_content = _cont.full_content
+                if _cont.should_return:
+                    return
 
                 _tool_outcome = _ToolTurnOutcome()
                 async for chunk in self._execute_tools_turn(

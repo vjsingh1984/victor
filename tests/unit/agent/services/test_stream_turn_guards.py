@@ -1172,3 +1172,142 @@ async def test_emit_empty_recovery_failure_yields_fallback_and_returns():
     assert chunks[0].content == "fallback message"
     assert chunks[0].is_final is True
     assert decision.should_return is True
+
+
+def _continuation_orch(messages):
+    return SimpleNamespace(
+        add_message=lambda role, content, **k: messages.append((role, content)),
+        _cumulative_prompt_interventions=0,
+        _chunk_generator=SimpleNamespace(
+            generate_content_chunk=lambda text, is_final=False: SimpleNamespace(
+                content=text, is_final=is_final
+            )
+        ),
+    )
+
+
+def _continuation_runtime_owner(*, intent_result, continuation_result):
+    handler = SimpleNamespace(
+        classify_and_determine_action=lambda **kw: intent_result,
+    )
+
+    async def _handle_action(*, action_result, stream_ctx, full_content):
+        return continuation_result
+
+    return SimpleNamespace(
+        _intent_classification_handler=handler,
+        _continuation_handler=SimpleNamespace(handle_action=_handle_action),
+    )
+
+
+def _intent_result(*, chunks=None, content_cleared=False, action="continue", state_updates=None):
+    return SimpleNamespace(
+        chunks=chunks or [],
+        content_cleared=content_cleared,
+        action=action,
+        state_updates=state_updates or {},
+        action_result=SimpleNamespace(
+            get=lambda k, d=None: d,
+            with_action=lambda a: SimpleNamespace(get=lambda k, d=None: d),
+        ),
+    )
+
+
+def _continuation_stream_ctx():
+    return SimpleNamespace(
+        total_iterations=1,
+        last_compaction_turn=0,
+        compaction_occurred=False,
+        force_completion=False,
+        compaction_message_removed_count=0,
+    )
+
+
+async def _collect_continuation(
+    executor, *, orch, runtime_owner, full_content="content", tool_calls=None
+):
+    # Avoid touching the real tracking-state machinery; the helper only forwards it.
+    decision = chat_stream_executor._ContinuationDecision()
+    chunks = [
+        c
+        async for c in executor._handle_continuation_decision(
+            orch,
+            runtime_owner,
+            _continuation_stream_ctx(),
+            full_content=full_content,
+            tool_calls=tool_calls,
+            mentioned_tools_detected=[],
+            content_length=len(full_content),
+            assistant_content_yielded=False,
+            forced_task_completion=False,
+            spin=_spin("ACTIVE"),
+            user_message="q",
+            decision=decision,
+        )
+    ]
+    return chunks, decision
+
+
+async def test_continuation_no_op_when_tool_calls_present():
+    executor = _provider_turn_executor()
+    messages = []
+    orch = _continuation_orch(messages)
+    # runtime_owner intentionally bare: helper must not touch it when tool_calls exist.
+    runtime_owner = SimpleNamespace()
+
+    chunks, decision = await _collect_continuation(
+        executor, orch=orch, runtime_owner=runtime_owner, tool_calls=[{"name": "edit"}]
+    )
+
+    assert chunks == []
+    assert decision.should_return is False
+    assert decision.full_content == "content"
+
+
+async def test_continuation_yields_then_falls_through(monkeypatch):
+    import victor.agent.streaming as streaming_mod
+
+    monkeypatch.setattr(
+        streaming_mod, "create_tracking_state", lambda orch: SimpleNamespace(force_finalize=False)
+    )
+    monkeypatch.setattr(streaming_mod, "apply_tracking_state_updates", lambda *a, **k: None)
+
+    executor = _provider_turn_executor()
+    messages = []
+    orch = _continuation_orch(messages)
+    intent = _intent_result(chunks=[SimpleNamespace(content="thinking", is_final=False)])
+    cont = SimpleNamespace(chunks=[], state_updates={}, should_return=False)
+    runtime_owner = _continuation_runtime_owner(intent_result=intent, continuation_result=cont)
+
+    chunks, decision = await _collect_continuation(executor, orch=orch, runtime_owner=runtime_owner)
+
+    # Intent chunk yielded; continuation not asked to return -> fall through.
+    assert [c.content for c in chunks] == ["thinking"]
+    assert decision.should_return is False
+
+
+async def test_continuation_clears_content_and_returns(monkeypatch):
+    import victor.agent.streaming as streaming_mod
+
+    monkeypatch.setattr(
+        streaming_mod, "create_tracking_state", lambda orch: SimpleNamespace(force_finalize=False)
+    )
+    monkeypatch.setattr(streaming_mod, "apply_tracking_state_updates", lambda *a, **k: None)
+
+    executor = _provider_turn_executor()
+    executor._build_final_marker_chunk = lambda orch: SimpleNamespace(
+        content="[final]", is_final=True
+    )
+    messages = []
+    orch = _continuation_orch(messages)
+    intent = _intent_result(content_cleared=True)
+    # should_return with no chunks -> emits the final marker.
+    cont = SimpleNamespace(chunks=[], state_updates={}, should_return=True)
+    runtime_owner = _continuation_runtime_owner(intent_result=intent, continuation_result=cont)
+
+    chunks, decision = await _collect_continuation(executor, orch=orch, runtime_owner=runtime_owner)
+
+    assert decision.should_return is True
+    # content_cleared propagated to run() via the holder.
+    assert decision.full_content == ""
+    assert chunks[-1].content == "[final]"
