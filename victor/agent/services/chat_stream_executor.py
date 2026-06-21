@@ -973,6 +973,27 @@ class StreamingChatExecutor:
                     metadata=_guidance_meta,
                 )
 
+    @staticmethod
+    def _initialize_task_intent(orch: Any, stream_ctx: Any, user_message: str) -> Any:
+        """Seed task intent on the stream context and return the inferred goals.
+
+        Final cohesive piece of run()'s preamble (FEP-0007 Phase 2 decomposition). Mutates
+        stream_ctx (task intent, plan steps, task-start event); yields nothing. Returns the
+        inferred ``goals`` so the loop can use them for tool planning.
+        """
+        goals = orch._tool_planner.infer_goals_from_message(user_message)
+        if hasattr(stream_ctx, "set_task_intent"):
+            stream_ctx.set_task_intent(user_message)
+        if hasattr(stream_ctx, "extend_plan_steps"):
+            stream_ctx.extend_plan_steps(goals)
+        if hasattr(stream_ctx, "record_intent_event"):
+            stream_ctx.record_intent_event(
+                "task_start",
+                f"task start ({stream_ctx.coarse_task_type})",
+                task_type=stream_ctx.coarse_task_type,
+            )
+        return goals
+
     async def run(self, user_message: str, **kwargs: Any) -> AsyncIterator[StreamChunk]:
         """Run the streaming executor for the provided message."""
         runtime_owner = self._runtime_owner
@@ -1007,17 +1028,7 @@ class StreamingChatExecutor:
 
         self._apply_run_guidance(orch, stream_ctx, user_message, max_exploration_iterations)
 
-        goals = orch._tool_planner.infer_goals_from_message(user_message)
-        if hasattr(stream_ctx, "set_task_intent"):
-            stream_ctx.set_task_intent(user_message)
-        if hasattr(stream_ctx, "extend_plan_steps"):
-            stream_ctx.extend_plan_steps(goals)
-        if hasattr(stream_ctx, "record_intent_event"):
-            stream_ctx.record_intent_event(
-                "task_start",
-                f"task start ({stream_ctx.coarse_task_type})",
-                task_type=stream_ctx.coarse_task_type,
-            )
+        goals = self._initialize_task_intent(orch, stream_ctx, user_message)
 
         logger.info(
             "Stream chat limits: tool_budget=%s, max_total_iterations=%s, "
