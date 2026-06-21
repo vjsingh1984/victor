@@ -117,3 +117,21 @@ def test_apply_run_guidance_non_action_skips_message():
         _guidance_orch(messages), stream_ctx, "explain the code", 50
     )
     assert messages.get("msg", []) == []  # no action-guidance for non-action tasks
+
+
+def test_initialize_task_intent_returns_goals_and_seeds_ctx():
+    seen = {}
+    orch = SimpleNamespace(
+        _tool_planner=SimpleNamespace(infer_goals_from_message=lambda m: ["goal1"]),
+    )
+    stream_ctx = SimpleNamespace(
+        coarse_task_type="analysis",
+        set_task_intent=lambda m: seen.__setitem__("intent", m),
+        extend_plan_steps=lambda g: seen.__setitem__("steps", g),
+        record_intent_event=lambda *a, **k: seen.__setitem__("event", True),
+    )
+    goals = StreamingChatExecutor._initialize_task_intent(orch, stream_ctx, "do the thing")
+    assert goals == ["goal1"]  # returned for downstream tool planning
+    assert seen["intent"] == "do the thing"
+    assert seen["steps"] == ["goal1"]
+    assert seen["event"] is True
