@@ -151,6 +151,19 @@ class _ProviderTurnEval:
     has_tools: bool = False
 
 
+@dataclass
+class _PostToolEval:
+    """Single-slot mutable holder for the post-tool-execution evaluation band.
+
+    ``_evaluate_post_tool_turn`` runs fulfillment / plateau / search-novelty after tool
+    execution; it's an async generator (the search-novelty safety-net yields a final chunk),
+    so it records its loop-exit decision here for ``run()`` to read via ``should_return``.
+    Part of FEP-0007 Phase 2's move toward a shared ``stream_turn()``.
+    """
+
+    should_return: bool = False
+
+
 class StreamingChatExecutor:
     """Canonical streaming chat executor bound to a runtime owner."""
 
@@ -1250,6 +1263,138 @@ class StreamingChatExecutor:
             outcome.should_return = True
             return
 
+    async def _evaluate_post_tool_turn(
+        self,
+        orch: Any,
+        stream_ctx: Any,
+        *,
+        perception: Any,
+        tool_exec_result: Any,
+        full_content: str,
+        user_message: str,
+        plateau: Any,
+        novelty: Any,
+        novelty_enabled: bool,
+        outcome: _PostToolEval,
+    ) -> AsyncIterator[StreamChunk]:
+        """Run fulfillment + plateau + search-novelty evaluation after tool execution.
+
+        The post-tool EVALUATE band of run()'s per-turn body (FEP-0007 Phase 2, toward a
+        shared stream_turn() boundary). Checks task fulfillment (ends the turn when fulfilled),
+        runs plateau detection (injects a nudge when unproductive), and the search-novelty
+        safety-net (forces synthesis — yielding a final chunk — when successive searches stop
+        surfacing new files, else nudges). Because the safety-net yields, the loop-exit decision
+        is written to ``outcome.should_return`` for run() to read rather than returned.
+        """
+        if self._fulfillment and perception:
+            try:
+                from victor.agent.turn_policy import FulfillmentCriteriaBuilder
+                from victor.framework.fulfillment import TaskType
+
+                task_analysis = getattr(perception, "task_analysis", None)
+                task_type_str = (
+                    getattr(task_analysis, "task_type", "unknown") if task_analysis else "unknown"
+                )
+                try:
+                    task_type = TaskType(task_type_str)
+                except (ValueError, KeyError):
+                    task_type = TaskType.UNKNOWN
+
+                criteria = FulfillmentCriteriaBuilder.from_tool_results(
+                    tool_exec_result.tool_results
+                    if hasattr(tool_exec_result, "tool_results")
+                    else []
+                )
+                fulfillment_result = await self._fulfillment.check_fulfillment(
+                    task_type=task_type,
+                    criteria=criteria,
+                    context={
+                        "full_content": full_content,
+                        "user_message": user_message,
+                    },
+                )
+                if fulfillment_result.is_fulfilled:
+                    logger.info(
+                        "Streaming fulfillment: task fulfilled (score=%.2f, reason=%s)",
+                        fulfillment_result.score,
+                        fulfillment_result.reason,
+                    )
+                    outcome.should_return = True
+                    return
+            except Exception as exc:
+                logger.debug("Streaming fulfillment check skipped: %s", exc)
+
+        # Plateau detection via the shared PlateauDetector (same productivity-weighted
+        # formula and "nudge only when unproductive" rule the headless loop uses).
+        productive_count = _count_productive_tools(tool_exec_result)
+        content_len = len(full_content) if full_content else 0
+        _plateau_res = plateau.record(productive_count, content_len)
+        if _plateau_res.is_plateau and not _plateau_res.should_nudge:
+            logger.info(
+                "Skipping plateau nudge: agent made %d productive tool call(s) this iteration",
+                productive_count,
+            )
+        elif _plateau_res.should_nudge:
+            logger.info(
+                "Streaming progress plateau detected (scores=%s), injecting nudge",
+                [f"{score:.2f}" for score in _plateau_res.recent_scores],
+            )
+            _plateau_intent = getattr(orch, "_current_intent", None)
+            _is_write = (
+                _plateau_intent is not None
+                and getattr(_plateau_intent, "value", None) == "write_allowed"
+            )
+            from victor.agent.conversation.types import (
+                MESSAGE_SOURCE_METADATA_KEY,
+                MessageSource,
+            )
+            from victor.agent.turn_policy import plateau_nudge_message
+
+            orch.add_message(
+                "system",
+                plateau_nudge_message(_is_write),
+                metadata={MESSAGE_SOURCE_METADATA_KEY: MessageSource.SYSTEM_INJECTED.value},
+            )
+
+        # Search-novelty safety-net: if successive searches stop surfacing new files,
+        # synthesize instead of thrashing. Skip when actively editing (real work).
+        from victor.tools.tool_names import get_canonical_name
+
+        _nov_results = getattr(tool_exec_result, "tool_results", None) or []
+        _nov = novelty.record_turn(_nov_results)
+        _editing = any(
+            get_canonical_name(r.get("tool_name") or r.get("name") or "")
+            in {"edit", "write", "create_file", "replace_in_file"}
+            for r in _nov_results
+            if isinstance(r, dict)
+        )
+        _iter_no = getattr(stream_ctx, "total_iterations", 0)
+        if novelty_enabled and _nov.should_force_complete and not _editing and _iter_no >= 2:
+            logger.info(
+                "[search-novelty] %d consecutive low-novelty searches — synthesizing.",
+                _nov.consecutive_low_novelty,
+            )
+            stream_ctx.force_completion = True
+            stream_ctx.skip_continuation = True
+            outcome.should_return = True
+            yield orch._chunk_generator.generate_content_chunk(
+                "\n\n[Enough context gathered — synthesizing the answer.]",
+                is_final=True,
+            )
+            return
+        if novelty_enabled and _nov.should_nudge:
+            from victor.agent.conversation.types import (
+                MESSAGE_SOURCE_METADATA_KEY,
+                MessageSource,
+            )
+            from victor.framework.search_novelty import synthesize_nudge_message
+
+            orch.add_message(
+                "system",
+                synthesize_nudge_message(),
+                metadata={MESSAGE_SOURCE_METADATA_KEY: MessageSource.SYSTEM_INJECTED.value},
+            )
+
     async def run(self, user_message: str, **kwargs: Any) -> AsyncIterator[StreamChunk]:
         """Run the streaming executor for the provided message."""
         runtime_owner = self._runtime_owner
@@ -1306,8 +1451,7 @@ class StreamingChatExecutor:
                 decision_service.reset_budget()
 
         # Loop-scoped names used in the per-turn body below.
-        from victor.agent.turn_policy import SpinState, plateau_nudge_message
-        from victor.framework.search_novelty import synthesize_nudge_message
+        from victor.agent.turn_policy import SpinState
 
         # Per-turn guard components (built once per run via the extracted factory — the first
         # step of FEP-0007 Phase 2 toward a shared stream_turn() boundary).
@@ -2003,118 +2147,22 @@ class StreamingChatExecutor:
                 if tool_exec_result.should_return:
                     return
 
-                if self._fulfillment and _perception:
-                    try:
-                        from victor.agent.turn_policy import FulfillmentCriteriaBuilder
-                        from victor.framework.fulfillment import TaskType
-
-                        task_analysis = getattr(_perception, "task_analysis", None)
-                        task_type_str = (
-                            getattr(task_analysis, "task_type", "unknown")
-                            if task_analysis
-                            else "unknown"
-                        )
-                        try:
-                            task_type = TaskType(task_type_str)
-                        except (ValueError, KeyError):
-                            task_type = TaskType.UNKNOWN
-
-                        criteria = FulfillmentCriteriaBuilder.from_tool_results(
-                            tool_exec_result.tool_results
-                            if hasattr(tool_exec_result, "tool_results")
-                            else []
-                        )
-                        fulfillment_result = await self._fulfillment.check_fulfillment(
-                            task_type=task_type,
-                            criteria=criteria,
-                            context={
-                                "full_content": full_content,
-                                "user_message": user_message,
-                            },
-                        )
-                        if fulfillment_result.is_fulfilled:
-                            logger.info(
-                                "Streaming fulfillment: task fulfilled (score=%.2f, reason=%s)",
-                                fulfillment_result.score,
-                                fulfillment_result.reason,
-                            )
-                            return
-                    except Exception as exc:
-                        logger.debug("Streaming fulfillment check skipped: %s", exc)
-
-                # Plateau detection via the shared PlateauDetector (same productivity-weighted
-                # formula and "nudge only when unproductive" rule the headless loop uses).
-                productive_count = _count_productive_tools(tool_exec_result)
-                content_len = len(full_content) if full_content else 0
-                _plateau_res = _plateau.record(productive_count, content_len)
-                if _plateau_res.is_plateau and not _plateau_res.should_nudge:
-                    logger.info(
-                        "Skipping plateau nudge: agent made %d productive tool call(s) "
-                        "this iteration",
-                        productive_count,
-                    )
-                elif _plateau_res.should_nudge:
-                    logger.info(
-                        "Streaming progress plateau detected (scores=%s), injecting nudge",
-                        [f"{score:.2f}" for score in _plateau_res.recent_scores],
-                    )
-                    _plateau_intent = getattr(orch, "_current_intent", None)
-                    _is_write = (
-                        _plateau_intent is not None
-                        and getattr(_plateau_intent, "value", None) == "write_allowed"
-                    )
-                    from victor.agent.conversation.types import (
-                        MESSAGE_SOURCE_METADATA_KEY,
-                        MessageSource,
-                    )
-
-                    orch.add_message(
-                        "system",
-                        plateau_nudge_message(_is_write),
-                        metadata={MESSAGE_SOURCE_METADATA_KEY: MessageSource.SYSTEM_INJECTED.value},
-                    )
-
-                # Search-novelty safety-net: if successive searches stop surfacing new files,
-                # synthesize instead of thrashing. Skip when actively editing (real work).
-                from victor.tools.tool_names import get_canonical_name
-
-                _nov_results = getattr(tool_exec_result, "tool_results", None) or []
-                _nov = _novelty.record_turn(_nov_results)
-                _editing = any(
-                    get_canonical_name(r.get("tool_name") or r.get("name") or "")
-                    in {"edit", "write", "create_file", "replace_in_file"}
-                    for r in _nov_results
-                    if isinstance(r, dict)
-                )
-                _iter_no = getattr(stream_ctx, "total_iterations", 0)
-                if (
-                    _novelty_enabled
-                    and _nov.should_force_complete
-                    and not _editing
-                    and _iter_no >= 2
+                _post_tool = _PostToolEval()
+                async for chunk in self._evaluate_post_tool_turn(
+                    orch,
+                    stream_ctx,
+                    perception=_perception,
+                    tool_exec_result=tool_exec_result,
+                    full_content=full_content,
+                    user_message=user_message,
+                    plateau=_plateau,
+                    novelty=_novelty,
+                    novelty_enabled=_novelty_enabled,
+                    outcome=_post_tool,
                 ):
-                    logger.info(
-                        "[search-novelty] %d consecutive low-novelty searches — synthesizing.",
-                        _nov.consecutive_low_novelty,
-                    )
-                    stream_ctx.force_completion = True
-                    stream_ctx.skip_continuation = True
-                    yield orch._chunk_generator.generate_content_chunk(
-                        "\n\n[Enough context gathered — synthesizing the answer.]",
-                        is_final=True,
-                    )
+                    yield chunk
+                if _post_tool.should_return:
                     return
-                if _novelty_enabled and _nov.should_nudge:
-                    from victor.agent.conversation.types import (
-                        MESSAGE_SOURCE_METADATA_KEY,
-                        MessageSource,
-                    )
-
-                    orch.add_message(
-                        "system",
-                        synthesize_nudge_message(),
-                        metadata={MESSAGE_SOURCE_METADATA_KEY: MessageSource.SYSTEM_INJECTED.value},
-                    )
 
 
 def create_streaming_chat_executor(
