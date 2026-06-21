@@ -71,30 +71,6 @@ def _count_productive_tools(tool_exec_result: Any) -> int:
     return int(getattr(tool_exec_result, "tool_calls_executed", 0) or 0)
 
 
-def _evaluate_overlap_repetition(overlap: float, repetition_count: int) -> Tuple[int, str]:
-    """Decide repetition handling from word-overlap between consecutive turns.
-
-    Returns ``(updated_repetition_count, action)`` where ``action`` is one of:
-      - ``"near_duplicate"`` — ``overlap >= 0.8``: a single strong repeat is
-        enough to force completion (breaks a narration spin immediately).
-      - ``"high_overlap"``  — ``overlap > 0.5`` and the running count has reached
-        2: force completion.
-      - ``"accumulating"``  — ``overlap > 0.5`` but only the first such turn so far.
-      - ``"reset"``         — ``overlap <= 0.3``: genuinely distinct, clear the count.
-      - ``"hold"``          — ``0.3 < overlap <= 0.5``: ambiguous; keep the count
-        without decaying it, so an oscillating loop still converges to the
-        threshold instead of resetting every other turn (the observed bug).
-    """
-    if overlap >= 0.8:
-        return repetition_count + 1, "near_duplicate"
-    if overlap > 0.5:
-        new_count = repetition_count + 1
-        return new_count, ("high_overlap" if new_count >= 2 else "accumulating")
-    if overlap <= 0.3:
-        return 0, "reset"
-    return repetition_count, "hold"
-
-
 def _extract_required_files_from_prompt(user_message: str) -> List[str]:
     """Extract required file paths from the user message."""
     pattern = r'(?:^|[\s"\'`])(/[\w./\-]+\.\w+|\.{1,2}/[\w./\-]+\.\w+)'
@@ -172,9 +148,6 @@ class StreamingChatExecutor:
         self._progress_scores: List[float] = []
         self._last_tool_context: Optional[str] = None
         self._last_tools: Optional[Any] = None
-        self._content_hashes: List[str] = []
-        self._prev_full_content: str = ""
-        self._repetition_count: int = 0
         self._visible_output_deduplicator = OutputDeduplicator(min_block_length=40)
         self._prev_visible_content: str = ""
 
@@ -991,10 +964,24 @@ class StreamingChatExecutor:
             if decision_service is not None and hasattr(decision_service, "reset_budget"):
                 decision_service.reset_budget()
 
-        from victor.agent.turn_policy import NudgePolicy, SpinDetector, SpinState
+        from victor.agent.turn_policy import (
+            NudgePolicy,
+            SpinDetector,
+            SpinState,
+            TurnEvaluationController,
+            TurnObservation,
+        )
 
         _spin = SpinDetector()
         _nudge_policy = NudgePolicy()
+        # Shared content-repetition detection (same detector the headless loop uses). Plateau
+        # and budget nudges stay owned by this loop below, so they're disabled on the controller.
+        _turn_eval = TurnEvaluationController(
+            spin_detector=_spin,
+            nudge_policy=_nudge_policy,
+            enable_plateau_nudge=False,
+            enable_budget_warning=False,
+        )
 
         _perception = None
         conversation_history = self._get_conversation_history(runtime_owner, orch, user_message)
@@ -1061,9 +1048,7 @@ class StreamingChatExecutor:
         self._progress_scores.clear()
         _prev_iteration_had_content = False
 
-        self._content_hashes.clear()
-        self._prev_full_content = ""
-        self._repetition_count = 0
+        _turn_eval.reset()  # resets spin_detector + shared content-repetition detector
         self._visible_output_deduplicator.reset()
         self._prev_visible_content = ""
 
@@ -1248,86 +1233,29 @@ class StreamingChatExecutor:
                 )
                 return
 
-            # P0 FIX: Content repetition detection with improved thresholds
-            # - Lower threshold for overlap detection (0.5 instead of 0.6)
-            # - Force completion after 2 consecutive repetitions (not 3)
-            # - Properly exit loop when repetition detected
-            if full_content and len(full_content.strip()) > 20:
-                normalized = re.sub(r"\s+", " ", full_content.strip().lower())
-                content_hash = hashlib.md5(normalized.encode()).hexdigest()
-                self._content_hashes.append(content_hash)
-
-                if len(self._content_hashes) > 5:
-                    self._content_hashes.pop(0)
-
-                if len(self._content_hashes) >= 3:
-                    last_3 = self._content_hashes[-3:]
-                    if len(set(last_3)) == 1:
-                        self._repetition_count += 1
-                        logger.warning(
-                            "[content-repetition] Exact content match detected "
-                            "(consecutive=%s, content_len=%s). "
-                            "Forcing completion to break feedback loop.",
-                            self._repetition_count,
-                            len(full_content),
-                        )
-                        stream_ctx.force_completion = True
-                        stream_ctx.skip_continuation = True
-                        yield orch._chunk_generator.generate_content_chunk(
-                            "\n\n[Content repetition detected — stopping to prevent "
-                            "infinite output loop.]",
-                            is_final=True,
-                        )
-                        return
-
-                if self._prev_full_content and len(self._prev_full_content) > 50:
-                    prev_norm = re.sub(r"\s+", " ", self._prev_full_content.strip().lower())
-                    curr_norm = normalized
-                    prev_words = set(prev_norm.split())
-                    curr_words = set(curr_norm.split())
-                    if prev_words and curr_words:
-                        overlap = len(prev_words & curr_words) / len(prev_words | curr_words)
-                        self._repetition_count, action = _evaluate_overlap_repetition(
-                            overlap, self._repetition_count
-                        )
-                        if action == "near_duplicate":
-                            # Near-duplicate narration (e.g. the same "Let me drill
-                            # into…" sentence repeated). A single strong repeat
-                            # breaks the spin — don't wait for a second.
-                            logger.warning(
-                                "[content-repetition] Near-duplicate content "
-                                "(overlap=%.1f%%, content_len=%s) — forcing completion "
-                                "to break narration spin.",
-                                overlap * 100,
-                                len(full_content),
-                            )
-                        elif action in ("high_overlap", "accumulating"):
-                            logger.warning(
-                                "[content-repetition] High content overlap detected "
-                                "(overlap=%.1f%%, consecutive=%s, content_len=%s)",
-                                overlap * 100,
-                                self._repetition_count,
-                                len(full_content),
-                            )
-
-                        if action in ("near_duplicate", "high_overlap"):
-                            if action == "high_overlap":
-                                logger.warning(
-                                    "[content-repetition] 2+ high-overlap iterations — "
-                                    "forcing completion immediately."
-                                )
-                            stream_ctx.force_completion = True
-                            stream_ctx.skip_continuation = True
-                            yield orch._chunk_generator.generate_content_chunk(
-                                "\n\n[Content repetition detected — stopping to prevent "
-                                "infinite output loop.]",
-                                is_final=True,
-                            )
-                            return
-                else:
-                    self._repetition_count = 0
-
-                self._prev_full_content = full_content
+            # Content-repetition detection via the shared TurnEvaluationController (same
+            # hash/overlap detector as the headless loop). The loop already fed the spin
+            # detector above, so don't re-record. On a repetition stop, force completion and
+            # emit a final chunk to break the feedback loop.
+            if full_content:
+                _decision = _turn_eval.evaluate(
+                    TurnObservation(content=full_content), record_spin=False
+                )
+                if _decision.stop:
+                    logger.warning(
+                        "[content-repetition] %s (content_len=%s) — forcing completion.",
+                        _decision.stop_reason,
+                        len(full_content),
+                    )
+                    stream_ctx.force_completion = True
+                    stream_ctx.skip_continuation = True
+                    yield orch._chunk_generator.generate_content_chunk(
+                        _decision.stop_message
+                        or "\n\n[Content repetition detected — stopping to prevent "
+                        "infinite output loop.]",
+                        is_final=True,
+                    )
+                    return
 
             # P0 FIX: Explicit exit check after content repetition detection
             # This ensures that if skip_continuation was set by content repetition or any other reason,
