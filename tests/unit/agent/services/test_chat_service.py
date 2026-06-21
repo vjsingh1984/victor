@@ -942,13 +942,15 @@ class TestStreamingExecutorIntegration:
         assert pipeline._fulfillment is mock_fulfillment
 
     def test_pipeline_has_progress_tracking(self):
-        """StreamingChatExecutor tracks progress scores."""
-        from unittest.mock import MagicMock
-        from victor.agent.services.chat_stream_executor import StreamingChatExecutor
+        """Progress/plateau tracking is the shared PlateauDetector (consolidated from the
+        per-executor _progress_scores list into victor.agent.turn_policy)."""
+        from victor.agent.turn_policy import PlateauDetector
 
-        pipeline = StreamingChatExecutor(MagicMock())
-        assert hasattr(pipeline, "_progress_scores")
-        assert pipeline._progress_scores == []
+        detector = PlateauDetector()
+        detector.record(0, 100)
+        detector.record(0, 100)
+        # Three unproductive low-score turns -> productivity-weighted plateau detected.
+        assert detector.record(0, 100).is_plateau
 
     def test_factory_passes_components(self):
         """create_streaming_chat_executor passes perception and fulfillment."""
