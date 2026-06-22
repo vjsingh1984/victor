@@ -33,6 +33,7 @@ from typing import (
 )
 
 from victor.agent.conversation.history_metadata import build_internal_history_metadata
+from victor.framework.temperature import escalate_temperature
 from victor.agent.streaming.context import StreamingChatContext
 from victor.agent.streaming.iteration import (
     IterationAction,
@@ -880,20 +881,20 @@ class StreamingChatHandler:
                             "- overview(path='.') for project structure\n"
                             "Pick ONE tool to continue."
                         ),
-                        min(base_temperature + 0.1, 0.7),
+                        escalate_temperature(base_temperature, 0.1, cap=0.7),
                     ),
                     (
                         maybe_prefix(
                             "Call a tool: search(query='main') or read(path='filename'). "
                             "Pick a file to examine."
                         ),
-                        min(base_temperature + 0.2, 0.8),
+                        escalate_temperature(base_temperature, 0.2, cap=0.8),
                     ),
                     (
                         maybe_prefix(
                             "Respond in 2-3 sentences: What files did you read and what did you find?"
                         ),
-                        min(base_temperature + 0.3, 0.9),
+                        escalate_temperature(base_temperature, 0.3, cap=0.9),
                     ),
                 ]
             else:
@@ -908,17 +909,17 @@ class StreamingChatHandler:
                         "- overview(path='.') - project structure\n"
                         "- refs(symbol_name='...') - find usages\n"
                         "Make ONE tool call to continue exploring.",
-                        min(base_temperature + 0.2, 1.0),
+                        escalate_temperature(base_temperature, 0.2, cap=1.0),
                     ),
                     (
                         "Call search(query='main') or read(path='filename') to examine code. "
                         "Continue your analysis.",
-                        min(base_temperature + 0.3, 1.0),
+                        escalate_temperature(base_temperature, 0.3, cap=1.0),
                     ),
                     (
                         "Summarize your findings so far. What files did you examine? "
                         "What patterns or issues did you notice? Keep it brief.",
-                        min(base_temperature + 0.4, 1.0),
+                        escalate_temperature(base_temperature, 0.4, cap=1.0),
                     ),
                 ]
         elif has_thinking_mode:
@@ -928,15 +929,15 @@ class StreamingChatHandler:
                     maybe_prefix(
                         "Respond in 2-3 sentences: What files did you read and what did you find?"
                     ),
-                    min(base_temperature + 0.1, 0.7),
+                    escalate_temperature(base_temperature, 0.1, cap=0.7),
                 ),
                 (
                     maybe_prefix("List 3 bullet points about the code you examined."),
-                    min(base_temperature + 0.2, 0.8),
+                    escalate_temperature(base_temperature, 0.2, cap=0.8),
                 ),
                 (
                     maybe_prefix("One sentence answer: What is the main thing you learned?"),
-                    min(base_temperature + 0.3, 0.9),
+                    escalate_temperature(base_temperature, 0.3, cap=0.9),
                 ),
             ]
         else:
@@ -945,15 +946,15 @@ class StreamingChatHandler:
                 (
                     "Summarize your findings so far. What files did you examine? "
                     "What patterns or issues did you notice? Keep it brief.",
-                    min(base_temperature + 0.2, 1.0),
+                    escalate_temperature(base_temperature, 0.2, cap=1.0),
                 ),
                 (
                     "Based on the code you've seen, list 3-5 observations or suggestions.",
-                    min(base_temperature + 0.3, 1.0),
+                    escalate_temperature(base_temperature, 0.3, cap=1.0),
                 ),
                 (
                     "What did you learn from the files? One paragraph summary.",
-                    min(base_temperature + 0.4, 1.0),
+                    escalate_temperature(base_temperature, 0.4, cap=1.0),
                 ),
             ]
 

@@ -27,6 +27,7 @@ from victor.core.utils import clamp
 from victor.framework.temperature.defaults import (
     DEFAULT_RATCHET_CAP,
     DEFAULT_RATCHET_STEP,
+    escalate_temperature,
     model_bounds,
 )
 from victor.framework.temperature.protocols import TemperatureContext, TemperatureRequest
@@ -58,8 +59,7 @@ class SpinRatchetModifier:
         steps = int(getattr(state, "steps", 0) or 0)
         if steps <= 0:
             return value, "no ratchet (steps=0)"
-        bonus = steps * self.step
-        new_value = min(value + bonus, self.cap)
+        new_value = escalate_temperature(value, steps * self.step, cap=self.cap)
         return new_value, f"ratchet +{new_value - value:.3f} (steps={steps}, cap={self.cap})"
 
 

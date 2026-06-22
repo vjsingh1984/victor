@@ -51,6 +51,14 @@ MODEL_TEMPERATURE_RANGES: Dict[str, Tuple[float, float]] = {
 DEFAULT_MODEL_BOUNDS: Tuple[float, float] = (0.0, 1.0)
 
 
+def escalate_temperature(base: float, increment: float, *, cap: float) -> float:
+    """Raise ``base`` by ``increment``, clamped at ``cap`` — the single home for temperature-escalation
+    arithmetic (ADR-013). The spin ratchet and the recovery ramps both call this instead of inlining
+    ``base + <number>``, so the consolidation holds and the boundary guard has nothing to allowlist.
+    """
+    return min(base + increment, cap)
+
+
 def model_bounds(model_name: str) -> Tuple[float, float]:
     """Return (min, max) effective temperature for ``model_name`` (substring match, full-range default).
 
