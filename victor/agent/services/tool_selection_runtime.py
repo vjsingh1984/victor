@@ -10,7 +10,32 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from victor.tools.tool_supply_trace import TOOL_SUPPLY_TOPIC, ToolSupplyTrace
+
 logger = logging.getLogger(__name__)
+
+
+def _emit_tool_supply_trace(trace: ToolSupplyTrace) -> None:
+    """Emit the per-turn tool-supply event. Best-effort; never breaks selection.
+
+    Mirrors the ``tool.intent`` emission pattern: fetch the observability bus and
+    publish a structured payload. Any failure is swallowed — telemetry must never
+    affect which tools the model receives.
+    """
+    try:
+        from victor.core.events import get_observability_bus
+
+        bus = get_observability_bus()
+        if bus is None:
+            return
+        bus.emit_sync(
+            topic=TOOL_SUPPLY_TOPIC,
+            data=trace.to_payload(),
+            source="ToolSelectionRuntime",
+        )
+    except Exception:  # telemetry is non-critical
+        logger.debug("tool-supply trace emit failed", exc_info=True)
+
 
 # Read-oriented task types: WRITE_ALLOWED is a *permission*, not an intent to write, so we
 # do not force mutation tools (edit/write/shell) onto these pure analysis/search turns.
@@ -92,10 +117,17 @@ class ToolSelectionRuntime:
         # must not become the anchor for intent filtering or stage prioritization.
         user_message_anchor = getattr(runtime, "_current_user_message", None) or context_msg
 
+        # Per-turn tool-supply telemetry (observe-only; never alters the value
+        # flowing through this method). Captures the registered set and every
+        # narrowing stage so over-restriction is queryable, not just log-grep-able.
+        trace = ToolSupplyTrace.begin(self._registered_tools(runtime))
+
         if not tooling_allowed:
+            _emit_tool_supply_trace(trace.mark_skipped("provider_or_model_no_tools"))
             return None
 
         if runtime._should_skip_tools_for_turn(user_message_anchor):
+            _emit_tool_supply_trace(trace.mark_skipped("qa_necessity_gate"))
             return None
 
         if planned_tools is None and goals:
@@ -116,6 +148,7 @@ class ToolSelectionRuntime:
             conversation_depth=conversation_depth,
             planned_tools=planned_tools,
         )
+        trace.set_candidates(tools)
         logger.info(
             "context_msg=%s\nuse_semantic=%s\nconversation_depth=%s",
             context_msg,
@@ -125,18 +158,32 @@ class ToolSelectionRuntime:
         # Stage prioritization should stay anchored to the user's request.
         # Feeding assistant progress narration here can wrongly push the
         # conversation state machine back toward analysis/search-heavy tools.
+        _prev = tools
         tools = runtime.tool_selector.prioritize_by_stage(user_message_anchor, tools)
+        trace.record("stage_priority", _prev, tools)
         current_intent = getattr(runtime, "_current_intent", None)
+        _prev = tools
         tools = runtime._tool_planner.filter_tools_by_intent(
             tools,
             current_intent,
             user_message=user_message_anchor,
         )
+        trace.record("intent_filter", _prev, tools, reason=str(current_intent or ""))
+        _prev = tools
         tools = self._ensure_write_tools_for_write_intent(tools, current_intent)
+        trace.record("ensure_write", _prev, tools)
+        _prev = tools
         tools = self._prioritize_explicit_database_tools(tools, user_message_anchor)
+        trace.record("explicit_db", _prev, tools)
+        _prev = tools
         tools = self._apply_e3tir_exploration(tools, user_message_anchor)
+        trace.record("e3tir_rerank", _prev, tools)
+        _prev = tools
         tools = runtime._apply_kv_tool_strategy(tools)
+        trace.record("kv_strategy", _prev, tools)
+        _prev = tools
         final_tools = runtime._sort_tools_for_kv_stability(tools)
+        trace.record("kv_sort", _prev, final_tools)
         # Log the tools actually dispatched to the provider. The selector's earlier
         # "Selected N tools" line is emitted before stage pruning / intent filtering and
         # can overstate the callable set (a tool can be selected then pruned away). This
@@ -149,7 +196,24 @@ class ToolSelectionRuntime:
             )
         except Exception:  # logging must never break tool selection
             logger.debug("dispatched-tools log failed", exc_info=True)
+        _emit_tool_supply_trace(trace.finalize(final_tools))
         return final_tools
+
+    @staticmethod
+    def _registered_tools(runtime: Any) -> Any:
+        """Best-effort snapshot of the enabled registered tool set (for telemetry).
+
+        Returns ``None`` on any failure — the trace simply records a zero registered
+        count rather than letting telemetry interfere with selection.
+        """
+        try:
+            selector = getattr(runtime, "tool_selector", None)
+            registry = getattr(selector, "tools", None)
+            if registry is not None:
+                return registry.list_tools(only_enabled=True)
+        except Exception:
+            logger.debug("registered-tools snapshot failed", exc_info=True)
+        return None
 
     def _get_e3tir_reranker(self) -> Any:
         """Lazily build the per-session E3-TIR reranker when enabled, else None.
