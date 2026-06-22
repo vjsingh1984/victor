@@ -74,6 +74,9 @@ class RLOutcome:
     timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
     metadata: Dict[str, Any] = field(default_factory=dict)
     vertical: str = DEFAULT_VERTICAL
+    # Per-segment process reward {turn/action index: credit} (Vision P6). Transient/observability —
+    # blended into quality_score at outcome construction, so it is not persisted to the DB.
+    segment_rewards: Optional[Dict[int, float]] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for storage."""
