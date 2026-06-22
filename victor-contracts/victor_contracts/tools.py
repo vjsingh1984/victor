@@ -137,8 +137,9 @@ class ToolContract:
 
 
 # Per-capability version gate (FEP-0009 Q3). External packages assert this contract — not
-# the raw victor-ai package range — to detect the feature floor.
-CONTRACT = CapabilityContract(name="tools", version=1, min_sdk_version=">=0.8")
+# the raw victor-ai package range — to detect the feature floor. Floor is the contracts
+# release that first ships this module (0.7.1), shipped additively in the 0.7.x line.
+CONTRACT = CapabilityContract(name="tools", version=1, min_sdk_version=">=0.7.1")
 
 
 __all__ = [
