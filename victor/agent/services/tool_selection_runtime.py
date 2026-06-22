@@ -41,6 +41,9 @@ def _emit_tool_supply_trace(trace: ToolSupplyTrace) -> None:
 # do not force mutation tools (edit/write/shell) onto these pure analysis/search turns.
 _READ_ORIENTED_TASK_TYPES = frozenset({"analyze", "search", "research"})
 
+# Minimal read-only core handed to borderline Q&A turns (tool-supply P3) instead of None.
+_READ_CORE_TOOL_NAMES = ("read", "code_search", "ls")
+
 
 # --- E3-TIR experience-replay exploration (opt-in via USE_E3_TIR_EXPLORATION) ---------
 # The experience STORE holds user-global RL data, so it is shared across sessions and fed
@@ -174,9 +177,24 @@ class ToolSelectionRuntime:
             _emit_tool_supply_trace(trace.mark_skipped("provider_or_model_no_tools"))
             return None
 
-        if runtime._should_skip_tools_for_turn(user_message_anchor):
-            _emit_tool_supply_trace(trace.mark_skipped("qa_necessity_gate"))
+        # Q&A necessity gate (tool-supply P3). A trivially-safe greeting still hard-skips
+        # (no tools); a borderline Q&A turn gets a minimal read-only core instead of None,
+        # so "how does X work?" can still read X rather than looping tool-less.
+        skip_mode_fn = getattr(runtime, "_tool_skip_mode", None)
+        if skip_mode_fn is not None:
+            skip_mode = skip_mode_fn(user_message_anchor)
+        else:  # back-compat for hosts without the 3-valued gate
+            skip_mode = (
+                "skip" if runtime._should_skip_tools_for_turn(user_message_anchor) else "tools"
+            )
+        if skip_mode == "skip":
+            _emit_tool_supply_trace(trace.mark_skipped("qa_greeting"))
             return None
+        if skip_mode == "read_core":
+            core = self._read_core_tools(runtime)
+            trace.set_candidates(core)
+            _emit_tool_supply_trace(trace.finalize(core))
+            return core or None
 
         if planned_tools is None and goals:
             available_inputs = ["query"]
@@ -262,6 +280,33 @@ class ToolSelectionRuntime:
         except Exception:
             logger.debug("registered-tools snapshot failed", exc_info=True)
         return None
+
+    @staticmethod
+    def _read_core_tools(runtime: Any) -> Any:
+        """Minimal read-only core for borderline Q&A turns (tool-supply P3).
+
+        A few STUB-schema read tools (read/code_search/ls — tens of tokens each) so the
+        model can look something up if the "question" actually needs a file or search,
+        rather than being handed no tools at all. Best-effort: returns ``[]`` if the
+        registry is unavailable.
+        """
+        try:
+            from victor.agent.tool_selection import tool_to_definition
+            from victor.tools.enums import SchemaLevel
+
+            selector = getattr(runtime, "tool_selector", None)
+            registry = getattr(selector, "tools", None)
+            if registry is None or not hasattr(registry, "get"):
+                return []
+            out = []
+            for name in _READ_CORE_TOOL_NAMES:
+                tool = registry.get(name)
+                if tool is not None:
+                    out.append(tool_to_definition(tool, SchemaLevel.STUB))
+            return out
+        except Exception:
+            logger.debug("read-core build failed", exc_info=True)
+            return []
 
     def _get_e3tir_reranker(self) -> Any:
         """Lazily build the per-session E3-TIR reranker when enabled, else None.
