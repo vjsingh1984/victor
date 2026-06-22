@@ -42,17 +42,22 @@ _autogen_cache: "weakref.WeakKeyDictionary[Any, ToolMetadata]" = weakref.WeakKey
 def resolve_contract(tool: Any) -> ToolMetadata:
     """Resolve a tool's canonical :class:`ToolMetadata` (the one fusion authority).
 
-    Precedence (identical to the historical two-tier ``get_metadata`` strategy):
+    Precedence (extends the historical two-tier ``get_metadata`` strategy with the
+    SDK contract tier from FEP-0009):
 
     1. **Explicit metadata** — ``tool.metadata`` when set. This is also where the
        ``@tool`` decorator records decorator-supplied traits, so decorator params are
        honored through this tier.
-    2. **Auto-generated** — derived from the tool's own ``name`` / ``description`` /
+    2. **SDK contract** — ``tool.contract`` (a ``victor_contracts.tools.ToolContract``)
+       when set, bridged via :meth:`ToolMetadata.from_contract`. Duck-typed: no
+       ``victor_contracts`` import here, so this works regardless of the installed
+       contracts version.
+    3. **Auto-generated** — derived from the tool's own ``name`` / ``description`` /
        ``parameters`` / ``cost_tier`` via :meth:`ToolMetadata.generate_from_tool`.
 
     Args:
         tool: A tool exposing ``name`` / ``description`` / ``parameters`` (and optionally
-            ``metadata`` / ``cost_tier``).
+            ``metadata`` / ``contract`` / ``cost_tier``).
 
     Returns:
         The tool's canonical :class:`ToolMetadata`.
@@ -68,12 +73,16 @@ def resolve_contract(tool: Any) -> ToolMetadata:
     except TypeError:  # tool not weak-referenceable / unhashable
         cached = None
 
-    result = ToolMetadata.generate_from_tool(
-        name=tool.name,
-        description=tool.description,
-        parameters=tool.parameters,
-        cost_tier=getattr(tool, "cost_tier", None),
-    )
+    contract = getattr(tool, "contract", None)
+    if contract is not None:
+        result = ToolMetadata.from_contract(contract, tool)
+    else:
+        result = ToolMetadata.generate_from_tool(
+            name=tool.name,
+            description=tool.description,
+            parameters=tool.parameters,
+            cost_tier=getattr(tool, "cost_tier", None),
+        )
 
     try:
         _autogen_cache[tool] = result
