@@ -34,14 +34,17 @@ import statistics
 from dataclasses import dataclass, field
 from typing import List, Optional
 
-# A battery that exercises the under-scoring/restatement failure mode: substantial answers that a
-# scalar evaluator tends to under-score (so enhanced burns extra turns; rubric should stop sooner).
-TASKS = [
-    "Explain in 3-4 sentences what a Python generator is and when to use one.",
-    "Summarize the trade-offs between REST and gRPC for a microservice API. Keep it to one paragraph.",
-    "What are the steps to safely roll back a bad database migration? List them.",
-    "Describe how a bloom filter works and one good use case, in a short paragraph.",
-]
+# Multi-turn, tool-driven coding tasks (shared with temperature_ab.py) — these exercise the
+# under-scoring/restatement failure mode that single-turn QA cannot: enhanced may over-run, rubric/
+# hybrid should stop once the relevant code is read.
+try:
+    from scripts.experiments.coding_tasks import MULTI_TURN_CODING_TASKS as TASKS
+except ImportError:  # allow running as `python scripts/experiments/completion_ab.py`
+    import os
+    import sys
+
+    sys.path.insert(0, os.path.dirname(__file__))
+    from coding_tasks import MULTI_TURN_CODING_TASKS as TASKS
 
 
 @dataclass

@@ -31,13 +31,17 @@ import statistics
 from dataclasses import dataclass, field
 from typing import List, Optional
 
-# Read-only tasks — safe to run repeatedly, exercise lookup/qa/analysis/coding-reasoning shapes.
-TASKS = [
-    "What is 47 times 9? Answer with just the number.",
-    "In one sentence, what is the purpose of a Python context manager?",
-    "List three trade-offs between depth-first and breadth-first search.",
-    "Explain, in 2-3 sentences, when you would use a hash map over a sorted array.",
-]
+# Multi-turn, tool-driven coding tasks (shared with completion_ab.py) — these stress determinism and
+# spin: a flakier temperature shows up as higher turn-count variance / more tool churn. (Single-turn
+# QA can't differentiate temperatures — every run ties at 1 turn.)
+try:
+    from scripts.experiments.coding_tasks import MULTI_TURN_CODING_TASKS as TASKS
+except ImportError:  # allow running as `python scripts/experiments/temperature_ab.py`
+    import os as _os
+    import sys as _sys
+
+    _sys.path.insert(0, _os.path.dirname(__file__))
+    from coding_tasks import MULTI_TURN_CODING_TASKS as TASKS
 
 
 @dataclass
