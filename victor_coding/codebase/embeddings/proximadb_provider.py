@@ -30,6 +30,7 @@ Features:
 - Multiple distance metrics (cosine, euclidean, dot)
 """
 
+import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -43,6 +44,8 @@ from victor_coding.codebase.embeddings.models import (
     EmbeddingModelConfig,
     create_embedding_model,
 )
+
+logger = logging.getLogger(__name__)
 
 # Check if ProximaDB is available
 try:
@@ -115,22 +118,22 @@ class ProximaDBProvider(BaseEmbeddingProvider):
         self.embedding_model = create_embedding_model(embedding_config)
         await self.embedding_model.initialize()
 
-        print("Initializing ProximaDB provider")
-        print("Vector Store: ProximaDB (SST engine)")
-        print(f"Embedding Model: {model_name} ({model_type})")
+        logger.debug("Initializing ProximaDB provider")
+        logger.debug("Vector Store: ProximaDB (SST engine)")
+        logger.debug(f"Embedding Model: {model_name} ({model_type})")
 
         # Setup data directory
         persist_dir = self.config.persist_directory
         if persist_dir:
             persist_dir = Path(persist_dir).expanduser()
             persist_dir.mkdir(parents=True, exist_ok=True)
-            print(f"Using persistent storage: {persist_dir}")
+            logger.debug(f"Using persistent storage: {persist_dir}")
         else:
             from victor_coding.compat.settings import get_project_paths
 
             persist_dir = get_project_paths().global_embeddings_dir / "proximadb"
             persist_dir.mkdir(parents=True, exist_ok=True)
-            print(f"Using default storage: {persist_dir}")
+            logger.debug(f"Using default storage: {persist_dir}")
 
         self._data_dir = persist_dir
 
@@ -139,7 +142,7 @@ class ProximaDBProvider(BaseEmbeddingProvider):
         if server_url:
             # Use external server
             self._server_url = server_url
-            print(f"Using external ProximaDB server: {server_url}")
+            logger.debug(f"Using external ProximaDB server: {server_url}")
         else:
             # Try to start embedded mode
             await self._start_embedded_server()
@@ -151,11 +154,13 @@ class ProximaDBProvider(BaseEmbeddingProvider):
         )
 
         # Create or get collection
-        collection_name = self.config.extra_config.get("collection_name", "code_embeddings")
+        collection_name = self.config.extra_config.get(
+            "collection_name", "code_embeddings"
+        )
         await self._ensure_collection(collection_name, dimension)
 
         self._initialized = True
-        print("ProximaDB provider initialized!")
+        logger.debug("ProximaDB provider initialized!")
 
     async def _start_embedded_server(self) -> None:
         """Start ProximaDB in embedded mode if available."""
@@ -176,7 +181,7 @@ class ProximaDBProvider(BaseEmbeddingProvider):
             await self._db.start()
             self._started = True
             self._server_url = self._db.rest_url
-            print(f"Started embedded ProximaDB: {self._server_url}")
+            logger.debug(f"Started embedded ProximaDB: {self._server_url}")
 
         except ImportError:
             # Fall back to checking for running server
@@ -192,7 +197,7 @@ class ProximaDBProvider(BaseEmbeddingProvider):
                     response = await client.get(f"{url}/health", timeout=2.0)
                     if response.status_code == 200:
                         self._server_url = url
-                        print(f"Found running ProximaDB server: {url}")
+                        logger.debug(f"Found running ProximaDB server: {url}")
                         return
             except Exception:
                 pass
@@ -225,12 +230,12 @@ class ProximaDBProvider(BaseEmbeddingProvider):
 
             result = response.json()
             if result.get("success") or "already exists" in str(result):
-                print(f"Collection ready: {name} (dim={dimension})")
+                logger.debug(f"Collection ready: {name} (dim={dimension})")
             else:
-                print(f"Collection creation result: {result}")
+                logger.debug(f"Collection creation result: {result}")
 
         except Exception as e:
-            print(f"Warning: Could not create collection: {e}")
+            logger.warning(f"Could not create collection: {e}")
 
     def _to_sql_value(self, value: Any) -> Dict[str, Any]:
         """Convert Python value to ProximaDB SqlValue format."""
@@ -266,7 +271,10 @@ class ProximaDBProvider(BaseEmbeddingProvider):
         elif "null_value" in sql_value:
             return None
         elif "array_value" in sql_value:
-            return [self._extract_sql_value(v) for v in sql_value["array_value"].get("values", [])]
+            return [
+                self._extract_sql_value(v)
+                for v in sql_value["array_value"].get("values", [])
+            ]
         return sql_value
 
     def _extract_metadata(self, metadata: Dict[str, Any]) -> Dict[str, Any]:
@@ -341,7 +349,7 @@ class ProximaDBProvider(BaseEmbeddingProvider):
 
         result = response.json()
         if not result.get("success"):
-            print(f"Warning: Insert may have failed: {result}")
+            logger.warning(f"Insert may have failed: {result}")
 
     async def index_documents(self, documents: List[Dict[str, Any]]) -> None:
         """Index multiple documents in batch.
@@ -384,7 +392,7 @@ class ProximaDBProvider(BaseEmbeddingProvider):
 
         result = response.json()
         if not result.get("success"):
-            print(f"Warning: Batch insert may have failed: {result}")
+            logger.warning(f"Batch insert may have failed: {result}")
 
     async def search_similar(
         self,
@@ -454,7 +462,9 @@ class ProximaDBProvider(BaseEmbeddingProvider):
                         content=metadata.get("content", ""),
                         score=score,
                         line_number=metadata.get("line_number"),
-                        metadata={k: v for k, v in metadata.items() if k not in ["content"]},
+                        metadata={
+                            k: v for k, v in metadata.items() if k not in ["content"]
+                        },
                     )
                 )
 
@@ -510,7 +520,7 @@ class ProximaDBProvider(BaseEmbeddingProvider):
 
         # Recreate collection
         await self._ensure_collection(self._collection_name, self._dimension)
-        print("Cleared index")
+        logger.debug("Cleared index")
 
     async def get_stats(self) -> Dict[str, Any]:
         """Get index statistics.
@@ -541,7 +551,9 @@ class ProximaDBProvider(BaseEmbeddingProvider):
             "total_documents": count,
             "embedding_model_type": self.config.embedding_model_type,
             "embedding_model_name": self.config.embedding_model_name,
-            "dimension": self.embedding_model.get_dimension() if self.embedding_model else 384,
+            "dimension": (
+                self.embedding_model.get_dimension() if self.embedding_model else 384
+            ),
             "distance_metric": self.config.distance_metric,
             "collection_name": self._collection_name,
             "persist_directory": str(self._data_dir),
