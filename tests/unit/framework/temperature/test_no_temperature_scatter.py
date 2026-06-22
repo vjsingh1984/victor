@@ -29,9 +29,7 @@ from pathlib import Path
 # recovery modules are the known escalation sites still pending absorption into the resolver.
 _ALLOWLIST = {
     "framework/temperature/",  # the canonical owner (prefix match)
-    "agent/recovery/temperature.py",
-    "agent/recovery/strategies.py",  # pending: reactive recovery escalation
-    "agent/streaming/handler.py",  # pending: streaming recovery ramp → fold into ratchet
+    "agent/recovery/temperature.py",  # ProgressiveTemperatureAdjuster (reactive escalation core)
 }
 
 _VICTOR = Path(__file__).resolve().parents[4] / "victor"

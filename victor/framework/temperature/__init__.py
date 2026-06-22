@@ -27,6 +27,7 @@ from victor.framework.temperature.defaults import (
     DEFAULT_RATCHET_STEP,
     GLOBAL_DEFAULT,
     MODEL_TEMPERATURE_RANGES,
+    escalate_temperature,
     model_bounds,
 )
 from victor.framework.temperature.factory import (
@@ -61,6 +62,7 @@ __all__ = [
     "DEFAULT_RATCHET_CAP",
     "MODEL_TEMPERATURE_RANGES",
     "model_bounds",
+    "escalate_temperature",
     # protocols / value objects
     "TemperatureRequest",
     "TemperatureContext",
