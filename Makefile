@@ -47,9 +47,15 @@ help:
 # =============================================================================
 
 install:
+	# Install the in-repo contracts editable FIRST so victor-ai resolves the local
+	# victor-contracts (which may carry unreleased modules, e.g. victor_contracts.tools
+	# from FEP-0009) instead of pulling the last PyPI release.
+	pip install -e ./victor-contracts
 	pip install -e .
 
 install-dev:
+	# Contracts first (see `install`) — keeps dev/CI on the in-repo SDK, not PyPI.
+	pip install -e ./victor-contracts
 	pip install -e ".[dev,docs,build]"
 	pip install pre-commit pytest-split
 	pre-commit install || true
