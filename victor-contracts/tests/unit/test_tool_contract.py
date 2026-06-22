@@ -104,7 +104,7 @@ def test_category_value_accepts_enum_or_str():
 def test_capability_contract_gate():
     assert CONTRACT.name == "tools"
     assert CONTRACT.version == 1
-    assert CONTRACT.min_sdk_version == ">=0.8"
+    assert CONTRACT.min_sdk_version == ">=0.7.1"
 
 
 def test_exports_available_from_package_root():

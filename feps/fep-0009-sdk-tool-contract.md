@@ -181,7 +181,7 @@ class ToolContract:
 
 # Versioned at the SDK floor where ToolContract first exists (resolves Q3). External
 # packages assert this contract — not the raw victor-ai package range — for the feature.
-CONTRACT = CapabilityContract(version=1, min_sdk_version=">=0.8")
+CONTRACT = CapabilityContract(name="tools", version=1, min_sdk_version=">=0.7.1")
 ```
 
 Notes:
@@ -251,10 +251,10 @@ No existing signatures change. `ToolMetadata` gains one classmethod (`from_contr
 ### Dependencies
 
 - No new third-party dependencies.
-- `victor-contracts` minor version bump (new public module): `0.7.0 → 0.8.0`.
+- `victor-contracts` additive patch bump (new module, backward-compatible): `0.7.0 → 0.7.1`.
 - **No `victor-ai` dependency-range change required**: the current pin
-  `victor-contracts>=0.6.0,<1.0` already admits `0.8`. The only requirement is that
-  contracts `0.8.0` is released (and the `CONTRACT.min_sdk_version=">=0.8"` capability
+  `victor-contracts>=0.6.0,<1.0` already admits `0.7.1`. The only requirement is that
+  contracts `0.7.1` is released (and the `CONTRACT.min_sdk_version=">=0.7.1"` capability
   gate enforces the feature floor at runtime).
 
 ## Benefits
@@ -340,9 +340,10 @@ for each rather than leaving them undecided.
   foot-gun ("everyone declares HIGH / mandatory") and are better owned by the selection
   engine and RL. `signature_params` is a loop-detection internal with no author meaning.
 
-- **Q3: capability `min_sdk_version` — RESOLVED: `>=0.8` on the capability gate, package
-  range unchanged.** `CONTRACT.min_sdk_version=">=0.8"` (the floor where `ToolContract`
-  first exists); `victor-ai` keeps `victor-contracts>=0.6.0,<1.0` (already admits `0.8`).
+- **Q3: capability `min_sdk_version` — RESOLVED: pin to the contracts release that ships
+  the module, package range unchanged.** The module ships additively in the `0.7.x` line
+  (not a `0.8` minor), so `CONTRACT.min_sdk_version=">=0.7.1"`; `victor-ai` keeps
+  `victor-contracts>=0.6.0,<1.0` (already admits `0.7.1`).
   *Rationale:* external packages should assert the **capability contract**, not the raw
   package range, so the feature floor and the dependency window are decoupled — the broad
   range avoids forcing a lockstep bump on packages that don't use the contract yet.
@@ -353,16 +354,17 @@ for each rather than leaving them undecided.
 
 - [ ] Add `victor_contracts/tools.py` (frozen `ToolContract` + trait enums + `CONTRACT`).
 - [ ] Unit tests: enum value stability, frozen/hashable, default round-trip.
-- [ ] Bump `victor-contracts/VERSION` → `0.8.0`; `python scripts/sync_version.py`.
+- [ ] Bump `victor-contracts/VERSION` → `0.7.1` (additive patch; keep the victor-ai floor
+      broad — do NOT run `sync_version.py --sdk`, which would raise it).
 
-**Deliverable**: importable, versioned SDK contract; contracts `0.8.0` released.
+**Deliverable**: importable, versioned SDK contract; contracts `0.7.1` released.
 
 ### Phase 2: Framework bridge (1 PR, root repo)
 
 - [ ] `ToolMetadata.from_contract(contract, tool)`.
 - [ ] `resolve_contract` SDK branch (precedence unchanged).
 - [ ] Register `CONTRACT` in the `CapabilityContractRegistry` (no `victor-ai` dependency-
-      range change — `>=0.6.0,<1.0` already admits `0.8`).
+      range change — `>=0.6.0,<1.0` already admits `0.7.1`).
 - [ ] Parity guard test: `ToolContract` fields/enums ⊆ `ToolMetadata`; bridge byte-stable
       against the current autogen for an undeclared tool.
 
@@ -386,7 +388,7 @@ for each rather than leaving them undecided.
 ### Rollout Plan
 
 - No feature flag (additive; absence of `contract` = today's behavior).
-- Contracts `0.8.0` first, then the framework bridge, then opt-in adoption.
+- Contracts `0.7.1` first, then the framework bridge, then opt-in adoption.
 - External-vertical compatibility CI (the existing dispatch to the six repos) gates the
   lockstep.
 
@@ -409,7 +411,7 @@ for each rather than leaving them undecided.
 
 ### Deprecation Timeline
 
-- `0.8.0`: `ToolContract` introduced (additive). No deprecations.
+- `0.7.1`: `ToolContract` introduced (additive). No deprecations.
 - Future (separate FEP, if ever): consider re-expressing `@tool(...)` trait kwargs in
   terms of `ToolContract`. Not in scope here; no removal is proposed.
 
@@ -424,9 +426,9 @@ for each rather than leaving them undecided.
 ### Version Compatibility
 
 - Minimum Python: 3.10 (unchanged).
-- `victor-contracts`: `0.8.0` (new module).
-- `victor-ai`: keeps `victor-contracts>=0.6.0,<1.0` (already admits `0.8`); the feature
-  floor is enforced by `CONTRACT.min_sdk_version=">=0.8"`, not the package range.
+- `victor-contracts`: `0.7.1` (additive module in the 0.7.x line).
+- `victor-ai`: keeps `victor-contracts>=0.6.0,<1.0` (already admits `0.7.1`); the feature
+  floor is enforced by `CONTRACT.min_sdk_version=">=0.7.1"`, not the package range.
 
 ### Vertical Compatibility
 
@@ -490,6 +492,13 @@ for each rather than leaving them undecided.
    owns `ToolCategory`; Q2 declarable-intent-only fields, drop `priority`; Q3 `>=0.8`
    capability gate, package range unchanged). Corrected the dependency claim — the existing
    `victor-contracts>=0.6.0,<1.0` already admits `0.8`, no range change needed.
+3. **v1.2** (2026-06-22): **Implemented** (Phase 1 #245 contract module; Phase 2 #246
+   duck-typed `resolve_contract` bridge) and **retargeted the shipping line to `0.7.1`**
+   (additive patch in the 0.7.x line) instead of a `0.8` minor — per the maintainer's
+   release decision. `CONTRACT.min_sdk_version` is now `>=0.7.1`; the victor-ai range stays
+   `>=0.6.0,<1.0`. Pre-release dev uses editable installs (#247). Q1 (framework
+   `ToolCategory` re-export) remains deferred — it needs a hard SDK import that would raise
+   the victor-ai floor.
 
 ## Acceptance Criteria
 
