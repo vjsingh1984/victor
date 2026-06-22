@@ -25,10 +25,12 @@ Usage:
 """
 
 import logging
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 from victor.core.yaml_utils import safe_load
+from victor.tools.enums import SchemaLevel
 
 logger = logging.getLogger(__name__)
 
@@ -285,3 +287,122 @@ def reload_provider_tiers() -> None:
     """
     global _provider_tier_cache
     _provider_tier_cache = None
+
+
+# --- Tool-supply profile (provider-economics resolver) ----------------------------
+# Extreme co-design: the tool-supply strategy bends to the inference engine's economics
+# (cache discount vs latency vs local token budget) decided once per turn from provider
+# capability — rather than a blanket fallback_max_tools / tiered_schema setting that
+# punishes a Claude session exactly as hard as an 8k Ollama session.
+#
+# This is a PURE resolver (no I/O, no mutation). It is not yet consumed — later phases
+# (cap->STUB budget, additive session-lock, capability-first prompt split) read it.
+
+# Context-window thresholds (tokens).
+_SUPPLY_LARGE_WINDOW = 32_000
+_SUPPLY_MID_WINDOW = 16_000
+# Fraction of the context window tool schemas may occupy before tiering bites.
+_SUPPLY_BUDGET_FRACTION = 0.25
+# Conservative default window when the provider can't report one.
+_SUPPLY_DEFAULT_WINDOW = 8192
+
+
+@dataclass(frozen=True)
+class ToolSupplyProfile:
+    """Per-turn tool-supply policy resolved from provider economics.
+
+    Replaces three scattered constants (the ``fallback_max_tools`` hard cap, the 25%
+    context ratio, the session-lock test) with one coherent profile.
+
+    Attributes:
+        cap_mode: ``"none"`` (ship the full set, never cap — caching providers),
+            ``"stub"`` (keep ``max_full_tools`` at full schema, demote the rest to STUB
+            rather than dropping), or ``"hard"`` (legacy delete-past-N escape hatch).
+        session_lock: ``"off"``, ``"additive"`` (grow the cached tool prefix as a
+            sorted suffix so byte-stability is preserved while new tools can still
+            join), or ``"frozen"`` (lock turn-1 selection).
+        default_schema: Baseline :class:`SchemaLevel` for the long tail.
+        max_full_tools: How many tools keep full schema before the rest go to STUB
+            (``None`` = no cap). Re-scoped from the ``fallback_max_tools`` setting.
+        budget_tokens: Soft token budget for tool schemas (``None`` = unbounded).
+    """
+
+    cap_mode: str
+    session_lock: str
+    default_schema: SchemaLevel
+    max_full_tools: Optional[int]
+    budget_tokens: Optional[int]
+
+
+def _supply_supports(provider: Any, method: str) -> bool:
+    """Best-effort capability probe; treats missing/raising methods as False."""
+    try:
+        fn = getattr(provider, method, None)
+        return bool(fn()) if callable(fn) else False
+    except Exception:
+        return False
+
+
+def _supply_window(provider: Any, context_window: Optional[int]) -> int:
+    """Resolve the effective context window (explicit arg wins; else ask provider)."""
+    if context_window and context_window > 0:
+        return int(context_window)
+    try:
+        fn = getattr(provider, "context_window", None)
+        if callable(fn):
+            cw = fn()
+            if cw and cw > 0:
+                return int(cw)
+    except Exception:
+        pass
+    return _SUPPLY_DEFAULT_WINDOW
+
+
+def resolve_tool_supply_profile(
+    provider: Any,
+    context_window: Optional[int] = None,
+    *,
+    fallback_max_tools: int = 8,
+) -> ToolSupplyProfile:
+    """Resolve the tool-supply profile for a provider (pure; capability-driven).
+
+    Co-design table:
+
+    ===========================================  ========  ==========  ========  ========
+    provider class                               cap_mode  session     schema    budget
+    ===========================================  ========  ==========  ========  ========
+    supports_prompt_caching()                    none      additive    FULL      None
+    supports_kv_prefix_caching() & window>=32k   none      additive    FULL      None
+    non-prompt-cache & window>=16k               stub      additive    COMPACT   25% win
+    small (window<16k)                           stub      additive    STUB      25% win
+    ===========================================  ========  ==========  ========  ========
+
+    Caching providers ship the full set at FULL schema (capping would invalidate the
+    cache for no gain). Token-constrained providers demote the long tail to STUB before
+    ever dropping a relevant tool.
+
+    Args:
+        provider: A provider exposing ``supports_prompt_caching()`` /
+            ``supports_kv_prefix_caching()`` / ``context_window()`` (all optional).
+        context_window: Effective context window in tokens (overrides the provider's).
+        fallback_max_tools: Re-scoped — how many tools keep FULL schema before the rest
+            go to STUB (the small/local cap). Ignored by the uncapped ``none`` profiles.
+
+    Returns:
+        The resolved :class:`ToolSupplyProfile`.
+    """
+    window = _supply_window(provider, context_window)
+
+    # Caching providers: the full tool set is cached cheaply — never cap or tier.
+    if _supply_supports(provider, "supports_prompt_caching"):
+        return ToolSupplyProfile("none", "additive", SchemaLevel.FULL, None, None)
+    if _supply_supports(provider, "supports_kv_prefix_caching") and window >= _SUPPLY_LARGE_WINDOW:
+        return ToolSupplyProfile("none", "additive", SchemaLevel.FULL, None, None)
+
+    # Non-caching / small window: tokens are the constraint. Demote, don't drop.
+    budget = int(window * _SUPPLY_BUDGET_FRACTION)
+    if window >= _SUPPLY_MID_WINDOW:
+        return ToolSupplyProfile(
+            "stub", "additive", SchemaLevel.COMPACT, fallback_max_tools, budget
+        )
+    return ToolSupplyProfile("stub", "additive", SchemaLevel.STUB, fallback_max_tools, budget)
