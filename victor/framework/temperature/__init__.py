@@ -29,7 +29,10 @@ from victor.framework.temperature.defaults import (
     MODEL_TEMPERATURE_RANGES,
     model_bounds,
 )
-from victor.framework.temperature.factory import build_default_resolver
+from victor.framework.temperature.factory import (
+    build_default_resolver,
+    build_resolver_from_settings,
+)
 from victor.framework.temperature.modifiers import ModelBoundsModifier, SpinRatchetModifier
 from victor.framework.temperature.protocols import (
     ReactiveTemperatureAdjuster,
@@ -82,4 +85,5 @@ __all__ = [
     # resolver + factory
     "TemperatureResolver",
     "build_default_resolver",
+    "build_resolver_from_settings",
 ]

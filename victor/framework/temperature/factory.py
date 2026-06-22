@@ -67,3 +67,25 @@ def build_default_resolver(
     modifiers.append(ModelBoundsModifier())
 
     return TemperatureResolver(sources, modifiers, global_default=global_default)
+
+
+def build_resolver_from_settings(
+    temperature_settings: object,
+    *,
+    hint_provider: Optional[object] = None,
+    reactive_adjuster: Optional[ReactiveTemperatureAdjuster] = None,
+) -> TemperatureResolver:
+    """Build a resolver from a ``TemperatureSettings``-shaped object (duck-typed, no config import).
+
+    The per-task ``task_defaults`` table is threaded per-request (``settings_task_temperatures``), not
+    at build time, so only the global/ratchet knobs are read here.
+    """
+    ts = temperature_settings
+    return build_default_resolver(
+        hint_provider=hint_provider,
+        reactive_adjuster=reactive_adjuster,
+        global_default=getattr(ts, "global_default", GLOBAL_DEFAULT),
+        ratchet_step=getattr(ts, "ratchet_step", DEFAULT_RATCHET_STEP),
+        ratchet_cap=getattr(ts, "ratchet_cap", DEFAULT_RATCHET_CAP),
+        ratchet_enabled=getattr(ts, "proactive_ratchet_enabled", True),
+    )
