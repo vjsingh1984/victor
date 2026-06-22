@@ -33,8 +33,12 @@ level; SQLite stays the default and nothing flips automatically.
   repeats it against a real embedded instance, skipping when the binary is absent.
 - **WIP / gated:** the multi-tenant **service** path (`server_url=`,
   `EmbeddingMode::Cold`/SQ8) is marked WIP — gated on ProximaDB TD-127 (secondary
-  indexes) + TD-130/131 (graph bulk-load + REST v2 hybrid). The Arrow Flight
-  bulk-load and ORION native centrality (steps below) are also still pending.
+  indexes) + TD-130/131 (graph bulk-load + REST v2 hybrid). As of 2026-06-22,
+  TD-127 is **in flight** (PR #215 / branches `feat/td-127-grpc-sql-writes-design`,
+  `feat/oltp-secondary-index`) but **not yet merged to `develop`**, and TD-130/131
+  are not yet opened. So nothing flips automatically — embedded is the build/verify
+  target. The Arrow Flight bulk-load and ORION native centrality (steps below) are
+  also still pending.
 
 ## Why
 
