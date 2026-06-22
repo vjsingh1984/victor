@@ -6,8 +6,9 @@
 """tool-supply P7 — task-type adapter enums collapse onto the canonical registry.
 
 Covers the two coarse runtime adapters (TrackerTaskType, ClassifierTaskType). The
-larger ``pattern_registry.TaskType`` (self-declared canonical, with vertical-scoped
-types) is intentionally out of scope for this pass.
+larger ``pattern_registry.TaskType`` (with vertical-scoped types) is covered by the
+P7 follow-on in
+``tests/unit/classification/test_pattern_registry_tasktype_adapter.py``.
 """
 
 from __future__ import annotations
