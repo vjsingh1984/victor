@@ -134,6 +134,71 @@ class ToolMetadata:
         }
 
     @classmethod
+    def from_contract(cls, contract: Any, tool: Any) -> "ToolMetadata":
+        """Bridge an SDK ``victor_contracts.tools.ToolContract`` into internal metadata.
+
+        FEP-0009 Phase 2. **Duck-typed by design** — this does NOT import
+        ``victor_contracts`` (victor-ai's contracts floor is below the version that ships
+        the contract), so it reads the contract's declared trait *values* off attributes.
+        It starts from the autogen baseline for the fields the contract does not carry
+        (keywords/use_cases/examples/priority_hints) and overrides with the declared
+        traits; declared selection hints replace autogen only when non-empty.
+
+        Args:
+            contract: An object exposing ``category`` / ``access_mode`` / ``danger_level``
+                / ``execution_category`` / ``cost_tier`` (str or str-enum) and optional
+                ``keywords`` / ``use_cases`` / ``task_types`` / ``stages`` sequences.
+            tool: The owning tool (for the autogen baseline: name/description/parameters).
+
+        Returns:
+            A :class:`ToolMetadata` fusing the declared contract over the autogen baseline.
+        """
+
+        def _v(value: Any) -> Any:
+            return value.value if hasattr(value, "value") else value
+
+        def _enum(enum_cls: Any, value: Any, default: Any) -> Any:
+            if value is None:
+                return default
+            try:
+                return enum_cls(value)
+            except ValueError:
+                return default
+
+        cost_tier = _enum(CostTier, _v(getattr(contract, "cost_tier", None)), None)
+
+        base = cls.generate_from_tool(
+            name=getattr(tool, "name", "") or "",
+            description=getattr(tool, "description", "") or "",
+            parameters=getattr(tool, "parameters", {}) or {},
+            cost_tier=cost_tier,
+        )
+
+        declared_category = _v(getattr(contract, "category", None))
+        if declared_category:
+            base.category = declared_category
+
+        base.access_mode = _enum(
+            AccessMode, _v(getattr(contract, "access_mode", None)), base.access_mode
+        )
+        base.danger_level = _enum(
+            DangerLevel, _v(getattr(contract, "danger_level", None)), base.danger_level
+        )
+        base.execution_category = _enum(
+            ExecutionCategory,
+            _v(getattr(contract, "execution_category", None)),
+            base.execution_category,
+        )
+
+        # Declared selection hints override the autogen baseline only when non-empty.
+        for field_name in ("keywords", "use_cases", "task_types", "stages"):
+            declared = getattr(contract, field_name, None)
+            if declared:
+                setattr(base, field_name, list(declared))
+
+        return base
+
+    @classmethod
     def generate_from_tool(
         cls,
         name: str,
