@@ -8,11 +8,24 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, Callable, NamedTuple
 
 from victor.tools.tool_supply_trace import TOOL_SUPPLY_TOPIC, ToolSupplyTrace
 
 logger = logging.getLogger(__name__)
+
+
+class _SelectionStage(NamedTuple):
+    """One ordered post-selection stage in the ACT pipeline (tool-supply P8).
+
+    ``apply`` transforms the tool list; ``name``/``reason`` annotate the tool-supply
+    trace. Expressing the pile as a list of these makes the selection pipeline an
+    explicit, ordered, inspectable sequence instead of a procedural god-method.
+    """
+
+    name: str
+    apply: Callable[[Any], Any]
+    reason: str = ""
 
 
 def _emit_tool_supply_trace(trace: ToolSupplyTrace) -> None:
@@ -221,35 +234,17 @@ class ToolSelectionRuntime:
             runtime.use_semantic_selection,
             conversation_depth,
         )
-        # Stage prioritization should stay anchored to the user's request.
-        # Feeding assistant progress narration here can wrongly push the
-        # conversation state machine back toward analysis/search-heavy tools.
-        _prev = tools
-        tools = runtime.tool_selector.prioritize_by_stage(user_message_anchor, tools)
-        trace.record("stage_priority", _prev, tools)
+        # ACT pipeline (P8): the post-selection transforms expressed as an explicit,
+        # ordered, named stage list and run by a single driver. Byte-identical to the
+        # prior inline pile (same calls, same order) — this only makes the pipeline
+        # declarative and inspectable (one trace record per stage). Stage anchoring:
+        # prioritization/intent stay on the user's request, not assistant narration.
         current_intent = getattr(runtime, "_current_intent", None)
-        _prev = tools
-        tools = runtime._tool_planner.filter_tools_by_intent(
+        final_tools = self._run_act_pipeline(
             tools,
-            current_intent,
-            user_message=user_message_anchor,
+            self._act_pipeline_stages(runtime, user_message_anchor, current_intent),
+            trace,
         )
-        trace.record("intent_filter", _prev, tools, reason=str(current_intent or ""))
-        _prev = tools
-        tools = self._ensure_write_tools_for_write_intent(tools, current_intent)
-        trace.record("ensure_write", _prev, tools)
-        _prev = tools
-        tools = self._prioritize_explicit_database_tools(tools, user_message_anchor)
-        trace.record("explicit_db", _prev, tools)
-        _prev = tools
-        tools = self._apply_e3tir_exploration(tools, user_message_anchor)
-        trace.record("e3tir_rerank", _prev, tools)
-        _prev = tools
-        tools = runtime._apply_kv_tool_strategy(tools)
-        trace.record("kv_strategy", _prev, tools)
-        _prev = tools
-        final_tools = runtime._sort_tools_for_kv_stability(tools)
-        trace.record("kv_sort", _prev, final_tools)
         # Log the tools actually dispatched to the provider. The selector's earlier
         # "Selected N tools" line is emitted before stage pruning / intent filtering and
         # can overstate the callable set (a tool can be selected then pruned away). This
@@ -264,6 +259,54 @@ class ToolSelectionRuntime:
             logger.debug("dispatched-tools log failed", exc_info=True)
         _emit_tool_supply_trace(trace.finalize(final_tools))
         return final_tools
+
+    def _act_pipeline_stages(
+        self, runtime: Any, user_message_anchor: str, current_intent: Any
+    ) -> "list[_SelectionStage]":
+        """Declare the ordered post-selection (ACT) stages (tool-supply P8).
+
+        The sequence and per-stage calls are identical to the prior inline pile —
+        expressing them as data makes the pipeline explicit and observable. Each stage
+        is captured at build time with the turn-scoped anchor/intent.
+        """
+        return [
+            _SelectionStage(
+                "stage_priority",
+                lambda t: runtime.tool_selector.prioritize_by_stage(user_message_anchor, t),
+            ),
+            _SelectionStage(
+                "intent_filter",
+                lambda t: runtime._tool_planner.filter_tools_by_intent(
+                    t, current_intent, user_message=user_message_anchor
+                ),
+                str(current_intent or ""),
+            ),
+            _SelectionStage(
+                "ensure_write",
+                lambda t: self._ensure_write_tools_for_write_intent(t, current_intent),
+            ),
+            _SelectionStage(
+                "explicit_db",
+                lambda t: self._prioritize_explicit_database_tools(t, user_message_anchor),
+            ),
+            _SelectionStage(
+                "e3tir_rerank",
+                lambda t: self._apply_e3tir_exploration(t, user_message_anchor),
+            ),
+            _SelectionStage("kv_strategy", runtime._apply_kv_tool_strategy),
+            _SelectionStage("kv_sort", runtime._sort_tools_for_kv_stability),
+        ]
+
+    @staticmethod
+    def _run_act_pipeline(
+        tools: Any, stages: "list[_SelectionStage]", trace: ToolSupplyTrace
+    ) -> Any:
+        """Run the ordered ACT stages, recording each into the trace; return final tools."""
+        for stage in stages:
+            prev = tools
+            tools = stage.apply(prev)
+            trace.record(stage.name, prev, tools, reason=stage.reason)
+        return tools
 
     @staticmethod
     def _registered_tools(runtime: Any) -> Any:
