@@ -2292,6 +2292,25 @@ class AgenticLoop:
                 tool_signatures=turn_result.tool_signatures,
             )
 
+            # Advance the spin-escape temperature ratchet (ADR-013, PR-E) from the same signal: a
+            # tool-using turn is progress (reset); a stalled/spinning turn escalates temperature for
+            # the NEXT turn's resolution. Shared on the orchestrator so the resolver reads it.
+            _ratchet = getattr(
+                getattr(self, "orchestrator", None), "temperature_ratchet_state", None
+            )
+            if _ratchet is not None:
+                from victor.framework.temperature import SpinSignal
+
+                _ratchet.record_turn(
+                    SpinSignal(
+                        spin_state=getattr(self.spin_detector.state, "value", "normal"),
+                        consecutive_no_tool_turns=getattr(
+                            self.spin_detector, "consecutive_no_tool_turns", 0
+                        ),
+                        made_progress=bool(turn_result.has_tool_calls),
+                    )
+                )
+
             # Record tool results for fulfillment criteria auto-derivation
             if turn_result.tool_results:
                 for tr in turn_result.tool_results:

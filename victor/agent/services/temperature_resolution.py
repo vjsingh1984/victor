@@ -57,6 +57,12 @@ def resolve_effective_temperature(
     resolver = getattr(orchestrator, "temperature_resolver", None) if orchestrator else None
     if resolver is None:
         return base_temperature
+    if context is None:
+        # Auto-attach the per-session ratchet state (ADR-013, PR-E) so the SpinRatchetModifier sees
+        # accumulated escape-velocity steps. The loop advances it once per turn; we only read here.
+        ratchet = getattr(orchestrator, "temperature_ratchet_state", None)
+        if ratchet is not None:
+            context = TemperatureContext(ratchet_state=ratchet)
     request = TemperatureRequest(
         # Normalize: callers may pass a TaskType enum (perception) or a string; the resolver's
         # task-hint lookup needs a plain string (it calls .lower()). None → "default".
