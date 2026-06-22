@@ -572,6 +572,7 @@ class TurnExecutor:
         enable_thinking: bool = False,
         intent: Optional[str] = None,
         temperature_override: Optional[float] = None,
+        task_type: Optional[str] = None,
         runtime_context_overrides: Optional[Dict[str, Any]] = None,
     ) -> TurnResult:
         """Execute a single complete turn: LLM call + tool execution.
@@ -600,6 +601,15 @@ class TurnExecutor:
             _orch = self._resolve_orchestrator()
             if _orch and hasattr(_orch, "transition_coordinator") and _orch.transition_coordinator:
                 _orch.transition_coordinator.begin_turn()
+
+            # Correlation spine: stamp a fresh turn_id so capture records emitted during
+            # this turn (tool.supply, tool.intent, rl_outcome) share one id. Best-effort.
+            try:
+                from victor.core.context import begin_turn as _begin_turn
+
+                _begin_turn()
+            except Exception:  # correlation is non-critical
+                pass
 
             effective_tool_budget = self._coerce_int_override(overrides.get("tool_budget"))
             if effective_tool_budget is None:
@@ -646,7 +656,10 @@ class TurnExecutor:
             if task_classification:
                 await self._check_context_compaction(user_message, task_classification)
 
-            # Apply task-aware temperature from TaskTypeHint (None = provider default)
+            # Route per-turn temperature through the unified resolver (ADR-013): pass the task type
+            # so it applies profile/settings/task-hint precedence + model bounds. An explicit
+            # temperature_override (heterogeneous teams / recovery) still wins downstream.
+            provider_kwargs["task_type"] = task_type or self._derive_task_type(task_classification)
             if temperature_override is not None:
                 provider_kwargs["temperature_override"] = temperature_override
             provider_kwargs.update(self._provider_call_overrides(overrides))
@@ -1035,12 +1048,24 @@ class TurnExecutor:
         # Create AgenticLoop with self as turn_executor
         # Use a lightweight mock orchestrator since AgenticLoop only needs
         # turn_executor for single-turn execution
+        # Completion strategy (ADR-009): thread from settings into the loop; build a provider-backed
+        # rubric judge when rubric/hybrid is selected (default "enhanced" → no rubric, no change).
+        import os as _os
+
+        _settings = getattr(self._chat_context, "settings", None)
+        _strategy = _os.environ.get("VICTOR_COMPLETION_STRATEGY") or getattr(
+            getattr(_settings, "agent", None), "completion_strategy", "enhanced"
+        )
+        _rubric_fn = self._build_rubric_complete_fn() if _strategy in ("rubric", "hybrid") else None
         loop = AgenticLoop(
             orchestrator=None,
             turn_executor=self,
             max_iterations=iteration_budget,
             enable_fulfillment_check=True,  # Auto-derived criteria via FulfillmentCriteriaBuilder
             enable_adaptive_iterations=True,
+            exploration_settings=getattr(self._chat_context.settings, "exploration", None),
+            config={"completion_strategy": _strategy},
+            rubric_complete_fn=_rubric_fn,
         )
 
         # Inject task classification into state for execute_turn()
@@ -1069,6 +1094,9 @@ class TurnExecutor:
 
         loop_result = await loop.run(user_message, **loop_run_kwargs)
         loop_success = getattr(loop_result, "success", True)
+        # Real agentic-loop iteration count (excludes rubric-judge / recovery sub-calls) — surfaced on
+        # the response metadata so it can reach TaskResult.metadata for observability + A/B harnesses.
+        loop_iterations = len(getattr(loop_result, "iterations", []) or [])
         loop_error = None
         if not loop_success:
             loop_error = "Agentic loop ended before satisfying the task"
@@ -1095,11 +1123,13 @@ class TurnExecutor:
                             metadata["agentic_loop_success"] = True
                             metadata["agentic_loop_recovered"] = True
                             metadata["agentic_loop_recovery_reason"] = loop_error
+                            metadata["agentic_loop_iterations"] = loop_iterations
                             synthesized.metadata = metadata
                             return synthesized
 
                     metadata = dict(getattr(response, "metadata", None) or {})
                     metadata["agentic_loop_success"] = loop_success
+                    metadata["agentic_loop_iterations"] = loop_iterations
                     if loop_error:
                         metadata["agentic_loop_error"] = loop_error
                     response.metadata = metadata
@@ -1110,6 +1140,7 @@ class TurnExecutor:
         response = await self._ensure_complete_response(None, failure_context)
         metadata = dict(getattr(response, "metadata", None) or {})
         metadata["agentic_loop_success"] = loop_success
+        metadata["agentic_loop_iterations"] = loop_iterations
         if loop_error:
             metadata["agentic_loop_error"] = loop_error
         response.metadata = metadata
@@ -1583,6 +1614,64 @@ class TurnExecutor:
 
         return tools
 
+    def _build_rubric_complete_fn(self) -> Optional[Any]:
+        """A provider-backed async ``complete_fn(prompt)->text`` for the LLM rubric judge (ADR-009).
+
+        Returns None when no provider is available (the loop then falls back to the heuristic judge).
+        Used only when completion_strategy is rubric/hybrid.
+        """
+        provider = getattr(self._provider_context, "provider", None)
+        model = getattr(self._provider_context, "model", None)
+        if provider is None:
+            return None
+
+        from victor.providers.base import Message
+
+        async def complete(prompt: str) -> str:
+            resp = await provider.chat(
+                [Message(role="user", content=prompt)],
+                model=model,
+                temperature=0.0,
+                max_tokens=400,
+            )
+            return getattr(resp, "content", "") or ""
+
+        return complete
+
+    @staticmethod
+    def _derive_task_type(task_classification: Any) -> Optional[str]:
+        """Best-effort task_type string from a classification (str / object / dict)."""
+        if task_classification is None:
+            return None
+        if isinstance(task_classification, str):
+            return task_classification
+        if isinstance(task_classification, dict):
+            return task_classification.get("task_type")
+        for attr in ("task_type", "unified_task_type", "category"):
+            val = getattr(task_classification, attr, None)
+            if val is not None:
+                return val if isinstance(val, str) else getattr(val, "value", None)
+        return None
+
+    def _resolve_turn_temperature(
+        self, task_type: Optional[str], model: str, explicit_override: Optional[float]
+    ) -> Optional[float]:
+        """Resolve this turn's temperature via the unified resolver (ADR-013).
+
+        An explicit caller override (heterogeneous teams / recovery) wins. Otherwise delegate to the
+        orchestrator-owned :class:`TemperatureResolver`; if unavailable (state-passed contexts), fall
+        back to the provider-context temperature so behaviour is never worse than before.
+        """
+        from victor.agent.services.temperature_resolution import resolve_effective_temperature
+
+        return resolve_effective_temperature(
+            self._resolve_orchestrator(),
+            task_type=task_type,
+            model=model,
+            base_temperature=self._provider_context.temperature,
+            explicit_override=explicit_override,
+        )
+
     async def _execute_model_turn(
         self,
         tools: Optional[List[Any]] = None,
@@ -1598,12 +1687,17 @@ class TurnExecutor:
         Returns:
             CompletionResponse from model
         """
-        temperature = kwargs.pop("temperature_override", None) or self._provider_context.temperature
+        model = self._provider_context.model
+        # Per-turn temperature via the unified resolver (ADR-013): task_type drives
+        # profile/settings/task-hint precedence + model-bounds. An explicit override
+        # (heterogeneous teams / recovery) still wins.
+        task_type = kwargs.pop("task_type", None)
+        explicit_override = kwargs.pop("temperature_override", None)
+        temperature = self._resolve_turn_temperature(task_type, model, explicit_override)
 
         # Forward a configured per-member reasoning_effort only when the
         # provider+model report support, so it is never sent to a model that
         # would reject it (the provider also strips it defensively).
-        model = self._provider_context.model
         reasoning_effort = getattr(self._provider_context, "reasoning_effort", None)
         if (
             reasoning_effort

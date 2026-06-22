@@ -1,6 +1,6 @@
 # Features
 
-**Version**: 0.7.1 | **Last Updated**: 2026-06 | **Status**: Canonical
+**Version**: {{ victor_version }} | **Last Updated**: 2026-06 | **Status**: Canonical
 
 Victor is a contract-first, async-first agentic AI framework. It coordinates LLMs to reason, call
 tools, run DAG workflows, and orchestrate multi-agent teams across **24 LLM providers**, with

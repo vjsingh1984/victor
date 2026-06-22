@@ -3,7 +3,7 @@
 > Canonical technology reference for Victor AI Framework.
 > Supersedes scattered tech-debt and stack documents across docs/.
 
-**Version**: 0.7.1 | **Last Updated**: 2026-06 | **Status**: Canonical
+**Version**: {{ victor_version }} | **Last Updated**: 2026-06 | **Status**: Canonical
 
 ---
 
@@ -232,6 +232,9 @@ erDiagram
 | TD-8 | Legacy Verticals | Built-in contrib verticals emit DeprecationWarning | Low | Complete | `victor/verticals/` |
 | TD-9 | Streaming + AgenticLoop | StreamingChatPipeline not yet integrated with AgenticLoop | Medium | Planned | `victor/agent/` |
 | TD-10 | Workspace Isolation | Rename internals from worktree-only to workspace-first | Medium | In Progress | `victor/teams/` |
+| TD-11 | ProximaDB CCG Backend | Make `proximadb_provider.py` real and add a `ProximaGraphStore` implementing `GraphStoreProtocol`, so the SQLite + LanceDB pair can be replaced by one correlated ProximaDB collection (graph + vector + relational on one `oid`). See `docs/architecture/proximadb-codegraph-backend.md`. | Medium | Planned | `victor/storage/` |
+| TD-12 | Embedding↔Node Correlation | Retire the unpopulated `graph_node.embedding_ref`: correlate embedding to node by shared `oid` (= `graph/{repo}/node/{symbol_oid}`) so a code change rewrites text + re-embedding in one atomic upsert. Removes SQLite↔Lance dual-write skew. | Medium | Planned | `victor/storage/graph/` |
+| TD-13 | Tier-A/Tier-B CCG split | Index symbols (~80K) + cross-fn edges (~96K) into the traversable graph; offload intra-procedural CPG (statements + DDG/CFG/CDG, ~96% of edges, 100% intra-file) to columnar fragments fetched on dataflow drill-down. Keeps the live graph ~120 MB f32 / ~35 MB SQ8 in-RAM. | Medium | Planned | `victor/core/graph_rag/` |
 
 ### Tech Debt Timeline
 

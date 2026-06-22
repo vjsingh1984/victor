@@ -8,13 +8,54 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, Callable, NamedTuple
+
+from victor.tools.tool_supply_trace import TOOL_SUPPLY_TOPIC, ToolSupplyTrace
 
 logger = logging.getLogger(__name__)
+
+
+class _SelectionStage(NamedTuple):
+    """One ordered post-selection stage in the ACT pipeline (tool-supply P8).
+
+    ``apply`` transforms the tool list; ``name``/``reason`` annotate the tool-supply
+    trace. Expressing the pile as a list of these makes the selection pipeline an
+    explicit, ordered, inspectable sequence instead of a procedural god-method.
+    """
+
+    name: str
+    apply: Callable[[Any], Any]
+    reason: str = ""
+
+
+def _emit_tool_supply_trace(trace: ToolSupplyTrace) -> None:
+    """Emit the per-turn tool-supply event. Best-effort; never breaks selection.
+
+    Mirrors the ``tool.intent`` emission pattern: fetch the observability bus and
+    publish a structured payload. Any failure is swallowed — telemetry must never
+    affect which tools the model receives.
+    """
+    try:
+        from victor.core.events import get_observability_bus
+
+        bus = get_observability_bus()
+        if bus is None:
+            return
+        bus.emit_sync(
+            topic=TOOL_SUPPLY_TOPIC,
+            data=trace.to_payload(),
+            source="ToolSelectionRuntime",
+        )
+    except Exception:  # telemetry is non-critical
+        logger.debug("tool-supply trace emit failed", exc_info=True)
+
 
 # Read-oriented task types: WRITE_ALLOWED is a *permission*, not an intent to write, so we
 # do not force mutation tools (edit/write/shell) onto these pure analysis/search turns.
 _READ_ORIENTED_TASK_TYPES = frozenset({"analyze", "search", "research"})
+
+# Minimal read-only core handed to borderline Q&A turns (tool-supply P3) instead of None.
+_READ_CORE_TOOL_NAMES = ("read", "code_search", "ls")
 
 
 # --- E3-TIR experience-replay exploration (opt-in via USE_E3_TIR_EXPLORATION) ---------
@@ -27,6 +68,48 @@ _e3tir_shared_store: Any = None
 _e3tir_hook_subscribed: bool = False
 
 
+def _warm_start_experience_store(store: Any, limit: int = 2000) -> None:
+    """Warm-start the experience projection from durable RL_OUTCOME tool rows (R3).
+
+    The store is an in-memory projection of the durable outcome stream but starts
+    empty each process, drifting from the durable truth. Replaying recent durable
+    tool outcomes (chronological) makes it a true projection. Best-effort: any
+    failure leaves the store empty rather than breaking selection. Reward uses the
+    R2 canonical ``reward_from_signals`` so it matches the live feed exactly.
+    """
+    try:
+        import json
+
+        from victor.core.database import get_database
+        from victor.framework.rl.reward import reward_from_signals
+
+        rows = get_database().query(
+            "SELECT task_type, success, quality_score, metadata FROM rl_outcome "
+            "WHERE learner_id = ? ORDER BY created_at DESC LIMIT ?",
+            ("tool_selector", limit),
+        )
+        outcomes = []
+        for row in reversed(rows or []):  # oldest -> newest for faithful running stats
+            task_type, success, quality_score, metadata = row[0], row[1], row[2], row[3]
+            try:
+                meta = json.loads(metadata) if metadata else {}
+            except (TypeError, ValueError):
+                meta = {}
+            tool = meta.get("tool_name")
+            if not tool:
+                continue
+            reward = reward_from_signals(success=bool(success), quality_score=quality_score)
+            outcomes.append((tool, task_type, bool(success), reward))
+        replayed = store.warm_start_from_outcomes(outcomes)
+        if replayed:
+            logger.info(
+                "E3-TIR: warm-started experience projection from %d durable outcomes",
+                replayed,
+            )
+    except Exception:  # warm-start is best-effort; live feed still populates the store
+        logger.debug("E3-TIR experience warm-start skipped", exc_info=True)
+
+
 def _get_e3tir_shared_store() -> Any:
     """Return the process-shared ToolExperienceStore, subscribing the outcome hook once."""
     global _e3tir_shared_store, _e3tir_hook_subscribed
@@ -34,6 +117,9 @@ def _get_e3tir_shared_store() -> Any:
         from victor.tools.experience_store import ToolExperienceStore
 
         _e3tir_shared_store = ToolExperienceStore()
+        # Make the in-memory store a projection of the durable outcome stream before
+        # the live feed begins, so it doesn't start blank (and drift) each process.
+        _warm_start_experience_store(_e3tir_shared_store)
     if not _e3tir_hook_subscribed:
         from victor.framework.rl.hooks import RLEventType, get_rl_hooks
 
@@ -45,10 +131,13 @@ def _get_e3tir_shared_store() -> Any:
                 if not tool:
                     return
                 success = event.success if event.success is not None else True
-                reward = (
-                    float(event.quality_score)
-                    if event.quality_score is not None
-                    else (1.0 if success else 0.3)
+                # Canonical default reward (R2) — was an inline
+                # `quality_score or (1.0 if success else 0.3)` here; now the single
+                # source in victor.framework.rl.reward so it can't drift.
+                from victor.framework.rl.reward import reward_from_signals
+
+                reward = reward_from_signals(
+                    success=bool(success), quality_score=event.quality_score
                 )
                 store.record_outcome(
                     tool_name=tool,
@@ -92,11 +181,33 @@ class ToolSelectionRuntime:
         # must not become the anchor for intent filtering or stage prioritization.
         user_message_anchor = getattr(runtime, "_current_user_message", None) or context_msg
 
+        # Per-turn tool-supply telemetry (observe-only; never alters the value
+        # flowing through this method). Captures the registered set and every
+        # narrowing stage so over-restriction is queryable, not just log-grep-able.
+        trace = ToolSupplyTrace.begin(self._registered_tools(runtime))
+
         if not tooling_allowed:
+            _emit_tool_supply_trace(trace.mark_skipped("provider_or_model_no_tools"))
             return None
 
-        if runtime._should_skip_tools_for_turn(user_message_anchor):
+        # Q&A necessity gate (tool-supply P3). A trivially-safe greeting still hard-skips
+        # (no tools); a borderline Q&A turn gets a minimal read-only core instead of None,
+        # so "how does X work?" can still read X rather than looping tool-less.
+        skip_mode_fn = getattr(runtime, "_tool_skip_mode", None)
+        if skip_mode_fn is not None:
+            skip_mode = skip_mode_fn(user_message_anchor)
+        else:  # back-compat for hosts without the 3-valued gate
+            skip_mode = (
+                "skip" if runtime._should_skip_tools_for_turn(user_message_anchor) else "tools"
+            )
+        if skip_mode == "skip":
+            _emit_tool_supply_trace(trace.mark_skipped("qa_greeting"))
             return None
+        if skip_mode == "read_core":
+            core = self._read_core_tools(runtime)
+            trace.set_candidates(core)
+            _emit_tool_supply_trace(trace.finalize(core))
+            return core or None
 
         if planned_tools is None and goals:
             available_inputs = ["query"]
@@ -116,27 +227,24 @@ class ToolSelectionRuntime:
             conversation_depth=conversation_depth,
             planned_tools=planned_tools,
         )
+        trace.set_candidates(tools)
         logger.info(
             "context_msg=%s\nuse_semantic=%s\nconversation_depth=%s",
             context_msg,
             runtime.use_semantic_selection,
             conversation_depth,
         )
-        # Stage prioritization should stay anchored to the user's request.
-        # Feeding assistant progress narration here can wrongly push the
-        # conversation state machine back toward analysis/search-heavy tools.
-        tools = runtime.tool_selector.prioritize_by_stage(user_message_anchor, tools)
+        # ACT pipeline (P8): the post-selection transforms expressed as an explicit,
+        # ordered, named stage list and run by a single driver. Byte-identical to the
+        # prior inline pile (same calls, same order) — this only makes the pipeline
+        # declarative and inspectable (one trace record per stage). Stage anchoring:
+        # prioritization/intent stay on the user's request, not assistant narration.
         current_intent = getattr(runtime, "_current_intent", None)
-        tools = runtime._tool_planner.filter_tools_by_intent(
+        final_tools = self._run_act_pipeline(
             tools,
-            current_intent,
-            user_message=user_message_anchor,
+            self._act_pipeline_stages(runtime, user_message_anchor, current_intent),
+            trace,
         )
-        tools = self._ensure_write_tools_for_write_intent(tools, current_intent)
-        tools = self._prioritize_explicit_database_tools(tools, user_message_anchor)
-        tools = self._apply_e3tir_exploration(tools, user_message_anchor)
-        tools = runtime._apply_kv_tool_strategy(tools)
-        final_tools = runtime._sort_tools_for_kv_stability(tools)
         # Log the tools actually dispatched to the provider. The selector's earlier
         # "Selected N tools" line is emitted before stage pruning / intent filtering and
         # can overstate the callable set (a tool can be selected then pruned away). This
@@ -149,7 +257,99 @@ class ToolSelectionRuntime:
             )
         except Exception:  # logging must never break tool selection
             logger.debug("dispatched-tools log failed", exc_info=True)
+        _emit_tool_supply_trace(trace.finalize(final_tools))
         return final_tools
+
+    def _act_pipeline_stages(
+        self, runtime: Any, user_message_anchor: str, current_intent: Any
+    ) -> "list[_SelectionStage]":
+        """Declare the ordered post-selection (ACT) stages (tool-supply P8).
+
+        The sequence and per-stage calls are identical to the prior inline pile —
+        expressing them as data makes the pipeline explicit and observable. Each stage
+        is captured at build time with the turn-scoped anchor/intent.
+        """
+        return [
+            _SelectionStage(
+                "stage_priority",
+                lambda t: runtime.tool_selector.prioritize_by_stage(user_message_anchor, t),
+            ),
+            _SelectionStage(
+                "intent_filter",
+                lambda t: runtime._tool_planner.filter_tools_by_intent(
+                    t, current_intent, user_message=user_message_anchor
+                ),
+                str(current_intent or ""),
+            ),
+            _SelectionStage(
+                "ensure_write",
+                lambda t: self._ensure_write_tools_for_write_intent(t, current_intent),
+            ),
+            _SelectionStage(
+                "explicit_db",
+                lambda t: self._prioritize_explicit_database_tools(t, user_message_anchor),
+            ),
+            _SelectionStage(
+                "e3tir_rerank",
+                lambda t: self._apply_e3tir_exploration(t, user_message_anchor),
+            ),
+            _SelectionStage("kv_strategy", runtime._apply_kv_tool_strategy),
+            _SelectionStage("kv_sort", runtime._sort_tools_for_kv_stability),
+        ]
+
+    @staticmethod
+    def _run_act_pipeline(
+        tools: Any, stages: "list[_SelectionStage]", trace: ToolSupplyTrace
+    ) -> Any:
+        """Run the ordered ACT stages, recording each into the trace; return final tools."""
+        for stage in stages:
+            prev = tools
+            tools = stage.apply(prev)
+            trace.record(stage.name, prev, tools, reason=stage.reason)
+        return tools
+
+    @staticmethod
+    def _registered_tools(runtime: Any) -> Any:
+        """Best-effort snapshot of the enabled registered tool set (for telemetry).
+
+        Returns ``None`` on any failure — the trace simply records a zero registered
+        count rather than letting telemetry interfere with selection.
+        """
+        try:
+            selector = getattr(runtime, "tool_selector", None)
+            registry = getattr(selector, "tools", None)
+            if registry is not None:
+                return registry.list_tools(only_enabled=True)
+        except Exception:
+            logger.debug("registered-tools snapshot failed", exc_info=True)
+        return None
+
+    @staticmethod
+    def _read_core_tools(runtime: Any) -> Any:
+        """Minimal read-only core for borderline Q&A turns (tool-supply P3).
+
+        A few STUB-schema read tools (read/code_search/ls — tens of tokens each) so the
+        model can look something up if the "question" actually needs a file or search,
+        rather than being handed no tools at all. Best-effort: returns ``[]`` if the
+        registry is unavailable.
+        """
+        try:
+            from victor.agent.tool_selection import tool_to_definition
+            from victor.tools.enums import SchemaLevel
+
+            selector = getattr(runtime, "tool_selector", None)
+            registry = getattr(selector, "tools", None)
+            if registry is None or not hasattr(registry, "get"):
+                return []
+            out = []
+            for name in _READ_CORE_TOOL_NAMES:
+                tool = registry.get(name)
+                if tool is not None:
+                    out.append(tool_to_definition(tool, SchemaLevel.STUB))
+            return out
+        except Exception:
+            logger.debug("read-core build failed", exc_info=True)
+            return []
 
     def _get_e3tir_reranker(self) -> Any:
         """Lazily build the per-session E3-TIR reranker when enabled, else None.

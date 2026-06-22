@@ -6,6 +6,7 @@
 import os
 import sys
 from datetime import datetime
+from pathlib import Path
 
 # -- Path setup --------------------------------------------------------------
 
@@ -19,10 +20,10 @@ project = "Victor AI Framework"
 copyright = f"{datetime.now().year}, Vijaykumar Singh"
 author = "Vijaykumar Singh"
 
+# Single-source the version from the repo-root VERSION file (no hand-typed stamp).
+release = (Path(__file__).resolve().parent.parent / "VERSION").read_text(encoding="utf-8").strip()
 # The short X.Y version
-version = "0.7"
-# The full version, including alpha/beta/rc tags
-release = "0.7.1"
+version = ".".join(release.split(".")[:2])
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration

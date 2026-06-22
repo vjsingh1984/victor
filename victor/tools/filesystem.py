@@ -1212,6 +1212,7 @@ TEXT_EXTENSIONS = {
     priority_hints=[
         "TRUNCATION: 10000 lines/64KB. Always ends on complete lines.",
         "PAGINATION: When truncated, output includes 'Use offset=N to continue' - use that exact offset value.",
+        "LARGE FILES: prefer extract_skeleton (signatures only) or code_search within the file to find the relevant section, instead of reading the whole file in many chunks.",
         "Use for TEXT and CODE files only (.py, .js, .json, .yaml, .md, etc.)",
         "NOT for binary files (.pdf, .docx, .db, .pyc, images, archives)",
         "SINGLE-FILE SEARCH: Use search parameter for grep-like pattern search within one file",

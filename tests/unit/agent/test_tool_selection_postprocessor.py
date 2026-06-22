@@ -198,3 +198,82 @@ def test_postprocessor_skips_optional_transforms_when_disabled():
     )
 
     assert result == tools
+
+
+# --- tool-supply P2: cap_mode (stub / none / hard) -------------------------------
+
+
+def _ctx(**over):
+    from victor.agent.tool_selection_postprocessor import ToolSelectionPostProcessContext
+
+    base = {
+        "user_message": "do work",
+        "stage": None,
+        "fallback_max_tools": 4,
+        "max_mcp_tools": 99,
+        "schema_promotion_threshold": 0.0,
+        "max_schema_tokens": 0,
+    }
+    base.update(over)
+    return ToolSelectionPostProcessContext(**base)
+
+
+def test_cap_stub_demotes_tail_not_drops():
+    from victor.agent.tool_selection_postprocessor import ToolSelectionPostProcessor
+
+    tools = [_tool(f"t{i}") for i in range(10)]
+    result = ToolSelectionPostProcessor().apply(
+        tools,
+        context=_ctx(cap_mode="stub", fallback_max_tools=4),
+        should_use_edge_filter=False,
+        cap_mcp_tools=lambda current, _m: current,
+    )
+    # All 10 survive — none dropped.
+    assert len(result) == 10
+    # Top 4 keep their schema; the rest are demoted to STUB.
+    assert all(t.schema_level is None for t in result[:4])
+    assert all(t.schema_level == "stub" for t in result[4:])
+
+
+def test_cap_none_keeps_all_full():
+    from victor.agent.tool_selection_postprocessor import ToolSelectionPostProcessor
+
+    tools = [_tool(f"t{i}") for i in range(10)]
+    result = ToolSelectionPostProcessor().apply(
+        tools,
+        context=_ctx(cap_mode="none", fallback_max_tools=4),
+        should_use_edge_filter=False,
+        cap_mcp_tools=lambda current, _m: current,
+    )
+    assert len(result) == 10
+    assert all(t.schema_level is None for t in result)  # nothing demoted
+
+
+def test_cap_hard_drops_tail():
+    from victor.agent.tool_selection_postprocessor import ToolSelectionPostProcessor
+
+    tools = [_tool(f"t{i}") for i in range(10)]
+    result = ToolSelectionPostProcessor().apply(
+        tools,
+        context=_ctx(cap_mode="hard", fallback_max_tools=4),
+        should_use_edge_filter=False,
+        cap_mcp_tools=lambda current, _m: current,
+    )
+    assert [t.name for t in result] == ["t0", "t1", "t2", "t3"]
+
+
+def test_cap_stub_keeps_web_tool_full():
+    from victor.agent.tool_selection_postprocessor import ToolSelectionPostProcessor
+
+    # web_search ranked just past the cap: in stub mode it must be kept at full schema
+    # (web-preserving), and nothing is dropped.
+    tools = [_tool(f"t{i}") for i in range(4)] + [_tool("web_search"), _tool("t5")]
+    result = ToolSelectionPostProcessor().apply(
+        tools,
+        context=_ctx(cap_mode="stub", fallback_max_tools=4, web_tools=frozenset({"web_search"})),
+        should_use_edge_filter=False,
+        cap_mcp_tools=lambda current, _m: current,
+    )
+    assert len(result) == 6  # nothing dropped
+    web = next(t for t in result if t.name == "web_search")
+    assert web.schema_level is None  # preserved at full, not stubbed

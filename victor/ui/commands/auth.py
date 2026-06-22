@@ -31,7 +31,9 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import shlex
 import subprocess
+import sys
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -59,7 +61,9 @@ from victor.config.accounts import (
     ProviderAccount,
     get_account_manager,
 )
+from victor.config.api_keys import LOCAL_PROVIDERS, APIKeyManager
 from victor.config.connection_validation import ConnectionValidator, ValidationResult
+from victor.ui.json_utils import create_json_option, print_json_data
 from victor.config.migration import (
     ConfigMigrator,
     check_migration_needed,
@@ -346,73 +350,304 @@ def auth_add(
 # =============================================================================
 
 
+def _provider_key_cell(provider: str, key_status: dict, *, plain: bool = False) -> str:
+    """Render whether a provider has an API key, and from where.
+
+    Local providers need no key. Cloud providers show the resolution source
+    (env/keyring/file) or a clear 'missing' so a user can see at a glance why a
+    profile/account works or doesn't — the gap behind 'why is my zai profile invisible'.
+    """
+    if provider in LOCAL_PROVIDERS:
+        return "local" if plain else "[dim]— local[/]"
+    st = key_status.get(provider) or {}
+    if st.get("configured"):
+        src = st.get("source") or "?"
+        return f"key:{src}" if plain else f"[green]✓ {src}[/]"
+    return "missing" if plain else "[red]✗ missing[/]"
+
+
+def _oauth_status_value(account) -> str:
+    """OAuth status as a clean lowercase string (no leaked AuthStatus enum repr)."""
+    raw = _get_oauth_status(account.provider, account.auth.source)
+    return str(getattr(raw, "value", raw)).lower()
+
+
 @auth_app.command("list")
-def auth_list() -> None:
-    """List all configured accounts.
+def auth_list(
+    json_output: bool = create_json_option(),
+    show_tags: bool = typer.Option(
+        False, "--tags", help="Show the Tags column (incl. migration bookkeeping)"
+    ),
+) -> None:
+    """List provider accounts AND profiles, with key status.
+
+    Unifies the two registries Victor uses: accounts (config.yaml, written by `auth add`)
+    and profiles (profiles.yaml, used by `--profile`). A profile you hand-edited (e.g.
+    `zai-coding`) shows up here even without a matching account, and the Key column shows
+    whether its provider's key is configured and from where.
 
     Example:
         victor auth list
+        victor auth list --json
     """
+    from victor.framework.runtime_discovery import list_runtime_profiles
+
     manager = get_account_manager()
     accounts = manager.list_accounts()
+    try:
+        profiles = list_runtime_profiles()
+    except Exception:
+        profiles = []
+    try:
+        key_status = APIKeyManager().get_status()
+    except Exception:
+        key_status = {}
 
-    if not accounts:
-        console.print("[yellow]No accounts configured.[/]")
+    default_account = manager.load_config().defaults.account
+    acct_by_name = {a.name: a for a in accounts}
+    prof_by_name = {p.name: p for p in profiles}
+    all_names = sorted(set(acct_by_name) | set(prof_by_name))
+
+    if not all_names:
+        if json_output:
+            print_json_data({"entries": []})
+            return
+        console.print("[yellow]No accounts or profiles configured.[/]")
         console.print("[dim]Run 'victor auth setup' to add your first account.[/]")
         return
 
-    # Determine default account name
-    default_name = manager.load_config().defaults.account
-
-    # Check OAuth token status for oauth accounts
-    oauth_status: dict[str, str] = {}
-    for account in accounts:
-        if account.auth.method == "oauth":
-            oauth_status[account.name] = _get_oauth_status(account.provider, account.auth.source)
-
-    table = Table(title="Configured Accounts", show_header=True)
-    table.add_column("Name", style="cyan", no_wrap=True)
-    table.add_column("Provider", style="green")
-    table.add_column("Model", style="yellow")
-    table.add_column("Auth", style="blue")
-    table.add_column("Status", style="dim")
-    table.add_column("Tags", style="dim")
-
-    for account in sorted(accounts, key=lambda a: a.name):
-        tags_str = ", ".join(account.tags) if account.tags else ""
-        # Mark default account
-        name_display = account.name
-        if account.name == default_name:
-            name_display = f"{account.name} ★"
-
-        # Auth display with OAuth status
-        auth_display = account.auth.method
-        if account.auth.source != "keyring":
-            auth_display = f"{account.auth.method}/{account.auth.source}"
-        if account.auth.method == "oauth":
-            status = oauth_status.get(account.name, "pending")
-            status_display = (
-                "[green]authenticated[/]"
-                if status == "authenticated"
-                else ("[yellow]pending login[/]" if status == "pending" else f"[red]{status}[/]")
-            )
-        elif account.auth.method == "none":
-            status_display = "[dim]local[/]"
+    entries: list[dict] = []
+    for name in all_names:
+        acct = acct_by_name.get(name)
+        prof = prof_by_name.get(name)
+        provider = acct.provider if acct else prof.provider
+        model = acct.model if acct else prof.model
+        if acct and prof:
+            kind = "account+profile"
+        elif acct:
+            kind = "account"
         else:
-            status_display = "[green]configured[/]"
-
-        table.add_row(
-            name_display,
-            account.provider,
-            account.model,
-            auth_display,
-            status_display,
-            tags_str,
+            kind = "profile"
+        is_default = bool(
+            (acct and name == default_account) or (prof and getattr(prof, "is_default", False))
+        )
+        if acct and acct.auth.method == "oauth":
+            status = _oauth_status_value(acct)
+        elif acct and acct.auth.method == "none":
+            status = "local"
+        elif acct:
+            status = "configured"
+        else:
+            status = "profile-only"
+        st = key_status.get(provider) or {}
+        entries.append(
+            {
+                "name": name,
+                "kind": kind,
+                "provider": provider,
+                "model": model,
+                "key_configured": provider in LOCAL_PROVIDERS or bool(st.get("configured")),
+                "key_source": "local" if provider in LOCAL_PROVIDERS else st.get("source"),
+                "status": status,
+                "default": is_default,
+                "tags": list(acct.tags) if acct else [],
+            }
         )
 
+    if json_output:
+        print_json_data({"entries": entries, "total": len(entries)})
+        return
+
+    status_render = {
+        "authenticated": "[green]authenticated[/]",
+        "pending": "[yellow]pending login[/]",
+        "configured": "[green]configured[/]",
+        "local": "[dim]local[/]",
+        "profile-only": "[dim]profile-only[/]",
+    }
+
+    table = Table(title="Accounts & Profiles", show_header=True)
+    table.add_column("Name", style="cyan", no_wrap=True)
+    table.add_column("Kind", style="magenta")
+    table.add_column("Provider", style="green")
+    table.add_column("Model", style="yellow")
+    table.add_column("Key", style="dim")
+    table.add_column("Status", style="dim")
+    if show_tags:
+        table.add_column("Tags", style="dim")
+
+    for e in entries:
+        name_display = f"{e['name']} ★" if e["default"] else e["name"]
+        row = [
+            name_display,
+            e["kind"],
+            e["provider"],
+            e["model"],
+            _provider_key_cell(e["provider"], key_status),
+            status_render.get(e["status"], f"[red]{e['status']}[/]"),
+        ]
+        if show_tags:
+            row.append(", ".join(e["tags"]))
+        table.add_row(*row)
+
     console.print(table)
-    console.print(f"\n[dim]Total: {len(accounts)} account(s)[/]")
-    console.print("[dim]★ = default account[/]")
+    n_acct = sum(1 for e in entries if "account" in e["kind"])
+    n_prof = sum(1 for e in entries if "profile" in e["kind"])
+    console.print(
+        f"\n[dim]Total: {len(entries)} ({n_acct} account(s), {n_prof} profile(s)) · "
+        f"★ = default · use 'victor auth show <name>' for details[/]"
+    )
+
+
+# =============================================================================
+# Show Command
+# =============================================================================
+
+
+@auth_app.command("show")
+def auth_show(
+    name: str = typer.Argument(..., help="Account name, profile name, or provider"),
+    json_output: bool = create_json_option(),
+) -> None:
+    """Show what a name resolves to and whether its key is ready.
+
+    Answers 'what will `--profile <name>` actually use?' — the resolved provider, model,
+    endpoint, and whether the provider's API key is configured (and from where). Accepts an
+    account name, a profile name, or a bare provider name.
+
+    Example:
+        victor auth show zai-coding
+        victor auth show zai --json
+    """
+    from victor.framework.runtime_discovery import list_runtime_profiles
+
+    manager = get_account_manager()
+    acct = next((a for a in manager.list_accounts() if a.name == name), None)
+    try:
+        prof = next((p for p in list_runtime_profiles() if p.name == name), None)
+    except Exception:
+        prof = None
+    try:
+        key_status = APIKeyManager().get_status()
+    except Exception:
+        key_status = {}
+
+    if acct or prof:
+        provider = acct.provider if acct else prof.provider
+        model = acct.model if acct else prof.model
+        kind = "account+profile" if (acct and prof) else ("account" if acct else "profile")
+    elif name in key_status or name in LOCAL_PROVIDERS:
+        provider, model, kind = name, None, "provider"
+    else:
+        console.print(f"[red]✗[/] No account, profile, or provider named '{name}'.")
+        console.print("[dim]Run 'victor auth list' to see available names.[/]")
+        raise typer.Exit(1)
+
+    st = key_status.get(provider) or {}
+    key_configured = provider in LOCAL_PROVIDERS or bool(st.get("configured"))
+    key_source = "local" if provider in LOCAL_PROVIDERS else st.get("source")
+    endpoint = getattr(acct, "endpoint", None) if acct else None
+    oauth = _oauth_status_value(acct) if (acct and acct.auth.method == "oauth") else None
+
+    if json_output:
+        print_json_data(
+            {
+                "name": name,
+                "kind": kind,
+                "provider": provider,
+                "model": model,
+                "endpoint": endpoint,
+                "key_configured": key_configured,
+                "key_source": key_source,
+                "oauth_status": oauth,
+            }
+        )
+        return
+
+    lines = [
+        f"[bold cyan]{name}[/]  [magenta]({kind})[/]",
+        f"  provider : [green]{provider}[/]",
+        f"  model    : [yellow]{model or '—'}[/]",
+    ]
+    if endpoint:
+        lines.append(f"  endpoint : {endpoint}")
+    lines.append(f"  key      : {_provider_key_cell(provider, key_status)}")
+    if oauth:
+        lines.append(f"  oauth    : {oauth}")
+    if not key_configured and provider not in LOCAL_PROVIDERS:
+        env_var = (st.get("env_var")) or f"{provider.upper()}_API_KEY"
+        lines.append(
+            f"  [dim]→ set a key with[/] victor auth add -p {provider} "
+            f"[dim]or[/] export {env_var}=..."
+        )
+    console.print(Panel("\n".join(lines), title="auth show", border_style="cyan"))
+
+
+# =============================================================================
+# Env Command (load keys into the shell for headless / follow-on sessions)
+# =============================================================================
+
+
+def _stdout_is_tty() -> bool:
+    """Whether stdout is an interactive terminal (extracted for testability)."""
+    return sys.stdout.isatty()
+
+
+@auth_app.command("env")
+def auth_env(
+    provider: Optional[str] = typer.Option(
+        None, "--provider", "-p", help="Only emit this provider's key (recommended)"
+    ),
+) -> None:
+    """Emit `export <VAR>=<key>` lines to load API keys into the environment.
+
+    Use with eval so follow-on / headless sessions resolve keys from env (the keyring is
+    skipped without a TTY, but env is checked first and always works):
+
+        eval "$(victor auth env -p zai)"
+        victor chat --profile zai-coding --headless -m "..."
+
+    For safety this REFUSES to print keys to an interactive terminal — the export lines are
+    only emitted when stdout is captured (eval, a pipe, or a file). Keys are never logged.
+    """
+    # Never display secrets on a real terminal; only emit when captured by eval/pipe/file.
+    if _stdout_is_tty():
+        suffix = f" -p {provider}" if provider else ""
+        console.print(
+            "[yellow]Refusing to print API keys to a terminal.[/] Run it through eval:\n"
+            f'  [cyan]eval "$(victor auth env{suffix})"[/]'
+        )
+        raise typer.Exit(1)
+
+    mgr = APIKeyManager()
+    try:
+        status = mgr.get_status()
+    except Exception:
+        status = {}
+
+    targets = [provider] if provider else [p for p, s in status.items() if s.get("configured")]
+
+    emitted = 0
+    for p in targets:
+        if p in LOCAL_PROVIDERS:
+            continue
+        # get_key (unlike the non-interactive get_api_key) reads env -> keyring -> file and
+        # returns the value, so this works as the keyring -> env bridge it's meant to be.
+        key = mgr.get_key(p)
+        if not key:
+            continue
+        env_var = (status.get(p) or {}).get("env_var") or f"{p.upper()}_API_KEY"
+        # Plain stdout for eval; shlex.quote guards shell metacharacters in the key value.
+        print(f"export {env_var}={shlex.quote(key)}")
+        emitted += 1
+
+    if emitted == 0:
+        # Diagnostics go to STDERR so a surrounding eval captures nothing.
+        print(
+            f"# victor auth env: no configured key for {provider or 'any cloud provider'}",
+            file=sys.stderr,
+        )
+        raise typer.Exit(1)
 
 
 # =============================================================================

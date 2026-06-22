@@ -214,6 +214,65 @@ def _turn_executor(self: "AgentOrchestrator") -> Any:
     return self._turn_executor
 
 
+def _temperature_resolver(self: "AgentOrchestrator") -> Any:
+    """Unified sampling-temperature resolver (ADR-013), built once and cached.
+
+    Composes profile/settings/task-hint sources + ratchet/bounds modifiers from
+    ``settings.temperature``. The reactive recovery modifier is added later (PR-E); for now the
+    resolver does base resolution + bounds, so behaviour matches the prior task-hint path.
+    """
+    cached = getattr(self, "_temperature_resolver_cached", None)
+    if cached is None:
+        from victor.framework.capabilities.task_hints import TaskTypeHintCapabilityProvider
+        from victor.framework.temperature import build_resolver_from_settings
+
+        cached = build_resolver_from_settings(
+            getattr(self.settings, "temperature_policy", None),
+            hint_provider=TaskTypeHintCapabilityProvider(),
+        )
+        self._temperature_resolver_cached = cached
+    return cached
+
+
+def _profile_task_temperatures(self: "AgentOrchestrator") -> Any:
+    """The active profile's per-task ``temperatures`` map (ADR-013), or ``{}``. Cached."""
+    cached = getattr(self, "_profile_task_temps_cached", None)
+    if cached is None:
+        cached = {}
+        try:
+            name = getattr(self, "_profile_name", None)
+            if name:
+                profiles = type(self.settings).load_profiles()
+                profile = profiles.get(name)
+                cached = dict(getattr(profile, "temperatures", None) or {})
+        except Exception:  # profile lookup is best-effort; fall back to no per-task overrides
+            cached = {}
+        self._profile_task_temps_cached = cached
+    return cached
+
+
+def _settings_task_temperatures(self: "AgentOrchestrator") -> Any:
+    """The settings-level ``temperature.task_defaults`` ops table (ADR-013), or ``{}``."""
+    temp_settings = getattr(self.settings, "temperature_policy", None)
+    return dict(getattr(temp_settings, "task_defaults", None) or {})
+
+
+def _temperature_ratchet_state(self: "AgentOrchestrator") -> Any:
+    """Per-session spin-escape ratchet state (ADR-013, PR-E), shared across buffered/streaming turns.
+
+    The agentic loop advances it once per turn (``RatchetState.record_turn``) from the SpinDetector
+    signal; the temperature resolver reads its step count to apply the escape-velocity ratchet. Lives
+    on the orchestrator so both the loop (writer) and the resolution seam (reader) share one instance.
+    """
+    cached = getattr(self, "_temperature_ratchet_state_obj", None)
+    if cached is None:
+        from victor.framework.temperature import RatchetState
+
+        cached = RatchetState()
+        self._temperature_ratchet_state_obj = cached
+    return cached
+
+
 def _runtime_intelligence_integration(
     self: "AgentOrchestrator",
 ) -> Optional["OrchestratorIntegration"]:
@@ -502,6 +561,10 @@ _PROPERTY_REGISTRY: dict[str, Any] = {
     # Group 2: Lazy coordinators (getter only)
     "protocol_adapter": (_protocol_adapter, None),
     "turn_executor": (_turn_executor, None),
+    "temperature_resolver": (_temperature_resolver, None),
+    "profile_task_temperatures": (_profile_task_temperatures, None),
+    "settings_task_temperatures": (_settings_task_temperatures, None),
+    "temperature_ratchet_state": (_temperature_ratchet_state, None),
     "runtime_intelligence_integration": (_runtime_intelligence_integration, None),
     "subagent_orchestrator": (_subagent_orchestrator, None),
     "coordination_advisor": (_coordination_advisor, None),

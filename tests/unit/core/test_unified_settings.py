@@ -27,7 +27,7 @@ class TestVictorSettingsBasic:
         settings = VictorSettings()
 
         assert settings.provider.default_provider == "ollama"
-        assert settings.provider.default_temperature == 0.7
+        assert settings.provider.default_temperature == 0.6  # ADR-013 default flip
         assert settings.provider.default_max_tokens == 4096
         assert settings.airgapped_mode is False
         assert settings.tool_selection.use_semantic_tool_selection is True

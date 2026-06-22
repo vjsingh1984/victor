@@ -3579,21 +3579,26 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         "good evening",
     )
 
-    def _should_skip_tools_for_turn(self, context_msg: str) -> bool:
-        """Determine if tools are unnecessary for this turn (HDPO-inspired).
+    def _tool_skip_mode(self, context_msg: str) -> str:
+        """Decide tool supply for a (possibly conversational) turn (tool-supply P3).
 
-        Uses a fast heuristic first (keyword scan), then optionally consults
-        the edge model via DecisionService if confidence is ambiguous.
-        Returns True to skip tool selection entirely for pure Q&A turns.
+        Uses a fast heuristic first (keyword scan), then optionally consults the edge
+        model via DecisionService for borderline Q&A. Returns one of:
+
+        - ``"skip"``      — trivially-safe conversational turn (short greeting): no tools.
+        - ``"read_core"`` — borderline Q&A: provide ONLY a minimal read-only core so the
+          model can look something up if it turns out it needs to, rather than removing
+          the entire tool set (the old behavior left "how does X work?" unable to read X).
+        - ``"tools"``     — proceed with normal tool selection.
         """
         msg_lower = context_msg.lower().strip()
 
-        # Very short messages are almost always Q&A or greetings
+        # Very short messages are almost always greetings/Q&A — the only hard no-tools path.
         if len(msg_lower) < 15:
             # Unless they look like commands: "fix it", "run tests", etc.
             if any(kw in msg_lower for kw in ("fix", "run", "edit", "create", "delete")):
-                return False
-            return True
+                return "tools"
+            return "skip"
 
         # Heuristic: count tool-signal keywords vs Q&A patterns
         words = set(msg_lower.split())
@@ -3602,16 +3607,27 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
 
         # High-confidence heuristic paths
         if tool_signals >= 2:
-            return False  # Clearly needs tools
+            return "tools"  # Clearly needs tools
         if qa_match and tool_signals == 0:
-            # Consult edge model for borderline Q&A (might still need tools)
-            return self._check_tool_necessity_via_edge(context_msg, heuristic_conf=0.85)
+            # Consult edge model for borderline Q&A (might still need tools). Even when it
+            # says "skip", give the read-only core rather than nothing.
+            skip = self._check_tool_necessity_via_edge(context_msg, heuristic_conf=0.85)
+            return "read_core" if skip else "tools"
 
-        # Ambiguous: 0-1 tool signals, no Q&A pattern — default to providing tools
+        # Ambiguous: 0-1 tool signals — default to providing tools
         if tool_signals == 0 and qa_match:
-            return self._check_tool_necessity_via_edge(context_msg, heuristic_conf=0.6)
+            skip = self._check_tool_necessity_via_edge(context_msg, heuristic_conf=0.6)
+            return "read_core" if skip else "tools"
 
-        return False  # Default: provide tools
+        return "tools"  # Default: provide tools
+
+    def _should_skip_tools_for_turn(self, context_msg: str) -> bool:
+        """Back-compat shim: True when full tool selection is not needed this turn.
+
+        Prefer :meth:`_tool_skip_mode`, which distinguishes a hard ``"skip"`` (greeting)
+        from ``"read_core"`` (borderline Q&A still gets read tools).
+        """
+        return self._tool_skip_mode(context_msg) != "tools"
 
     def _check_tool_necessity_via_edge(self, context_msg: str, heuristic_conf: float) -> bool:
         """Consult edge model for tool necessity decision.
@@ -3708,8 +3724,10 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
             session_semantic_tools=getattr(self, "_session_semantic_tools", None),
             kv_tool_strategy=strategy,
         )
-        # Persist session-stable selection at orchestrator level (ToolService is a singleton)
-        if strategy == "session_stable" and not getattr(self, "_session_semantic_tools", None):
+        # Persist the (grow-only) session-stable selection at orchestrator level
+        # (ToolService is a singleton). P4: persist EVERY turn — not just the first —
+        # so newly-added tools join the cached set and stay available next turn.
+        if strategy in ("session_stable", "additive"):
             self._session_semantic_tools = result
         return result
 

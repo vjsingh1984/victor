@@ -131,7 +131,9 @@ class TestEstimateToolTokens:
 
 
 class TestApplyKvToolStrategySessionStable:
-    def test_returns_cached_tools_when_session_set(self):
+    def test_additive_appends_new_tools(self):
+        # P4: session_stable is grow-only/additive — a newly-selected tool joins the
+        # cached set instead of being locked out (the mid-session intent-shift fix).
         svc = _make_service()
         cached = [_make_tool("cached")]
         fresh = [_make_tool("fresh")]
@@ -145,7 +147,39 @@ class TestApplyKvToolStrategySessionStable:
             session_semantic_tools=cached,
             kv_tool_strategy="session_stable",
         )
+        assert [t.name for t in result] == ["cached", "fresh"]
+
+    def test_returns_cached_object_when_no_new_tools(self):
+        # A turn that selects nothing new returns the cached set unchanged -> KV cache hit.
+        svc = _make_service()
+        cached = [_make_tool("a"), _make_tool("b")]
+        fresh = [_make_tool("a")]  # subset of cached
+        provider = MagicMock(supports_prompt_caching=MagicMock(return_value=False))
+        provider.context_window = MagicMock(return_value=8192)
+        result = svc.apply_kv_tool_strategy(
+            fresh,
+            kv_optimization_enabled=True,
+            provider=provider,
+            model="m",
+            session_semantic_tools=cached,
+            kv_tool_strategy="session_stable",
+        )
         assert result is cached
+
+    def test_additive_alias_behaves_like_session_stable(self):
+        svc = _make_service()
+        cached = [_make_tool("a")]
+        provider = MagicMock(supports_prompt_caching=MagicMock(return_value=False))
+        provider.context_window = MagicMock(return_value=8192)
+        result = svc.apply_kv_tool_strategy(
+            [_make_tool("b")],
+            kv_optimization_enabled=True,
+            provider=provider,
+            model="m",
+            session_semantic_tools=cached,
+            kv_tool_strategy="additive",
+        )
+        assert [t.name for t in result] == ["a", "b"]
 
     def test_returns_tools_on_first_call_no_cache(self):
         svc = _make_service()

@@ -453,3 +453,61 @@ async def test_tool_selection_runtime_preserves_order_without_explicit_database_
     )
 
     assert [tool.name for tool in result] == ["graph", "read", "shell", "db"]
+
+
+# --- tool-supply P3: Q&A gate -> read-core (not None) ----------------------------
+
+
+class _FakeTool:
+    def __init__(self, name: str) -> None:
+        self.name = name
+        self.description = f"{name} tool"
+        self.parameters = {"type": "object", "properties": {}}
+
+
+@pytest.mark.asyncio
+async def test_qa_gate_skip_mode_returns_none():
+    provider = MagicMock()
+    provider.supports_tools.return_value = True
+    host = SimpleNamespace(
+        provider=provider,
+        _model_supports_tool_calls=MagicMock(return_value=True),
+        _tool_skip_mode=MagicMock(return_value="skip"),
+        _should_skip_tools_for_turn=MagicMock(return_value=True),
+        tool_selector=SimpleNamespace(tools=None),
+    )
+    runtime = ToolSelectionRuntime(OrchestratorProtocolAdapter(host))
+    result = await runtime.select_tools_for_turn("hi", goals=None)
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_qa_gate_read_core_mode_returns_read_tools():
+    provider = MagicMock()
+    provider.supports_tools.return_value = True
+    registry = MagicMock()
+    registry.get.side_effect = lambda name: (
+        _FakeTool(name)
+        if name
+        in {
+            "read",
+            "code_search",
+            "ls",
+        }
+        else None
+    )
+    host = SimpleNamespace(
+        provider=provider,
+        _model_supports_tool_calls=MagicMock(return_value=True),
+        _tool_skip_mode=MagicMock(return_value="read_core"),
+        _should_skip_tools_for_turn=MagicMock(return_value=True),
+        tool_selector=SimpleNamespace(tools=registry),
+    )
+    runtime = ToolSelectionRuntime(OrchestratorProtocolAdapter(host))
+    result = await runtime.select_tools_for_turn("how does the auth flow work", goals=None)
+
+    # Borderline Q&A keeps a minimal read-only core (not None), at STUB schema.
+    assert result is not None
+    names = [t.name for t in result]
+    assert names == ["read", "code_search", "ls"]
+    assert all(t.schema_level == "stub" for t in result)

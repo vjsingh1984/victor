@@ -66,7 +66,12 @@ dependencies = [
     "aiohttp>=3.9",
 
     # CLI/UI
-    "typer>=0.12",
+    # typer<0.15 (e.g. 0.12.x) is incompatible with click>=8.2: click added
+    # validation that rejects --flag/--no-flag secondary opts unless is_flag is
+    # set, which old typer doesn't do — every boolean CLI option then fails at
+    # group-build time. Floor at a click-8.2+ aware typer; cap to satisfy
+    # huggingface-hub (typer<0.26).
+    "typer>=0.15,<0.26",
     "rich>=13.7",
     "prompt-toolkit>=3.0",
     "textual>=0.89",
@@ -104,6 +109,15 @@ embeddings = [
     "sentence-transformers>=2.2.0",
     "lancedb>=0.6.0",
     "pyarrow>=14.0",
+]
+
+# ProximaDB vector store / embedding provider (optional backend).
+# Imported lazily with graceful ImportError fallback in
+# victor/storage/vector_stores/proximadb_provider.py — degrades to other
+# providers when absent. Pin kept identical to victor-coding's proximadb extra
+# so the backend version stays aligned across packages.
+proximadb = [
+    "proximadb-python>=0.2,<0.3",
 ]
 
 # LangChain interop: adapt LangChain tools as native Victor tools
@@ -207,12 +221,17 @@ ci = [
     "mkdocs>=1.5",
     "mkdocs-material>=9.5",
     "mkdocstrings[python]>=0.24",
+    # Pygments 2.19 escapes the formatter filename; pymdownx passes filename=None for
+    # mkdocstrings' block signatures -> html.escape(None) crash. Cap until upstream fixes it.
+    "pygments<2.19",
 ]
 
 docs = [
     "mkdocs>=1.5",
     "mkdocs-material>=9.5",
     "mkdocstrings[python]>=0.24",
+    # See note in [dev]: cap Pygments to avoid the mkdocstrings signature-render crash.
+    "pygments<2.19",
 ]
 
 sphinx-docs = [

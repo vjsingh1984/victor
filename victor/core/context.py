@@ -31,6 +31,14 @@ trace_id: contextvars.ContextVar[str] = contextvars.ContextVar("trace_id", defau
 # Session ID for the current orchestrator session
 session_id: contextvars.ContextVar[str] = contextvars.ContextVar("session_id", default="")
 
+# Turn ID for the current PERCEIVE->ACT->EVALUATE turn within a session. Together with
+# session_id and request_id this forms the correlation spine that lets the capture axis
+# (tool.supply offered -> tool.intent invoked -> rl_outcome resulted) be joined end-to-end.
+turn_id: contextvars.ContextVar[str] = contextvars.ContextVar("turn_id", default="")
+
+# Request ID for the current single operation (one tool call / decision) within a turn.
+request_id: contextvars.ContextVar[str] = contextvars.ContextVar("request_id", default="")
+
 # Vertical name for the current operation
 active_vertical: contextvars.ContextVar[str] = contextvars.ContextVar("active_vertical", default="")
 
@@ -69,6 +77,56 @@ def get_session_id() -> str:
 def set_session_id(sid: str) -> contextvars.Token:
     """Set the current session ID."""
     return session_id.set(sid)
+
+
+def get_turn_id() -> str:
+    """Get the current turn ID (empty string if no turn is active)."""
+    return turn_id.get()
+
+
+def set_turn_id(tid: str) -> contextvars.Token:
+    """Set the current turn ID."""
+    return turn_id.set(tid)
+
+
+def begin_turn() -> str:
+    """Start a new turn: generate a fresh turn ID, set it, and return it.
+
+    Call at each per-turn boundary (buffered ``execute_turn`` / streaming
+    ``_stream_turn``) so capture records emitted during the turn share one
+    ``turn_id``. Best-effort: callers should not let a failure here break the turn.
+    """
+    tid = uuid.uuid4().hex[:12]
+    turn_id.set(tid)
+    return tid
+
+
+def get_request_id() -> str:
+    """Get the current request/operation ID (empty string if none)."""
+    return request_id.get()
+
+
+def set_request_id(rid: str) -> contextvars.Token:
+    """Set the current request/operation ID."""
+    return request_id.set(rid)
+
+
+def get_correlation() -> dict[str, str]:
+    """Return the current correlation spine as a dict (omitting empty values).
+
+    Convenience for stamping capture records (trace events, rl_outcome rows).
+    """
+    out: dict[str, str] = {}
+    sid = session_id.get()
+    tid = turn_id.get()
+    rid = request_id.get()
+    if sid:
+        out["session_id"] = sid
+    if tid:
+        out["turn_id"] = tid
+    if rid:
+        out["request_id"] = rid
+    return out
 
 
 def get_active_vertical() -> str:

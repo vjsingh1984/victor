@@ -33,12 +33,16 @@ level; SQLite stays the default and nothing flips automatically.
   repeats it against a real embedded instance, skipping when the binary is absent.
 - **WIP / gated:** the multi-tenant **service** path (`server_url=`,
   `EmbeddingMode::Cold`/SQ8) is marked WIP — gated on ProximaDB TD-127 (secondary
-  indexes) + TD-130/131 (graph bulk-load + REST v2 hybrid). As of 2026-06-22,
-  TD-127 is **in flight** (PR #215 / branches `feat/td-127-grpc-sql-writes-design`,
-  `feat/oltp-secondary-index`) but **not yet merged to `develop`**, and TD-130/131
-  are not yet opened. So nothing flips automatically — embedded is the build/verify
-  target. The Arrow Flight bulk-load and ORION native centrality (steps below) are
-  also still pending.
+  indexes) + TD-130/131 (graph bulk-load + REST v2 hybrid). As of 2026-06-22 the
+  **engine-side gate is now satisfied on ProximaDB `develop`**: TD-127/128 merged
+  (PR #215, `40c08076`), TD-130 graph bulk-load merged (PR #220, `967f15db`), and
+  REST v2 hybrid is live (`/api/v2/hybrid/search` + `/strategies` in the SDK). The
+  remaining blocker is operational, not API: there is **no built `proximadb-server`
+  binary** in this environment, so the embedded engine cannot start and live parity
+  cannot be measured yet. The code keeps the service-mode WIP guard and SQLite
+  default until a live parity bench passes (`cd proximaDB && cargo build --release`
+  to unblock). Arrow Flight bulk-load and ORION native centrality (steps below) are
+  also still pending on that live verification.
 
 ## Why
 
@@ -130,5 +134,5 @@ Tier-B PAX fragment contract, optional transactional multi-modal write, code-emb
 2. ✅ Parity test on a fixture repo: `impact_analysis(forward/backward)` and hybrid seed→expand match
    the SQLite store on known symbols (adapter-level always-on + embedded gated).
 3. ⏳ Bench Arrow Flight bulk-load + k-hop + hybrid latency; compare footprint vs the 2.4 GB SQLite + Lance
-   pair (projected ~120 MB f32 / ~35 MB SQ8 for Tier-A).
+   pair (projected ~120 MB f32 / ~35 MB SQ8 for Tier-A). Blocked on a built `proximadb-server` binary.
 4. ⏳ Flip the default provider per-repo once parity holds (per-repo `.victor/graph_backend` flag exists; SQLite stays default).

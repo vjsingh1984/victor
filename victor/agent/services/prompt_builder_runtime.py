@@ -439,6 +439,14 @@ class PromptBuilderRuntime:
                 normalized.append(canonical)
                 seen.add(canonical)
 
+        # P5 capability-first split: a prompt-caching provider caches the full tool set
+        # nearly free (billing discount), so keep ALL tools in the stable system prefix —
+        # per-turn dynamic injection would only churn the cache for no benefit. Only
+        # non-caching / local providers keep the window-tiered CORE-stable + ADAPTIVE
+        # split (where moving the long tail into per-turn user messages saves tokens).
+        if self._provider_supports_prompt_caching():
+            return normalized, []
+
         stable: list[str] = []
         dynamic: list[str] = []
         for tool_name in normalized:
@@ -448,6 +456,19 @@ class PromptBuilderRuntime:
             else:
                 dynamic.append(tool_name)
         return stable, dynamic
+
+    def _provider_supports_prompt_caching(self) -> bool:
+        """Best-effort: does the active provider offer API-level prompt caching?
+
+        Used to decide the prompt-tool split (P5). Any failure -> False (fall back to
+        the window-tiered split), so this never breaks prompt assembly.
+        """
+        try:
+            provider = getattr(self._runtime, "provider", None)
+            fn = getattr(provider, "supports_prompt_caching", None)
+            return bool(fn()) if callable(fn) else False
+        except Exception:
+            return False
 
     def _reload_project_context_if_needed(self) -> None:
         """Refresh .victor/init.md content when the backing file changed."""

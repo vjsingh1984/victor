@@ -852,6 +852,7 @@ class ToolSelector(ModeAwareMixin):
         on_selection_recorded: Optional[Callable[[str, int], None]] = None,
         vertical_context: Optional["VerticalContext"] = None,
         runtime_intelligence: Optional[Any] = None,
+        cap_mode: str = "stub",
     ):
         """Initialize the tool selector.
 
@@ -876,6 +877,10 @@ class ToolSelector(ModeAwareMixin):
         self.provider_name = provider_name
         self.tool_selection_config = tool_selection_config or {}
         self.fallback_max_tools = fallback_max_tools
+        # tool-supply P2: over-cap policy. Default "stub" demotes the long tail to STUB
+        # instead of dropping it (no relevant tool is made invisible). "none"/"hard"
+        # available for caching providers / the legacy escape hatch respectively.
+        self.cap_mode = cap_mode
         self._on_selection_recorded = on_selection_recorded
 
         # Vertical context for vertical-specific tool selection (DIP)
@@ -2230,6 +2235,7 @@ class ToolSelector(ModeAwareMixin):
             # Protect deliberately-selected web tools from the order-blind edge filter /
             # truncation so web_search survives to dispatch for research-flavored tasks.
             web_tools=frozenset(self._get_web_tools_cached()),
+            cap_mode=self.cap_mode,
         )
 
     def _finalize_semantic_selection(

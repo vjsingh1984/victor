@@ -21,6 +21,14 @@ class ToolSelectionPostProcessContext:
     # flavored task that ranked web_search just below the cap, dropping it leaves the model
     # told about a tool it can't call. Empty by default (no protection).
     web_tools: frozenset[str] = frozenset()
+    # Cap behavior past ``fallback_max_tools`` (tool-supply P2):
+    #   "hard" — legacy: drop the over-cap tail (kept as an escape hatch).
+    #   "stub" — keep ALL tools; demote the over-cap tail to STUB schema instead of
+    #            dropping, so a relevant tool is never made invisible to the model.
+    #   "none" — no cap (caching providers: the full set is nearly free).
+    # Default "hard" preserves prior behavior for direct callers; the selector passes
+    # "stub" so the live path stops silently dropping ranked tools.
+    cap_mode: str = "hard"
 
 
 class ToolSelectionPostProcessor:
@@ -46,6 +54,37 @@ class ToolSelectionPostProcessor:
         keep_non_web = max(0, max_tools - len(web))
         keep_names = {t.name for t in web} | {t.name for t in non_web[:keep_non_web]}
         return [t for t in tools if t.name in keep_names]
+
+    @staticmethod
+    def _apply_cap(
+        tools: list[ToolDefinition],
+        cap_mode: str,
+        max_tools: int,
+        web_tools: frozenset[str],
+    ) -> list[ToolDefinition]:
+        """Apply the over-cap policy (tool-supply P2).
+
+        - ``none``: return every tool unchanged (no cap).
+        - ``stub``: keep the top ``max_tools`` (web-preserving) at their current schema
+          and demote the rest to STUB — returning **all** tools so a relevant tool is
+          never dropped, only made terser. STUB schemas (~25-40 tokens) keep it callable;
+          the downstream token-budget step is the backstop.
+        - ``hard`` (default): legacy truncation — drop the over-cap tail.
+        """
+        if cap_mode == "none" or len(tools) <= max_tools:
+            return tools
+        if cap_mode == "stub":
+            keep = ToolSelectionPostProcessor._truncate_preserving_web(tools, max_tools, web_tools)
+            keep_names = {t.name for t in keep}
+            for t in tools:
+                if t.name not in keep_names:
+                    try:
+                        t.schema_level = "stub"
+                    except Exception:  # never let schema-tier marking break selection
+                        pass
+            return tools
+        # "hard" — legacy behavior.
+        return ToolSelectionPostProcessor._truncate_preserving_web(tools, max_tools, web_tools)
 
     def apply(
         self,
@@ -86,8 +125,7 @@ class ToolSelectionPostProcessor:
 
         result = cap_mcp_tools(result, context.max_mcp_tools)
 
-        if len(result) > context.fallback_max_tools:
-            result = self._truncate_preserving_web(result, context.fallback_max_tools, web_tools)
+        result = self._apply_cap(result, context.cap_mode, context.fallback_max_tools, web_tools)
 
         if (
             selection_scores

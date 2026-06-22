@@ -64,10 +64,13 @@ from enum import Enum
 from typing import (
     Any,
     AsyncIterator,
+    Awaitable,
+    Callable,
     Dict,
     List,
     Literal,
     Optional,
+    Protocol,
     Union,
     TYPE_CHECKING,
 )
@@ -77,6 +80,8 @@ from victor.agent.turn_policy import (
     NudgePolicy,
     SpinDetector,
     SpinState,
+    TurnEvaluationController,
+    TurnObservation,
 )
 from victor.agent.topology_contract import TopologyAction
 from victor.agent.topology_grounder import GroundedTopologyPlan, TopologyGrounder
@@ -98,6 +103,7 @@ from victor.framework.capabilities.task_hints import TaskTypeHintCapabilityProvi
 from victor.agent.paradigm_router import ParadigmRouter, get_paradigm_router
 from victor.agent.services.runtime_intelligence import RuntimeIntelligenceService
 from victor.framework.enhanced_completion_evaluation import EnhancedCompletionEvaluator
+from victor.providers.base import StreamChunk
 
 # StateGraph-backed agentic-loop executor.
 # Imported lazily to avoid circular dependencies at module import time.
@@ -127,6 +133,46 @@ class AdaptiveTerminationDecision(str, Enum):
 
 # Type alias for backward compatibility
 _AdaptiveTerminationDecisionLiteral = Literal["plateau", "extend"]
+
+
+@dataclass
+class StreamingTurnOutcome:
+    """Carries the ``TurnResult`` produced by one streaming ACT turn (FEP-0007 Addendum A).
+
+    ``run_streaming``'s ACT is an async generator (it yields ``StreamChunk``s), so it can't
+    return a value: the streaming ACT port writes the turn's ``TurnResult`` here for the shared
+    EVALUATE phase to consume — the same primitive the buffered ACT (``_act``) produces.
+    """
+
+    turn_result: Any = None
+
+
+class StreamingActProvider(Protocol):
+    """Framework-side streaming ACT seam driven by ``AgenticLoop.run_streaming`` (FEP-0007
+    Addendum A).
+
+    The streaming counterpart of the buffered ACT (``turn_executor.execute_turn``): given this
+    turn's perception/plan/state, run the provider + emit + tool sub-steps, yield ``StreamChunk``s
+    for live delivery, and write the produced ``TurnResult`` to ``outcome``. Letting the loop
+    depend on this narrow seam keeps PERCEIVE/PLAN/EVALUATE/DECIDE shared while the I/O shape
+    differs only in ACT. The concrete implementation — an adapter over the service-layer
+    ``StreamingChatExecutor.execute_turn_streaming`` — is wired at cutover; until then
+    ``run_streaming`` is unwired (no default provider).
+    """
+
+    def stream_turn_act(
+        self,
+        *,
+        query: str,
+        state: Dict[str, Any],
+        perception: Any,
+        plan: Any,
+        turn_index: int,
+        outcome: StreamingTurnOutcome,
+    ) -> AsyncIterator[StreamChunk]:
+        """Run one streaming turn's ACT, yielding chunks and writing the ``TurnResult``."""
+        ...
+
 
 if TYPE_CHECKING:
     from victor.agent.services.turn_execution_runtime import (
@@ -456,6 +502,10 @@ class AgenticLoopConfig:
     enable_completion_scoring: bool = True
     enable_context_keywords: bool = True
     enable_calibrated_completion: Optional[bool] = None
+    # Completion strategy (ADR-009): "enhanced" (default) | "rubric" | "hybrid" | "legacy".
+    # A strategy setting, not a feature flag. Default "enhanced" → zero behavior change until the
+    # rubric path is proven to match-or-beat on the A/B + judge-α gate.
+    completion_strategy: str = "enhanced"
     enable_planning_gate: bool = True
     enable_paradigm_router: bool = True
     enable_topology_routing: bool = True
@@ -521,7 +571,10 @@ class AgenticLoop:
         enable_adaptive_iterations: bool = True,
         plateau_window: int = 3,
         plateau_tolerance: float = 0.02,
+        exploration_settings: Optional[Any] = None,
         config: "Union[AgenticLoopConfig, Dict[str, Any], None]" = None,
+        streaming_act_port: Optional["StreamingActProvider"] = None,
+        rubric_complete_fn: Optional[Callable[[str], Awaitable[str]]] = None,
     ):
         """Initialize agentic loop.
 
@@ -544,6 +597,9 @@ class AgenticLoop:
         self.orchestrator = orchestrator
         self.turn_executor = turn_executor
         self.memory_coordinator = memory_coordinator
+        # FEP-0007 Addendum A: the streaming ACT seam run_streaming() drives. None until
+        # wired at cutover, at which point run_streaming becomes the live UI loop body.
+        self.streaming_act_port = streaming_act_port
         self.max_iterations = max_iterations
         self.enable_fulfillment_check = enable_fulfillment_check
         self.enable_adaptive_iterations = enable_adaptive_iterations
@@ -579,6 +635,15 @@ class AgenticLoop:
         self.spin_detector = SpinDetector()
         self.nudge_policy = NudgePolicy()
         self.criteria_builder = FulfillmentCriteriaBuilder()
+        # Shared per-turn content-repetition + nudge decision (also used by the streaming loop).
+        # Plateau stays owned by this loop's _check_adaptive_termination (FAIL/extend), so the
+        # controller's plateau-nudge is disabled here to preserve current behavior.
+        self.turn_evaluation_controller = TurnEvaluationController.from_exploration_settings(
+            exploration_settings,
+            spin_detector=self.spin_detector,
+            nudge_policy=self.nudge_policy,
+            enable_plateau_nudge=False,
+        )
 
         # Initialize canonical runtime intelligence boundary
         if runtime_intelligence is None:
@@ -626,6 +691,34 @@ class AgenticLoop:
             logger.warning(
                 "[EnhancedCompletion] DISABLED via config - using legacy completion detection"
             )
+
+        # Rubric-based completion (ADR-009 / EVR-3) — opt-in via completion_strategy in
+        # {"rubric","hybrid"}. Default "enhanced" leaves this None (zero behavior change). When an
+        # async rubric_complete_fn is injected, use the LLM judge; otherwise the deterministic
+        # heuristic judge. "hybrid" additionally consults the enhanced evaluator (both must agree).
+        self.rubric_completion_evaluator = None
+        if self.config.completion_strategy in ("rubric", "hybrid"):
+            if rubric_complete_fn is not None:
+                from victor.framework.rubric_completion import (
+                    AsyncRubricCompletionEvaluator,
+                    LLMRubricJudge,
+                )
+
+                self.rubric_completion_evaluator = AsyncRubricCompletionEvaluator(
+                    LLMRubricJudge(rubric_complete_fn)
+                )
+                logger.info(
+                    "[RubricCompletion] ENABLED (LLM judge) — strategy=%s",
+                    self.config.completion_strategy,
+                )
+            else:
+                from victor.framework.rubric_completion import RubricCompletionEvaluator
+
+                self.rubric_completion_evaluator = RubricCompletionEvaluator()
+                logger.info(
+                    "[RubricCompletion] ENABLED (heuristic judge) — strategy=%s",
+                    self.config.completion_strategy,
+                )
 
         # Initialize planning gate for fast-slow architecture
         self.planning_gate = PlanningGate(enabled=self.config.enable_planning_gate)
@@ -701,7 +794,7 @@ class AgenticLoop:
         iterations: List[LoopIteration] = []
         state: Dict[str, Any] = {"query": query, **(context or {})}
         self._progress_scores = []
-        self.spin_detector.reset()
+        self.turn_evaluation_controller.reset()  # resets spin_detector + content-repetition + plateau
         self.criteria_builder.reset()
         effective_max = self.max_iterations
 
@@ -763,9 +856,9 @@ class AgenticLoop:
                         task_hint = self._task_hint_provider.get_hint(task_type)
                         if task_hint:
                             skip_planning = getattr(task_hint, "skip_planning", False)
-                            temp_override = getattr(task_hint, "temperature_override", None)
-                            if temp_override is not None:
-                                state["temperature_override"] = temp_override
+                            # Temperature is now resolved at the provider seam from state["task_type"]
+                            # via the unified TemperatureResolver (ADR-013), which reads the same
+                            # TaskTypeHint.temperature_override constant — no per-turn override here.
 
                     if hasattr(self.runtime_intelligence, "get_structured_routing_policy"):
                         structured_routing_policy = (
@@ -1023,76 +1116,71 @@ class AgenticLoop:
                 # Track progress (SubSearch intermediate rewards)
                 self._progress_scores.append(evaluation.score)
 
-                # AGENTIC LOOP FIX: Content degradation detection
-                # Detect if agent is looping without making progress (same content repeated)
-                if len(self._progress_scores) >= 3:
-                    # Check content lengths from recent iterations
-                    recent_lengths = []
-                    recent_tool_counts = []
-                    for iter_obj in iterations[-3:]:
-                        if iter_obj.action_result and hasattr(iter_obj.action_result, "content"):
-                            content_length = len(iter_obj.action_result.content)
-                            recent_lengths.append(content_length)
-                        elif iter_obj.action_result and hasattr(iter_obj.action_result, "response"):
-                            content_length = len(iter_obj.action_result.response)
-                            recent_lengths.append(content_length)
-
-                        # Track tool usage to distinguish "no progress" from "tool progress but no text"
-                        if iter_obj.action_result and hasattr(
-                            iter_obj.action_result, "tool_calls_count"
-                        ):
-                            recent_tool_counts.append(iter_obj.action_result.tool_calls_count)
-                        elif iter_obj.action_result and hasattr(
-                            iter_obj.action_result, "has_tool_calls"
-                        ):
-                            recent_tool_counts.append(
-                                1 if iter_obj.action_result.has_tool_calls else 0
-                            )
-
-                    # If all 3 recent iterations have same content length, likely looping
-                    if (
-                        len(recent_lengths) >= 3 and len(set(recent_lengths)) == 1 and i >= 5
-                    ):  # Only check after 5 iterations to avoid false positives
-                        # Check for evidence of tool progress to avoid false positives
-                        # when agent is actively reading/analyzing but not generating text yet
-                        has_tool_progress = getattr(evaluation, "metadata", {}).get(
-                            "successful_tool_progress"
-                        ) or (
-                            len(recent_tool_counts) >= 3 and sum(recent_tool_counts) >= 3
-                        )  # At least 3 tools across last 3 iterations
-
-                        if has_tool_progress:
-                            logger.debug(
-                                "Deferring content-repetition degradation because this iteration "
-                                "produced successful tool progress (tool_count=%d)",
-                                sum(recent_tool_counts) if recent_tool_counts else 0,
-                            )
-                        else:
-                            state.setdefault("degradation_events", []).append(
-                                {
-                                    "source": "agentic_loop",
-                                    "kind": "content_repetition",
-                                    "failure_type": "STUCK_LOOP",
-                                    "iteration": i,
-                                    "task_type": state.get("task_type"),
-                                    "post_degraded": True,
-                                    "recovered": False,
-                                    "adaptation_cost": float(len(recent_lengths)),
-                                    "degradation_reasons": ["content_repetition"],
-                                }
-                            )
-                            logger.warning(
-                                f"Content degradation detected: same content length "
-                                f"({recent_lengths[0]}) repeated for 3 iterations - stopping loop"
-                            )
-                            evaluation = EvaluationResult(
-                                decision=EvaluationDecision.FAIL,
-                                score=evaluation.score,
-                                reason=(
-                                    f"Content degradation: same length repeated 3x (iteration {i})"
-                                ),
-                            )
-                            # Continue to exit logic below
+                # Content-repetition detection via the shared TurnEvaluationController (the same
+                # hash/overlap detector the streaming loop uses — replaces the cruder
+                # content-length heuristic). The loop already fed the spin detector in _act, so
+                # don't re-record. Plateau/nudge stay owned by this loop below.
+                _action_content = self._extract_turn_content(action_result)
+                _tool_results = getattr(action_result, "tool_results", None) or []
+                _turn_obs = TurnObservation(
+                    content=_action_content,
+                    productive_count=int(getattr(action_result, "successful_tool_count", 0) or 0),
+                    has_tool_calls=bool(getattr(action_result, "has_tool_calls", False)),
+                    all_blocked=bool(getattr(action_result, "all_tools_blocked", False)),
+                    tool_names={
+                        (r.get("tool_name") or r.get("name") or "")
+                        for r in _tool_results
+                        if isinstance(r, dict)
+                    },
+                    tool_count=int(getattr(action_result, "tool_calls_count", 0) or 0),
+                    tool_signatures=getattr(action_result, "tool_signatures", None),
+                    tool_results=_tool_results,
+                    iteration=i,
+                    max_iterations=effective_max,
+                )
+                turn_decision = self.turn_evaluation_controller.evaluate(
+                    _turn_obs, record_spin=False
+                )
+                if turn_decision.stop and turn_decision.terminal_success:
+                    # Search-saturation (or other clean stop) -> COMPLETE so the loop synthesizes
+                    # the gathered context instead of thrashing to the iteration cap.
+                    logger.info(
+                        "Converged at iteration %d (%s) - completing to synthesize",
+                        i,
+                        turn_decision.stop_reason,
+                    )
+                    evaluation = EvaluationResult(
+                        decision=EvaluationDecision.COMPLETE,
+                        score=evaluation.score,
+                        reason=f"Converged: {turn_decision.stop_reason} (iteration {i})",
+                    )
+                elif turn_decision.stop:
+                    state.setdefault("degradation_events", []).append(
+                        {
+                            "source": "agentic_loop",
+                            "kind": turn_decision.stop_reason or "content_repetition",
+                            "failure_type": "STUCK_LOOP",
+                            "iteration": i,
+                            "task_type": state.get("task_type"),
+                            "post_degraded": True,
+                            "recovered": False,
+                            "adaptation_cost": float(i),
+                            "degradation_reasons": [
+                                turn_decision.stop_reason or "content_repetition"
+                            ],
+                        }
+                    )
+                    logger.warning(
+                        "Content degradation detected (%s) at iteration %d - stopping loop",
+                        turn_decision.stop_reason,
+                        i,
+                    )
+                    evaluation = EvaluationResult(
+                        decision=EvaluationDecision.FAIL,
+                        score=evaluation.score,
+                        reason=f"Content repetition detected (iteration {i})",
+                    )
+                    # Continue to exit logic below
 
                 # FULFILLMENT CHECK (optional)
                 if self.enable_fulfillment_check:
@@ -1187,42 +1275,10 @@ class AgenticLoop:
                     logger.warning("Task failed - exiting loop")
                     break
 
-                # NUDGE INJECTION via shared NudgePolicy (consistent with streaming)
-                # Inject on any non-terminal decision (RETRY or CONTINUE)
-                if (
-                    evaluation.decision
-                    not in (EvaluationDecision.COMPLETE, EvaluationDecision.FAIL)
-                    and self.turn_executor is not None
-                ):
-                    chat_ctx = getattr(self.turn_executor, "_chat_context", None)
-                    if chat_ctx and hasattr(chat_ctx, "add_message"):
-                        nudge = self.nudge_policy.evaluate(self.spin_detector)
-                        if nudge.should_inject:
-                            from victor.agent.conversation.history_metadata import (
-                                build_internal_history_metadata,
-                            )
-                            from victor.agent.conversation.types import MessageSource
-
-                            _nudge_meta = build_internal_history_metadata(
-                                "nudge", source=MessageSource.AGENT_NUDGE
-                            )
-                            chat_ctx.add_message(nudge.role, nudge.message, metadata=_nudge_meta)
-                            logger.info(f"Nudge injected: {nudge.nudge_type.value}")
-
-                        budget_nudge = self.nudge_policy.budget_warning(i, effective_max)
-                        if budget_nudge.should_inject:
-                            from victor.agent.conversation.history_metadata import (
-                                build_internal_history_metadata,
-                            )
-                            from victor.agent.conversation.types import MessageSource
-
-                            chat_ctx.add_message(
-                                budget_nudge.role,
-                                budget_nudge.message,
-                                metadata=build_internal_history_metadata(
-                                    "budget_nudge", source=MessageSource.AGENT_NUDGE
-                                ),
-                            )
+                # NUDGE INJECTION via shared NudgePolicy (consistent with streaming).
+                # Inject on any non-terminal decision (RETRY or CONTINUE). Shared with
+                # run_streaming() so buffered and streaming nudge behavior can't drift.
+                self._inject_decide_nudges(evaluation, i, effective_max)
 
             # Determine success
             success = self._determine_success(iterations)
@@ -1294,6 +1350,169 @@ class AgenticLoop:
                     "degradation_events": list(state.get("degradation_events", [])),
                 },
             )
+
+    @staticmethod
+    def _extract_turn_content(action_result: Any) -> str:
+        """Return a turn's assistant text as a string for content-repetition evaluation.
+
+        A tool-only turn legitimately has empty content (``""``). The previous
+        ``getattr(action_result, "content", None) or getattr(action_result, "response", "")``
+        idiom fell through to the ``CompletionResponse`` *object* on such turns, which then
+        crashed the content-repetition detector on ``.strip()``. This coerces to ``str``,
+        drilling into ``response.content`` only when ``action_result`` is neither a ``TurnResult``
+        (string ``.content``) nor a raw string response.
+        """
+        raw = getattr(action_result, "content", None)
+        if isinstance(raw, str):
+            return raw
+        if isinstance(action_result, str):
+            return action_result
+        resp = getattr(action_result, "response", "")
+        content = resp if isinstance(resp, str) else getattr(resp, "content", "")
+        return content if isinstance(content, str) else ""
+
+    def _inject_decide_nudges(
+        self,
+        evaluation: EvaluationResult,
+        iteration: int,
+        effective_max: int,
+    ) -> None:
+        """Inject shared NudgePolicy nudges on a non-terminal DECIDE (RETRY/CONTINUE/ESCALATE).
+
+        Extracted from run() so the buffered and streaming loops share one nudge path and can't
+        drift (FEP-0007 Addendum A). The nudge *decision* already comes from the shared
+        ``self.nudge_policy`` / ``self.spin_detector``; this is the conversation-injection glue.
+        No-op on terminal decisions or when no turn executor / chat context is available.
+        """
+        if evaluation.decision in (EvaluationDecision.COMPLETE, EvaluationDecision.FAIL):
+            return
+        if self.turn_executor is None:
+            return
+        chat_ctx = getattr(self.turn_executor, "_chat_context", None)
+        if not (chat_ctx and hasattr(chat_ctx, "add_message")):
+            return
+
+        from victor.agent.conversation.history_metadata import (
+            build_internal_history_metadata,
+        )
+        from victor.agent.conversation.types import MessageSource
+
+        nudge = self.nudge_policy.evaluate(self.spin_detector)
+        if nudge.should_inject:
+            chat_ctx.add_message(
+                nudge.role,
+                nudge.message,
+                metadata=build_internal_history_metadata("nudge", source=MessageSource.AGENT_NUDGE),
+            )
+            logger.info(f"Nudge injected: {nudge.nudge_type.value}")
+
+        budget_nudge = self.nudge_policy.budget_warning(iteration, effective_max)
+        if budget_nudge.should_inject:
+            chat_ctx.add_message(
+                budget_nudge.role,
+                budget_nudge.message,
+                metadata=build_internal_history_metadata(
+                    "budget_nudge", source=MessageSource.AGENT_NUDGE
+                ),
+            )
+
+    async def run_streaming(
+        self,
+        query: str,
+        context: Optional[Dict[str, Any]] = None,
+        conversation_history: Optional[List[Dict[str, Any]]] = None,
+    ) -> AsyncIterator[StreamChunk]:
+        """Stream the agentic loop — the SAME loop as run(), differing only in I/O.
+
+        FEP-0007 Addendum A (framing B): ``run_streaming`` drives the identical
+        PERCEIVE -> PLAN -> ACT -> EVALUATE -> DECIDE sequence as the buffered ``run()``. It
+        reuses the same non-yielding ``_analyze_turn`` / ``_plan`` / ``_evaluate`` phase methods
+        and the shared ``turn_evaluation_controller`` / ``nudge_policy``. The ONLY difference is
+        ACT: instead of a buffered ``_act`` returning a ``TurnResult``, it drives the injected
+        streaming ACT port, which yields ``StreamChunk``s for live delivery and produces the same
+        ``TurnResult`` the shared EVALUATE phase consumes. Streaming thus becomes a pure I/O mode
+        of the one research-rooted loop rather than a separate, thinner loop.
+
+        NOT yet wired into the live streaming path: it requires an injected ``streaming_act_port``
+        and currently covers the core phase loop. The run()-only preamble bands (fast-slow
+        planning gate, semantic response cache, paradigm/topology routing) and the richer DECIDE
+        bands (content-repetition controller, adaptive termination) are reconciled into this shared
+        path at cutover; until then ``StreamingChatExecutor.run()`` remains the single live
+        streaming loop body.
+
+        Args:
+            query: User's natural language query.
+            context: Additional execution context.
+            conversation_history: Prior turns for multi-turn context.
+
+        Yields:
+            StreamChunk: live chunks for each turn's streaming ACT.
+
+        Raises:
+            RuntimeError: if no streaming ACT port has been wired.
+        """
+        if self.streaming_act_port is None:
+            raise RuntimeError(
+                "AgenticLoop.run_streaming requires a streaming ACT port; it is wired at the "
+                "FEP-0007 cutover. Construct AgenticLoop(streaming_act_port=...) to drive it."
+            )
+
+        state: Dict[str, Any] = {"query": query, **(context or {})}
+        self._progress_scores = []
+        # Resets the shared spin detector + content-repetition + plateau (same as run()).
+        self.turn_evaluation_controller.reset()
+        self.criteria_builder.reset()
+        effective_max = self.max_iterations
+
+        for i in range(1, effective_max + 1):
+            # PERCEIVE (shared, non-yielding)
+            perception = await self._analyze_turn(query, context, conversation_history)
+            self._last_perception = perception
+            state["iteration"] = i
+            if getattr(perception, "task_analysis", None):
+                state["task_type"] = getattr(perception.task_analysis, "task_type", "unknown")
+            state["perception"] = (
+                perception.to_dict() if hasattr(perception, "to_dict") else perception
+            )
+
+            # PLAN (shared, non-yielding) — planned once, reused across turns like run().
+            plan = state.get("plan")
+            if plan is None:
+                plan = await self._plan(perception, state)
+                state["plan"] = plan
+
+            # ACT (streaming) — yields chunks; produces a TurnResult via the outcome holder.
+            act_outcome = StreamingTurnOutcome()
+            async for chunk in self.streaming_act_port.stream_turn_act(
+                query=query,
+                state=state,
+                perception=perception,
+                plan=plan,
+                turn_index=i,
+                outcome=act_outcome,
+            ):
+                yield chunk
+            action_result = act_outcome.turn_result
+            state["action_result"] = action_result
+
+            # Update shared spin detector + advance the temperature ratchet — the same per-turn step
+            # the buffered _act path runs, so streaming detects spin and escalates temperature
+            # identically (closes a latent streaming parity gap; ADR-013).
+            self._record_spin_and_ratchet(action_result)
+
+            # EVALUATE (shared, non-yielding)
+            evaluation = await self._evaluate(perception, action_result, state)
+            self._progress_scores.append(evaluation.score)
+
+            # DECIDE — terminal decisions end the stream; non-terminal nudge + continue.
+            if evaluation.decision == EvaluationDecision.COMPLETE:
+                evaluation = self._apply_backslide_guard(evaluation)
+            if evaluation.decision in (
+                EvaluationDecision.COMPLETE,
+                EvaluationDecision.FAIL,
+            ):
+                return
+            self._inject_decide_nudges(evaluation, i, effective_max)
 
     async def stream(
         self,
@@ -1387,7 +1606,7 @@ class AgenticLoop:
             StreamChunk objects from the streaming executor
         """
         # Reset spin detector for this conversation turn
-        self.spin_detector.reset()
+        self.turn_evaluation_controller.reset()  # resets spin_detector + content-repetition + plateau
         self.criteria_builder.reset()
 
         # PERCEIVE (before streaming — understands task before LLM call)
@@ -2038,6 +2257,44 @@ class AgenticLoop:
         # Minimal fallback: return perception as plan
         return {"perception": perception.to_dict()}
 
+    def _record_spin_and_ratchet(self, turn_result: Any) -> None:
+        """Update the shared SpinDetector + advance the temperature ratchet from one turn's result.
+
+        Shared by the buffered (``_act``) and streaming (``run_streaming``) paths so both detect spin
+        and escalate temperature identically (ADR-013): a tool-using turn is progress (reset); a
+        stalled/spinning turn escalates temperature for the next turn's resolution. The ratchet lives
+        on the orchestrator so the resolver reads the same instance.
+        """
+        if turn_result is None:
+            return
+        # Defensive reads: in production turn_result is a full TurnResult, but the loop must not crash
+        # the turn if a partial result reaches here (a missing field just means "no tool activity").
+        has_tool_calls = bool(getattr(turn_result, "has_tool_calls", False))
+        tool_results = getattr(turn_result, "tool_results", None)
+        tool_names = set()
+        if has_tool_calls and tool_results:
+            tool_names = {r.get("tool_name", "") for r in tool_results}
+        self.spin_detector.record_turn(
+            has_tool_calls=has_tool_calls,
+            all_blocked=bool(getattr(turn_result, "all_tools_blocked", False)),
+            tool_names=tool_names,
+            tool_count=getattr(turn_result, "tool_calls_count", 0),
+            tool_signatures=getattr(turn_result, "tool_signatures", ()),
+        )
+        ratchet = getattr(getattr(self, "orchestrator", None), "temperature_ratchet_state", None)
+        if ratchet is not None:
+            from victor.framework.temperature import SpinSignal
+
+            ratchet.record_turn(
+                SpinSignal(
+                    spin_state=getattr(self.spin_detector.state, "value", "normal"),
+                    consecutive_no_tool_turns=getattr(
+                        self.spin_detector, "consecutive_no_tool_turns", 0
+                    ),
+                    made_progress=has_tool_calls,
+                )
+            )
+
     async def _act(
         self,
         plan: Any,
@@ -2097,21 +2354,12 @@ class AgenticLoop:
                     is_qa_task=is_qa,
                     enable_thinking=enable_thinking,
                     intent=state.get("perception", {}).get("intent"),
-                    temperature_override=state.get("temperature_override"),
+                    task_type=state.get("task_type"),
                     runtime_context_overrides=runtime_context_overrides,
                 )
 
-            # Update shared spin detector
-            tool_names = set()
-            if turn_result.has_tool_calls and hasattr(turn_result, "tool_results"):
-                tool_names = {r.get("tool_name", "") for r in turn_result.tool_results}
-            self.spin_detector.record_turn(
-                has_tool_calls=turn_result.has_tool_calls,
-                all_blocked=turn_result.all_tools_blocked,
-                tool_names=tool_names,
-                tool_count=turn_result.tool_calls_count,
-                tool_signatures=turn_result.tool_signatures,
-            )
+            # Update shared spin detector + advance the temperature ratchet (shared with streaming).
+            self._record_spin_and_ratchet(turn_result)
 
             # Record tool results for fulfillment criteria auto-derivation
             if turn_result.tool_results:
@@ -2363,6 +2611,88 @@ class AgenticLoop:
         )
         return any(first_line.startswith(p) for p in intent_prefixes)
 
+    async def _rubric_completion_result(
+        self, perception: Any, action_result: Any, state: Dict[str, Any]
+    ) -> Optional[EvaluationResult]:
+        """Rubric-based completion verdict (ADR-009), for completion_strategy in {"rubric","hybrid"}.
+
+        Returns ``None`` to defer to the enhanced/legacy cascade when not applicable: no rubric
+        evaluator (other strategy), not a ``TurnResult``, tools still pending, or empty content.
+        Duck-types the sync heuristic evaluator (``.evaluate``) vs the async LLM-judge evaluator
+        (``.aevaluate``). For ``"hybrid"``, a rubric COMPLETE is confirmed only if the enhanced
+        evaluator also says COMPLETE — this cancels the rubric judge's observed over-completion on
+        intent statements (calibration κ≈0.5) while keeping its anti-under-scoring on real answers.
+        """
+        evaluator = self.rubric_completion_evaluator
+        if evaluator is None:
+            return None
+        from victor.agent.services.turn_execution_runtime import TurnResult
+
+        if not isinstance(action_result, TurnResult) or action_result.has_tool_calls:
+            return None
+        content = (getattr(action_result, "content", "") or "").strip()
+        if not content:
+            return None
+        task_family = str(state.get("task_type") or "general")
+        if hasattr(evaluator, "aevaluate"):
+            result = await evaluator.aevaluate(
+                task_family=task_family, content=content, context=state
+            )
+        else:
+            result = evaluator.evaluate(task_family=task_family, content=content, context=state)
+
+        if (
+            self.config.completion_strategy == "hybrid"
+            and result.complete
+            and self.enhanced_completion_evaluator is not None
+        ):
+            enhanced = await self.enhanced_completion_evaluator.evaluate(
+                perception=perception,
+                action_result=action_result,
+                state=state,
+                fulfillment_detector=self.fulfillment,
+                spin_detector=self.spin_detector,
+            )
+            if enhanced.decision != EvaluationDecision.COMPLETE:
+                return EvaluationResult(
+                    decision=EvaluationDecision.CONTINUE,
+                    score=result.aggregate,
+                    reason=f"[hybrid] rubric COMPLETE but enhanced disagreed: {enhanced.reason[:80]}",
+                    metadata={"rubric_completion": result.to_dict()},
+                )
+
+        decision = EvaluationDecision.COMPLETE if result.complete else EvaluationDecision.CONTINUE
+        return EvaluationResult(
+            decision=decision,
+            score=result.aggregate,
+            reason=f"[rubric] {result.reason}",
+            metadata={"rubric_completion": result.to_dict()},
+        )
+
+    def _is_terminal_answer(self, action_result: Any) -> bool:
+        """True when a no-tool turn delivered a genuine final answer (not narration / a question).
+
+        Mirrors the legacy terminal-answer rule: a substantial response (or any response after
+        prior tool usage) with no pending tool calls that is neither intent-only narration
+        ("I'll now read…") nor a continuation request ("Would you like me to…"). Used to complete
+        promptly even when EnhancedCompletionEvaluator under-scores a finished answer — without it
+        the loop burns low-confidence retries restating the answer (FEP-0007 cutover verbosity fix).
+        """
+        from victor.agent.services.turn_execution_runtime import TurnResult
+
+        if not isinstance(action_result, TurnResult):
+            return False
+        if action_result.has_tool_calls or not action_result.has_content:
+            return False
+        content = action_result.content.strip()
+        had_prior_tool_usage = getattr(self.spin_detector, "total_tool_calls", 0) > 0
+        is_substantial = len(content) > 100
+        if not (had_prior_tool_usage or is_substantial):
+            return False
+        return not self._is_continuation_request(content) and not self._is_intent_only_response(
+            content
+        )
+
     async def _evaluate(
         self,
         perception: Perception,
@@ -2401,6 +2731,19 @@ class AgenticLoop:
                 response_metadata = (
                     raw_response_metadata if isinstance(raw_response_metadata, dict) else {}
                 )
+                # The ACT primitive may signal a HIGH-confidence task completion (no pending
+                # tools) — e.g. the streaming executor's task-completion detector. Honor it as an
+                # immediate COMPLETE so the loop stops promptly instead of leaning on the
+                # under-scoring completion evaluator (FEP-0007 cutover tune-up).
+                if response_metadata.get("forced_task_completion") and not getattr(
+                    action_result, "has_tool_calls", False
+                ):
+                    return EvaluationResult(
+                        decision=EvaluationDecision.COMPLETE,
+                        score=0.95,
+                        reason="Task-completion active signal (HIGH confidence, no pending tools)",
+                        metadata={"forced_task_completion": True},
+                    )
                 if (
                     response_metadata.get("deterministic_tool_execution")
                     and action_result.successful_tool_count > 0
@@ -2465,6 +2808,12 @@ class AgenticLoop:
         except Exception:
             pass
 
+        # RUBRIC: task-adaptive rubric completion (ADR-009), opt-in via completion_strategy in
+        # {"rubric","hybrid"}. Returns None to defer to the enhanced/legacy cascade when not applicable.
+        rubric_result = await self._rubric_completion_result(perception, action_result, state)
+        if rubric_result is not None:
+            return rubric_result
+
         # ENHANCED: Use EnhancedCompletionEvaluator if enabled
         if self.enhanced_completion_evaluator is not None and self._should_use_enhanced_evaluation(
             action_result
@@ -2507,6 +2856,28 @@ class AgenticLoop:
                     # a written answer; forcing it on every successful turn
                     # is the bug.
                     return tool_progress_result
+                # A clear final answer (no pending tools, substantial, not narration/question) is
+                # COMPLETE even when the evaluator under-scored it — otherwise the loop retries a
+                # finished answer, restating it. Mirrors the legacy terminal-answer rule below
+                # (FEP-0007 cutover verbosity fix).
+                if enhanced_result.decision in (
+                    EvaluationDecision.RETRY,
+                    EvaluationDecision.CONTINUE,
+                ) and self._is_terminal_answer(action_result):
+                    logger.info(
+                        "[EnhancedCompletion] Overriding low-confidence %s -> COMPLETE: final "
+                        "answer delivered with no pending tools",
+                        enhanced_result.decision.value,
+                    )
+                    return EvaluationResult(
+                        decision=EvaluationDecision.COMPLETE,
+                        score=max(enhanced_result.score, 0.8),
+                        reason=(
+                            "Final answer delivered with no pending tools — completing despite "
+                            "low completion score"
+                        ),
+                        metadata={"terminal_answer_override": True},
+                    )
                 return self._apply_low_confidence_retry_budget(enhanced_result, state)
             except Exception as e:
                 # Graceful degradation: fall back to legacy evaluation on error

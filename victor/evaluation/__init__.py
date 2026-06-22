@@ -160,6 +160,20 @@ from victor.evaluation.agentic_harness import (
     generate_agentic_report,
 )
 
+# Trajectory-level evaluation (EVR-1, FEP-0008 Phase E)
+from victor.evaluation.trajectory_eval import (
+    TrajectoryDimension,
+    DimensionScore,
+    TrajectoryScore,
+    DimensionInterval,
+    IntervalStat,
+    BatteryResult,
+    DimensionScorer,
+    TrajectoryEvaluator,
+    default_scorers,
+    mean_confidence_interval,
+)
+
 # Agent adapter (connects Victor orchestrator to agentic benchmarks)
 from victor.evaluation.agent_adapter import (
     AdapterConfig,
@@ -239,6 +253,17 @@ from victor.evaluation.evaluation_orchestrator import (
     EvaluationSummary,
     EvaluationOrchestrator,
     run_swe_bench_evaluation,
+)
+
+# Judge reliability gating (EVR-2, ADR-011)
+from victor.evaluation.judge_calibration import (
+    JudgeReliability,
+    GateDecision,
+    JudgeReliabilityGate,
+    OrderSwapEnsembleJudge,
+    cohens_kappa,
+    krippendorff_alpha,
+    evaluate_judge_agreement,
 )
 
 __all__ = [
@@ -382,4 +407,23 @@ __all__ = [
     "EvaluationSummary",
     "EvaluationOrchestrator",
     "run_swe_bench_evaluation",
+    # Trajectory-level evaluation (EVR-1)
+    "TrajectoryDimension",
+    "DimensionScore",
+    "TrajectoryScore",
+    "DimensionInterval",
+    "IntervalStat",
+    "BatteryResult",
+    "DimensionScorer",
+    "TrajectoryEvaluator",
+    "default_scorers",
+    "mean_confidence_interval",
+    # Judge reliability gating (EVR-2)
+    "JudgeReliability",
+    "GateDecision",
+    "JudgeReliabilityGate",
+    "OrderSwapEnsembleJudge",
+    "cohens_kappa",
+    "krippendorff_alpha",
+    "evaluate_judge_agreement",
 ]
