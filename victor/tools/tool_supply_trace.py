@@ -94,10 +94,28 @@ class ToolSupplyTrace:
     profile: Optional[str] = None
     skipped: bool = False
     skip_reason: str = ""
+    # Correlation spine (R1): joins this offered-trace to the turn's invoked
+    # (tool.intent) and resulted (rl_outcome) records.
+    session_id: str = ""
+    turn_id: str = ""
+    request_id: str = ""
 
     @classmethod
     def begin(cls, registered: Any = None) -> "ToolSupplyTrace":
-        return cls(registered=_tool_names(registered))
+        trace = cls(registered=_tool_names(registered))
+        trace._capture_correlation()
+        return trace
+
+    def _capture_correlation(self) -> None:
+        """Stamp the live correlation spine (best-effort; telemetry is non-critical)."""
+        try:
+            from victor.core.context import get_request_id, get_session_id, get_turn_id
+
+            self.session_id = get_session_id() or ""
+            self.turn_id = get_turn_id() or ""
+            self.request_id = get_request_id() or ""
+        except Exception:
+            pass
 
     def set_candidates(self, tools: Any) -> Any:
         """Record the candidate set produced by candidate generation."""
@@ -148,6 +166,9 @@ class ToolSupplyTrace:
     def to_payload(self) -> Dict[str, Any]:
         """Serialize for the observability event (JSON-friendly)."""
         return {
+            "session_id": self.session_id,
+            "turn_id": self.turn_id,
+            "request_id": self.request_id,
             "registered_count": len(self.registered),
             "candidate_count": len(self.candidates),
             "dispatched_count": len(self.dispatched),

@@ -602,6 +602,15 @@ class TurnExecutor:
             if _orch and hasattr(_orch, "transition_coordinator") and _orch.transition_coordinator:
                 _orch.transition_coordinator.begin_turn()
 
+            # Correlation spine: stamp a fresh turn_id so capture records emitted during
+            # this turn (tool.supply, tool.intent, rl_outcome) share one id. Best-effort.
+            try:
+                from victor.core.context import begin_turn as _begin_turn
+
+                _begin_turn()
+            except Exception:  # correlation is non-critical
+                pass
+
             effective_tool_budget = self._coerce_int_override(overrides.get("tool_budget"))
             if effective_tool_budget is None:
                 effective_tool_budget = self._tool_context.tool_budget

@@ -2624,6 +2624,19 @@ class ToolPipeline:
         if enricher:
             reasoning = getattr(enricher, "_pending_reasoning", "") or ""
 
+        # Correlation spine (R1): stamp session/turn/request so this invoked record
+        # joins the turn's offered (tool.supply) and resulted (rl_outcome) records.
+        try:
+            from victor.core.context import get_request_id, get_session_id, get_turn_id
+
+            correlation = {
+                "session_id": get_session_id() or "",
+                "turn_id": get_turn_id() or "",
+                "request_id": get_request_id() or "",
+            }
+        except Exception:
+            correlation = {}
+
         try:
             bus.emit_sync(
                 "tool.intent",
@@ -2632,6 +2645,7 @@ class ToolPipeline:
                     "arguments_hash": args_hash,
                     "reasoning_before": reasoning[:500],
                     "timestamp": time.time(),
+                    **correlation,
                 },
             )
         except Exception:

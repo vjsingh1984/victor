@@ -1437,6 +1437,15 @@ class StreamingChatExecutor:
         ``AgenticLoop`` phases that drive this primitive via ``run_streaming``. It is the live
         streaming ACT — the legacy ``run()`` / ``_stream_turn`` loop was removed at the cutover.
         """
+        # Correlation spine: fresh turn_id so this streaming turn's capture records
+        # (tool.supply, tool.intent, rl_outcome) share one id. Best-effort.
+        try:
+            from victor.core.context import begin_turn as _begin_turn
+
+            _begin_turn()
+        except Exception:  # correlation is non-critical
+            pass
+
         # ACT — provider response (token streaming happens inside _stream_provider_turn).
         tools, full_content, tool_calls, garbage_detected = await self._stream_provider_turn(
             orch, runtime_owner, stream_ctx, goals
