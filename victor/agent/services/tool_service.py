@@ -2677,8 +2677,12 @@ class ToolService:
         value; ToolService never stores per-session state.
 
         Strategies:
-          ``session_stable`` — return cached tools when available; caller must
-                               persist the returned value for the next turn.
+          ``session_stable`` / ``additive`` — grow-only session tool set: keep the
+                               cached set (KV-cache prefix) and ADD any newly-selected
+                               tools, so a mid-session intent shift ("now write the fix")
+                               can still surface edit/write instead of being locked out.
+                               A turn that selects nothing new returns the cached set
+                               unchanged (full cache hit). Caller persists the result.
           ``per_turn``       — return tools unchanged (fresh each turn).
           ``context_aware``  — economy-first context-window-aware selection
                                (default).
@@ -2688,13 +2692,31 @@ class ToolService:
         if not tools or not kv_optimization_enabled:
             return tools
 
-        if kv_tool_strategy == "session_stable":
-            return session_semantic_tools if session_semantic_tools is not None else tools
+        if kv_tool_strategy in ("session_stable", "additive"):
+            return self._merge_session_tools(tools, session_semantic_tools)
 
         if kv_tool_strategy == "per_turn":
             return tools
 
         return self.apply_context_aware_strategy(tools, provider=provider, model=model)
+
+    @staticmethod
+    def _merge_session_tools(tools: list, cached: Optional[list]) -> list:
+        """Additive session-stable merge (tool-supply P4): grow-only tool set.
+
+        Returns the cached set plus any newly-selected tools not already in it. When
+        nothing new is selected, returns the cached object unchanged so the downstream
+        name-sort yields a byte-identical prefix (KV cache hit). The set only grows —
+        it never shrinks or drops a tool the model may have started using — so a later
+        turn can surface new tools without re-locking the prefix from scratch.
+        """
+        if not cached:
+            return tools
+        cached_names = {t.name for t in cached}
+        additions = [t for t in tools if t.name not in cached_names]
+        if not additions:
+            return cached
+        return list(cached) + additions
 
     def apply_context_aware_strategy(self, tools, *, provider: Any, model: str) -> list:
         """Economy-first, context-window-aware tool selection.
