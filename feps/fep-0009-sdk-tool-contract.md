@@ -159,23 +159,28 @@ class ExecutionCategory(str, Enum):
 class CostTier(str, Enum):
     FREE = "free"; LOW = "low"; MEDIUM = "medium"; HIGH = "high"
 
-class Priority(str, Enum):
-    LOW = "low"; MEDIUM = "medium"; HIGH = "high"; CRITICAL = "critical"
-
 @dataclass(frozen=True)
 class ToolContract:
-    """Declarable, stable subset of a tool's metadata (SDK boundary type)."""
+    """Declarable, stable subset of a tool's metadata (SDK boundary type).
+
+    Carries only *declarable intent*: the safety/economics/identity traits that drive
+    capping, parallel-exec, and prompt-split, plus the author's selection hints. It does
+    NOT carry selection-*engine* knobs (priority/priority_hints, mandatory_keywords,
+    signature_params) — those stay internal to ``ToolMetadata`` and are owned by the
+    selection engine / RL, not the tool author. (Resolves Q2.)
+    """
     category: ToolCategory | str = ToolCategory.CUSTOM
     access_mode: AccessMode = AccessMode.READONLY
     danger_level: DangerLevel = DangerLevel.SAFE
     execution_category: ExecutionCategory = ExecutionCategory.READ_ONLY
     cost_tier: CostTier = CostTier.LOW
-    priority: Priority = Priority.MEDIUM
     keywords: tuple[str, ...] = ()
     use_cases: tuple[str, ...] = ()
     task_types: tuple[str, ...] = ()
     stages: tuple[str, ...] = ()
 
+# Versioned at the SDK floor where ToolContract first exists (resolves Q3). External
+# packages assert this contract — not the raw victor-ai package range — for the feature.
 CONTRACT = CapabilityContract(version=1, min_sdk_version=">=0.8")
 ```
 
@@ -185,8 +190,12 @@ Notes:
 - **Frozen + tuple fields** so the contract is hashable and immutable (safe to share).
 - **Data-only**: no imports from `victor.*`. This is what lets external packages depend on
   it without pulling root internals.
-- `ToolCategory` here is the same 16-name vocabulary established in PR #238; the framework
-  enum becomes the consumer/derived view (see Migration Path).
+- **`ToolCategory` is owned here (resolves Q1).** This is the same 16-name vocabulary from
+  PR #238; `victor.framework.tools.ToolCategory` re-exports this SDK enum (adding only the
+  legacy ``REFACTOR`` back-compat alias at the framework layer), and the existing
+  ``test_tool_category_yaml_parity.py`` guard extends to assert SDK ≡ framework ≡ YAML.
+- **No `Priority` in the contract (resolves Q2).** "Everyone declares HIGH" is a foot-gun;
+  ranking stays an engine/RL concern.
 
 #### Bridge in `resolve_contract` (framework side)
 
@@ -243,7 +252,10 @@ No existing signatures change. `ToolMetadata` gains one classmethod (`from_contr
 
 - No new third-party dependencies.
 - `victor-contracts` minor version bump (new public module): `0.7.0 → 0.8.0`.
-- `victor-ai` dependency range on contracts widens to admit `>=0.8`.
+- **No `victor-ai` dependency-range change required**: the current pin
+  `victor-contracts>=0.6.0,<1.0` already admits `0.8`. The only requirement is that
+  contracts `0.8.0` is released (and the `CONTRACT.min_sdk_version=">=0.8"` capability
+  gate enforces the feature floor at runtime).
 
 ## Benefits
 
@@ -251,16 +263,24 @@ No existing signatures change. `ToolMetadata` gains one classmethod (`from_contr
 
 - Tools (internal or external) declare traits the same way; better selection/safety
   defaults because intent is declared, not inferred.
+- Safer execution: a tool that declares `access_mode=WRITE` / `danger_level=DANGEROUS`
+  is treated correctly by approval and parallel-execution paths instead of relying on
+  name-based heuristics that can misclassify a mutating or network-bound tool as safe.
 
 ### For Vertical Developers
 
 - A supported, import-clean way to declare tool traits — closes the boundary violation
   that is otherwise the only path. The six external verticals get parity with built-ins.
+- One declaration, no churn: authors write a frozen `ToolContract` and never import
+  `victor.tools.*`, so a root-internal refactor cannot break their package.
 
 ### For the Ecosystem
 
 - A stable, versioned trait vocabulary other tooling (registry/marketplace, linters,
   docs) can read without depending on root internals.
+- The `CapabilityContract` version makes the trait surface independently evolvable and
+  machine-checkable, so consumers can detect incompatibility at install/validate time
+  rather than failing at runtime.
 
 ## Drawbacks and Alternatives
 
@@ -292,15 +312,40 @@ No existing signatures change. `ToolMetadata` gains one classmethod (`from_contr
 
 ## Unresolved Questions
 
-- **Q1: `ToolCategory` ownership across the boundary.** Should the framework enum
-  (PR #238) re-export the SDK enum, or stay a parallel 16-name list pinned equal by a
-  guard test? (Proposed: framework imports the SDK enum and the existing YAML-parity guard
-  extends to cover SDK↔framework equality.)
-- **Q2: Should `priority`/`keywords` be in the contract at all,** or are they purely a
-  selection-engine concern that should stay internal? (Proposed: include the declarative
-  subset, exclude engine-tuning fields like `signature_params`.)
-- **Q3: min SDK version.** Pin `>=0.8` exact-on-release vs a wider floor for early
-  adopters. (Proposed: `>=0.8`.)
+All three open questions from the initial draft (v1.0) are **resolved below** with a
+recommended decision and rationale, and reflected in the spec above. They remain open for
+reviewers to overturn during the review window, but the FEP now proposes a concrete answer
+for each rather than leaving them undecided.
+
+- **Q1: `ToolCategory` ownership across the boundary — RESOLVED: the SDK owns it.**
+  `victor_contracts.tools.ToolCategory` is the single category-name authority;
+  `victor.framework.tools.ToolCategory` re-exports it (adding only the legacy `REFACTOR`
+  back-compat alias at the framework layer so `from victor.framework.tools import
+  ToolCategory` keeps working), and `tests/unit/framework/test_tool_category_yaml_parity.py`
+  extends to assert **SDK ≡ framework ≡ YAML**.
+  *Rationale:* victor-contracts is the lower layer (victor-ai depends on it), so the
+  identity authority established in PR #238 should live there; a re-export avoids a third
+  parallel list and keeps every existing import path working. *Alternative (rejected):* a
+  parallel framework list pinned equal by a guard — it duplicates the vocabulary and invites
+  exactly the drift PR #238 removed.
+
+- **Q2: Which fields belong in the contract — RESOLVED: declarable intent only.**
+  Include `category`, `access_mode`, `danger_level`, `execution_category`, `cost_tier`
+  (safety/economics/identity, which drive capping/parallel-exec/prompt-split) plus the
+  author's selection *hints* (`keywords`, `use_cases`, `task_types`, `stages`). **Exclude
+  `priority`** and the other engine-tuning fields (`priority_hints`, `mandatory_keywords`,
+  `signature_params`) — they stay internal to `ToolMetadata`.
+  *Rationale:* `keywords`/`use_cases` are genuine author knowledge (what triggers the tool);
+  `priority`/`mandatory_keywords` are ranking knobs where author-declared values are a
+  foot-gun ("everyone declares HIGH / mandatory") and are better owned by the selection
+  engine and RL. `signature_params` is a loop-detection internal with no author meaning.
+
+- **Q3: capability `min_sdk_version` — RESOLVED: `>=0.8` on the capability gate, package
+  range unchanged.** `CONTRACT.min_sdk_version=">=0.8"` (the floor where `ToolContract`
+  first exists); `victor-ai` keeps `victor-contracts>=0.6.0,<1.0` (already admits `0.8`).
+  *Rationale:* external packages should assert the **capability contract**, not the raw
+  package range, so the feature floor and the dependency window are decoupled — the broad
+  range avoids forcing a lockstep bump on packages that don't use the contract yet.
 
 ## Implementation Plan
 
@@ -316,8 +361,8 @@ No existing signatures change. `ToolMetadata` gains one classmethod (`from_contr
 
 - [ ] `ToolMetadata.from_contract(contract, tool)`.
 - [ ] `resolve_contract` SDK branch (precedence unchanged).
-- [ ] Widen `victor-ai` contracts dependency to admit `>=0.8`; register `CONTRACT` in the
-      `CapabilityContractRegistry`.
+- [ ] Register `CONTRACT` in the `CapabilityContractRegistry` (no `victor-ai` dependency-
+      range change — `>=0.6.0,<1.0` already admits `0.8`).
 - [ ] Parity guard test: `ToolContract` fields/enums ⊆ `ToolMetadata`; bridge byte-stable
       against the current autogen for an undeclared tool.
 
@@ -380,7 +425,8 @@ No existing signatures change. `ToolMetadata` gains one classmethod (`from_contr
 
 - Minimum Python: 3.10 (unchanged).
 - `victor-contracts`: `0.8.0` (new module).
-- `victor-ai`: dependency widened to `victor-contracts>=0.8,<1.0`.
+- `victor-ai`: keeps `victor-contracts>=0.6.0,<1.0` (already admits `0.8`); the feature
+  floor is enforced by `CONTRACT.min_sdk_version=">=0.8"`, not the package range.
 
 ### Vertical Compatibility
 
@@ -440,6 +486,10 @@ No existing signatures change. `ToolMetadata` gains one classmethod (`from_contr
 ### Revision History
 
 1. **v1.0** (2026-06-22): Initial submission.
+2. **v1.1** (2026-06-22): Resolved the three open questions with recommendations (Q1 SDK
+   owns `ToolCategory`; Q2 declarable-intent-only fields, drop `priority`; Q3 `>=0.8`
+   capability gate, package range unchanged). Corrected the dependency claim — the existing
+   `victor-contracts>=0.6.0,<1.0` already admits `0.8`, no range change needed.
 
 ## Acceptance Criteria
 
@@ -462,8 +512,10 @@ No existing signatures change. `ToolMetadata` gains one classmethod (`from_contr
 1. **Reference adoption**: one built-in and one external tool migrated.
    - Success metric: both resolve identically pre/post.
    - Priority: Medium.
-2. **`ToolCategory` unification** across SDK and framework (resolve Q1).
-   - Success metric: single vocabulary, guard-pinned.
+2. **`ToolCategory` unification** across SDK and framework (per Q1: SDK owns it, framework
+   re-exports).
+   - Success metric: single vocabulary; `test_tool_category_yaml_parity.py` asserts
+     SDK ≡ framework ≡ YAML.
    - Priority: Medium.
 
 ### Implementation Requirements
