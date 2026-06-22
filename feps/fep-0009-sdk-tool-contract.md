@@ -1,0 +1,496 @@
+---
+fep: 0009
+title: "SDK Tool Contract — promote tool metadata/traits into victor-contracts"
+type: Standards Track
+status: Draft
+created: 2026-06-22
+modified: 2026-06-22
+authors:
+  - name: Vijaykumar Singh
+    email: singhvjd@gmail.com
+    github: vjsingh1984
+reviewers: []
+discussion: https://github.com/vjsingh1984/victor/discussions
+---
+
+# FEP-0009: SDK Tool Contract — promote tool metadata/traits into victor-contracts
+
+## Table of Contents
+
+1. [Summary](#summary)
+2. [Motivation](#motivation)
+3. [Proposed Change](#proposed-change)
+4. [Benefits](#benefits)
+5. [Drawbacks and Alternatives](#drawbacks-and-alternatives)
+6. [Unresolved Questions](#unresolved-questions)
+7. [Implementation Plan](#implementation-plan)
+8. [Migration Path](#migration-path)
+9. [Compatibility](#compatibility)
+10. [References](#references)
+11. [Review Process](#review-process)
+12. [Acceptance Criteria](#acceptance-criteria)
+
+---
+
+## Summary
+
+Victor resolves a tool's metadata/traits through a single internal authority,
+`victor.tools.contract.resolve_contract(tool)` (tool-supply P6, PR #234), which returns
+the framework-internal `victor.tools.metadata.ToolMetadata` dataclass. The trait
+vocabulary it depends on — `category`, `keywords`, `priority`, `access_mode`,
+`danger_level`, `execution_category`, `task_types`, `stages`, `cost_tier`, `schema_level`
+— lives entirely under `victor/tools/` (the dataclass in `metadata.py`, the enums in
+`enums.py`). External, SDK-first verticals (`victor-coding`, `victor-devops`,
+`victor-rag`, `victor-dataanalysis`, `victor-research`, `victor-invest`) must import only
+from `victor_contracts`; today they have **no stable, importable way to declare these
+traits** for the tools they contribute, so they either under-declare metadata or reach
+into `victor.tools.*` (a boundary violation). This FEP promotes a minimal, frozen
+**Tool Contract** — a data-only `ToolContract` plus the trait enums — into
+`victor_contracts`, versioned with a `CapabilityContract`, and makes the existing
+internal `ToolMetadata` a superset/adapter of it. The change is **additive**: it
+introduces no breaking change for the framework or current tools; external packages opt
+in. The audience is tool authors and the six external vertical maintainers.
+
+## Motivation
+
+### Problem Statement
+
+P6 deliberately made `resolve_contract` the one fusion authority for tool metadata but
+kept it **framework-internal** ("minimal cut … no new parallel contract type"). That was
+the right call for an internal refactor, but it leaves a real gap at the SDK boundary:
+
+- **No SDK trait surface.** `ToolMetadata` (`victor/tools/metadata.py:38`) and its enums
+  (`CostTier`, `Priority`, `AccessMode`, `ExecutionCategory`, `DangerLevel`,
+  `SchemaLevel` in `victor/tools/enums.py`) are all under `victor/tools/`. The SDK's
+  tool surface (`victor_contracts/tool_runtime.py`) is a lazy re-export shim with no
+  metadata vocabulary of its own.
+- **External verticals can't declare traits cleanly.** The architecture mandate (see
+  `CLAUDE.md`, "Extension System & SDK Contract") is that external verticals import only
+  `victor_contracts` / `victor.framework.extensions`. A `victor-coding` tool that wants
+  to set `access_mode=WRITE`, `danger_level=...`, or `category="git"` has no SDK type to
+  declare against. The choices today are: (a) omit the traits and accept worse tool
+  selection/safety defaults, or (b) import `victor.tools.enums` / `victor.tools.metadata`
+  — a boundary violation that couples the vertical to root internals.
+- **The autogen fallback can't see intent.** When traits are omitted, `resolve_contract`
+  falls back to `ToolMetadata.generate_from_tool(...)`, which infers from name/description
+  /parameters. Inference is necessarily weaker than a declared contract — e.g. it cannot
+  know a tool mutates the filesystem (`access_mode`) or is network-bound
+  (`execution_category`) from its name alone.
+
+This matters now because the tool-supply track (P0–P8) made tool *selection, capping,
+prompt-splitting, and parallel-execution* all read these traits. Tools that under-declare
+get systematically worse treatment, and the packages most affected are exactly the ones
+that can't declare — the external verticals.
+
+### Goals
+
+1. Provide a **stable, frozen, data-only** `ToolContract` and trait enums in
+   `victor_contracts` that external tool authors can import and declare against.
+2. Keep `resolve_contract` the single fusion authority; have it **bridge** an
+   SDK-declared contract into the internal `ToolMetadata` with byte-stable precedence.
+3. Version the contract explicitly via `CapabilityContract` so it can evolve
+   independently and external packages can assert compatibility.
+4. **Zero breaking change**: existing tools, `ToolMetadata`, and `@tool(...)` keep
+   working unchanged; SDK declaration is purely opt-in.
+
+### Non-Goals
+
+- Not replacing `ToolMetadata`. The internal dataclass stays as the richer
+  runtime-internal type (it carries selection/loop-detection fields that are not part of
+  the public contract). `ToolContract` is the *declarable subset*.
+- Not collapsing the execution-category axis with the organizational `ToolCategory`
+  axis (those are intentionally distinct — see PR #238).
+- Not changing tool *registration* or discovery mechanics, the `@tool` decorator's
+  Python signature, or `BaseTool`.
+- Not moving keyword/semantic-selection logic into the SDK; only the declarative traits
+  move, not the selection engine.
+
+## Proposed Change
+
+### High-Level Design
+
+```
+External vertical tool (SDK-only imports)
+    │  declares
+    ▼
+victor_contracts.tools.ToolContract  ◀── frozen dataclass + trait enums (NEW, SDK)
+    │  consumed by
+    ▼
+victor.tools.contract.resolve_contract(tool)   ◀── single fusion authority (P6, exists)
+    │  bridges SDK contract → internal
+    ▼
+victor.tools.metadata.ToolMetadata   ◀── internal superset (existing, unchanged shape)
+    │  read by
+    ▼
+tool selection / capping / prompt-split / parallel-exec  (tool-supply P0–P8)
+```
+
+The SDK gains a *declaration* type; the framework keeps the *resolution* and *runtime*
+types. `resolve_contract` is the only place the two meet.
+
+### Detailed Specification
+
+#### New SDK module: `victor_contracts/tools.py`
+
+A new `victor_contracts.tools` module exposes:
+
+```python
+# victor_contracts/tools.py  (NEW — frozen, data-only, no framework imports)
+from __future__ import annotations
+from dataclasses import dataclass, field
+from enum import Enum
+
+class ToolCategory(str, Enum):
+    CORE = "core"; FILESYSTEM = "filesystem"; GIT = "git"; SEARCH = "search"
+    WEB = "web"; DATABASE = "database"; DOCKER = "docker"; TESTING = "testing"
+    REFACTORING = "refactoring"; DOCUMENTATION = "documentation"; ANALYSIS = "analysis"
+    COMMUNICATION = "communication"; NOTEBOOK = "notebook"
+    TASK_MANAGEMENT = "task_management"; VERIFICATION = "verification"; CUSTOM = "custom"
+
+class AccessMode(str, Enum):
+    READONLY = "readonly"; WRITE = "write"; EXECUTE = "execute"
+
+class DangerLevel(str, Enum):
+    SAFE = "safe"; CAUTION = "caution"; DANGEROUS = "dangerous"
+
+class ExecutionCategory(str, Enum):
+    READ_ONLY = "read_only"; WRITE = "write"; NETWORK = "network"; COMPUTE = "compute"
+
+class CostTier(str, Enum):
+    FREE = "free"; LOW = "low"; MEDIUM = "medium"; HIGH = "high"
+
+class Priority(str, Enum):
+    LOW = "low"; MEDIUM = "medium"; HIGH = "high"; CRITICAL = "critical"
+
+@dataclass(frozen=True)
+class ToolContract:
+    """Declarable, stable subset of a tool's metadata (SDK boundary type)."""
+    category: ToolCategory | str = ToolCategory.CUSTOM
+    access_mode: AccessMode = AccessMode.READONLY
+    danger_level: DangerLevel = DangerLevel.SAFE
+    execution_category: ExecutionCategory = ExecutionCategory.READ_ONLY
+    cost_tier: CostTier = CostTier.LOW
+    priority: Priority = Priority.MEDIUM
+    keywords: tuple[str, ...] = ()
+    use_cases: tuple[str, ...] = ()
+    task_types: tuple[str, ...] = ()
+    stages: tuple[str, ...] = ()
+
+CONTRACT = CapabilityContract(version=1, min_sdk_version=">=0.8")
+```
+
+Notes:
+- **`str`-valued enums** (like the framework's `SchemaLevel`) so values serialize/compare
+  as plain strings across the package boundary and tolerate version skew.
+- **Frozen + tuple fields** so the contract is hashable and immutable (safe to share).
+- **Data-only**: no imports from `victor.*`. This is what lets external packages depend on
+  it without pulling root internals.
+- `ToolCategory` here is the same 16-name vocabulary established in PR #238; the framework
+  enum becomes the consumer/derived view (see Migration Path).
+
+#### Bridge in `resolve_contract` (framework side)
+
+`resolve_contract` gains one branch, preserving its current precedence
+(explicit → autogen) and byte-stability:
+
+```python
+def resolve_contract(tool: Any) -> ToolMetadata:
+    explicit = getattr(tool, "metadata", None)
+    if explicit is not None:
+        return explicit
+    sdk = getattr(tool, "contract", None)            # NEW: SDK-declared ToolContract
+    if sdk is not None:
+        return ToolMetadata.from_contract(sdk, tool) # NEW: bridge, then same shape
+    return ToolMetadata.generate_from_tool(...)      # unchanged autogen fallback
+```
+
+`ToolMetadata.from_contract(...)` maps each SDK field onto the matching internal field and
+enum (the internal `enums.py` values are unchanged), filling the remaining internal-only
+fields (e.g. `signature_params`, `mandatory_keywords`) from autogen defaults. Tools that
+set the existing `.metadata` continue to win — **no precedence change**.
+
+#### Versioning
+
+`victor_contracts.tools.CONTRACT` is a `CapabilityContract` (already in
+`victor_contracts/core/capability_contract.py`). External packages assert
+`CONTRACT.is_sdk_compatible(installed_sdk_version)` and the framework registers it in the
+`CapabilityContractRegistry` so the existing `check_all()` health path covers it. The
+contract version is independent of `CURRENT_API_VERSION` (manifest API) so the trait
+vocabulary can evolve without a manifest bump.
+
+### API Changes
+
+```python
+# Before — external vertical has no SDK option; must violate the boundary:
+from victor.tools.enums import AccessMode          # ❌ root internal import
+from victor.tools.metadata import ToolMetadata     # ❌
+
+# After — declare against the SDK:
+from victor_contracts.tools import ToolContract, AccessMode, ToolCategory
+
+class DeployTool(BaseTool):
+    contract = ToolContract(
+        category=ToolCategory.DOCKER,
+        access_mode=AccessMode.EXECUTE,
+        danger_level=DangerLevel.CAUTION,
+    )
+```
+
+No existing signatures change. `ToolMetadata` gains one classmethod (`from_contract`);
+`resolve_contract` gains one branch.
+
+### Dependencies
+
+- No new third-party dependencies.
+- `victor-contracts` minor version bump (new public module): `0.7.0 → 0.8.0`.
+- `victor-ai` dependency range on contracts widens to admit `>=0.8`.
+
+## Benefits
+
+### For Framework Users
+
+- Tools (internal or external) declare traits the same way; better selection/safety
+  defaults because intent is declared, not inferred.
+
+### For Vertical Developers
+
+- A supported, import-clean way to declare tool traits — closes the boundary violation
+  that is otherwise the only path. The six external verticals get parity with built-ins.
+
+### For the Ecosystem
+
+- A stable, versioned trait vocabulary other tooling (registry/marketplace, linters,
+  docs) can read without depending on root internals.
+
+## Drawbacks and Alternatives
+
+### Drawbacks
+
+- **Two trait types** (`ToolContract` SDK + `ToolMetadata` internal). Mitigation:
+  `from_contract` is the only bridge; a guard test pins field/enum parity so they cannot
+  drift, and `ToolContract` is explicitly the declarable *subset*, not a parallel runtime
+  type.
+- **Six-package lockstep** on the contracts bump. Mitigation: additive + version-gated;
+  external packages opt in on their own schedule because the framework still accepts
+  tools with no `contract`.
+
+### Alternatives Considered
+
+1. **Keep it framework-internal (status quo / P6 minimal cut)**
+   - Pros: zero SDK surface to maintain.
+   - Cons: external verticals keep under-declaring or violating the boundary. Rejected:
+     the tool-supply track made traits matter for exactly those packages.
+2. **Move `ToolMetadata` wholesale into the SDK**
+   - Pros: one type.
+   - Cons: drags runtime-internal fields (loop-detection `signature_params`, selection
+     internals) and their churn into a stable public contract. Rejected: violates "stable
+     SDK, evolving internals."
+3. **TypedDict / plain dict contract**
+   - Pros: ultra-light.
+   - Cons: no enum safety, no frozen identity, weaker validation at the boundary.
+     Rejected: trait correctness (access_mode/danger_level) is safety-relevant.
+
+## Unresolved Questions
+
+- **Q1: `ToolCategory` ownership across the boundary.** Should the framework enum
+  (PR #238) re-export the SDK enum, or stay a parallel 16-name list pinned equal by a
+  guard test? (Proposed: framework imports the SDK enum and the existing YAML-parity guard
+  extends to cover SDK↔framework equality.)
+- **Q2: Should `priority`/`keywords` be in the contract at all,** or are they purely a
+  selection-engine concern that should stay internal? (Proposed: include the declarative
+  subset, exclude engine-tuning fields like `signature_params`.)
+- **Q3: min SDK version.** Pin `>=0.8` exact-on-release vs a wider floor for early
+  adopters. (Proposed: `>=0.8`.)
+
+## Implementation Plan
+
+### Phase 1: Contract in the SDK (1 PR, contracts repo)
+
+- [ ] Add `victor_contracts/tools.py` (frozen `ToolContract` + trait enums + `CONTRACT`).
+- [ ] Unit tests: enum value stability, frozen/hashable, default round-trip.
+- [ ] Bump `victor-contracts/VERSION` → `0.8.0`; `python scripts/sync_version.py`.
+
+**Deliverable**: importable, versioned SDK contract; contracts `0.8.0` released.
+
+### Phase 2: Framework bridge (1 PR, root repo)
+
+- [ ] `ToolMetadata.from_contract(contract, tool)`.
+- [ ] `resolve_contract` SDK branch (precedence unchanged).
+- [ ] Widen `victor-ai` contracts dependency to admit `>=0.8`; register `CONTRACT` in the
+      `CapabilityContractRegistry`.
+- [ ] Parity guard test: `ToolContract` fields/enums ⊆ `ToolMetadata`; bridge byte-stable
+      against the current autogen for an undeclared tool.
+
+**Deliverable**: tools may declare `contract = ToolContract(...)`; resolution honors it.
+
+### Phase 3: Adopt + document (per external package, opt-in)
+
+- [ ] Migrate one built-in tool and one external vertical tool as reference.
+- [ ] Update the SDK/extension docs and the external-vertical compatibility matrix.
+
+**Deliverable**: worked example + docs; external packages adopt on their own schedule.
+
+### Testing Strategy
+
+- Unit: contract immutability/enum stability; `from_contract` mapping; parity guard.
+- Integration: a tool declaring only `contract` flows through selection/capping/parallel-
+  exec identically to the same tool declaring `.metadata`.
+- Backward compatibility: existing tools (no `contract`) produce byte-identical
+  `ToolMetadata` to today (autogen path unchanged).
+
+### Rollout Plan
+
+- No feature flag (additive; absence of `contract` = today's behavior).
+- Contracts `0.8.0` first, then the framework bridge, then opt-in adoption.
+- External-vertical compatibility CI (the existing dispatch to the six repos) gates the
+  lockstep.
+
+## Migration Path
+
+### From internal-only to SDK contract
+
+1. External tool currently importing root internals (or under-declaring):
+   ```python
+   from victor.tools.enums import AccessMode  # boundary violation
+   ```
+2. Switch to the SDK contract:
+   ```python
+   from victor_contracts.tools import ToolContract, AccessMode
+   class T(BaseTool):
+       contract = ToolContract(access_mode=AccessMode.WRITE)
+   ```
+3. Built-in tools may stay on `.metadata`/`@tool(...)` indefinitely; optional convergence
+   later.
+
+### Deprecation Timeline
+
+- `0.8.0`: `ToolContract` introduced (additive). No deprecations.
+- Future (separate FEP, if ever): consider re-expressing `@tool(...)` trait kwargs in
+  terms of `ToolContract`. Not in scope here; no removal is proposed.
+
+## Compatibility
+
+### Backward Compatibility
+
+- **Breaking change**: No.
+- **Migration required**: No (opt-in).
+- **Deprecation period**: N/A (nothing deprecated).
+
+### Version Compatibility
+
+- Minimum Python: 3.10 (unchanged).
+- `victor-contracts`: `0.8.0` (new module).
+- `victor-ai`: dependency widened to `victor-contracts>=0.8,<1.0`.
+
+### Vertical Compatibility
+
+- Built-in verticals: no change required.
+- External verticals: opt-in; gain a supported declaration path. Lockstep handled by the
+  existing external-vertical compatibility workflow.
+
+## References
+
+- PR #234 — `resolve_contract()` single metadata authority (tool-supply P6)
+- PR #238 — ToolCategory ⇄ YAML single vocabulary authority (P6 follow-on)
+- `victor/tools/metadata.py`, `victor/tools/enums.py` — internal metadata + trait enums
+- `victor_contracts/core/capability_contract.py` — per-capability versioning
+- `CLAUDE.md` — "Extension System & SDK Contract", "Plugin → Vertical → Extension"
+- [FEP-0005](./fep-0005-policy-engine.md), [FEP-0006](./fep-0006-external-harness-executors.md)
+  — prior SDK-boundary-touching FEPs
+
+## Review Process
+
+### Submission
+
+- **Submitted by**: Vijaykumar Singh
+- **Date**: 2026-06-22
+- **Pull Request**: (this PR)
+
+### Review Timeline
+
+- **Initial review period**: 14 days minimum
+- **Reviewers assigned**: TBD
+- **Discussion thread**: TBD
+
+### Review Checklist
+
+#### Technical Review
+
+- [ ] Specification is clear and complete
+- [ ] API design follows Victor conventions (frozen, str-enums, data-only SDK type)
+- [ ] Bridge precedence is byte-stable with today's `resolve_contract`
+- [ ] Testing strategy is adequate (parity + backward-compat guards)
+- [ ] Documentation plan is included
+
+#### Community Review
+
+- [ ] Use cases are well-understood (external verticals declaring traits)
+- [ ] Benefits outweigh drawbacks (two types vs boundary cleanliness)
+- [ ] Migration path is clear and opt-in
+- [ ] Alternatives were considered
+- [ ] Lockstep/compatibility addressed
+
+### Decisions
+
+- **Recommendation**: TBD
+- **Decision date**: TBD
+- **Approved by**: TBD
+- **Rationale**: TBD
+
+### Revision History
+
+1. **v1.0** (2026-06-22): Initial submission.
+
+## Acceptance Criteria
+
+### Must-Have Criteria
+
+1. **Data-only SDK contract**: `victor_contracts.tools` imports nothing from `victor.*`.
+   - Success metric: import-boundary test passes.
+   - Verification: AST/import guard in `victor-contracts/tests`.
+2. **Byte-stable resolution**: a tool with no `contract` yields the same `ToolMetadata`
+   as today.
+   - Success metric: parity test green.
+   - Verification: golden compare against current autogen output.
+3. **Field/enum parity**: every `ToolContract` field/enum maps onto an existing
+   `ToolMetadata` field/enum (no orphan trait).
+   - Success metric: parity guard test.
+   - Verification: test enumerates contract fields against `ToolMetadata`.
+
+### Should-Have Criteria
+
+1. **Reference adoption**: one built-in and one external tool migrated.
+   - Success metric: both resolve identically pre/post.
+   - Priority: Medium.
+2. **`ToolCategory` unification** across SDK and framework (resolve Q1).
+   - Success metric: single vocabulary, guard-pinned.
+   - Priority: Medium.
+
+### Implementation Requirements
+
+- [ ] Code implementation following the specification
+- [ ] Comprehensive test coverage (>80% for new code)
+- [ ] API documentation updated
+- [ ] Migration guide (opt-in adoption) completed
+- [ ] Changelog entries (both packages) added
+- [ ] Backward compatibility verified (autogen byte-parity)
+- [ ] External-vertical compatibility workflow green
+
+### Validation Process
+
+1. **Automated validation**: import-boundary + parity + backward-compat tests in CI.
+2. **Manual review**: API review against SDK conventions.
+3. **Community testing**: external-vertical maintainers trial the contract pre-`1.0`.
+4. **Final approval**: maintainer sign-off after the 14-day window.
+
+### Success Metrics
+
+- Boundary violations (`victor.tools.*` imports in external verticals): target **0**.
+- Tools declaring traits via the SDK contract: target **≥1 per external vertical** within
+  one release after adoption docs land.
+
+---
+
+## Copyright
+
+This FEP is licensed under the Apache License 2.0, same as the Victor project.
