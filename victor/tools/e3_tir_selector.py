@@ -39,6 +39,10 @@ class E3TIRConfig:
     # Demonstration warm-up
     demonstration_boost: float = 0.3  # Q-value boost for demonstrated tools
     min_demonstrations: int = 3  # Min demonstrations before trusting demo signal
+    # R4: tool *success* is owned by the RL Q-value (hybrid_tool_selector); E3-TIR is
+    # exploration scheduling only. Demonstration-reward reranking would re-score the
+    # same success signal a second time (double-count), so it is OFF by default.
+    enable_demonstration_reranking: bool = False
 
     # Self-play
     self_play_epsilon: float = 0.15  # Exploration rate during self-play
@@ -145,8 +149,11 @@ class E3TIRToolSelector:
         # Start from base ranking or available tools
         candidates = list(base_ranking or available_tools)
 
-        # 1. Apply demonstration warm-up boost
-        candidates = self._apply_demonstration_boost(candidates, task_type)
+        # 1. Apply demonstration warm-up boost (R4: OFF by default — tool success is
+        #    the RL Q-value's job in hybrid_tool_selector; reranking by demonstration
+        #    reward here would double-count the same signal).
+        if self._config.enable_demonstration_reranking:
+            candidates = self._apply_demonstration_boost(candidates, task_type)
 
         # 2. Apply self-play exploration
         candidates = self._apply_self_play(candidates, task_type)
