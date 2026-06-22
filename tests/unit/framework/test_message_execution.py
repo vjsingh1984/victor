@@ -294,3 +294,19 @@ async def test_victor_client_chat_delegates_to_shared_message_executor() -> None
         stream=True,
         forward_stream_option=True,
     )
+
+
+def test_build_task_result_metadata_propagates_agentic_loop_iterations():
+    """The real loop iteration count must reach TaskResult.metadata (A/B turn-count fix)."""
+    from victor.framework.message_execution import _build_task_result_metadata
+
+    response = SimpleNamespace(
+        usage={}, model="m", stop_reason="stop", metadata={"agentic_loop_iterations": 6}
+    )
+    md = _build_task_result_metadata(SimpleNamespace(), response)
+    assert md["agentic_loop_iterations"] == 6
+    # absent on the response → 0 (harness then falls back to "turns"/proxy)
+    md2 = _build_task_result_metadata(
+        SimpleNamespace(), SimpleNamespace(usage={}, model="m", stop_reason="stop", metadata={})
+    )
+    assert md2["agentic_loop_iterations"] == 0

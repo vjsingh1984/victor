@@ -95,7 +95,14 @@ async def _run_one(task: str, temperature: float, profile: Optional[str]) -> Run
             except Exception:
                 pass
     md = result.metadata or {}
-    turns = int(md.get("iterations") or md.get("turn_count") or md.get("iteration_count") or 0)
+    # agentic_loop_iterations = real loop turn count; "turns" (request_count) next; proxy last.
+    turns = int(
+        md.get("agentic_loop_iterations")
+        or md.get("turns")
+        or md.get("iterations")
+        or md.get("iteration_count")
+        or 0
+    )
     if turns == 0:  # fall back to a tool-activity proxy when the runtime doesn't expose it
         turns = len(result.tool_calls) + 1
     content = result.content or ""

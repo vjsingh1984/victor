@@ -99,10 +99,12 @@ async def _run_one(task: str, profile: Optional[str], temperature: float) -> Run
             except Exception:
                 pass
     md = result.metadata or {}
+    # agentic_loop_iterations is the real loop turn count (excludes rubric-judge/recovery sub-calls);
+    # "turns" (request_count) is the next-best signal; len(tool_calls)+1 is a last-resort proxy.
     turns = int(
-        md.get("iterations_count")
-        or md.get("iterations")
-        or md.get("turn_count")
+        md.get("agentic_loop_iterations")
+        or md.get("turns")
+        or md.get("iterations_count")
         or md.get("iteration_count")
         or 0
     )
