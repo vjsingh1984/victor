@@ -184,6 +184,7 @@ def _build_task_result_metadata(
         else {}
     )
     task_report = _get_last_task_report(orchestrator)
+    resp_meta = getattr(response, "metadata", None) or {}
 
     def report_value(key: str) -> Any:
         if task_report is None or key not in task_report:
@@ -216,6 +217,9 @@ def _build_task_result_metadata(
             _coalesce_value(report_value("api_total_tokens"), usage.get("total_tokens"))
         ),
         "turns": _safe_int(report_value("request_count")),
+        # Real agentic-loop iteration count (excludes rubric-judge/recovery sub-calls); see
+        # TurnExecutor.execute_agentic_loop. Used by the A/B harnesses for an honest turn metric.
+        "agentic_loop_iterations": _safe_int(resp_meta.get("agentic_loop_iterations")),
         "cached_tokens": _safe_int(
             _coalesce_value(
                 report_value("cache_read_tokens"),

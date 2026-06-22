@@ -1094,6 +1094,9 @@ class TurnExecutor:
 
         loop_result = await loop.run(user_message, **loop_run_kwargs)
         loop_success = getattr(loop_result, "success", True)
+        # Real agentic-loop iteration count (excludes rubric-judge / recovery sub-calls) — surfaced on
+        # the response metadata so it can reach TaskResult.metadata for observability + A/B harnesses.
+        loop_iterations = len(getattr(loop_result, "iterations", []) or [])
         loop_error = None
         if not loop_success:
             loop_error = "Agentic loop ended before satisfying the task"
@@ -1120,11 +1123,13 @@ class TurnExecutor:
                             metadata["agentic_loop_success"] = True
                             metadata["agentic_loop_recovered"] = True
                             metadata["agentic_loop_recovery_reason"] = loop_error
+                            metadata["agentic_loop_iterations"] = loop_iterations
                             synthesized.metadata = metadata
                             return synthesized
 
                     metadata = dict(getattr(response, "metadata", None) or {})
                     metadata["agentic_loop_success"] = loop_success
+                    metadata["agentic_loop_iterations"] = loop_iterations
                     if loop_error:
                         metadata["agentic_loop_error"] = loop_error
                     response.metadata = metadata
@@ -1135,6 +1140,7 @@ class TurnExecutor:
         response = await self._ensure_complete_response(None, failure_context)
         metadata = dict(getattr(response, "metadata", None) or {})
         metadata["agentic_loop_success"] = loop_success
+        metadata["agentic_loop_iterations"] = loop_iterations
         if loop_error:
             metadata["agentic_loop_error"] = loop_error
         response.metadata = metadata
