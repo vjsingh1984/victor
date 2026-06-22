@@ -52,6 +52,48 @@ _e3tir_shared_store: Any = None
 _e3tir_hook_subscribed: bool = False
 
 
+def _warm_start_experience_store(store: Any, limit: int = 2000) -> None:
+    """Warm-start the experience projection from durable RL_OUTCOME tool rows (R3).
+
+    The store is an in-memory projection of the durable outcome stream but starts
+    empty each process, drifting from the durable truth. Replaying recent durable
+    tool outcomes (chronological) makes it a true projection. Best-effort: any
+    failure leaves the store empty rather than breaking selection. Reward uses the
+    R2 canonical ``reward_from_signals`` so it matches the live feed exactly.
+    """
+    try:
+        import json
+
+        from victor.core.database import get_database
+        from victor.framework.rl.reward import reward_from_signals
+
+        rows = get_database().query(
+            "SELECT task_type, success, quality_score, metadata FROM rl_outcome "
+            "WHERE learner_id = ? ORDER BY created_at DESC LIMIT ?",
+            ("tool_selector", limit),
+        )
+        outcomes = []
+        for row in reversed(rows or []):  # oldest -> newest for faithful running stats
+            task_type, success, quality_score, metadata = row[0], row[1], row[2], row[3]
+            try:
+                meta = json.loads(metadata) if metadata else {}
+            except (TypeError, ValueError):
+                meta = {}
+            tool = meta.get("tool_name")
+            if not tool:
+                continue
+            reward = reward_from_signals(success=bool(success), quality_score=quality_score)
+            outcomes.append((tool, task_type, bool(success), reward))
+        replayed = store.warm_start_from_outcomes(outcomes)
+        if replayed:
+            logger.info(
+                "E3-TIR: warm-started experience projection from %d durable outcomes",
+                replayed,
+            )
+    except Exception:  # warm-start is best-effort; live feed still populates the store
+        logger.debug("E3-TIR experience warm-start skipped", exc_info=True)
+
+
 def _get_e3tir_shared_store() -> Any:
     """Return the process-shared ToolExperienceStore, subscribing the outcome hook once."""
     global _e3tir_shared_store, _e3tir_hook_subscribed
@@ -59,6 +101,9 @@ def _get_e3tir_shared_store() -> Any:
         from victor.tools.experience_store import ToolExperienceStore
 
         _e3tir_shared_store = ToolExperienceStore()
+        # Make the in-memory store a projection of the durable outcome stream before
+        # the live feed begins, so it doesn't start blank (and drift) each process.
+        _warm_start_experience_store(_e3tir_shared_store)
     if not _e3tir_hook_subscribed:
         from victor.framework.rl.hooks import RLEventType, get_rl_hooks
 
