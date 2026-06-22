@@ -1460,6 +1460,11 @@ class AgenticLoop:
             action_result = act_outcome.turn_result
             state["action_result"] = action_result
 
+            # Update shared spin detector + advance the temperature ratchet — the same per-turn step
+            # the buffered _act path runs, so streaming detects spin and escalates temperature
+            # identically (closes a latent streaming parity gap; ADR-013).
+            self._record_spin_and_ratchet(action_result)
+
             # EVALUATE (shared, non-yielding)
             evaluation = await self._evaluate(perception, action_result, state)
             self._progress_scores.append(evaluation.score)
@@ -2217,6 +2222,44 @@ class AgenticLoop:
         # Minimal fallback: return perception as plan
         return {"perception": perception.to_dict()}
 
+    def _record_spin_and_ratchet(self, turn_result: Any) -> None:
+        """Update the shared SpinDetector + advance the temperature ratchet from one turn's result.
+
+        Shared by the buffered (``_act``) and streaming (``run_streaming``) paths so both detect spin
+        and escalate temperature identically (ADR-013): a tool-using turn is progress (reset); a
+        stalled/spinning turn escalates temperature for the next turn's resolution. The ratchet lives
+        on the orchestrator so the resolver reads the same instance.
+        """
+        if turn_result is None:
+            return
+        # Defensive reads: in production turn_result is a full TurnResult, but the loop must not crash
+        # the turn if a partial result reaches here (a missing field just means "no tool activity").
+        has_tool_calls = bool(getattr(turn_result, "has_tool_calls", False))
+        tool_results = getattr(turn_result, "tool_results", None)
+        tool_names = set()
+        if has_tool_calls and tool_results:
+            tool_names = {r.get("tool_name", "") for r in tool_results}
+        self.spin_detector.record_turn(
+            has_tool_calls=has_tool_calls,
+            all_blocked=bool(getattr(turn_result, "all_tools_blocked", False)),
+            tool_names=tool_names,
+            tool_count=getattr(turn_result, "tool_calls_count", 0),
+            tool_signatures=getattr(turn_result, "tool_signatures", ()),
+        )
+        ratchet = getattr(getattr(self, "orchestrator", None), "temperature_ratchet_state", None)
+        if ratchet is not None:
+            from victor.framework.temperature import SpinSignal
+
+            ratchet.record_turn(
+                SpinSignal(
+                    spin_state=getattr(self.spin_detector.state, "value", "normal"),
+                    consecutive_no_tool_turns=getattr(
+                        self.spin_detector, "consecutive_no_tool_turns", 0
+                    ),
+                    made_progress=has_tool_calls,
+                )
+            )
+
     async def _act(
         self,
         plan: Any,
@@ -2280,36 +2323,8 @@ class AgenticLoop:
                     runtime_context_overrides=runtime_context_overrides,
                 )
 
-            # Update shared spin detector
-            tool_names = set()
-            if turn_result.has_tool_calls and hasattr(turn_result, "tool_results"):
-                tool_names = {r.get("tool_name", "") for r in turn_result.tool_results}
-            self.spin_detector.record_turn(
-                has_tool_calls=turn_result.has_tool_calls,
-                all_blocked=turn_result.all_tools_blocked,
-                tool_names=tool_names,
-                tool_count=turn_result.tool_calls_count,
-                tool_signatures=turn_result.tool_signatures,
-            )
-
-            # Advance the spin-escape temperature ratchet (ADR-013, PR-E) from the same signal: a
-            # tool-using turn is progress (reset); a stalled/spinning turn escalates temperature for
-            # the NEXT turn's resolution. Shared on the orchestrator so the resolver reads it.
-            _ratchet = getattr(
-                getattr(self, "orchestrator", None), "temperature_ratchet_state", None
-            )
-            if _ratchet is not None:
-                from victor.framework.temperature import SpinSignal
-
-                _ratchet.record_turn(
-                    SpinSignal(
-                        spin_state=getattr(self.spin_detector.state, "value", "normal"),
-                        consecutive_no_tool_turns=getattr(
-                            self.spin_detector, "consecutive_no_tool_turns", 0
-                        ),
-                        made_progress=bool(turn_result.has_tool_calls),
-                    )
-                )
+            # Update shared spin detector + advance the temperature ratchet (shared with streaming).
+            self._record_spin_and_ratchet(turn_result)
 
             # Record tool results for fulfillment criteria auto-derivation
             if turn_result.tool_results:
