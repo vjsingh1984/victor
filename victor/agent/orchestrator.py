@@ -3724,8 +3724,10 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
             session_semantic_tools=getattr(self, "_session_semantic_tools", None),
             kv_tool_strategy=strategy,
         )
-        # Persist session-stable selection at orchestrator level (ToolService is a singleton)
-        if strategy == "session_stable" and not getattr(self, "_session_semantic_tools", None):
+        # Persist the (grow-only) session-stable selection at orchestrator level
+        # (ToolService is a singleton). P4: persist EVERY turn — not just the first —
+        # so newly-added tools join the cached set and stay available next turn.
+        if strategy in ("session_stable", "additive"):
             self._session_semantic_tools = result
         return result
 
