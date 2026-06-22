@@ -20,24 +20,35 @@ clear its threshold before COMPLETE (AdaRubric 2603.21362). This fixes the two f
 FEP-0007 cutover exposed: one strong axis masking a failed one (premature stop), and a finished
 answer being under-scored overall (restatement).
 
-This module is the machinery, offline-testable and additive — it is **not** yet wired into
-``AgenticLoop._evaluate`` (that cutover is EVR-3b, behind ``settings.evaluation.completion_strategy``,
-gated by the parity/characterization batteries). The judge and the rubric generator are injected
-Protocols with deterministic defaults, so nothing here requires an LLM call.
+Two evaluators share the same rubric model + DimensionAwareFilter:
 
-**Production wiring note:** the injected :class:`RubricJudge` should be an LLM judge wrapped in
-``OrderSwapEnsembleJudge`` and only trusted when it clears ``JudgeReliabilityGate`` (EVR-2 / ADR-011);
-otherwise fall back to :class:`HeuristicRubricJudge`. Rubrics are cached per task family (>95% cost
-cut, AdaRubric).
+- :class:`RubricCompletionEvaluator` (sync) with a per-dimension :class:`RubricJudge`. The default
+  :class:`HeuristicRubricJudge` needs no LLM (the safe baseline).
+- :class:`AsyncRubricCompletionEvaluator` (EVR-3c) with :class:`LLMRubricJudge`, which scores all
+  dimensions in a single LLM call via an injected async ``complete_fn`` — the task-adaptive judge
+  AdaRubric's gains come from.
+
+``AgenticLoop`` selects between them via ``completion_strategy="rubric"`` (EVR-3b): an injected
+``rubric_complete_fn`` activates the LLM path, otherwise the heuristic baseline. Default strategy is
+"enhanced" so behavior is unchanged until the rubric path is proven on the batteries.
+
+**Reliability note:** before trusting the LLM judge in production, gate it with EVR-2
+(``JudgeReliabilityGate`` over a human-labeled set) and consider wrapping it with
+``OrderSwapEnsembleJudge`` for position-bias robustness; on the α-gate failing, fall back to the
+heuristic judge. Rubrics are cached per task family (>95% cost cut, AdaRubric).
 """
 
 from __future__ import annotations
 
+import logging
 import math
+import re
 from dataclasses import dataclass, field
-from typing import Any, Mapping, Optional, Protocol, Sequence
+from typing import Any, Awaitable, Callable, Mapping, Optional, Protocol, Sequence
 
 from victor.core.utils import clamp
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -267,18 +278,123 @@ class RubricCompletionEvaluator:
         ctx: Mapping[str, Any] = context or {}
         rubric = self._cache.get_or_generate(task_family, self._generator, ctx)
         scores = tuple(self._judge.score(d, content, ctx) for d in rubric.dimensions)
-        failed = self._filter.failed(rubric, scores)
-        aggregate = confidence_weighted_mean(scores)
-        complete = not failed
-        if complete:
-            reason = f"all engaged dimensions cleared their thresholds (aggregate={aggregate:.2f})"
-        else:
-            names = ", ".join(f"{f.name}={f.score:.2f}" for f in failed)
-            reason = f"dimensions below threshold: {names}"
-        return RubricCompletionResult(
-            complete=complete,
-            aggregate=aggregate,
-            scores=scores,
-            failed_dimensions=tuple(f.name for f in failed),
-            reason=reason,
-        )
+        return _assemble_result(rubric, scores, self._filter)
+
+
+def _assemble_result(
+    rubric: Rubric,
+    scores: Sequence[RubricDimensionScore],
+    dimension_filter: DimensionAwareFilter,
+) -> RubricCompletionResult:
+    """Apply the DimensionAwareFilter + confidence-weighted aggregate to per-dimension scores."""
+    failed = dimension_filter.failed(rubric, scores)
+    aggregate = confidence_weighted_mean(scores)
+    complete = not failed
+    if complete:
+        reason = f"all engaged dimensions cleared their thresholds (aggregate={aggregate:.2f})"
+    else:
+        names = ", ".join(f"{f.name}={f.score:.2f}" for f in failed)
+        reason = f"dimensions below threshold: {names}"
+    return RubricCompletionResult(
+        complete=complete,
+        aggregate=aggregate,
+        scores=tuple(scores),
+        failed_dimensions=tuple(f.name for f in failed),
+        reason=reason,
+    )
+
+
+# ----------------------------------------------------------------------------------------------------
+# LLM-backed judge (EVR-3c) — the task-adaptive judge AdaRubric's gains come from.
+# ----------------------------------------------------------------------------------------------------
+
+_SCORE_RE = re.compile(r"score\s*[=:]\s*(1(?:\.0+)?|0?\.\d+|[01])", re.IGNORECASE)
+_CONF_RE = re.compile(r"conf(?:idence)?\s*[=:]\s*(1(?:\.0+)?|0?\.\d+|[01])", re.IGNORECASE)
+
+
+def _build_rubric_prompt(rubric: Rubric, content: str) -> str:
+    """A compact grading prompt: one ``<name>: score=.. confidence=..`` line per dimension."""
+    lines = [
+        "Grade whether the RESPONSE satisfies the task on each dimension below.",
+        "For EACH dimension output exactly one line: <name>: score=<0.0-1.0> confidence=<0.0-1.0>",
+        "score = how well the response satisfies the dimension; confidence = how sure you are "
+        "(use a LOW confidence when the response does not engage that dimension at all).",
+        "",
+        "Dimensions:",
+    ]
+    lines += [f"- {d.name}: {d.description}" for d in rubric.dimensions]
+    lines += ["", "RESPONSE:", (content or "")[:4000], "", "Grades (one line per dimension):"]
+    return "\n".join(lines)
+
+
+def _parse_rubric_scores(rubric: Rubric, text: str) -> tuple[RubricDimensionScore, ...]:
+    """Parse one ``score``/``confidence`` per dimension from the judge's text; tolerant fallbacks."""
+    out = []
+    rows = (text or "").splitlines()
+    for d in rubric.dimensions:
+        row = next((r for r in rows if d.name.lower() in r.lower()), "")
+        s_match = _SCORE_RE.search(row)
+        c_match = _CONF_RE.search(row)
+        if not row:
+            out.append(RubricDimensionScore(d.name, 0.5, 0.2, "llm: dimension not in output"))
+            continue
+        score = clamp(float(s_match.group(1)), 0.0, 1.0) if s_match else 0.5
+        confidence = clamp(float(c_match.group(1)), 0.0, 1.0) if c_match else 0.3
+        out.append(RubricDimensionScore(d.name, score, confidence, "llm"))
+    return tuple(out)
+
+
+@dataclass
+class LLMRubricJudge:
+    """Scores all rubric dimensions in a SINGLE LLM call via an injected async ``complete_fn``.
+
+    Provider-agnostic: ``complete_fn(prompt) -> text`` is supplied by the caller (provider or edge
+    model). One call per completion check keeps latency/cost bounded; the result should be cached per
+    task family upstream. For position-bias robustness it can be wrapped to run under multiple
+    dimension orderings (EVR-2 ``OrderSwapEnsembleJudge``); a provider error degrades to neutral,
+    low-confidence scores so completion never hard-fails on the judge.
+    """
+
+    complete_fn: Callable[[str], Awaitable[str]]
+
+    async def score_rubric(
+        self, rubric: Rubric, content: str, context: Mapping[str, Any]
+    ) -> tuple[RubricDimensionScore, ...]:
+        try:
+            text = await self.complete_fn(_build_rubric_prompt(rubric, content))
+        except Exception as exc:  # degrade, don't crash the loop's completion check
+            logger.warning("LLM rubric judge call failed (%s); using neutral fallback", exc)
+            return tuple(
+                RubricDimensionScore(d.name, 0.5, 0.2, "llm error fallback")
+                for d in rubric.dimensions
+            )
+        return _parse_rubric_scores(rubric, text or "")
+
+
+class AsyncRubricCompletionEvaluator:
+    """Async counterpart of :class:`RubricCompletionEvaluator` for an LLM (single-call) judge."""
+
+    def __init__(
+        self,
+        judge: LLMRubricJudge,
+        *,
+        generator: Optional[RubricGenerator] = None,
+        dimension_filter: Optional[DimensionAwareFilter] = None,
+        cache: Optional[RubricCache] = None,
+    ) -> None:
+        self._judge = judge
+        self._generator: RubricGenerator = generator or DefaultRubricGenerator()
+        self._filter = dimension_filter or DimensionAwareFilter()
+        self._cache = cache or RubricCache()
+
+    async def aevaluate(
+        self,
+        *,
+        task_family: str,
+        content: str,
+        context: Optional[Mapping[str, Any]] = None,
+    ) -> RubricCompletionResult:
+        ctx: Mapping[str, Any] = context or {}
+        rubric = self._cache.get_or_generate(task_family, self._generator, ctx)
+        scores = await self._judge.score_rubric(rubric, content, ctx)
+        return _assemble_result(rubric, scores, self._filter)
