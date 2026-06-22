@@ -239,17 +239,25 @@ class BaseLearner(ABC):
         """
         pass
 
-    @abstractmethod
     def _compute_reward(self, outcome: RLOutcome) -> float:
         """Compute reward signal from outcome.
+
+        Default = the canonical reward derived from the outcome's success +
+        quality_score (``victor.framework.rl.reward.reward_from_outcome``). Learners
+        MAY override this for domain-specific *shaping* (e.g. ``tool_selector`` weights
+        success/completion/grounding/efficiency); overriding is fully supported. This
+        concrete default removes the need to reimplement the trivial case and gives
+        one canonical formula instead of several drifting ones.
 
         Args:
             outcome: Outcome to compute reward for
 
         Returns:
-            Reward value (typically -1.0 to 1.0)
+            Reward value in ``[0.0, 1.0]``.
         """
-        pass
+        from victor.framework.rl.reward import reward_from_outcome
+
+        return reward_from_outcome(outcome)
 
     def _get_provider_baseline(self, param_name: str) -> Any:
         """Get baseline value from provider adapter if available.

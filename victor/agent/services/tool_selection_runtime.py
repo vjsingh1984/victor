@@ -70,10 +70,13 @@ def _get_e3tir_shared_store() -> Any:
                 if not tool:
                     return
                 success = event.success if event.success is not None else True
-                reward = (
-                    float(event.quality_score)
-                    if event.quality_score is not None
-                    else (1.0 if success else 0.3)
+                # Canonical default reward (R2) — was an inline
+                # `quality_score or (1.0 if success else 0.3)` here; now the single
+                # source in victor.framework.rl.reward so it can't drift.
+                from victor.framework.rl.reward import reward_from_signals
+
+                reward = reward_from_signals(
+                    success=bool(success), quality_score=event.quality_score
                 )
                 store.record_outcome(
                     tool_name=tool,
