@@ -257,6 +257,22 @@ def _settings_task_temperatures(self: "AgentOrchestrator") -> Any:
     return dict(getattr(temp_settings, "task_defaults", None) or {})
 
 
+def _temperature_ratchet_state(self: "AgentOrchestrator") -> Any:
+    """Per-session spin-escape ratchet state (ADR-013, PR-E), shared across buffered/streaming turns.
+
+    The agentic loop advances it once per turn (``RatchetState.record_turn``) from the SpinDetector
+    signal; the temperature resolver reads its step count to apply the escape-velocity ratchet. Lives
+    on the orchestrator so both the loop (writer) and the resolution seam (reader) share one instance.
+    """
+    cached = getattr(self, "_temperature_ratchet_state_obj", None)
+    if cached is None:
+        from victor.framework.temperature import RatchetState
+
+        cached = RatchetState()
+        self._temperature_ratchet_state_obj = cached
+    return cached
+
+
 def _runtime_intelligence_integration(
     self: "AgentOrchestrator",
 ) -> Optional["OrchestratorIntegration"]:
@@ -548,6 +564,7 @@ _PROPERTY_REGISTRY: dict[str, Any] = {
     "temperature_resolver": (_temperature_resolver, None),
     "profile_task_temperatures": (_profile_task_temperatures, None),
     "settings_task_temperatures": (_settings_task_temperatures, None),
+    "temperature_ratchet_state": (_temperature_ratchet_state, None),
     "runtime_intelligence_integration": (_runtime_intelligence_integration, None),
     "subagent_orchestrator": (_subagent_orchestrator, None),
     "coordination_advisor": (_coordination_advisor, None),
