@@ -163,6 +163,31 @@ async def test_run_streaming_requires_a_port():
             pass
 
 
+def test_extract_turn_content_handles_empty_tool_turn():
+    """Regression: a tool-only TurnResult has empty content; extraction must return "" (a str),
+    never the CompletionResponse object (which crashed the content-repetition .strip() check)."""
+    from victor.agent.services.turn_execution_runtime import TurnResult
+    from victor.providers.base import CompletionResponse
+
+    tool_turn = TurnResult(
+        response=CompletionResponse(content="", tool_calls=[{"name": "read", "arguments": {}}]),
+        tool_results=[{"success": True, "name": "read"}],
+        has_tool_calls=True,
+        tool_calls_count=1,
+    )
+    assert AgenticLoop._extract_turn_content(tool_turn) == ""
+
+    text_turn = TurnResult(response=CompletionResponse(content="done"))
+    assert AgenticLoop._extract_turn_content(text_turn) == "done"
+
+    # Raw string response and a bare CompletionResponse both coerce to a string.
+    assert AgenticLoop._extract_turn_content("plain string") == "plain string"
+    assert (
+        AgenticLoop._extract_turn_content(SimpleNamespace(response=CompletionResponse(content="x")))
+        == "x"
+    )
+
+
 def _nudge_loop(chat_ctx, *, should_inject_nudge, should_inject_budget=False):
     loop = AgenticLoop.__new__(AgenticLoop)
     loop.turn_executor = SimpleNamespace(_chat_context=chat_ctx)
@@ -216,3 +241,50 @@ def test_inject_decide_nudges_noop_without_turn_executor():
     loop._inject_decide_nudges(
         EvaluationResult(decision=EvaluationDecision.CONTINUE, score=0.2, reason="x"), 2, 5
     )
+
+
+def _terminal_loop(total_tool_calls=0):
+    loop = AgenticLoop.__new__(AgenticLoop)
+    loop.spin_detector = SimpleNamespace(total_tool_calls=total_tool_calls)
+    return loop
+
+
+def _turn(content, *, tool_calls=None):
+    from victor.agent.services.turn_execution_runtime import TurnResult
+    from victor.providers.base import CompletionResponse
+
+    return TurnResult(
+        response=CompletionResponse(content=content, tool_calls=tool_calls),
+        has_tool_calls=bool(tool_calls),
+    )
+
+
+def test_is_terminal_answer_substantial_no_tools_true():
+    assert _terminal_loop()._is_terminal_answer(_turn("x" * 150)) is True
+
+
+def test_is_terminal_answer_short_after_prior_tools_true():
+    # Short final answer counts once tools have already run this task.
+    assert _terminal_loop(total_tool_calls=2)._is_terminal_answer(_turn("Done.")) is True
+
+
+def test_is_terminal_answer_short_no_prior_tools_false():
+    assert _terminal_loop()._is_terminal_answer(_turn("short")) is False
+
+
+def test_is_terminal_answer_tool_call_turn_false():
+    assert (
+        _terminal_loop()._is_terminal_answer(_turn("x" * 150, tool_calls=[{"name": "read"}]))
+        is False
+    )
+
+
+def test_is_terminal_answer_intent_only_false():
+    # Prior tools satisfy the substance gate, but intent narration is not a final answer.
+    loop = _terminal_loop(total_tool_calls=2)
+    assert loop._is_terminal_answer(_turn("I'll now read the file and summarize it.")) is False
+
+
+def test_is_terminal_answer_continuation_request_false():
+    text = "Here is the summary so far. Would you like me to continue with the next file? " * 2
+    assert _terminal_loop()._is_terminal_answer(_turn(text)) is False

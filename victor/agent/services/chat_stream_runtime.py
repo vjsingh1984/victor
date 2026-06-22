@@ -404,7 +404,10 @@ class ServiceStreamingRuntime(ChatStreamHelperMixin):
         stream_failed = False
 
         try:
-            async for chunk in executor.run(user_message, **kwargs):
+            # FEP-0007 cutover: drive the unified loop (AgenticLoop.run_streaming via run_unified)
+            # so the streaming UI path runs the same PERCEIVE/PLAN/ACT/EVALUATE/DECIDE loop as the
+            # buffered path. The legacy run() is now dead and removed in the follow-up step.
+            async for chunk in executor.run_unified(user_message, **kwargs):
                 yield chunk
         except Exception:
             stream_failed = True

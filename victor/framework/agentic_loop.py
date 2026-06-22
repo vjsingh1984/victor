@@ -1085,11 +1085,7 @@ class AgenticLoop:
                 # hash/overlap detector the streaming loop uses — replaces the cruder
                 # content-length heuristic). The loop already fed the spin detector in _act, so
                 # don't re-record. Plateau/nudge stay owned by this loop below.
-                _action_content = (
-                    getattr(action_result, "content", None)
-                    or getattr(action_result, "response", "")
-                    or ""
-                )
+                _action_content = self._extract_turn_content(action_result)
                 _tool_results = getattr(action_result, "tool_results", None) or []
                 _turn_obs = TurnObservation(
                     content=_action_content,
@@ -1319,6 +1315,26 @@ class AgenticLoop:
                     "degradation_events": list(state.get("degradation_events", [])),
                 },
             )
+
+    @staticmethod
+    def _extract_turn_content(action_result: Any) -> str:
+        """Return a turn's assistant text as a string for content-repetition evaluation.
+
+        A tool-only turn legitimately has empty content (``""``). The previous
+        ``getattr(action_result, "content", None) or getattr(action_result, "response", "")``
+        idiom fell through to the ``CompletionResponse`` *object* on such turns, which then
+        crashed the content-repetition detector on ``.strip()``. This coerces to ``str``,
+        drilling into ``response.content`` only when ``action_result`` is neither a ``TurnResult``
+        (string ``.content``) nor a raw string response.
+        """
+        raw = getattr(action_result, "content", None)
+        if isinstance(raw, str):
+            return raw
+        if isinstance(action_result, str):
+            return action_result
+        resp = getattr(action_result, "response", "")
+        content = resp if isinstance(resp, str) else getattr(resp, "content", "")
+        return content if isinstance(content, str) else ""
 
     def _inject_decide_nudges(
         self,
@@ -2526,6 +2542,30 @@ class AgenticLoop:
         )
         return any(first_line.startswith(p) for p in intent_prefixes)
 
+    def _is_terminal_answer(self, action_result: Any) -> bool:
+        """True when a no-tool turn delivered a genuine final answer (not narration / a question).
+
+        Mirrors the legacy terminal-answer rule: a substantial response (or any response after
+        prior tool usage) with no pending tool calls that is neither intent-only narration
+        ("I'll now read…") nor a continuation request ("Would you like me to…"). Used to complete
+        promptly even when EnhancedCompletionEvaluator under-scores a finished answer — without it
+        the loop burns low-confidence retries restating the answer (FEP-0007 cutover verbosity fix).
+        """
+        from victor.agent.services.turn_execution_runtime import TurnResult
+
+        if not isinstance(action_result, TurnResult):
+            return False
+        if action_result.has_tool_calls or not action_result.has_content:
+            return False
+        content = action_result.content.strip()
+        had_prior_tool_usage = getattr(self.spin_detector, "total_tool_calls", 0) > 0
+        is_substantial = len(content) > 100
+        if not (had_prior_tool_usage or is_substantial):
+            return False
+        return not self._is_continuation_request(content) and not self._is_intent_only_response(
+            content
+        )
+
     async def _evaluate(
         self,
         perception: Perception,
@@ -2564,6 +2604,19 @@ class AgenticLoop:
                 response_metadata = (
                     raw_response_metadata if isinstance(raw_response_metadata, dict) else {}
                 )
+                # The ACT primitive may signal a HIGH-confidence task completion (no pending
+                # tools) — e.g. the streaming executor's task-completion detector. Honor it as an
+                # immediate COMPLETE so the loop stops promptly instead of leaning on the
+                # under-scoring completion evaluator (FEP-0007 cutover tune-up).
+                if response_metadata.get("forced_task_completion") and not getattr(
+                    action_result, "has_tool_calls", False
+                ):
+                    return EvaluationResult(
+                        decision=EvaluationDecision.COMPLETE,
+                        score=0.95,
+                        reason="Task-completion active signal (HIGH confidence, no pending tools)",
+                        metadata={"forced_task_completion": True},
+                    )
                 if (
                     response_metadata.get("deterministic_tool_execution")
                     and action_result.successful_tool_count > 0
@@ -2670,6 +2723,28 @@ class AgenticLoop:
                     # a written answer; forcing it on every successful turn
                     # is the bug.
                     return tool_progress_result
+                # A clear final answer (no pending tools, substantial, not narration/question) is
+                # COMPLETE even when the evaluator under-scored it — otherwise the loop retries a
+                # finished answer, restating it. Mirrors the legacy terminal-answer rule below
+                # (FEP-0007 cutover verbosity fix).
+                if enhanced_result.decision in (
+                    EvaluationDecision.RETRY,
+                    EvaluationDecision.CONTINUE,
+                ) and self._is_terminal_answer(action_result):
+                    logger.info(
+                        "[EnhancedCompletion] Overriding low-confidence %s -> COMPLETE: final "
+                        "answer delivered with no pending tools",
+                        enhanced_result.decision.value,
+                    )
+                    return EvaluationResult(
+                        decision=EvaluationDecision.COMPLETE,
+                        score=max(enhanced_result.score, 0.8),
+                        reason=(
+                            "Final answer delivered with no pending tools — completing despite "
+                            "low completion score"
+                        ),
+                        metadata={"terminal_answer_override": True},
+                    )
                 return self._apply_low_confidence_retry_budget(enhanced_result, state)
             except Exception as e:
                 # Graceful degradation: fall back to legacy evaluation on error
