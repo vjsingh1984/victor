@@ -24,6 +24,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from victor.agent.turn_policy import SpinDetector
 from victor.framework.agentic_loop import AgenticLoop, StreamingTurnOutcome
 from victor.framework.evaluation_nodes import EvaluationDecision, EvaluationResult
 from victor.providers.base import StreamChunk
@@ -53,7 +54,9 @@ def _loop(port, *, evaluations, turn_executor=None):
     loop._progress_scores = []
     loop._last_perception = None
     loop.turn_executor = turn_executor
-    loop.spin_detector = object()
+    # run_streaming now records per-turn spin (+ advances the temperature ratchet) like the buffered
+    # _act path (ADR-013), so it needs a real SpinDetector rather than a bare stub.
+    loop.spin_detector = SpinDetector()
     loop.turn_evaluation_controller = SimpleNamespace(reset=lambda: None)
     loop.criteria_builder = SimpleNamespace(reset=lambda: None)
     loop.nudge_policy = SimpleNamespace(

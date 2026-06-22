@@ -76,3 +76,37 @@ def test_ratchet_capped_at_0_9():
         orch, task_type="conversational", model="claude", base_temperature=0.6
     )
     assert value == 0.9  # hard cap, well below the degeneration cliff
+
+
+def _turn(*, has_tool_calls, blocked=False):
+    return SimpleNamespace(
+        has_tool_calls=has_tool_calls,
+        all_tools_blocked=blocked,
+        tool_calls_count=1 if has_tool_calls else 0,
+        tool_signatures=(),
+        tool_results=[{"tool_name": "read"}] if has_tool_calls else [],
+    )
+
+
+def test_shared_record_spin_and_ratchet_used_by_both_paths():
+    """The shared _record_spin_and_ratchet (buffered _act + streaming run_streaming) updates the
+    spin detector AND advances the orchestrator ratchet — the basis for buffered↔streaming symmetry.
+    """
+    from victor.agent.turn_policy import SpinDetector
+    from victor.framework.agentic_loop import AgenticLoop
+
+    loop = AgenticLoop.__new__(AgenticLoop)
+    loop.spin_detector = SpinDetector()
+    ratchet = RatchetState()
+    loop.orchestrator = SimpleNamespace(temperature_ratchet_state=ratchet)
+
+    # a stalled (no-tool) turn records spin and (once spin warns/sticks) escalates the ratchet
+    for _ in range(4):
+        loop._record_spin_and_ratchet(_turn(has_tool_calls=False))
+    assert ratchet.steps >= 1  # escalated on stall
+    # a tool-using (progress) turn resets the ratchet
+    loop._record_spin_and_ratchet(_turn(has_tool_calls=True))
+    assert ratchet.steps == 0
+    # None turn is a safe no-op
+    loop._record_spin_and_ratchet(None)
+    assert ratchet.steps == 0
