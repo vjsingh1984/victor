@@ -64,6 +64,8 @@ from enum import Enum
 from typing import (
     Any,
     AsyncIterator,
+    Awaitable,
+    Callable,
     Dict,
     List,
     Literal,
@@ -500,6 +502,10 @@ class AgenticLoopConfig:
     enable_completion_scoring: bool = True
     enable_context_keywords: bool = True
     enable_calibrated_completion: Optional[bool] = None
+    # Completion strategy (ADR-009): "enhanced" (default) | "rubric" | "hybrid" | "legacy".
+    # A strategy setting, not a feature flag. Default "enhanced" → zero behavior change until the
+    # rubric path is proven to match-or-beat on the A/B + judge-α gate.
+    completion_strategy: str = "enhanced"
     enable_planning_gate: bool = True
     enable_paradigm_router: bool = True
     enable_topology_routing: bool = True
@@ -568,6 +574,7 @@ class AgenticLoop:
         exploration_settings: Optional[Any] = None,
         config: "Union[AgenticLoopConfig, Dict[str, Any], None]" = None,
         streaming_act_port: Optional["StreamingActProvider"] = None,
+        rubric_complete_fn: Optional[Callable[[str], Awaitable[str]]] = None,
     ):
         """Initialize agentic loop.
 
@@ -684,6 +691,34 @@ class AgenticLoop:
             logger.warning(
                 "[EnhancedCompletion] DISABLED via config - using legacy completion detection"
             )
+
+        # Rubric-based completion (ADR-009 / EVR-3) — opt-in via completion_strategy in
+        # {"rubric","hybrid"}. Default "enhanced" leaves this None (zero behavior change). When an
+        # async rubric_complete_fn is injected, use the LLM judge; otherwise the deterministic
+        # heuristic judge. "hybrid" additionally consults the enhanced evaluator (both must agree).
+        self.rubric_completion_evaluator = None
+        if self.config.completion_strategy in ("rubric", "hybrid"):
+            if rubric_complete_fn is not None:
+                from victor.framework.rubric_completion import (
+                    AsyncRubricCompletionEvaluator,
+                    LLMRubricJudge,
+                )
+
+                self.rubric_completion_evaluator = AsyncRubricCompletionEvaluator(
+                    LLMRubricJudge(rubric_complete_fn)
+                )
+                logger.info(
+                    "[RubricCompletion] ENABLED (LLM judge) — strategy=%s",
+                    self.config.completion_strategy,
+                )
+            else:
+                from victor.framework.rubric_completion import RubricCompletionEvaluator
+
+                self.rubric_completion_evaluator = RubricCompletionEvaluator()
+                logger.info(
+                    "[RubricCompletion] ENABLED (heuristic judge) — strategy=%s",
+                    self.config.completion_strategy,
+                )
 
         # Initialize planning gate for fast-slow architecture
         self.planning_gate = PlanningGate(enabled=self.config.enable_planning_gate)
@@ -2576,6 +2611,64 @@ class AgenticLoop:
         )
         return any(first_line.startswith(p) for p in intent_prefixes)
 
+    async def _rubric_completion_result(
+        self, perception: Any, action_result: Any, state: Dict[str, Any]
+    ) -> Optional[EvaluationResult]:
+        """Rubric-based completion verdict (ADR-009), for completion_strategy in {"rubric","hybrid"}.
+
+        Returns ``None`` to defer to the enhanced/legacy cascade when not applicable: no rubric
+        evaluator (other strategy), not a ``TurnResult``, tools still pending, or empty content.
+        Duck-types the sync heuristic evaluator (``.evaluate``) vs the async LLM-judge evaluator
+        (``.aevaluate``). For ``"hybrid"``, a rubric COMPLETE is confirmed only if the enhanced
+        evaluator also says COMPLETE — this cancels the rubric judge's observed over-completion on
+        intent statements (calibration κ≈0.5) while keeping its anti-under-scoring on real answers.
+        """
+        evaluator = self.rubric_completion_evaluator
+        if evaluator is None:
+            return None
+        from victor.agent.services.turn_execution_runtime import TurnResult
+
+        if not isinstance(action_result, TurnResult) or action_result.has_tool_calls:
+            return None
+        content = (getattr(action_result, "content", "") or "").strip()
+        if not content:
+            return None
+        task_family = str(state.get("task_type") or "general")
+        if hasattr(evaluator, "aevaluate"):
+            result = await evaluator.aevaluate(
+                task_family=task_family, content=content, context=state
+            )
+        else:
+            result = evaluator.evaluate(task_family=task_family, content=content, context=state)
+
+        if (
+            self.config.completion_strategy == "hybrid"
+            and result.complete
+            and self.enhanced_completion_evaluator is not None
+        ):
+            enhanced = await self.enhanced_completion_evaluator.evaluate(
+                perception=perception,
+                action_result=action_result,
+                state=state,
+                fulfillment_detector=self.fulfillment,
+                spin_detector=self.spin_detector,
+            )
+            if enhanced.decision != EvaluationDecision.COMPLETE:
+                return EvaluationResult(
+                    decision=EvaluationDecision.CONTINUE,
+                    score=result.aggregate,
+                    reason=f"[hybrid] rubric COMPLETE but enhanced disagreed: {enhanced.reason[:80]}",
+                    metadata={"rubric_completion": result.to_dict()},
+                )
+
+        decision = EvaluationDecision.COMPLETE if result.complete else EvaluationDecision.CONTINUE
+        return EvaluationResult(
+            decision=decision,
+            score=result.aggregate,
+            reason=f"[rubric] {result.reason}",
+            metadata={"rubric_completion": result.to_dict()},
+        )
+
     def _is_terminal_answer(self, action_result: Any) -> bool:
         """True when a no-tool turn delivered a genuine final answer (not narration / a question).
 
@@ -2714,6 +2807,12 @@ class AgenticLoop:
                     )
         except Exception:
             pass
+
+        # RUBRIC: task-adaptive rubric completion (ADR-009), opt-in via completion_strategy in
+        # {"rubric","hybrid"}. Returns None to defer to the enhanced/legacy cascade when not applicable.
+        rubric_result = await self._rubric_completion_result(perception, action_result, state)
+        if rubric_result is not None:
+            return rubric_result
 
         # ENHANCED: Use EnhancedCompletionEvaluator if enabled
         if self.enhanced_completion_evaluator is not None and self._should_use_enhanced_evaluation(
