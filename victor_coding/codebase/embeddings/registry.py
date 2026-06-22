@@ -14,9 +14,12 @@
 
 """Registry for embedding providers."""
 
+import logging
 from typing import Dict, List, Type
 
 from victor_coding.codebase.embeddings.base import BaseEmbeddingProvider, EmbeddingConfig
+
+logger = logging.getLogger(__name__)
 
 
 class EmbeddingRegistry:
@@ -48,7 +51,10 @@ class EmbeddingRegistry:
             raise TypeError(f"{provider_class} must inherit from BaseEmbeddingProvider")
 
         cls._providers[name] = provider_class
-        print(f"Registered embedding provider: {name}")
+        # Route to the logger (stderr/log), never stdout — these import-time
+        # registration lines otherwise pollute machine-readable stdout such as
+        # `victor auth env`'s `export ...` output.
+        logger.debug("Registered embedding provider: %s", name)
 
     @classmethod
     def get(cls, name: str) -> Type[BaseEmbeddingProvider]:
