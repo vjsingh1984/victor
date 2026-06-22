@@ -57,7 +57,7 @@ jobs:
           cache: pip
 
       - name: Install Black
-        run: pip install black==26.1.0
+        run: pip install black==26.3.1
 
       - name: Check formatting
         run: black --check victor tests
