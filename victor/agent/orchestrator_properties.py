@@ -227,7 +227,7 @@ def _temperature_resolver(self: "AgentOrchestrator") -> Any:
         from victor.framework.temperature import build_resolver_from_settings
 
         cached = build_resolver_from_settings(
-            getattr(self.settings, "temperature", None),
+            getattr(self.settings, "temperature_policy", None),
             hint_provider=TaskTypeHintCapabilityProvider(),
         )
         self._temperature_resolver_cached = cached
@@ -253,7 +253,7 @@ def _profile_task_temperatures(self: "AgentOrchestrator") -> Any:
 
 def _settings_task_temperatures(self: "AgentOrchestrator") -> Any:
     """The settings-level ``temperature.task_defaults`` ops table (ADR-013), or ``{}``."""
-    temp_settings = getattr(self.settings, "temperature", None)
+    temp_settings = getattr(self.settings, "temperature_policy", None)
     return dict(getattr(temp_settings, "task_defaults", None) or {})
 
 

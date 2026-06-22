@@ -30,9 +30,12 @@ def test_temperature_settings_defaults():
 
 def test_settings_exposes_temperature_group():
     settings = Settings()
-    # nested group auto-instantiates from defaults
-    assert isinstance(settings.temperature, TemperatureSettings)
-    assert settings.temperature.global_default == 0.6
+    # nested group auto-instantiates from defaults; named temperature_policy to avoid colliding
+    # with the float temperature that callers read via getattr(settings, "temperature", 0.7).
+    assert isinstance(settings.temperature_policy, TemperatureSettings)
+    assert settings.temperature_policy.global_default == 0.6
+    # the float `temperature` reader path must NOT receive the group object (the regression we fixed)
+    assert not isinstance(getattr(settings, "temperature", None), TemperatureSettings)
 
 
 def test_profile_config_accepts_temperatures_map():
