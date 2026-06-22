@@ -334,6 +334,41 @@ def test_sync_prompt_builder_runtime_state_splits_stable_and_dynamic_tools():
 
     runtime.sync_prompt_builder_runtime_state()
 
+    # P5 capability-first: this provider supports prompt caching, so the FULL tool set
+    # is kept in the stable prefix (cached ~free) and the dynamic/per-turn split is empty.
+    assert builder.stable_prompt_tools == ["read", "shell", "web_search"]
+    assert builder.dynamic_prompt_tools == []
+
+
+def test_sync_prompt_builder_runtime_state_tiers_split_for_non_caching_provider():
+    builder = SimpleNamespace(
+        available_tools=[],
+        stable_prompt_tools=[],
+        dynamic_prompt_tools=[],
+        mode_prompt_addition="",
+        invalidate_cache=MagicMock(),
+        provider_name="ollama",
+        model="qwen",
+        provider_caches=False,
+        provider_has_kv_cache=True,
+    )
+    host = SimpleNamespace(
+        prompt_builder=builder,
+        get_enabled_tools=MagicMock(return_value={"read", "shell", "web_search"}),
+        get_mode_system_prompt=MagicMock(return_value=""),
+        _get_model_context_window=lambda: 32768,
+        provider=SimpleNamespace(
+            supports_prompt_caching=lambda: False,
+            supports_kv_prefix_caching=lambda: True,
+        ),
+        provider_name="ollama",
+        model="qwen",
+    )
+    runtime = PromptBuilderRuntime(OrchestratorProtocolAdapter(host))
+
+    runtime.sync_prompt_builder_runtime_state()
+
+    # Non-caching provider keeps the window-tiered CORE-stable + ADAPTIVE-per-turn split.
     assert builder.stable_prompt_tools == ["read", "shell"]
     assert builder.dynamic_prompt_tools == ["web_search"]
 
