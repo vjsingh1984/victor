@@ -821,9 +821,9 @@ class AgenticLoop:
                         task_hint = self._task_hint_provider.get_hint(task_type)
                         if task_hint:
                             skip_planning = getattr(task_hint, "skip_planning", False)
-                            temp_override = getattr(task_hint, "temperature_override", None)
-                            if temp_override is not None:
-                                state["temperature_override"] = temp_override
+                            # Temperature is now resolved at the provider seam from state["task_type"]
+                            # via the unified TemperatureResolver (ADR-013), which reads the same
+                            # TaskTypeHint.temperature_override constant — no per-turn override here.
 
                     if hasattr(self.runtime_intelligence, "get_structured_routing_policy"):
                         structured_routing_policy = (
@@ -2276,7 +2276,7 @@ class AgenticLoop:
                     is_qa_task=is_qa,
                     enable_thinking=enable_thinking,
                     intent=state.get("perception", {}).get("intent"),
-                    temperature_override=state.get("temperature_override"),
+                    task_type=state.get("task_type"),
                     runtime_context_overrides=runtime_context_overrides,
                 )
 
