@@ -365,7 +365,7 @@ class ProfileConfig(BaseSettings):
 
     provider: str = Field(..., description="Provider name (ollama, anthropic, openai, google)")
     model: str = Field(..., description="Model identifier")
-    temperature: float = Field(0.7, ge=0.0, le=2.0)
+    temperature: float = Field(0.6, ge=0.0, le=2.0)  # ADR-013 default flip 0.7→0.6 (A/B 2026-06-22)
     temperatures: Optional[Dict[str, float]] = Field(
         None,
         description="Per-task temperature overrides (task_type -> temperature), e.g. {'plan': 0.5}. "
@@ -2306,7 +2306,7 @@ class Settings(BaseSettings):
                 "default": ProfileConfig(
                     provider="lmstudio",
                     model=default_model,
-                    temperature=0.7,
+                    temperature=0.6,
                     max_tokens=4096,
                     description=None,
                     tool_selection=None,
