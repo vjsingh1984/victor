@@ -1051,6 +1051,28 @@ def get_task_type_registry() -> TaskTypeRegistry:
     return TaskTypeRegistry.get_instance()
 
 
+def canonicalize_task_type(value: str, overrides: Optional[Dict[str, str]] = None) -> str:
+    """Resolve any task-type token to its canonical registered name.
+
+    The single mapping authority used by the task-type *adapter* enums
+    (``TrackerTaskType`` / ``ClassifierTaskType`` / ``pattern_registry.TaskType``)
+    so they all collapse onto this registry instead of each carrying their own
+    parallel taxonomy. ``overrides`` covers adapter-local tokens that have no alias
+    in the default registry (e.g. coding-specific ``bug_fix`` -> ``debug``).
+
+    Args:
+        value: A task-type name/alias from any adapter enum.
+        overrides: Optional adapter-local pre-map applied before alias resolution.
+
+    Returns:
+        The canonical task-type name (an alias resolves to its target; an already-
+        canonical name is returned unchanged).
+    """
+    if overrides and value in overrides:
+        value = overrides[value]
+    return get_task_type_registry().resolve_alias(value)
+
+
 def get_task_hint(task_type: str, vertical: Optional[str] = None) -> str:
     """Get the system prompt hint for a task type.
 

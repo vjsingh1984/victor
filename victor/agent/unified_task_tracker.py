@@ -94,6 +94,27 @@ class TrackerTaskType(Enum):
     DESIGN = "design"  # Conceptual/planning (no tools)
     GENERAL = "general"  # Ambiguous or mixed tasks
 
+    def to_canonical(self) -> str:
+        """Canonical task-type name in the TaskTypeRegistry (tool-supply P7).
+
+        Collapses this adapter enum onto the single registry taxonomy; this enum's
+        values are already canonical names.
+        """
+        from victor.framework.task_types import canonicalize_task_type
+
+        return canonicalize_task_type(self.value)
+
+    @classmethod
+    def from_canonical(cls, name: str) -> "Optional[TrackerTaskType]":
+        """Best-effort reverse map: a canonical name -> the member that yields it."""
+        from victor.framework.task_types import canonicalize_task_type
+
+        target = canonicalize_task_type(name)
+        for member in cls:
+            if member.to_canonical() == target:
+                return member
+        return None
+
 
 class Milestone(Enum):
     """Task milestones for progress tracking."""
