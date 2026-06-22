@@ -94,7 +94,7 @@ class TestNestedModelDefaults:
         ps = ProviderSettings()
         assert ps.default_provider == "ollama"
         assert ps.default_model == "qwen3.5:27b-q4_K_M"
-        assert ps.default_temperature == 0.7
+        assert ps.default_temperature == 0.6  # ADR-013 default flip
         assert ps.default_max_tokens == 4096
         assert ps.anthropic_api_key is None
         assert ps.ollama_base_url == "http://localhost:11434"

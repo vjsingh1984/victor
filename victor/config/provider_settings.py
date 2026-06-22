@@ -12,7 +12,7 @@ class ProviderSettings(BaseModel):
 
     default_provider: str = "ollama"
     default_model: str = "qwen3-coder:30b"
-    default_temperature: float = 0.7
+    default_temperature: float = 0.6  # ADR-013 default flip 0.7→0.6 (A/B 2026-06-22)
     default_max_tokens: int = 4096
     anthropic_api_key: Optional[SecretStr] = None
     openai_api_key: Optional[SecretStr] = None

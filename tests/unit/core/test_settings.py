@@ -70,7 +70,7 @@ class TestProfileConfig:
 
         assert config.provider == "lmstudio"
         assert config.model == "qwen2.5-coder:7b"
-        assert config.temperature == 0.7
+        assert config.temperature == 0.6  # ADR-013 default flip
         assert config.max_tokens == 4096
 
     def test_profile_config_custom_values(self):
@@ -169,7 +169,7 @@ class TestSettings:
         # Note: default_provider is "ollama" in Settings class
         assert settings.provider.default_provider == "ollama"
         assert settings.provider.default_model == "qwen3.5:27b-q4_K_M"
-        assert settings.provider.default_temperature == 0.7
+        assert settings.provider.default_temperature == 0.6  # ADR-013 default flip
         assert settings.provider.default_max_tokens == 4096
         assert settings.log_level == "INFO"
         assert settings.airgapped_mode is False

@@ -74,8 +74,12 @@ constants remain the SDK-stable floor (read in place — `victor-contracts` unch
 ## Consequences
 
 - **Behavior change**: the global default moves 0.7→0.6 for profiles without an explicit temperature.
-  Gated by `temperature.global_default`; the buffered cutover keeps 0.7 first to isolate, flipping to
-  0.6 only after measurement (SWE-bench A/B can pin it).
+  Gated by `temperature.global_default`; the buffered cutover kept 0.7 first to isolate. **Flipped to
+  0.6 on 2026-06-22** after a multi-turn A/B (`completion_ab.py`/`temperature_ab.py`, glm-5.2, honest
+  turn metric via #235): `enhanced@0.60` was the best-combo (5.2 turns, all-complete) and 0.60
+  match-or-beat 0.70 on the temperature sweep (5.30 vs 6.30 turns, equal variance). Applied to
+  `ProfileConfig.temperature`, the built-in BASIC/ADVANCED/EXPERT profile presets, and the
+  `ProviderSettings.default_temperature` defaults. Quality was not auto-scored (efficiency gate only).
 - The `temperature_override` plumbing in the loop becomes redundant and is removed once both seams
   route through the resolver.
 - An AST boundary guard forbids raw `temperature + <float>` arithmetic outside

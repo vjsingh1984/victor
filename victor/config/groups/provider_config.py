@@ -106,7 +106,7 @@ class ProviderSettings(BaseModel):
 
     # Default generation parameters
     default_temperature: float = Field(
-        default=0.7, ge=0.0, le=2.0, description="Default temperature for generation"
+        default=0.6, ge=0.0, le=2.0, description="Default temperature for generation"
     )
     default_max_tokens: int = Field(
         default=4096, gt=0, description="Default maximum tokens for generation"
