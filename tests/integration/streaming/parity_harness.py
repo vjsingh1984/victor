@@ -39,7 +39,13 @@ from unittest.mock import MagicMock, patch
 
 from victor.agent.orchestrator import AgentOrchestrator
 from victor.config.settings import ProfileConfig, Settings
-from victor.providers.base import BaseProvider, Message, StreamChunk, ToolDefinition
+from victor.providers.base import (
+    BaseProvider,
+    CompletionResponse,
+    Message,
+    StreamChunk,
+    ToolDefinition,
+)
 from victor.tools.base import BaseTool
 
 # ---------------------------------------------------------------------------
@@ -84,8 +90,32 @@ class ScriptedProvider(BaseProvider):
     def supports_streaming(self) -> bool:
         return True
 
-    async def chat(self, *args: Any, **kwargs: Any):  # pragma: no cover - loop uses stream()
-        return SimpleNamespace(content="", tool_calls=None, usage=None, model="scripted")
+    async def chat(
+        self,
+        messages: List[Message],
+        *,
+        model: str = "scripted",
+        temperature: float = 0.7,
+        max_tokens: int = 4096,
+        tools: Optional[List[ToolDefinition]] = None,
+        **kwargs: Any,
+    ) -> CompletionResponse:
+        """Replay the next scripted turn as a buffered ``CompletionResponse``.
+
+        The buffered loop (``AgenticLoop`` via ``execute_turn`` ->
+        ``orchestrator_protocol_adapter.execute_turn`` -> ``provider.chat()``) consumes turns
+        the same way ``stream()`` does for the streaming loop, so one ``ScriptedProvider`` drives
+        BOTH loops from the same script — the basis for run/stream parity comparison.
+        """
+        turn = self._turns[min(self.turn_index, len(self._turns) - 1)]
+        self.turn_index += 1
+        has_tools = bool(turn.tool_calls)
+        return CompletionResponse(
+            content=turn.content or "",
+            tool_calls=turn.tool_calls,
+            stop_reason="tool_calls" if has_tools else turn.finish_reason,
+            model="scripted",
+        )
 
     async def stream(
         self,
@@ -248,6 +278,31 @@ async def capture_transcript(orch: AgentOrchestrator, message: str) -> StreamTra
         errored = True
         error = f"{type(exc).__name__}: {exc}"
     content = re.sub(r"\s+", " ", "".join(parts)).strip()
+    return StreamTranscript(
+        content=content,
+        tool_calls=list(getattr(orch, "_parity_tool_log", [])),
+        errored=errored,
+        error=error,
+    )
+
+
+async def capture_buffered_transcript(orch: AgentOrchestrator, message: str) -> StreamTranscript:
+    """Drive the real buffered loop (``orch.chat`` -> ``AgenticLoop.run``) into a transcript.
+
+    The buffered counterpart of :func:`capture_transcript`, normalized into the SAME
+    ``StreamTranscript`` shape so run/stream parity is a direct field comparison (final content +
+    executed tool sequence). A single ``CompletionResponse`` is returned rather than streamed, so
+    there is no per-turn duplication to strip — the cost footer never appears.
+    """
+    errored = False
+    error: Optional[str] = None
+    content = ""
+    try:
+        response = await orch.chat(message)
+        content = re.sub(r"\s+", " ", getattr(response, "content", "") or "").strip()
+    except Exception as exc:  # capture rather than raise — "no buffered traceback" is asserted
+        errored = True
+        error = f"{type(exc).__name__}: {exc}"
     return StreamTranscript(
         content=content,
         tool_calls=list(getattr(orch, "_parity_tool_log", [])),
