@@ -62,33 +62,45 @@ def test_config_from_dict_accepts_rubric_strategy():
 # --- _rubric_completion_result -------------------------------------------------------------------
 
 
-def test_defers_when_no_rubric_evaluator():
+async def test_defers_when_no_rubric_evaluator():
     # Default ("enhanced") strategy -> evaluator is None -> defer to the normal cascade.
-    assert _loop(None)._rubric_completion_result(_turn("done"), {}) is None
+    assert await _loop(None)._rubric_completion_result(_turn("done"), {}) is None
 
 
-def test_complete_when_rubric_passes():
-    res = _loop(_scripted_rubric(complete=True))._rubric_completion_result(
+async def test_complete_when_rubric_passes():
+    res = await _loop(_scripted_rubric(complete=True))._rubric_completion_result(
         _turn("a real final answer"), {"task_type": "qa"}
     )
     assert res is not None and res.decision == EvaluationDecision.COMPLETE
     assert res.reason.startswith("[rubric]")
 
 
-def test_continue_when_rubric_fails():
-    res = _loop(_scripted_rubric(complete=False))._rubric_completion_result(
+async def test_continue_when_rubric_fails():
+    res = await _loop(_scripted_rubric(complete=False))._rubric_completion_result(
         _turn("partial"), {"task_type": "qa"}
     )
     assert res is not None and res.decision == EvaluationDecision.CONTINUE
 
 
-def test_defers_when_tools_pending():
-    res = _loop(_scripted_rubric(complete=True))._rubric_completion_result(
+async def test_defers_when_tools_pending():
+    res = await _loop(_scripted_rubric(complete=True))._rubric_completion_result(
         _turn("text", tool_calls=[{"name": "read"}]), {}
     )
     assert res is None  # tools pending -> not a completion candidate
 
 
-def test_defers_on_empty_content():
-    res = _loop(_scripted_rubric(complete=True))._rubric_completion_result(_turn(""), {})
+async def test_defers_on_empty_content():
+    res = await _loop(_scripted_rubric(complete=True))._rubric_completion_result(_turn(""), {})
     assert res is None
+
+
+async def test_uses_async_evaluator_when_present():
+    # An evaluator exposing aevaluate() (the LLM-judge path) is awaited.
+    class _AsyncEval:
+        async def aevaluate(self, *, task_family, content, context):
+            return SimpleNamespace(
+                complete=True, aggregate=0.88, reason="async", to_dict=lambda: {}
+            )
+
+    res = await _loop(_AsyncEval())._rubric_completion_result(_turn("answer"), {"task_type": "qa"})
+    assert res is not None and res.decision == EvaluationDecision.COMPLETE and res.score == 0.88

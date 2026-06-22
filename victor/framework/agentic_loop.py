@@ -64,6 +64,8 @@ from enum import Enum
 from typing import (
     Any,
     AsyncIterator,
+    Awaitable,
+    Callable,
     Dict,
     List,
     Literal,
@@ -573,6 +575,7 @@ class AgenticLoop:
         exploration_settings: Optional[Any] = None,
         config: "Union[AgenticLoopConfig, Dict[str, Any], None]" = None,
         streaming_act_port: Optional["StreamingActProvider"] = None,
+        rubric_complete_fn: Optional[Callable[[str], Awaitable[str]]] = None,
     ):
         """Initialize agentic loop.
 
@@ -696,10 +699,25 @@ class AgenticLoop:
         # injected by replacing this attribute. Only consulted when the strategy is "rubric".
         self.rubric_completion_evaluator = None
         if self.config.completion_strategy == "rubric":
-            from victor.framework.rubric_completion import RubricCompletionEvaluator
+            if rubric_complete_fn is not None:
+                from victor.framework.rubric_completion import (
+                    AsyncRubricCompletionEvaluator,
+                    LLMRubricJudge,
+                )
 
-            self.rubric_completion_evaluator = RubricCompletionEvaluator()
-            logger.info("[RubricCompletion] ENABLED via completion_strategy='rubric'")
+                self.rubric_completion_evaluator = AsyncRubricCompletionEvaluator(
+                    LLMRubricJudge(rubric_complete_fn)
+                )
+                logger.info(
+                    "[RubricCompletion] ENABLED (LLM judge) via completion_strategy='rubric'"
+                )
+            else:
+                from victor.framework.rubric_completion import RubricCompletionEvaluator
+
+                self.rubric_completion_evaluator = RubricCompletionEvaluator()
+                logger.info(
+                    "[RubricCompletion] ENABLED (heuristic judge) via completion_strategy='rubric'"
+                )
 
         # Initialize planning gate for fast-slow architecture
         self.planning_gate = PlanningGate(enabled=self.config.enable_planning_gate)
@@ -2558,17 +2576,19 @@ class AgenticLoop:
         )
         return any(first_line.startswith(p) for p in intent_prefixes)
 
-    def _rubric_completion_result(
+    async def _rubric_completion_result(
         self, action_result: Any, state: Dict[str, Any]
     ) -> Optional[EvaluationResult]:
         """Rubric-based completion verdict (EVR-3 / ADR-009), when ``completion_strategy='rubric'``.
 
         Scores the turn's answer on task-conditioned rubric dimensions and gates COMPLETE on the
-        DimensionAwareFilter. Returns ``None`` to defer to the normal completion cascade when not
-        applicable: no rubric evaluator (other strategy), not a ``TurnResult``, tools still pending
-        (not a completion candidate), or empty content.
+        DimensionAwareFilter. Supports both the sync heuristic evaluator (``.evaluate``) and the
+        async LLM-judge evaluator (``.aevaluate``, EVR-3c). Returns ``None`` to defer to the normal
+        completion cascade when not applicable: no rubric evaluator (other strategy), not a
+        ``TurnResult``, tools still pending (not a completion candidate), or empty content.
         """
-        if self.rubric_completion_evaluator is None:
+        evaluator = self.rubric_completion_evaluator
+        if evaluator is None:
             return None
         from victor.agent.services.turn_execution_runtime import TurnResult
 
@@ -2578,9 +2598,12 @@ class AgenticLoop:
         if not content:
             return None
         task_family = str(state.get("task_type") or "general")
-        result = self.rubric_completion_evaluator.evaluate(
-            task_family=task_family, content=content, context=state
-        )
+        if hasattr(evaluator, "aevaluate"):
+            result = await evaluator.aevaluate(
+                task_family=task_family, content=content, context=state
+            )
+        else:
+            result = evaluator.evaluate(task_family=task_family, content=content, context=state)
         decision = EvaluationDecision.COMPLETE if result.complete else EvaluationDecision.CONTINUE
         return EvaluationResult(
             decision=decision,
@@ -2645,7 +2668,7 @@ class AgenticLoop:
 
         # Rubric-based completion (EVR-3 / ADR-009), opt-in via completion_strategy="rubric".
         # Returns None to defer to the cascade below when not applicable (tools pending, etc.).
-        rubric_result = self._rubric_completion_result(action_result, state)
+        rubric_result = await self._rubric_completion_result(action_result, state)
         if rubric_result is not None:
             return rubric_result
 
