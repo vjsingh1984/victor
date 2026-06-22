@@ -38,6 +38,9 @@ from victor.agent.recovery.protocols import (
     RecoveryContext,
     TemperaturePolicy,
 )
+from victor.framework.temperature.defaults import (
+    MODEL_TEMPERATURE_RANGES as _FRAMEWORK_MODEL_TEMPERATURE_RANGES,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -113,16 +116,9 @@ class ProgressiveTemperatureAdjuster:
         ),
     }
 
-    # Model-specific temperature ranges (learned over time)
-    MODEL_TEMPERATURE_RANGES: Dict[str, Tuple[float, float]] = {
-        # (min_effective, max_effective)
-        "qwen": (0.3, 0.9),
-        "llama": (0.2, 0.8),
-        "mistral": (0.3, 0.85),
-        "claude": (0.0, 1.0),
-        "gpt": (0.0, 1.0),
-        "deepseek": (0.2, 0.9),
-    }
+    # Model-specific effective temperature ranges. Single source of truth lives in
+    # victor.framework.temperature.defaults (ADR-013); referenced here to avoid duplication.
+    MODEL_TEMPERATURE_RANGES: Dict[str, Tuple[float, float]] = _FRAMEWORK_MODEL_TEMPERATURE_RANGES
 
     def __init__(
         self,
