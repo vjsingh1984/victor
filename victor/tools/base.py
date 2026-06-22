@@ -354,18 +354,12 @@ class BaseTool(ABC):
         Returns:
             ToolMetadata with semantic information for tool selection
         """
-        # Tier 1: Use explicit metadata if defined
-        explicit_metadata = self.metadata
-        if explicit_metadata is not None:
-            return explicit_metadata
+        # Delegate to the single resolution authority (tool-supply P6). The two-tier
+        # precedence (explicit metadata -> auto-generate) now lives in one place so every
+        # consumer resolves a tool's metadata identically and the autogen result is cached.
+        from victor.tools.contract import resolve_contract
 
-        # Tier 2: Auto-generate from tool properties
-        return ToolMetadata.generate_from_tool(
-            name=self.name,
-            description=self.description,
-            parameters=self.parameters,
-            cost_tier=self.cost_tier,
-        )
+        return resolve_contract(self)
 
     @property
     def cost_tier(self) -> CostTier:
