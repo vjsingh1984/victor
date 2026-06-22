@@ -1543,15 +1543,33 @@ class StreamingChatExecutor:
         adapter = await StreamingActAdapter.prepare(self, user_message, **kwargs)
         stream_ctx = adapter.session.stream_ctx
 
+        # Completion strategy (ADR-009): thread from settings; build the provider-backed rubric judge
+        # for rubric/hybrid (default "enhanced" → no rubric, no behavior change). Reuses the buffered
+        # path's helper so both modes resolve completion identically.
+        import os as _os
+
+        _te = getattr(orch, "turn_executor", None)
+        _strategy = _os.environ.get("VICTOR_COMPLETION_STRATEGY") or getattr(
+            getattr(getattr(orch, "settings", None), "agent", None),
+            "completion_strategy",
+            "enhanced",
+        )
+        _rubric_fn = (
+            _te._build_rubric_complete_fn()
+            if (_strategy in ("rubric", "hybrid") and _te is not None)
+            else None
+        )
         loop = AgenticLoop(
             orchestrator=None,
-            turn_executor=getattr(orch, "turn_executor", None),
+            turn_executor=_te,
             runtime_intelligence=self._runtime_intelligence,
             max_iterations=getattr(stream_ctx, "max_total_iterations", 10),
             enable_fulfillment_check=True,
             enable_adaptive_iterations=True,
             exploration_settings=getattr(getattr(orch, "settings", None), "exploration", None),
             streaming_act_port=adapter,
+            config={"completion_strategy": _strategy},
+            rubric_complete_fn=_rubric_fn,
         )
 
         conversation_history = self._get_conversation_history(runtime_owner, orch, user_message)

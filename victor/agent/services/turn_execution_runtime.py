@@ -1039,6 +1039,15 @@ class TurnExecutor:
         # Create AgenticLoop with self as turn_executor
         # Use a lightweight mock orchestrator since AgenticLoop only needs
         # turn_executor for single-turn execution
+        # Completion strategy (ADR-009): thread from settings into the loop; build a provider-backed
+        # rubric judge when rubric/hybrid is selected (default "enhanced" → no rubric, no change).
+        import os as _os
+
+        _settings = getattr(self._chat_context, "settings", None)
+        _strategy = _os.environ.get("VICTOR_COMPLETION_STRATEGY") or getattr(
+            getattr(_settings, "agent", None), "completion_strategy", "enhanced"
+        )
+        _rubric_fn = self._build_rubric_complete_fn() if _strategy in ("rubric", "hybrid") else None
         loop = AgenticLoop(
             orchestrator=None,
             turn_executor=self,
@@ -1046,6 +1055,8 @@ class TurnExecutor:
             enable_fulfillment_check=True,  # Auto-derived criteria via FulfillmentCriteriaBuilder
             enable_adaptive_iterations=True,
             exploration_settings=getattr(self._chat_context.settings, "exploration", None),
+            config={"completion_strategy": _strategy},
+            rubric_complete_fn=_rubric_fn,
         )
 
         # Inject task classification into state for execute_turn()
@@ -1587,6 +1598,30 @@ class TurnExecutor:
                 pass
 
         return tools
+
+    def _build_rubric_complete_fn(self) -> Optional[Any]:
+        """A provider-backed async ``complete_fn(prompt)->text`` for the LLM rubric judge (ADR-009).
+
+        Returns None when no provider is available (the loop then falls back to the heuristic judge).
+        Used only when completion_strategy is rubric/hybrid.
+        """
+        provider = getattr(self._provider_context, "provider", None)
+        model = getattr(self._provider_context, "model", None)
+        if provider is None:
+            return None
+
+        from victor.providers.base import Message
+
+        async def complete(prompt: str) -> str:
+            resp = await provider.chat(
+                [Message(role="user", content=prompt)],
+                model=model,
+                temperature=0.0,
+                max_tokens=400,
+            )
+            return getattr(resp, "content", "") or ""
+
+        return complete
 
     @staticmethod
     def _derive_task_type(task_classification: Any) -> Optional[str]:
