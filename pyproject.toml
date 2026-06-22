@@ -111,6 +111,15 @@ embeddings = [
     "pyarrow>=14.0",
 ]
 
+# ProximaDB vector store / embedding provider (optional backend).
+# Imported lazily with graceful ImportError fallback in
+# victor/storage/vector_stores/proximadb_provider.py — degrades to other
+# providers when absent. Pin kept identical to victor-coding's proximadb extra
+# so the backend version stays aligned across packages.
+proximadb = [
+    "proximadb-python>=0.2,<0.3",
+]
+
 # LangChain interop: adapt LangChain tools as native Victor tools
 langchain = [
     "langchain-core>=0.2.0",
