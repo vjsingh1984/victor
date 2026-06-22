@@ -1612,25 +1612,15 @@ class TurnExecutor:
         orchestrator-owned :class:`TemperatureResolver`; if unavailable (state-passed contexts), fall
         back to the provider-context temperature so behaviour is never worse than before.
         """
-        if explicit_override is not None:
-            return explicit_override
-        orchestrator = self._resolve_orchestrator()
-        resolver = getattr(orchestrator, "temperature_resolver", None) if orchestrator else None
-        if resolver is None:
-            return self._provider_context.temperature
-        from victor.framework.temperature import TemperatureRequest
+        from victor.agent.services.temperature_resolution import resolve_effective_temperature
 
-        provider = getattr(self._provider_context, "provider", None)
-        request = TemperatureRequest(
-            task_type=task_type or "default",
-            provider_name=getattr(provider, "name", "") or "",
-            model_name=model or "",
-            profile_temperature=self._provider_context.temperature,
-            profile_task_temperatures=getattr(orchestrator, "profile_task_temperatures", {}) or {},
-            settings_task_temperatures=getattr(orchestrator, "settings_task_temperatures", {})
-            or {},
+        return resolve_effective_temperature(
+            self._resolve_orchestrator(),
+            task_type=task_type,
+            model=model,
+            base_temperature=self._provider_context.temperature,
+            explicit_override=explicit_override,
         )
-        return resolver.resolve(request).value
 
     async def _execute_model_turn(
         self,

@@ -1331,10 +1331,32 @@ class ChatStreamHelperMixin:
             selected_tools=tools,
             planned_tools=(stream_ctx.planned_tools if stream_ctx else None),
         )
+        # Resolve per-turn temperature through the SAME unified seam as the buffered path (ADR-013),
+        # so streaming no longer ignores task-hint/profile-per-task temperature. Falls back to
+        # orch.temperature when no resolver is available.
+        from victor.agent.services.temperature_resolution import (
+            normalize_task_type,
+            resolve_effective_temperature,
+        )
+
+        stream_task_type = (
+            normalize_task_type(
+                getattr(stream_ctx, "unified_task_type", None)
+                or getattr(stream_ctx, "coarse_task_type", None)
+            )
+            if stream_ctx
+            else None
+        )
+        stream_temperature = resolve_effective_temperature(
+            orch,
+            task_type=stream_task_type,
+            model=orch.model,
+            base_temperature=orch.temperature,
+        )
         provider_stream = orch.provider.stream(
             messages=assembled,
             model=orch.model,
-            temperature=orch.temperature,
+            temperature=stream_temperature,
             max_tokens=orch.max_tokens,
             tools=tools,
             **provider_kwargs,
