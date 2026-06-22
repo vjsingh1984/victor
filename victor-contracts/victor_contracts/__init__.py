@@ -131,6 +131,15 @@ from victor_contracts.multi_agent import (
     TeamTemplate,
     TeamTopology,
 )
+from victor_contracts.tools import (
+    AccessMode,
+    CostTier,
+    DangerLevel,
+    ExecutionCategory,
+    ToolCategory,
+    ToolContract,
+)
+from victor_contracts.tools import CONTRACT as TOOL_CONTRACT
 from victor_contracts.safety import (
     SafetyAction,
     SafetyCategory,
@@ -299,6 +308,14 @@ __all__ = [
     "TeamSpec",
     "TeamTemplate",
     "TeamTopology",
+    # Tool contract (FEP-0009)
+    "ToolContract",
+    "ToolCategory",
+    "AccessMode",
+    "DangerLevel",
+    "ExecutionCategory",
+    "CostTier",
+    "TOOL_CONTRACT",
     "WorkflowMetadata",
     "StageDefinition",
     "TurnType",
