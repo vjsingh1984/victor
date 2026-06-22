@@ -1,0 +1,94 @@
+# Copyright 2026 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Tests for the rubric completion strategy wiring in AgenticLoop (EVR-3b, ADR-009)."""
+
+from types import SimpleNamespace
+
+from victor.agent.services.turn_execution_runtime import TurnResult
+from victor.framework.agentic_loop import AgenticLoop, AgenticLoopConfig
+from victor.framework.evaluation_nodes import EvaluationDecision
+from victor.providers.base import CompletionResponse
+
+
+def _turn(content="", *, tool_calls=None):
+    return TurnResult(
+        response=CompletionResponse(content=content, tool_calls=tool_calls),
+        has_tool_calls=bool(tool_calls),
+    )
+
+
+def _scripted_rubric(*, complete: bool):
+    return SimpleNamespace(
+        evaluate=lambda task_family, content, context: SimpleNamespace(
+            complete=complete,
+            aggregate=0.9 if complete else 0.4,
+            reason="scripted",
+            to_dict=lambda: {"complete": complete},
+        )
+    )
+
+
+def _loop(evaluator):
+    loop = AgenticLoop.__new__(AgenticLoop)
+    loop.rubric_completion_evaluator = evaluator
+    return loop
+
+
+# --- config --------------------------------------------------------------------------------------
+
+
+def test_config_default_strategy_is_enhanced():
+    assert AgenticLoopConfig().completion_strategy == "enhanced"
+
+
+def test_config_from_dict_accepts_rubric_strategy():
+    cfg = AgenticLoopConfig.from_dict({"completion_strategy": "rubric"})
+    assert cfg.completion_strategy == "rubric"
+    assert "completion_strategy" not in cfg.extra_config  # known field, not spilled to extra
+
+
+# --- _rubric_completion_result -------------------------------------------------------------------
+
+
+def test_defers_when_no_rubric_evaluator():
+    # Default ("enhanced") strategy -> evaluator is None -> defer to the normal cascade.
+    assert _loop(None)._rubric_completion_result(_turn("done"), {}) is None
+
+
+def test_complete_when_rubric_passes():
+    res = _loop(_scripted_rubric(complete=True))._rubric_completion_result(
+        _turn("a real final answer"), {"task_type": "qa"}
+    )
+    assert res is not None and res.decision == EvaluationDecision.COMPLETE
+    assert res.reason.startswith("[rubric]")
+
+
+def test_continue_when_rubric_fails():
+    res = _loop(_scripted_rubric(complete=False))._rubric_completion_result(
+        _turn("partial"), {"task_type": "qa"}
+    )
+    assert res is not None and res.decision == EvaluationDecision.CONTINUE
+
+
+def test_defers_when_tools_pending():
+    res = _loop(_scripted_rubric(complete=True))._rubric_completion_result(
+        _turn("text", tool_calls=[{"name": "read"}]), {}
+    )
+    assert res is None  # tools pending -> not a completion candidate
+
+
+def test_defers_on_empty_content():
+    res = _loop(_scripted_rubric(complete=True))._rubric_completion_result(_turn(""), {})
+    assert res is None

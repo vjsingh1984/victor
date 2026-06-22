@@ -500,6 +500,11 @@ class AgenticLoopConfig:
     enable_completion_scoring: bool = True
     enable_context_keywords: bool = True
     enable_calibrated_completion: Optional[bool] = None
+    # Completion strategy for EVALUATE: "enhanced" (default, EnhancedCompletionEvaluator),
+    # "rubric" (EVR-3, RubricCompletionEvaluator + DimensionAwareFilter), or "legacy". A strategy
+    # setting (not a feature flag); "rubric" must match-or-beat "enhanced" on the parity/
+    # characterization batteries before being made default (FEP-0008 Phase A / ADR-009).
+    completion_strategy: str = "enhanced"
     enable_planning_gate: bool = True
     enable_paradigm_router: bool = True
     enable_topology_routing: bool = True
@@ -684,6 +689,17 @@ class AgenticLoop:
             logger.warning(
                 "[EnhancedCompletion] DISABLED via config - using legacy completion detection"
             )
+
+        # Rubric-based completion (EVR-3 / ADR-009) — opt-in via completion_strategy="rubric".
+        # Default-constructed it uses the deterministic heuristic judge (no LLM); a production
+        # LLM judge (wrapped in OrderSwapEnsembleJudge + gated by JudgeReliabilityGate, EVR-2) can be
+        # injected by replacing this attribute. Only consulted when the strategy is "rubric".
+        self.rubric_completion_evaluator = None
+        if self.config.completion_strategy == "rubric":
+            from victor.framework.rubric_completion import RubricCompletionEvaluator
+
+            self.rubric_completion_evaluator = RubricCompletionEvaluator()
+            logger.info("[RubricCompletion] ENABLED via completion_strategy='rubric'")
 
         # Initialize planning gate for fast-slow architecture
         self.planning_gate = PlanningGate(enabled=self.config.enable_planning_gate)
@@ -2542,6 +2558,37 @@ class AgenticLoop:
         )
         return any(first_line.startswith(p) for p in intent_prefixes)
 
+    def _rubric_completion_result(
+        self, action_result: Any, state: Dict[str, Any]
+    ) -> Optional[EvaluationResult]:
+        """Rubric-based completion verdict (EVR-3 / ADR-009), when ``completion_strategy='rubric'``.
+
+        Scores the turn's answer on task-conditioned rubric dimensions and gates COMPLETE on the
+        DimensionAwareFilter. Returns ``None`` to defer to the normal completion cascade when not
+        applicable: no rubric evaluator (other strategy), not a ``TurnResult``, tools still pending
+        (not a completion candidate), or empty content.
+        """
+        if self.rubric_completion_evaluator is None:
+            return None
+        from victor.agent.services.turn_execution_runtime import TurnResult
+
+        if not isinstance(action_result, TurnResult) or action_result.has_tool_calls:
+            return None
+        content = action_result.content.strip()
+        if not content:
+            return None
+        task_family = str(state.get("task_type") or "general")
+        result = self.rubric_completion_evaluator.evaluate(
+            task_family=task_family, content=content, context=state
+        )
+        decision = EvaluationDecision.COMPLETE if result.complete else EvaluationDecision.CONTINUE
+        return EvaluationResult(
+            decision=decision,
+            score=result.aggregate,
+            reason=f"[rubric] {result.reason}",
+            metadata={"rubric_completion": result.to_dict()},
+        )
+
     def _is_terminal_answer(self, action_result: Any) -> bool:
         """True when a no-tool turn delivered a genuine final answer (not narration / a question).
 
@@ -2595,6 +2642,12 @@ class AgenticLoop:
                     "clarification_prompt": clarification.prompt,
                 },
             )
+
+        # Rubric-based completion (EVR-3 / ADR-009), opt-in via completion_strategy="rubric".
+        # Returns None to defer to the cascade below when not applicable (tools pending, etc.).
+        rubric_result = self._rubric_completion_result(action_result, state)
+        if rubric_result is not None:
+            return rubric_result
 
         try:
             from victor.agent.services.turn_execution_runtime import TurnResult
