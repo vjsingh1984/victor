@@ -26,7 +26,6 @@ from __future__ import annotations
 import argparse
 import asyncio
 import os
-from pathlib import Path
 
 from victor.evaluation.judge_calibration import cohens_kappa
 from victor.framework.rubric_completion import (
@@ -93,17 +92,16 @@ def _report(name: str, decisions: list[bool]) -> None:
 
 
 def _build_zai_complete_fn():
-    key_file = Path(".zai_api_key")
-    api_key = os.environ.get("ZAI_API_KEY") or (
-        key_file.read_text().strip() if key_file.exists() else None
-    )
-    if not api_key:
-        raise RuntimeError("no z.ai API key (set ZAI_API_KEY or provide .zai_api_key)")
+    # Authenticate via the `victor auth env -p zai` bridge: run
+    #   eval "$(victor auth env -p zai 2>/dev/null | grep '^export')"
+    # before this script so the credentials are in the environment. ZAIProvider's resolver
+    # (get_api_key("zai")) then picks them up the same way `victor chat` does — api_key=None lets
+    # the resolver consult env + keyring.
     from victor.providers.base import Message
     from victor.providers.zai_provider import ZAIProvider
 
-    model = os.environ.get("VICTOR_ZAI_MODEL", "glm-4.6")
-    provider = ZAIProvider(api_key=api_key, coding_plan=True, model=model)
+    model = os.environ.get("VICTOR_ZAI_MODEL", "glm-5.2")
+    provider = ZAIProvider(api_key=os.environ.get("ZAI_API_KEY"), coding_plan=True, model=model)
 
     async def complete(prompt: str) -> str:
         resp = await provider.chat(

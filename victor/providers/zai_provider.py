@@ -51,8 +51,18 @@ ZAI_BASE_URLS = {
 # Reference: https://open.bigmodel.cn/dev/api
 ZAI_MODELS = {
     # Paid flagship models (context windows from docs.z.ai and OpenRouter)
+    "glm-5.2": {
+        "description": (
+            "GLM-5.2 - Latest SOTA model (2026-06-16); 753B MoE (~40B active), 1M context. "
+            "Beats GPT-5.5 on FrontierSWE/SWE-bench Pro at ~1/6 the price; MIT-licensed."
+        ),
+        "context_window": 1000000,
+        "max_output": 65535,
+        "supports_tools": True,
+        "supports_thinking": True,
+    },
     "glm-5.1": {
-        "description": "GLM-5.1 - Latest SOTA model, rivals Claude Opus 4.6",
+        "description": "GLM-5.1 - Prior flagship, rivals Claude Opus 4.6",
         "context_window": 200000,
         "max_output": 65535,
         "supports_tools": True,
