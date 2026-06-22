@@ -660,6 +660,27 @@ class OrchestratorIntegration:
                 # Get vertical name from context (avoid hardcoded "coding")
                 vertical_name = getattr(vertical_context, "vertical_name", None) or "default"
 
+                # Vision P6: derive segment-level process reward from this session's tool trajectory
+                # (first production use of the credit-assignment framework) and blend it into the
+                # quality score so every learner consumes a process-aware signal. No tools → no change.
+                segment_rewards: Optional[Dict[int, float]] = None
+                try:
+                    from victor.core.feature_flags import FeatureFlag, is_feature_enabled
+
+                    if is_feature_enabled(FeatureFlag.USE_LEARNING_FROM_EXECUTION):
+                        from victor.framework.rl.trace_to_credit import (
+                            blend_quality_with_segments,
+                            compute_segment_rewards_from_trace,
+                        )
+
+                        segment_rewards = compute_segment_rewards_from_trace(ctx) or None
+                        if segment_rewards:
+                            quality_score = blend_quality_with_segments(
+                                quality_score, segment_rewards
+                            )
+                except Exception as exc:  # never break outcome recording on the P6 blend
+                    logger.debug("P6 segment-reward blend skipped: %s", exc)
+
                 # Record outcome for continuation_prompts learner
                 outcome = RLOutcome(
                     provider=provider_name,
@@ -667,6 +688,7 @@ class OrchestratorIntegration:
                     task_type=task_type,
                     success=success and completed,
                     quality_score=quality_score,
+                    segment_rewards=segment_rewards,
                     metadata={
                         "continuation_prompts_used": continuation_prompts,
                         "max_prompts_configured": max_continuation_prompts_used,
