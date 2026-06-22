@@ -68,6 +68,7 @@ from typing import (
     List,
     Literal,
     Optional,
+    Protocol,
     Union,
     TYPE_CHECKING,
 )
@@ -100,6 +101,7 @@ from victor.framework.capabilities.task_hints import TaskTypeHintCapabilityProvi
 from victor.agent.paradigm_router import ParadigmRouter, get_paradigm_router
 from victor.agent.services.runtime_intelligence import RuntimeIntelligenceService
 from victor.framework.enhanced_completion_evaluation import EnhancedCompletionEvaluator
+from victor.providers.base import StreamChunk
 
 # StateGraph-backed agentic-loop executor.
 # Imported lazily to avoid circular dependencies at module import time.
@@ -129,6 +131,46 @@ class AdaptiveTerminationDecision(str, Enum):
 
 # Type alias for backward compatibility
 _AdaptiveTerminationDecisionLiteral = Literal["plateau", "extend"]
+
+
+@dataclass
+class StreamingTurnOutcome:
+    """Carries the ``TurnResult`` produced by one streaming ACT turn (FEP-0007 Addendum A).
+
+    ``run_streaming``'s ACT is an async generator (it yields ``StreamChunk``s), so it can't
+    return a value: the streaming ACT port writes the turn's ``TurnResult`` here for the shared
+    EVALUATE phase to consume — the same primitive the buffered ACT (``_act``) produces.
+    """
+
+    turn_result: Any = None
+
+
+class StreamingActProvider(Protocol):
+    """Framework-side streaming ACT seam driven by ``AgenticLoop.run_streaming`` (FEP-0007
+    Addendum A).
+
+    The streaming counterpart of the buffered ACT (``turn_executor.execute_turn``): given this
+    turn's perception/plan/state, run the provider + emit + tool sub-steps, yield ``StreamChunk``s
+    for live delivery, and write the produced ``TurnResult`` to ``outcome``. Letting the loop
+    depend on this narrow seam keeps PERCEIVE/PLAN/EVALUATE/DECIDE shared while the I/O shape
+    differs only in ACT. The concrete implementation — an adapter over the service-layer
+    ``StreamingChatExecutor.execute_turn_streaming`` — is wired at cutover; until then
+    ``run_streaming`` is unwired (no default provider).
+    """
+
+    def stream_turn_act(
+        self,
+        *,
+        query: str,
+        state: Dict[str, Any],
+        perception: Any,
+        plan: Any,
+        turn_index: int,
+        outcome: StreamingTurnOutcome,
+    ) -> AsyncIterator[StreamChunk]:
+        """Run one streaming turn's ACT, yielding chunks and writing the ``TurnResult``."""
+        ...
+
 
 if TYPE_CHECKING:
     from victor.agent.services.turn_execution_runtime import (
@@ -525,6 +567,7 @@ class AgenticLoop:
         plateau_tolerance: float = 0.02,
         exploration_settings: Optional[Any] = None,
         config: "Union[AgenticLoopConfig, Dict[str, Any], None]" = None,
+        streaming_act_port: Optional["StreamingActProvider"] = None,
     ):
         """Initialize agentic loop.
 
@@ -547,6 +590,9 @@ class AgenticLoop:
         self.orchestrator = orchestrator
         self.turn_executor = turn_executor
         self.memory_coordinator = memory_coordinator
+        # FEP-0007 Addendum A: the streaming ACT seam run_streaming() drives. None until
+        # wired at cutover, at which point run_streaming becomes the live UI loop body.
+        self.streaming_act_port = streaming_act_port
         self.max_iterations = max_iterations
         self.enable_fulfillment_check = enable_fulfillment_check
         self.enable_adaptive_iterations = enable_adaptive_iterations
@@ -1198,42 +1244,10 @@ class AgenticLoop:
                     logger.warning("Task failed - exiting loop")
                     break
 
-                # NUDGE INJECTION via shared NudgePolicy (consistent with streaming)
-                # Inject on any non-terminal decision (RETRY or CONTINUE)
-                if (
-                    evaluation.decision
-                    not in (EvaluationDecision.COMPLETE, EvaluationDecision.FAIL)
-                    and self.turn_executor is not None
-                ):
-                    chat_ctx = getattr(self.turn_executor, "_chat_context", None)
-                    if chat_ctx and hasattr(chat_ctx, "add_message"):
-                        nudge = self.nudge_policy.evaluate(self.spin_detector)
-                        if nudge.should_inject:
-                            from victor.agent.conversation.history_metadata import (
-                                build_internal_history_metadata,
-                            )
-                            from victor.agent.conversation.types import MessageSource
-
-                            _nudge_meta = build_internal_history_metadata(
-                                "nudge", source=MessageSource.AGENT_NUDGE
-                            )
-                            chat_ctx.add_message(nudge.role, nudge.message, metadata=_nudge_meta)
-                            logger.info(f"Nudge injected: {nudge.nudge_type.value}")
-
-                        budget_nudge = self.nudge_policy.budget_warning(i, effective_max)
-                        if budget_nudge.should_inject:
-                            from victor.agent.conversation.history_metadata import (
-                                build_internal_history_metadata,
-                            )
-                            from victor.agent.conversation.types import MessageSource
-
-                            chat_ctx.add_message(
-                                budget_nudge.role,
-                                budget_nudge.message,
-                                metadata=build_internal_history_metadata(
-                                    "budget_nudge", source=MessageSource.AGENT_NUDGE
-                                ),
-                            )
+                # NUDGE INJECTION via shared NudgePolicy (consistent with streaming).
+                # Inject on any non-terminal decision (RETRY or CONTINUE). Shared with
+                # run_streaming() so buffered and streaming nudge behavior can't drift.
+                self._inject_decide_nudges(evaluation, i, effective_max)
 
             # Determine success
             success = self._determine_success(iterations)
@@ -1305,6 +1319,144 @@ class AgenticLoop:
                     "degradation_events": list(state.get("degradation_events", [])),
                 },
             )
+
+    def _inject_decide_nudges(
+        self,
+        evaluation: EvaluationResult,
+        iteration: int,
+        effective_max: int,
+    ) -> None:
+        """Inject shared NudgePolicy nudges on a non-terminal DECIDE (RETRY/CONTINUE/ESCALATE).
+
+        Extracted from run() so the buffered and streaming loops share one nudge path and can't
+        drift (FEP-0007 Addendum A). The nudge *decision* already comes from the shared
+        ``self.nudge_policy`` / ``self.spin_detector``; this is the conversation-injection glue.
+        No-op on terminal decisions or when no turn executor / chat context is available.
+        """
+        if evaluation.decision in (EvaluationDecision.COMPLETE, EvaluationDecision.FAIL):
+            return
+        if self.turn_executor is None:
+            return
+        chat_ctx = getattr(self.turn_executor, "_chat_context", None)
+        if not (chat_ctx and hasattr(chat_ctx, "add_message")):
+            return
+
+        from victor.agent.conversation.history_metadata import (
+            build_internal_history_metadata,
+        )
+        from victor.agent.conversation.types import MessageSource
+
+        nudge = self.nudge_policy.evaluate(self.spin_detector)
+        if nudge.should_inject:
+            chat_ctx.add_message(
+                nudge.role,
+                nudge.message,
+                metadata=build_internal_history_metadata("nudge", source=MessageSource.AGENT_NUDGE),
+            )
+            logger.info(f"Nudge injected: {nudge.nudge_type.value}")
+
+        budget_nudge = self.nudge_policy.budget_warning(iteration, effective_max)
+        if budget_nudge.should_inject:
+            chat_ctx.add_message(
+                budget_nudge.role,
+                budget_nudge.message,
+                metadata=build_internal_history_metadata(
+                    "budget_nudge", source=MessageSource.AGENT_NUDGE
+                ),
+            )
+
+    async def run_streaming(
+        self,
+        query: str,
+        context: Optional[Dict[str, Any]] = None,
+        conversation_history: Optional[List[Dict[str, Any]]] = None,
+    ) -> AsyncIterator[StreamChunk]:
+        """Stream the agentic loop — the SAME loop as run(), differing only in I/O.
+
+        FEP-0007 Addendum A (framing B): ``run_streaming`` drives the identical
+        PERCEIVE -> PLAN -> ACT -> EVALUATE -> DECIDE sequence as the buffered ``run()``. It
+        reuses the same non-yielding ``_analyze_turn`` / ``_plan`` / ``_evaluate`` phase methods
+        and the shared ``turn_evaluation_controller`` / ``nudge_policy``. The ONLY difference is
+        ACT: instead of a buffered ``_act`` returning a ``TurnResult``, it drives the injected
+        streaming ACT port, which yields ``StreamChunk``s for live delivery and produces the same
+        ``TurnResult`` the shared EVALUATE phase consumes. Streaming thus becomes a pure I/O mode
+        of the one research-rooted loop rather than a separate, thinner loop.
+
+        NOT yet wired into the live streaming path: it requires an injected ``streaming_act_port``
+        and currently covers the core phase loop. The run()-only preamble bands (fast-slow
+        planning gate, semantic response cache, paradigm/topology routing) and the richer DECIDE
+        bands (content-repetition controller, adaptive termination) are reconciled into this shared
+        path at cutover; until then ``StreamingChatExecutor.run()`` remains the single live
+        streaming loop body.
+
+        Args:
+            query: User's natural language query.
+            context: Additional execution context.
+            conversation_history: Prior turns for multi-turn context.
+
+        Yields:
+            StreamChunk: live chunks for each turn's streaming ACT.
+
+        Raises:
+            RuntimeError: if no streaming ACT port has been wired.
+        """
+        if self.streaming_act_port is None:
+            raise RuntimeError(
+                "AgenticLoop.run_streaming requires a streaming ACT port; it is wired at the "
+                "FEP-0007 cutover. Construct AgenticLoop(streaming_act_port=...) to drive it."
+            )
+
+        state: Dict[str, Any] = {"query": query, **(context or {})}
+        self._progress_scores = []
+        # Resets the shared spin detector + content-repetition + plateau (same as run()).
+        self.turn_evaluation_controller.reset()
+        self.criteria_builder.reset()
+        effective_max = self.max_iterations
+
+        for i in range(1, effective_max + 1):
+            # PERCEIVE (shared, non-yielding)
+            perception = await self._analyze_turn(query, context, conversation_history)
+            self._last_perception = perception
+            state["iteration"] = i
+            if getattr(perception, "task_analysis", None):
+                state["task_type"] = getattr(perception.task_analysis, "task_type", "unknown")
+            state["perception"] = (
+                perception.to_dict() if hasattr(perception, "to_dict") else perception
+            )
+
+            # PLAN (shared, non-yielding) — planned once, reused across turns like run().
+            plan = state.get("plan")
+            if plan is None:
+                plan = await self._plan(perception, state)
+                state["plan"] = plan
+
+            # ACT (streaming) — yields chunks; produces a TurnResult via the outcome holder.
+            act_outcome = StreamingTurnOutcome()
+            async for chunk in self.streaming_act_port.stream_turn_act(
+                query=query,
+                state=state,
+                perception=perception,
+                plan=plan,
+                turn_index=i,
+                outcome=act_outcome,
+            ):
+                yield chunk
+            action_result = act_outcome.turn_result
+            state["action_result"] = action_result
+
+            # EVALUATE (shared, non-yielding)
+            evaluation = await self._evaluate(perception, action_result, state)
+            self._progress_scores.append(evaluation.score)
+
+            # DECIDE — terminal decisions end the stream; non-terminal nudge + continue.
+            if evaluation.decision == EvaluationDecision.COMPLETE:
+                evaluation = self._apply_backslide_guard(evaluation)
+            if evaluation.decision in (
+                EvaluationDecision.COMPLETE,
+                EvaluationDecision.FAIL,
+            ):
+                return
+            self._inject_decide_nudges(evaluation, i, effective_max)
 
     async def stream(
         self,
