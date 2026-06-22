@@ -572,6 +572,12 @@ global_db = get_database()    # ~/.victor/victor.db
 project_db = get_project_database()  # ./.victor/project.db
 ```
 
+**Direction — correlated graph + vector backend:** the Code Context Graph (SQLite `graph_*`) and the
+LanceDB embedding index are hand-joined today (`graph_node.embedding_ref` is unpopulated). The planned
+direction collapses them into one correlated ProximaDB collection where a code symbol is one entity
+(relational row + graph node + vector) addressed by a single `oid`. See
+[ProximaDB as the CCG Backend](architecture/proximadb-codegraph-backend.md) (TD-11/TD-12/TD-13).
+
 ---
 
 ## Configuration System
