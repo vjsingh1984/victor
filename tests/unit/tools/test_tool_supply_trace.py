@@ -154,3 +154,37 @@ def test_emit_helper_swallows_errors(monkeypatch):
     monkeypatch.setattr(events_mod, "get_observability_bus", _boom)
     # Telemetry must never propagate failures into selection.
     tsr._emit_tool_supply_trace(ToolSupplyTrace.begin(None))
+
+
+# --- correlation spine (R1) ------------------------------------------------------
+
+
+def test_trace_captures_correlation_from_context():
+    from victor.core import context as ctx
+
+    s = ctx.set_session_id("sess-trace")
+    t = ctx.set_turn_id("turn-trace")
+    r = ctx.set_request_id("req-trace")
+    try:
+        payload = ToolSupplyTrace.begin(_tools("read")).finalize(_tools("read")).to_payload()
+        assert payload["session_id"] == "sess-trace"
+        assert payload["turn_id"] == "turn-trace"
+        assert payload["request_id"] == "req-trace"
+    finally:
+        ctx.session_id.reset(s)
+        ctx.turn_id.reset(t)
+        ctx.request_id.reset(r)
+
+
+def test_trace_correlation_empty_when_context_unset():
+    from victor.core import context as ctx
+
+    s = ctx.set_session_id("")
+    t = ctx.set_turn_id("")
+    try:
+        payload = ToolSupplyTrace.begin(None).to_payload()
+        assert payload["session_id"] == ""
+        assert payload["turn_id"] == ""
+    finally:
+        ctx.session_id.reset(s)
+        ctx.turn_id.reset(t)
