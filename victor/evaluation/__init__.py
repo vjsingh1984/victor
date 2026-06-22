@@ -241,6 +241,17 @@ from victor.evaluation.evaluation_orchestrator import (
     run_swe_bench_evaluation,
 )
 
+# Judge reliability gating (EVR-2, ADR-011)
+from victor.evaluation.judge_calibration import (
+    JudgeReliability,
+    GateDecision,
+    JudgeReliabilityGate,
+    OrderSwapEnsembleJudge,
+    cohens_kappa,
+    krippendorff_alpha,
+    evaluate_judge_agreement,
+)
+
 __all__ = [
     # Protocol types
     "BenchmarkFailureCategory",
@@ -382,4 +393,12 @@ __all__ = [
     "EvaluationSummary",
     "EvaluationOrchestrator",
     "run_swe_bench_evaluation",
+    # Judge reliability gating (EVR-2)
+    "JudgeReliability",
+    "GateDecision",
+    "JudgeReliabilityGate",
+    "OrderSwapEnsembleJudge",
+    "cohens_kappa",
+    "krippendorff_alpha",
+    "evaluate_judge_agreement",
 ]
