@@ -14,12 +14,11 @@
 
 """Streaming-loop characterization battery — the FEP-0007 regression gate.
 
-These tests pin the canonical streaming loop (``StreamingChatExecutor.run()`` driving the unified
-``_stream_turn()`` primitive) on the QA battery: each scenario must yield the expected answer +
-tool sequence with no streaming traceback. There is a single streaming path — no feature flag and
-no legacy fallback — so these characterization transcripts ARE the regression gate: any refactor of
-the loop (e.g. the Phase 2 helper extractions and the ``_stream_turn`` assembly) must keep them
-byte-stable.
+These tests pin the canonical streaming loop (``AgenticLoop.run_streaming`` driven via
+``StreamingChatExecutor.run_unified``) on the QA battery: each scenario must yield the expected
+answer + tool sequence with no streaming traceback. There is a single streaming path — no feature
+flag and no legacy fallback — so these characterization transcripts ARE the regression gate: any
+refactor of the loop must keep them byte-stable.
 """
 
 from __future__ import annotations

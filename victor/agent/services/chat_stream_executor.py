@@ -104,24 +104,6 @@ def _get_decision_service(orchestrator: object) -> object | None:
 
 
 @dataclass
-class _StreamTurnGuards:
-    """Per-turn guard components built once per streaming run.
-
-    Bundling these makes the per-turn evaluation boundary explicit — the first step of
-    FEP-0007 Phase 2 toward a ``stream_turn()`` primitive that both loops can share. The
-    streaming loop reads/feeds these each iteration (content-repetition via ``turn_eval``,
-    plateau via ``plateau``, search-novelty via ``novelty``, spin via ``spin``).
-    """
-
-    spin: Any
-    nudge_policy: Any
-    turn_eval: Any
-    plateau: Any
-    novelty: Any
-    novelty_enabled: bool
-
-
-@dataclass
 class _ToolTurnOutcome:
     """Single-slot mutable holder for the tool-execution ACT sub-step's result.
 
@@ -132,51 +114,6 @@ class _ToolTurnOutcome:
     """
 
     result: Any = None
-
-
-@dataclass
-class _ProviderTurnEval:
-    """Single-slot mutable holder for the post-provider early-stop evaluation.
-
-    ``_evaluate_provider_turn_stops`` records per-turn spin signals and runs the early-stop
-    checks (TERMINATED spin, content-repetition, skip_continuation). Because it's an async
-    generator (it yields the final stop chunk), it writes its decision here for ``run()`` to
-    read: ``should_return`` drives loop exit, while ``content_length`` / ``has_tools`` are the
-    derived turn metrics the rest of the loop body reuses. Part of FEP-0007 Phase 2's move
-    toward a shared ``stream_turn()``.
-    """
-
-    should_return: bool = False
-    content_length: int = 0
-    has_tools: bool = False
-
-
-@dataclass
-class _PostToolEval:
-    """Single-slot mutable holder for the post-tool-execution evaluation band.
-
-    ``_evaluate_post_tool_turn`` runs fulfillment / plateau / search-novelty after tool
-    execution; it's an async generator (the search-novelty safety-net yields a final chunk),
-    so it records its loop-exit decision here for ``run()`` to read via ``should_return``.
-    Part of FEP-0007 Phase 2's move toward a shared ``stream_turn()``.
-    """
-
-    should_return: bool = False
-
-
-@dataclass
-class _RecoveryDecision:
-    """Single-slot mutable holder for the per-turn recovery step.
-
-    ``_apply_turn_recovery`` consults the recovery integration and may yield a recovery chunk,
-    so it can't return its loop-control decision directly: ``should_return`` ends the stream
-    (a final recovery chunk) and ``should_continue`` restarts the loop (a retry / force_summary
-    action). When neither is set, run() falls through to assistant-content emit. Part of
-    FEP-0007 Phase 2's move toward a shared ``stream_turn()``.
-    """
-
-    should_return: bool = False
-    should_continue: bool = False
 
 
 @dataclass
@@ -201,38 +138,6 @@ class _EmitDecision:
 
 
 @dataclass
-class _ContinuationDecision:
-    """Single-slot mutable holder for the no-tool continuation decision.
-
-    ``_handle_continuation_decision`` classifies intent and runs the continuation handler for a
-    turn that produced no tool calls, yielding intent/continuation chunks. Because it yields, it
-    writes ``should_return`` (the continuation handler asked to end the stream) and the
-    possibly-cleared ``full_content`` (intent classification may clear it) for run() to read. Part
-    of FEP-0007 Phase 2's move toward a shared ``stream_turn()``.
-    """
-
-    should_return: bool = False
-    full_content: str = ""
-
-
-@dataclass
-class _TurnOutcome:
-    """Single-slot mutable holder for one streaming turn (``_stream_turn``).
-
-    ``_stream_turn`` is the canonical per-turn primitive: it runs exactly one iteration of the
-    streaming loop, yielding that turn's chunks. Because it yields, it can't return its loop
-    control — ``should_stop`` ends the run (a turn that hit a return/break), while leaving it
-    False means continue to the next turn. ``prev_iteration_had_content`` is the one piece of
-    loop-local state that crosses turns (drives the inter-turn blank-line separator); run()
-    carries the same holder across iterations. The shared per-turn boundary FEP-0007 Phase 2
-    builds toward — the single streaming loop body, no flag, no legacy fallback.
-    """
-
-    should_stop: bool = False
-    prev_iteration_had_content: bool = False
-
-
-@dataclass
 class StreamingActResult:
     """ACT-phase output of one streaming turn (FEP-0007 Addendum A, the streaming-ACT seam).
 
@@ -251,10 +156,9 @@ class StreamingActResult:
     - ``emit_should_return`` / ``emit_should_continue``: loop-control hints surfaced by the
       assistant-emit / empty-response sub-step, for the future ``run_streaming`` driver.
 
-    This carries ACT output only; it deliberately runs none of the EVALUATE/DECIDE bands that
-    ``_stream_turn`` interleaves today — those move up to the shared ``AgenticLoop`` phases at
-    cutover. Until then this primitive is additive and unwired; ``run()``/``_stream_turn`` are
-    the live path.
+    This carries ACT output only; the EVALUATE/DECIDE bands live in the shared ``AgenticLoop``
+    phases (``run_streaming``), which is the canonical streaming loop — the legacy ``run()`` /
+    ``_stream_turn`` were removed at the FEP-0007 cutover.
     """
 
     turn_result: Optional[Any] = None
@@ -266,6 +170,11 @@ class StreamingActResult:
     assistant_content_yielded: bool = False
     emit_should_return: bool = False
     emit_should_continue: bool = False
+    # HIGH-confidence task-completion active signal (no pending tool calls). Surfaced onto the
+    # TurnResult so the shared EVALUATE phase stops promptly — restoring the streaming loop's
+    # immediate completion the unified loop would otherwise lose to the under-scoring
+    # EnhancedCompletionEvaluator (FEP-0007 cutover tune-up).
+    forced_completion: bool = False
 
 
 class StreamingActPort(Protocol):
@@ -296,43 +205,6 @@ class StreamingActPort(Protocol):
 
 class StreamingChatExecutor:
     """Canonical streaming chat executor bound to a runtime owner."""
-
-    @staticmethod
-    def _create_stream_turn_guards(orch: Any) -> "_StreamTurnGuards":
-        """Build the per-turn guard components for one streaming run from settings.
-
-        Mirrors the headless loop's controller setup: content-repetition + spin go through the
-        shared ``TurnEvaluationController`` (plateau/budget/novelty disabled on it because this
-        loop checks plateau/novelty at the post-tool point); plateau and search-novelty run as
-        dedicated trackers fed after tool execution. Thresholds + the novelty on/off come from
-        ``ExplorationSettings``.
-        """
-        from victor.agent.turn_policy import (
-            NudgePolicy,
-            PlateauDetector,
-            SpinDetector,
-            TurnEvaluationController,
-        )
-        from victor.framework.search_novelty import NoveltyConfig, SearchNoveltyTracker
-
-        spin = SpinDetector()
-        nudge_policy = NudgePolicy()
-        turn_eval = TurnEvaluationController(
-            spin_detector=spin,
-            nudge_policy=nudge_policy,
-            enable_plateau_nudge=False,
-            enable_budget_warning=False,
-            enable_search_novelty=False,
-        )
-        explore = getattr(getattr(orch, "settings", None), "exploration", None)
-        return _StreamTurnGuards(
-            spin=spin,
-            nudge_policy=nudge_policy,
-            turn_eval=turn_eval,
-            plateau=PlateauDetector(),
-            novelty=SearchNoveltyTracker(NoveltyConfig.from_exploration(explore)),
-            novelty_enabled=bool(getattr(explore, "search_novelty_guard_enabled", True)),
-        )
 
     _WRITE_MUTATION_TOOL_NAMES = {
         "apply_patch",
@@ -1291,386 +1163,6 @@ class StreamingChatExecutor:
 
         result_holder.result = tool_exec_result
 
-    async def _evaluate_provider_turn_stops(
-        self,
-        orch: Any,
-        stream_ctx: Any,
-        *,
-        full_content: str,
-        tool_calls: Any,
-        spin: Any,
-        turn_eval: Any,
-        outcome: _ProviderTurnEval,
-    ) -> AsyncIterator[StreamChunk]:
-        """Record per-turn spin signals and run the early-stop checks for the provider turn.
-
-        The EVALUATE sub-step that runs right after the provider response (FEP-0007 Phase 2,
-        toward a shared stream_turn() boundary). Feeds the SpinDetector this turn's tool
-        signatures, then applies the three early stops — TERMINATED spin, content-repetition
-        (shared TurnEvaluationController), and a pre-set ``skip_continuation`` — each of which
-        forces completion and ends the turn. Because this yields the final stop chunk, it can't
-        return a value: it writes ``should_return`` plus the derived ``content_length`` /
-        ``has_tools`` metrics onto ``outcome`` for run() to read.
-        """
-        from victor.agent.turn_policy import TurnObservation
-
-        # P1 FIX: Earlier spin state detection
-        # Move spin check earlier (before content repetition detection) so that spin state
-        # can influence continuation decisions. This helps detect stuck patterns sooner.
-        content_length = len(full_content.strip()) if full_content else 0
-        _has_tools = bool(tool_calls)
-        _no_progress = not _has_tools and content_length < 120
-        outcome.content_length = content_length
-        outcome.has_tools = _has_tools
-
-        tool_names_set = {tc.get("name", "") for tc in tool_calls} if tool_calls else set()
-        # Feed per-turn tool-call signatures so the SpinDetector's repeated-signature
-        # path is live in streaming. Without these it only tracked names/counts and
-        # never tripped on a model re-issuing the *same* tool call (same args) every
-        # turn — the exact shape of the observed code_search loop.
-        spin.record_turn(
-            has_tool_calls=_has_tools,
-            tool_names=tool_names_set,
-            tool_count=len(tool_calls) if tool_calls else 0,
-            tool_signatures=_tool_call_signatures(tool_calls) if tool_calls else None,
-        )
-
-        logger.debug(
-            "[spin-check] tool_calls=%s content_len=%s no_progress=%s state=%s",
-            len(tool_calls) if tool_calls else 0,
-            content_length,
-            _no_progress,
-            spin.state.value,
-        )
-
-        # P1 FIX: Check for terminated spin state early
-        # If already in TERMINATED state, we should force completion immediately
-        # instead of waiting for later checks
-        if spin.state.name == "TERMINATED":
-            logger.warning(
-                "[spin-detect-early] Spin state TERMINATED detected early - forcing completion"
-            )
-            stream_ctx.force_completion = True
-            stream_ctx.skip_continuation = True
-            outcome.should_return = True
-            yield orch._chunk_generator.generate_content_chunk(
-                "\n\n[Agent detected a response loop pattern — breaking to prevent wasted time.]",
-                is_final=True,
-            )
-            return
-
-        # Content-repetition detection via the shared TurnEvaluationController (same
-        # hash/overlap detector as the headless loop). The loop already fed the spin
-        # detector above, so don't re-record. On a repetition stop, force completion and
-        # emit a final chunk to break the feedback loop.
-        if full_content:
-            _decision = turn_eval.evaluate(TurnObservation(content=full_content), record_spin=False)
-            if _decision.stop:
-                logger.warning(
-                    "[content-repetition] %s (content_len=%s) — forcing completion.",
-                    _decision.stop_reason,
-                    len(full_content),
-                )
-                stream_ctx.force_completion = True
-                stream_ctx.skip_continuation = True
-                outcome.should_return = True
-                yield orch._chunk_generator.generate_content_chunk(
-                    _decision.stop_message
-                    or "\n\n[Content repetition detected — stopping to prevent "
-                    "infinite output loop.]",
-                    is_final=True,
-                )
-                return
-
-        # P0 FIX: Explicit exit check after content repetition detection
-        # This ensures that if skip_continuation was set by content repetition or any other
-        # reason, we exit the loop immediately instead of continuing to continuation handling
-        if getattr(stream_ctx, "skip_continuation", False):
-            logger.info(
-                "Exiting loop: skip_continuation flag set (content repetition or other forced "
-                "completion)"
-            )
-            outcome.should_return = True
-            return
-
-    async def _evaluate_post_tool_turn(
-        self,
-        orch: Any,
-        stream_ctx: Any,
-        *,
-        perception: Any,
-        tool_exec_result: Any,
-        full_content: str,
-        user_message: str,
-        plateau: Any,
-        novelty: Any,
-        novelty_enabled: bool,
-        outcome: _PostToolEval,
-    ) -> AsyncIterator[StreamChunk]:
-        """Run fulfillment + plateau + search-novelty evaluation after tool execution.
-
-        The post-tool EVALUATE band of run()'s per-turn body (FEP-0007 Phase 2, toward a
-        shared stream_turn() boundary). Checks task fulfillment (ends the turn when fulfilled),
-        runs plateau detection (injects a nudge when unproductive), and the search-novelty
-        safety-net (forces synthesis — yielding a final chunk — when successive searches stop
-        surfacing new files, else nudges). Because the safety-net yields, the loop-exit decision
-        is written to ``outcome.should_return`` for run() to read rather than returned.
-        """
-        if self._fulfillment and perception:
-            try:
-                from victor.agent.turn_policy import FulfillmentCriteriaBuilder
-                from victor.framework.fulfillment import TaskType
-
-                task_analysis = getattr(perception, "task_analysis", None)
-                task_type_str = (
-                    getattr(task_analysis, "task_type", "unknown") if task_analysis else "unknown"
-                )
-                try:
-                    task_type = TaskType(task_type_str)
-                except (ValueError, KeyError):
-                    task_type = TaskType.UNKNOWN
-
-                # Auto-derive acceptance criteria from this turn's tool results, mirroring the
-                # headless AgenticLoop's canonical pattern (record_tool_result per result ->
-                # build -> to_dict). check_fulfillment expects a criteria dict.
-                criteria_builder = FulfillmentCriteriaBuilder()
-                for tool_result in (
-                    tool_exec_result.tool_results
-                    if hasattr(tool_exec_result, "tool_results")
-                    else []
-                ):
-                    criteria_builder.record_tool_result(tool_result)
-                criteria = criteria_builder.build().to_dict()
-                fulfillment_result = await self._fulfillment.check_fulfillment(
-                    task_type=task_type,
-                    criteria=criteria,
-                    context={
-                        "full_content": full_content,
-                        "user_message": user_message,
-                    },
-                )
-                if fulfillment_result.is_fulfilled:
-                    logger.info(
-                        "Streaming fulfillment: task fulfilled (score=%.2f, reason=%s)",
-                        fulfillment_result.score,
-                        fulfillment_result.reason,
-                    )
-                    outcome.should_return = True
-                    return
-            except Exception as exc:
-                logger.debug("Streaming fulfillment check skipped: %s", exc)
-
-        # Plateau detection via the shared PlateauDetector (same productivity-weighted
-        # formula and "nudge only when unproductive" rule the headless loop uses).
-        productive_count = _count_productive_tools(tool_exec_result)
-        content_len = len(full_content) if full_content else 0
-        _plateau_res = plateau.record(productive_count, content_len)
-        if _plateau_res.is_plateau and not _plateau_res.should_nudge:
-            logger.info(
-                "Skipping plateau nudge: agent made %d productive tool call(s) this iteration",
-                productive_count,
-            )
-        elif _plateau_res.should_nudge:
-            logger.info(
-                "Streaming progress plateau detected (scores=%s), injecting nudge",
-                [f"{score:.2f}" for score in _plateau_res.recent_scores],
-            )
-            _plateau_intent = getattr(orch, "_current_intent", None)
-            _is_write = (
-                _plateau_intent is not None
-                and getattr(_plateau_intent, "value", None) == "write_allowed"
-            )
-            from victor.agent.conversation.types import (
-                MESSAGE_SOURCE_METADATA_KEY,
-                MessageSource,
-            )
-            from victor.agent.turn_policy import plateau_nudge_message
-
-            orch.add_message(
-                "system",
-                plateau_nudge_message(_is_write),
-                metadata={MESSAGE_SOURCE_METADATA_KEY: MessageSource.SYSTEM_INJECTED.value},
-            )
-
-        # Search-novelty safety-net: if successive searches stop surfacing new files,
-        # synthesize instead of thrashing. Skip when actively editing (real work).
-        from victor.tools.tool_names import get_canonical_name
-
-        _nov_results = getattr(tool_exec_result, "tool_results", None) or []
-        _nov = novelty.record_turn(_nov_results)
-        _editing = any(
-            get_canonical_name(r.get("tool_name") or r.get("name") or "")
-            in {"edit", "write", "create_file", "replace_in_file"}
-            for r in _nov_results
-            if isinstance(r, dict)
-        )
-        _iter_no = getattr(stream_ctx, "total_iterations", 0)
-        if novelty_enabled and _nov.should_force_complete and not _editing and _iter_no >= 2:
-            logger.info(
-                "[search-novelty] %d consecutive low-novelty searches — synthesizing.",
-                _nov.consecutive_low_novelty,
-            )
-            stream_ctx.force_completion = True
-            stream_ctx.skip_continuation = True
-            outcome.should_return = True
-            yield orch._chunk_generator.generate_content_chunk(
-                "\n\n[Enough context gathered — synthesizing the answer.]",
-                is_final=True,
-            )
-            return
-        if novelty_enabled and _nov.should_nudge:
-            from victor.agent.conversation.types import (
-                MESSAGE_SOURCE_METADATA_KEY,
-                MessageSource,
-            )
-            from victor.framework.search_novelty import synthesize_nudge_message
-
-            orch.add_message(
-                "system",
-                synthesize_nudge_message(),
-                metadata={MESSAGE_SOURCE_METADATA_KEY: MessageSource.SYSTEM_INJECTED.value},
-            )
-
-    def _detect_task_completion_and_mentions(
-        self,
-        orch: Any,
-        stream_ctx: Any,
-        *,
-        full_content: str,
-        tool_calls: Any,
-        spin: Any,
-    ) -> tuple[bool, List[str]]:
-        """Detect HIGH-confidence task completion and unexecuted tool mentions for this turn.
-
-        A cohesive non-yielding slice of run()'s per-turn body (FEP-0007 Phase 2, toward a
-        shared stream_turn() boundary). Runs the task-completion detector (a HIGH-confidence
-        active signal with no pending tool calls forces completion and persists a VICTOR_SUMMARY
-        for next-turn context), then — only when the turn produced content but no tool calls and
-        completion wasn't forced — detects tools the model described but didn't call and injects a
-        format hint. Mutates orch/stream_ctx; yields nothing. Returns ``(forced_task_completion,
-        mentioned_tools_detected)`` for the recovery/continuation steps downstream.
-        """
-        forced_task_completion = False
-        if orch._task_completion_detector and full_content:
-            from victor.agent.task_completion import CompletionConfidence
-
-            orch._task_completion_detector.analyze_response(full_content)
-            confidence = orch._task_completion_detector.get_completion_confidence()
-
-            if confidence == CompletionConfidence.HIGH:
-                if tool_calls:
-                    logger.info(
-                        "Task completion: HIGH confidence marker deferred because response "
-                        "still contains %s tool call(s)",
-                        len(tool_calls),
-                    )
-                    self._clear_deferred_active_completion_signal(orch._task_completion_detector)
-                else:
-                    logger.info(
-                        "Task completion: HIGH confidence detected (active signal), "
-                        "forcing completion NOW (immediate stop, skip continuation)"
-                    )
-                    forced_task_completion = True
-                    stream_ctx.force_completion = True
-                    stream_ctx.skip_continuation = True
-                    last_summary = getattr(
-                        orch._task_completion_detector._state, "last_summary", ""
-                    )
-                    sanitized_summary = strip_active_completion_markers(last_summary).strip()
-                    if sanitized_summary and hasattr(orch, "_conversation_controller"):
-                        try:
-                            orch._conversation_controller.persist_compaction_summary(
-                                sanitized_summary, []
-                            )
-                            orch._conversation_controller.inject_compaction_context()
-                            logger.info("VICTOR_SUMMARY persisted for next-turn context injection")
-                        except Exception as exc:
-                            logger.debug("Failed to persist VICTOR_SUMMARY: %s", exc)
-            elif confidence == CompletionConfidence.MEDIUM:
-                logger.info(
-                    "Task completion: MEDIUM confidence detected (file mods + passive signal)"
-                )
-
-        mentioned_tools_detected: List[str] = []
-
-        from victor.agent.continuation_strategy import ContinuationStrategy
-        from victor.tools.tool_names import TOOL_ALIASES, get_all_canonical_names
-
-        if full_content and not tool_calls and not forced_task_completion:
-            all_tool_names = get_all_canonical_names() | set(TOOL_ALIASES.keys())
-            mentioned_tools_detected = ContinuationStrategy.detect_mentioned_tools(
-                full_content, list(all_tool_names), TOOL_ALIASES
-            )
-
-            if mentioned_tools_detected and spin.consecutive_no_tool_turns >= 1:
-                tool_hint = mentioned_tools_detected[0]
-                logger.info(
-                    "[tool-format-assist] Model mentioned '%s' without calling it "
-                    "(state=%s). Injecting format hint.",
-                    tool_hint,
-                    spin.state.value,
-                )
-                from victor.agent.conversation.history_metadata import (
-                    build_internal_history_metadata,
-                )
-                from victor.agent.conversation.types import MessageSource
-
-                orch.add_message(
-                    "user",
-                    f"[TOOL-FORMAT-HINT: You described wanting to use '{tool_hint}' but didn't "
-                    f"call it. Call the tool directly — don't describe what you want to do, "
-                    f"execute it. If you've already modified the file successfully, say "
-                    f"{FILE_DONE_MARKER}]",
-                    metadata=build_internal_history_metadata(
-                        "tool_format_hint", source=MessageSource.AGENT_GUIDANCE
-                    ),
-                )
-
-        return forced_task_completion, mentioned_tools_detected
-
-    async def _apply_turn_recovery(
-        self,
-        orch: Any,
-        stream_ctx: Any,
-        *,
-        full_content: str,
-        tool_calls: Any,
-        forced_task_completion: bool,
-        mentioned_tools_detected: Any,
-        decision: _RecoveryDecision,
-    ) -> AsyncIterator[StreamChunk]:
-        """Run this turn's recovery step and signal the resulting loop control.
-
-        A cohesive slice of run()'s per-turn body (FEP-0007 Phase 2, toward a shared
-        stream_turn() boundary). Consults the recovery integration (skipped when the turn already
-        forced completion with no pending tool calls) and, for a non-continue action, records and
-        applies it — yielding any recovery chunk. Because it yields, the loop control is written to
-        ``decision``: ``should_return`` on a final recovery chunk, ``should_continue`` on a
-        retry / force_summary action. When neither is set, run() proceeds to assistant-content emit.
-        """
-        if forced_task_completion and not tool_calls:
-            recovery_action = SimpleNamespace(action="continue")
-        else:
-            recovery_action = await orch._handle_recovery_with_integration(
-                stream_ctx=stream_ctx,
-                full_content=full_content,
-                tool_calls=tool_calls,
-                mentioned_tools=mentioned_tools_detected or None,
-            )
-
-        if recovery_action.action != "continue":
-            self._record_recovery_action(stream_ctx, recovery_action)
-            recovery_chunk = orch._apply_recovery_action(recovery_action, stream_ctx)
-            if recovery_chunk:
-                yield recovery_chunk
-                if recovery_chunk.is_final:
-                    orch._recovery_integration.record_outcome(success=False)
-                    decision.should_return = True
-                    return
-            if recovery_action.action in ("retry", "force_summary"):
-                decision.should_continue = True
-                return
-
     async def _emit_assistant_turn(
         self,
         orch: Any,
@@ -1833,528 +1325,52 @@ class StreamingChatExecutor:
                 decision.should_return = True
                 return
 
-    async def _handle_continuation_decision(
+    def _detect_high_confidence_completion(
         self,
         orch: Any,
-        runtime_owner: Any,
         stream_ctx: Any,
         *,
         full_content: str,
         tool_calls: Any,
-        mentioned_tools_detected: Any,
-        content_length: int,
-        assistant_content_yielded: bool,
-        forced_task_completion: bool,
-        spin: Any,
-        user_message: str,
-        decision: _ContinuationDecision,
-    ) -> AsyncIterator[StreamChunk]:
-        """Classify intent and run the continuation handler for a no-tool turn.
+    ) -> bool:
+        """Return True when this turn's answer is a HIGH-confidence completion with no pending tools.
 
-        The continuation decision band of run()'s per-turn body (FEP-0007 Phase 2, toward a shared
-        stream_turn() boundary). For a turn that produced no tool calls, classifies the intended
-        action, applies tracking-state updates, injects a post-compaction continuation prompt when
-        applicable, and runs the continuation handler — yielding intent + continuation chunks.
-        A no-op when there are tool calls to execute. Because it yields, ``should_return`` and the
-        possibly-cleared ``full_content`` are written to ``decision`` for run() to read.
+        Runs ``orch._task_completion_detector`` over the assistant content; on a HIGH-confidence
+        active signal with no outstanding tool calls it persists a VICTOR_SUMMARY for any next-turn
+        context and returns True. This is the streaming loop's prompt-completion signal (formerly in
+        ``_detect_task_completion_and_mentions``) — the unified loop surfaces it onto the TurnResult
+        so EVALUATE stops immediately instead of restating to the iteration cap (FEP-0007 tune-up).
         """
-        decision.full_content = full_content
+        detector = getattr(orch, "_task_completion_detector", None)
+        if not detector or not full_content:
+            return False
+
+        from victor.agent.task_completion import CompletionConfidence
+
+        detector.analyze_response(full_content)
+        if detector.get_completion_confidence() != CompletionConfidence.HIGH:
+            return False
         if tool_calls:
-            return
-
-        if not runtime_owner._intent_classification_handler:
-            from victor.agent.streaming import (
-                create_intent_classification_handler,
-            )
-
-            runtime_owner._intent_classification_handler = create_intent_classification_handler(
-                orch
-            )
-
-        from victor.agent.streaming import create_tracking_state
-
-        tracking_state = create_tracking_state(orch)
-
-        intent_result = runtime_owner._intent_classification_handler.classify_and_determine_action(
-            stream_ctx=stream_ctx,
-            full_content=full_content,
-            content_length=content_length,
-            mentioned_tools=mentioned_tools_detected,
-            tracking_state=tracking_state,
-        )
-
-        for chunk in intent_result.chunks:
-            yield chunk
-
-        if intent_result.content_cleared:
-            full_content = ""
-            decision.full_content = ""
-
-        force_finalize_used = tracking_state.force_finalize and intent_result.action == "finish"
-        from victor.agent.streaming import apply_tracking_state_updates
-
-        apply_tracking_state_updates(orch, intent_result.state_updates, force_finalize_used)
-
-        action_result = intent_result.action_result
-        action = intent_result.action
+            # Defer: a HIGH marker alongside pending tool calls isn't a real completion.
+            self._clear_deferred_active_completion_signal(detector)
+            return False
 
         logger.info(
-            "[continuation] action=%s reason=%s content_len=%s tool_calls=%s "
-            "iteration=%s spin_state=%s",
-            action,
-            action_result.get("reason", "unknown"),
-            content_length,
-            len(tool_calls) if tool_calls else 0,
-            stream_ctx.total_iterations,
-            spin.state.value,
+            "Task completion: HIGH confidence detected (active signal), "
+            "forcing completion NOW (immediate stop, skip continuation)"
         )
-
-        if (
-            stream_ctx.compaction_occurred
-            and not stream_ctx.force_completion
-            and not forced_task_completion
-        ):
-            turns_since_compaction = stream_ctx.total_iterations - stream_ctx.last_compaction_turn
-            if turns_since_compaction <= 2:
-                is_asking_input = action_result.get("is_asking_input", False)
-                is_completion = action_result.get("is_completion", False)
-
-                if not is_asking_input and not is_completion:
-                    logger.info(
-                        "[post-compaction-continuation] Forcing continuation after "
-                        "compaction (turn %s, %s messages removed)",
-                        stream_ctx.total_iterations,
-                        stream_ctx.compaction_message_removed_count,
-                    )
-                    post_compaction_prompt = self._build_post_compaction_continuation_prompt(
-                        orch,
-                        stream_ctx,
-                    )
-                    orch.add_message(
-                        "user",
-                        post_compaction_prompt,
-                    )
-                    if turns_since_compaction == 2:
-                        stream_ctx.compaction_occurred = False
-
-        if not runtime_owner._continuation_handler:
-            from victor.agent.streaming import create_continuation_handler
-
-            runtime_owner._continuation_handler = create_continuation_handler(orch)
-
-        action_result = action_result.with_action(action)
-
-        continuation_result = await runtime_owner._continuation_handler.handle_action(
-            action_result=action_result,
-            stream_ctx=stream_ctx,
-            full_content=full_content,
-        )
-
-        for chunk in continuation_result.chunks:
-            yield chunk
-
-        if "cumulative_prompt_interventions" in continuation_result.state_updates:
-            orch._cumulative_prompt_interventions = continuation_result.state_updates[
-                "cumulative_prompt_interventions"
-            ]
-
-        if continuation_result.should_return:
-            continuation_visible = any(
-                bool(getattr(chunk, "content", "").strip()) for chunk in continuation_result.chunks
-            )
-            if not tool_calls and not assistant_content_yielded and not continuation_visible:
-                yield await self._build_terminal_delivery_chunk(
-                    orch,
-                    stream_ctx,
-                    full_content=full_content,
-                    user_message=user_message,
-                )
-            elif not continuation_result.chunks:
-                yield self._build_final_marker_chunk(orch)
-            decision.should_return = True
-            return
-
-    async def _stream_turn(
-        self,
-        orch: Any,
-        runtime_owner: Any,
-        stream_ctx: Any,
-        *,
-        user_message: str,
-        goals: Any,
-        guards: _StreamTurnGuards,
-        perception: Any,
-        recovery: Any,
-        create_recovery_context: Any,
-        max_total_iterations: int,
-        outcome: _TurnOutcome,
-    ) -> AsyncIterator[StreamChunk]:
-        """Run exactly ONE streaming turn — the canonical per-turn primitive (FEP-0007 Phase 2/3).
-
-        Drives a single iteration of the streaming loop: pre-checks, context/iteration limits, the
-        provider ACT, early-stop and task-completion evaluation, recovery, assistant emit, nudge /
-        quality / loop-warning tracking, the continuation decision, the tool ACT, and post-tool
-        evaluation — each delegated to the extracted helpers. Yields that turn's chunks; loop control
-        is written to ``outcome``: ``should_stop`` ends the run (the turn hit a return/break), while
-        leaving it False continues to the next turn. ``outcome.prev_iteration_had_content`` carries
-        the inter-turn separator state across turns. This is the single streaming loop body — no flag,
-        no legacy fallback; run() is a thin driver over it.
-        """
-        from victor.agent.turn_policy import SpinState
-
-        _spin = guards.spin
-        _nudge_policy = guards.nudge_policy
-        _turn_eval = guards.turn_eval
-        _plateau = guards.plateau
-        _novelty = guards.novelty
-        _novelty_enabled = guards.novelty_enabled
-
-        if outcome.prev_iteration_had_content and stream_ctx.total_iterations > 1:
-            yield StreamChunk(content="\n\n")
-        outcome.prev_iteration_had_content = False
-
-        cancelled = False
-        async for pre_chunk in runtime_owner._run_iteration_pre_checks(stream_ctx, user_message):
-            yield pre_chunk
-            if pre_chunk.content == "" and getattr(pre_chunk, "is_final", False):
-                cancelled = True
-        if cancelled:
-            outcome.should_stop = True
-            return
-
-        unique_resources = orch.unified_tracker.unique_resources
-        logger.debug(
-            "Iteration %s/%s: tool_calls_used=%s/%s, unique_resources=%s, force_completion=%s",
-            stream_ctx.total_iterations,
-            max_total_iterations,
-            orch.tool_calls_used,
-            orch.tool_budget,
-            len(unique_resources),
-            stream_ctx.force_completion,
-        )
-        orch.debug_logger.log_iteration_start(
-            stream_ctx.total_iterations,
-            tool_calls=orch.tool_calls_used,
-            files_read=len(unique_resources),
-        )
-        orch.debug_logger.log_limits(
-            tool_budget=orch.tool_budget,
-            tool_calls_used=orch.tool_calls_used,
-            max_iterations=max_total_iterations,
-            current_iteration=stream_ctx.total_iterations,
-            is_analysis_task=stream_ctx.is_analysis_task,
-        )
-
-        max_context = orch._get_max_context_chars()
-        chat_service = getattr(orch, "_chat_service", None)
-        if chat_service is not None and hasattr(
-            chat_service, "handle_context_and_iteration_limits"
-        ):
-            handled, iter_chunk = await chat_service.handle_context_and_iteration_limits(
-                user_message,
-                max_total_iterations,
-                max_context,
-                stream_ctx.total_iterations,
-                stream_ctx.last_quality_score,
-            )
-        else:
-            handled, iter_chunk = await orch._handle_context_and_iteration_limits(
-                user_message,
-                max_total_iterations,
-                max_context,
-                stream_ctx.total_iterations,
-                stream_ctx.last_quality_score,
-            )
-        if iter_chunk:
-            yield iter_chunk
-        if handled:
-            outcome.should_stop = True
-            return
-
-        tools, full_content, tool_calls, garbage_detected = await self._stream_provider_turn(
-            orch, runtime_owner, stream_ctx, goals
-        )
-
-        if self._confidence_monitor is not None and not tool_calls:
+        stream_ctx.force_completion = True
+        stream_ctx.skip_continuation = True
+        last_summary = getattr(getattr(detector, "_state", None), "last_summary", "")
+        sanitized_summary = strip_active_completion_markers(last_summary).strip()
+        if sanitized_summary and hasattr(orch, "_conversation_controller"):
             try:
-                from victor.core.feature_flags import (
-                    FeatureFlag,
-                    is_feature_enabled,
-                )
-
-                if is_feature_enabled(FeatureFlag.USE_CONFIDENCE_MONITOR):
-                    self._confidence_monitor.record(
-                        full_content or "", stream_ctx.estimated_content_tokens
-                    )
-                    if self._confidence_monitor.should_stop():
-                        self._record_confidence_early_stop(stream_ctx)
-                        logger.info(
-                            "[ConfidenceMonitor] Stopping iteration early — confidence threshold met"
-                        )
-                        outcome.should_stop = True
-                        return
-            except Exception:
-                pass
-
-        content_preview = full_content[:200] if full_content else "(empty)"
-        logger.debug(
-            "_stream_provider_response returned: content_len=%s, native_tool_calls=%s, "
-            "tokens=%s, garbage=%s, content_preview=%r",
-            len(full_content) if full_content else 0,
-            len(tool_calls) if tool_calls else 0,
-            stream_ctx.estimated_content_tokens,
-            garbage_detected,
-            content_preview,
-        )
-
-        if garbage_detected and not tool_calls:
-            stream_ctx.force_completion = True
-            logger.info("Setting force_completion due to garbage detection")
-
-        _turn_stop = _ProviderTurnEval()
-        async for chunk in self._evaluate_provider_turn_stops(
-            orch,
-            stream_ctx,
-            full_content=full_content,
-            tool_calls=tool_calls,
-            spin=_spin,
-            turn_eval=_turn_eval,
-            outcome=_turn_stop,
-        ):
-            yield chunk
-        if _turn_stop.should_return:
-            outcome.should_stop = True
-            return
-        content_length = _turn_stop.content_length
-        _has_tools = _turn_stop.has_tools
-
-        tool_calls, full_content = orch._parse_and_validate_tool_calls(tool_calls, full_content)
-
-        forced_task_completion, mentioned_tools_detected = (
-            self._detect_task_completion_and_mentions(
-                orch,
-                stream_ctx,
-                full_content=full_content,
-                tool_calls=tool_calls,
-                spin=_spin,
-            )
-        )
-
-        _recovery = _RecoveryDecision()
-        async for chunk in self._apply_turn_recovery(
-            orch,
-            stream_ctx,
-            full_content=full_content,
-            tool_calls=tool_calls,
-            forced_task_completion=forced_task_completion,
-            mentioned_tools_detected=mentioned_tools_detected,
-            decision=_recovery,
-        ):
-            yield chunk
-        if _recovery.should_return:
-            outcome.should_stop = True
-            return
-        if _recovery.should_continue:
-            return
-
-        _emit = _EmitDecision()
-        async for chunk in self._emit_assistant_turn(
-            orch,
-            runtime_owner,
-            stream_ctx,
-            recovery=recovery,
-            create_recovery_context=create_recovery_context,
-            full_content=full_content,
-            tool_calls=tool_calls,
-            forced_task_completion=forced_task_completion,
-            user_message=user_message,
-            tools=tools,
-            decision=_emit,
-        ):
-            yield chunk
-        if _emit.prev_iteration_had_content:
-            outcome.prev_iteration_had_content = True
-        assistant_content_yielded = _emit.assistant_content_yielded
-        tool_calls = _emit.tool_calls
-        if _emit.should_return:
-            outcome.should_stop = True
-            return
-        if _emit.should_continue:
-            return
-
-        for tc in tool_calls or []:
-            tool_name = tc.get("name", "")
-            tool_args = tc.get("arguments", {})
-            orch.unified_tracker.record_tool_call(tool_name, tool_args)
-
-        # P1 FIX: Spin state already recorded earlier (before content repetition check)
-        # This section now only handles nudge policy and detailed termination messages
-        _no_progress = not _has_tools and content_length < 120
-
-        if _no_progress:
-            _intent = getattr(orch, "_current_intent", None)
-            nudge = _nudge_policy.evaluate(_spin, intent=_intent)
-            if nudge.should_inject:
-                from victor.agent.conversation.history_metadata import (
-                    build_internal_history_metadata,
-                )
-                from victor.agent.conversation.types import MessageSource
-
-                orch.add_message(
-                    nudge.role,
-                    nudge.message,
-                    metadata=build_internal_history_metadata(
-                        "nudge", source=MessageSource.AGENT_NUDGE
-                    ),
-                )
-                logger.info("[nudge] %s", nudge.nudge_type.value)
-
-            if _spin.state == SpinState.TERMINATED:
-                logger.warning(
-                    "[spin-detect] Terminated after no_tool=%s blocked=%s. Last response: %r",
-                    _spin.consecutive_no_tool_turns,
-                    _spin.consecutive_all_blocked,
-                    full_content[:100],
-                )
-                if getattr(stream_ctx, "is_action_task", False):
-                    loop_break_message = (
-                        "\n\n[Agent detected a repeated no-tool response loop while trying to "
-                        "resume an action task. The previous action did not recover cleanly. "
-                        "Start a follow-up turn or make one concrete tool call to continue.]"
-                    )
-                elif getattr(stream_ctx, "is_analysis_task", False):
-                    loop_break_message = (
-                        "\n\n[Agent detected a repeated no-tool response loop while trying to "
-                        "continue analysis. Start a follow-up turn or make one concrete discovery "
-                        "tool call to continue.]"
-                    )
-                else:
-                    loop_break_message = (
-                        "\n\n[Agent detected a response loop — breaking to prevent wasted time.]"
-                    )
-                yield orch._chunk_generator.generate_content_chunk(
-                    loop_break_message,
-                    is_final=True,
-                )
-                outcome.should_stop = True
-                return
-
-        orch.unified_tracker.record_iteration(content_length)
-
-        if (
-            full_content
-            and len(full_content.strip()) > 50
-            and not getattr(stream_ctx, "is_qa_task", False)
-        ):
-            quality_result = await orch._validate_runtime_intelligence_response(
-                response=full_content,
-                query=user_message,
-                tool_calls=orch.tool_calls_used,
-                task_type=stream_ctx.unified_task_type.value,
-            )
-            if quality_result and not quality_result.get("is_grounded", True):
-                issues = quality_result.get("grounding_issues", [])
-                if issues:
-                    logger.debug(
-                        "IntelligentPipeline detected grounding issues: %s",
-                        issues[:3],
-                    )
-                if quality_result.get("should_retry"):
-                    grounding_feedback = quality_result.get("grounding_feedback", "")
-                    if grounding_feedback:
-                        logger.info(
-                            "Injecting grounding feedback for retry: %s chars",
-                            len(grounding_feedback),
-                        )
-                        stream_ctx.pending_grounding_feedback = grounding_feedback
-
-            if quality_result:
-                new_score = quality_result.get("quality_score", stream_ctx.last_quality_score)
-                stream_ctx.update_quality_score(new_score)
-
-            if quality_result and quality_result.get("should_finalize"):
-                finalize_reason = quality_result.get("finalize_reason", "grounding limit exceeded")
-                logger.debug(
-                    "Force finalize triggered: %s. Stopping continuation to prevent "
-                    "infinite loop.",
-                    finalize_reason,
-                )
-                orch._force_finalize = True
-
-        unified_loop_warning = orch.unified_tracker.check_loop_warning()
-        loop_warning_chunk = orch._streaming_handler.handle_loop_warning(
-            stream_ctx, unified_loop_warning
-        )
-        if loop_warning_chunk:
-            logger.warning("UnifiedTaskTracker loop warning: %s", unified_loop_warning)
-            yield loop_warning_chunk
-        else:
-            recovery_ctx = create_recovery_context(stream_ctx)
-            was_triggered, hint = recovery.check_force_action(recovery_ctx)
-            if was_triggered:
-                logger.info(
-                    "UnifiedTaskTracker forcing action: %s, metrics=%s",
-                    hint,
-                    orch.unified_tracker.get_metrics(),
-                )
-
-            logger.debug("After streaming pass, tool_calls = %s", tool_calls)
-
-            _cont = _ContinuationDecision()
-            async for chunk in self._handle_continuation_decision(
-                orch,
-                runtime_owner,
-                stream_ctx,
-                full_content=full_content,
-                tool_calls=tool_calls,
-                mentioned_tools_detected=mentioned_tools_detected,
-                content_length=content_length,
-                assistant_content_yielded=assistant_content_yielded,
-                forced_task_completion=forced_task_completion,
-                spin=_spin,
-                user_message=user_message,
-                decision=_cont,
-            ):
-                yield chunk
-            full_content = _cont.full_content
-            if _cont.should_return:
-                outcome.should_stop = True
-                return
-
-            _tool_outcome = _ToolTurnOutcome()
-            async for chunk in self._execute_tools_turn(
-                orch,
-                runtime_owner,
-                stream_ctx,
-                user_message=user_message,
-                tool_calls=tool_calls,
-                full_content=full_content,
-                result_holder=_tool_outcome,
-            ):
-                yield chunk
-            tool_exec_result = _tool_outcome.result
-
-            if tool_exec_result.should_return:
-                outcome.should_stop = True
-                return
-
-            _post_tool = _PostToolEval()
-            async for chunk in self._evaluate_post_tool_turn(
-                orch,
-                stream_ctx,
-                perception=perception,
-                tool_exec_result=tool_exec_result,
-                full_content=full_content,
-                user_message=user_message,
-                plateau=_plateau,
-                novelty=_novelty,
-                novelty_enabled=_novelty_enabled,
-                outcome=_post_tool,
-            ):
-                yield chunk
-            if _post_tool.should_return:
-                outcome.should_stop = True
-                return
+                orch._conversation_controller.persist_compaction_summary(sanitized_summary, [])
+                orch._conversation_controller.inject_compaction_context()
+                logger.info("VICTOR_SUMMARY persisted for next-turn context injection")
+            except Exception as exc:
+                logger.debug("Failed to persist VICTOR_SUMMARY: %s", exc)
+        return True
 
     @staticmethod
     def _build_streaming_turn_result(
@@ -2363,19 +1379,23 @@ class StreamingChatExecutor:
         full_content: str,
         tool_calls: Any,
         tool_exec_result: Any,
+        forced_completion: bool = False,
     ) -> Any:
         """Assemble a ``TurnResult`` from one streaming turn's ACT output.
 
         Produces the same primitive ``turn_executor.execute_turn`` returns for the buffered
         path, so the shared EVALUATE phase is mode-agnostic: the streamed ``full_content`` /
         ``tool_calls`` become the ``CompletionResponse``, and the streaming
-        ``ToolExecutionResult.tool_results`` (if any) become ``TurnResult.tool_results``.
+        ``ToolExecutionResult.tool_results`` (if any) become ``TurnResult.tool_results``. A
+        ``forced_completion`` HIGH-confidence signal is stamped onto ``response.metadata`` so the
+        shared EVALUATE phase stops promptly (FEP-0007 cutover tune-up).
         """
         from victor.agent.services.turn_execution_runtime import TurnResult
 
         response = CompletionResponse(
             content=full_content or "",
             tool_calls=list(tool_calls) if tool_calls else None,
+            metadata={"forced_task_completion": True} if forced_completion else None,
         )
         tool_results = (
             list(getattr(tool_exec_result, "tool_results", None) or [])
@@ -2412,11 +1432,10 @@ class StreamingChatExecutor:
         writing the produced ``TurnResult`` (plus the raw signals the shared EVALUATE/DECIDE
         phases need) onto ``result``.
 
-        This carries ACT only: it runs none of the per-turn EVALUATE/DECIDE bands that
-        ``_stream_turn`` interleaves today (early-stop, task-completion, continuation, nudge,
-        quality, post-tool fulfillment/plateau/novelty) — those move up to ``AgenticLoop`` at
-        cutover. It is additive and not yet wired into ``run()``; ``_stream_turn`` remains the
-        single live streaming loop body until then.
+        This carries ACT only: the per-turn EVALUATE/DECIDE bands (early-stop, task-completion,
+        continuation, nudge, quality, post-tool fulfillment/plateau/novelty) live in the shared
+        ``AgenticLoop`` phases that drive this primitive via ``run_streaming``. It is the live
+        streaming ACT — the legacy ``run()`` / ``_stream_turn`` loop was removed at the cutover.
         """
         # ACT — provider response (token streaming happens inside _stream_provider_turn).
         tools, full_content, tool_calls, garbage_detected = await self._stream_provider_turn(
@@ -2464,6 +1483,13 @@ class StreamingChatExecutor:
                 yield chunk
             tool_exec_result = _tool_outcome.result
 
+        # Restore the streaming loop's prompt completion: a HIGH-confidence answer with no pending
+        # tools stops the unified loop immediately (signalled via the TurnResult to EVALUATE),
+        # rather than relying solely on the under-scoring EnhancedCompletionEvaluator.
+        result.forced_completion = self._detect_high_confidence_completion(
+            orch, stream_ctx, full_content=full_content, tool_calls=tool_calls
+        )
+
         result.full_content = full_content
         result.tool_calls = tool_calls
         result.tool_exec_result = tool_exec_result
@@ -2472,159 +1498,67 @@ class StreamingChatExecutor:
             full_content=full_content,
             tool_calls=tool_calls,
             tool_exec_result=tool_exec_result,
+            forced_completion=result.forced_completion,
         )
 
-    async def run(self, user_message: str, **kwargs: Any) -> AsyncIterator[StreamChunk]:
-        """Run the streaming executor for the provided message."""
+    async def run_unified(self, user_message: str, **kwargs: Any) -> AsyncIterator[StreamChunk]:
+        """Unified streaming run — drive ``AgenticLoop.run_streaming`` (FEP-0007 cutover, DRAFT).
+
+        Makes the streaming UI path run the SAME research-rooted PERCEIVE -> PLAN -> ACT ->
+        EVALUATE -> DECIDE loop as the buffered path, emitting ``StreamChunk``s via the streaming
+        ACT adapter. This is the step-3 cutover entry point: it runs the per-run governance gate,
+        prepares the streaming session/adapter, builds the ``AgenticLoop`` over the orchestrator's
+        own collaborators (the same ``turn_executor`` + ``runtime_intelligence`` the buffered loop
+        uses), and yields ``run_streaming``'s chunks.
+
+        DRAFT / not yet wired into ``ChatStreamRuntime``: the legacy ``run()`` remains the live
+        streaming path until the repoint. **Behavior change vs run():** the UI path adopts the
+        unified loop's EVALUATE — including its requirement-driven completion (EnhancedCompletion /
+        fulfillment) — so it may complete earlier on multi-step tasks than today's streaming loop,
+        which simply follows the model's tool calls. That convergence is the whole point of the
+        unification; whether the completion threshold is well-tuned for real tasks is verified live
+        (zai), not on the scripted parity battery. See the run/stream parity battery.
+        """
+        from victor.agent.services.streaming_act_adapter import StreamingActAdapter
+        from victor.framework.agentic_loop import AgenticLoop
+
         runtime_owner = self._runtime_owner
         orch = runtime_owner._orchestrator
-        recovery = getattr(orch, "_recovery_service", None) or orch._recovery_coordinator
-        create_recovery_context = orch.create_recovery_context
 
-        # Governance REQUEST phase: gate/redact the user message before any state
-        # is set up or the LLM is called. A block short-circuits the stream with
-        # a single refusal chunk; a redaction substitutes the message text used
-        # downstream (and stored in history).
-        _gate = getattr(orch, "_message_policy_gate", None)
-        if _gate is not None:
-            _req = await _gate.gate_request(user_message)
-            if not _req.allowed:
+        # Governance REQUEST phase (per-run): a block short-circuits the WHOLE run with a single
+        # refusal chunk; a redaction substitutes the message used downstream. Unlike run(), this
+        # lives in the run wrapper (not the per-turn ACT), since run_streaming owns the turn loop.
+        gate = getattr(orch, "_message_policy_gate", None)
+        if gate is not None:
+            req = await gate.gate_request(user_message)
+            if not req.allowed:
                 yield orch._chunk_generator.generate_content_chunk(
-                    _req.reason or "Your message was blocked by policy.",
+                    req.reason or "Your message was blocked by policy.",
                     is_final=True,
                 )
                 return
-            user_message = _req.content
+            user_message = req.content
 
-        self._reset_streaming_turn_state(orch)
+        # Per-run setup (stream context, goals, recovery) captured as a session + ACT adapter.
+        adapter = await StreamingActAdapter.prepare(self, user_message, **kwargs)
+        stream_ctx = adapter.session.stream_ctx
 
-        stream_ctx = await runtime_owner._create_stream_context(user_message, **kwargs)
-        orch._current_stream_context = stream_ctx
-
-        await self._extract_task_requirements(orch, user_message)
-
-        max_total_iterations = stream_ctx.max_total_iterations
-        max_exploration_iterations = stream_ctx.max_exploration_iterations
-
-        self._apply_run_guidance(orch, stream_ctx, user_message, max_exploration_iterations)
-
-        goals = self._initialize_task_intent(orch, stream_ctx, user_message)
-
-        logger.info(
-            "Stream chat limits: tool_budget=%s, max_total_iterations=%s, "
-            "max_exploration_iterations=%s, is_analysis_task=%s, is_action_task=%s",
-            orch.tool_budget,
-            max_total_iterations,
-            max_exploration_iterations,
-            stream_ctx.is_analysis_task,
-            stream_ctx.is_action_task,
+        loop = AgenticLoop(
+            orchestrator=None,
+            turn_executor=getattr(orch, "turn_executor", None),
+            runtime_intelligence=self._runtime_intelligence,
+            max_iterations=getattr(stream_ctx, "max_total_iterations", 10),
+            enable_fulfillment_check=True,
+            enable_adaptive_iterations=True,
+            exploration_settings=getattr(getattr(orch, "settings", None), "exploration", None),
+            streaming_act_port=adapter,
         )
 
-        orch.debug_logger.reset()
-
-        if self._runtime_intelligence is not None:
-            self._runtime_intelligence.reset_decision_budget()
-        else:
-            decision_service = _get_decision_service(orch)
-            if decision_service is not None and hasattr(decision_service, "reset_budget"):
-                decision_service.reset_budget()
-
-        # Per-turn guard components (built once per run via the extracted factory) and passed as a
-        # bundle into the per-turn primitive _stream_turn() — the shared boundary FEP-0007 builds.
-        _guards = self._create_stream_turn_guards(orch)
-
-        _perception = None
         conversation_history = self._get_conversation_history(runtime_owner, orch, user_message)
-        if self._runtime_intelligence is not None:
-            try:
-                snapshot = await self._runtime_intelligence.analyze_turn(
-                    user_message,
-                    context={
-                        "conversation_stage": getattr(stream_ctx, "conversation_stage", "initial"),
-                        "is_analysis_task": stream_ctx.is_analysis_task,
-                        "is_action_task": stream_ctx.is_action_task,
-                    },
-                    conversation_history=conversation_history,
-                )
-                _perception = snapshot.perception
-                if _perception:
-                    stream_ctx.perception = _perception
-                    logger.info(
-                        "Streaming perception: intent=%s, complexity=%s, confidence=%.2f",
-                        getattr(_perception, "intent", "unknown"),
-                        getattr(_perception, "complexity", "unknown"),
-                        getattr(_perception, "confidence", 0.0),
-                    )
-                    clarification = self._evaluation_policy.get_clarification_decision(_perception)
-                    if clarification.requires_clarification:
-                        yield orch._chunk_generator.generate_content_chunk(
-                            clarification.prompt
-                            or self._evaluation_policy.default_clarification_prompt,
-                            is_final=True,
-                        )
-                        return
-            except Exception as exc:
-                logger.debug("Runtime intelligence perception skipped: %s", exc)
-        elif self._perception is not None:
-            try:
-                _perception = await self._perception.perceive(
-                    user_message,
-                    context={
-                        "conversation_stage": getattr(stream_ctx, "conversation_stage", "initial"),
-                        "is_analysis_task": stream_ctx.is_analysis_task,
-                        "is_action_task": stream_ctx.is_action_task,
-                    },
-                    conversation_history=conversation_history,
-                )
-                if _perception:
-                    stream_ctx.perception = _perception
-                    logger.info(
-                        "Streaming perception: intent=%s, complexity=%s, confidence=%.2f",
-                        getattr(_perception, "intent", "unknown"),
-                        getattr(_perception, "complexity", "unknown"),
-                        getattr(_perception, "confidence", 0.0),
-                    )
-                    clarification = self._evaluation_policy.get_clarification_decision(_perception)
-                    if clarification.requires_clarification:
-                        yield orch._chunk_generator.generate_content_chunk(
-                            clarification.prompt
-                            or self._evaluation_policy.default_clarification_prompt,
-                            is_final=True,
-                        )
-                        return
-            except Exception as exc:
-                logger.debug("Perception phase skipped: %s", exc)
-
-        _prev_iteration_had_content = False
-
-        _guards.turn_eval.reset()  # resets spin_detector + shared content-repetition detector
-        self._visible_output_deduplicator.reset()
-        self._prev_visible_content = ""
-
-        if self._should_execute_prepared_team(stream_ctx):
-            team_chunk = await self._execute_prepared_team(orch, user_message, stream_ctx)
-            if team_chunk is not None:
-                yield team_chunk
-                return
-
-        _turn_outcome = _TurnOutcome(prev_iteration_had_content=_prev_iteration_had_content)
-        while True:
-            async for chunk in self._stream_turn(
-                orch,
-                runtime_owner,
-                stream_ctx,
-                user_message=user_message,
-                goals=goals,
-                guards=_guards,
-                perception=_perception,
-                recovery=recovery,
-                create_recovery_context=create_recovery_context,
-                max_total_iterations=max_total_iterations,
-                outcome=_turn_outcome,
-            ):
-                yield chunk
-            if _turn_outcome.should_stop:
-                return
+        async for chunk in loop.run_streaming(
+            user_message, conversation_history=conversation_history
+        ):
+            yield chunk
 
 
 def create_streaming_chat_executor(

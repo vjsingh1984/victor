@@ -203,3 +203,95 @@ def test_build_streaming_turn_result_empty_content_is_safe():
     assert turn.content == ""
     assert turn.has_tool_calls is False
     assert turn.response.tool_calls is None
+
+
+def test_build_streaming_turn_result_stamps_forced_completion_metadata():
+    forced = StreamingChatExecutor._build_streaming_turn_result(
+        SimpleNamespace(is_qa_task=False),
+        full_content="done",
+        tool_calls=None,
+        tool_exec_result=None,
+        forced_completion=True,
+    )
+    assert forced.response.metadata == {"forced_task_completion": True}
+
+    not_forced = StreamingChatExecutor._build_streaming_turn_result(
+        SimpleNamespace(is_qa_task=False),
+        full_content="done",
+        tool_calls=None,
+        tool_exec_result=None,
+        forced_completion=False,
+    )
+    assert not_forced.response.metadata is None
+
+
+class _FakeCompletionDetector:
+    def __init__(self, confidence):
+        self._confidence = confidence
+        self._state = SimpleNamespace(last_summary="")
+
+    def analyze_response(self, content):  # noqa: D401 - test stub
+        self.analyzed = content
+
+    def get_completion_confidence(self):
+        return self._confidence
+
+
+def test_detect_high_confidence_completion_high_no_tools_forces_stop():
+    from victor.agent.task_completion import CompletionConfidence
+
+    ex = _executor()
+    orch = SimpleNamespace(
+        _task_completion_detector=_FakeCompletionDetector(CompletionConfidence.HIGH)
+    )
+    stream_ctx = SimpleNamespace(force_completion=False, skip_continuation=False)
+
+    assert (
+        ex._detect_high_confidence_completion(
+            orch, stream_ctx, full_content="The answer is 42.", tool_calls=None
+        )
+        is True
+    )
+    assert stream_ctx.force_completion is True
+    assert stream_ctx.skip_continuation is True
+
+
+def test_detect_high_confidence_completion_defers_when_tools_pending():
+    from victor.agent.task_completion import CompletionConfidence
+
+    ex = _executor()
+    ex._clear_deferred_active_completion_signal = lambda detector: None  # isolate from internals
+    orch = SimpleNamespace(
+        _task_completion_detector=_FakeCompletionDetector(CompletionConfidence.HIGH)
+    )
+    stream_ctx = SimpleNamespace(force_completion=False, skip_continuation=False)
+
+    assert (
+        ex._detect_high_confidence_completion(
+            orch, stream_ctx, full_content="x", tool_calls=[{"name": "read", "arguments": {}}]
+        )
+        is False
+    )
+    assert stream_ctx.force_completion is False
+
+
+def test_detect_high_confidence_completion_non_high_and_no_detector_return_false():
+    from victor.agent.task_completion import CompletionConfidence
+
+    ex = _executor()
+    medium = SimpleNamespace(
+        _task_completion_detector=_FakeCompletionDetector(CompletionConfidence.MEDIUM)
+    )
+    assert (
+        ex._detect_high_confidence_completion(
+            medium, SimpleNamespace(), full_content="x", tool_calls=None
+        )
+        is False
+    )
+    none = SimpleNamespace(_task_completion_detector=None)
+    assert (
+        ex._detect_high_confidence_completion(
+            none, SimpleNamespace(), full_content="x", tool_calls=None
+        )
+        is False
+    )

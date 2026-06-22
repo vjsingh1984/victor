@@ -12,25 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Run/stream behavioral-parity battery — the FEP-0007 cutover acceptance gate.
+"""Run/stream behavioral-parity battery — the FEP-0007 unified-loop gate.
 
-Addendum A (framing B) makes streaming a pure I/O mode of the one research-rooted loop, so the
-acceptance bar is **behavioral parity**: ``Agent.run(p)`` (buffered ``AgenticLoop.run``) and
-``Agent.stream(p)`` (``StreamingChatExecutor.run``) must produce the SAME executed tool sequence
-and the SAME answer for each QA scenario. This battery drives BOTH real loops from one scripted
-script and compares.
+Addendum A (framing B) makes streaming a pure I/O mode of the one research-rooted loop:
+``Agent.run(p)`` (buffered ``AgenticLoop.run``) and ``Agent.stream(p)`` (streaming, now
+``AgenticLoop.run_streaming`` via ``StreamingChatExecutor.run_unified``) drive the SAME
+PERCEIVE/PLAN/ACT/EVALUATE/DECIDE loop and differ only in I/O. So they must produce the SAME
+executed tool sequence and the SAME answer for each QA scenario. This battery drives BOTH real
+loops from one scripted script and asserts that parity across the whole battery.
 
-Status today (pre-cutover): the two loops are still separate and genuinely diverge on multi-step
-tasks — the buffered loop's completion evaluation is more eager and stops after the first tool,
-while the streaming loop runs the full scripted sequence. So this file is split:
-
-* ``test_run_stream_parity`` asserts full parity on the scenarios that ALREADY agree — a real
-  regression guard today.
-* ``test_multistep_scenarios_still_diverge`` is the cutover **tripwire**: it pins the known
-  divergence on the multi-step scenarios. When the step-3 cutover unifies the loops, those
-  scenarios reach parity, this test fails, and the divergent ids move into the parity set above.
-
-No ``xfail``: every test here is a positive, passing assertion about current behavior.
+History: before the step-3 cutover the two loops diverged on multi-step tasks — but that was a
+latent ``run()`` bug (a tool-only turn's empty content fell through to a ``CompletionResponse``
+object and crashed the content-repetition check), not PPAED eagerness. With the cutover (streaming
+driving the unified loop) and that bug fixed, all scenarios reach parity.
 """
 
 import pytest
@@ -44,23 +38,6 @@ from .parity_harness import (
 )
 
 pytestmark = [pytest.mark.integration, pytest.mark.agents]
-
-
-# Scenarios whose buffered vs. streaming tool sequence diverges TODAY: the buffered AgenticLoop
-# completes after the first tool (eager completion / fulfillment), where the streaming loop runs
-# the whole scripted sequence. The cutover must reconcile completion so the unified loop runs the
-# full multi-step task; when it does, the tripwire below fails and these move into the parity set.
-_DIVERGES_UNTIL_CUTOVER = {
-    "M1": "buffered completes after code_search; streaming also runs read",
-    "M2": "buffered completes after first ls; streaming runs both",
-    "C1": "buffered completes after code_search; streaming also runs read,read",
-    "W1": "buffered completes after read; streaming also runs edit",
-    "W3": "buffered completes after read; streaming also runs multi_edit",
-    "W4": "buffered completes after read; streaming also runs patch",
-}
-
-_SCENARIOS_BY_ID = {s.id: s for s in SCENARIOS}
-_PARITY_SCENARIOS = [s for s in SCENARIOS if s.id not in _DIVERGES_UNTIL_CUTOVER]
 
 
 async def _run_both(scenario):
@@ -82,7 +59,7 @@ async def _run_both(scenario):
     return buffered, streaming
 
 
-@pytest.mark.parametrize("scenario", _PARITY_SCENARIOS, ids=[s.id for s in _PARITY_SCENARIOS])
+@pytest.mark.parametrize("scenario", SCENARIOS, ids=[s.id for s in SCENARIOS])
 async def test_run_stream_parity(scenario):
     """Buffered and streaming loops agree on tool sequence + answer for the scenario."""
     buffered, streaming = await _run_both(scenario)
@@ -110,31 +87,6 @@ async def test_run_stream_parity(scenario):
         )
 
 
-async def test_multistep_scenarios_still_diverge():
-    """Cutover tripwire: the multi-step scenarios still diverge (buffered stops early).
-
-    Pins the current behavior so the gap can't go unnoticed. When the step-3 cutover unifies the
-    loops these reach parity and this test fails — the signal to move the now-matching ids into the
-    parity set above and delete them here.
-    """
-    assert _DIVERGES_UNTIL_CUTOVER.keys() <= set(
-        _SCENARIOS_BY_ID
-    ), _DIVERGES_UNTIL_CUTOVER.keys() - set(_SCENARIOS_BY_ID)
-
-    for scenario_id in _DIVERGES_UNTIL_CUTOVER:
-        scenario = _SCENARIOS_BY_ID[scenario_id]
-        buffered, streaming = await _run_both(scenario)
-        assert not buffered.errored, f"{scenario_id} buffered: {buffered.error}"
-        assert not streaming.errored, f"{scenario_id} streaming: {streaming.error}"
-        # Buffered stops early — strictly fewer tools, and a prefix of the streaming sequence.
-        assert (
-            buffered.tool_calls != streaming.tool_calls
-        ), f"{scenario_id} now reaches parity — move it into the parity set and remove it here"
-        assert (
-            streaming.tool_calls[: len(buffered.tool_calls)] == buffered.tool_calls
-        ), f"{scenario_id}: buffered {buffered.tool_calls} is not a prefix of {streaming.tool_calls}"
-
-
-async def test_parity_battery_has_matching_scenarios():
-    """The parity set is non-empty, so test_run_stream_parity actually asserts something today."""
-    assert _PARITY_SCENARIOS, "expected at least one scenario to already reach run/stream parity"
+async def test_parity_battery_is_non_empty():
+    """Guard: the battery actually runs scenarios (so the parity assertions above mean something)."""
+    assert SCENARIOS, "expected a non-empty QA battery"
