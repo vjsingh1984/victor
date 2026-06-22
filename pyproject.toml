@@ -66,7 +66,12 @@ dependencies = [
     "aiohttp>=3.9",
 
     # CLI/UI
-    "typer>=0.12",
+    # typer<0.15 (e.g. 0.12.x) is incompatible with click>=8.2: click added
+    # validation that rejects --flag/--no-flag secondary opts unless is_flag is
+    # set, which old typer doesn't do — every boolean CLI option then fails at
+    # group-build time. Floor at a click-8.2+ aware typer; cap to satisfy
+    # huggingface-hub (typer<0.26).
+    "typer>=0.15,<0.26",
     "rich>=13.7",
     "prompt-toolkit>=3.0",
     "textual>=0.89",
