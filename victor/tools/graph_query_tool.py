@@ -146,7 +146,10 @@ async def graph_semantic_search(
 
         # Create graph store
         project_path = Path(path).resolve()
-        graph_store = create_graph_store(name="sqlite", project_path=project_path)
+        # "auto" honors the per-repo .victor/graph_backend marker (default sqlite),
+        # so a repo can flip impact_analysis + hybrid seed→expand to ProximaDB
+        # once parity holds — without changing global settings.
+        graph_store = create_graph_store(name="auto", project_path=project_path)
         await graph_store.initialize()
 
         # Create retriever with config
@@ -274,7 +277,10 @@ async def impact_analysis(
 
         # Create graph store with project path
         project_path = Path(path).resolve()
-        graph_store = create_graph_store(name="sqlite", project_path=project_path)
+        # "auto" honors the per-repo .victor/graph_backend marker (default sqlite),
+        # so a repo can flip impact_analysis + hybrid seed→expand to ProximaDB
+        # once parity holds — without changing global settings.
+        graph_store = create_graph_store(name="auto", project_path=project_path)
         await graph_store.initialize()
 
         # Parse target
