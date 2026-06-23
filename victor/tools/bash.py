@@ -1154,7 +1154,7 @@ async def _stream_subprocess_output(process: Any, tool_name: str) -> tuple[bytes
 )
 async def shell(
     cmd: str,
-    cwd: Optional[str] = None,
+    cwd: str = ".",
     timeout: Optional[int] = None,
     dangerous: bool = False,
     readonly: bool = True,
@@ -1162,17 +1162,44 @@ async def shell(
     stdout_limit: Optional[int] = None,
     stderr_limit: Optional[int] = None,
 ) -> Dict[str, Any]:
-    """Execute a shell command. The `cmd` parameter is required.
+    """Execute a shell command from a working directory.
+
+    The `cmd` parameter is required. The `cwd` parameter sets the working
+    directory the command runs from — its canonical path. Default is `"."`
+    (the current/present working directory). Prefer passing `cwd` over
+    embedding `cd dir && cmd` in the command string, since `cwd` is validated,
+    logged, and preserved across the execution pipeline.
+
+    Args:
+        cmd: The shell command to execute.
+        cwd: Canonical working directory to run the command from.
+            Defaults to `"."` (present working directory). Must exist.
+        timeout: Max seconds before the command is killed.
+        dangerous: Allow mutating/network commands when `readonly` blocks them.
+        readonly: When True (default), block commands that mutate state.
+        action: "read" (default) or "write" — the caller's intent.
+        stdout_limit: Max stdout lines to return.
+        stderr_limit: Max stderr lines to return.
 
     Examples:
-        shell(cmd="ls -la")
-        shell(cmd="git status")
-        shell(cmd='sqlite3 data.db ".tables"')  # Database operations
+        shell(cmd="ls -la")                       # runs in present working dir
+        shell(cmd="pytest -q", cwd="tests/unit")  # run from a subdirectory
+        shell(cmd="git status")                   # git via shell (no git tool needed)
+        shell(cmd='sqlite3 data.db ".tables"')    # Database operations
         shell(cmd='sqlite3 data.db "SELECT * FROM users LIMIT 10"')
 
     For database files (SQLite, PostgreSQL, MySQL):
     - Use shell(cmd='sqlite3 file.db ".tables"') to list tables
     - Use shell(cmd='sqlite3 file.db "SELECT * FROM table LIMIT 10"') to query
+
+    Feasible CLI commands (use shell for these instead of dedicated tools):
+        git status, git diff, git log, git branch, git checkout, git push
+        docker ps, docker build, docker run, docker exec, docker images
+        pip install, pip list, pip show, pipdeptree
+        pytest, make test, npm test, cargo test
+        gh pr create, gh pr list, gh issue list
+        terraform validate, terraform plan, docker-compose config
+        make, npm, cargo, go build, yarn, pnpm
     - Use shell(cmd='psql -h localhost -U user -d db -c "SELECT * FROM table"') for PostgreSQL
     - Use shell(cmd='mysql -u user -p db -e "SHOW TABLES"') for MySQL
 

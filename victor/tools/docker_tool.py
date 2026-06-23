@@ -14,6 +14,20 @@
 
 """Consolidated Docker tool for container and image management.
 
+NOTE: For standard docker operations, PREFER the ``shell`` tool:
+    shell(cmd="docker ps")
+    shell(cmd="docker ps -a")
+    shell(cmd="docker images")
+    shell(cmd="docker logs <container>")
+    shell(cmd="docker exec <container> ls -la")
+    shell(cmd="docker build -t myimage .")
+    shell(cmd="docker run -d -p 8080:80 nginx")
+
+This tool wraps ``docker`` CLI commands via subprocess — the ``shell`` tool
+already intercepts and validates docker commands with the same safety.
+Use this dedicated tool only when you need the structured dict return format
+or the ``inspect`` operation (which uses the Docker SDK, not CLI).
+
 Provides unified Docker operations using the Docker CLI for maximum compatibility.
 
 Features:

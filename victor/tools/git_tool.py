@@ -14,12 +14,22 @@
 
 """Git tool with AI-powered commit messages and smart operations.
 
-This tool provides:
-1. Unified git operations (status, diff, stage, commit, push, log, branch)
-2. AI-generated commit messages based on diff analysis
-3. PR creation and management
-4. Conflict detection and resolution help
-5. Push with --force-with-lease, --tags, --dry-run, and --all support
+NOTE: For standard git operations, PREFER the ``shell`` tool:
+    shell(cmd="git status")
+    shell(cmd="git diff", cwd=".")
+    shell(cmd="git log --oneline -10")
+    shell(cmd="git branch")
+    shell(cmd="git checkout -b feature-branch")
+    shell(cmd="git push origin main")
+
+This tool should be used ONLY for:
+1. AI-generated commit messages based on diff analysis
+2. PR creation and management
+3. Conflict detection and resolution help
+4. Push with --force-with-lease, --tags, --dry-run, and --all support
+
+All other git operations (status, diff, log, branch, checkout) should
+use the ``shell`` tool directly to reduce token/schema burden.
 
 Fallback: If this tool is unavailable or fails, use the shell tool:
     shell(cmd="git push origin <branch>")

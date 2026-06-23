@@ -14,6 +14,18 @@
 
 """Unified dependency management tool for Python projects.
 
+NOTE: For standard pip operations, PREFER the ``shell`` tool:
+    shell(cmd="pip list")
+    shell(cmd="pip show requests")
+    shell(cmd="pip install black")
+    shell(cmd="pip install --upgrade requests")
+    shell(cmd="pipdeptree")
+
+This tool wraps ``pip`` and ``pipdeptree`` CLI commands via subprocess.
+Use it only for the ``security`` action (vulnerability scanning) or
+``generate`` action (requirements.txt generation). For list/show/install/tree
+operations, ``shell(cmd="pip ...")`` is more efficient.
+
 Consolidates all dependency operations into a single tool for better token efficiency.
 Supports: list, outdated, security, generate, update, tree, check.
 """
