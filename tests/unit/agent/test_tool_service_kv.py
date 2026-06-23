@@ -73,7 +73,9 @@ class TestSortToolsForKvStability:
             _make_tool("read", schema_level="full"),
         ]
         result = svc.sort_tools_for_kv_stability(tools, kv_optimization_enabled=True)
-        assert [t.name for t in result] == ["read", "code_search", "shell"]
+        # Priority order per STABLE_TOOL_ORDER: read < shell < code_search.
+        # (shell is more fundamental than code_search in the core read/edit loop.)
+        assert [t.name for t in result] == ["read", "shell", "code_search"]
 
     def test_returns_none_when_tools_is_none(self):
         svc = _make_service()
@@ -291,6 +293,89 @@ class TestApplyContextAwareStrategy:
                 kv_tool_strategy="context_aware",
             )
         assert [t.name for t in result] == ["read", "refs"]
+
+
+# ---------------------------------------------------------------------------
+# semantic_select_tools
+# ---------------------------------------------------------------------------
+
+
+# ---------------------------------------------------------------------------
+# STABLE_TOOL_ORDER coverage (coding-agent priority ranking)
+# ---------------------------------------------------------------------------
+
+
+class TestStableToolOrderCoverage:
+    """Regression: STABLE_TOOL_ORDER must rank the full coding-agent tool set.
+
+    Previously only 14/54 tools were ranked, so the remaining 40 fell through to
+    alphabetical ordering (unknown_rank tie-break). This made the serialized
+    tool schema order alphabetical instead of priority-based, hurting both model
+    salience and the intended read/edit/shell-first ordering.
+    """
+
+    CORE_LOOP_TOOLS = [
+        "read",
+        "edit",
+        "write",
+        "shell",
+        "ls",
+        "code_search",
+    ]
+
+    # Every tool observed in a real coding-agent session (54 tools).
+    FULL_SESSION_TOOLS = {
+        "graph", "graph_analytics", "graph_dependencies", "graph_neighbors",
+        "graph_path", "graph_patterns", "graph_query", "graph_search",
+        "graph_semantic", "lsp", "cicd", "docker", "git", "pr", "db", "test",
+        "find", "ls", "project_overview", "read", "write", "deps", "shell",
+        "workflow", "notebook_edit", "extract", "inline", "organize_imports",
+        "rename", "jira", "batch", "code_search", "http", "docs",
+        "docs_coverage", "scaffold", "cache", "web_fetch", "web_search",
+        "sandbox", "mcp", "scan", "graph_semantic_search", "impact_analysis",
+        "refs", "symbol", "edit", "metrics", "analysis_checkpoint", "patch",
+        "merge", "audit", "pipeline", "iac",
+    }
+
+    def test_core_loop_tools_ranked_before_others(self):
+        """read/edit/write/shell/ls/code_search must precede unranked tools."""
+        svc = _make_service()
+        tools = [
+            _make_tool("zzz_unranked", schema_level="full"),
+            _make_tool("shell", schema_level="full"),
+            _make_tool("read", schema_level="full"),
+            _make_tool("edit", schema_level="full"),
+        ]
+        result = svc.sort_tools_for_kv_stability(tools, kv_optimization_enabled=True)
+        names = [t.name for t in result]
+        # All core-loop tools must come before the unranked tail tool.
+        assert names.index("read") < names.index("zzz_unranked")
+        assert names.index("edit") < names.index("zzz_unranked")
+        assert names.index("shell") < names.index("zzz_unranked")
+
+    def test_core_loop_order_is_read_edit_write_shell_ls_code_search(self):
+        """The exact priority order of the core coding loop must be preserved."""
+        svc = _make_service()
+        tools = [_make_tool(n, schema_level="full") for n in self.CORE_LOOP_TOOLS]
+        # Shuffle so input order does not influence result.
+        import random
+        random.shuffle(tools)
+        result = svc.sort_tools_for_kv_stability(tools, kv_optimization_enabled=True)
+        assert [t.name for t in result] == self.CORE_LOOP_TOOLS
+
+    def test_full_session_tools_are_all_ranked(self):
+        """No coding-agent session tool should fall through to unknown_rank.
+
+        This is the core regression guard: every tool in a real session must
+        appear in STABLE_TOOL_ORDER so ordering is priority-based, not
+        alphabetical.
+        """
+        ranked = set(ToolService.STABLE_TOOL_ORDER)
+        unranked = self.FULL_SESSION_TOOLS - ranked
+        assert not unranked, (
+            f"These session tools are unranked and fall back to alphabetical "
+            f"ordering: {sorted(unranked)}"
+        )
 
 
 # ---------------------------------------------------------------------------

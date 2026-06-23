@@ -651,21 +651,75 @@ class ToolService:
     # Stable tool ordering is both a cache primitive and a model-salience prior.
     # Keep high-value coding-agent tools first; unknown tools fall back to schema
     # level and name for deterministic extension behavior.
+    #
+    # Tiered by usage frequency in a coding-agent session. Tier 0 is the core
+    # read/edit loop that almost every turn touches; later tiers are progressively
+    # less frequent. Ranking every session tool here (not just the core loop)
+    # guarantees priority-based ordering instead of alphabetical fallback — see
+    # ``sort_tools_for_kv_stability`` where unranked tools get ``unknown_rank``.
     STABLE_TOOL_ORDER = (
+        # Tier 0 — core read/edit loop (highest frequency, exact order matters)
         "read",
-        "code_search",
-        "ls",
-        "project_overview",
-        "shell",
         "edit",
         "write",
-        "git",
+        "shell",
+        "ls",
+        "code_search",
+        # Tier 1 — navigation / lookup
+        "find",
         "refs",
         "symbol",
         "graph",
-        "docs_coverage",
-        "scan",
+        "project_overview",
+        # Tier 2 — version control + test workflow
+        "git",
+        "test",
+        "pr",
+        # Tier 3 — refactoring (single-file AST ops)
+        "rename",
+        "extract",
+        "patch",
+        "inline",
+        "organize_imports",
+        # Tier 4 — analysis / quality
         "metrics",
+        "scan",
+        "impact_analysis",
+        "docs_coverage",
+        "analysis_checkpoint",
+        "lsp",
+        # Tier 5 — web / external integrations
+        "web_search",
+        "web_fetch",
+        "http",
+        "jira",
+        # Tier 6 — graph query variants (keep grouped after the umbrella ``graph``)
+        "graph_semantic_search",
+        "graph_search",
+        "graph_semantic",
+        "graph_neighbors",
+        "graph_path",
+        "graph_patterns",
+        "graph_analytics",
+        "graph_dependencies",
+        "graph_query",
+        # Tier 7 — infra / data / generation (lower frequency)
+        "docker",
+        "cicd",
+        "pipeline",
+        "iac",
+        "audit",
+        "sandbox",
+        "mcp",
+        "db",
+        "deps",
+        "notebook_edit",
+        "docs",
+        "scaffold",
+        "cache",
+        "batch",
+        "workflow",
+        "merge",
     )
     STABLE_TOOL_ORDER_RANK = {name: rank for rank, name in enumerate(STABLE_TOOL_ORDER)}
 

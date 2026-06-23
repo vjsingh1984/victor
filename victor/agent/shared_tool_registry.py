@@ -102,6 +102,11 @@ class SharedToolRegistry:
 
         self._tool_classes: Dict[str, Type[Any]] = {}
         self._decorated_tools: Dict[str, Any] = {}
+        # Cache of instances created during discovery so that LazyToolProxy
+        # can reuse them instead of re-instantiating the class on first use.
+        # This eliminates the double-instantiation defect where _discover_tools()
+        # created an instance to read .name and the proxy then called cls() again.
+        self._tool_instances: Dict[str, Any] = {}
         self._initialized: bool = False
         self._discovery_lock: threading.Lock = threading.Lock()
 
@@ -305,10 +310,15 @@ class SharedToolRegistry:
                         ):
                             # Only store the class reference if it's not abstract
                             try:
-                                # Attempt to create an instance to get the name
+                                # Attempt to create an instance to get the name.
+                                # NOTE: BaseTool.name is a @property, so we must
+                                # instantiate to read it. We cache this instance so
+                                # LazyToolProxy can reuse it instead of calling
+                                # cls() again on first use (double-instantiation fix).
                                 temp_instance = obj()
                                 tool_name = temp_instance.name
                                 self._tool_classes[tool_name] = obj
+                                self._tool_instances[tool_name] = temp_instance
                                 discovered_classes += 1
                             except Exception:
                                 # Skip abstract classes or classes that can't be instantiated
@@ -358,9 +368,17 @@ class SharedToolRegistry:
                     description = getattr(cls, "description", "") or ""
                     if callable(description):
                         description = ""  # Skip property descriptors
+                    # Reuse the instance created during discovery if available,
+                    # so the proxy does not re-instantiate the class on first use.
+                    cached_instance = self._tool_instances.get(name)
+                    factory = (
+                        (lambda inst=cached_instance: inst)
+                        if cached_instance is not None
+                        else cls
+                    )
                     proxy = LazyToolProxy(
                         name=name,
-                        factory=cls,
+                        factory=factory,
                         cost_tier=cost_tier,
                         description=description,
                     )
