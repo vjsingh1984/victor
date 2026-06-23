@@ -535,7 +535,10 @@ class GraphManager:
             async with path_lock:
                 phase2_start = datetime.now().timestamp()
 
-                graph_store = create_graph_store("sqlite", root)
+                # "auto" honors the per-repo .victor/graph_backend marker so a
+                # repo flipped to ProximaDB is populated through the same
+                # incremental refresh path; defaults to sqlite.
+                graph_store = create_graph_store("auto", root)
                 config = GraphIndexConfig(
                     root_path=root,
                     enable_ccg=enable_ccg,

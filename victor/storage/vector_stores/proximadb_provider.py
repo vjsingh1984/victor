@@ -12,567 +12,286 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""ProximaDB embedding provider for Victor.
+"""ProximaDB embedding provider for Victor (Code Context Graph backend).
 
-ProximaDB is a high-performance embedded vector + graph database:
-- SST engine for fast vector operations (~5ms search latency)
-- ORION engine for graph relationships (code symbol relationships)
-- Native Rust performance with Python bindings
-- Embedded mode (no separate server needed)
+A real :class:`BaseEmbeddingProvider` over ProximaDB's vector engine via the
+``proximadb_sdk`` embedded API. For the embedded/local single-repo case it runs
+one ``EmbeddedProximaDB`` per repo with an in-process embedding model and
+full-precision (fp32) vectors held in RAM — the ``EmbeddingMode::Memory``
+equivalent — so semantic seed→expand scores neighbors inline.
 
-Install: pip install proximadb
+Correlation: a document is keyed by its ``oid``. When indexing code symbols the
+caller passes ``doc_id = graph/{repo}/node/{symbol_oid}`` — the same id used for
+the ORION graph node — so the vector and the graph node are one entity and the
+old ``graph_node.embedding_ref`` bridge is unnecessary.
 
-Features:
-- Unified vector + graph storage for semantic code knowledge
-- Hardware-accelerated SIMD operations
-- Real-time indexing with write-ahead logging
-- Hilbert curve locality optimization
-- Multiple distance metrics (cosine, euclidean, dot)
+ProximaDB is an optional dependency: if ``proximadb_sdk`` (or the embedded
+server binary) is unavailable, ``initialize()`` raises a clear error and callers
+fall back to the default LanceDB/SQLite stack.
+
+- Embedded (``embedding_mode="memory"``, default): in-RAM fp32, drop-in local.
+- Service (``embedding_mode="cold"`` / ``server_url=``): SQ8 multi-tenant. **WIP**,
+  gated on ProximaDB TD-127 (secondary indexes) + TD-130/131 (graph bulk-load +
+  REST v2 hybrid).
 """
 
 import logging
-import asyncio
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from victor.storage.proxima_runtime import (
+    ProximaEmbeddingMode,
+    ProximaUnavailableError,
+    is_proxima_available,
+    start_embedded_db,
+)
 from victor.storage.vector_stores.base import (
     BaseEmbeddingProvider,
     EmbeddingConfig,
     EmbeddingSearchResult,
 )
-from victor.storage.vector_stores.models import (
-    BaseEmbeddingModel,
-    EmbeddingModelConfig,
-    create_embedding_model,
-)
 
 logger = logging.getLogger(__name__)
-
-# Check if ProximaDB is available
-try:
-    import httpx
-
-    HTTPX_AVAILABLE = True
-except ImportError:
-    HTTPX_AVAILABLE = False
 
 
 class ProximaDBProvider(BaseEmbeddingProvider):
     """ProximaDB embedding provider for semantic code knowledge.
 
-    Uses ProximaDB's embedded mode for vector storage with pluggable embedding models.
-
-    Features:
-    - SST engine: Write-optimized real-time indexing (~5ms search)
-    - ORION graph engine: Code symbol relationships
-    - Hardware-accelerated distance computation
-    - Persistent storage with WAL durability
-    - Low memory footprint with mmap
-
-    Advantages over LanceDB/ChromaDB:
-    - Combined vector + graph storage (code relationships)
-    - Better real-time write performance (SST engine)
-    - Native Rust performance with zero-copy operations
-    - Hilbert curve locality optimization (HELIX engine option)
+    Uses ProximaDB's embedded mode (``proximadb_sdk.embedded``) with an
+    in-process embedding model so embedding generation, storage, and inline
+    semantic scoring all happen in one in-RAM engine (EmbeddingMode::Memory).
     """
 
     def __init__(self, config: EmbeddingConfig):
         """Initialize ProximaDB provider.
 
         Args:
-            config: Embedding configuration
+            config: Embedding configuration. Honored ``extra_config`` keys:
+                ``collection_name`` (default ``code_embeddings``),
+                ``dimension`` (default 384), ``embedding_mode``
+                (``memory``/``cold``), ``server_url`` (service mode, WIP),
+                ``binary_path`` (embedded server binary).
         """
         super().__init__(config)
+        extra = config.extra_config or {}
+        self._collection_name: str = extra.get("collection_name", "code_embeddings")
+        self._dimension: int = int(extra.get("dimension", 384))
+        self._embedding_mode = ProximaEmbeddingMode.coerce(extra.get("embedding_mode"))
+        self._server_url: Optional[str] = extra.get("server_url")
+        self._binary_path: Optional[str] = extra.get("binary_path")
 
-        if not HTTPX_AVAILABLE:
-            raise ImportError("httpx not available. Install with: pip install httpx")
+        self._db = None  # EmbeddedProximaDB (we own/stop it)
+        self._collection = None  # EmbeddedCollection
+        self._model = None  # proximadb_sdk embedding model (in-process)
+        self._data_dir: Optional[Path] = None
 
-        self._db = None
-        self._collection = None
-        self._client: Optional[httpx.AsyncClient] = None
-        self.embedding_model: Optional[BaseEmbeddingModel] = None
-        self._server_url = "http://localhost:15678"  # Embedded mode port
-        self._started = False
-
+    # ------------------------------------------------------------------
+    # Lifecycle
+    # ------------------------------------------------------------------
     async def initialize(self) -> None:
-        """Initialize ProximaDB and load embedding model."""
         if self._initialized:
             return
+        if not is_proxima_available():
+            raise ImportError(
+                "proximadb_sdk is not installed. Install it (pip install proximadb) "
+                "or use a different vector_store (lancedb/chromadb)."
+            )
+        if self._server_url:
+            # Multi-tenant service path is not yet wired for the embedding
+            # provider — gated on TD-127/130/131.
+            raise ProximaUnavailableError(
+                "ProximaDB service mode (server_url) for the embedding provider is "
+                "WIP (gated on TD-127/130/131). Use embedded mode for local repos."
+            )
 
-        # Get embedding model configuration from EmbeddingConfig
-        model_type = self.config.embedding_model_type
-        model_name = self.config.embedding_model_name
-        api_key = self.config.embedding_api_key
-        dimension = self.config.extra_config.get("dimension", 384)
-        batch_size = self.config.extra_config.get("batch_size", 16)
+        from proximadb_sdk import create_embedding_model
 
-        # Create embedding model config
-        embedding_config = EmbeddingModelConfig(
-            model_type=model_type,
-            model_name=model_name,
-            dimension=dimension,
-            api_key=api_key,
-            batch_size=batch_size,
-        )
-
-        # Initialize embedding model
-        self.embedding_model = create_embedding_model(embedding_config)
-        await self.embedding_model.initialize()
-
-        logger.debug("Initializing ProximaDB provider")
-        logger.debug("Vector Store: ProximaDB (SST engine)")
-        logger.debug(f"Embedding Model: {model_name} ({model_type})")
-
-        # Setup data directory
+        # Resolve persistent data directory.
         persist_dir = self.config.persist_directory
         if persist_dir:
-            persist_dir = Path(persist_dir).expanduser()
-            persist_dir.mkdir(parents=True, exist_ok=True)
-            logger.debug(f"Using persistent storage: {persist_dir}")
+            self._data_dir = Path(persist_dir).expanduser()
         else:
             from victor.config.settings import get_project_paths
 
-            persist_dir = get_project_paths().global_embeddings_dir / "proximadb"
-            persist_dir.mkdir(parents=True, exist_ok=True)
-            logger.debug(f"Using default storage: {persist_dir}")
+            self._data_dir = get_project_paths().global_embeddings_dir / "proximadb"
+        self._data_dir.mkdir(parents=True, exist_ok=True)
 
-        self._data_dir = persist_dir
-
-        # Check for external server or start embedded
-        server_url = self.config.extra_config.get("server_url")
-        if server_url:
-            # Use external server
-            self._server_url = server_url
-            logger.debug(f"Using external ProximaDB server: {server_url}")
-        else:
-            # Try to start embedded mode
-            await self._start_embedded_server()
-
-        # Create HTTP client
-        self._client = httpx.AsyncClient(
-            base_url=self._server_url,
-            timeout=60.0,
+        # In-process embedding model — ProximaDB embeds inline (Memory mode).
+        self._model = create_embedding_model(
+            model_type=self.config.embedding_model_type or "sentence-transformers",
+            model_name=self.config.embedding_model_name,
         )
+        try:
+            self._dimension = int(self._model.get_dimension())
+        except Exception:  # pragma: no cover - model-specific
+            pass
 
-        # Create or get collection
-        collection_name = self.config.extra_config.get("collection_name", "code_embeddings")
-        await self._ensure_collection(collection_name, dimension)
+        # Start the embedded engine and create the correlated collection.
+        self._db = await start_embedded_db(self._data_dir, binary_path=self._binary_path)
+        self._collection = await self._db.create_collection(
+            self._collection_name,
+            dimension=self._dimension,
+            distance_metric=self.config.distance_metric or "cosine",
+            embedding_model=self._model,
+        )
 
         self._initialized = True
-        logger.debug("ProximaDB provider initialized!")
-
-    async def _start_embedded_server(self) -> None:
-        """Start ProximaDB in embedded mode if available."""
-        try:
-            # Try to import proximadb embedded module
-            from proximadb import EmbeddedProximaDB, EmbeddedConfig
-
-            config = EmbeddedConfig(
-                data_dir=str(self._data_dir),
-                rest_port=15678,
-                grpc_port=15679,
-                log_level="warn",
-                vector_engine="SST",
-                graph_engine="ORION",
-            )
-
-            self._db = EmbeddedProximaDB(config=config)
-            await self._db.start()
-            self._started = True
-            self._server_url = self._db.rest_url
-            logger.debug(f"Started embedded ProximaDB: {self._server_url}")
-
-        except ImportError:
-            # Fall back to checking for running server
-            await self._check_external_server()
-
-    async def _check_external_server(self) -> None:
-        """Check if an external ProximaDB server is running."""
-        # Try common ports
-        for port in [15678, 5678]:
-            url = f"http://localhost:{port}"
-            try:
-                async with httpx.AsyncClient() as client:
-                    response = await client.get(f"{url}/health", timeout=2.0)
-                    if response.status_code == 200:
-                        self._server_url = url
-                        logger.debug(f"Found running ProximaDB server: {url}")
-                        return
-            except Exception:
-                pass
-
-        raise RuntimeError(
-            "ProximaDB not available. Either:\n"
-            "1. Install proximadb package: pip install proximadb\n"
-            "2. Start ProximaDB server: proximadb-server\n"
-            "3. Provide server_url in extra_config"
+        logger.debug(
+            "ProximaDB embedding provider ready (collection=%s, dim=%s, mode=%s)",
+            self._collection_name,
+            self._dimension,
+            self._embedding_mode.value,
         )
 
-    async def _ensure_collection(self, name: str, dimension: int) -> None:
-        """Ensure collection exists."""
-        self._collection_name = name
-        self._dimension = dimension
-
-        try:
-            response = await self._client.post(
-                "/api/v1/collections",
-                json={
-                    "operation": 1,  # CREATE
-                    "collection_id": name,
-                    "collection_config": {
-                        "name": name,
-                        "dimension": dimension,
-                        "distance_metric": 1,  # COSINE
-                    },
-                },
-            )
-
-            result = response.json()
-            if result.get("success") or "already exists" in str(result):
-                logger.debug(f"Collection ready: {name} (dim={dimension})")
-            else:
-                logger.debug(f"Collection creation result: {result}")
-
-        except Exception as e:
-            logger.warning(f"Could not create collection: {e}")
-
-    def _to_sql_value(self, value: Any) -> Dict[str, Any]:
-        """Convert Python value to ProximaDB SqlValue format."""
-        if value is None:
-            return {"null_value": 0}
-        elif isinstance(value, bool):
-            return {"bool_value": value}
-        elif isinstance(value, int):
-            return {"int64_value": value}
-        elif isinstance(value, float):
-            return {"number_value": value}
-        elif isinstance(value, str):
-            return {"string_value": value}
-        elif isinstance(value, (list, tuple)):
-            return {"array_value": {"values": [self._to_sql_value(v) for v in value]}}
-        else:
-            return {"string_value": str(value)}
-
-    def _convert_metadata(self, metadata: Dict[str, Any]) -> Dict[str, Any]:
-        """Convert metadata dict to SqlValue format."""
-        return {k: self._to_sql_value(v) for k, v in metadata.items()}
-
-    def _extract_sql_value(self, sql_value: Dict[str, Any]) -> Any:
-        """Extract Python value from SqlValue format."""
-        if "string_value" in sql_value:
-            return sql_value["string_value"]
-        elif "int64_value" in sql_value:
-            return sql_value["int64_value"]
-        elif "number_value" in sql_value:
-            return sql_value["number_value"]
-        elif "bool_value" in sql_value:
-            return sql_value["bool_value"]
-        elif "null_value" in sql_value:
-            return None
-        elif "array_value" in sql_value:
-            return [self._extract_sql_value(v) for v in sql_value["array_value"].get("values", [])]
-        return sql_value
-
-    def _extract_metadata(self, metadata: Dict[str, Any]) -> Dict[str, Any]:
-        """Extract Python values from SqlValue metadata."""
-        return {k: self._extract_sql_value(v) for k, v in metadata.items()}
-
+    # ------------------------------------------------------------------
+    # Embedding generation (delegates to the in-process model)
+    # ------------------------------------------------------------------
     async def embed_text(self, text: str) -> List[float]:
-        """Generate embedding for single text.
-
-        Args:
-            text: Text to embed
-
-        Returns:
-            Embedding vector
-        """
         if not self._initialized:
             await self.initialize()
-
-        return await self.embedding_model.embed_text(text)
+        return await self._model.embed_async(text)
 
     async def embed_batch(self, texts: List[str]) -> List[List[float]]:
-        """Generate embeddings for batch of texts.
-
-        Args:
-            texts: List of texts to embed
-
-        Returns:
-            List of embedding vectors
-        """
         if not self._initialized:
             await self.initialize()
+        return await self._model.embed_batch_async(texts)
 
-        return await self.embedding_model.embed_batch(texts)
-
+    # ------------------------------------------------------------------
+    # Indexing — doc_id is the oid (graph/{repo}/node/{symbol_oid})
+    # ------------------------------------------------------------------
     async def index_document(
         self,
         doc_id: str,
         content: str,
         metadata: Optional[Dict[str, Any]] = None,
     ) -> None:
-        """Index a single document.
-
-        Args:
-            doc_id: Document identifier
-            content: Document content
-            metadata: Optional metadata
-        """
-        if not self._initialized:
-            await self.initialize()
-
-        # Generate embedding
-        embedding = await self.embed_text(content)
-
-        # Prepare vector with metadata
-        vector_data = {
-            "id": doc_id,
-            "vector": embedding,
-        }
-
-        # Add content to metadata for retrieval
-        full_metadata = {"content": content, **(metadata or {})}
-        vector_data["metadata"] = self._convert_metadata(full_metadata)
-
-        # Insert into collection
-        response = await self._client.post(
-            "/api/v1/vectors/batch",
-            json={
-                "collection_id": self._collection_name,
-                "vectors": [vector_data],
-            },
-        )
-
-        result = response.json()
-        if not result.get("success"):
-            logger.warning(f"Insert may have failed: {result}")
+        await self.index_documents([{"id": doc_id, "content": content, "metadata": metadata or {}}])
 
     async def index_documents(self, documents: List[Dict[str, Any]]) -> None:
-        """Index multiple documents in batch.
-
-        Args:
-            documents: List of documents with id, content, metadata
-        """
         if not self._initialized:
             await self.initialize()
-
         if not documents:
             return
+        # EmbeddedCollection.insert_with_embedding embeds in-process and stores
+        # the text under props["text"]; ProximaDB holds vectors in RAM.
+        payload = [
+            {
+                "id": doc["id"],
+                "text": doc["content"],
+                "metadata": doc.get("metadata", {}),
+            }
+            for doc in documents
+        ]
+        await self._collection.insert_with_embedding(payload)
 
-        # Generate embeddings in batch
-        contents = [doc["content"] for doc in documents]
-        embeddings = await self.embed_batch(contents)
-
-        # Prepare vectors for insertion
-        vectors = []
-        for doc, embedding in zip(documents, embeddings, strict=False):
-            # Merge content into metadata for retrieval
-            full_metadata = {"content": doc["content"], **doc.get("metadata", {})}
-
-            vectors.append(
-                {
-                    "id": doc["id"],
-                    "vector": embedding,
-                    "metadata": self._convert_metadata(full_metadata),
-                }
-            )
-
-        # Batch insert
-        response = await self._client.post(
-            "/api/v1/vectors/batch",
-            json={
-                "collection_id": self._collection_name,
-                "vectors": vectors,
-            },
-        )
-
-        result = response.json()
-        if not result.get("success"):
-            logger.warning(f"Batch insert may have failed: {result}")
-
+    # ------------------------------------------------------------------
+    # Search
+    # ------------------------------------------------------------------
     async def search_similar(
         self,
         query: str,
         limit: int = 5,
         filter_metadata: Optional[Dict[str, Any]] = None,
     ) -> List[EmbeddingSearchResult]:
-        """Search for similar documents.
-
-        Args:
-            query: Search query
-            limit: Maximum number of results
-            filter_metadata: Optional metadata filters
-
-        Returns:
-            List of search results
-        """
         if not self._initialized:
             await self.initialize()
 
-        # Generate query embedding
-        query_embedding = await self.embed_text(query)
+        raw = await self._collection.search_text(
+            query, top_k=limit, filters=filter_metadata or None
+        )
+        return [self._to_search_result(item) for item in (raw or [])]
 
-        # Prepare search request
-        search_query = {"vector": query_embedding}
-        if filter_metadata:
-            search_query["filters"] = self._convert_metadata(filter_metadata)
+    def _to_search_result(self, item: Dict[str, Any]) -> EmbeddingSearchResult:
+        # ProximaDB returns id/score (or distance) plus props (incl. "text").
+        props = item.get("props") or item.get("metadata") or {}
+        if not isinstance(props, dict):
+            props = {}
+        content = props.get("text", item.get("text", ""))
 
-        # Execute search
-        response = await self._client.post(
-            "/api/v1/search",
-            json={
-                "collection_id": self._collection_name,
-                "queries": [search_query],
-                "top_k": limit,
-            },
+        if "score" in item and item["score"] is not None:
+            score = float(item["score"])
+        else:
+            distance = float(item.get("distance", 0.0) or 0.0)
+            score = 1.0 / (1.0 + distance) if distance >= 0 else 0.0
+
+        meta = {k: v for k, v in props.items() if k != "text"}
+        return EmbeddingSearchResult(
+            file_path=str(props.get("file_path", props.get("file", ""))),
+            symbol_name=props.get("symbol_name") or props.get("name"),
+            content=str(content),
+            score=score,
+            line_number=props.get("line_number") or props.get("line"),
+            metadata=meta,
         )
 
-        data = response.json()
-
-        # Parse results (handle nested structure)
-        results = []
-        if data.get("success") and data.get("results"):
-            inner = data["results"]
-            if isinstance(inner, dict) and "results" in inner:
-                raw_results = inner["results"] or []
-            elif isinstance(inner, list):
-                raw_results = inner
-            else:
-                raw_results = []
-
-            for result in raw_results:
-                # Extract metadata
-                metadata = {}
-                if "metadata" in result:
-                    metadata = self._extract_metadata(result["metadata"])
-
-                # Calculate similarity score (ProximaDB returns distance)
-                distance = result.get("distance", result.get("score", 0.0))
-                # Convert distance to similarity (0-1, higher is better)
-                score = 1.0 / (1.0 + distance) if distance >= 0 else 0.0
-
-                results.append(
-                    EmbeddingSearchResult(
-                        file_path=metadata.get("file_path", ""),
-                        symbol_name=metadata.get("symbol_name"),
-                        content=metadata.get("content", ""),
-                        score=score,
-                        line_number=metadata.get("line_number"),
-                        metadata={k: v for k, v in metadata.items() if k not in ["content"]},
-                    )
-                )
-
-        return results
-
+    # ------------------------------------------------------------------
+    # Deletes / maintenance
+    # ------------------------------------------------------------------
     async def delete_document(self, doc_id: str) -> None:
-        """Delete a document from index.
-
-        Args:
-            doc_id: Document identifier
-        """
         if not self._initialized:
             await self.initialize()
-
-        # ProximaDB delete endpoint (if available)
         try:
-            await self._client.delete(
-                f"/api/v1/vectors/{self._collection_name}/{doc_id}",
-            )
-        except Exception:
-            # Delete may not be fully implemented yet
-            pass
+            await self._collection.delete([doc_id])
+        except Exception as exc:  # pragma: no cover - depends on live server
+            logger.debug("ProximaDB delete(%s) failed: %s", doc_id, exc)
 
     async def delete_by_file(self, file_path: str) -> int:
-        """Delete all documents from a specific file.
-
-        Args:
-            file_path: Relative file path to delete documents for
-
-        Returns:
-            Number of documents deleted
-        """
         if not self._initialized:
             await self.initialize()
-
-        # ProximaDB doesn't have a bulk delete by metadata yet
-        # This would require listing documents with that file_path and deleting individually
-        # For now, return 0 (documents remain but will be overwritten on re-index)
+        # Bulk delete-by-metadata lands with TD-127 (secondary indexes); until
+        # then, stale rows are overwritten on re-index by their stable oid.
+        logger.debug(
+            "ProximaDB delete_by_file(%s) is a noop until TD-127; rows overwrite "
+            "by oid on re-index.",
+            file_path,
+        )
         return 0
 
     async def clear_index(self) -> None:
-        """Clear entire index."""
         if not self._initialized:
             await self.initialize()
-
-        # Delete and recreate collection
         try:
-            await self._client.delete(
-                f"/api/v1/collections/{self._collection_name}",
-            )
-        except Exception:
-            pass
-
-        # Recreate collection
-        await self._ensure_collection(self._collection_name, self._dimension)
-        logger.debug("Cleared index")
+            await self._db.delete_collection(self._collection_name)
+        except Exception as exc:  # pragma: no cover
+            logger.debug("delete_collection failed: %s", exc)
+        self._collection = await self._db.create_collection(
+            self._collection_name,
+            dimension=self._dimension,
+            distance_metric=self.config.distance_metric or "cosine",
+            embedding_model=self._model,
+        )
 
     async def get_stats(self) -> Dict[str, Any]:
-        """Get index statistics.
-
-        Returns:
-            Dictionary with statistics
-        """
         if not self._initialized:
             await self.initialize()
-
         count = 0
         try:
-            response = await self._client.get(
-                f"/api/v1/collections/{self._collection_name}",
-            )
-            if response.status_code == 200:
-                data = response.json()
-                if data.get("collection"):
-                    stats = data["collection"].get("stats", {})
-                    count = stats.get("vector_count", 0)
-        except Exception:
+            count = await self._collection.count()
+        except Exception:  # pragma: no cover
             pass
-
         return {
             "provider": "proximadb",
             "engine": "SST",
             "graph_engine": "ORION",
+            "embedding_mode": self._embedding_mode.value,
             "total_documents": count,
             "embedding_model_type": self.config.embedding_model_type,
             "embedding_model_name": self.config.embedding_model_name,
-            "dimension": (self.embedding_model.get_dimension() if self.embedding_model else 384),
+            "dimension": self._dimension,
             "distance_metric": self.config.distance_metric,
             "collection_name": self._collection_name,
-            "persist_directory": str(self._data_dir),
-            "server_url": self._server_url,
+            "persist_directory": str(self._data_dir) if self._data_dir else None,
         }
 
     async def close(self) -> None:
-        """Clean up resources."""
-        # Close embedding model
-        if self.embedding_model:
-            await self.embedding_model.close()
-            self.embedding_model = None
-
-        # Close HTTP client
-        if self._client:
-            await self._client.aclose()
-            self._client = None
-
-        # Stop embedded server if we started it
-        if self._db and self._started:
+        if self._db is not None:
             try:
                 await self._db.stop()
-            except Exception:
+            except Exception:  # pragma: no cover
                 pass
             self._db = None
-            self._started = False
-
+        self._collection = None
+        self._model = None
         self._initialized = False
 
 
@@ -582,23 +301,22 @@ def create_proximadb_provider(
     collection_name: str = "code_embeddings",
     embedding_model: str = "BAAI/bge-small-en-v1.5",
     server_url: Optional[str] = None,
+    embedding_mode: str = "memory",
 ) -> ProximaDBProvider:
     """Create a ProximaDB provider with optimized defaults for code search.
 
     Args:
         persist_directory: Where to store data (default: ~/.victor/embeddings/proximadb)
         collection_name: Name of the vector collection
-        embedding_model: Sentence-transformer model name
-        server_url: External ProximaDB server URL (optional)
+        embedding_model: Sentence-transformer model name (384-d bge-small default)
+        server_url: External ProximaDB server URL (service mode, WIP)
+        embedding_mode: ``memory`` (embedded, in-RAM fp32) or ``cold`` (service SQ8)
 
     Returns:
         Configured ProximaDB provider
 
     Example:
-        provider = create_proximadb_provider(
-            persist_directory="~/.myapp/data",
-            collection_name="my_codebase"
-        )
+        provider = create_proximadb_provider(persist_directory="~/.myapp/data")
         await provider.initialize()
     """
     config = EmbeddingConfig(
@@ -611,6 +329,7 @@ def create_proximadb_provider(
             "collection_name": collection_name,
             "dimension": 384,  # BAAI/bge-small-en-v1.5 dimension
             "server_url": server_url,
+            "embedding_mode": embedding_mode,
         },
     )
     return ProximaDBProvider(config)

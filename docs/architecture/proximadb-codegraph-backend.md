@@ -1,7 +1,48 @@
 # ProximaDB as the Code Context Graph (CCG) Backend
 
-Status: Design intent (tracked as TD-11, TD-12, TD-13 in `../tech-stack.md`)
+Status: Embedded backend implemented behind a per-repo flag; SQLite remains default
+(tracked as TD-11, TD-12, TD-13 in `../tech-stack.md`). Service mode is WIP.
 Date: 2026-06-22
+
+## Implementation status (2026-06-22)
+
+The embedded ProximaDB backend is implemented and parity-verified at the adapter
+level; SQLite stays the default and nothing flips automatically.
+
+- `victor/storage/proxima_runtime.py` — shared helpers: optional-dependency
+  detection, the canonical `node_oid(repo, symbol_oid)` =
+  `graph/{repo}/node/{symbol_oid}` correlation key, the `ProximaEmbeddingMode`
+  (`memory`/`cold`) encoding of the Rust `EmbeddingMode`, and embedded bootstrap.
+- `victor/storage/vector_stores/proximadb_provider.py` — now a real
+  `EmbeddingProvider` over `proximadb_sdk`'s embedded API with an in-process
+  embedding model (in-RAM fp32 = `EmbeddingMode::Memory`). Documents are keyed by
+  their `oid`, so the always-empty `embedding_ref` bridge is unnecessary.
+- `victor/storage/graph/proxima_store.py` — `ProximaGraphStore` implements
+  `GraphStoreProtocol` over `proximadb_sdk.graph.ProximaDBGraph`
+  (`upsert_nodes/edges`, `get_neighbors`, `search_symbols`, `find_nodes`,
+  `multi_hop_traverse_parallel`, …). The graph node id **is** the vector id (one
+  `oid`); `embedding_ref` is dropped.
+- Selection: `create_graph_store("proxima", …)`, or per-repo via a
+  `<project>/.victor/graph_backend` marker honored by `create_graph_store("auto", …)`
+  (default `sqlite`). `impact_analysis` and the hybrid graph query tool resolve
+  the backend through `"auto"`.
+- Parity: `tests/unit/storage/graph/test_proxima_store_parity.py` drives the real
+  `ProximaDBGraph` against an in-memory fake client and asserts impact_analysis
+  (forward/backward) and hybrid seed→expand match SQLite — runs without the
+  server binary. `tests/integration/storage/graph/test_proxima_embedded_parity.py`
+  repeats it against a real embedded instance, skipping when the binary is absent.
+- **WIP / gated:** the multi-tenant **service** path (`server_url=`,
+  `EmbeddingMode::Cold`/SQ8) is marked WIP — gated on ProximaDB TD-127 (secondary
+  indexes) + TD-130/131 (graph bulk-load + REST v2 hybrid). As of 2026-06-22 the
+  **engine-side gate is now satisfied on ProximaDB `develop`**: TD-127/128 merged
+  (PR #215, `40c08076`), TD-130 graph bulk-load merged (PR #220, `967f15db`), and
+  REST v2 hybrid is live (`/api/v2/hybrid/search` + `/strategies` in the SDK). The
+  remaining blocker is operational, not API: there is **no built `proximadb-server`
+  binary** in this environment, so the embedded engine cannot start and live parity
+  cannot be measured yet. The code keeps the service-mode WIP guard and SQLite
+  default until a live parity bench passes (`cd proximaDB && cargo build --release`
+  to unblock). Arrow Flight bulk-load and ORION native centrality (steps below) are
+  also still pending on that live verification.
 
 ## Why
 
@@ -89,9 +130,9 @@ Tier-B PAX fragment contract, optional transactional multi-modal write, code-emb
 
 ## Migration / verification (when picked up)
 
-1. Stand up `ProximaGraphStore` behind the existing `GraphStoreProtocol`; keep SQLite as the default.
-2. Parity test on a fixture repo: `impact_analysis(forward/backward)` and hybrid seed→expand must match
-   the SQLite store on known symbols.
-3. Bench Arrow Flight bulk-load + k-hop + hybrid latency; compare footprint vs the 2.4 GB SQLite + Lance
-   pair (projected ~120 MB f32 / ~35 MB SQ8 for Tier-A).
-4. Flip the default provider per-repo once parity holds.
+1. ✅ Stand up `ProximaGraphStore` behind the existing `GraphStoreProtocol`; keep SQLite as the default.
+2. ✅ Parity test on a fixture repo: `impact_analysis(forward/backward)` and hybrid seed→expand match
+   the SQLite store on known symbols (adapter-level always-on + embedded gated).
+3. ⏳ Bench Arrow Flight bulk-load + k-hop + hybrid latency; compare footprint vs the 2.4 GB SQLite + Lance
+   pair (projected ~120 MB f32 / ~35 MB SQ8 for Tier-A). Blocked on a built `proximadb-server` binary.
+4. ⏳ Flip the default provider per-repo once parity holds (per-repo `.victor/graph_backend` flag exists; SQLite stays default).
