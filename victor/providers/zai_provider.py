@@ -276,6 +276,52 @@ class ZAIProvider(HttpxOpenAICompatProvider):
     def supports_streaming(self) -> bool:
         return True
 
+    def supports_prompt_caching(self) -> bool:
+        """Z.AI GLM API-level context caching (~50% discount on cached tokens).
+
+        Z.AI provides automatic, implicit context caching for GLM-5 / GLM-4.7 /
+        GLM-4.6 / GLM-4.5 series models. The cache key is the repeated prefix
+        content (system prompt +, when stable, the tool definitions), so keeping
+        the system prompt and tools[] byte-stable across turns maximizes the
+        cached-token share and the resulting billing discount.
+
+        Evidence (Z.AI official docs, ``docs.z.ai/guides/capabilities/cache.md``):
+        - "Automatic Cache Recognition: Implicit caching that intelligently
+          identifies repeated context content without manual configuration"
+        - "Cached tokens are billed at discounted prices (usually 50% of
+          standard price)"
+        - Cache status is reported via ``usage.prompt_tokens_details.cached_tokens``.
+        - No explicit ``cache_control`` marker is required (unlike Anthropic).
+
+        ``HttpxOpenAICompatProvider`` does NOT override this; before this override
+        the inherited ``BaseProvider.supports_prompt_caching()`` returned
+        ``False``, so the framework treated ZAI like a non-caching provider and
+        never attempted prefix-stable tool selection.
+        """
+        return True
+
+    def supports_kv_prefix_caching(self) -> bool:
+        """Z.AI reuses computed KV state for matching prompt prefixes.
+
+        Same automatic prefix-similarity mechanism as the billing cache: when
+        consecutive requests share an identical leading prefix (system prompt +
+        tools), the inference engine reuses the precomputed key-value state,
+        reducing time-to-first-token. Declaring this enables the framework's
+        ``_kv_optimization_enabled`` gate chain (see
+        ``victor/agent/services/prompt_builder_runtime.py``) which in turn
+        activates:
+
+        - ``_apply_kv_tool_strategy()`` -- freezes the turn-1 tool set for the
+          session under the ``session_stable`` / ``additive`` strategies.
+        - ``_sort_tools_for_kv_stability()`` -- deterministic name-ordering so the
+          serialized ``tools[]`` hashes identically across turns.
+
+        The context cache has a bounded TTL (Z.AI notes "reasonable time limits")
+        and is invalidated by any prefix mutation, hence the need for stable
+        ordering and a frozen selection.
+        """
+        return True
+
     # ── Template Method overrides ─────────────────────────────────────────────
 
     def _clean_model_name(self, model: str) -> str:
