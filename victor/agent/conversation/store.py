@@ -186,12 +186,22 @@ class ConversationStore:
         # Thread-local connection pool for better performance
         self._local = threading.local()
 
+        # Instantiate sub-managers
+        from victor.agent.conversation.store_schema import ConversationStoreSchema
+        from victor.agent.conversation.store_session import ConversationStoreSession
+        from victor.agent.conversation.store_trace import ConversationStoreTrace
+        from victor.agent.conversation.store_messages import ConversationStoreMessages
+
+        self._schema = ConversationStoreSchema(self)
+        self._sessions_mgr = ConversationStoreSession(self)
+        self._traces = ConversationStoreTrace(self)
+        self._messages = ConversationStoreMessages(self)
+
         # Initialize database
         self._init_database()
 
         logger.debug(
-            f"ConversationStore initialized. "
-            f"DB: {self.db_path}, Max tokens: {max_context_tokens}"
+            f"ConversationStore initialized. DB: {self.db_path}, Max tokens: {max_context_tokens}"
         )
 
     def _get_connection(self) -> sqlite3.Connection:
@@ -256,928 +266,54 @@ class ConversationStore:
         yield self._get_connection()
 
     def _init_database(self) -> None:
-        """Initialize SQLite database for persistence with normalized schema.
-
-        Schema v2 Design (Normalized for ML/RL):
-        - Lookup tables with INTEGER PKs for categorical values
-        - Sessions table uses INTEGER FKs for efficient joins
-        - Indexes on all FK columns for fast aggregation queries
-
-        Database Architecture:
-        - Primary: .victor/project.db (all project-specific data)
-        - Legacy: Auto-migrate conversation.db → project.db if exists
-        - Global: ~/.victor/victor.db (providers, models, cross-project settings)
-
-        Migration Strategy:
-        - Run pending migrations before schema initialization
-        - Support legacy conversation.db → project.db migration
-        """
-        self.db_path.parent.mkdir(parents=True, exist_ok=True)
-
-        # Run database migrations first (before schema version check)
-        try:
-            from victor.agent.conversation.migrations import migrate_database
-
-            migrate_database(str(self.db_path))
-            logger.debug(f"Database migrations completed for {self.db_path}")
-        except Exception as e:
-            logger.warning(f"Database migration failed (will continue with existing schema): {e}")
-
-        with sqlite3.connect(self.db_path) as conn:
-            # SQLite performance optimizations
-            conn.execute("PRAGMA journal_mode = WAL")  # Write-ahead logging
-            conn.execute("PRAGMA synchronous = NORMAL")  # Balanced durability/speed
-            conn.execute("PRAGMA cache_size = -2000")  # 2MB cache in RAM
-            conn.execute("PRAGMA auto_vacuum = INCREMENTAL")  # Auto space reclaim
-            conn.execute("PRAGMA temp_store = MEMORY")  # Temp tables in memory
-
-            # Enable foreign keys
-            conn.execute("PRAGMA foreign_keys = ON")
-
-            # Create schema version tracking table (stores semver strings)
-            from victor.agent.conversation.migrations import ensure_schema_version_table
-
-            ensure_schema_version_table(conn)
-
-            # Check if current schema version is applied
-            cursor = conn.execute(
-                "SELECT version FROM schema_version WHERE version = ?",
-                (self.SCHEMA_VERSION,),
-            )
-            version_applied = cursor.fetchone() is not None
-
-            if not version_applied:
-                # First, migrate existing sessions table if it exists
-                # This must happen BEFORE _apply_normalized_schema since that creates
-                # indexes on columns that need to exist
-                self._migrate_sessions_table(conn)
-
-                # Apply normalized schema
-                self._apply_normalized_schema(conn)
-                conn.execute(
-                    "INSERT INTO schema_version (version, applied_at) VALUES (?, ?)",
-                    (self.SCHEMA_VERSION, datetime.now().isoformat()),
-                )
-                conn.commit()
-                logger.info(f"Database schema upgraded to v{self.SCHEMA_VERSION}")
-            else:
-                # Guard: schema version may have been recorded by migrate_database() which
-                # only runs column migrations, not table creation. If the normalized lookup
-                # tables are missing (e.g. old project.db migrated before lookup tables were
-                # added), create them without touching sessions/messages/indexes.
-                cursor = conn.execute(
-                    "SELECT name FROM sqlite_master WHERE type='table' AND name='model_families'"
-                )
-                if cursor.fetchone() is None:
-                    logger.info(
-                        "Normalized lookup tables absent in versioned DB — creating them (%s)",
-                        self.db_path,
-                    )
-                    self._ensure_lookup_tables(conn)
-                    conn.commit()
-
-                # Load ID caches for existing database
-                self._load_lookup_caches(conn)
-
-                # Run migration for any missing columns (in case of partial upgrade)
-                self._migrate_sessions_table(conn)
-                conn.commit()
-
-            # Idempotently ensure core data tables are present regardless of migration path.
-            # migrate_database() records schema_version without creating sessions/messages;
-            # this guard covers that race so token accounting is never silently broken.
-            self._ensure_critical_tables(conn)
-            conn.commit()
-
-        logger.debug(f"Database initialized at {self.db_path}")
+        """Initialize SQLite database for persistence with normalized schema."""
+        self._schema.init_database()
 
     def _ensure_lookup_tables(self, conn: sqlite3.Connection) -> None:
-        """Create only the four normalized lookup tables on an existing database.
-
-        Used when the schema version is already recorded (e.g. by migrate_database()
-        which only runs column migrations) but the lookup tables are absent.
-        Does NOT touch sessions/messages/indexes to avoid conflicts with old schemas.
-        """
-        conn.executescript("""
-            CREATE TABLE IF NOT EXISTS model_families (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT UNIQUE NOT NULL,
-                provider_id INTEGER
-            );
-            CREATE TABLE IF NOT EXISTS model_sizes (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT UNIQUE NOT NULL,
-                family_id INTEGER,
-                num_parameters INTEGER
-            );
-            CREATE TABLE IF NOT EXISTS context_sizes (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT UNIQUE NOT NULL,
-                min_tokens INTEGER,
-                max_tokens INTEGER
-            );
-            CREATE TABLE IF NOT EXISTS providers (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT UNIQUE NOT NULL,
-                description TEXT
-            );
-        """)
-        self._populate_lookup_tables(conn)
-        self._populate_fts5_index(conn)  # Populate FTS5 index from existing messages
+        self._schema.ensure_lookup_tables(conn)
 
     def _ensure_critical_tables(self, conn: sqlite3.Connection) -> None:
-        """Idempotently create core data tables that must always exist.
-
-        Called unconditionally after the schema-version check so sessions,
-        messages, context_summaries, and compaction_events are always present
-        regardless of migration history (migrate_database() records schema_version
-        without running table-creation DDL).
-        """
-        conn.executescript("""
-            CREATE TABLE IF NOT EXISTS sessions (
-                session_id TEXT PRIMARY KEY,
-                created_at TIMESTAMP NOT NULL,
-                last_activity TIMESTAMP NOT NULL,
-                project_path TEXT,
-                model TEXT,
-                profile TEXT,
-                max_tokens INTEGER DEFAULT 100000,
-                reserved_tokens INTEGER DEFAULT 4096,
-                metadata TEXT,
-                provider_id INTEGER REFERENCES providers(id),
-                model_family_id INTEGER REFERENCES model_families(id),
-                model_size_id INTEGER REFERENCES model_sizes(id),
-                context_size_id INTEGER REFERENCES context_sizes(id),
-                model_params_b REAL,
-                context_tokens INTEGER,
-                tool_capable INTEGER DEFAULT 0,
-                is_moe INTEGER DEFAULT 0,
-                is_reasoning INTEGER DEFAULT 0,
-                prompt_tokens INTEGER DEFAULT 0,
-                completion_tokens INTEGER DEFAULT 0,
-                cached_tokens INTEGER DEFAULT 0,
-                reasoning_tokens INTEGER DEFAULT 0,
-                cost_usd_micros INTEGER DEFAULT 0
-            );
-
-            CREATE TABLE IF NOT EXISTS messages (
-                id TEXT PRIMARY KEY,
-                session_id TEXT NOT NULL,
-                role TEXT NOT NULL,
-                content TEXT NOT NULL,
-                timestamp TIMESTAMP NOT NULL,
-                token_count INTEGER NOT NULL,
-                priority INTEGER NOT NULL,
-                tool_name TEXT,
-                tool_call_id TEXT,
-                metadata TEXT,
-                agent_id TEXT,
-                parent_session_id TEXT,
-                team_id TEXT,
-                member_id TEXT,
-                plan_id TEXT,
-                plan_step_id TEXT,
-                FOREIGN KEY (session_id) REFERENCES sessions(session_id)
-                    ON DELETE CASCADE
-            );
-
-            CREATE TABLE IF NOT EXISTS context_summaries (
-                id TEXT PRIMARY KEY,
-                session_id TEXT NOT NULL,
-                summary TEXT NOT NULL,
-                token_count INTEGER NOT NULL,
-                messages_summarized TEXT,
-                created_at TIMESTAMP NOT NULL,
-                FOREIGN KEY (session_id) REFERENCES sessions(session_id)
-                    ON DELETE CASCADE
-            );
-
-            CREATE TABLE IF NOT EXISTS compaction_events (
-                id TEXT PRIMARY KEY,
-                session_id TEXT NOT NULL,
-                agent_id TEXT,
-                parent_session_id TEXT,
-                team_id TEXT,
-                member_id TEXT,
-                plan_id TEXT,
-                plan_step_id TEXT,
-                strategy TEXT NOT NULL,
-                messages_removed INTEGER DEFAULT 0,
-                tokens_freed INTEGER DEFAULT 0,
-                summary TEXT,
-                created_at TIMESTAMP NOT NULL,
-                metadata TEXT,
-                FOREIGN KEY (session_id) REFERENCES sessions(session_id)
-                    ON DELETE CASCADE
-            );
-
-            -- Full-text search index for message content (FTS5)
-            CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5(
-                content,
-                session_id,
-                content_rowid=rowid,
-                content=messages
-            );
-        """)
-
-        # Create triggers to keep FTS5 index in sync with messages table
-        try:
-            conn.executescript("""
-                -- Trigger to insert into FTS5 when message is inserted
-                CREATE TRIGGER IF NOT EXISTS messages_fts_insert AFTER INSERT ON messages BEGIN
-                    INSERT INTO messages_fts(rowid, content, session_id)
-                    VALUES (NEW.rowid, NEW.content, NEW.session_id);
-                END;
-
-                -- Trigger to update FTS5 when message is updated
-                CREATE TRIGGER IF NOT EXISTS messages_fts_update AFTER UPDATE OF content, session_id ON messages BEGIN
-                    UPDATE messages_fts SET content = NEW.content, session_id = NEW.session_id
-                    WHERE rowid = NEW.rowid;
-                END;
-
-                -- Trigger to delete from FTS5 when message is deleted
-                CREATE TRIGGER IF NOT EXISTS messages_fts_delete AFTER DELETE ON messages BEGIN
-                    DELETE FROM messages_fts WHERE rowid = OLD.rowid;
-                END;
-            """)
-        except Exception as e:
-            logger.debug(f"FTS5 triggers creation skipped (may already exist): {e}")
-
-        try:
-            self._load_lookup_caches(conn)
-        except Exception:
-            pass  # non-fatal: lookup tables may not be populated yet
+        self._schema.ensure_critical_tables(conn)
 
     def _apply_normalized_schema(self, conn: sqlite3.Connection) -> None:
-        """Apply the normalized schema with lookup tables.
-
-        Creates:
-        - model_families: Lookup table for model architecture families
-        - model_sizes: Lookup table for parameter size categories
-        - context_sizes: Lookup table for context window categories
-        - providers: Lookup table for LLM provider names
-        - sessions: Main table with INTEGER FKs
-        - messages: Message storage with session FK
-        - context_summaries: Compaction summaries
-        """
-        # Create lookup tables
-        conn.executescript("""
-            -- Model family lookup (llama, qwen, claude, gpt, etc.)
-            CREATE TABLE IF NOT EXISTS model_families (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT UNIQUE NOT NULL,
-                provider_id INTEGER
-            );
-
-            -- Model size lookup (tiny, small, medium, large, xlarge, xxlarge)
-            CREATE TABLE IF NOT EXISTS model_sizes (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT UNIQUE NOT NULL,
-                family_id INTEGER,
-                num_parameters INTEGER,
-                FOREIGN KEY (family_id) REFERENCES model_families(id)
-                    ON DELETE SET NULL
-            );
-
-            -- Context size lookup (small, medium, large, xlarge)
-            CREATE TABLE IF NOT EXISTS context_sizes (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT UNIQUE NOT NULL,
-                min_tokens INTEGER,
-                max_tokens INTEGER
-            );
-
-            -- Provider lookup (anthropic, openai, ollama, groq, etc.)
-            CREATE TABLE IF NOT EXISTS providers (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT UNIQUE NOT NULL,
-                description TEXT
-            );
-
-            -- Sessions table with normalized FK columns
-            CREATE TABLE IF NOT EXISTS sessions (
-                session_id TEXT PRIMARY KEY,
-                created_at TIMESTAMP NOT NULL,
-                last_activity TIMESTAMP NOT NULL,
-                project_path TEXT,
-                model TEXT,
-                profile TEXT,
-                max_tokens INTEGER DEFAULT 100000,
-                reserved_tokens INTEGER DEFAULT 4096,
-                metadata TEXT,
-                -- Normalized FK columns for ML/RL
-                provider_id INTEGER REFERENCES providers(id),
-                model_family_id INTEGER REFERENCES model_families(id),
-                model_size_id INTEGER REFERENCES model_sizes(id),
-                context_size_id INTEGER REFERENCES context_sizes(id),
-                -- Numeric columns for direct queries
-                model_params_b REAL,
-                context_tokens INTEGER,
-                tool_capable INTEGER DEFAULT 0,
-                is_moe INTEGER DEFAULT 0,
-                is_reasoning INTEGER DEFAULT 0,
-                -- Token accounting: actual API-returned counts (NULL until first API response)
-                prompt_tokens INTEGER DEFAULT 0,
-                completion_tokens INTEGER DEFAULT 0,
-                cached_tokens INTEGER DEFAULT 0,
-                reasoning_tokens INTEGER DEFAULT 0,
-                cost_usd_micros INTEGER DEFAULT 0
-            );
-
-            -- Messages table
-            CREATE TABLE IF NOT EXISTS messages (
-                id TEXT PRIMARY KEY,
-                session_id TEXT NOT NULL,
-                role TEXT NOT NULL,
-                content TEXT NOT NULL,
-                timestamp TIMESTAMP NOT NULL,
-                token_count INTEGER NOT NULL,
-                priority INTEGER NOT NULL,
-                tool_name TEXT,
-                tool_call_id TEXT,
-                metadata TEXT,
-                agent_id TEXT,
-                parent_session_id TEXT,
-                team_id TEXT,
-                member_id TEXT,
-                plan_id TEXT,
-                plan_step_id TEXT,
-                FOREIGN KEY (session_id) REFERENCES sessions(session_id)
-                    ON DELETE CASCADE
-            );
-
-            -- Context summaries for pruned conversations
-            CREATE TABLE IF NOT EXISTS context_summaries (
-                id TEXT PRIMARY KEY,
-                session_id TEXT NOT NULL,
-                summary TEXT NOT NULL,
-                token_count INTEGER NOT NULL,
-                messages_summarized TEXT,
-                created_at TIMESTAMP NOT NULL,
-                FOREIGN KEY (session_id) REFERENCES sessions(session_id)
-                    ON DELETE CASCADE
-            );
-
-            -- Per-agent compaction audit trail for restartable multi-agent context windows
-            CREATE TABLE IF NOT EXISTS compaction_events (
-                id TEXT PRIMARY KEY,
-                session_id TEXT NOT NULL,
-                agent_id TEXT,
-                parent_session_id TEXT,
-                team_id TEXT,
-                member_id TEXT,
-                plan_id TEXT,
-                plan_step_id TEXT,
-                strategy TEXT NOT NULL,
-                messages_removed INTEGER DEFAULT 0,
-                tokens_freed INTEGER DEFAULT 0,
-                summary TEXT,
-                created_at TIMESTAMP NOT NULL,
-                metadata TEXT,
-                FOREIGN KEY (session_id) REFERENCES sessions(session_id)
-                    ON DELETE CASCADE
-            );
-
-            -- Indexes for efficient queries
-            CREATE INDEX IF NOT EXISTS idx_messages_session_time
-            ON messages(session_id, timestamp);
-
-            CREATE INDEX IF NOT EXISTS idx_messages_priority
-            ON messages(session_id, priority DESC);
-
-            CREATE INDEX IF NOT EXISTS idx_summaries_session
-            ON context_summaries(session_id, created_at DESC);
-
-            CREATE INDEX IF NOT EXISTS idx_compaction_events_session_agent_time
-            ON compaction_events(session_id, agent_id, created_at DESC);
-
-            CREATE INDEX IF NOT EXISTS idx_compaction_events_team_time
-            ON compaction_events(team_id, created_at DESC);
-
-            -- Indexes on FK columns for ML/RL aggregation
-            CREATE INDEX IF NOT EXISTS idx_sessions_provider
-            ON sessions(provider_id);
-
-            CREATE INDEX IF NOT EXISTS idx_sessions_model_family
-            ON sessions(model_family_id);
-
-            CREATE INDEX IF NOT EXISTS idx_sessions_model_size
-            ON sessions(model_size_id);
-
-            CREATE INDEX IF NOT EXISTS idx_sessions_context_size
-            ON sessions(context_size_id);
-
-            CREATE INDEX IF NOT EXISTS idx_sessions_tool_capable
-            ON sessions(tool_capable);
-
-            -- Composite indexes for common ML queries
-            CREATE INDEX IF NOT EXISTS idx_sessions_family_size
-            ON sessions(model_family_id, model_size_id);
-
-            CREATE INDEX IF NOT EXISTS idx_sessions_provider_family
-            ON sessions(provider_id, model_family_id);
-
-            -- FTS5 virtual table for fast full-text search on messages
-            -- Enables O(log n) keyword search vs O(n) linear scan
-            CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5(
-                content,
-                message_id UNINDEXED,
-                session_id UNINDEXED,
-                content='messages',
-                content_rowid='rowid'
-            );
-
-            -- Triggers to keep FTS index in sync with messages table
-            CREATE TRIGGER IF NOT EXISTS messages_fts_insert AFTER INSERT ON messages BEGIN
-                INSERT INTO messages_fts(rowid, content, message_id, session_id)
-                VALUES (NEW.rowid, NEW.content, NEW.id, NEW.session_id);
-            END;
-
-            CREATE TRIGGER IF NOT EXISTS messages_fts_delete AFTER DELETE ON messages BEGIN
-                INSERT INTO messages_fts(messages_fts, rowid, content, message_id, session_id)
-                VALUES ('delete', OLD.rowid, OLD.content, OLD.id, OLD.session_id);
-            END;
-
-            CREATE TRIGGER IF NOT EXISTS messages_fts_update AFTER UPDATE ON messages BEGIN
-                INSERT INTO messages_fts(messages_fts, rowid, content, message_id, session_id)
-                VALUES ('delete', OLD.rowid, OLD.content, OLD.id, OLD.session_id);
-                INSERT INTO messages_fts(rowid, content, message_id, session_id)
-                VALUES (NEW.rowid, NEW.content, NEW.id, NEW.session_id);
-            END;
-
-            -- Index for tool result retrieval (high-value messages for context)
-            CREATE INDEX IF NOT EXISTS idx_messages_tool_results
-            ON messages(session_id, role, tool_name, timestamp DESC)
-            WHERE role IN ('tool_call', 'tool');
-
-            -- Index for user-assistant exchanges
-            CREATE INDEX IF NOT EXISTS idx_messages_exchange
-            ON messages(session_id, role, timestamp)
-            WHERE role IN ('user', 'assistant');
-
-            CREATE INDEX IF NOT EXISTS idx_messages_session_agent_time
-            ON messages(session_id, agent_id, timestamp);
-
-            CREATE INDEX IF NOT EXISTS idx_messages_agent_time
-            ON messages(agent_id, timestamp);
-
-            CREATE INDEX IF NOT EXISTS idx_messages_team_time
-            ON messages(team_id, timestamp);
-
-            CREATE INDEX IF NOT EXISTS idx_messages_plan_step_time
-            ON messages(plan_id, plan_step_id, timestamp);
-            """)
-
-        # Populate lookup tables with enum values
-        self._populate_lookup_tables(conn)
-
-        # Load caches
-        self._load_lookup_caches(conn)
-
-        # Apply hybrid compaction schema enhancements
-        self._apply_hybrid_compaction_schema(conn)
-
-        # Auto-maintenance: vacuum if fragmented, cleanup stale sessions
-        self._auto_maintenance()
+        self._schema.apply_normalized_schema(conn)
 
     def _auto_maintenance(self) -> None:
-        """Run lightweight maintenance on startup.
-
-        - Purge test model sessions and empty sessions
-        - Reclaim space if freelist exceeds threshold
-        """
-        _FREELIST_VACUUM_THRESHOLD = 100  # pages (~400KB at 4KB/page)
-
-        try:
-            # Cleanup stale/test sessions
-            self.cleanup_stale_sessions(
-                max_age_days=0,  # don't TTL on startup — only purge junk
-                purge_test_models=True,
-                purge_empty=True,
-            )
-
-            # Auto-vacuum if fragmented
-            with sqlite3.connect(self.db_path) as conn:
-                freelist = conn.execute("PRAGMA freelist_count").fetchone()[0]
-                if freelist > _FREELIST_VACUUM_THRESHOLD:
-                    conn.execute("PRAGMA incremental_vacuum")
-                    conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
-                    logger.info(f"Auto-vacuum: reclaimed {freelist} free pages")
-        except sqlite3.Error as e:
-            logger.debug(f"Auto-maintenance skipped: {e}")
+        self._schema.auto_maintenance()
 
     def _apply_hybrid_compaction_schema(self, conn: sqlite3.Connection) -> None:
-        """Apply enhanced schema for hybrid compaction system.
-
-        Adds JSON1 extension support, new columns for dual-format storage,
-        and analytics tables for monitoring compaction performance.
-
-        This is a non-breaking migration - all new columns have DEFAULT values.
-        """
-        try:
-            # Enable JSON1 extension (built-in to Python's sqlite3)
-            conn.execute("SELECT json_extract('{\"test\": 1}', '$.test')")
-
-            # Add new columns to messages table (if not exist)
-            messages_columns = [
-                ("metadata_json", "TEXT DEFAULT '{}'"),  # JSON metadata
-                ("priority", "INTEGER DEFAULT 50"),  # Message priority
-            ]
-
-            for col_name, col_def in messages_columns:
-                try:
-                    conn.execute(f"ALTER TABLE messages ADD COLUMN {col_name} {col_def}")
-                    logger.info(f"Added column {col_name} to messages table")
-                except sqlite3.OperationalError as e:
-                    if "duplicate column name" not in str(e).lower():
-                        logger.warning(f"Failed to add column {col_name} to messages: {e}")
-
-            lineage_columns = [
-                ("agent_id", "TEXT"),
-                ("parent_session_id", "TEXT"),
-                ("team_id", "TEXT"),
-                ("member_id", "TEXT"),
-                ("plan_id", "TEXT"),
-                ("plan_step_id", "TEXT"),
-            ]
-            for col_name, col_def in lineage_columns:
-                try:
-                    conn.execute(f"ALTER TABLE messages ADD COLUMN {col_name} {col_def}")
-                    logger.info(f"Added column {col_name} to messages table")
-                except sqlite3.OperationalError as e:
-                    if "duplicate column name" not in str(e).lower():
-                        logger.warning(f"Failed to add column {col_name} to messages: {e}")
-            self._backfill_message_lineage_columns(conn)
-
-            # Add new columns to context_summaries table (if not exist)
-            summary_columns = [
-                (
-                    "summary_format",
-                    "TEXT DEFAULT 'natural'",
-                ),  # 'xml', 'natural', 'both'
-                ("summary_xml", "TEXT"),  # Machine-readable XML format
-                ("summary_text", "TEXT"),  # Natural language format
-                ("summary_json", "TEXT DEFAULT '{}'"),  # Structured summary data
-                ("messages_summarized_json", "TEXT DEFAULT '[]'"),  # Native JSON array
-                ("strategy_used", "TEXT"),  # 'rule_based', 'llm_based', 'hybrid'
-                ("complexity_score", "REAL"),  # 0.0-1.0 complexity score
-                ("estimated_tokens_saved", "INTEGER DEFAULT 0"),  # Token savings
-            ]
-
-            for col_name, col_def in summary_columns:
-                try:
-                    conn.execute(f"ALTER TABLE context_summaries ADD COLUMN {col_name} {col_def}")
-                    logger.info(f"Added column {col_name} to context_summaries table")
-                except sqlite3.OperationalError as e:
-                    if "duplicate column name" not in str(e).lower():
-                        logger.warning(f"Failed to add column {col_name} to context_summaries: {e}")
-
-            # Create compaction_history table for analytics
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS compaction_history (
-                    id TEXT PRIMARY KEY,
-                    session_id TEXT NOT NULL,
-                    strategy_used TEXT NOT NULL,
-                    message_count_before INTEGER NOT NULL,
-                    message_count_after INTEGER NOT NULL,
-                    token_count_before INTEGER NOT NULL,
-                    token_count_after INTEGER NOT NULL,
-                    duration_ms INTEGER NOT NULL,
-                    llm_provider TEXT,
-                    llm_model TEXT,
-                    success BOOLEAN NOT NULL,
-                    error_message TEXT,
-                    created_at TIMESTAMP NOT NULL,
-                    FOREIGN KEY (session_id) REFERENCES sessions(session_id)
-                )
-            """)
-
-            # Create topic_segments table (future-proofing for topic-aware segmentation)
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS topic_segments (
-                    id TEXT PRIMARY KEY,
-                    session_id TEXT NOT NULL,
-                    topic_name TEXT NOT NULL,
-                    start_message_id TEXT NOT NULL,
-                    end_message_id TEXT,
-                    message_count INTEGER DEFAULT 0,
-                    metadata_json TEXT DEFAULT '{}',
-                    created_at TIMESTAMP NOT NULL,
-                    FOREIGN KEY (session_id) REFERENCES sessions(session_id),
-                    FOREIGN KEY (start_message_id) REFERENCES messages(id),
-                    FOREIGN KEY (end_message_id) REFERENCES messages(id)
-                )
-            """)
-
-            # Create indexes for enhanced queries
-            conn.execute("""
-                CREATE INDEX IF NOT EXISTS idx_summaries_strategy
-                ON context_summaries(strategy_used, created_at)
-            """)
-
-            conn.execute("""
-                CREATE INDEX IF NOT EXISTS idx_compaction_history_session
-                ON compaction_history(session_id, created_at)
-            """)
-
-            conn.execute("""
-                CREATE INDEX IF NOT EXISTS idx_compaction_history_strategy
-                ON compaction_history(strategy_used, created_at)
-            """)
-
-            conn.execute("""
-                CREATE INDEX IF NOT EXISTS idx_topic_segments_session
-                ON topic_segments(session_id, created_at)
-            """)
-
-            logger.info("Applied hybrid compaction schema enhancements")
-
-        except sqlite3.Error as e:
-            logger.warning(f"Failed to apply hybrid compaction schema: {e}")
+        self._schema.apply_hybrid_compaction_schema(conn)
 
     def _backfill_message_lineage_columns(self, conn: sqlite3.Connection) -> None:
-        """Backfill queryable lineage columns from metadata JSON for legacy rows."""
-        try:
-            rows = conn.execute("""
-                SELECT id, metadata FROM messages
-                WHERE metadata IS NOT NULL
-                  AND metadata != ''
-                  AND (
-                    agent_id IS NULL OR parent_session_id IS NULL OR team_id IS NULL
-                    OR member_id IS NULL OR plan_id IS NULL OR plan_step_id IS NULL
-                  )
-                """).fetchall()
-        except sqlite3.Error as exc:
-            logger.debug("Skipping lineage backfill: %s", exc)
-            return
-
-        updated = 0
-        for message_id, metadata_raw in rows:
-            try:
-                metadata = json_loads(metadata_raw or "{}")
-            except Exception:
-                continue
-            if not isinstance(metadata, dict):
-                continue
-            values = {
-                "agent_id": metadata.get("agent_id"),
-                "parent_session_id": metadata.get("parent_session_id"),
-                "team_id": metadata.get("team_id"),
-                "member_id": metadata.get("member_id"),
-                "plan_id": metadata.get("plan_id"),
-                "plan_step_id": metadata.get("plan_step_id"),
-            }
-            if not any(value is not None for value in values.values()):
-                continue
-            conn.execute(
-                """
-                UPDATE messages
-                SET agent_id = COALESCE(agent_id, ?),
-                    parent_session_id = COALESCE(parent_session_id, ?),
-                    team_id = COALESCE(team_id, ?),
-                    member_id = COALESCE(member_id, ?),
-                    plan_id = COALESCE(plan_id, ?),
-                    plan_step_id = COALESCE(plan_step_id, ?)
-                WHERE id = ?
-                """,
-                (
-                    values["agent_id"],
-                    values["parent_session_id"],
-                    values["team_id"],
-                    values["member_id"],
-                    values["plan_id"],
-                    values["plan_step_id"],
-                    message_id,
-                ),
-            )
-            updated += 1
-
-        if updated:
-            logger.info("Backfilled message lineage columns for %s messages", updated)
+        self._schema.backfill_message_lineage_columns(conn)
 
     def _populate_fts5_index(self, conn: sqlite3.Connection) -> None:
-        """Populate FTS5 index from existing messages (one-time migration)."""
-        try:
-            # Check if FTS5 index is already populated
-            fts_count = conn.execute("SELECT COUNT(*) FROM messages_fts").fetchone()[0]
-            msg_count = conn.execute("SELECT COUNT(*) FROM messages").fetchone()[0]
-
-            if fts_count >= msg_count:
-                logger.debug("FTS5 index already populated (%d messages)", fts_count)
-                return
-
-            # Populate FTS5 index from existing messages
-            conn.execute("""
-                INSERT INTO messages_fts(rowid, content, session_id)
-                SELECT rowid, content, session_id FROM messages
-            """)
-            indexed = conn.execute("SELECT changes()").fetchone()[0]
-            logger.info("Populated FTS5 index with %d existing messages", indexed)
-
-        except sqlite3.Error as e:
-            logger.debug("FTS5 population skipped: %s", e)
+        self._schema.populate_fts5_index(conn)
 
     def _populate_lookup_tables(self, conn: sqlite3.Connection) -> None:
-        """Populate lookup tables with predefined enum values."""
-        # Model families
-        families = [
-            ("llama", None),  # provider_id will be set later
-            ("qwen", None),
-            ("mistral", None),
-            ("mixtral", None),
-            ("claude", None),
-            ("gpt", None),
-            ("gemini", None),
-            ("deepseek", None),
-            ("phi", None),
-            ("codellama", None),
-            ("command", None),
-            ("grok", None),
-            ("unknown", None),
-        ]
-        conn.executemany(
-            "INSERT OR IGNORE INTO model_families (name, provider_id) VALUES (?, ?)",
-            families,
-        )
-
-        # Model sizes with parameter ranges (using midpoint as num_parameters)
-        sizes = [
-            ("tiny", None, 0),  # <1B (use midpoint, family_id NULL)
-            ("small", None, 4),  # 1-8B (midpoint: 4B)
-            ("medium", None, 20),  # 8-32B (midpoint: 20B)
-            ("large", None, 51),  # 32-70B (midpoint: 51B)
-            ("xlarge", None, 122),  # 70-175B (midpoint: 122B)
-            ("xxlarge", None, 175),  # >175B (minimum)
-        ]
-        conn.executemany(
-            "INSERT OR IGNORE INTO model_sizes (name, family_id, num_parameters) VALUES (?, ?, ?)",
-            sizes,
-        )
-
-        # Context sizes with token ranges
-        ctx_sizes = [
-            ("small", 0, 8000),  # <8K
-            ("medium", 8000, 32000),  # 8K-32K
-            ("large", 32000, 128000),  # 32K-128K
-            ("xlarge", 128000, 999999999),  # 128K+
-        ]
-        conn.executemany(
-            "INSERT OR IGNORE INTO context_sizes (name, min_tokens, max_tokens) VALUES (?, ?, ?)",
-            ctx_sizes,
-        )
-
-        # Common providers
-        providers = [
-            ("anthropic", "Anthropic Claude API"),
-            ("openai", "OpenAI API"),
-            ("ollama", "Local Ollama server"),
-            ("groq", "Groq Cloud API"),
-            ("google", "Google Gemini API"),
-            ("xai", "xAI Grok API"),
-            ("deepseek", "DeepSeek API"),
-            ("mistral", "Mistral AI API"),
-            ("lmstudio", "Local LMStudio server"),
-            ("vllm", "vLLM server"),
-            ("together", "Together AI API"),
-            ("openrouter", "OpenRouter API"),
-            ("moonshot", "Moonshot/Kimi API"),
-            ("fireworks", "Fireworks AI API"),
-            ("cerebras", "Cerebras API"),
-            ("unknown", "Unknown provider"),
-        ]
-        conn.executemany(
-            "INSERT OR IGNORE INTO providers (name, description) VALUES (?, ?)",
-            providers,
-        )
-
-        conn.commit()
+        self._schema.populate_lookup_tables(conn)
 
     def _load_lookup_caches(self, conn: sqlite3.Connection) -> None:
-        """Load lookup table IDs into memory caches for fast lookup."""
-        # Model families
-        rows = conn.execute("SELECT name, id FROM model_families").fetchall()
-        self._model_family_ids = {row[0]: row[1] for row in rows}
-
-        # Model sizes
-        rows = conn.execute("SELECT name, id FROM model_sizes").fetchall()
-        self._model_size_ids = {row[0]: row[1] for row in rows}
-
-        # Context sizes
-        rows = conn.execute("SELECT name, id FROM context_sizes").fetchall()
-        self._context_size_ids = {row[0]: row[1] for row in rows}
-
-        # Providers
-        rows = conn.execute("SELECT name, id FROM providers").fetchall()
-        self._provider_ids = {row[0]: row[1] for row in rows}
-
-        logger.debug(
-            f"Loaded lookup caches: {len(self._model_family_ids)} families, "
-            f"{len(self._provider_ids)} providers"
-        )
+        self._schema.load_lookup_caches(conn)
 
     def _migrate_sessions_table(self, conn: sqlite3.Connection) -> None:
-        """Add missing columns to sessions table for schema migration.
-
-        This handles the case where an old database exists with a sessions table
-        that was created before the normalized schema was introduced.
-        The CREATE TABLE IF NOT EXISTS doesn't add columns to existing tables,
-        so we need to use ALTER TABLE to add missing columns.
-        """
-        # Check if sessions table exists
-        cursor = conn.execute(
-            "SELECT sql FROM sqlite_master WHERE type='table' AND name='sessions'"
-        )
-        result = cursor.fetchone()
-        if not result:
-            # No sessions table - nothing to migrate
-            return
-
-        table_sql = result[0]
-
-        # Define columns that need to be added if missing
-        # Format: (column_name, column_definition)
-        new_columns = [
-            ("provider_id", "INTEGER"),
-            ("model_family_id", "INTEGER"),
-            ("model_size_id", "INTEGER"),
-            ("context_size_id", "INTEGER"),
-            ("model_params_b", "REAL"),
-            ("context_tokens", "INTEGER"),
-            ("tool_capable", "INTEGER DEFAULT 0"),
-            ("is_moe", "INTEGER DEFAULT 0"),
-            ("is_reasoning", "INTEGER DEFAULT 0"),
-            # Token accounting columns (added for actual API token tracking)
-            ("prompt_tokens", "INTEGER DEFAULT 0"),
-            ("completion_tokens", "INTEGER DEFAULT 0"),
-            ("cached_tokens", "INTEGER DEFAULT 0"),
-            ("reasoning_tokens", "INTEGER DEFAULT 0"),
-            ("cost_usd_micros", "INTEGER DEFAULT 0"),
-        ]
-
-        columns_added = []
-        for col_name, col_def in new_columns:
-            # Check if column exists in table definition
-            if col_name not in table_sql:
-                try:
-                    conn.execute(f"ALTER TABLE sessions ADD COLUMN {col_name} {col_def}")
-                    columns_added.append(col_name)
-                except sqlite3.OperationalError as e:
-                    # Column might already exist (race condition or partial migration)
-                    if "duplicate column name" not in str(e).lower():
-                        logger.warning(f"Failed to add column {col_name} to sessions: {e}")
-
-        if columns_added:
-            logger.info(f"Migrated sessions table: added columns {columns_added}")
+        self._schema.migrate_sessions_table(conn)
 
     def _get_or_create_provider_id(
-        self, conn: sqlite3.Connection, provider: Optional[str]
+        self,
+        conn: sqlite3.Connection,
+        provider: Optional[str],
     ) -> Optional[int]:
-        """Get or create provider ID, with caching."""
-        if not provider:
-            return None
-
-        provider_lower = provider.lower()
-
-        # Check cache first
-        if provider_lower in self._provider_ids:
-            return self._provider_ids[provider_lower]
-
-        # Insert and get ID
-        try:
-            conn.execute(
-                "INSERT OR IGNORE INTO providers (name) VALUES (?)",
-                (provider_lower,),
-            )
-            cursor = conn.execute(
-                "SELECT id FROM providers WHERE name = ?",
-                (provider_lower,),
-            )
-            row = cursor.fetchone()
-            if row:
-                self._provider_ids[provider_lower] = row[0]
-                return row[0]
-        except sqlite3.Error as e:
-            logger.warning(f"Failed to get/create provider ID for {provider}: {e}")
-
-        return None
+        return self._schema.get_or_create_provider_id(conn, provider)
 
     def _get_model_family_id(self, family: Optional[ModelFamily]) -> Optional[int]:
-        """Get model family ID from cache."""
-        if not family:
-            return None
-        return self._model_family_ids.get(family.value)
+        return self._schema.get_model_family_id(family)
 
     def _get_model_size_id(self, size: Optional[ModelSize]) -> Optional[int]:
-        """Get model size ID from cache."""
-        if not size:
-            return None
-        return self._model_size_ids.get(size.value)
+        return self._schema.get_model_size_id(size)
 
     def _get_context_size_id(self, ctx_size: Optional[ContextSize]) -> Optional[int]:
-        """Get context size ID from cache."""
-        if not ctx_size:
-            return None
-        return self._context_size_ids.get(ctx_size.value)
+        return self._schema.get_context_size_id(ctx_size)
 
     def create_session(
         self,
@@ -1189,622 +325,90 @@ class ConversationStore:
         profile: Optional[str] = None,
         tool_capable: bool = False,
     ) -> ConversationSession:
-        """Create a new conversation session.
-
-        Args:
-            session_id: Optional session ID. Generated if not provided.
-            project_path: Path to the project being worked on
-            provider: LLM provider name
-            model: Model identifier
-            max_tokens: Override max context tokens
-            profile: User-facing profile name (e.g., "groq-fast")
-            tool_capable: Whether the model supports tool calling
-
-        Returns:
-            New ConversationSession instance
-        """
-        if session_id is None:
-            session_id = self._generate_session_id()
-
-        # Auto-populate ML fields from model metadata
-        model_family = None
-        model_size = None
-        model_params_b = None
-        context_size = None
-        context_tokens = None
-        is_moe = False
-        is_reasoning = False
-
-        if model:
-            # Get known values first
-            known_context = get_known_model_context(model)
-            known_params = get_known_model_params(model)
-
-            # Parse metadata from model name
-            metadata = parse_model_metadata(
-                model,
-                provider=provider,
-                known_context=known_context,
-                known_params_b=known_params,
-            )
-
-            model_family = metadata.model_family
-            model_size = metadata.model_size
-            model_params_b = metadata.model_params_b
-            context_size = metadata.context_size
-            context_tokens = metadata.context_tokens
-            is_moe = metadata.is_moe
-            is_reasoning = metadata.is_reasoning
-
-        session = ConversationSession(
+        return self._sessions_mgr.create_session(
             session_id=session_id,
             project_path=project_path,
             provider=provider,
             model=model,
+            max_tokens=max_tokens,
             profile=profile,
-            max_tokens=max_tokens or self.max_context_tokens,
-            reserved_tokens=self.response_reserve,
-            # ML-friendly fields
-            model_family=model_family,
-            model_size=model_size,
-            model_params_b=model_params_b,
-            context_size=context_size,
-            context_tokens=context_tokens,
             tool_capable=tool_capable,
-            is_moe=is_moe,
-            is_reasoning=is_reasoning,
         )
-
-        self._sessions[session_id] = session
-        self._persist_session(session)
-
-        fam = model_family.value if model_family else "unknown"
-        sz = model_size.value if model_size else "unknown"
-        logger.info(f"Created session {session_id} for project: " f"{project_path} [{fam}/{sz}]")
-
-        return session
 
     def save_session(
         self,
-        conversation: Any,  # MessageHistory or list of messages
-        model: str,
-        provider: str,
-        profile: str = "default",
-        session_id: Optional[str] = None,
-        title: Optional[str] = None,
-        tags: Optional[List[str]] = None,
-        conversation_state: Optional[Any] = None,
-        tool_selection_stats: Optional[Dict[str, Any]] = None,
-        execution_state: Optional[Any] = None,
-        session_ledger: Optional[Any] = None,
-        compaction_hierarchy: Optional[Dict[str, Any]] = None,
-    ) -> str:
-        """Save session with rich metadata (compatibility shim for SQLiteSessionPersistence).
-
-        Args:
-            conversation: MessageHistory instance or list of ConversationMessage dicts
-            model: Model name used in the session
-            provider: Provider name
-            profile: Profile name
-            session_id: Optional custom session ID (auto-generated if not provided)
-            title: Optional custom title (auto-generated if not provided)
-            tags: Optional list of tags
-            conversation_state: Optional ConversationStateMachine state
-            tool_selection_stats: Optional tool usage statistics (ignored for now)
-            execution_state: Optional ExecutionState state
-            session_ledger: Optional SessionLedger state
-            compaction_hierarchy: Optional message compaction hierarchy
-
-        Returns:
-            The session ID
-        """
-        # Convert conversation to messages list
-        if hasattr(conversation, "to_dict"):
-            conversation_data = conversation.to_dict()
-            messages = conversation_data.get("messages", [])
-        elif isinstance(conversation, dict):
-            messages = conversation.get("messages", [])
-        elif isinstance(conversation, list):
-            messages = conversation
-        else:
-            messages = []
-
-        # Generate session ID if not provided
-        if not session_id:
-            session_id = self._generate_session_id()
-
-        # Generate title if not provided (use first user message)
-        if not title and messages:
-            # Find first user message for title
-            for msg in messages:
-                if isinstance(msg, dict):
-                    if msg.get("role") == "user":
-                        title = msg.get("content", "")[:50]
-                        break
-                elif hasattr(msg, "role") and msg.role == MessageRole.USER:
-                    title = msg.content[:50]
-                    break
-
-        # Convert state objects to dict if they have to_dict method
-        conv_state_dict = (
-            conversation_state.to_dict()
-            if hasattr(conversation_state, "to_dict")
-            else conversation_state
-        )
-        exec_state_dict = (
-            execution_state.to_dict() if hasattr(execution_state, "to_dict") else execution_state
-        )
-        ledger_dict = (
-            session_ledger.to_dict() if hasattr(session_ledger, "to_dict") else session_ledger
-        )
-
-        # Create or update session
-        session = self.get_session(session_id)
-        if not session:
-            # Create new session with rich metadata
-            session = self.create_session(
-                session_id=session_id,
-                provider=provider,
-                model=model,
-                profile=profile,
-            )
-        else:
-            # Clear existing messages for update (will be repopulated from conversation)
-            session.messages.clear()
-
-        # Update rich metadata fields
-        session.title = title
-        session.tags = tags or []
-        session.conversation_state = conv_state_dict
-        session.execution_state = exec_state_dict
-        session.session_ledger = ledger_dict
-        session.compaction_hierarchy = compaction_hierarchy
-
-        # Add messages to session
-        for msg in messages:
-            if isinstance(msg, dict):
-                role = MessageRole(msg["role"])
-                content = msg["content"]
-                # Extract optional fields
-                token_count = msg.get("token_count", 0)
-                priority = MessagePriority(msg.get("priority", 50))  # Default MEDIUM
-                tool_name = msg.get("tool_name")
-                tool_call_id = msg.get("tool_call_id")
-                metadata = msg.get("metadata", {})
-                timestamp_str = msg.get("timestamp")
-                timestamp = (
-                    datetime.fromisoformat(timestamp_str) if timestamp_str else datetime.now()
-                )
-
-                conversation_msg = ConversationMessage(
-                    role=role,
-                    content=content,
-                    token_count=token_count,
-                    priority=priority,
-                    tool_name=tool_name,
-                    tool_call_id=tool_call_id,
-                    metadata=metadata,
-                    timestamp=timestamp,
-                )
-            elif isinstance(msg, ConversationMessage):
-                conversation_msg = msg
-            else:
-                continue  # Skip unknown message types
-
-            # Add message if not already in session
-            if conversation_msg not in session.messages:
-                session.messages.append(conversation_msg)
-
-        # Persist session with rich metadata
-        self._persist_session(session)
-
-        logger.info(f"Saved session {session_id} with title: {title}")
-
-        return session_id
+        session: ConversationSession,
+    ) -> None:
+        self._sessions_mgr.save_session(session)
 
     def load_session(self, session_id: str) -> Optional[Dict[str, Any]]:
-        """Load session with rich metadata (compatibility shim for SQLiteSessionPersistence).
-
-        Returns dict with structure:
-        {
-            "metadata": {session_id, created_at, title, tags, model, provider, ...},
-            "conversation": {"messages": [...], "preview_messages": [...]},
-            "conversation_state": Optional[Dict],
-            "tool_selection_stats": Optional[Dict],
-            "execution_state": Optional[Dict],
-            "session_ledger": Optional[Dict],
-            "compaction_hierarchy": Optional[Dict]
-        }
-
-        Args:
-            session_id: Session ID to load
-
-        Returns:
-            Session dictionary or None if not found
-        """
-        # Load session using existing method
-        session = self.get_session(session_id)
-        if not session:
-            logger.warning(f"Session not found: {session_id}")
-            return None
-
-        # Split messages into conversation and preview
-        conversation_messages = []
-        preview_messages = []
-
-        for msg in session.messages:
-            # Check if message is a preview message
-            if isinstance(msg, ConversationMessage):
-                msg_dict = {
-                    "role": msg.role.value,
-                    "content": msg.content,
-                    "timestamp": msg.timestamp.isoformat() if msg.timestamp else None,
-                    "token_count": msg.token_count,
-                    "priority": msg.priority.value if msg.priority else None,
-                    "tool_name": msg.tool_name,
-                    "tool_call_id": msg.tool_call_id,
-                    "metadata": msg.metadata if msg.metadata else {},
-                }
-
-                # Check metadata flag for preview
-                if msg.metadata and msg.metadata.get("is_preview"):
-                    preview_messages.append(msg_dict)
-                else:
-                    conversation_messages.append(msg_dict)
-
-        # Also include messages from session.preview_messages
-        for msg in session.preview_messages:
-            if isinstance(msg, ConversationMessage):
-                msg_dict = {
-                    "role": msg.role.value,
-                    "content": msg.content,
-                    "timestamp": msg.timestamp.isoformat() if msg.timestamp else None,
-                    "token_count": msg.token_count,
-                    "priority": msg.priority.value if msg.priority else None,
-                    "tool_name": msg.tool_name,
-                    "tool_call_id": msg.tool_call_id,
-                    "metadata": msg.metadata if msg.metadata else {},
-                }
-                preview_messages.append(msg_dict)
-
-        # Generate title if not set
-        title = session.title
-        if not title and conversation_messages:
-            # Use first user message as title
-            for msg in conversation_messages:
-                if msg["role"] == "user":
-                    title = msg["content"][:50]
-                    break
-
-        if not title:
-            title = "Untitled"
-
-        # Build return dict matching SQLiteSessionPersistence format
-        session_data = {
-            "metadata": {
-                "session_id": session.session_id,
-                "created_at": session.created_at.isoformat(),
-                "updated_at": session.last_activity.isoformat(),
-                "model": session.model or "unknown",
-                "provider": session.provider or "unknown",
-                "profile": session.profile or "default",
-                "message_count": len(conversation_messages),
-                "title": title,
-                "tags": session.tags or [],
-            },
-            "conversation": {
-                "messages": conversation_messages,
-                "preview_messages": preview_messages,
-            },
-            "conversation_state": session.conversation_state,
-            "tool_selection_stats": None,  # Not stored in new schema
-            "execution_state": session.execution_state,
-            "session_ledger": session.session_ledger,
-            "compaction_hierarchy": session.compaction_hierarchy,
-        }
-
-        logger.info(f"Loaded session {session_id} from ConversationStore")
-
-        return session_data
+        return self._sessions_mgr.load_session(session_id)
 
     def search_sessions(
         self,
         query: str,
-        limit: int = 10,
+        *,
+        limit: int = 5,
         project_path: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
-        """Search sessions by title or content.
-
-        Args:
-            query: Search query string
-            limit: Maximum results
-            project_path: Optional project path filter
-
-        Returns:
-            List of matching session dicts (SQLiteSessionPersistence format)
-        """
-        try:
-            lowered_query = f"%{query.lower()}%"
-            results = []
-
-            # First, search by title using SQL (optimized single query)
-            with self._connection() as conn:
-                # Search by title in metadata using JSON extract
-                # This eliminates the N+1 query pattern for title searches
-                if project_path:
-                    rows = conn.execute(
-                        """
-                        SELECT DISTINCT
-                            s.session_id,
-                            s.created_at,
-                            s.last_activity,
-                            s.model,
-                            s.profile,
-                            p.name AS provider,
-                            s.metadata,
-                            NULL as message_count
-                        FROM sessions s
-                        LEFT JOIN providers p ON s.provider_id = p.id
-                        WHERE s.project_path = ?
-                          AND LOWER(json_extract(s.metadata, '$.title')) LIKE LOWER(?)
-                        ORDER BY s.last_activity DESC
-                        LIMIT ?
-                        """,
-                        (project_path, lowered_query, limit),
-                    ).fetchall()
-                else:
-                    rows = conn.execute(
-                        """
-                        SELECT DISTINCT
-                            s.session_id,
-                            s.created_at,
-                            s.last_activity,
-                            s.model,
-                            s.profile,
-                            p.name AS provider,
-                            s.metadata,
-                            NULL as message_count
-                        FROM sessions s
-                        LEFT JOIN providers p ON s.provider_id = p.id
-                        WHERE LOWER(json_extract(s.metadata, '$.title')) LIKE LOWER(?)
-                        ORDER BY s.last_activity DESC
-                        LIMIT ?
-                        """,
-                        (lowered_query, limit),
-                    ).fetchall()
-
-                # Convert title matches to dict format
-                for row in rows:
-                    session_dict = self._row_to_session_dict(row)
-                    # Get message count from in-memory cache if available
-                    if row["session_id"] in self._sessions:
-                        session_dict["message_count"] = len(
-                            self._sessions[row["session_id"]].messages
-                        )
-                    results.append(session_dict)
-
-                # If we have enough results from title search, return early
-                if len(results) >= limit:
-                    return results[:limit]
-
-                # Second, search by content using FTS5 full-text search
-                # This is much faster than in-memory search for persisted messages
-                # Prepare FTS5 search query (simple query without special operators)
-                fts_query = query.replace('"', '""')  # Escape quotes for FTS5
-
-                # Track session_ids we already found via title search to avoid duplicates
-                found_ids = {r["session_id"] for r in results} if results else set()
-
-                if project_path:
-                    content_rows = conn.execute(
-                        """
-                        SELECT DISTINCT
-                            s.session_id,
-                            s.created_at,
-                            s.last_activity,
-                            s.model,
-                            s.profile,
-                            p.name AS provider,
-                            s.metadata
-                        FROM sessions s
-                        LEFT JOIN providers p ON s.provider_id = p.id
-                        INNER JOIN messages_fts fts ON s.session_id = fts.session_id
-                        WHERE s.project_path = ?
-                          AND messages_fts MATCH ?
-                        ORDER BY s.last_activity DESC
-                        LIMIT ?
-                        """,
-                        (
-                            project_path,
-                            fts_query,
-                            limit * 2,
-                        ),  # Fetch extra to account for duplicates
-                    ).fetchall()
-                else:
-                    content_rows = conn.execute(
-                        """
-                        SELECT DISTINCT
-                            s.session_id,
-                            s.created_at,
-                            s.last_activity,
-                            s.model,
-                            s.profile,
-                            p.name AS provider,
-                            s.metadata
-                        FROM sessions s
-                        LEFT JOIN providers p ON s.provider_id = p.id
-                        INNER JOIN messages_fts fts ON s.session_id = fts.session_id
-                        WHERE messages_fts MATCH ?
-                        ORDER BY s.last_activity DESC
-                        LIMIT ?
-                        """,
-                        (fts_query, limit * 2),  # Fetch extra to account for duplicates
-                    ).fetchall()
-
-                # Convert content matches to dict format, excluding already-found sessions
-                for row in content_rows:
-                    if row["session_id"] in found_ids:
-                        continue
-                    if len(results) >= limit:
-                        break
-                    session_dict = self._row_to_session_dict(row)
-                    results.append(session_dict)
-
-                # Third, search in-memory cached sessions for messages not yet persisted
-                # This is necessary because save_session() doesn't persist messages immediately
-                # Only search if we haven't reached the limit yet
-                if len(results) < limit:
-                    for session_id, session in list(self._sessions.items()):
-                        if project_path and session.project_path != project_path:
-                            continue
-
-                        # Skip if already found by title or FTS5
-                        if session_id in found_ids:
-                            continue
-
-                        # Search message content in memory
-                        for msg in session.messages:
-                            if lowered_query.replace("%", "") in msg.content.lower():
-                                session_dict = {
-                                    "session_id": session.session_id,
-                                    "created_at": session.created_at.isoformat(),
-                                    "updated_at": session.last_activity.isoformat(),
-                                    "model": session.model or "unknown",
-                                    "provider": session.provider or "unknown",
-                                    "profile": session.profile or "default",
-                                    "message_count": len(session.messages),
-                                    "title": session.title or "Untitled",
-                                    "tags": session.tags or [],
-                                }
-                                results.append(session_dict)
-                                found_ids.add(session_id)  # Mark as found
-                                break
-
-                        if len(results) >= limit:
-                            break
-
-            return results[:limit]
-
-        except Exception as e:
-            logger.error(f"Failed to search sessions: {e}")
-            return []
+        return self._sessions_mgr.search_sessions(
+            query=query,
+            limit=limit,
+            project_path=project_path,
+        )
 
     def _row_to_session_dict(self, row: sqlite3.Row) -> Dict[str, Any]:
-        """Convert a database row to SQLiteSessionPersistence dict format.
+        """Convert a database row into a dictionary of session metadata."""
+        meta_raw = row["metadata"]
+        meta = json_loads(meta_raw) if meta_raw else {}
+        row_keys = row.keys()
 
-        Args:
-            row: SQLite Row object with session data
-
-        Returns:
-            Dictionary in SQLiteSessionPersistence format
-        """
-        import json
-        from victor.agent.conversation.types import MessageRole
-
-        # Parse metadata to get title and tags
-        metadata = {}
-        try:
-            if row["metadata"]:
-                metadata = (
-                    json.loads(row["metadata"])
-                    if isinstance(row["metadata"], str)
-                    else row["metadata"]
-                )
-        except (json.JSONDecodeError, TypeError):
-            metadata = {}
-
-        title = metadata.get("title") or "Untitled"
-        tags = metadata.get("tags", [])
+        # Parse joined lookup strings to construct dict matching model_metadata expectations
+        provider_name = row["provider_name"] if "provider_name" in row_keys else None
+        family_name = row["model_family_name"] if "model_family_name" in row_keys else None
+        size_name = row["model_size_name"] if "model_size_name" in row_keys else None
+        ctx_name = row["context_size_name"] if "context_size_name" in row_keys else None
 
         return {
             "session_id": row["session_id"],
-            "created_at": row["created_at"],
-            "updated_at": row["last_activity"],
-            "model": row["model"] or "unknown",
-            "provider": row["provider"] or "unknown",
-            "profile": row["profile"] or "default",
-            "message_count": row["message_count"],
-            "title": title,
-            "tags": tags,
+            "created_at": datetime.fromisoformat(row["created_at"]),
+            "last_activity": datetime.fromisoformat(row["last_activity"]),
+            "project_path": Path(row["project_path"]) if row["project_path"] else None,
+            "model": row["model"],
+            "profile": row["profile"],
+            "max_tokens": row["max_tokens"],
+            "reserved_tokens": row["reserved_tokens"],
+            "metadata": meta,
+            # Normalization lookups
+            "provider": provider_name,
+            "model_family": ModelFamily(family_name) if family_name else None,
+            "model_size": ModelSize(size_name) if size_name else None,
+            "context_size": ContextSize(ctx_name) if ctx_name else None,
+            "model_params_b": row["model_params_b"],
+            "context_tokens": row["context_tokens"],
+            "tool_capable": bool(row["tool_capable"]),
+            "is_moe": bool(row["is_moe"]),
+            "is_reasoning": bool(row["is_reasoning"]),
+            # Tokens/Metrics
+            "prompt_tokens": row["prompt_tokens"],
+            "completion_tokens": row["completion_tokens"],
+            "cached_tokens": row["cached_tokens"],
+            "reasoning_tokens": row["reasoning_tokens"],
+            "cost_usd_micros": row["cost_usd_micros"],
         }
 
     def get_session(self, session_id: str) -> Optional[ConversationSession]:
-        """Get a session by ID.
-
-        Args:
-            session_id: Session identifier
-
-        Returns:
-            ConversationSession or None if not found
-        """
-        # Check cache first
-        if session_id in self._sessions:
-            return self._sessions[session_id]
-
-        # Try to load from database
-        session = self._load_session(session_id)
-        if session:
-            self._sessions[session_id] = session
-
-        return session
+        return self._sessions_mgr.get_session(session_id)
 
     def list_sessions(
         self,
         project_path: Optional[str] = None,
         limit: int = 10,
     ) -> List[ConversationSession]:
-        """List recent sessions with JOINs to lookup tables.
-
-        Args:
-            project_path: Filter by project path
-            limit: Maximum sessions to return
-
-        Returns:
-            List of sessions ordered by last activity
-        """
-        with sqlite3.connect(self.db_path) as conn:
-            conn.row_factory = sqlite3.Row
-
-            base_query = """
-                SELECT
-                    s.*,
-                    p.name AS provider_name,
-                    mf.name AS model_family_name,
-                    ms.name AS model_size_name,
-                    cs.name AS context_size_name
-                FROM sessions s
-                LEFT JOIN providers p ON s.provider_id = p.id
-                LEFT JOIN model_families mf ON s.model_family_id = mf.id
-                LEFT JOIN model_sizes ms ON s.model_size_id = ms.id
-                LEFT JOIN context_sizes cs ON s.context_size_id = cs.id
-            """
-
-            if project_path:
-                rows = conn.execute(
-                    f"""
-                    {base_query}
-                    WHERE s.project_path = ?
-                    ORDER BY s.last_activity DESC
-                    LIMIT ?
-                    """,
-                    (project_path, limit),
-                ).fetchall()
-            else:
-                rows = conn.execute(
-                    f"""
-                    {base_query}
-                    ORDER BY s.last_activity DESC
-                    LIMIT ?
-                    """,
-                    (limit,),
-                ).fetchall()
-
-            sessions = []
-            for row in rows:
-                session = self._session_from_row(row)
-                sessions.append(session)
-
-            return sessions
+        return self._sessions_mgr.list_sessions(
+            project_path=project_path,
+            limit=limit,
+        )
 
     def _add_message_impl(
         self,
@@ -1817,76 +421,16 @@ class ConversationStore:
         metadata: Optional[Dict[str, Any]],
         tool_calls: Optional[List],
     ) -> ConversationMessage:
-        """Shared implementation for adding a message.
-
-        This contains all the common logic for both sync and async versions.
-        The only difference between sync/async is how persistence is handled.
-
-        Args:
-            session_id: Session identifier
-            role: Message role
-            content: Message content
-            priority: Message priority (auto-determined if None)
-            tool_name: Tool name for tool calls
-            tool_call_id: Tool call ID
-            metadata: Additional metadata
-            tool_calls: Tool calls list
-
-        Returns:
-            Created ConversationMessage
-        """
-        session = self._get_or_create_session(session_id)
-
-        # Auto-determine priority based on role and source (when available)
-        if priority is None:
-            source_raw = (metadata or {}).get(MESSAGE_SOURCE_METADATA_KEY)
-            source: Optional[MessageSource] = None
-            if source_raw:
-                try:
-                    source = MessageSource(source_raw)
-                except ValueError:
-                    pass
-            priority = self._determine_priority(role, tool_name, source=source)
-
-        # Estimate token count
-        token_count = self._estimate_tokens(content)
-        trace_metadata = self._build_trace_metadata(
+        return self._messages._add_message_impl(
+            session_id=session_id,
             role=role,
             content=content,
+            priority=priority,
             tool_name=tool_name,
             tool_call_id=tool_call_id,
             metadata=metadata,
             tool_calls=tool_calls,
         )
-        merged_metadata = dict(metadata or {})
-        merged_metadata.update(trace_metadata)
-
-        message = ConversationMessage(
-            id=self._generate_message_id(),
-            role=role,
-            content=content,
-            timestamp=datetime.now(),
-            token_count=token_count,
-            priority=priority,
-            tool_name=tool_name,
-            tool_call_id=tool_call_id,
-            metadata=merged_metadata,
-            tool_calls=tool_calls,
-        )
-
-        session.messages.append(message)
-        session.current_tokens += token_count
-        session.last_activity = datetime.now()
-
-        # Track tool usage
-        if role in (MessageRole.TOOL_CALL, MessageRole.TOOL):
-            session.tool_usage_count += 1
-
-        # Check if pruning is needed
-        if session.current_tokens > (session.max_tokens - session.reserved_tokens):
-            self._prune_context(session)
-
-        return message
 
     def add_message(
         self,
@@ -1899,66 +443,23 @@ class ConversationStore:
         metadata: Optional[Dict[str, Any]] = None,
         tool_calls: Optional[List] = None,
     ) -> ConversationMessage:
-        """Add a message to the conversation.
-
-        Args:
-            session_id: Session identifier
-            role: Message role (user, assistant, system, etc.)
-            content: Message content
-            priority: Message priority for pruning. Auto-determined if not provided.
-            tool_name: Tool name for tool calls/results
-            tool_call_id: Tool call ID for correlation
-            metadata: Additional metadata
-            tool_calls: Tool calls list for assistant messages (OpenAI spec)
-
-        Returns:
-            Created ConversationMessage
-        """
-        # Call shared implementation
-        message = self._add_message_impl(
-            session_id,
-            role,
-            content,
-            priority,
-            tool_name,
-            tool_call_id,
-            metadata,
-            tool_calls,
+        return self._messages.add_message(
+            session_id=session_id,
+            role=role,
+            content=content,
+            priority=priority,
+            tool_name=tool_name,
+            tool_call_id=tool_call_id,
+            metadata=metadata,
+            tool_calls=tool_calls,
         )
-
-        # Persist (sync SQLite I/O)
-        self._persist_message(session_id, message)
-        self._update_session_activity(session_id)
-
-        # NOTE: Lazy embedding - embeddings created on search, not on add
-        # This reduces write overhead and file proliferation
-
-        logger.debug(
-            f"Added {role.value} message to {session_id}. " f"Tokens: {message.token_count}"
-        )
-
-        return message
 
     def add_system_message(
         self,
         session_id: str,
         content: str,
     ) -> ConversationMessage:
-        """Add a system message with CRITICAL priority.
-
-        Args:
-            session_id: Session identifier
-            content: System prompt content
-
-        Returns:
-            Created ConversationMessage
-        """
-        return self.add_message(
-            session_id,
-            MessageRole.SYSTEM,
-            content,
-            priority=MessagePriority.CRITICAL,
-        )
+        return self._messages.add_system_message(session_id, content)
 
     def get_context_messages(
         self,
@@ -1966,47 +467,11 @@ class ConversationStore:
         max_tokens: Optional[int] = None,
         include_system: bool = True,
     ) -> List[Dict[str, Any]]:
-        """Get messages formatted for the provider, respecting token limits.
-
-        Args:
-            session_id: Session identifier
-            max_tokens: Override max tokens for this retrieval
-            include_system: Whether to include system messages
-
-        Returns:
-            List of messages in provider format
-        """
-        session = self.get_session(session_id)
-        if not session:
-            return []
-
-        max_tokens = max_tokens or (session.max_tokens - session.reserved_tokens)
-
-        # Score and select messages
-        scored_messages = self._score_messages(session.messages)
-
-        # Select messages within token budget
-        selected = []
-        token_budget = max_tokens
-
-        for msg, _score in scored_messages:
-            if msg.token_count <= token_budget:
-                selected.append(msg)
-                token_budget -= msg.token_count
-
-        # Sort by timestamp for coherent conversation
-        selected.sort(key=lambda m: m.timestamp)
-
-        # Filter system messages if requested
-        if not include_system:
-            selected = [m for m in selected if m.role != MessageRole.SYSTEM]
-
-        logger.debug(
-            f"Selected {len(selected)} messages for context. "
-            f"Tokens used: {max_tokens - token_budget}/{max_tokens}"
+        return self._messages.get_context_messages(
+            session_id=session_id,
+            max_tokens=max_tokens,
+            include_system=include_system,
         )
-
-        return [msg.to_provider_format() for msg in selected]
 
     def get_messages_for_agent(
         self,
@@ -2015,23 +480,11 @@ class ConversationStore:
         *,
         limit: Optional[int] = None,
     ) -> List[ConversationMessage]:
-        """Return messages scoped to one agent inside a session."""
-        query = """
-            SELECT * FROM messages
-            WHERE session_id = ? AND agent_id = ?
-            ORDER BY timestamp
-        """
-        params: tuple[Any, ...]
-        if limit is not None:
-            query += " LIMIT ?"
-            params = (session_id, agent_id, int(limit))
-        else:
-            params = (session_id, agent_id)
-
-        with sqlite3.connect(self.db_path) as conn:
-            conn.row_factory = sqlite3.Row
-            rows = conn.execute(query, params).fetchall()
-        return [self._message_from_row(row) for row in rows]
+        return self._messages.get_messages_for_agent(
+            session_id=session_id,
+            agent_id=agent_id,
+            limit=limit,
+        )
 
     def load_agent_context_service(
         self,
@@ -2039,22 +492,10 @@ class ConversationStore:
         *,
         max_tokens: Optional[int] = None,
     ) -> ContextService:
-        """Hydrate a ContextService from persisted messages for one agent runtime."""
-        service = ContextService(
-            ContextServiceConfig(max_tokens=max_tokens or self.max_context_tokens)
+        return self._messages.load_agent_context_service(
+            runtime_context=runtime_context,
+            max_tokens=max_tokens,
         )
-        for message in self.get_messages_for_agent(
-            runtime_context.session_id,
-            runtime_context.agent_id,
-        ):
-            payload: Dict[str, Any] = {
-                "role": message.role.value,
-                "content": message.content,
-            }
-            if message.metadata:
-                payload["metadata"] = dict(message.metadata)
-            service.add_message(payload)
-        return service
 
     def record_compaction_event(
         self,
@@ -2067,98 +508,28 @@ class ConversationStore:
         summary: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
     ) -> str:
-        """Persist a per-agent compaction audit event."""
-        metadata = dict(metadata or {})
-        event_id = f"compact_{uuid.uuid4().hex[:12]}"
-        parent_session_id = metadata.get("parent_session_id")
-        team_id = metadata.get("team_id")
-        member_id = metadata.get("member_id")
-        plan_id = metadata.get("plan_id")
-        plan_step_id = metadata.get("plan_step_id")
-
-        def _write(conn: sqlite3.Connection) -> None:
-            conn.execute(
-                """
-                INSERT INTO compaction_events (
-                    id, session_id, agent_id, parent_session_id, team_id, member_id,
-                    plan_id, plan_step_id, strategy, messages_removed, tokens_freed,
-                    summary, created_at, metadata
-                )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    event_id,
-                    session_id,
-                    agent_id,
-                    parent_session_id,
-                    team_id,
-                    member_id,
-                    plan_id,
-                    plan_step_id,
-                    strategy,
-                    int(messages_removed),
-                    int(tokens_freed),
-                    summary,
-                    datetime.now(timezone.utc).isoformat(),
-                    json_dumps(self._sanitize_metadata_for_json(metadata)),
-                ),
-            )
-
-        self._with_locked_write_retry(_write, operation="record_compaction_event")
-        return event_id
+        return self._messages.record_compaction_event(
+            session_id=session_id,
+            strategy=strategy,
+            agent_id=agent_id,
+            messages_removed=messages_removed,
+            tokens_freed=tokens_freed,
+            summary=summary,
+            metadata=metadata,
+        )
 
     def get_recent_messages(
         self,
         session_id: str,
         count: int = 10,
     ) -> List[ConversationMessage]:
-        """Get the most recent messages.
-
-        Args:
-            session_id: Session identifier
-            count: Number of messages to return
-
-        Returns:
-            List of recent messages
-        """
-        session = self.get_session(session_id)
-        if not session:
-            return []
-
-        return session.messages[-count:]
+        return self._messages.get_recent_messages(session_id, count)
 
     def clear_session(self, session_id: str):
-        """Clear all messages from a session.
-
-        Args:
-            session_id: Session identifier
-        """
-        session = self.get_session(session_id)
-        if session:
-            session.messages.clear()
-            session.current_tokens = 0
-
-            with sqlite3.connect(self.db_path) as conn:
-                conn.execute(
-                    "DELETE FROM messages WHERE session_id = ?",
-                    (session_id,),
-                )
-
-            logger.info(f"Cleared session {session_id}")
+        self._sessions_mgr.clear_session(session_id)
 
     def delete_session(self, session_id: str):
-        """Delete a session and all its messages.
-
-        Args:
-            session_id: Session identifier
-        """
-        if session_id in self._sessions:
-            del self._sessions[session_id]
-
-        with sqlite3.connect(self.db_path) as conn:
-            conn.execute("DELETE FROM sessions WHERE session_id = ?", (session_id,))
-
-        logger.info(f"Deleted session {session_id}")
+        self._sessions_mgr.delete_session(session_id)
 
     def vacuum(self) -> Dict[str, Any]:
         """Reclaim unused space in the database.
@@ -2219,68 +590,11 @@ class ConversationStore:
         purge_test_models: bool = True,
         purge_empty: bool = True,
     ) -> Dict[str, int]:
-        """Remove stale, test, and empty sessions from SQLite.
-
-        This prevents unbounded database growth from test artifacts,
-        abandoned sessions, and expired history.
-
-        Args:
-            max_age_days: Delete sessions older than this (0 = skip)
-            purge_test_models: Delete sessions with test model names
-            purge_empty: Delete sessions that have zero messages
-
-        Returns:
-            Dictionary with counts of deleted sessions by category
-        """
-        deleted = {"test_models": 0, "empty": 0, "stale": 0}
-
-        try:
-            with sqlite3.connect(self.db_path) as conn:
-                conn.execute("PRAGMA foreign_keys = ON")
-
-                # 1. Purge test model sessions
-                if purge_test_models:
-                    placeholders = ",".join("?" * len(self.TEST_MODEL_NAMES))
-                    cursor = conn.execute(
-                        f"DELETE FROM sessions WHERE model IN " f"({placeholders})",
-                        list(self.TEST_MODEL_NAMES),
-                    )
-                    deleted["test_models"] = cursor.rowcount
-
-                # 2. Purge empty sessions (no messages)
-                if purge_empty:
-                    cursor = conn.execute(
-                        "DELETE FROM sessions WHERE session_id NOT IN "
-                        "(SELECT DISTINCT session_id FROM messages)"
-                    )
-                    deleted["empty"] = cursor.rowcount
-
-                # 3. Purge sessions older than max_age_days
-                if max_age_days > 0:
-                    from datetime import timedelta
-
-                    cutoff = (datetime.now() - timedelta(days=max_age_days)).isoformat()
-                    cursor = conn.execute(
-                        "DELETE FROM sessions " "WHERE last_activity < ?",
-                        (cutoff,),
-                    )
-                    deleted["stale"] = cursor.rowcount
-
-            total = sum(deleted.values())
-            if total > 0:
-                logger.info(
-                    f"Cleaned up {total} sessions: "
-                    f"{deleted['test_models']} test, "
-                    f"{deleted['empty']} empty, "
-                    f"{deleted['stale']} stale"
-                )
-                # Also clear in-memory caches for deleted sessions
-                self._sessions.clear()
-
-        except sqlite3.Error as e:
-            logger.warning(f"Session cleanup failed: {e}")
-
-        return deleted
+        return self._sessions_mgr.cleanup_stale_sessions(
+            max_age_days=max_age_days,
+            purge_test_models=purge_test_models,
+            purge_empty=purge_empty,
+        )
 
     def get_database_stats(self) -> Dict[str, Any]:
         """Get database statistics including file size and record counts.
@@ -2309,34 +623,7 @@ class ConversationStore:
         }
 
     def get_session_stats(self, session_id: str) -> Dict[str, Any]:
-        """Get statistics for a session.
-
-        Args:
-            session_id: Session identifier
-
-        Returns:
-            Dictionary of session statistics
-        """
-        session = self.get_session(session_id)
-        if not session:
-            return {}
-
-        role_counts = {}
-        for msg in session.messages:
-            role_counts[msg.role.value] = role_counts.get(msg.role.value, 0) + 1
-
-        return {
-            "session_id": session_id,
-            "message_count": len(session.messages),
-            "total_tokens": session.current_tokens,
-            "available_tokens": session.available_tokens,
-            "utilization": session.current_tokens / session.max_tokens,
-            "role_distribution": role_counts,
-            "tool_usage_count": session.tool_usage_count,
-            "created_at": session.created_at.isoformat(),
-            "last_activity": session.last_activity.isoformat(),
-            "duration_seconds": (session.last_activity - session.created_at).total_seconds(),
-        }
+        return self._sessions_mgr.get_session_stats(session_id)
 
     # =========================================================================
     # Private Methods
@@ -2386,14 +673,7 @@ class ConversationStore:
         return MessagePriority.MEDIUM
 
     def _estimate_tokens(self, content: str) -> int:
-        """Estimate token count from content.
-
-        Uses the fast native token counter when available and falls back
-        to word-based estimation.
-        """
-        from victor.processing.native.tokenizer import count_tokens_fast
-
-        return count_tokens_fast(content)
+        return self._traces.estimate_tokens(content)
 
     def _build_trace_metadata(
         self,
@@ -2404,35 +684,14 @@ class ConversationStore:
         metadata: Optional[Dict[str, Any]],
         tool_calls: Optional[List],
     ) -> Dict[str, Any]:
-        """Build persisted metadata for semantic and execution retrieval traces."""
-        existing = dict(metadata or {})
-        semantic_text = str(existing.get("memory_semantic_text") or content)
-        trace_kind = (
-            "execution"
-            if self._is_execution_trace_message(
-                role,
-                tool_name,
-                tool_call_id,
-                tool_calls,
-            )
-            else "semantic"
+        return self._traces.build_trace_metadata(
+            role=role,
+            content=content,
+            tool_name=tool_name,
+            tool_call_id=tool_call_id,
+            metadata=metadata,
+            tool_calls=tool_calls,
         )
-        trace_metadata: Dict[str, Any] = {
-            "memory_trace_kind": trace_kind,
-            "memory_semantic_text": semantic_text,
-        }
-        if trace_kind == "execution":
-            trace_metadata["memory_execution_text"] = str(
-                existing.get("memory_execution_text")
-                or self._build_execution_trace_text(
-                    role=role,
-                    content=content,
-                    tool_name=tool_name,
-                    tool_call_id=tool_call_id,
-                    tool_calls=tool_calls,
-                )
-            )
-        return trace_metadata
 
     def _is_execution_trace_message(
         self,
@@ -2441,12 +700,11 @@ class ConversationStore:
         tool_call_id: Optional[str],
         tool_calls: Optional[List],
     ) -> bool:
-        """Return whether a message should participate in execution-trace retrieval."""
-        return (
-            role in (MessageRole.TOOL, MessageRole.TOOL_CALL)
-            or bool(tool_name)
-            or bool(tool_call_id)
-            or bool(tool_calls)
+        return self._traces.is_execution_trace_message(
+            role=role,
+            tool_name=tool_name,
+            tool_call_id=tool_call_id,
+            tool_calls=tool_calls,
         )
 
     def _build_execution_trace_text(
@@ -2457,109 +715,42 @@ class ConversationStore:
         tool_call_id: Optional[str],
         tool_calls: Optional[List],
     ) -> str:
-        """Create a compact lexical representation for execution-oriented recall."""
-        parts: List[str] = []
-        canonical_tool_name = canonicalize_core_tool_name(tool_name) if tool_name else None
-        extracted_tool_name = self._extract_trace_attribute(content, "tool")
-        effective_tool_name = canonical_tool_name or extracted_tool_name
-
-        if effective_tool_name:
-            parts.append(f"tool {effective_tool_name}")
-        else:
-            role_value = role.value if hasattr(role, "value") else str(role)
-            parts.append(role_value.replace("_", " "))
-
-        if tool_call_id:
-            parts.append(tool_call_id)
-
-        for attr_name in ("path", "query", "pattern", "symbol", "file", "name"):
-            attr_value = self._extract_trace_attribute(content, attr_name)
-            if attr_value:
-                parts.append(f"{attr_name} {attr_value}")
-
-        if tool_calls:
-            parts.append(str(tool_calls))
-
-        body_text = re.sub(r"<[^>]+>", " ", content)
-        body_text = re.sub(r"\s+", " ", body_text).strip()
-        if body_text:
-            parts.append(body_text[:500])
-
-        trace_text = " ".join(part for part in parts if part).strip()
-        return trace_text or content[:500]
+        return self._traces.build_execution_trace_text(
+            role=role,
+            content=content,
+            tool_name=tool_name,
+            tool_call_id=tool_call_id,
+            tool_calls=tool_calls,
+        )
 
     @staticmethod
     def _extract_trace_attribute(content: str, attribute_name: str) -> Optional[str]:
-        """Extract an XML-style attribute value from stored tool-output markup."""
-        match = re.search(rf'{attribute_name}="([^"]+)"', content)
-        if not match:
-            return None
-        return match.group(1).strip() or None
+        from victor.agent.conversation.store_trace import ConversationStoreTrace
+
+        return ConversationStoreTrace.extract_trace_attribute(content, attribute_name)
 
     @staticmethod
     def _trace_tokens(text: str) -> List[str]:
-        """Tokenize trace text for lightweight overlap scoring."""
-        return re.findall(r"[a-z0-9_]+", text.lower())
+        from victor.agent.conversation.store_trace import ConversationStoreTrace
+
+        return ConversationStoreTrace.trace_tokens(text)
 
     def get_message_trace_kind(self, message: ConversationMessage) -> str:
-        """Return the retrieval trace kind for a message."""
-        metadata = getattr(message, "metadata", {}) or {}
-        trace_kind = metadata.get("memory_trace_kind")
-        if trace_kind in {"semantic", "execution"}:
-            return trace_kind
-        role = message.role if isinstance(message.role, MessageRole) else MessageRole(message.role)
-        if self._is_execution_trace_message(
-            role,
-            getattr(message, "tool_name", None),
-            getattr(message, "tool_call_id", None),
-            getattr(message, "tool_calls", None),
-        ):
-            return "execution"
-        return "semantic"
+        return self._traces.get_message_trace_kind(message)
 
     def get_message_trace_text(
         self,
         message: ConversationMessage,
         trace_kind: Optional[str] = None,
     ) -> str:
-        """Return the retrieval text for the requested trace kind."""
-        metadata = getattr(message, "metadata", {}) or {}
-        resolved_kind = trace_kind or self.get_message_trace_kind(message)
-        if resolved_kind == "execution":
-            existing = metadata.get("memory_execution_text")
-            if existing:
-                return str(existing)
-            role = (
-                message.role if isinstance(message.role, MessageRole) else MessageRole(message.role)
-            )
-            return self._build_execution_trace_text(
-                role=role,
-                content=message.content,
-                tool_name=getattr(message, "tool_name", None),
-                tool_call_id=getattr(message, "tool_call_id", None),
-                tool_calls=getattr(message, "tool_calls", None),
-            )
-        return str(metadata.get("memory_semantic_text") or message.content)
+        return self._traces.get_message_trace_text(message, trace_kind)
 
     def _score_execution_trace(
         self,
         query: str,
         trace_text: str,
     ) -> float:
-        """Score execution traces by lexical overlap with the current request."""
-        query_tokens = set(self._trace_tokens(query))
-        trace_tokens = set(self._trace_tokens(trace_text))
-        if not query_tokens or not trace_tokens:
-            return 0.0
-
-        overlap = query_tokens & trace_tokens
-        if not overlap:
-            return 0.0
-
-        score = len(overlap) / len(query_tokens)
-        if query.lower() in trace_text.lower():
-            score += 0.15
-        return min(score, 1.0)
+        return self._traces.score_execution_trace(query, trace_text)
 
     def get_dual_trace_relevant_messages(
         self,
@@ -2569,25 +760,12 @@ class ConversationStore:
         execution_limit: int = 3,
         min_similarity: float = 0.3,
     ) -> Dict[str, List[Tuple[ConversationMessage, float]]]:
-        """Retrieve semantic and execution traces in separate relevance buckets."""
-        try:
-            asyncio.get_running_loop()
-        except RuntimeError:
-            pass
-        else:
-            raise RuntimeError(
-                "Cannot call get_dual_trace_relevant_messages from async context. "
-                "Use await aget_dual_trace_relevant_messages(...) instead."
-            )
-
-        return run_sync(
-            self.aget_dual_trace_relevant_messages(
-                session_id=session_id,
-                query=query,
-                semantic_limit=semantic_limit,
-                execution_limit=execution_limit,
-                min_similarity=min_similarity,
-            )
+        return self._traces.get_dual_trace_relevant_messages(
+            session_id=session_id,
+            query=query,
+            semantic_limit=semantic_limit,
+            execution_limit=execution_limit,
+            min_similarity=min_similarity,
         )
 
     async def aget_dual_trace_relevant_messages(
@@ -2598,31 +776,13 @@ class ConversationStore:
         execution_limit: int = 3,
         min_similarity: float = 0.3,
     ) -> Dict[str, List[Tuple[ConversationMessage, float]]]:
-        """Async dual-trace retrieval with semantic and execution lanes."""
-        semantic_results = await self.aget_semantically_relevant_messages(
+        return await self._traces.aget_dual_trace_relevant_messages(
             session_id=session_id,
             query=query,
-            limit=max(semantic_limit, 1),
+            semantic_limit=semantic_limit,
+            execution_limit=execution_limit,
             min_similarity=min_similarity,
-            exclude_recent=0,
         )
-        semantic_bucket = [
-            (message, score)
-            for message, score in semantic_results
-            if self.get_message_trace_kind(message) == "semantic"
-        ][:semantic_limit]
-
-        execution_bucket = await asyncio.to_thread(
-            self._get_execution_trace_matches,
-            session_id,
-            query,
-            execution_limit,
-        )
-
-        return {
-            "semantic": semantic_bucket,
-            "execution": execution_bucket,
-        }
 
     def _get_execution_trace_matches(
         self,
@@ -2661,113 +821,13 @@ class ConversationStore:
         self,
         messages: List[ConversationMessage],
     ) -> List[tuple[ConversationMessage, float]]:
-        """Score messages for context selection.
-
-        Delegates to canonical score_messages() with STORE_WEIGHTS
-        (priority 40% + recency 60%). Includes Rust-accelerated batch scoring.
-        """
-        if not messages:
-            return []
-
-        from victor.agent.conversation.scoring import score_messages, STORE_WEIGHTS
-        from victor.agent.conversation.types import (
-            ConversationMessage as CanonicalMessage,
-        )
-
-        # Convert store messages to canonical type for scoring
-        canonical_msgs = [
-            CanonicalMessage(
-                role=msg.role.value,
-                content=msg.content,
-                id=msg.id,
-                timestamp=msg.timestamp,
-                token_count=msg.token_count,
-                priority=msg.priority,
-                metadata=msg.metadata,
-                tool_name=msg.tool_name,
-                tool_call_id=msg.tool_call_id,
-            )
-            for msg in messages
-        ]
-
-        scored = score_messages(canonical_msgs, weights=STORE_WEIGHTS)
-
-        # Map back to original store messages
-        canonical_to_store = {id(cm): msg for cm, msg in zip(canonical_msgs, messages)}
-        return [(canonical_to_store[id(cm)], s) for cm, s in scored]
+        return self._messages._score_messages(messages)
 
     def _prune_context(self, session: ConversationSession):
-        """Prune conversation context to fit within token limits.
-
-        Strategy:
-        1. Keep all CRITICAL priority messages
-        2. Score remaining messages
-        3. Keep highest scoring messages within budget
-        4. Delete pruned messages from SQLite to prevent unbounded growth
-        """
-        target_tokens = int((session.max_tokens - session.reserved_tokens) * 0.8)
-
-        logger.info(
-            f"Pruning session {session.session_id}. "
-            f"Current: {session.current_tokens}, Target: {target_tokens}"
-        )
-
-        # Separate by priority
-        critical = [m for m in session.messages if m.priority == MessagePriority.CRITICAL]
-        others = [m for m in session.messages if m.priority != MessagePriority.CRITICAL]
-
-        # Sort others by score
-        scored_others = self._score_messages(others)
-
-        # Select within budget
-        kept = list(critical)
-        kept_ids = {m.id for m in kept}
-        current_tokens = sum(m.token_count for m in kept)
-
-        for msg, _ in scored_others:
-            if current_tokens + msg.token_count <= target_tokens:
-                kept.append(msg)
-                kept_ids.add(msg.id)
-                current_tokens += msg.token_count
-
-        # Identify pruned messages and delete from SQLite
-        pruned_ids = [m.id for m in session.messages if m.id not in kept_ids]
-        pruned_count = len(pruned_ids)
-
-        if pruned_ids:
-            self._delete_messages_from_db(session.session_id, pruned_ids)
-
-        # Update session
-        session.messages = sorted(kept, key=lambda m: m.timestamp)
-        session.current_tokens = current_tokens
-
-        logger.info(
-            f"Pruned {pruned_count} messages (deleted from DB). "
-            f"Remaining: {len(session.messages)}, Tokens: {current_tokens}"
-        )
+        self._messages._prune_context(session)
 
     def _delete_messages_from_db(self, session_id: str, message_ids: List[str]) -> None:
-        """Delete pruned messages from SQLite in batches.
-
-        Args:
-            session_id: Session identifier (for logging)
-            message_ids: List of message IDs to delete
-        """
-        batch_size = 500
-        try:
-            with sqlite3.connect(self.db_path) as conn:
-                for i in range(0, len(message_ids), batch_size):
-                    batch = message_ids[i : i + batch_size]
-                    placeholders = ",".join("?" * len(batch))
-                    conn.execute(
-                        f"DELETE FROM messages WHERE id IN ({placeholders})",
-                        batch,
-                    )
-            logger.debug(
-                f"Deleted {len(message_ids)} pruned messages from DB " f"for session {session_id}"
-            )
-        except sqlite3.Error as e:
-            logger.warning(f"Failed to delete pruned messages from DB: {e}")
+        self._messages._delete_messages_from_db(session_id, message_ids)
 
     def _persist_session(self, session: ConversationSession):
         """Persist session to database using normalized FK columns."""
@@ -2978,7 +1038,7 @@ class ConversationStore:
 
         def _write(conn: sqlite3.Connection) -> None:
             conn.execute(
-                "UPDATE sessions SET last_activity = ? " "WHERE session_id = ?",
+                "UPDATE sessions SET last_activity = ? WHERE session_id = ?",
                 (datetime.now().isoformat(), session_id),
             )
 
@@ -3251,45 +1311,17 @@ class ConversationStore:
         metadata: Optional[Dict[str, Any]] = None,
         tool_calls: Optional[List] = None,
     ) -> "ConversationMessage":
-        """Async variant of add_message with serialized writes.
-
-        Uses asyncio.Lock to ensure only one database write operation
-        happens at a time, preventing SQLite lock contention.
-
-        In-memory work runs on the calling coroutine. Blocking
-        SQLite I/O is offloaded to the default thread executor.
-        """
-        import asyncio
-
-        # Call shared implementation
-        message = self._add_message_impl(
-            session_id,
-            role,
-            content,
-            priority,
-            tool_name,
-            tool_call_id,
-            metadata,
-            tool_calls,
+        """Async variant of add_message with serialized writes."""
+        return await self._messages.add_message_async(
+            session_id=session_id,
+            role=role,
+            content=content,
+            priority=priority,
+            tool_name=tool_name,
+            tool_call_id=tool_call_id,
+            metadata=metadata,
+            tool_calls=tool_calls,
         )
-
-        # CRITICAL: Serialize async writes with asyncio.Lock
-        # This prevents concurrent to_thread calls from competing for DB lock
-        async with self._write_lock_async:
-            # Persist (async SQLite I/O - offloaded to thread pool)
-            await asyncio.to_thread(self._persist_message, session_id, message)
-            await asyncio.to_thread(self._update_session_activity, session_id)
-
-        session = self._sessions.get(session_id)
-        total_tokens = session.current_tokens if session else 0
-        logger.debug(
-            "Added %s message to %s (async). " "Tokens: %d, Total: %d",
-            role.value,
-            session_id,
-            message.token_count,
-            total_tokens,
-        )
-        return message
 
     def _load_session(self, session_id: str) -> Optional[ConversationSession]:
         """Load session from database with JOINs to lookup tables."""

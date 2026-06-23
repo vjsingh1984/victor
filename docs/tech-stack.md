@@ -224,7 +224,7 @@ erDiagram
 |----|------|-------------|----------|--------|--------|
 | TD-1 | API Server | `victor/integrations/api/server.py` hotspot decomposition | High | Planned | `victor/integrations/` |
 | TD-2 | Vertical Integration | `victor/framework/vertical_integration.py` cleanup | Medium | Planned | `victor/framework/` |
-| TD-3 | Conversation Memory | `victor/agent/conversation/store.py` refactoring | Medium | Planned | `victor/agent/` |
+| TD-3 | Conversation Memory | `victor/agent/conversation/store.py` refactoring | Medium | Complete | `victor/agent/` |
 | TD-4 | Secret Handling | Normalize across provider, server, session settings | High | In Progress | `victor/providers/` |
 | TD-5 | Observability | Decide: prototype or supported surface | Medium | Pending | `victor/core/` |
 | TD-6 | Benchmark Publication | Publish SWE-bench results publicly | High | Planned | `benchmarks/` |
@@ -249,7 +249,7 @@ gantt
         TD-7 Onboarding          :active, a4, 2026-05-01, 2026-06-15
     section Medium Priority
         TD-5 Observability       : b1, 2026-07-01, 2026-08-01
-        TD-3 Conv Memory         : b2, 2026-07-01, 2026-08-01
+        TD-3 Conv Memory         :done, b2, 2026-07-01, 2026-08-01
         TD-9 Streaming Loop      : b3, 2026-08-01, 2026-09-01
         TD-10 Workspace Rename   :active, b4, 2026-05-15, 2026-06-30
     section Low Priority
