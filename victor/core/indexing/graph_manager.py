@@ -180,8 +180,13 @@ class GraphManager:
             # Subscribe to file changes and keep the persisted graph fresh.
             await self.ensure_background_refresh(root, exec_ctx=exec_ctx)
 
-            # Import graph tool to build graph
-            from victor.tools.graph_tool import graph
+            try:
+                import importlib
+                module = importlib.import_module("victor_coding.tools.graph_tool")
+                graph = module.graph
+            except ImportError:
+                logger.warning("victor-coding not installed, returning empty graph")
+                return {}, False
 
             try:
                 result = await graph(

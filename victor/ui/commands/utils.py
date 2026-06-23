@@ -27,7 +27,7 @@ try:
     from victor.framework.vertical_protocols import CodebaseIndexFactoryProtocol
 except ImportError:
     CodebaseIndexFactoryProtocol = None  # type: ignore[misc,assignment]
-from victor.tools.code_search_tool import (
+from victor_coding.tools.code_search_tool import (
     _get_or_build_index,
     _INDEX_CACHE,
     _resolve_graph_writer_mode,

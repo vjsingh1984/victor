@@ -466,7 +466,7 @@ class VictorAgentAdapter:
 
         # Clear code_search index cache for task isolation
         try:
-            from victor.tools.code_search_tool import clear_index_cache
+            from victor_coding.tools.code_search_tool import clear_index_cache
 
             clear_index_cache()
         except ImportError:

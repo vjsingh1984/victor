@@ -188,7 +188,7 @@ def cleanup_containers(
         victor tools cleanup-containers --include-unlabeled
         victor tools cleanup-containers --dry-run
     """
-    from victor.tools.code_executor_tool import (
+    from victor_coding.tools.code_executor_tool import (
         cleanup_orphaned_containers,
         DOCKER_AVAILABLE,
         SANDBOX_CONTAINER_LABEL,

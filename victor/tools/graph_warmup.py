@@ -37,7 +37,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from victor.config.settings import load_settings
-from victor.tools.graph_tool import graph, GraphMode
+from victor_coding.tools.graph_tool import graph, GraphMode
 
 logger = logging.getLogger(__name__)
 
