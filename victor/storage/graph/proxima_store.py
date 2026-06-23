@@ -154,6 +154,9 @@ class ProximaGraphStore(GraphStoreProtocol):
         from proximadb_sdk.graph import ProximaDBGraph
         from proximadb_sdk.unified_client import ProximaDBClient
 
+        # Graph node/edge operations are served over REST (the gRPC client has no
+        # graph RPCs), so the client must use the REST protocol explicitly —
+        # otherwise it auto-selects gRPC and 404s against the REST port.
         if self._server_url:
             # Multi-tenant service path — WIP until TD-127/130/131 merge.
             logger.warning(
@@ -161,10 +164,10 @@ class ProximaGraphStore(GraphStoreProtocol):
                 "ProximaDB TD-127/130/131; embedded mode is the supported path.",
                 self._server_url,
             )
-            self._client = ProximaDBClient(url=self._server_url)
+            self._client = ProximaDBClient(url=self._server_url, protocol="rest")
         else:
             self._db = await start_embedded_db(self._data_dir, binary_path=self._binary_path)
-            self._client = ProximaDBClient(url=self._db.rest_url)
+            self._client = ProximaDBClient(url=self._db.rest_url, protocol="rest")
 
         # Ensure the graph exists (idempotent; ignore "already exists").
         try:
@@ -259,8 +262,11 @@ class ProximaGraphStore(GraphStoreProtocol):
 
     @staticmethod
     def _sorted_edges(edges: List[GraphEdge]) -> List[GraphEdge]:
-        # Match SqliteGraphStore/MemoryGraphStore ordering for parity.
-        return sorted(edges, key=lambda e: (e.src, e.dst, e.type))
+        # Drop malformed/empty edges (the REST graph API can return a single
+        # blank edge for a node with no neighbors) and match the
+        # SqliteGraphStore/MemoryGraphStore ordering for parity.
+        valid = [e for e in edges if e.src and e.dst and e.type]
+        return sorted(valid, key=lambda e: (e.src, e.dst, e.type))
 
     # ------------------------------------------------------------------
     # Writes

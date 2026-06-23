@@ -149,6 +149,30 @@ def graph_id_for_repo(repo: str) -> str:
 # ---------------------------------------------------------------------------
 # Embedded bootstrap
 # ---------------------------------------------------------------------------
+def _pick_free_ports(count: int) -> list[int]:
+    """Reserve ``count`` distinct loopback ports and return them.
+
+    The embedded ProximaDB is a managed subprocess reached over loopback TCP, so
+    it needs free REST/gRPC ports. The SDK defaults (15678/15679) frequently
+    collide (Docker, a second repo, a leftover instance); picking ports the OS
+    reports free avoids ``Address already in use`` on startup. There is a small
+    TOCTOU window between release and the server's bind, acceptable for a
+    local single-instance launch.
+    """
+    import socket
+
+    held: list[socket.socket] = []
+    try:
+        for _ in range(count):
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.bind(("127.0.0.1", 0))
+            held.append(sock)
+        return [sock.getsockname()[1] for sock in held]
+    finally:
+        for sock in held:
+            sock.close()
+
+
 async def start_embedded_db(
     data_dir: Path | str,
     *,
@@ -157,8 +181,15 @@ async def start_embedded_db(
     graph_engine: str = "ORION",
     binary_path: Optional[str] = None,
     timeout: float = 30.0,
+    rest_port: Optional[int] = None,
+    grpc_port: Optional[int] = None,
 ) -> Any:
     """Start and return an embedded ``EmbeddedProximaDB`` for a single repo.
+
+    The SDK's "embedded" mode is a self-managed ``proximadb-server`` subprocess
+    reached over loopback REST/gRPC (it is not in-process), so it needs ports.
+    Unless explicit ports are given, free ones are selected to avoid colliding
+    with the SDK defaults (15678/15679), Docker, or a leftover instance.
 
     Args:
         data_dir: Persistent data directory for this repo's collection/graph.
@@ -167,6 +198,8 @@ async def start_embedded_db(
         graph_engine: Graph engine (ORION = WAL + in-memory).
         binary_path: Explicit path to the ``proximadb-server`` binary (optional).
         timeout: Seconds to wait for the server to become healthy.
+        rest_port: Explicit REST port (default: an OS-selected free port).
+        grpc_port: Explicit gRPC port (default: an OS-selected free port).
 
     Returns:
         A started ``EmbeddedProximaDB`` instance.
@@ -187,11 +220,18 @@ async def start_embedded_db(
     data_path = Path(data_dir).expanduser()
     data_path.mkdir(parents=True, exist_ok=True)
 
+    if rest_port is None or grpc_port is None:
+        free_rest, free_grpc = _pick_free_ports(2)
+        rest_port = rest_port if rest_port is not None else free_rest
+        grpc_port = grpc_port if grpc_port is not None else free_grpc
+
     config = EmbeddedConfig(
         data_dir=str(data_path),
         log_level=log_level,
         vector_engine=vector_engine,
         graph_engine=graph_engine,
+        rest_port=rest_port,
+        grpc_port=grpc_port,
     )
     db = EmbeddedProximaDB(config=config, binary_path=binary_path)
     try:

@@ -68,7 +68,7 @@ async def embedded_proxima_store(tmp_path):
     from proximadb_sdk.graph import ProximaDBGraph
     from proximadb_sdk.unified_client import ProximaDBClient
 
-    client = ProximaDBClient(url=db.rest_url)
+    client = ProximaDBClient(url=db.rest_url, protocol="rest")
     try:
         client.create_graph("fixture_codegraph")
     except Exception:
@@ -100,5 +100,12 @@ async def test_embedded_impact_and_hybrid_parity(tmp_path, embedded_proxima_stor
         p_exp = await proxima.multi_hop_traverse_parallel(["n:main"], max_hops=3)
         assert {n.node_id for n in s_exp.nodes} == {n.node_id for n in p_exp.nodes}
         assert _edge_keys(s_exp.edges) == _edge_keys(p_exp.edges)
+
+        # Exercise the v2 query/nodes envelope path (find_nodes/get_nodes_by_file).
+        assert {n.node_id for n in await proxima.find_nodes(name="helper")} == {"n:helper"}
+        assert {n.node_id for n in await proxima.get_nodes_by_file("b.py")} == {
+            "n:validate",
+            "n:helper",
+        }
     finally:
         await sqlite.close()
