@@ -96,6 +96,39 @@ async def test_get_context_window(zai_provider):
 
 
 @pytest.mark.asyncio
+async def test_context_window_runtime_method_matches_get(zai_provider):
+    """Regression: the runtime path calls context_window(), not get_context_window().
+
+    BaseProvider.context_window() has its own lookup table that does not include
+    GLM models and falls back to 8192 for unknown models. ZAIProvider must
+    override context_window() so both methods agree for every supported model.
+    See docs/guides/TROUBLESHOOTING.md (Provider Model Registration).
+    """
+    for model in ("glm-5.2", "glm-5.2:coding", "glm-5.1", "glm-4.7", "glm-4.6"):
+        assert zai_provider.context_window(model) == zai_provider.get_context_window(model)
+
+
+@pytest.mark.asyncio
+async def test_glm_5_2_registered_with_1m_context(zai_provider):
+    """Regression: glm-5.2 advertises 1M context and must not fall back to 8192.
+
+    Mis-resolution to the base class default of 8192 collapses the tool-token
+    budget to 2048 and disables KV session-locking, causing the empty-response /
+    aggressive-recovery freeze documented in the runbook.
+    """
+    from victor.providers.zai_provider import ZAI_MODELS
+
+    # Exact registry entry exists
+    assert "glm-5.2" in ZAI_MODELS
+    assert ZAI_MODELS["glm-5.2"]["context_window"] == 1000000
+
+    # Both methods resolve the true window for the model name and its coding suffix
+    for model in ("glm-5.2", "glm-5.2:coding"):
+        assert zai_provider.context_window(model) == 1000000
+        assert zai_provider.get_context_window(model) == 1000000
+
+
+@pytest.mark.asyncio
 async def test_chat_server_error(zai_provider):
     """Test server error handling."""
     mock_response = MagicMock()

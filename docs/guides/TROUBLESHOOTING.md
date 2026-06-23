@@ -792,6 +792,133 @@ victor doctor --verbose | grep -E "memory|disk|cpu"
 
 ---
 
+## Provider Model Registration (Context-Window Mis-Resolution)
+
+This runbook covers the class of failure where a **new model** (e.g. a newly
+released flagship like `glm-5.2`) causes the UI to freeze, the agent to emit
+empty responses, and the streaming executor to loop on "aggressive recovery"
+—even though the model itself advertises a very large context window.
+
+### Problem
+
+A provider profile advertises a model with a large context window (e.g. 1M
+context), but once the conversation grows past a low threshold the session
+freezes. Logs show a degenerate loop:
+
+```
+WARNING - chat_stream_helpers - Stream completed without content or tool calls
+WARNING - chat_stream_helpers - Provider payload required tool-history repair: ... removed=1 ...
+WARNING - chat_stream_executor - Model returned empty response - attempting aggressive recovery
+```
+
+### Root Cause
+
+The runtime does **not** read the advertised context window from
+`~/.victor/profiles.yaml` (that loader only maps `provider`, `model`,
+`coding_plan`, `temperature`, `max_tokens`, `description`). The effective window
+comes from `provider.context_window(model)` (the `BaseProvider` API), consumed at
+`victor/agent/services/tool_service.py:2799` (`_get_tool_context_window`).
+
+Two registration gaps cause the freeze:
+
+1. **Missing `context_window()` override.** The base class method has its own
+   lookup table (`victor/providers/base.py:1075`) that does NOT include the new
+   model. Unknown models fall back to `8192` tokens
+   (`base.py:1150` warns `Unknown model ... using default context window of 8192`).
+2. **Missing registry entry.** If the provider only ships a custom
+   `get_context_window()` (note the `get_` prefix), it is **not** consulted by
+   the tool/KV-budgeting path — the base `context_window()` wins.
+
+With the window mis-resolved to 8192:
+- `max_tool_tokens = int(8192 * 0.25) = 2048` for the tool schema budget
+  (`tool_service.py:2740`).
+- KV session-locking is disabled (`8192 >= 32000` is False,
+  `tool_service.py:2810`).
+- Context pruning/compaction is tuned to a ceiling ~125x too small, so the
+  tool-history repair path starts *removing* messages — breaking the
+  OpenAI tool-call ↔ tool-result pairing and triggering the empty-response
+  recovery loop that manifests as the freeze.
+
+### Diagnosis
+
+Confirm what the runtime actually sees (this is the authoritative check):
+
+```bash
+python -c "
+from victor.providers.zai_provider import ZAIProvider
+p = ZAIProvider(api_key='x')
+for m in ['glm-5.2','glm-5.2:coding','glm-5.1','glm-4.6']:
+    print(f'{m:16} context_window()={p.context_window(m)}')
+"
+```
+
+A healthy result shows the model's true window (e.g. `1000000`). An unhealthy
+result shows `8192` or a value far below the advertised window, plus the
+`Unknown model ... using default context window of 8192` warning.
+
+### Solutions
+
+1. **Register the model in the provider's model table** (single source of
+   truth). For ZAI, add an exact entry to `ZAI_MODELS` in
+   `victor/providers/zai_provider.py`, placed so exact-match wins:
+
+   ```python
+   "glm-5.2": {
+       "description": "GLM-5.2 - Latest SOTA model (753B MoE), 1M context",
+       "context_window": 1000000,
+       "max_output": 65535,
+       "supports_tools": True,
+       "supports_thinking": True,
+   },
+   ```
+
+2. **Ensure `context_window()` (no `get_` prefix) is overridden** and delegates
+   to the table, so the runtime path consults it instead of the base fallback:
+
+   ```python
+   def context_window(self, model: str) -> int:
+       return self.get_context_window(model)
+   ```
+
+3. Re-run the diagnosis snippet above — both the exact name **and** any suffix
+   variant (e.g. `glm-5.2:coding`) must resolve to the true window.
+
+> Note: adding `context_window:` to `~/.victor/profiles.yaml` will **not** fix
+> this — the profile loader ignores that field. The provider registry is the
+> only effective override.
+
+### Prevention (Adding Any New Model)
+
+Follow this checklist whenever a new model is added (new release, new provider,
+or new suffix/variant):
+
+1. **Add the model to the provider's `<PROVIDER>_MODELS` table** with the
+   correct `context_window`, `max_output`, `supports_tools`, and
+   `supports_thinking`.
+2. **Confirm `context_window(model)` resolves correctly** by running the
+   diagnosis snippet — verify the exact name AND every suffix/variant used in
+   profiles (e.g. `:coding`, `:china`).
+3. **Check `get_provider_category()`** (`victor/config/tool_tiers.py:184`) —
+   tool-broadcasting strategy is tiered by window (`<16384`, `<131072`, ...);
+   a mis-resolved window picks the wrong strategy.
+4. **Watch the logs for the failure signature** on first real use:
+   `Unknown model ... using default context window of 8192`, or the
+   `tool-history repair ... removed=` / `attempting aggressive recovery` loop.
+   If either appears, the model is not registered for the budgeting path.
+5. **Add/extend the provider's unit test** asserting both
+   `provider.context_window(model)` and `provider.get_context_window(model)`
+   return the expected value for each supported model name.
+
+### Related Files
+
+- `victor/providers/<provider>_provider.py` — model registry + window override
+- `victor/providers/base.py:1055` — `context_window()` default lookup (8192
+  fallback at `:1150`)
+- `victor/agent/services/tool_service.py:2799,2740,2810` — runtime consumers
+- `victor/config/tool_tiers.py:184` — provider category by window size
+
+---
+
 ## Related Documentation
 
 - **Configuration Guide**: See `victor profile list` for available profiles

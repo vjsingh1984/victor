@@ -51,6 +51,17 @@ ZAI_BASE_URLS = {
 # Reference: https://open.bigmodel.cn/dev/api
 ZAI_MODELS = {
     # Paid flagship models (context windows from docs.z.ai and OpenRouter)
+    # GLM-5.2 (2026-06-16): 753B MoE (~40B active), 1M context window.
+    # MUST be listed here so get_context_window() matches it EXACTLY — otherwise
+    # the prefix fallback mis-resolves it to the glm-5 family's 200K and the
+    # base-class context_window() falls back to 8192 (see context_window() below).
+    "glm-5.2": {
+        "description": "GLM-5.2 - Latest SOTA model (753B MoE), 1M context",
+        "context_window": 1000000,
+        "max_output": 65535,
+        "supports_tools": True,
+        "supports_thinking": True,
+    },
     "glm-5.1": {
         "description": "GLM-5.1 - Latest SOTA model, rivals Claude Opus 4.6",
         "context_window": 200000,
@@ -384,11 +395,25 @@ class ZAIProvider(HttpxOpenAICompatProvider):
 
     # ── ZAI-specific helpers ──────────────────────────────────────────────────
 
+    def context_window(self, model: str) -> int:
+        """Context window in tokens — the method the runtime actually calls.
+
+        ToolService._get_tool_context_window and the KV / tool-broadcasting
+        strategies call ``provider.context_window(model)`` (the BaseProvider
+        API), NOT get_context_window(). BaseProvider.context_window() has its
+        own lookup table that does NOT include any GLM model, so without this
+        override every GLM model falls back to the base class's 8192 default —
+        which collapses the tool-token budget to 2048 and disables KV
+        session-locking. This override delegates to get_context_window() so
+        ZAI_MODELS remains the single source of truth.
+        """
+        return self.get_context_window(model)
+
     def get_context_window(self, model: str) -> int:
         """Get context window size for a GLM model.
 
         Args:
-            model: Model name (e.g., "glm-4.7", "glm-4.6")
+            model: Model name (e.g., "glm-5.2", "glm-4.7", "glm-4.6")
 
         Returns:
             Context window size in tokens (default 128K for unknown models)
