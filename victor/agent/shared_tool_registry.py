@@ -317,7 +317,7 @@ class SharedToolRegistry:
             tool_instance = tool_obj.Tool
             self._tool_classes[tool_instance.name] = type(tool_instance)
             self._decorated_tools[tool_instance.name] = tool_obj
-            return tool_obj
+            return tool_instance
 
         try:
             tool_name_from_obj = getattr(tool_obj, "name", tool_name)

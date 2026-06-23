@@ -2,6 +2,8 @@ from types import SimpleNamespace
 from victor.agent.tool_catalog_loader import ToolCatalogLoader
 from victor.agent.tool_registrar import ToolRegistrar, ToolRegistrarConfig
 from victor.tools.base import BaseTool, ToolResult
+from victor.tools.batch_registration import BatchRegistrar
+from victor.tools.decorators import tool
 from victor.tools.registry import ToolRegistry
 
 
@@ -65,6 +67,21 @@ def test_catalog_loader_bootstrap_does_not_full_discover(monkeypatch):
     assert result.full_catalog_loaded is False
     assert fake_shared.bootstrap_calls == 1
     assert fake_shared.full_calls == 0
+
+
+def test_batch_registration_accepts_decorated_tool_functions():
+    registry = ToolRegistry()
+
+    @tool(name="decorated_batch_test")
+    async def decorated_batch_test(value: str = "ok"):
+        """Decorated test tool."""
+        return value
+
+    result = BatchRegistrar(registry).register_batch([decorated_batch_test])
+
+    assert result.success_count == 1
+    assert result.failed == []
+    assert registry.get("decorated_batch_test") is not None
 
 
 def test_registrar_hydrates_graph_on_query_demand(monkeypatch):

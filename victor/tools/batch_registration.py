@@ -108,6 +108,22 @@ class BatchRegistrationValidator:
         """Initialize validator with registry reference."""
         self._registry = registry
 
+    @staticmethod
+    def _registration_tool(tool: Any) -> Any:
+        """Return the concrete tool object used for validation/registration."""
+        if hasattr(tool, "Tool"):
+            return tool.Tool
+        return tool
+
+    @staticmethod
+    def _tool_name(tool: Any) -> str:
+        """Return a stable tool name for diagnostics without assuming .name."""
+        concrete = BatchRegistrationValidator._registration_tool(tool)
+        name = getattr(concrete, "name", None)
+        if name:
+            return str(name)
+        return getattr(tool, "__name__", type(tool).__name__) or "unnamed_tool"
+
     def validate_batch(self, tools: List[Any]) -> ValidationContext:
         """Validate all tools in the batch.
 
@@ -119,11 +135,13 @@ class BatchRegistrationValidator:
         """
         context = ValidationContext()
 
-        for tool in tools:
+        for raw_tool in tools:
+            tool = self._registration_tool(raw_tool)
+            tool_name = self._tool_name(tool)
             try:
                 # Validate tool name uniqueness
-                if tool.name in context.tools:
-                    context.add_error(tool.name, f"Duplicate tool name: {tool.name}")
+                if tool_name in context.tools:
+                    context.add_error(tool_name, f"Duplicate tool name: {tool_name}")
                     continue
 
                 # Validate tool metadata
@@ -133,10 +151,10 @@ class BatchRegistrationValidator:
                 self._validate_tool_parameters(tool, context)
 
                 # Tool is valid, add to context
-                context.add_tool(tool.name, tool)
+                context.add_tool(tool_name, tool)
 
             except Exception as e:
-                context.add_error(tool.name, str(e))
+                context.add_error(tool_name, str(e))
 
         return context
 
@@ -147,22 +165,24 @@ class BatchRegistrationValidator:
             tool: Tool to validate
             context: Validation context to update
         """
-        # Check required fields
-        if not tool.name:
-            context.add_error(tool.name or "unnamed_tool", "Tool name is required")
+        tool_name = self._tool_name(tool)
 
-        if not tool.description:
-            context.add_error(tool.name, "Tool description is required")
+        # Check required fields
+        if not tool_name:
+            context.add_error("unnamed_tool", "Tool name is required")
+
+        if not getattr(tool, "description", ""):
+            context.add_error(tool_name, "Tool description is required")
 
         # Validate tags
         if hasattr(tool, "tags") and tool.tags:
             if not isinstance(tool.tags, list):
-                context.add_error(tool.name, "Tags must be a list")
+                context.add_error(tool_name, "Tags must be a list")
 
             # Validate tag format
             for tag in tool.tags:
                 if not isinstance(tag, str):
-                    context.add_error(tool.name, f"Tag must be string, got {type(tag)}")
+                    context.add_error(tool_name, f"Tag must be string, got {type(tag)}")
 
     def _validate_tool_parameters(self, tool: Any, context: ValidationContext) -> None:
         """Validate tool parameter schema.
@@ -176,17 +196,17 @@ class BatchRegistrationValidator:
 
         parameters = tool.parameters
         if not isinstance(parameters, dict):
-            context.add_error(tool.name, "Parameters must be a dict")
+            context.add_error(self._tool_name(tool), "Parameters must be a dict")
             return
 
         # Validate schema structure
         if parameters.get("type") != "object":
-            context.add_error(tool.name, "Parameters root type must be 'object'")
+            context.add_error(self._tool_name(tool), "Parameters root type must be 'object'")
 
         # Validate properties if present
         properties = parameters.get("properties", {})
         if not isinstance(properties, dict):
-            context.add_error(tool.name, "Properties must be a dict")
+            context.add_error(self._tool_name(tool), "Properties must be a dict")
             return
 
         # Check for required fields
