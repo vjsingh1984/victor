@@ -51,7 +51,7 @@ def create_shell_parser() -> UnifiedShellParser:
     execution_category=ExecutionCategory.MIXED,
     priority=Priority.HIGH,
 )
-async def shell_tool(command: str) -> str:
+async def shell_tool(cmd: str) -> str:
     """Unified shell tool.
     Example commands:
       shell "ls -la"
@@ -60,7 +60,7 @@ async def shell_tool(command: str) -> str:
     parser = create_shell_parser()
 
     try:
-        args_list = split_command(command)
+        args_list = split_command(cmd)
         if args_list and args_list[0] == "shell":
             args_list = args_list[1:]
         parsed_args = parser.parse_args(args_list)

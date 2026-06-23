@@ -136,3 +136,29 @@ def test_shared_registry_bootstrap_exposes_grouped_command_tools():
     assert {"fs", "search", "code", "web", "shell"}.issubset(names)
     assert "git" not in names
     assert "pr" not in names
+
+
+def test_grouped_command_tool_schemas_use_cmd_parameter():
+    from victor.agent.shared_tool_registry import SharedToolRegistry
+    from victor.tools.batch_registration import BatchRegistrar
+    from victor.tools.registry import ToolRegistry
+
+    SharedToolRegistry.reset_instance()
+    try:
+        shared = SharedToolRegistry.get_instance()
+        registry = ToolRegistry()
+        BatchRegistrar(registry).register_batch(
+            shared.get_bootstrap_tools_for_registration(),
+            fail_fast=False,
+        )
+
+        schemas = {
+            schema["function"]["name"]: schema["function"]["parameters"].get("properties", {})
+            for schema in registry.get_tool_schemas(include_folded=True, only_enabled=False)
+        }
+    finally:
+        SharedToolRegistry.reset_instance()
+
+    for tool_name in ("fs", "search", "code", "web", "shell"):
+        assert "cmd" in schemas[tool_name]
+        assert "command" not in schemas[tool_name]

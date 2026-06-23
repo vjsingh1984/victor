@@ -81,7 +81,7 @@ def create_search_parser() -> UnifiedSearchParser:
     execution_category=ExecutionCategory.MIXED,
     priority=Priority.HIGH,
 )
-async def search_tool(command: str) -> str:
+async def search_tool(cmd: str) -> str:
     """Unified search tool with bash-like syntax.
     Example commands:
       search grep "def foo" /path
@@ -91,7 +91,7 @@ async def search_tool(command: str) -> str:
     parser = create_search_parser()
 
     try:
-        args_list = split_command(command)
+        args_list = split_command(cmd)
         if args_list and args_list[0] == "search":
             args_list = args_list[1:]
         parsed_args = parser.parse_args(args_list)

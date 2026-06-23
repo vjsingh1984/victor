@@ -77,7 +77,7 @@ def create_web_parser() -> UnifiedWebParser:
     execution_category=ExecutionCategory.MIXED,
     priority=Priority.HIGH,
 )
-async def web_tool(command: str) -> str:
+async def web_tool(cmd: str) -> str:
     """Unified web tool.
     Example commands:
       web fetch "https://google.com"
@@ -87,7 +87,7 @@ async def web_tool(command: str) -> str:
     parser = create_web_parser()
 
     try:
-        args_list = split_command(command)
+        args_list = split_command(cmd)
         if args_list and args_list[0] == "web":
             args_list = args_list[1:]
         parsed_args = parser.parse_args(args_list)

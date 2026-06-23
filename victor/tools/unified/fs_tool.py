@@ -73,7 +73,7 @@ def create_fs_parser() -> UnifiedFsParser:
     execution_category=ExecutionCategory.MIXED,
     priority=Priority.HIGH,
 )
-async def fs_tool(command: str) -> str:
+async def fs_tool(cmd: str) -> str:
     """Unified filesystem tool with bash-like syntax. Use subcommands to
     interact with the file system. Example commands:
       fs ls /path/to/dir
@@ -86,7 +86,7 @@ async def fs_tool(command: str) -> str:
     try:
         from victor.tools.unified.parser import split_command
 
-        args_list = split_command(command)
+        args_list = split_command(cmd)
         if args_list and args_list[0] == "fs":
             args_list = args_list[1:]
 

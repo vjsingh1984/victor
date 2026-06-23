@@ -453,6 +453,37 @@ class SharedToolRegistry:
                 except Exception as e:
                     logger.debug(f"Failed to load tools from {module_name}: {e}")
 
+        # The flat scan above only visits top-level .py files. The unified
+        # bash-style tools (fs/shell/search/web/code) live in the ``unified/``
+        # subpackage; scan it with the same discovery logic so their @tool
+        # decorators populate this registry's catalogs. Without this, the
+        # unified tools are absent from get_all_tools_for_registration() and
+        # therefore never registered on the full-discovery (full=True) path.
+        unified_dir = os.path.join(tools_dir, "unified")
+        if os.path.isdir(unified_dir):
+            for filename in os.listdir(unified_dir):
+                # Only the *_tool.py modules define @tool entrypoints; skip
+                # registry/adapters/parser/__init__ helpers.
+                if not filename.endswith("_tool.py"):
+                    continue
+                module_name = f"victor.tools.unified.{filename[:-3]}"
+                try:
+                    module = importlib.import_module(module_name)
+                    for _member_name, obj in inspect.getmembers(module):
+                        if inspect.isfunction(obj) and getattr(obj, "_is_tool", False):
+                            tool_instance = obj.Tool
+                            tool_name = tool_instance.name
+                            # The flat scan above runs first, so canonical tools
+                            # (e.g. ``bash.shell``) already own their names. Skip
+                            # unified duplicates to avoid silently shadowing them.
+                            if tool_name in self._tool_classes:
+                                continue
+                            self._tool_classes[tool_name] = type(tool_instance)
+                            self._decorated_tools[tool_name] = obj
+                            discovered_decorated += 1
+                except Exception as e:
+                    logger.debug(f"Failed to load tools from {module_name}: {e}")
+
         logger.info(
             f"SharedToolRegistry discovered {len(self._tool_classes)} tools "
             f"({discovered_classes} classes, {discovered_decorated} decorated)"

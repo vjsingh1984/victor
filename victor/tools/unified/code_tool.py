@@ -89,7 +89,7 @@ def create_code_parser() -> UnifiedCodeParser:
     execution_category=ExecutionCategory.MIXED,
     priority=Priority.HIGH,
 )
-async def code_tool(command: str) -> str:
+async def code_tool(cmd: str) -> str:
     """Unified code tool.
     Example commands:
       code test pytest tests/
@@ -99,7 +99,7 @@ async def code_tool(command: str) -> str:
     parser = create_code_parser()
 
     try:
-        args_list = split_command(command)
+        args_list = split_command(cmd)
         if args_list and args_list[0] == "code":
             args_list = args_list[1:]
         parsed_args = parser.parse_args(args_list)
