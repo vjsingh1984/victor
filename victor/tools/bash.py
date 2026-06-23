@@ -177,6 +177,10 @@ READONLY_COMMANDS_UNIX: Set[str] = {
     "black",
     "ruff",
     "eslint",
+    # Dependency tree visualization (readonly)
+    "pipdeptree",
+    # Infrastructure as Code inspection (readonly)
+    "terraform",
 }
 
 READONLY_COMMANDS_WINDOWS: Set[str] = {
@@ -641,6 +645,17 @@ def _validate_single_readonly_command(cmd: str) -> tuple[bool, str]:
     if base_cmd not in readonly_commands and base_cmd not in _SHELL_SAFE_BUILTINS:
         return False, base_cmd
 
+    # Allow bare --version / --help / -V / -h for any command (they're always readonly)
+    # This must come BEFORE subcommand handlers because _extract_subcommand
+    # returns None for bare flags, which would cause false rejections.
+    _bare_info = {"--version", "-v", "-V", "--help", "-h", "version", "help"}
+    try:
+        _tokens = shlex.split(cmd.strip())
+    except ValueError:
+        _tokens = cmd.strip().split()
+    if len(_tokens) <= 2 and any(t in _bare_info for t in _tokens[1:]):
+        return True, ""
+
     # Special handling for commands with subcommands
     if base_cmd == "git":
         subcommand = _extract_subcommand(cmd, "git")
@@ -736,6 +751,14 @@ def _validate_single_readonly_command(cmd: str) -> tuple[bool, str]:
             "info",
             "version",
             "system",
+            "stats",
+            "history",
+            "context",
+            "buildx",
+            "compose",
+            "manifest",
+            "image",
+            "container",
         }
         for sub in readonly_docker:
             if f"docker {sub}" in cmd:
@@ -743,10 +766,29 @@ def _validate_single_readonly_command(cmd: str) -> tuple[bool, str]:
                 if sub in {"network", "volume"}:
                     if "ls" in cmd or "inspect" in cmd:
                         return True, ""
+                elif sub == "system":
+                    # Allow df, info, events but not prune
+                    if "prune" in cmd:
+                        return False, "docker system prune"
+                    return True, ""
+                elif sub == "image":
+                    # Allow ls, inspect, history, prune is write
+                    if "ls" in cmd or "inspect" in cmd or "history" in cmd:
+                        return True, ""
+                    return False, f"docker image (write op)"
+                elif sub == "container":
+                    if "ls" in cmd or "inspect" in cmd or "stats" in cmd:
+                        return True, ""
+                    return False, f"docker container (write op)"
+                elif sub == "compose":
+                    # Allow ps, logs, config, top, images
+                    _compose_ro = {"ps", "logs", "config", "top", "images", "port"}
+                    _compose_sub = _extract_subcommand(cmd.replace("docker compose", "compose"), "compose")
+                    if _compose_sub in _compose_ro:
+                        return True, ""
+                    return False, f"docker compose {_compose_sub or ''}"
                 else:
                     return True, ""
-        if "docker" in cmd and ("--version" in cmd or "version" in cmd):
-            return True, ""
         return False, "docker (write operation)"
 
     # podman handling: same as docker
@@ -827,6 +869,13 @@ def _validate_single_readonly_command(cmd: str) -> tuple[bool, str]:
             if f"pnpm {sub}" in cmd:
                 return True, ""
         return False, "pnpm (write operation)"
+
+    # npm handling: similar to pip — only allow readonly subcommands
+    if base_cmd == "npm":
+        subcommand = _extract_subcommand(cmd, "npm")
+        if subcommand and subcommand in NPM_READONLY_SUBCOMMANDS:
+            return True, ""
+        return False, f"npm {subcommand or ''}"
 
     # Code quality tools: allow --check, --version, help
     if base_cmd in {"flake8", "pylint", "mypy", "ruff", "eslint"}:
