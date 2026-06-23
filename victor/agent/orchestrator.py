@@ -244,7 +244,6 @@ from victor.core.errors import (
 )
 from victor.tools.enums import CostTier
 from victor.tools.registry import ToolRegistry
-from victor.tools.code_executor_tool import CodeSandbox
 from victor.tools.mcp_bridge_tool import get_mcp_tool_definitions
 from victor.tools.plugin_registry import ToolPluginRegistry
 from victor.tools.semantic_selector import SemanticToolSelector

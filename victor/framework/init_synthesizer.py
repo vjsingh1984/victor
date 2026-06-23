@@ -1807,7 +1807,13 @@ class InitSynthesizer:
         2. Find loosely coupled patterns (registries, decorators) via semantic edges.
         """
         try:
-            from victor.tools.graph_tool import graph, GraphMode
+            try:
+                import importlib
+                module = importlib.import_module("victor_coding.tools.graph_tool")
+                graph = module.graph
+                GraphMode = module.GraphMode
+            except ImportError:
+                return {}
 
             discovery_lines = []
 

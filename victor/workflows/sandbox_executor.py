@@ -338,10 +338,9 @@ class SandboxedExecutor:
         Returns:
             SandboxExecutionResult
         """
-        from victor.tools.code_executor_tool import (
-            SANDBOX_CONTAINER_LABEL,
-            SANDBOX_CONTAINER_VALUE,
-        )
+        # Using inline constants to avoid dependency on victor_coding
+        SANDBOX_CONTAINER_LABEL = "victor.sandbox"
+        SANDBOX_CONTAINER_VALUE = "code-executor"
 
         limits = isolation.resource_limits or ResourceLimits()
         image = isolation.docker_image or self._default_image
