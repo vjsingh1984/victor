@@ -120,3 +120,19 @@ def test_chat_file_watchers_are_demand_driven_by_default(monkeypatch):
 
     monkeypatch.setenv("VICTOR_CHAT_FILE_WATCHERS", "1")
     assert _should_start_file_watchers_on_startup(SimpleNamespace()) is True
+
+
+def test_shared_registry_bootstrap_exposes_grouped_command_tools():
+    from victor.agent.shared_tool_registry import SharedToolRegistry
+
+    SharedToolRegistry.reset_instance()
+    try:
+        registry = SharedToolRegistry.get_instance()
+        tools = registry.get_bootstrap_tools_for_registration()
+        names = {getattr(tool, "name", "") for tool in tools}
+    finally:
+        SharedToolRegistry.reset_instance()
+
+    assert {"fs", "search", "code", "web", "shell"}.issubset(names)
+    assert "git" not in names
+    assert "pr" not in names

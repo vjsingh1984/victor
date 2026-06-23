@@ -6,19 +6,41 @@ from victor.tools.base import AccessMode, DangerLevel, ExecutionCategory, Priori
 from victor.tools.decorators import tool
 from victor.tools.unified.parser import split_command
 
-# Mock imports for the underlying web tools
-try:
-    from victor.tools.web import fetch_url, search_web, render_page
-except ImportError:
 
-    async def fetch_url(url: str):
-        return ""
+async def fetch_url(url: str):
+    """Fetch a URL through the production web_fetch tool."""
+    from victor.tools.web_search_tool import web_fetch
 
-    async def search_web(query: str):
-        return []
+    result = await web_fetch(url=url, render="auto")
+    if isinstance(result, dict):
+        if result.get("success") is False:
+            raise RuntimeError(result.get("error", "fetch failed"))
+        return result.get("content") or result.get("results") or result.get("text") or str(result)
+    return result
 
-    async def render_page(url: str):
-        return ""
+
+async def search_web(query: str):
+    """Search the web through the production web_search tool."""
+    from victor.tools.web_search_tool import web_search
+
+    result = await web_search(query=query)
+    if isinstance(result, dict):
+        if result.get("success") is False:
+            raise RuntimeError(result.get("error", "web search failed"))
+        return result.get("results") or str(result)
+    return result
+
+
+async def render_page(url: str):
+    """Render a page through the production web_fetch browser path."""
+    from victor.tools.web_search_tool import web_fetch
+
+    result = await web_fetch(url=url, render="browser")
+    if isinstance(result, dict):
+        if result.get("success") is False:
+            raise RuntimeError(result.get("error", "render failed"))
+        return result.get("content") or result.get("results") or result.get("text") or str(result)
+    return result
 
 
 class UnifiedWebParser(argparse.ArgumentParser):

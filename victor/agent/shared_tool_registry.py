@@ -56,6 +56,7 @@ logger = logging.getLogger(__name__)
 
 # Web tools that should be filtered out in airgapped mode
 WEB_TOOL_NAMES: Set[str] = {
+    "web",
     "web_search",
     "web_fetch",
     "http_tool",
@@ -83,15 +84,16 @@ SCHEMA_HIDDEN_TOOL_NAMES: Set[str] = {
 
 
 BOOTSTRAP_TOOL_SPECS: Dict[str, tuple[str, str]] = {
+    "fs": ("victor.tools.unified.fs_tool", "fs_tool"),
+    "search": ("victor.tools.unified.search_tool", "search_tool"),
+    "code": ("victor.tools.unified.code_tool", "code_tool"),
+    "web": ("victor.tools.unified.web_tool", "web_tool"),
     "read": ("victor.tools.filesystem", "read"),
     "write": ("victor.tools.filesystem", "write"),
     "ls": ("victor.tools.filesystem", "ls"),
     "project_overview": ("victor.tools.filesystem", "project_overview"),
     "edit": ("victor.tools.file_editor_tool", "edit"),
-    "code_search": ("victor.tools.code_search_tool", "code_search"),
     "shell": ("victor.tools.bash", "shell"),
-    "git": ("victor.tools.git_tool", "git"),
-    "pr": ("victor.tools.git_tool", "pr"),
     "web_search": ("victor.tools.web_search_tool", "web_search"),
     "web_fetch": ("victor.tools.web_search_tool", "web_fetch"),
 }
@@ -310,7 +312,9 @@ class SharedToolRegistry:
             module = importlib.import_module(module_name)
             tool_obj = getattr(module, member_name)
         except Exception as exc:
-            logger.debug("Failed to load bootstrap tool %s from %s: %s", tool_name, module_name, exc)
+            logger.debug(
+                "Failed to load bootstrap tool %s from %s: %s", tool_name, module_name, exc
+            )
             return None
 
         if inspect.isfunction(tool_obj) and getattr(tool_obj, "_is_tool", False):
@@ -503,9 +507,7 @@ class SharedToolRegistry:
                     # so the proxy does not re-instantiate the class on first use.
                     cached_instance = self._tool_instances.get(name)
                     factory = (
-                        (lambda inst=cached_instance: inst)
-                        if cached_instance is not None
-                        else cls
+                        (lambda inst=cached_instance: inst) if cached_instance is not None else cls
                     )
                     proxy = LazyToolProxy(
                         name=name,

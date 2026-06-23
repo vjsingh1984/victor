@@ -38,16 +38,28 @@ async def test_fs_tool_ls_markdown_formatting():
 
 
 @pytest.mark.asyncio
-async def test_fs_tool_patch_recovery_hint():
+async def test_fs_tool_patch_replaces_first_match(tmp_path):
+    """Test that `fs patch --search/--replace` edits the target file."""
+    target = tmp_path / "app.py"
+    target.write_text("foo\nfoo\n", encoding="utf-8")
+
+    result = await fs_tool(f'fs patch {target} --search "foo" --replace "bar"')
+
+    assert "replaced 1 occurrence" in result
+    assert target.read_text(encoding="utf-8") == "bar\nfoo\n"
+
+
+@pytest.mark.asyncio
+async def test_fs_tool_patch_recovery_hint(tmp_path):
     """Test that failed patches return Markdown headers and recovery hints."""
-    with patch("victor.tools.unified.fs_tool.apply_patch", new_callable=AsyncMock) as mock_replace:
-        mock_replace.side_effect = ValueError("String not found")
+    target = tmp_path / "app.py"
+    target.write_text("baz\n", encoding="utf-8")
 
-        # Pass the options just like bash
-        result = await fs_tool('fs patch app.py --search "foo" --replace "bar"')
+    # Pass the options just like bash
+    result = await fs_tool(f'fs patch {target} --search "foo" --replace "bar"')
 
-        # Assert markdown headers and explicit recovery hints
-        assert "### ❌ ERROR" in result
-        assert "Patch failed: String not found" in result
-        assert "### 💡 SYSTEM HINT" in result
-        assert "Use `fs cat app.py` to refresh your view" in result
+    # Assert markdown headers and explicit recovery hints
+    assert "### ❌ ERROR" in result
+    assert "Patch failed: String not found" in result
+    assert "### 💡 SYSTEM HINT" in result
+    assert f"Use `fs cat {target}` to refresh your view" in result

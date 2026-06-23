@@ -51,6 +51,6 @@ async def test_search_tool_files():
 
         result = await search_tool('search files "*.py" .')
 
-        mock_find.assert_called_once_with(pattern="*.py", path=".")
+        mock_find.assert_called_once_with(name="*.py", path=".")
         assert "src/app.py" in result
         assert "tests/test_app.py" in result

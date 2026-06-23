@@ -1,27 +1,46 @@
 import argparse
+import re
 import sys
 from io import StringIO
-from typing import Any, List, Dict
+from pathlib import Path
 
 from victor.tools.base import AccessMode, DangerLevel, ExecutionCategory, Priority
 from victor.tools.decorators import tool
+from victor.tools.filesystem import find
 from victor.tools.unified.parser import split_command
 
-# We assume these exist or will be imported correctly from the core codebase
-try:
-    from victor.tools.search import grep_search
-except ImportError:
-    # Fallback or mock for testing if it doesn't exist
-    async def grep_search(query: str, path: str, regex: bool = False, case_sensitive: bool = False):
-        return []
 
-
-try:
-    from victor.tools.filesystem import find
-except ImportError:
-
-    async def find(pattern: str, path: str):
-        return []
+async def grep_search(
+    query: str,
+    path: str,
+    regex: bool = False,
+    case_sensitive: bool = False,
+):
+    """Search text files and return grep-like match dictionaries."""
+    root = Path(path).expanduser()
+    targets = [root] if root.is_file() else [p for p in root.rglob("*") if p.is_file()]
+    flags = 0 if case_sensitive else re.IGNORECASE
+    pattern = re.compile(query if regex else re.escape(query), flags)
+    results = []
+    for file_path in targets:
+        if any(
+            part in {".git", ".venv", "__pycache__", "node_modules"} for part in file_path.parts
+        ):
+            continue
+        try:
+            lines = file_path.read_text(encoding="utf-8", errors="ignore").splitlines()
+        except OSError:
+            continue
+        for line_no, line in enumerate(lines, start=1):
+            if pattern.search(line):
+                results.append(
+                    {
+                        "file": str(file_path),
+                        "line": line_no,
+                        "content": line,
+                    }
+                )
+    return results
 
 
 class UnifiedSearchParser(argparse.ArgumentParser):
@@ -116,7 +135,7 @@ async def search_tool(command: str) -> str:
 
     elif parsed_args.subcommand == "files":
         try:
-            results = await find(pattern=parsed_args.pattern, path=parsed_args.path)
+            results = await find(name=parsed_args.pattern, path=parsed_args.path)
             if not isinstance(results, list):
                 return str(results)
 

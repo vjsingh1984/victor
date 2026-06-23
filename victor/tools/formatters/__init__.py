@@ -54,6 +54,7 @@ def _register_default_formatters() -> None:
     registry.register("code_search", SearchResultsFormatter())
     registry.register("semantic_code_search", SearchResultsFormatter())
     registry.register("search", SearchResultsFormatter())
+    registry.register("web", HTTPFormatter())
 
     registry.register("git", GitFormatter())
 
@@ -75,6 +76,7 @@ def _register_default_formatters() -> None:
 
     # Phase 7 formatters
     registry.register("filesystem", FileSystemFormatter())
+    registry.register("fs", FileSystemFormatter())
     registry.register("ls", FileSystemFormatter())
     registry.register("find", FileSystemFormatter())
     registry.register("cat", FileSystemFormatter())

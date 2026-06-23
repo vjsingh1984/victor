@@ -1,25 +1,57 @@
 import argparse
+from pathlib import Path
+import shlex
 import sys
 from io import StringIO
-import json
 
 from victor.tools.base import AccessMode, DangerLevel, ExecutionCategory, Priority
 from victor.tools.decorators import tool
 from victor.tools.unified.parser import split_command
 
-# Mock imports for the underlying code tools
-try:
-    from victor.tools.code import run_tests, execute_python, analyze_metrics
-except ImportError:
 
-    async def run_tests(runner: str, path: str):
-        return {}
+async def run_tests(runner: str, path: str):
+    """Run tests through the production shell surface."""
+    from victor.tools.bash import shell
 
-    async def execute_python(code: str):
-        return ""
+    cmd = f"{shlex.quote(runner)} {shlex.quote(path)}"
+    return await shell(cmd=cmd, readonly=True, action="read")
 
-    async def analyze_metrics(path: str):
-        return {}
+
+async def execute_python(code: str):
+    """Execute a short Python snippet through the production shell surface."""
+    from victor.tools.bash import shell
+
+    result = await shell(
+        cmd=f"python -c {shlex.quote(code)}",
+        readonly=False,
+        action="execute",
+    )
+    if isinstance(result, dict):
+        stdout = result.get("stdout", "")
+        stderr = result.get("stderr", "")
+        if result.get("success") is False:
+            return stderr or result.get("error", "")
+        return stdout or stderr
+    return str(result)
+
+
+async def analyze_metrics(path: str):
+    """Return lightweight code metrics for Python files under a path."""
+    root = Path(path).expanduser()
+    files = [root] if root.is_file() else list(root.rglob("*.py"))
+    loc = 0
+    functions = 0
+    classes = 0
+    for file_path in files:
+        try:
+            text = file_path.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            continue
+        lines = text.splitlines()
+        loc += sum(1 for line in lines if line.strip())
+        functions += sum(1 for line in lines if line.lstrip().startswith("def "))
+        classes += sum(1 for line in lines if line.lstrip().startswith("class "))
+    return {"files": len(files), "loc": loc, "functions": functions, "classes": classes}
 
 
 class UnifiedCodeParser(argparse.ArgumentParser):
@@ -81,6 +113,13 @@ async def code_tool(command: str) -> str:
             results = await run_tests(runner=parsed_args.runner, path=parsed_args.path)
             if isinstance(results, dict) and "output" in results:
                 return str(results["output"])
+            if isinstance(results, dict):
+                stdout = results.get("stdout", "").strip()
+                stderr = results.get("stderr", "").strip()
+                if stdout or stderr:
+                    return "\n\n".join(part for part in (stdout, stderr) if part)
+                if results.get("success") is False:
+                    return f"### ❌ ERROR\n{results.get('error', 'Test execution failed')}"
             return str(results)
         except Exception as e:
             return f"### ❌ ERROR\nTest execution failed: {e}"

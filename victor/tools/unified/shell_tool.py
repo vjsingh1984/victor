@@ -5,16 +5,19 @@ from io import StringIO
 
 from victor.tools.base import AccessMode, DangerLevel, ExecutionCategory, Priority
 from victor.tools.decorators import tool
-from victor.tools.unified.parser import split_command
 from victor.agent.background_tasks import BackgroundTaskDef
+from victor.tools.unified.parser import split_command
 
-# Mock import for underlying shell runner
-try:
-    from victor.tools.bash import execute_bash
-except ImportError:
 
-    async def execute_bash(cmd: str, sandbox: bool = False, readonly: bool = False):
-        return {"stdout": "", "stderr": ""}
+async def execute_bash(cmd: str, sandbox: bool = False, readonly: bool = False):
+    """Execute through the production shell tool implementation."""
+    from victor.tools.bash import shell
+
+    return await shell(
+        cmd=cmd,
+        readonly=readonly,
+        action="read" if readonly else "write",
+    )
 
 
 class UnifiedShellParser(argparse.ArgumentParser):

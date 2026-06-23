@@ -20,15 +20,13 @@ operations (read, write, list) via a single entrypoint using bash-like syntax
 """
 
 import argparse
-import shlex
+from pathlib import Path
 import sys
 from io import StringIO
-from typing import List, Optional
 
 from victor.tools.base import AccessMode, DangerLevel, ExecutionCategory, Priority
 from victor.tools.decorators import tool
 from victor.tools.filesystem import read, write, ls
-from victor.tools.patch_tool import patch as apply_patch
 
 
 class UnifiedFsParser(argparse.ArgumentParser):
@@ -140,11 +138,13 @@ async def fs_tool(command: str) -> str:
 
     elif parsed_args.subcommand == "patch":
         try:
-            return str(
-                await apply_patch(
-                    operation="apply", file_path=parsed_args.path, patch_content=parsed_args.replace
-                )
-            )
+            file_path = Path(parsed_args.path).expanduser()
+            content = file_path.read_text(encoding="utf-8")
+            if parsed_args.search not in content:
+                raise ValueError("String not found")
+            updated = content.replace(parsed_args.search, parsed_args.replace, 1)
+            file_path.write_text(updated, encoding="utf-8")
+            return f"Patched {parsed_args.path}: replaced 1 occurrence."
         except Exception as e:
             return f"### ❌ ERROR\nPatch failed: {e}\n\n### 💡 SYSTEM HINT\nUse `fs cat {parsed_args.path}` to refresh your view of the code before editing."
 
