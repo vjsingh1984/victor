@@ -16,6 +16,7 @@
 
 import asyncio
 import json
+import logging
 import re
 from typing import Any, AsyncIterator, Dict, List, Optional, Union
 
@@ -34,6 +35,8 @@ from victor.providers.base import (
 )
 from victor.providers.logging import ProviderLogger
 from victor.providers.runtime_capabilities import ProviderRuntimeCapabilities
+
+logger = logging.getLogger(__name__)
 from victor.providers.ollama_capability_detector import TOOL_SUPPORT_PATTERNS
 
 
@@ -826,6 +829,13 @@ class OllamaProvider(BaseProvider):
                 }
                 for tool in tools
             ]
+            # INFO log of the serialized tool payload (first-principles debugging).
+            _tool_names = ", ".join(t["function"]["name"] for t in payload["tools"])
+            logger.info(
+                "[ToolSchemas→LLM] Ollama payload: %d tools: %s",
+                len(payload["tools"]),
+                _tool_names,
+            )
 
         # Merge additional options
         if "options" in kwargs:

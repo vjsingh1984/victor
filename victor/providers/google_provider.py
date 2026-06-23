@@ -489,8 +489,14 @@ class GoogleProvider(BaseProvider):
             )
             function_declarations.append(func_decl)
 
-        logger.debug(
-            f"Converted {len(function_declarations)} tools to Gemini FunctionDeclaration format"
+        # Log tool count at INFO for first-principles debugging of the
+        # serialized Gemini payload. Gemini uses opaque SDK types, so we log
+        # tool names + count rather than a fingerprint.
+        _tool_names = ", ".join(t.name for t in tools)
+        logger.info(
+            "[ToolSchemas→LLM] Gemini payload: %d tools: %s",
+            len(function_declarations),
+            _tool_names,
         )
         # Wrap in Tool object - this is the proper way to pass tools
         return [types.Tool(function_declarations=function_declarations)]

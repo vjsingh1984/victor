@@ -35,6 +35,7 @@ from typing import Any, AsyncIterator, Dict, List, Optional
 logger = logging.getLogger(__name__)
 
 from victor.providers.base import CompletionResponse, StreamChunk, ToolDefinition
+from victor.providers.httpx_openai_compat import build_openai_messages
 from victor.providers.httpx_openai_compat import HttpxOpenAICompatProvider
 from victor.providers.resolution import (
     UnifiedApiKeyResolver,
@@ -86,6 +87,73 @@ class DeepSeekProvider(HttpxOpenAICompatProvider):
     RETRY_ATTEMPTS = 5
     # Cap per-call timeout to prevent a single API call from stalling a benchmark
     MAX_API_TIMEOUT = 120
+
+    def supports_prompt_caching(self) -> bool:
+        """DeepSeek context caching (90% discount on cached tokens, 1h+ TTL).
+
+        DeepSeek's API automatically caches prompt prefixes server-side (disk
+        cache). No explicit client-side markers are required — caching is
+        implicit, keyed on a stable serialized prefix.
+        """
+        return True
+
+    def supports_kv_prefix_caching(self) -> bool:
+        """DeepSeek reuses KV cache for matching prompt prefixes."""
+        return True
+
+    def _build_request_payload(
+        self,
+        messages: List[Any],
+        model: str,
+        temperature: float,
+        max_tokens: int,
+        tools: Optional[List[ToolDefinition]],
+        stream: bool,
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        """Build payload with tools[] BEFORE messages[] for prefix-cache stability.
+
+        DeepSeek's server-side auto-prefix cache keys on the serialized request
+        prefix. By placing ``tools`` and ``tool_choice`` before ``messages`` in
+        the payload dict, the tool-definition block becomes the cacheable prefix
+        and stays identical across turns, maximizing cache hits.
+        """
+        formatted = build_openai_messages(messages)
+        if not formatted:
+            raise ValueError(
+                "Cannot send request with empty messages list. "
+                "This usually indicates a conversation initialization issue."
+            )
+
+        provider_params = self._get_provider_params(model, temperature, max_tokens, **kwargs)
+
+        # Pre-build the prefix block (tools/tool_choice) so it can be placed
+        # before messages in the final ordered dict.
+        prefix: Dict[str, Any] = {}
+        effective_tools = self._filter_tools_for_model(model, tools)
+        if effective_tools:
+            prefix["tools"] = self._convert_tools(effective_tools)
+            prefix["tool_choice"] = "auto"
+
+        # Construct payload with tools before messages for cache-friendly
+        # serialization order.
+        payload: Dict[str, Any] = {}
+        payload["model"] = model
+        payload.update(prefix)
+        payload["messages"] = formatted
+        payload["stream"] = stream
+        payload.update(provider_params)
+
+        # Pass through provider-specific kwargs (exclude internal keys)
+        for key, value in kwargs.items():
+            if key not in {"api_key"} and value is not None and key not in payload:
+                payload[key] = value
+
+        # reasoning_effort is only valid for reasoning models; strip if unsupported.
+        if "reasoning_effort" in payload and not self.supports_reasoning_effort(model):
+            payload.pop("reasoning_effort", None)
+
+        return payload
 
     def __init__(
         self,
