@@ -1985,12 +1985,30 @@ class SemanticToolSelector:
             f"Classification-aware selection: type={task_type_str}, " f"confidence={confidence:.2f}"
         )
 
-        # Get tools excluded by negated keywords
-        excluded_tools = self._get_excluded_tools_from_negations(
+        # Intent-based negations (e.g. "don't analyze") DEMOTE the matching tools
+        # to the STUB schema tier rather than delisting them. Delisting makes a tool
+        # completely invisible to the LLM, so it can never be proposed even if the
+        # user's intent shifts mid-turn. Demotion keeps it available (terse, low-token,
+        # still callable) — consistent with the core/compact/stub bucket policy used by
+        # tool_selection._apply_cap("stub") and _enforce_token_budget.
+        demoted_tools = self._get_excluded_tools_from_negations(
             classification_result.negated_keywords
         )
-        if excluded_tools:
-            logger.debug(f"Tools excluded by negation: {excluded_tools}")
+        # Core/mandatory tools are never demoted: the agent must always be able to
+        # reason with read/write/shell capabilities.
+        excluded_tools = set()
+        for name in demoted_tools:
+            if name in mandatory_tool_names:
+                logger.debug(
+                    f"Negation would demote mandatory tool '{name}'; keeping FULL."
+                )
+                continue
+            excluded_tools.add(name)
+        if demoted_tools:
+            logger.debug(
+                f"Tools demoted to STUB by negation: {sorted(demoted_tools)} "
+                f"(mandatory preserved: {sorted(set(demoted_tools) - excluded_tools)})"
+            )
 
         # Adjust threshold based on confidence
         similarity_threshold = self._adjust_threshold_by_confidence(

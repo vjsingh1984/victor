@@ -65,6 +65,16 @@ class TestSortToolsForKvStability:
         result = svc.sort_tools_for_kv_stability(tools, kv_optimization_enabled=True)
         assert result[0].name == "a_full"
 
+    def test_ranked_core_tools_precede_alphabetical_order(self):
+        svc = _make_service()
+        tools = [
+            _make_tool("shell", schema_level="full"),
+            _make_tool("code_search", schema_level="full"),
+            _make_tool("read", schema_level="full"),
+        ]
+        result = svc.sort_tools_for_kv_stability(tools, kv_optimization_enabled=True)
+        assert [t.name for t in result] == ["read", "code_search", "shell"]
+
     def test_returns_none_when_tools_is_none(self):
         svc = _make_service()
         assert svc.sort_tools_for_kv_stability(None) is None
@@ -246,6 +256,41 @@ class TestApplyContextAwareStrategy:
             result = svc.apply_context_aware_strategy(tools, provider=provider, model="small-m")
         mock_ss.assert_called_once()
         assert result == tools[:3]
+
+    def test_context_aware_large_no_cache_provider_merges_additively(self):
+        svc = _make_service()
+        cached = [_make_tool("read")]
+        fresh = [_make_tool("git")]
+        provider = self._provider(supports_caching=False, context_window=128000)
+        with (
+            patch("victor.config.tool_tiers.get_provider_category", return_value="large"),
+            patch.object(svc, "estimate_tool_tokens", return_value=50),
+        ):
+            result = svc.apply_context_aware_strategy(
+                fresh,
+                provider=provider,
+                model="glm-5.2",
+                session_semantic_tools=cached,
+            )
+        assert [t.name for t in result] == ["read", "git"]
+
+    def test_context_aware_runs_even_when_kv_flag_disabled(self):
+        svc = _make_service()
+        cached = [_make_tool("read")]
+        provider = self._provider(supports_caching=False, context_window=128000)
+        with (
+            patch("victor.config.tool_tiers.get_provider_category", return_value="large"),
+            patch.object(svc, "estimate_tool_tokens", return_value=50),
+        ):
+            result = svc.apply_kv_tool_strategy(
+                [_make_tool("refs")],
+                kv_optimization_enabled=False,
+                provider=provider,
+                model="glm-5.2",
+                session_semantic_tools=cached,
+                kv_tool_strategy="context_aware",
+            )
+        assert [t.name for t in result] == ["read", "refs"]
 
 
 # ---------------------------------------------------------------------------

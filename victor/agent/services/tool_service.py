@@ -648,6 +648,27 @@ class ToolService:
         result = await service.execute_tool("read", {"path": "file.txt"})
     """
 
+    # Stable tool ordering is both a cache primitive and a model-salience prior.
+    # Keep high-value coding-agent tools first; unknown tools fall back to schema
+    # level and name for deterministic extension behavior.
+    STABLE_TOOL_ORDER = (
+        "read",
+        "code_search",
+        "ls",
+        "project_overview",
+        "shell",
+        "edit",
+        "write",
+        "git",
+        "refs",
+        "symbol",
+        "graph",
+        "docs_coverage",
+        "scan",
+        "metrics",
+    )
+    STABLE_TOOL_ORDER_RANK = {name: rank for rank, name in enumerate(STABLE_TOOL_ORDER)}
+
     def __init__(
         self,
         config: ToolServiceConfig,
@@ -2622,21 +2643,25 @@ class ToolService:
     # ==========================================================================
 
     def sort_tools_for_kv_stability(self, tools, *, kv_optimization_enabled: bool = True) -> list:
-        """Sort tools by schema level then name for KV-cache-optimal ordering.
+        """Sort tools by stable semantic rank, schema level, then name.
 
-        Produces a deterministic ordering — FULL → COMPACT → STUB then
-        alphabetical — so the stable prefix bytes remain unchanged across turns.
-        Session-local caching of the sorted list is the caller's responsibility
-        (ToolService is a container singleton and must not store per-session state).
+        Produces deterministic ordering so the stable prefix bytes remain unchanged
+        across turns. The primary key is a numeric coding-agent tool rank rather
+        than alphabetical order, because serialized tool order is also a model
+        salience prior. Session-local caching of the sorted list is the caller's
+        responsibility (ToolService is a container singleton and must not store
+        per-session state).
         """
         if tools is None:
             return None
         if not kv_optimization_enabled:
             return tools
         level_order = {"full": 0, "compact": 1, "stub": 2, None: 2}
+        unknown_rank = len(self.STABLE_TOOL_ORDER_RANK)
         return sorted(
             tools,
             key=lambda t: (
+                self.STABLE_TOOL_ORDER_RANK.get(t.name, unknown_rank),
                 level_order.get(getattr(t, "schema_level", None), 2),
                 t.name,
             ),
@@ -2689,16 +2714,21 @@ class ToolService:
         """
         if tools is None:
             return None
-        if not tools or not kv_optimization_enabled:
+        if not tools:
+            return tools
+
+        if kv_tool_strategy == "per_turn":
             return tools
 
         if kv_tool_strategy in ("session_stable", "additive"):
             return self._merge_session_tools(tools, session_semantic_tools)
 
-        if kv_tool_strategy == "per_turn":
-            return tools
-
-        return self.apply_context_aware_strategy(tools, provider=provider, model=model)
+        return self.apply_context_aware_strategy(
+            tools,
+            provider=provider,
+            model=model,
+            session_semantic_tools=session_semantic_tools,
+        )
 
     @staticmethod
     def _merge_session_tools(tools: list, cached: Optional[list]) -> list:
@@ -2718,26 +2748,40 @@ class ToolService:
             return cached
         return list(cached) + additions
 
-    def apply_context_aware_strategy(self, tools, *, provider: Any, model: str) -> list:
+    def apply_context_aware_strategy(
+        self,
+        tools,
+        *,
+        provider: Any,
+        model: str,
+        session_semantic_tools: Optional[list] = None,
+    ) -> list:
         """Economy-first, context-window-aware tool selection.
 
         Decision tree (priority order):
-        1. Demote/drop tools that exceed the 25 % context-window hard limit.
-        2. Session-lock all tools when the provider supports caching or the
-           context window is ≥ 32 K (KV-efficiency wins).
-        3. Semantic selection within budget for small local models.
+        1. Resolve one provider-economics profile for cache/token tradeoffs.
+        2. Demote/drop tools that exceed the profile's tool-schema budget.
+        3. Apply additive session stability when the profile asks for it.
+        4. For hard token-constrained profiles, semantic-select within budget.
 
         Does NOT emit tool-strategy events — that responsibility stays with the
         orchestrator shim to preserve ``AgentMetricsService`` ownership.
         """
         from victor.config.tool_tiers import get_provider_category
+        from victor.config.tool_tiers import resolve_tool_supply_profile
 
         context_window = self._get_tool_context_window(provider, model)
+        fallback_max_tools = self._fallback_max_full_tools()
+        profile = resolve_tool_supply_profile(
+            provider,
+            context_window,
+            fallback_max_tools=fallback_max_tools,
+        )
         provider_category = get_provider_category(context_window)
         tool_tokens = sum(
             self.estimate_tool_tokens(t, provider_category=provider_category) for t in tools
         )
-        max_tool_tokens = int(context_window * 0.25)
+        max_tool_tokens = profile.budget_tokens or int(context_window * 0.25)
 
         if tool_tokens > max_tool_tokens:
             self._logger.warning(
@@ -2748,12 +2792,28 @@ class ToolService:
                 tools, max_tool_tokens, context_window, provider_category
             )
 
-        if self._should_session_lock_tools(provider, context_window):
+        if profile.cap_mode == "none" or self._should_session_lock_tools(provider, context_window):
+            if profile.session_lock == "additive":
+                return self._merge_session_tools(tools, session_semantic_tools)
             return tools
 
-        return self.semantic_select_tools(
+        tools = self.semantic_select_tools(
             tools, max_tool_tokens, provider_category=provider_category
         )
+        if profile.session_lock == "additive":
+            return self._merge_session_tools(tools, session_semantic_tools)
+        return tools
+
+    def _fallback_max_full_tools(self) -> int:
+        """Return configured full-schema head size for profile resolution."""
+        try:
+            tools_settings = getattr(self._settings, "tools", None)
+            budget = getattr(tools_settings, "budget", None)
+            if budget and int(budget) > 0:
+                return int(budget)
+        except Exception:
+            pass
+        return 8
 
     def semantic_select_tools(
         self, tools, max_tokens: int, *, provider_category: Optional[str] = None

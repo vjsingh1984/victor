@@ -293,8 +293,8 @@ class ToolSelectionRuntime:
                 "e3tir_rerank",
                 lambda t: self._apply_e3tir_exploration(t, user_message_anchor),
             ),
-            _SelectionStage("kv_strategy", runtime._apply_kv_tool_strategy),
-            _SelectionStage("kv_sort", runtime._sort_tools_for_kv_stability),
+            _SelectionStage("kv_strategy", lambda t: self._apply_kv_tool_strategy(t)),
+            _SelectionStage("kv_sort", lambda t: self._sort_tools_for_kv_stability(t)),
         ]
 
     @staticmethod
@@ -416,6 +416,88 @@ class ToolSelectionRuntime:
             return reordered
         except Exception:
             logger.debug("E3-TIR rerank failed; using base order", exc_info=True)
+            return tools
+
+    def _resolve_kv_tool_strategy(self) -> str:
+        """Resolve the KV tool strategy.
+
+        Reads the ``kv_tool_strategy`` setting (context_settings). Defaults to
+        ``context_aware`` when unset or unreadable, matching ``ContextSettings``.
+        """
+        runtime = self._runtime
+        for source in (
+            getattr(getattr(runtime, "settings", None), "context_settings", None),
+            getattr(getattr(runtime, "settings", None), "context", None),
+            getattr(runtime, "settings", None),
+        ):
+            strategy = getattr(source, "kv_tool_strategy", None)
+            if strategy:
+                return str(strategy).lower()
+        return "context_aware"
+
+    def _apply_kv_tool_strategy(self, tools: Any) -> Any:
+        """Enforce the KV-prefix tool-session strategy (tool-supply P9 / kv wiring).
+
+        Connects the modeled ``kv_tool_strategy`` setting to runtime behavior. When the
+        provider supports KV-prefix caching (``_kv_optimization_enabled``) AND the
+        strategy is ``session_stable``, the turn-1 tool selection is frozen for the
+        session so the serialized tool prefix stays byte-identical turn over turn -> the
+        KV cache keeps hitting (latency savings). ``per_turn`` (default) leaves the
+        selection unchanged.
+
+        The frozen set is intersected with the current registered set so a tool that
+        later becomes unavailable is never surfaced. Under ``session_stable`` new tools
+        are *not* appended: any prefix mutation would invalidate the cache, defeating
+        the optimization.
+        """
+        if not tools:
+            return tools
+        runtime = self._runtime
+        host_apply = getattr(runtime, "_apply_kv_tool_strategy", None)
+        if callable(host_apply):
+            return host_apply(tools)
+
+        if not getattr(runtime, "_kv_optimization_enabled", False):
+            return tools
+        if self._resolve_kv_tool_strategy() != "session_stable":
+            return tools
+
+        frozen = getattr(runtime, "_kv_frozen_tools", None)
+        if frozen is None:
+            runtime._kv_frozen_tools = list(tools)
+            logger.info(
+                "KV session-stable: freezing tool set for the session (%d tools)",
+                len(tools),
+            )
+            return tools
+        # Reuse the frozen order/set; drop any tool no longer registered.
+        current_names = {self._tool_name(t) for t in tools}
+        pruned = [t for t in frozen if self._tool_name(t) in current_names]
+        return pruned
+
+    def _sort_tools_for_kv_stability(self, tools: Any) -> Any:
+        """Deterministically sort tools by name for KV/Anthropic prefix stability.
+
+        KV-prefix (local engines) and Anthropic ``cache_control`` both reward a
+        byte-stable tool block: sorting by name yields a canonical order so the prefix
+        hashes identically across turns even when selection reshuffles. This mirrors the
+        ``_sort_tools_for_kv_stability`` behavior documented in the provider-caching
+        architecture. No-op unless ``_kv_optimization_enabled`` is set.
+        """
+        if not tools:
+            return tools
+        runtime = self._runtime
+        host_sort = getattr(runtime, "_sort_tools_for_kv_stability", None)
+        if callable(host_sort):
+            return host_sort(tools)
+
+        if not getattr(runtime, "_kv_optimization_enabled", False):
+            return tools
+        try:
+            sorted_tools = sorted(tools, key=self._tool_name)
+            return sorted_tools
+        except Exception:
+            logger.debug("KV stability sort failed; keeping selection order", exc_info=True)
             return tools
 
     @staticmethod

@@ -3579,6 +3579,34 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         "good evening",
     )
 
+    # Bare continuation/affirmation messages from a user mid-task. These are short
+    # (< 15 chars) and carry no tool-signal keyword, so the length gate below would
+    # otherwise short-circuit to "skip" and drop the working tool set. A bare
+    # "continue" / "proceed" / "go" typed as a NEW user turn should preserve the
+    # read-only core (so the model can still reason over the in-progress work)
+    # rather than going tool-less. Matches the 3-valued return contract of
+    # _tool_skip_mode (skip / read_core / tools).
+    _CONTINUATION_TOKENS = frozenset(
+        {
+            "continue",
+            "proceed",
+            "go",
+            "go on",
+            "keep going",
+            "next",
+            "more",
+            "again",
+            "yes",
+            "y",
+            "ok",
+            "okay",
+            "sure",
+            "do it",
+            "apply",
+            "apply it",
+        }
+    )
+
     def _tool_skip_mode(self, context_msg: str) -> str:
         """Decide tool supply for a (possibly conversational) turn (tool-supply P3).
 
@@ -3592,6 +3620,14 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         - ``"tools"``     — proceed with normal tool selection.
         """
         msg_lower = context_msg.lower().strip()
+
+        # Bare continuation/affirmation of an in-progress task ("continue",
+        # "proceed", "go", "yes", "apply it", ...). These are short and carry no
+        # tool-signal keyword, so the length gate below would drop the tool set.
+        # Preserve the read-only core instead so the model can keep working the
+        # active task. Checked BEFORE the length short-circuit on purpose.
+        if msg_lower in self._CONTINUATION_TOKENS:
+            return "read_core"
 
         # Very short messages are almost always greetings/Q&A — the only hard no-tools path.
         if len(msg_lower) < 15:
@@ -3683,7 +3719,11 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         """Sort tools for KV-cache stability; session-local cache is managed here."""
         if tools is None:
             return None
-        if not self._kv_optimization_enabled:
+        if self._kv_optimization_enabled:
+            stabilize_order = True
+        else:
+            stabilize_order = AgentOrchestrator._should_stabilize_tool_order(self)
+        if not stabilize_order:
             return tools
         current_names = frozenset(t.name for t in tools)
         last_names = getattr(self, "_last_sorted_tool_names", None)
@@ -3691,11 +3731,23 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         if last_names == current_names and last_tools is not None:
             return last_tools
         sorted_tools = self._tool_service.sort_tools_for_kv_stability(
-            tools, kv_optimization_enabled=self._kv_optimization_enabled
+            tools, kv_optimization_enabled=stabilize_order
         )
         self._last_sorted_tool_names = current_names
         self._last_sorted_tools = sorted_tools
         return sorted_tools
+
+    def _should_stabilize_tool_order(self) -> bool:
+        """Return whether this turn should use byte-stable tool ordering."""
+        if self._kv_optimization_enabled:
+            return True
+
+        strategy = self._resolve_kv_strategy_setting()
+        if strategy in ("session_stable", "additive"):
+            return True
+        if strategy != "context_aware":
+            return False
+        return self._context_aware_profile_session_locked()
 
     def _resolve_kv_strategy_setting(self) -> str:
         """Read kv_tool_strategy from settings; default to 'context_aware'."""
@@ -3712,9 +3764,15 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
     def _apply_kv_tool_strategy(self, tools):
         """Delegate KV tool strategy to ToolService; manage session-stable cache here."""
         if self._is_tool_strategy_v2_enabled():
-            return self._tool_service.apply_context_aware_strategy(
-                tools, provider=self.provider, model=self.model
+            result = self._tool_service.apply_context_aware_strategy(
+                tools,
+                provider=self.provider,
+                model=self.model,
+                session_semantic_tools=getattr(self, "_session_semantic_tools", None),
             )
+            if self._context_aware_profile_session_locked():
+                self._session_semantic_tools = result
+            return result
         strategy = self._resolve_kv_strategy_setting()
         result = self._tool_service.apply_kv_tool_strategy(
             tools,
@@ -3727,9 +3785,31 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         # Persist the (grow-only) session-stable selection at orchestrator level
         # (ToolService is a singleton). P4: persist EVERY turn — not just the first —
         # so newly-added tools join the cached set and stay available next turn.
-        if strategy in ("session_stable", "additive"):
+        if strategy in ("session_stable", "additive") or (
+            strategy == "context_aware" and self._context_aware_profile_session_locked()
+        ):
             self._session_semantic_tools = result
         return result
+
+    def _context_aware_profile_session_locked(self) -> bool:
+        """Whether the provider-economics profile wants session-stable tools."""
+        try:
+            from victor.config.tool_tiers import resolve_tool_supply_profile
+
+            context_window = self._get_context_window(self.provider, self.model)
+            fallback_max_tools = None
+            try:
+                fallback_max_tools = getattr(getattr(self.settings, "tools", None), "budget", None)
+            except Exception:
+                fallback_max_tools = None
+            profile = resolve_tool_supply_profile(
+                self.provider,
+                context_window,
+                fallback_max_tools=int(fallback_max_tools or 8),
+            )
+            return profile.session_lock != "off"
+        except Exception:
+            return False
 
     def _is_tool_strategy_v2_enabled(self) -> bool:
         """Check if the new context-aware tool strategy is enabled.
