@@ -373,11 +373,10 @@ def render_thinking_indicator(console: Console) -> None:
 
     # Use high contrast colors if enabled
     if theme_settings.high_contrast:
-        console.rule("[bold cyan]Reasoning[/]", style="bold", align="left")
-        console.print("[bold cyan]◌[/] [bold]Thinking[/]")
+        console.print("🤔 [bold cyan]Thinking...[/]")
     else:
-        console.rule("[dim cyan]Reasoning[/]", style="dim", align="left")
-        console.print("[cyan]◌[/] [dim italic]Thinking[/]")
+        # Subtle theme-based indicator
+        console.print("🤔 [thinking.indicator]Thinking...[/]", style="thinking.text")
 
 
 def render_thinking_text(console: Console, text: str) -> None:
@@ -387,7 +386,7 @@ def render_thinking_text(console: Console, text: str) -> None:
         console: Rich Console to render to
         text: Thinking text to display
     """
-    styled = Text(text, style="italic color(246)")
+    styled = Text(text, style="thinking.text")
     console.print(styled, end="")
 
 
@@ -479,22 +478,35 @@ def render_tool_preview(
         contains_rich_markup: If True, preview_text contains Rich markup and should
                              be rendered directly. If False, wrap with [dim] tags.
     """
-    for line in preview_text.split("\n"):
-        if line:
-            if contains_rich_markup:
-                # Line already contains Rich markup (e.g., formatted diffs)
-                # Just add the gutter prefix without wrapping the whole line
-                console.print(f"[dim]│ [/]{line}")
-            else:
-                # Plain text - wrap with dim for subtle preview
-                console.print(f"[dim]│ {line}[/]")
+    from rich import box
+    from rich.panel import Panel
+    from rich.text import Text
 
+    if not preview_text.strip():
+        return
+
+    # If it contains rich markup, we must construct a Text object using from_markup
+    # Otherwise we just use a dimmed Text object
+    if contains_rich_markup:
+        content = Text.from_markup(preview_text)
+    else:
+        content = Text(preview_text, style="dim")
+
+    footer = None
     if total_lines > preview_lines:
         remaining = total_lines - preview_lines
         suffix = "s" if remaining != 1 else ""
-        console.print(
-            f"[dim italic]└ {remaining} more line{suffix} • {hotkey} at prompt or /expand[/]"
-        )
+        footer = f"[dim italic]... {remaining} more line{suffix} • {hotkey} at prompt or /expand[/]"
+
+    panel = Panel(
+        content,
+        border_style="dim",
+        box=box.MINIMAL,
+        padding=(0, 2),
+        subtitle=footer,
+        subtitle_align="left",
+    )
+    console.print(panel)
 
 
 # Tools whose names map to valid Pygments lexer identifiers.

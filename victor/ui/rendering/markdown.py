@@ -16,8 +16,10 @@ from rich.tree import Tree
 
 _DIAGRAM_LANGS = {"mermaid"}
 _TOKEN_PATTERN = re.compile(
-    r"```(?P<lang>[a-zA-Z0-9_-]+)\s*\n(?P<code>.*?)```|!\[(?P<alt>[^\]]*)\]\((?P<src>[^)]+)\)",
-    re.DOTALL,
+    r"```(?P<lang>[a-zA-Z0-9_-]+)\s*\n(?P<code>[\s\S]*?)```"
+    r"|!\[(?P<alt>[^\]]*)\]\((?P<src>[^)]+)\)"
+    r"|^(?:>\s*)?\[!(?P<admon_type>NOTE|TIP|IMPORTANT|WARNING|CAUTION)\][ \t]*\n(?P<admon_body>(?:^(?:>\s*)?.*\n?)*?)(?=\n^(?:[^>]|$)|\Z)",
+    re.MULTILINE,
 )
 
 # Pattern to detect Rich markup tags that could cause parsing errors
@@ -85,8 +87,14 @@ def render_markdown_with_hooks(content: str) -> RenderableType:
                 if chunk.strip():
                     parts.append(_markdown_block(chunk))
 
+            admon_type = match.group("admon_type")
             lang = match.group("lang")
-            if lang:
+
+            if admon_type:
+                admon_body = match.group("admon_body") or ""
+                clean_body = re.sub(r"^>?\s*", "", admon_body, flags=re.MULTILINE)
+                parts.append(_render_admonition(admon_type, clean_body))
+            elif lang:
                 lang = lang.lower()
                 code = (match.group("code") or "").strip()
                 if lang in _DIAGRAM_LANGS:
@@ -133,6 +141,36 @@ def _render_diagram(lang: str, code: str) -> RenderableType:
         Syntax(code, lang or "text", theme="monokai", word_wrap=True),
         title=f"{lang.title()} diagram",
         border_style="cyan",
+    )
+
+
+def _render_admonition(admon_type: str, body: str) -> RenderableType:
+    colors = {
+        "NOTE": "blue",
+        "TIP": "green",
+        "IMPORTANT": "magenta",
+        "WARNING": "yellow",
+        "CAUTION": "red",
+    }
+    icons = {
+        "NOTE": "ℹ️",
+        "TIP": "💡",
+        "IMPORTANT": "✨",
+        "WARNING": "⚠️",
+        "CAUTION": "🛑",
+    }
+    color = colors.get(admon_type, "blue")
+    icon = icons.get(admon_type, "ℹ️")
+
+    from rich import box
+
+    return Panel(
+        _markdown_block(body),
+        title=f"[{color}]{icon} {admon_type.title()}[/]",
+        title_align="left",
+        border_style=color,
+        box=box.ROUNDED,
+        padding=(0, 2),
     )
 
 

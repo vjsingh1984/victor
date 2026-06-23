@@ -23,6 +23,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from rich.console import Console
+from victor.ui.theme import victor_theme
 
 from victor.ui.rendering import LiveDisplayRenderer
 
@@ -58,7 +59,7 @@ class TestLiveDisplayRendererContentDisplay:
         but not displayed during thinking mode. With the fix, content
         prints immediately to console (not Live display which is paused).
         """
-        console = Console()
+        console = Console(theme=victor_theme)
         renderer = LiveDisplayRenderer(console)
 
         renderer.on_thinking_start()
@@ -81,7 +82,7 @@ class TestLiveDisplayRendererContentDisplay:
         """
         mock_live = MagicMock()
         mock_live_class.return_value = mock_live
-        console = Console()
+        console = Console(theme=victor_theme)
         renderer = LiveDisplayRenderer(console)
 
         # Simulate stream ending in thinking mode without Live update
@@ -102,7 +103,7 @@ class TestLiveDisplayRendererContentDisplay:
         """
         from unittest.mock import MagicMock
 
-        console = Console()
+        console = Console(theme=victor_theme)
         renderer = LiveDisplayRenderer(console)
 
         renderer.start()
@@ -123,7 +124,7 @@ class TestLiveDisplayRendererContentDisplay:
         """
         mock_live = MagicMock()
         mock_live_class.return_value = mock_live
-        console = Console()
+        console = Console(theme=victor_theme)
         renderer = LiveDisplayRenderer(console)
 
         renderer.start()
@@ -143,7 +144,7 @@ class TestLiveDisplayRendererContentDisplay:
 
     def test_finalize_preserves_content(self):
         """finalize() should preserve all content in the buffer."""
-        console = Console()
+        console = Console(theme=victor_theme)
         renderer = LiveDisplayRenderer(console)
 
         # Add content in thinking mode
@@ -162,7 +163,7 @@ class TestLiveDisplayRendererContentDisplay:
 
     def test_finalize_with_empty_buffers(self):
         """finalize() should handle empty buffers gracefully."""
-        console = Console()
+        console = Console(theme=victor_theme)
         renderer = LiveDisplayRenderer(console)
 
         # Don't add any content
@@ -176,7 +177,7 @@ class TestLiveDisplayRendererContentDisplay:
         """Multiple thinking cycles should handle content correctly."""
         mock_live = MagicMock()
         mock_live_class.return_value = mock_live
-        console = Console()
+        console = Console(theme=victor_theme)
         renderer = LiveDisplayRenderer(console)
 
         renderer.start()
@@ -211,7 +212,7 @@ class TestLiveDisplayRendererFailSafe:
     def test_fail_safe_display_when_live_never_started(self, mock_live_class):
         """Fail-safe should display content if Live was never started."""
         mock_live_class.return_value = None  # Live never starts
-        console = Console()
+        console = Console(theme=victor_theme)
         renderer = LiveDisplayRenderer(console)
 
         # Add content without starting Live
@@ -224,7 +225,7 @@ class TestLiveDisplayRendererFailSafe:
 
     def test_fail_safe_preserves_content_on_error(self):
         """Content should be preserved even if Live update fails."""
-        console = Console()
+        console = Console(theme=victor_theme)
         renderer = LiveDisplayRenderer(console)
 
         # Start Live
@@ -249,7 +250,7 @@ class TestLiveDisplayRendererDebugLogging:
 
     def test_finalize_logs_buffer_lengths(self, caplog):
         """finalize() should log buffer lengths for debugging."""
-        console = Console()
+        console = Console(theme=victor_theme)
         renderer = LiveDisplayRenderer(console)
 
         # Add content
@@ -265,7 +266,7 @@ class TestLiveDisplayRendererDebugLogging:
 
     def test_finalize_logs_empty_content_warning(self, caplog):
         """finalize() should warn if content is empty."""
-        console = Console()
+        console = Console(theme=victor_theme)
         renderer = LiveDisplayRenderer(console)
 
         # Don't add any content
@@ -278,7 +279,7 @@ class TestLiveDisplayRendererDebugLogging:
 
     def test_unmatched_resume_is_debug_only(self, caplog):
         """Benign extra resume calls should not pollute operator logs."""
-        console = Console()
+        console = Console(theme=victor_theme)
         renderer = LiveDisplayRenderer(console)
 
         with caplog.at_level("WARNING"):
@@ -292,7 +293,7 @@ class TestLiveDisplayRendererNoDuplication:
 
     def test_thinking_content_no_duplication_in_buffer(self):
         """Content during thinking mode should not be duplicated in buffer."""
-        console = Console()
+        console = Console(theme=victor_theme)
         renderer = LiveDisplayRenderer(console)
 
         renderer.on_thinking_start()
@@ -308,7 +309,7 @@ class TestLiveDisplayRendererNoDuplication:
         """Normal content should stream to Live display incrementally."""
         from unittest.mock import MagicMock
 
-        console = Console()
+        console = Console(theme=victor_theme)
         renderer = LiveDisplayRenderer(console)
 
         # Mock Live to track updates
@@ -328,7 +329,7 @@ class TestLiveDisplayRendererNoDuplication:
 
     def test_rapid_state_transitions(self):
         """Rapid transitions between thinking and normal should work correctly."""
-        console = Console()
+        console = Console(theme=victor_theme)
         renderer = LiveDisplayRenderer(console)
 
         # Rapid transitions
@@ -355,7 +356,7 @@ class TestLiveDisplayRendererSimplifiedAPI:
 
     def test_no_thinking_buffer_attribute(self):
         """_thinking_buffer attribute should not exist (removed in fix)."""
-        console = Console()
+        console = Console(theme=victor_theme)
         renderer = LiveDisplayRenderer(console)
 
         # Should not have _thinking_buffer
@@ -365,7 +366,7 @@ class TestLiveDisplayRendererSimplifiedAPI:
 
     def test_no_last_thinking_rendered_attribute(self):
         """_last_thinking_rendered attribute should not exist (removed in fix)."""
-        console = Console()
+        console = Console(theme=victor_theme)
         renderer = LiveDisplayRenderer(console)
 
         # Should not have _last_thinking_rendered
@@ -375,7 +376,7 @@ class TestLiveDisplayRendererSimplifiedAPI:
 
     def test_single_buffer_for_all_content(self):
         """All content should go through single _content_buffer."""
-        console = Console()
+        console = Console(theme=victor_theme)
         renderer = LiveDisplayRenderer(console)
 
         # Add content in different modes

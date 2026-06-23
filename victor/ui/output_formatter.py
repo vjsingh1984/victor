@@ -72,6 +72,7 @@ from victor.ui.rendering.utils import (
     render_tool_preview,
 )
 from victor.ui.rendering.tool_preview import renderer as _tool_preview_renderer
+from victor.ui.theme import victor_theme
 
 
 class OutputMode(Enum):
@@ -114,7 +115,11 @@ class OutputFormatter:
             config: Output configuration. Defaults to Rich mode.
         """
         self.config = config or OutputConfig()
-        self._console = Console(file=self.config.stdout, force_terminal=False)
+        self._console = Console(
+            file=self.config.stdout,
+            force_terminal=False,
+            theme=victor_theme,
+        )
         self._content_buffer: List[str] = []
         self._tool_calls: List[Dict[str, Any]] = []
         self._metrics: Dict[str, Any] = {}

@@ -11,12 +11,17 @@ import time
 from collections import deque
 from typing import Any
 
+from rich import box
 from rich.console import Console, Group
 from rich.live import Live
 from rich.markdown import Markdown
+from rich.padding import Padding
 from rich.markup import escape as _markup_escape
 from rich.panel import Panel
+from rich.spinner import Spinner
 from rich.text import Text
+
+from victor.ui.rendering.markdown import render_markdown_with_hooks
 
 from victor.ui.rendering.metrics import StreamingMetrics
 
@@ -83,7 +88,9 @@ class LiveDisplayRenderer:
 
     def start(self) -> None:
         """Start the Live display."""
-        self._live = Live(Markdown(""), console=self.console, refresh_per_second=10)
+        self._live = Live(
+            render_markdown_with_hooks(""), console=self.console, refresh_per_second=10
+        )
         self._live.start()
         self._is_paused = False
         self._pause_count = 0
@@ -164,13 +171,12 @@ class LiveDisplayRenderer:
             self._tool_section_shown = True
             self.resume()
 
-        # Show "starting" hint for tools likely to take >2s. Fast tools stay
-        # silent at start; their result line shows everything.
-        if any(name.startswith(prefix) for prefix in self._SLOW_TOOL_PREFIXES):
-            display_name = format_tool_display_name(name)
-            self.pause()
-            self.console.print(f"[dim]  → {display_name} starting…[/]")
-            self.resume()
+        # Always activate progress panel to show the spinner
+        if self._live and not self._is_paused:
+            self._tool_progress_name = name
+            self._tool_progress_active = True
+            self._tool_progress_lines.clear()
+            self._render_tool_progress()
 
     def _visible_content(self) -> str:
         """Post-pause slice of the content buffer (what the live panel shows)."""
@@ -184,13 +190,7 @@ class LiveDisplayRenderer:
         progress: float = 0.0,
         is_final: bool = False,
     ) -> None:
-        """Render a live, updating terminal block from streamed tool output.
-
-        Best-effort: only acts while the Live display is active and never raises
-        (UI streaming must not break tool execution). Throttled to avoid flooding
-        the terminal. The block is cleared on completion (see ``on_tool_result``)
-        so it does not freeze into the scrollback.
-        """
+        """Render a live, updating terminal block from streamed tool output."""
         try:
             if not self._live or self._is_paused:
                 return
@@ -217,14 +217,28 @@ class LiveDisplayRenderer:
         """Update the Live renderable to content + a live tool-output panel."""
         if not self._live or not self._tool_progress_active:
             return
-        body = Text("\n".join(self._tool_progress_lines) or "…", style="dim")
+
+        from rich.spinner import Spinner
+
+        body_text = "\n".join(self._tool_progress_lines)
+        tool_label = format_tool_display_name(self._tool_progress_name)
+        if body_text:
+            body = Text(body_text, style="dim")
+            content = Group(
+                Spinner("dots", text=f"[bold blue]{tool_label}[/] [dim]running...[/]"),
+                body,
+            )
+        else:
+            content = Spinner("dots", text=f"[bold blue]{tool_label}[/] [dim]starting...[/]")
+
         panel = Panel(
-            body,
-            title=f"[dim]{format_tool_display_name(self._tool_progress_name)} · live[/]",
+            content,
             border_style="dim",
-            expand=True,
+            box=box.MINIMAL,
+            expand=False,
+            padding=(0, 1),
         )
-        self._live.update(Group(Markdown(self._visible_content()), panel))
+        self._live.update(Group(render_markdown_with_hooks(self._visible_content()), panel))
 
     def _clear_tool_progress_panel(self) -> None:
         """Drop the live panel and reset progress state.
@@ -234,7 +248,7 @@ class LiveDisplayRenderer:
         self._tool_progress_lines.clear()
         self._tool_progress_active = False
         if self._live and not self._is_paused:
-            self._live.update(Markdown(self._visible_content()))
+            self._live.update(render_markdown_with_hooks(self._visible_content()))
 
     def on_tool_result(
         self,
@@ -302,15 +316,15 @@ class LiveDisplayRenderer:
 
         args_display = format_tool_args(arguments)
         icon = "✓" if success else "✗"
-        color = "green" if success else "red"
-        status_line = f"[{color}]{icon}[/] [bold]{format_tool_display_name(name)}[/]"
+        color = "success" if success else "error"
+        status_line = f"[{color}]{icon}[/] [tool.name]{format_tool_display_name(name)}[/]"
         if args_display:
-            status_line += f" [dim]{args_display}[/]"
-        status_line += f" [dim]• {format_duration(elapsed)}[/]"
+            status_line += f" [tool.args]{args_display}[/]"
+        status_line += f" [tool.time]• {format_duration(elapsed)}[/]"
         if error:
             # Show more context for errors - up to 150 chars with better formatting
             error_text = error[:150] + "..." if len(error) > 150 else error
-            status_line += f"\n[dim]  Error: {error_text}[/]"
+            status_line += f"\n[{color}]  Error: {error_text}[/]"
         self.console.print(status_line)
 
         # Show preview if enabled
@@ -468,7 +482,7 @@ class LiveDisplayRenderer:
         t0 = time.monotonic() * 1000
         if self._live:
             visible = self._content_buffer[len(self._content_shown_before_pause) :]
-            self._live.update(Markdown(visible))
+            self._live.update(render_markdown_with_hooks(visible))
         duration_ms = time.monotonic() * 1000 - t0
         self._metrics.record_content_chunk(duration_ms)
         if duration_ms > 100:
@@ -523,12 +537,14 @@ class LiveDisplayRenderer:
         Args:
             title: Optional title to display in the separator
         """
+        from rich.rule import Rule
+
         if title:
             # Styled separator with title
-            self.console.print(f"[dim]{'─' * 20} {title} {'─' * 20}[/]")
+            self.console.print(Rule(f"[dim]{title}[/]", style="dim"))
         else:
             # Simple separator line
-            self.console.print("[dim]" + "─" * 60 + "[/]")
+            self.console.print(Rule(style="dim"))
 
     def _update_tool_progress(self, tool_name: str, elapsed: float) -> None:
         """Show progress indicator for long-running tools.
@@ -564,12 +580,13 @@ class LiveDisplayRenderer:
         # Only print the portion not already shown directly (e.g., via thinking-mode print)
         unshown = self._content_buffer[len(self._content_shown_before_pause) :]
         if unshown and not self._live:
-            self.console.print(Markdown(unshown))
+            # Wrap final text in nice padding
+            self.console.print(Padding(render_markdown_with_hooks(unshown), (1, 2)))
         elif self._live and self._content_buffer:
             # Live display exists - ensure final update
             final_content = self._content_buffer[len(self._content_shown_before_pause) :]
             if final_content.strip():
-                self._live.update(Markdown(final_content))
+                self._live.update(Padding(render_markdown_with_hooks(final_content), (1, 2)))
                 # Small delay to ensure user sees final content
                 time.sleep(0.1)
 

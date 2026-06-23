@@ -95,6 +95,7 @@ from victor.ui.commands.auth import auth_app
 
 # Import verification command
 from victor.ui.commands.verify import app as verify_app
+from victor.ui.theme import victor_theme
 
 app = typer.Typer(
     name="victor",
@@ -102,7 +103,7 @@ app = typer.Typer(
     add_completion=False,
 )
 
-console = Console()
+console = Console(theme=victor_theme)
 
 
 # Define doctor_command BEFORE registering it
