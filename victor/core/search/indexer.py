@@ -28,6 +28,9 @@ from victor.framework.vertical_protocols import CodebaseIndexFactoryProtocol
 
 logger = logging.getLogger(__name__)
 
+# Global cache for codebase indexes to avoid re-initializing/re-building
+_INDEX_CACHE: Dict[str, Any] = {}
+
 
 class BaseCodebaseIndex:
     """Generic index for codebase-like directory structures.

@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Optional
 from victor.agent.conversation.types import ConversationMessage
 from victor.agent.ml_metadata import ContextSize, ModelFamily, ModelSize
 
+
 @dataclass
 class ConversationSession:
     """A conversation session with context management."""

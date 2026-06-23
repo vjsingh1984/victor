@@ -278,9 +278,12 @@ class ExplorationCoordinator:
         return terms[:5]
 
     async def _search_codebase(self, query: str, project_root: Path) -> Dict[str, Any]:
-        """Run code_search for a single query."""
+        """Run code_search for a single query via dynamic vertical loading."""
         try:
-            from victor.tools.code_search_tool import code_search
+            from victor.core.utils.capability_loader import load_code_search_module
+
+            module = load_code_search_module()
+            code_search = module.code_search
 
             result = await code_search(
                 query=query,
@@ -288,6 +291,9 @@ class ExplorationCoordinator:
                 k=5,
             )
             return result if isinstance(result, dict) else {"summary": str(result)}
+        except ImportError:
+            logger.debug("victor-coding not available, skipping code search.")
+            return {}
         except Exception as e:
             logger.debug("Search for '%s' failed: %s", query, e)
             return {}

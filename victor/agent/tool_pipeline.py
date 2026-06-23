@@ -1553,12 +1553,15 @@ class ToolPipeline:
             self.semantic_cache.invalidate(file_path)
 
         try:
-            from victor.tools.code_search_tool import mark_index_cache_stale_for_path
+            from victor.core.utils.capability_loader import load_code_search_module
 
-            summary["search_index_roots"] = mark_index_cache_stale_for_path(
+            module = load_code_search_module()
+            summary["search_index_roots"] = module.mark_index_cache_stale_for_path(
                 file_path,
                 exec_ctx=context,
             )
+        except ImportError:
+            logger.debug("victor-coding not available, skipping index cache invalidation.")
         except Exception as exc:
             logger.debug("Failed to mark code_search index stale for %s: %s", file_path, exc)
 

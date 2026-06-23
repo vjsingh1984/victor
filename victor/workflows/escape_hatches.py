@@ -31,12 +31,6 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 
 
-
-
-
-
-
-
 def complexity_assessment(ctx: Dict[str, Any]) -> str:
     """Assess task complexity for planning.
 
@@ -137,15 +131,9 @@ def complexity_check(ctx: Dict[str, Any]) -> str:
     return "simple"
 
 
-
-
-
 # =============================================================================
 # Transform Functions
 # =============================================================================
-
-
-
 
 
 def format_implementation_plan(ctx: Dict[str, Any]) -> Dict[str, Any]:

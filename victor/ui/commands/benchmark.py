@@ -615,7 +615,11 @@ async def _prewarm_code_intelligence_index(
 
     try:
         from victor.config.settings import load_settings
-        from victor.tools.code_search_tool import _get_or_build_index
+
+        from victor.core.utils.capability_loader import load_code_search_module
+
+        _code_search_module = load_code_search_module()
+        _get_or_build_index = _code_search_module._get_or_build_index
 
         prewarm_settings = load_settings()
         index, _rebuilt = await asyncio.wait_for(

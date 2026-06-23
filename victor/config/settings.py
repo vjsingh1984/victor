@@ -2597,3 +2597,53 @@ def validate_default_model(settings: "Settings") -> tuple[bool, str | None]:
     except Exception:
         # Unexpected error - don't block startup
         return True, None
+
+
+_warned_graph_writer_compatibility = False
+
+
+def _get_settings_group_value(
+    settings: Any, group_name: str, field_name: str, default: Any = None
+) -> Any:
+    """Resolve a setting from its nested group, with flat fallback for test doubles."""
+    group = getattr(settings, group_name, None)
+    if group is not None and hasattr(group, field_name):
+        return getattr(group, field_name)
+    return getattr(settings, field_name, default)
+
+
+def _get_search_setting(settings: Any, field_name: str, default: Any = None) -> Any:
+    """Resolve a code-search setting from the canonical search group."""
+    return _get_settings_group_value(settings, "search", field_name, default)
+
+
+def _resolve_graph_writer_mode(settings: Any) -> str:
+    """Resolve graph writer mode with explicit compatibility-mode warning."""
+    global _warned_graph_writer_compatibility
+
+    graph_writer_mode = _get_search_setting(settings, "codebase_graph_writer_mode", "")
+    if not graph_writer_mode:
+        graph_writer_mode = os.environ.get("VICTOR_CODEBASE_GRAPH_WRITER_MODE", "off")
+
+    mode = str(graph_writer_mode).strip().lower()
+    if mode in {"", "off", "false", "0"}:
+        return "off"
+    if mode == "compatibility":
+        if not _warned_graph_writer_compatibility:
+            warnings.warn(
+                "codebase_graph_writer_mode='compatibility' is deprecated compatibility "
+                "support. Victor-coding graph writes should be treated as explicit, "
+                "temporary compatibility behavior and are not the primary graph source.",
+                UserWarning,
+                stacklevel=2,
+            )
+            _warned_graph_writer_compatibility = True
+        return "compatibility"
+    if mode in {"on", "true", "1"}:
+        warnings.warn(
+            "codebase_graph_writer_mode only supports 'off' (default) and "
+            "'compatibility' (deprecated). Treating value as 'off'.",
+            UserWarning,
+            stacklevel=2,
+        )
+    return "off"

@@ -57,7 +57,7 @@ from pathlib import Path
 from typing import Any, Iterator, Optional
 
 from victor.evaluation.protocol import BenchmarkTask, BenchmarkType
-from victor.tools.code_search_tool import _resolve_graph_writer_mode
+from victor.config.settings import _resolve_graph_writer_mode
 
 logger = logging.getLogger(__name__)
 
