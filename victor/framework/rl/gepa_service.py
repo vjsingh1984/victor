@@ -195,17 +195,46 @@ class GEPAService:
             f"Generate the improved version (under {limit} characters):"
         )
         result = self._call_llm(system, user_prompt, max_tokens=self._max_tokens)
-        if result:
-            # Hard-truncate if LLM exceeds limit
-            if len(result) > limit:
-                result = result[:limit]
-                logger.info(
-                    "GEPA mutate output truncated from %d to %d chars",
-                    len(result),
-                    limit,
-                )
-            return result
-        return current_text  # Fallback: no change
+        if not result:
+            return current_text  # Fallback: no change
+
+        original_len = len(result)
+        from victor.framework.rl.prompt_hygiene import (
+            evaluate_prompt_candidate,
+            sanitize_prompt_candidate,
+        )
+
+        # Boundary-aware truncation + fence stripping + consecutive-line dedupe.
+        # Prevents the corrupt mid-token / mid-sentence outputs seen in
+        # LARGE_FILE_PAGINATION_GUIDANCE (44 chars) and INIT_SYNTHESIS_RULES.
+        sanitized = sanitize_prompt_candidate(result, limit=limit, seed_text=current_text)
+        if len(sanitized) < len(current_text) // 4:
+            logger.warning(
+                "GEPA mutate for '%s' collapsed to %d chars after sanitization; "
+                "rejecting candidate.",
+                section_name,
+                len(sanitized),
+            )
+            return current_text
+        if len(sanitized) != original_len:
+            logger.info(
+                "GEPA mutate output sanitized from %d to %d chars (truncated=%s)",
+                original_len,
+                len(sanitized),
+                len(sanitized) < original_len,
+            )
+
+        # Run the same hygiene gate as PrefPO so fence-wrapped / duplicate-line
+        # candidates cannot slip through the GEPA-service path.
+        report = evaluate_prompt_candidate(current_text, sanitized)
+        if not report.accepted:
+            logger.info(
+                "GEPA rejected candidate for %s due to hygiene violations: %s",
+                section_name,
+                ",".join(report.violations),
+            )
+            return current_text
+        return sanitized
 
     def merge(
         self,

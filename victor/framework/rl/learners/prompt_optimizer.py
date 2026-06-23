@@ -1318,6 +1318,27 @@ class PromptOptimizerLearner(BaseLearner):
             )
             return None
 
+        # GEPA/ProTeGi require a real scalar reward to make selection meaningful.
+        # Without observed outcomes the loop would mutate blindly and never close:
+        # candidates would stay at alpha=beta=1.0, sample_count=0, is_active=0
+        # (the inert-record state observed in prior sessions). Require at least one
+        # rewarded trace so evolution is grounded in evidence, not noise.
+        rewarded = [
+            t
+            for t in traces
+            if getattr(t, "reward", None) is not None
+            or getattr(t, "quality_score", None) is not None
+            or getattr(t, "completion_score", 0.0) > 0.0
+        ]
+        if not rewarded:
+            logger.info(
+                "Skipping evolution for '%s': no rewarded traces available "
+                "(%d traces, 0 with reward/quality signals).",
+                section_name,
+                len(traces),
+            )
+            return None
+
         # Apply strategies sequentially (layered composition)
         new_text = self._apply_section_strategies(
             section_name,
@@ -1338,13 +1359,16 @@ class PromptOptimizerLearner(BaseLearner):
             logger.info("Mutation produced no change for '%s'", section_name)
             return None
 
-        # Prompt bloat control: hard-truncate
+        # Prompt bloat control: boundary-aware truncation (never mid-token).
+        # Strategies already sanitize, but this is a final safety net before persist.
         if self._max_prompt_chars and len(new_text) > self._max_prompt_chars:
-            new_text = new_text[: self._max_prompt_chars]
+            from victor.framework.rl.prompt_hygiene import boundary_aware_truncate
+
+            new_text, _ = boundary_aware_truncate(new_text, self._max_prompt_chars)
             logger.info(
-                "GEPA bloat control: truncated '%s' to %d chars",
+                "GEPA bloat control: truncated '%s' to %d chars (boundary-aware)",
                 section_name,
-                self._max_prompt_chars,
+                len(new_text),
             )
 
         # Reject if over 2x the limit (likely garbage output)
@@ -1353,6 +1377,19 @@ class PromptOptimizerLearner(BaseLearner):
                 "GEPA rejected mutation for '%s': %d chars > 2x limit",
                 section_name,
                 len(new_text),
+            )
+            return None
+
+        # Final hygiene gate (fence-wrap, duplicate-lines, similarity) applied
+        # uniformly to every strategy path so degraded candidates are never stored.
+        from victor.framework.rl.prompt_hygiene import evaluate_prompt_candidate
+
+        report = evaluate_prompt_candidate(current_text, new_text)
+        if not report.accepted:
+            logger.info(
+                "GEPA rejected '%s' candidate at persist gate: %s",
+                section_name,
+                ",".join(report.violations),
             )
             return None
 
