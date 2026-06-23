@@ -17,6 +17,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 from rich.panel import Panel
 from rich.table import Table
@@ -25,6 +26,37 @@ from victor.ui.slash.protocol import BaseSlashCommand, CommandContext, CommandMe
 from victor.ui.slash.registry import register_command
 
 logger = logging.getLogger(__name__)
+
+
+def _resolve_conversation_owner(agent: Any) -> Any:
+    """Resolve the conversation-bearing runtime object from a slash-command agent.
+
+    The slash handler receives the framework ``Agent`` facade, which does not
+    expose ``conversation`` / ``conversation_controller`` directly — those live
+    on the underlying ``AgentOrchestrator``. Resolve through
+    ``Agent.get_orchestrator()`` so commands work against both the facade and a
+    raw orchestrator. Mirrors the resolution pattern in ``chat.py``.
+
+    Args:
+        agent: The object in ``CommandContext.agent`` (Agent facade or orchestrator).
+
+    Returns:
+        The object exposing ``conversation`` / ``conversation_controller``.
+    """
+    if agent is None:
+        return None
+    if hasattr(agent, "conversation"):
+        return agent
+    orchestrator_getter = getattr(agent, "get_orchestrator", None)
+    if callable(orchestrator_getter):
+        try:
+            return orchestrator_getter()
+        except Exception:
+            logger.debug(
+                "get_orchestrator() failed during slash-command resolution",
+                exc_info=True,
+            )
+    return agent
 
 
 def _preview_count(preview_messages: object) -> int:
@@ -539,7 +571,17 @@ class CompactCommand(BaseSlashCommand):
         if not self._require_agent(ctx):
             return
 
-        original_count = ctx.agent.conversation.message_count()
+        # ctx.agent is the framework Agent facade; ``conversation`` lives on the
+        # underlying orchestrator (see orchestrator.py). Resolve it explicitly.
+        owner = _resolve_conversation_owner(ctx.agent)
+        conversation = getattr(owner, "conversation", None)
+        if conversation is None:
+            ctx.console.print(
+                "[red]Cannot compact:[/] active session exposes no conversation history."
+            )
+            return
+
+        original_count = conversation.message_count()
 
         if original_count < 5:
             ctx.console.print("[dim]Conversation is already small enough, nothing to compact[/]")
@@ -556,8 +598,8 @@ class CompactCommand(BaseSlashCommand):
             except ValueError:
                 pass
 
-        keep_recent = min(keep_recent, len(ctx.agent.conversation.messages) // 2)
-        messages = ctx.agent.conversation.messages
+        keep_recent = min(keep_recent, len(conversation.messages) // 2)
+        messages = conversation.messages
 
         if use_smart:
             ctx.console.print("[dim]Generating AI summary...[/]")
@@ -592,10 +634,15 @@ class CompactCommand(BaseSlashCommand):
                     ),
                     *messages[-keep_recent:],
                 ]
-                ctx.agent.conversation.messages = new_messages
+                # MessageHistory.messages is read-only (returns a copy); mutate via
+                # the public clear()/append_message() API — mirrors the canonical
+                # ConversationController.compact_history path.
+                conversation.clear()
+                for _msg in new_messages:
+                    conversation.append_message(_msg)
 
                 # Record in controller tracking systems (mirrors auto-compact in conversation_controller)
-                _cc = getattr(ctx.agent, "conversation_controller", None)
+                _cc = getattr(owner, "conversation_controller", None)
                 if _cc:
                     _compact_record = f"[Manual compact: {summary[:300]}]"
                     if hasattr(_cc, "_compaction_summaries"):
@@ -615,9 +662,18 @@ class CompactCommand(BaseSlashCommand):
             except Exception as e:
                 ctx.console.print(f"[red]Smart compaction failed:[/] {e}")
         else:
-            # Simple truncation
-            ctx.agent.conversation.messages = messages[-keep_recent:]
-            new_count = ctx.agent.conversation.message_count()
+            # Simple truncation — preserve a leading system message plus the
+            # recent window via the public mutation API (messages is read-only).
+            _system_msg = None
+            if messages and messages[0].role == "system":
+                _system_msg = messages[0]
+            recent = messages[-keep_recent:]
+            conversation.clear()
+            if _system_msg is not None:
+                conversation.append_message(_system_msg)
+            for _msg in recent:
+                conversation.append_message(_msg)
+            new_count = conversation.message_count()
 
             ctx.console.print(
                 f"[green]Compacted:[/] {original_count} -> {new_count} messages\n"

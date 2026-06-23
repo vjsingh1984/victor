@@ -337,9 +337,52 @@ class ConversationStore:
 
     def save_session(
         self,
-        session: ConversationSession,
-    ) -> None:
-        self._sessions_mgr.save_session(session)
+        conversation: Any,
+        model: str,
+        provider: str,
+        profile: str = "default",
+        session_id: Optional[str] = None,
+        title: Optional[str] = None,
+        tags: Optional[List[str]] = None,
+        conversation_state: Optional[Any] = None,
+        tool_selection_stats: Optional[Dict[str, Any]] = None,
+        execution_state: Optional[Any] = None,
+        session_ledger: Optional[Any] = None,
+        compaction_hierarchy: Optional[Dict[str, Any]] = None,
+    ) -> str:
+        """Save session with rich metadata.
+
+        Args:
+            conversation: Conversation object, dict with "messages", or list of messages.
+            model: Model identifier.
+            provider: Provider identifier.
+            profile: User-facing profile name.
+            session_id: Existing session id to update, or None for a new session.
+            title: Optional session title.
+            tags: Optional user-assigned tags.
+            conversation_state: ConversationStateMachine (or its dict).
+            tool_selection_stats: Optional tool selection statistics dict.
+            execution_state: ExecutionState (or its dict).
+            session_ledger: SessionLedger (or its dict).
+            compaction_hierarchy: Message compaction hierarchy dict.
+
+        Returns:
+            The session id.
+        """
+        return self._sessions_mgr.save_session(
+            conversation=conversation,
+            model=model,
+            provider=provider,
+            profile=profile,
+            session_id=session_id,
+            title=title,
+            tags=tags,
+            conversation_state=conversation_state,
+            tool_selection_stats=tool_selection_stats,
+            execution_state=execution_state,
+            session_ledger=session_ledger,
+            compaction_hierarchy=compaction_hierarchy,
+        )
 
     def load_session(self, session_id: str) -> Optional[Dict[str, Any]]:
         return self._sessions_mgr.load_session(session_id)
@@ -358,43 +401,52 @@ class ConversationStore:
         )
 
     def _row_to_session_dict(self, row: sqlite3.Row) -> Dict[str, Any]:
-        """Convert a database row into a dictionary of session metadata."""
-        meta_raw = row["metadata"]
+        """Convert a database row into a dictionary of session metadata.
+
+        Safe for partial SELECTs (e.g. lightweight search queries): missing
+        columns default to None instead of raising ``No item with that key``.
+        """
+        # sqlite3.Row supports the mapping protocol, so dict(row) yields a
+        # plain dict we can safely .get() against for any optional column.
+        row_map = dict(row)
+        meta_raw = row_map.get("metadata")
         meta = json_loads(meta_raw) if meta_raw else {}
-        row_keys = row.keys()
 
         # Parse joined lookup strings to construct dict matching model_metadata expectations
-        provider_name = row["provider_name"] if "provider_name" in row_keys else None
-        family_name = row["model_family_name"] if "model_family_name" in row_keys else None
-        size_name = row["model_size_name"] if "model_size_name" in row_keys else None
-        ctx_name = row["context_size_name"] if "context_size_name" in row_keys else None
+        provider_name = row_map.get("provider_name")
+        family_name = row_map.get("model_family_name")
+        size_name = row_map.get("model_size_name")
+        ctx_name = row_map.get("context_size_name")
 
         return {
-            "session_id": row["session_id"],
-            "created_at": datetime.fromisoformat(row["created_at"]),
-            "last_activity": datetime.fromisoformat(row["last_activity"]),
-            "project_path": Path(row["project_path"]) if row["project_path"] else None,
-            "model": row["model"],
-            "profile": row["profile"],
-            "max_tokens": row["max_tokens"],
-            "reserved_tokens": row["reserved_tokens"],
+            "session_id": row_map.get("session_id"),
+            "created_at": datetime.fromisoformat(row_map["created_at"]),
+            "last_activity": datetime.fromisoformat(row_map["last_activity"]),
+            "project_path": Path(row_map["project_path"]) if row_map.get("project_path") else None,
+            "model": row_map.get("model"),
+            "profile": row_map.get("profile"),
+            "max_tokens": row_map.get("max_tokens"),
+            "reserved_tokens": row_map.get("reserved_tokens"),
             "metadata": meta,
+            # Rich metadata surfaced for search/list consumers
+            "title": meta.get("title"),
+            "tags": meta.get("tags", []),
             # Normalization lookups
             "provider": provider_name,
             "model_family": ModelFamily(family_name) if family_name else None,
             "model_size": ModelSize(size_name) if size_name else None,
             "context_size": ContextSize(ctx_name) if ctx_name else None,
-            "model_params_b": row["model_params_b"],
-            "context_tokens": row["context_tokens"],
-            "tool_capable": bool(row["tool_capable"]),
-            "is_moe": bool(row["is_moe"]),
-            "is_reasoning": bool(row["is_reasoning"]),
+            "model_params_b": row_map.get("model_params_b"),
+            "context_tokens": row_map.get("context_tokens"),
+            "tool_capable": bool(row_map.get("tool_capable")),
+            "is_moe": bool(row_map.get("is_moe")),
+            "is_reasoning": bool(row_map.get("is_reasoning")),
             # Tokens/Metrics
-            "prompt_tokens": row["prompt_tokens"],
-            "completion_tokens": row["completion_tokens"],
-            "cached_tokens": row["cached_tokens"],
-            "reasoning_tokens": row["reasoning_tokens"],
-            "cost_usd_micros": row["cost_usd_micros"],
+            "prompt_tokens": row_map.get("prompt_tokens"),
+            "completion_tokens": row_map.get("completion_tokens"),
+            "cached_tokens": row_map.get("cached_tokens"),
+            "reasoning_tokens": row_map.get("reasoning_tokens"),
+            "cost_usd_micros": row_map.get("cost_usd_micros"),
         }
 
     def get_session(self, session_id: str) -> Optional[ConversationSession]:
