@@ -16,64 +16,12 @@ import pytest
 from victor.workflows.escape_hatches import (
     CONDITIONS,
     TRANSFORMS,
-    tests_passing,
-    should_continue_fixing,
     complexity_check,
     ensure_global_escape_hatches_registered,
 )
 
 
-def test_tests_passing():
-    # Scenario: No tests
-    assert tests_passing({}) == "no_tests"
 
-    # Scenario: Failing tests
-    ctx = {"test_results": {"passed": 5, "failed": 1, "coverage": 0.9}}
-    assert tests_passing(ctx) == "failing"
-
-    # Scenario: Low coverage
-    ctx = {"test_results": {"passed": 5, "failed": 0, "coverage": 0.5}, "min_coverage": 0.8}
-    assert tests_passing(ctx) == "failing"
-
-    # Scenario: Passing tests
-    ctx = {"test_results": {"passed": 5, "failed": 0, "coverage": 0.9}}
-    assert tests_passing(ctx) == "passing"
-
-    # Scenario: Warnings are tolerated by default (non-strict mode)
-    ctx = {"test_results": {"passed": 5, "failed": 0, "warnings": 3, "coverage": 0.9}}
-    assert tests_passing(ctx) == "passing"
-
-    # Scenario: Strict mode fails on ANY warning
-    ctx = {
-        "test_results": {"passed": 5, "failed": 0, "warnings": 1, "coverage": 0.9},
-        "strict": True,
-    }
-    assert tests_passing(ctx) == "failing"
-
-    # Scenario: Strict mode passes when there are no warnings
-    ctx = {
-        "test_results": {"passed": 5, "failed": 0, "warnings": 0, "coverage": 0.9},
-        "strict": True,
-    }
-    assert tests_passing(ctx) == "passing"
-
-
-def test_should_continue_fixing():
-    # Scenario: Max iterations reached
-    ctx = {"fix_iterations": 5, "max_iterations": 5}
-    assert should_continue_fixing(ctx) == "submit_best_effort"
-
-    # Scenario: High pass rate
-    ctx = {"fix_iterations": 1, "test_results": {"passed": 95, "failed": 0}}
-    assert should_continue_fixing(ctx) == "submit_best_effort"
-
-    # Scenario: Making progress
-    ctx = {"fix_iterations": 1, "progress_made": True, "test_results": {"passed": 5, "failed": 5}}
-    assert should_continue_fixing(ctx) == "continue_fixing"
-
-    # Scenario: No progress, escalate
-    ctx = {"fix_iterations": 3, "progress_made": False, "test_results": {"passed": 5, "failed": 5}}
-    assert should_continue_fixing(ctx) == "escalate"
 
 
 def test_complexity_check():
@@ -137,4 +85,4 @@ def test_provider_hatches_take_precedence_over_global():
     provider_conditions = {"complexity_check": lambda ctx: "provider_specific"}
     merged = {**global_conditions, **provider_conditions}
     assert merged["complexity_check"]({}) == "provider_specific"
-    assert merged["tdd_cycle_status"]({"tests_written": False}) == "red"
+    assert merged["complexity_assessment"]({"task_analysis": "simple"}) == "simple"
