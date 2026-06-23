@@ -188,12 +188,20 @@ def cleanup_containers(
         victor tools cleanup-containers --include-unlabeled
         victor tools cleanup-containers --dry-run
     """
-    from victor_coding.tools.code_executor_tool import (
-        cleanup_orphaned_containers,
-        DOCKER_AVAILABLE,
-        SANDBOX_CONTAINER_LABEL,
-        SANDBOX_CONTAINER_VALUE,
-    )
+    try:
+        from victor.core.utils.capability_loader import load_code_executor_module
+
+        _module = load_code_executor_module()
+        cleanup_orphaned_containers = _module.cleanup_orphaned_containers
+        DOCKER_AVAILABLE = _module.DOCKER_AVAILABLE
+        SANDBOX_CONTAINER_LABEL = _module.SANDBOX_CONTAINER_LABEL
+        SANDBOX_CONTAINER_VALUE = _module.SANDBOX_CONTAINER_VALUE
+    except ImportError:
+        console.print(
+            "[red]Container cleanup requires the 'victor-coding' package. "
+            "Install it (pip install victor-coding) to use this command.[/]"
+        )
+        raise typer.Exit(1)
 
     if not DOCKER_AVAILABLE:
         console.print("[red]Docker is not available. Cannot cleanup containers.[/]")

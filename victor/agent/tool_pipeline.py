@@ -1553,8 +1553,9 @@ class ToolPipeline:
             self.semantic_cache.invalidate(file_path)
 
         try:
-            import importlib
-            module = importlib.import_module("victor_coding.tools.code_search_tool")
+            from victor.core.utils.capability_loader import load_code_search_module
+
+            module = load_code_search_module()
             summary["search_index_roots"] = module.mark_index_cache_stale_for_path(
                 file_path,
                 exec_ctx=context,

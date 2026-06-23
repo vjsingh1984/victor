@@ -37,7 +37,20 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from victor.config.settings import load_settings
-from victor_coding.tools.graph_tool import graph, GraphMode
+from victor.core.utils.capability_loader import load_graph_tool_module
+from victor.tools.enums import GraphMode
+
+
+def _load_graph_tool():
+    """Load the graph tool from the victor-coding vertical (dynamic discovery).
+
+    Core must not hard-depend on the external victor-coding package. The graph
+    tool instance lives in the vertical; only the shared ``GraphMode`` enum was
+    promoted into core (``victor.tools.enums``). Discovery routes through
+    ``capability_loader`` so core holds no vertical string-literal import.
+    """
+    return load_graph_tool_module().graph
+
 
 logger = logging.getLogger(__name__)
 
@@ -82,6 +95,9 @@ async def warmup_graph_tool(
     exec_ctx = {
         "settings": load_settings(),
     }
+
+    # Graph tool instance lives in the victor-coding vertical; load it dynamically.
+    graph = _load_graph_tool()
 
     logger.info(f"[warmup] Starting graph tool warm-up with {len(warmup_queries)} queries")
 

@@ -1808,8 +1808,9 @@ class InitSynthesizer:
         """
         try:
             try:
-                import importlib
-                module = importlib.import_module("victor_coding.tools.graph_tool")
+                from victor.core.utils.capability_loader import load_graph_tool_module
+
+                module = load_graph_tool_module()
                 graph = module.graph
                 GraphMode = module.GraphMode
             except ImportError:

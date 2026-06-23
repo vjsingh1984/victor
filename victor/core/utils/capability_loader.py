@@ -70,7 +70,60 @@ _FALLBACK_MODULES: dict[str, tuple[str, ...]] = {
         "victor_coding.commands.analyze",
         "victor.verticals.contrib.coding.commands.analyze",
     ),
+    # Extracted vertical tool modules. The dotted paths live here (a data
+    # structure) rather than as string-literal import_module() calls so that
+    # core never holds a static vertical import — satisfying the core/vertical
+    # import boundary guard (tests/unit/contracts/test_core_vertical_import_boundary.py).
+    "graph_tool": (
+        "victor_coding.tools.graph_tool",
+        "victor.verticals.contrib.coding.tools.graph_tool",
+    ),
+    "code_search_tool": (
+        "victor_coding.tools.code_search_tool",
+        "victor.verticals.contrib.coding.tools.code_search_tool",
+    ),
+    "code_executor_tool": (
+        "victor_coding.tools.code_executor_tool",
+        "victor.verticals.contrib.coding.tools.code_executor_tool",
+    ),
 }
+
+
+def _load_fallback_module(capability: str, description: str) -> ModuleType:
+    """Resolve a vertical tool module through the importlib fallback chain.
+
+    The dotted module paths are stored in ``_FALLBACK_MODULES`` (a data
+    structure) and resolved through ``_try_import`` using a *variable*, so
+    core never holds a static string-literal import of an external vertical
+    package. This is the sanctioned pattern for the core/vertical import
+    boundary.
+    """
+    last_error: ImportError | None = None
+    for module_path in _FALLBACK_MODULES[capability]:
+        try:
+            return _try_import(module_path)
+        except ImportError as exc:
+            last_error = exc
+            continue
+    raise ImportError(
+        f"{description} requires the victor-coding package. "
+        "Install with: pip install victor-coding"
+    ) from last_error
+
+
+def load_graph_tool_module() -> ModuleType:
+    """Resolve the coding vertical's graph tool module (dynamic discovery)."""
+    return _load_fallback_module("graph_tool", "graph tool")
+
+
+def load_code_search_module() -> ModuleType:
+    """Resolve the coding vertical's code search tool module (dynamic discovery)."""
+    return _load_fallback_module("code_search_tool", "code search tool")
+
+
+def load_code_executor_module() -> ModuleType:
+    """Resolve the coding vertical's code executor tool module (dynamic discovery)."""
+    return _load_fallback_module("code_executor_tool", "code executor tool")
 
 
 # ---------------------------------------------------------------------------
@@ -198,4 +251,7 @@ __all__ = [
     "load_codebase_analyzer_attr",
     "load_tree_sitter_get_parser",
     "load_coding_analyze_app",
+    "load_graph_tool_module",
+    "load_code_search_module",
+    "load_code_executor_module",
 ]

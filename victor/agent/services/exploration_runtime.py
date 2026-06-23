@@ -280,8 +280,9 @@ class ExplorationCoordinator:
     async def _search_codebase(self, query: str, project_root: Path) -> Dict[str, Any]:
         """Run code_search for a single query via dynamic vertical loading."""
         try:
-            import importlib
-            module = importlib.import_module("victor_coding.tools.code_search_tool")
+            from victor.core.utils.capability_loader import load_code_search_module
+
+            module = load_code_search_module()
             code_search = module.code_search
 
             result = await code_search(

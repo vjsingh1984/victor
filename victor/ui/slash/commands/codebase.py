@@ -30,7 +30,7 @@ from victor.ui.commands.init_content import (
 )
 from victor.ui.slash.protocol import BaseSlashCommand, CommandContext, CommandMetadata
 from victor.ui.slash.registry import register_command
-from victor_coding.tools.code_search_tool import _resolve_graph_writer_mode
+from victor.config.settings import _resolve_graph_writer_mode
 
 logger = logging.getLogger(__name__)
 

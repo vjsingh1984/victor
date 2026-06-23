@@ -181,8 +181,9 @@ class GraphManager:
             await self.ensure_background_refresh(root, exec_ctx=exec_ctx)
 
             try:
-                import importlib
-                module = importlib.import_module("victor_coding.tools.graph_tool")
+                from victor.core.utils.capability_loader import load_graph_tool_module
+
+                module = load_graph_tool_module()
                 graph = module.graph
             except ImportError:
                 logger.warning("victor-coding not installed, returning empty graph")

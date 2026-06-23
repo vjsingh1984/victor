@@ -616,16 +616,21 @@ class OrchestratorServiceProvider:
     def _create_code_execution_manager(self) -> "CodeExecutionManagerProtocol":
         """Create CodeSandbox instance via dynamic vertical loading."""
         try:
-            import importlib
-            module = importlib.import_module("victor_coding.tools.code_executor_tool")
+            from victor.core.utils.capability_loader import load_code_executor_module
+
+            module = load_code_executor_module()
             manager = module.CodeSandbox()
             manager.start()
             return manager
         except ImportError:
             # Provide a dummy implementation if victor-coding is not installed
             class DummyExecutionManager:
-                def start(self): pass
-                def stop(self): pass
+                def start(self):
+                    pass
+
+                def stop(self):
+                    pass
+
             return DummyExecutionManager()
 
     def _create_workflow_registry(self) -> "WorkflowRegistryProtocol":

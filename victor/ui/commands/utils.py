@@ -27,11 +27,22 @@ try:
     from victor.framework.vertical_protocols import CodebaseIndexFactoryProtocol
 except ImportError:
     CodebaseIndexFactoryProtocol = None  # type: ignore[misc,assignment]
-from victor_coding.tools.code_search_tool import (
-    _get_or_build_index,
-    _INDEX_CACHE,
-    _resolve_graph_writer_mode,
-)
+# Shared symbols were promoted into core so that victor no longer hard-depends
+# on the external victor-coding package. Only the vertical-specific index
+# builder (_get_or_build_index) is loaded dynamically below.
+from victor.config.settings import _resolve_graph_writer_mode
+from victor.core.search.indexer import _INDEX_CACHE
+
+
+def _load_code_search_index_builder():
+    """Load ``_get_or_build_index`` from the victor-coding vertical.
+
+    Discovery routes through ``capability_loader`` so core never holds a
+    vertical string-literal import (core/vertical boundary guard).
+    """
+    from victor.core.utils.capability_loader import load_code_search_module
+
+    return load_code_search_module()._get_or_build_index
 
 if TYPE_CHECKING:
     from victor.config.config_loaders import LoggingConfig
@@ -503,6 +514,10 @@ async def preload_semantic_index(
 
         # Show progress during indexing (can take 20-30s)
         from rich.console import Console as RichConsole
+
+        # Index builder lives in the victor-coding vertical; load it dynamically
+        # so core does not hard-depend on the external package.
+        _get_or_build_index = _load_code_search_index_builder()
 
         if isinstance(console_obj, RichConsole):
             with console_obj.status(

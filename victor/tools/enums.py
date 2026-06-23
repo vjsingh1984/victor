@@ -353,3 +353,31 @@ class SchemaLevel(str, Enum):
     def include_optional_params(self) -> bool:
         """Whether to include optional parameters."""
         return self in {SchemaLevel.FULL, SchemaLevel.COMPACT}
+
+
+class GraphMode(str, Enum):
+    """Mode for graph analysis operations."""
+
+    FIND = "find"
+    SEARCH = "search"
+    OVERVIEW = "overview"
+    NEIGHBORS = "neighbors"
+    PAGERANK = "pagerank"
+    CENTRALITY = "centrality"
+    PATH = "path"
+    IMPACT = "impact"
+    CLUSTERS = "clusters"
+    STATS = "stats"
+    SUBGRAPH = "subgraph"
+    FILE_DEPS = "file_deps"
+    PATTERNS = "patterns"
+    MODULE_PAGERANK = "module_pagerank"
+    MODULE_CENTRALITY = "module_centrality"
+    CALL_FLOW = "call_flow"
+    CALLERS = "callers"
+    CALLEES = "callees"
+    TRACE = "trace"
+    SEMANTIC = "semantic"
+    QUERY = "query"
+    SCHEMA = "schema"
+

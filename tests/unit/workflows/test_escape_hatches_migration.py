@@ -21,9 +21,6 @@ from victor.workflows.escape_hatches import (
 )
 
 
-
-
-
 def test_complexity_check():
     # Scenario: String analysis - complex
     ctx = {"task_analysis": "This is a very complex task involving major changes."}
