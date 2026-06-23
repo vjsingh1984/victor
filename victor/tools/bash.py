@@ -360,10 +360,12 @@ def _extract_subcommand(cmd: str, base_cmd: str) -> Optional[str]:
 
 
 def _split_compound_command(cmd: str) -> List[str]:
-    """Split a compound command into individual components.
+    """Split a compound command into individual command segments.
 
-    Handles &&, ||, and ; operators while respecting quoted strings.
-    Returns a list of command strings.
+    Handles ``&&``, ``||``, ``;`` and pipeline ``|`` operators while respecting
+    quoted strings. Every returned segment is validated independently for
+    readonly mode, so a safe command cannot hide a mutating command later in a
+    chain or pipeline.
     """
     components = []
     current = []
@@ -418,6 +420,15 @@ def _split_compound_command(cmd: str) -> List[str]:
                 current = []
                 i += 2
                 continue
+            # Check for single pipeline |. A pipeline is readonly only if every
+            # segment is readonly; `cat f | tee out` must fail on the tee segment.
+            if char == "|":
+                component = "".join(current).strip()
+                if component:
+                    components.append(component)
+                current = []
+                i += 1
+                continue
             # Check for ; (not part of ;; or other constructs)
             if char == ";":
                 # Skip if it's ;; (used in some shells like case statements)
@@ -441,6 +452,127 @@ def _split_compound_command(cmd: str) -> List[str]:
         components.append(component)
 
     return components if components else [cmd.strip()]
+
+
+def _redirection_target(cmd: str, start: int) -> tuple[str, int]:
+    """Return the target token after a redirection operator.
+
+    ``start`` points just after the operator. The target is read until shell
+    whitespace or another unquoted shell operator. Quotes are stripped by
+    ``shlex`` later; here we only need enough lexical awareness to distinguish
+    ``>/dev/null`` from ``> output.txt``.
+    """
+    n = len(cmd)
+    i = start
+    while i < n and cmd[i].isspace():
+        i += 1
+    out: List[str] = []
+    in_quote = None
+    escape = False
+    while i < n:
+        ch = cmd[i]
+        if escape:
+            out.append(ch)
+            escape = False
+            i += 1
+            continue
+        if ch == "\\":
+            escape = True
+            i += 1
+            continue
+        if ch in {"'", '"'} and (in_quote is None or in_quote == ch):
+            in_quote = None if in_quote == ch else ch
+            i += 1
+            continue
+        if in_quote is None and (ch.isspace() or ch in {";", "|", "&", "<", ">"}):
+            break
+        out.append(ch)
+        i += 1
+    return "".join(out), i
+
+
+def _validate_readonly_redirections(cmd: str) -> tuple[bool, str]:
+    """Reject output redirection that can write files in readonly mode.
+
+    Allowed:
+      * stderr/stdout suppression to ``/dev/null``: ``>/dev/null``, ``2>/dev/null``
+      * descriptor duplication/closure: ``2>&1``, ``1>&2``, ``2>&-``
+      * input-only redirection: ``less < file``
+
+    Rejected:
+      * file writes/appends: ``> out``, ``>> out``, ``2> err``, ``&> out``
+    """
+    i, n = 0, len(cmd)
+    in_single = False
+    in_double = False
+    escape = False
+    while i < n:
+        ch = cmd[i]
+        if escape:
+            escape = False
+            i += 1
+            continue
+        if ch == "\\" and not in_single:
+            escape = True
+            i += 1
+            continue
+        if ch == "'" and not in_double:
+            in_single = not in_single
+            i += 1
+            continue
+        if ch == '"' and not in_single:
+            in_double = not in_double
+            i += 1
+            continue
+        if in_single or in_double:
+            i += 1
+            continue
+
+        # Input redirection is readonly; skip `< file` and here-strings/docs.
+        if ch == "<":
+            i += 2 if i + 1 < n and cmd[i + 1] == "<" else 1
+            continue
+
+        # stdout/stderr redirection. Include optional leading fd and &>.
+        op_start = i
+        if ch.isdigit():
+            j = i
+            while j < n and cmd[j].isdigit():
+                j += 1
+            if j >= n or cmd[j] != ">":
+                i += 1
+                continue
+            op_start = j
+        elif ch == "&" and i + 1 < n and cmd[i + 1] == ">":
+            op_start = i + 1
+        elif ch != ">":
+            i += 1
+            continue
+
+        # Do not confuse comparison operators in test/[ with redirection; this
+        # scanner is conservative, but `-gt`/`>` comparisons are usually quoted
+        # or spaced inside test. Redirection requires an operator token here.
+        if op_start > 0 and cmd[op_start - 1] not in " \t\n\r&0123456789":
+            i += 1
+            continue
+
+        j = op_start + 1
+        if j < n and cmd[j] == ">":
+            j += 1
+        if j < n and cmd[j] == "&":
+            target, next_i = _redirection_target(cmd, j + 1)
+            if target in {"1", "2", "-"}:
+                i = next_i
+                continue
+            return False, "redirection (>&)"
+
+        target, next_i = _redirection_target(cmd, j)
+        if target == "/dev/null":
+            i = next_i
+            continue
+        return False, "redirection (>)"
+
+    return True, ""
 
 
 # Shell control-flow keywords are structural — they run no command themselves.
@@ -653,6 +785,16 @@ def _validate_single_readonly_command(cmd: str) -> tuple[bool, str]:
         _tokens = shlex.split(cmd.strip())
     except ValueError:
         _tokens = cmd.strip().split()
+
+    redirect_valid, redirect_reason = _validate_readonly_redirections(cmd)
+    if not redirect_valid:
+        return False, redirect_reason
+
+    # sed is readonly unless it edits in place. Tokenize this check so a pattern
+    # containing the text "-i" is not misclassified.
+    if base_cmd == "sed" and any(t == "-i" or t.startswith("-i") for t in _tokens[1:]):
+        return False, "sed -i"
+
     if len(_tokens) <= 2 and any(t in _bare_info for t in _tokens[1:]):
         return True, ""
 
@@ -905,16 +1047,6 @@ def _validate_single_readonly_command(cmd: str) -> tuple[bool, str]:
         # If it's just 'python script.py', it depends on the script, but we allow it
         # as python is in the readonly set. We could be stricter here.
         return True, ""
-
-    # Check for sed with -i (in-place edit)
-    if base_cmd == "sed" and "-i" in cmd:
-        return False, "sed -i"
-
-    # Check for dangerous redirect patterns in readonly mode.
-    redirect_check = re.sub(r"\s*\d?>\s*/dev/null\b", "", cmd)
-    redirect_check = re.sub(r"\s*\d?>&\d\b", "", redirect_check)
-    if ">" in redirect_check or ">>" in redirect_check:
-        return False, "redirection (>)"
 
     # Check for pipe to shell
     if any(p in cmd for p in ["| sh", "| bash", "|sh", "|bash"]):
