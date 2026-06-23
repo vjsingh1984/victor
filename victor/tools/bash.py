@@ -1158,6 +1158,7 @@ async def shell(
     timeout: Optional[int] = None,
     dangerous: bool = False,
     readonly: bool = True,
+    action: str = "read",
     stdout_limit: Optional[int] = None,
     stderr_limit: Optional[int] = None,
 ) -> Dict[str, Any]:
@@ -1265,6 +1266,23 @@ async def shell(
             "return_code": -1,
         }
 
+    # Map explicit `action` intent to a readonly override so the model can
+    # declare what KIND of command it is running (read|write|network|exec)
+    # instead of guessing the inverted `readonly` boolean.
+    #   action="read"    -> readonly stays as passed (enforce allowlist)
+    #   action="network" -> allow curl/wget/ping/ssh (network class)
+    #   action="write"   -> mutate filesystem/git state
+    #   action="exec"    -> arbitrary exec
+    _ACTION_EFFECTIVE_READONLY = {
+        "read": None,       # honor the `readonly` arg as-is
+        "network": False,   # network ops are never readonly-allowlisted
+        "write": False,     # mutations must bypass the allowlist
+        "exec": False,      # arbitrary exec must bypass the allowlist
+    }
+    _eff = _ACTION_EFFECTIVE_READONLY.get(action)
+    if _eff is not None:
+        readonly = _eff
+
     # Check readonly mode restrictions
     if readonly:
         is_valid, failing_cmd = _validate_readonly_command(cmd)
@@ -1274,7 +1292,8 @@ async def shell(
                 "error": (
                     f"Command '{failing_cmd}' is not allowed in readonly mode. "
                     f"Allowed commands: {', '.join(sorted(get_allowed_readonly_commands())[:15])}... "
-                    "Use 'shell' tool without readonly=True for other commands."
+                    "Re-run with readonly=False (or action='network'/'write'/'exec') "
+                    "to run mutating or network commands."""
                 ),
                 "stdout": "",
                 "stderr": "",

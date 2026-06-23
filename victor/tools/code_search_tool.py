@@ -2984,7 +2984,9 @@ async def _literal_search(
 
 @tool(
     category="search",
-    priority=Priority.CRITICAL,  # Always available for code exploration
+    priority=Priority.HIGH,  # Demoted from CRITICAL: requires victor-coding index
+    # provider for semantic mode; CRITICAL would tie with `shell` and create a
+    # dead-end loop when the index is absent (shell grep redirect -> broken tool).
     access_mode=AccessMode.READONLY,  # Only reads files for search
     danger_level=DangerLevel.SAFE,  # No side effects
     # Registry-driven metadata for tool selection and loop detection

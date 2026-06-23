@@ -204,6 +204,7 @@ async def git(
     author_name: Optional[str] = None,
     author_email: Optional[str] = None,
     context: Optional[Dict[str, Any]] = None,
+    path: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Run git operations: status, diff, stash, log, branch, commit_msg, conflicts, push.
 
