@@ -35,12 +35,13 @@ server binary is absent, so SQLite remains the default with no proximadb install
 
 from __future__ import annotations
 
+import asyncio
 import enum
 import hashlib
 import logging
 import re
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -244,3 +245,135 @@ async def start_embedded_db(
             "running instance. SQLite remains the default backend."
         ) from exc
     return db
+
+
+# ---------------------------------------------------------------------------
+# Shared per-repo connection — one embedded instance for graph + vectors
+# ---------------------------------------------------------------------------
+_CONN_REGISTRY: "Dict[str, ProximaRepoConnection]" = {}
+_CONN_LOCK = asyncio.Lock()
+
+
+class ProximaRepoConnection:
+    """One embedded ProximaDB instance shared by a repo's graph + vector stores.
+
+    The correlated-substrate design (TD-11/12) keeps a symbol's ORION graph node
+    and its HNSW vector in **one** instance under a single ``oid``. Both
+    :class:`ProximaGraphStore` and ``ProximaDBProvider`` acquire the same
+    connection (keyed by ``data_dir``), so the graph and the vectors are
+    physically co-located and a vector hit maps to its graph node by identity
+    (``vector record id == graph node id == oid``) rather than a cross-store join.
+
+    The connection is **ref-counted**: the ``proximadb-server`` subprocess starts
+    on first :meth:`acquire` and stops when the last holder calls :meth:`release`.
+    """
+
+    def __init__(self, key: str, data_dir: Path, binary_path: Optional[str]) -> None:
+        self._key = key
+        self._data_dir = data_dir
+        self._binary_path = binary_path
+        self._db: Any = None
+        self._client: Any = None
+        self._graphs: Dict[str, Any] = {}
+        self._collections: Dict[str, Any] = {}
+        self._refcount = 0
+
+    @classmethod
+    async def acquire(
+        cls, data_dir: Path | str, *, binary_path: Optional[str] = None
+    ) -> "ProximaRepoConnection":
+        """Return the shared connection for ``data_dir``, starting it if needed."""
+        key = str(Path(data_dir).expanduser().resolve(strict=False))
+        async with _CONN_LOCK:
+            conn = _CONN_REGISTRY.get(key)
+            if conn is None:
+                conn = cls(key, Path(data_dir), binary_path)
+                _CONN_REGISTRY[key] = conn
+            conn._refcount += 1
+            try:
+                await conn._ensure_started()
+            except Exception:
+                # Roll back the registration if startup failed.
+                conn._refcount -= 1
+                if conn._refcount <= 0:
+                    _CONN_REGISTRY.pop(key, None)
+                raise
+            return conn
+
+    async def _ensure_started(self) -> None:
+        if self._db is not None:
+            return
+        from proximadb_sdk.unified_client import ProximaDBClient
+
+        self._db = await start_embedded_db(self._data_dir, binary_path=self._binary_path)
+        # Graph + vector ops are served over REST (the gRPC client has no graph
+        # RPCs), so the shared client is pinned to the REST protocol.
+        self._client = ProximaDBClient(url=self._db.rest_url, protocol="rest")
+
+    @property
+    def client(self) -> Any:
+        return self._client
+
+    @property
+    def embedded_db(self) -> Any:
+        return self._db
+
+    async def graph(self, graph_id: str) -> Any:
+        """Return (and cache) a ``ProximaDBGraph`` for ``graph_id`` (idempotent create)."""
+        cached = self._graphs.get(graph_id)
+        if cached is not None:
+            return cached
+        from proximadb_sdk.graph import ProximaDBGraph
+
+        try:
+            await asyncio.to_thread(self._client.create_graph, graph_id)
+        except Exception as exc:  # pragma: no cover - depends on live server
+            logger.debug("create_graph(%s) noop/failed: %s", graph_id, exc)
+        graph = ProximaDBGraph(self._client, graph_id)
+        self._graphs[graph_id] = graph
+        return graph
+
+    async def get_or_create_collection(
+        self,
+        name: str,
+        *,
+        dimension: int,
+        distance_metric: str = "cosine",
+        embedding_model: Any = None,
+    ) -> Any:
+        """Return (and cache) a vector collection on this shared instance."""
+        cached = self._collections.get(name)
+        if cached is not None:
+            if embedding_model is not None and not getattr(cached, "has_embedding_model", True):
+                cached.set_embedding_model(embedding_model)
+            return cached
+        collection = await self._db.create_collection(
+            name,
+            dimension=dimension,
+            distance_metric=distance_metric,
+            embedding_model=embedding_model,
+        )
+        self._collections[name] = collection
+        return collection
+
+    def forget_collection(self, name: str) -> None:
+        """Drop a cached collection handle (e.g. after it was deleted server-side)."""
+        self._collections.pop(name, None)
+
+    async def release(self) -> None:
+        """Drop one reference; stop the subprocess when the last holder releases."""
+        async with _CONN_LOCK:
+            self._refcount -= 1
+            if self._refcount > 0:
+                return
+            _CONN_REGISTRY.pop(self._key, None)
+            db = self._db
+            self._db = None
+            self._client = None
+            self._graphs.clear()
+            self._collections.clear()
+        if db is not None:
+            try:
+                await db.stop()
+            except Exception as exc:  # pragma: no cover
+                logger.debug("Embedded ProximaDB stop failed: %s", exc)
