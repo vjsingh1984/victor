@@ -119,9 +119,10 @@ class ToolRegistry(BaseRegistry[str, _ToolType]):
 
         # Schema cache: version-counter based invalidation for O(1) cache checks.
         # Key is (only_enabled: bool), value is (version_at_cache_time, schemas_list)
-        self._schema_cache: Dict[bool, Optional[Tuple[int, List[Dict[str, Any]]]]] = {
-            True: None,  # Cache for only_enabled=True
-            False: None,  # Cache for only_enabled=False
+        self._schema_cache: Dict[Any, Optional[Tuple[int, List[Dict[str, Any]]]]] = {
+            True: None,  # Backward-compatible cache for enabled advertised tools
+            False: None,  # Backward-compatible cache for all registered tools
+            (True, True): None,  # Enabled tools including folded tools
         }
         self._schema_cache_version: int = 0
         self._schema_cache_lock = threading.RLock()
@@ -821,24 +822,32 @@ class ToolRegistry(BaseRegistry[str, _ToolType]):
         """
         return super().get(name)
 
-    def list_tools(self, only_enabled: bool = True) -> list:
+    def list_tools(self, only_enabled: bool = True, include_folded: bool = False) -> list:
         """List all registered tools.
 
         Args:
             only_enabled: If True, only return enabled tools (default: True)
+            include_folded: If True, include tools folded into other advertised
+                tools. Folded tools remain executable but are hidden from
+                default enabled listings to reduce schema/tool-count burden.
 
         Returns:
             List of tool instances
         """
         if only_enabled:
+            from victor.tools.folding import should_advertise_tool
+
             return [
                 tool
                 for name, tool in self._tools.items()
                 if self._tool_enabled.get(name, False) and self._tool_is_available(tool)
+                and should_advertise_tool(name, include_folded=include_folded)
             ]
         return list(self._tools.values())
 
-    def get_tool_schemas(self, only_enabled: bool = True) -> List[Dict[str, Any]]:
+    def get_tool_schemas(
+        self, only_enabled: bool = True, include_folded: bool = False
+    ) -> List[Dict[str, Any]]:
         """Get JSON schemas for all tools with caching.
 
         Uses O(1) version-counter invalidation. The cache is bumped automatically
@@ -846,6 +855,7 @@ class ToolRegistry(BaseRegistry[str, _ToolType]):
 
         Args:
             only_enabled: If True, only return schemas for enabled tools (default: True)
+            include_folded: If True, include schemas for folded tools.
 
         Returns:
             List of tool JSON schemas
@@ -853,10 +863,14 @@ class ToolRegistry(BaseRegistry[str, _ToolType]):
         with self._schema_cache_lock:
             current_version = self._schema_cache_version
             use_cache = not (only_enabled and self._has_dynamic_availability_checks())
+            if only_enabled and include_folded:
+                cache_key: Any = (True, True)
+            else:
+                cache_key = bool(only_enabled)
 
             # O(1) cache check via version counter
             if use_cache:
-                cache_entry = self._schema_cache.get(only_enabled)
+                cache_entry = self._schema_cache.get(cache_key)
                 if cache_entry is not None:
                     cached_version, cached_schemas = cache_entry
                     if cached_version == current_version:
@@ -864,17 +878,20 @@ class ToolRegistry(BaseRegistry[str, _ToolType]):
 
             # Cache miss - generate schemas
             if only_enabled:
+                from victor.tools.folding import should_advertise_tool
+
                 schemas = [
                     tool.to_json_schema()
                     for name, tool in self._tools.items()
                     if self._tool_enabled.get(name, False) and self._tool_is_available(tool)
+                    and should_advertise_tool(name, include_folded=include_folded)
                 ]
             else:
                 schemas = [tool.to_json_schema() for tool in self._tools.values()]
 
             # Update cache with current version
             if use_cache:
-                self._schema_cache[only_enabled] = (current_version, schemas)
+                self._schema_cache[cache_key] = (current_version, schemas)
 
             return schemas
 

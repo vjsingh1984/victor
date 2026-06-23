@@ -368,6 +368,8 @@ class CommitCommand(BaseSlashCommand):
 
         import subprocess
 
+        from victor.core.attribution import append_victor_commit_attribution
+
         # Check for staged changes
         try:
             result = subprocess.run(
@@ -421,6 +423,7 @@ class CommitCommand(BaseSlashCommand):
                 return
 
         ctx.console.print(f"[bold]Commit message:[/] {commit_message}")
+        commit_message = append_victor_commit_attribution(commit_message)
 
         # Stage all changes
         subprocess.run(["git", "add", "-A"], cwd=Path.cwd())

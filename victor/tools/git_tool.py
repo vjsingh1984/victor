@@ -45,6 +45,11 @@ from typing import Any, Dict, List, Optional, Tuple
 logger = logging.getLogger(__name__)
 
 from victor.config.timeouts import ProcessTimeouts
+from victor.core.attribution import (
+    append_victor_commit_attribution,
+    append_victor_pr_attribution,
+    get_victor_attribution_identity,
+)
 from victor.tools.formatters import format_git_output
 from victor.tools.base import (
     AccessMode,
@@ -356,9 +361,7 @@ async def git(
             env_overrides["GIT_AUTHOR_EMAIL"] = author_email
             env_overrides["GIT_COMMITTER_EMAIL"] = author_email
 
-        # Append Victor Agent trailer to commit message
-        trailer = "\n\n🤖 Generated with Victor Agent"
-        full_message = f"{message}{trailer}"
+        full_message = append_victor_commit_attribution(message)
 
         # Commit with message and optional author override
         success, stdout, stderr = await _run_git_async(
@@ -377,7 +380,11 @@ async def git(
 
         return {
             "success": True,
-            "output": f"Committed successfully{author_info}:\n{stdout}",
+            "output": (
+                f"Committed successfully{author_info}:\n{stdout}\n\n"
+                "Victor AI attribution trailers were recorded in the commit message "
+                "and will be visible after push."
+            ),
             "error": "",
         }
 
@@ -777,6 +784,9 @@ DESCRIPTION:
     if not pr_description:
         pr_description = "Automatically generated PR description"
 
+    pr_description = append_victor_pr_attribution(pr_description)
+    identity = get_victor_attribution_identity()
+
     # Push branch first
     success, stdout, stderr = await _run_git_async(
         "push", "--set-upstream", "origin", current_branch
@@ -791,8 +801,11 @@ DESCRIPTION:
 
     # Create PR with gh CLI
     pr_command = (
-        f'gh pr create --base "{base_branch}" --head "{current_branch}" '
-        f'--title "{pr_title}" --body "{pr_description}"'
+        "gh pr create "
+        f"--base {shlex.quote(base_branch)} "
+        f"--head {shlex.quote(current_branch)} "
+        f"--title {shlex.quote(pr_title)} "
+        f"--body {shlex.quote(pr_description)}"
     )
 
     result = await run_command_async(
@@ -804,7 +817,10 @@ DESCRIPTION:
     if result.success:
         return {
             "success": True,
-            "output": f"PR created successfully!\n\n{result.stdout}",
+            "output": (
+                f"PR created successfully!\n\n{result.stdout}\n\n"
+                f"PR body includes Victor AI attribution for {identity.name}."
+            ),
             "error": "",
         }
     elif "not found" in result.error_message.lower() if result.error_message else False:
