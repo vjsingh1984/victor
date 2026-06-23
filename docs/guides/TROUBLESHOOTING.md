@@ -858,43 +858,65 @@ result shows `8192` or a value far below the advertised window, plus the
 
 ### Solutions
 
-1. **Register the model in the provider's model table** (single source of
-   truth). For ZAI, add an exact entry to `ZAI_MODELS` in
-   `victor/providers/zai_provider.py`, placed so exact-match wins:
+**Preferred (config-driven, no code change):**
 
-   ```python
-   "glm-5.2": {
-       "description": "GLM-5.2 - Latest SOTA model (753B MoE), 1M context",
-       "context_window": 1000000,
-       "max_output": 65535,
-       "supports_tools": True,
-       "supports_thinking": True,
-   },
+1. **Register the model in `victor/config/provider_context_limits.yaml`.** This is
+   the single source of truth for context windows at runtime —
+   `BaseProvider.context_window()` consults it first, before any hardcoded
+   provider table. Add a fnmatch pattern under `models:` (takes precedence over
+   the provider default), or a provider block under `providers:`:
+
+   ```yaml
+   providers:
+     zai:                      # provider-level default for all GLM models
+       context_window: 200000
+       response_reserve: 8192
+       supports_extended_context: true
+
+   models:
+     "glm-5.2*":              # model-specific override (highest precedence)
+       context_window: 1000000  # 753B MoE, 1M context
    ```
 
-2. **Ensure `context_window()` (no `get_` prefix) is overridden** and delegates
-   to the table, so the runtime path consults it instead of the base fallback:
+   Resolution order at runtime:
+   1. `models:` fnmatch pattern (e.g. `glm-5.2*` matches `glm-5.2` and
+      `glm-5.2:coding`)
+   2. `providers:` block default for the provider
+   3. the provider's hardcoded `<PROVIDER>_MODELS` table (legacy fallback)
+   4. `8192` safe default
+
+2. Re-run the diagnosis snippet above — both the exact name **and** any suffix
+   variant (e.g. `glm-5.2:coding`) must resolve to the true window.
+
+> **Adding a new model is now a YAML edit.** You only need to touch provider
+> code if the model also needs non-window metadata (`max_output`,
+> `supports_thinking`, etc.) for that provider's `list_models()` / capability
+> advertising. For context-window sizing alone, use the YAML.
+
+**Fallback (code edit, for providers without a YAML entry):**
+
+3. Add an exact entry to the provider's `<PROVIDER>_MODELS` table (e.g.
+   `ZAI_MODELS` in `victor/providers/zai_provider.py`), placed so exact-match
+   wins, AND ensure `context_window()` (no `get_` prefix) is overridden to
+   delegate to it:
 
    ```python
    def context_window(self, model: str) -> int:
        return self.get_context_window(model)
    ```
 
-3. Re-run the diagnosis snippet above — both the exact name **and** any suffix
-   variant (e.g. `glm-5.2:coding`) must resolve to the true window.
-
 > Note: adding `context_window:` to `~/.victor/profiles.yaml` will **not** fix
-> this — the profile loader ignores that field. The provider registry is the
-> only effective override.
+> this — the profile loader ignores that field. Use
+> `victor/config/provider_context_limits.yaml` (the runtime override) instead.
 
 ### Prevention (Adding Any New Model)
 
 Follow this checklist whenever a new model is added (new release, new provider,
 or new suffix/variant):
 
-1. **Add the model to the provider's `<PROVIDER>_MODELS` table** with the
-   correct `context_window`, `max_output`, `supports_tools`, and
-   `supports_thinking`.
+1. **Add a `models:` pattern to `provider_context_limits.yaml`** with the
+   correct `context_window`. This makes the window available to the runtime
+   budgeting path with no code change.
 2. **Confirm `context_window(model)` resolves correctly** by running the
    diagnosis snippet — verify the exact name AND every suffix/variant used in
    profiles (e.g. `:coding`, `:china`).
@@ -905,15 +927,22 @@ or new suffix/variant):
    `Unknown model ... using default context window of 8192`, or the
    `tool-history repair ... removed=` / `attempting aggressive recovery` loop.
    If either appears, the model is not registered for the budgeting path.
-5. **Add/extend the provider's unit test** asserting both
-   `provider.context_window(model)` and `provider.get_context_window(model)`
-   return the expected value for each supported model name.
+5. **Add/extend the provider's unit test** asserting
+   `provider.context_window(model)` returns the expected value for each
+   supported model name (see `test_context_window_config_driven_override` in
+   `tests/unit/providers/test_zai_provider_ext.py` for the config-driven
+   pattern).
 
 ### Related Files
 
-- `victor/providers/<provider>_provider.py` — model registry + window override
-- `victor/providers/base.py:1055` — `context_window()` default lookup (8192
-  fallback at `:1150`)
+- `victor/config/provider_context_limits.yaml` — **runtime source of truth**
+  for context windows (config-driven; edit this to register a new model)
+- `victor/config/config_loaders.py:166` — `get_provider_limits()` YAML loader
+  (fnmatch patterns, TTL cache, hot-reload via `invalidate_config_cache()`)
+- `victor/providers/base.py:1055` — `context_window()` consults the YAML first,
+  then falls back to its hardcoded table (8192 fallback at `:1150`)
+- `victor/providers/<provider>_provider.py` — hardcoded `<PROVIDER>_MODELS`
+  registry (legacy fallback when no YAML entry exists)
 - `victor/agent/services/tool_service.py:2799,2740,2810` — runtime consumers
 - `victor/config/tool_tiers.py:184` — provider category by window size
 

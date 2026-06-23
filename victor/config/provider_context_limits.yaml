@@ -48,6 +48,16 @@ providers:
     rate_limit_rpm: 60
     rate_limit_tpm: 100000
 
+  # Z.AI (GLM models) — config-driven registration.
+  # New GLM models can be registered here WITHOUT editing provider code.
+  # Model-specific patterns below take precedence over this default.
+  zai:
+    context_window: 200000
+    response_reserve: 8192
+    supports_extended_context: true
+    rate_limit_rpm: 60
+    rate_limit_tpm: 100000
+
   moonshot:
     context_window: 128000
     response_reserve: 4096
@@ -199,3 +209,22 @@ models:
   # Moonshot Kimi Models
   "kimi-k2*":
     context_window: 256000
+
+  # Z.AI GLM Models — config-driven registration.
+  # Adding a new GLM model = add a pattern here. No code change required.
+  # These patterns take precedence over the `zai:` provider default above
+  # and over the provider's hardcoded ZAI_MODELS table.
+  "glm-5.2*":
+    context_window: 1000000  # 753B MoE, 1M context
+  "glm-5.1*":
+    context_window: 200000
+  "glm-5*":
+    context_window: 200000
+  "glm-4.7*":
+    context_window: 200000
+  "glm-4.6*":
+    context_window: 128000
+  "glm-4.5*":
+    context_window: 128000
+  "glm-4*":
+    context_window: 128000

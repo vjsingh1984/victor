@@ -91,8 +91,25 @@ async def test_get_context_window(zai_provider):
     assert zai_provider.get_context_window("glm-4.6") == 128000
     assert zai_provider.get_context_window("glm-4.5") == 128000
     assert zai_provider.get_context_window("glm-4.5-air") == 128000
-    # Default for unknown models
-    assert zai_provider.get_context_window("glm-unknown") == 128000
+    # Unknown GLM models fall back to the `zai:` provider default in
+    # provider_context_limits.yaml (config-driven), not the hardcoded 128000.
+    assert zai_provider.get_context_window("glm-unknown") == 200000
+
+
+@pytest.mark.asyncio
+async def test_context_window_config_driven_override(zai_provider):
+    """Config-driven registration: context_window() reads provider_context_limits.yaml.
+
+    Adding a new GLM model is a YAML edit (under `models:`), NOT a code change.
+    This test proves the YAML layer is consulted at runtime: glm-5.2 is
+    registered ONLY in provider_context_limits.yaml (not in ZAI_MODELS) yet
+    resolves to its 1M context window.
+    """
+    # glm-5.2 has a 1M-context entry in provider_context_limits.yaml only
+    assert zai_provider.context_window("glm-5.2") == 1000000
+    assert zai_provider.context_window("glm-5.2:coding") == 1000000
+    # glm-5.1 is also YAML-registered at 200000
+    assert zai_provider.context_window("glm-5.1") == 200000
 
 
 @pytest.mark.asyncio

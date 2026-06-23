@@ -398,19 +398,23 @@ class ZAIProvider(HttpxOpenAICompatProvider):
     def context_window(self, model: str) -> int:
         """Context window in tokens — the method the runtime actually calls.
 
-        ToolService._get_tool_context_window and the KV / tool-broadcasting
-        strategies call ``provider.context_window(model)`` (the BaseProvider
-        API), NOT get_context_window(). BaseProvider.context_window() has its
-        own lookup table that does NOT include any GLM model, so without this
-        override every GLM model falls back to the base class's 8192 default —
-        which collapses the tool-token budget to 2048 and disables KV
-        session-locking. This override delegates to get_context_window() so
-        ZAI_MODELS remains the single source of truth.
+        Resolution order (all config-driven, no code edit needed for new models):
+          1. provider_context_limits.yaml  (BaseProvider.context_window() — see base.py)
+          2. ZAI_MODELS registry            (see get_context_window() below)
+          3. 128000 safe default
+        To register a new GLM model, add a pattern to the `models:` block of
+        victor/config/provider_context_limits.yaml — it takes precedence over
+        the hardcoded ZAI_MODELS table.
         """
         return self.get_context_window(model)
 
     def get_context_window(self, model: str) -> int:
         """Get context window size for a GLM model.
+
+        Resolution order:
+          1. provider_context_limits.yaml (explicit provider/model match)
+          2. ZAI_MODELS registry (exact name, then prefix match)
+          3. 128000 safe default
 
         Args:
             model: Model name (e.g., "glm-5.2", "glm-4.7", "glm-4.6")
@@ -418,11 +422,25 @@ class ZAIProvider(HttpxOpenAICompatProvider):
         Returns:
             Context window size in tokens (default 128K for unknown models)
         """
+        # 1. Config-driven override: consult provider_context_limits.yaml.
+        # Reuses BaseProvider's YAML-first logic so registration stays a YAML
+        # edit (no code change). Falls back to ZAI_MODELS below if no entry.
+        try:
+            from victor.providers.base import BaseProvider
+
+            yaml_cw = BaseProvider.context_window(self, model)
+            if yaml_cw:
+                return yaml_cw
+        except Exception:
+            pass
+
+        # 2. Hardcoded registry (legacy / offline fallback)
         if model in ZAI_MODELS:
             return ZAI_MODELS[model]["context_window"]
         for prefix, info in ZAI_MODELS.items():
             if model.startswith(prefix):
                 return info["context_window"]
+        # 3. Safe default
         return 128000
 
     async def list_models(self) -> List[Dict[str, Any]]:

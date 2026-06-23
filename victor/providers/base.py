@@ -1070,6 +1070,40 @@ class BaseProvider(ABC):
             >>> cw = provider.context_window("claude-sonnet-4-20250514")
             >>> assert cw == 200000
         """
+        # Config-driven override: consult provider_context_limits.yaml first.
+        # This makes model registration a YAML edit (not a code change): add a
+        # pattern under `models:` or a provider block under `providers:` in
+        # victor/config/provider_context_limits.yaml and it takes effect here.
+        # We fall back to the hardcoded table below only if the YAML has no
+        # explicit entry for this provider/model (legacy behaviour).
+        try:
+            from victor.config.config_loaders import (
+                get_provider_limits,
+                _load_yaml_cached,
+                PROVIDER_LIMITS_FILE,
+            )
+            import fnmatch as _fnmatch
+
+            data = _load_yaml_cached(PROVIDER_LIMITS_FILE, "provider_limits")
+            providers = (data or {}).get("providers", {})
+            models = (data or {}).get("models", {})
+
+            # Only treat the YAML as authoritative when there is an EXPLICIT
+            # match (provider block or model fnmatch pattern). The loader's
+            # ProviderLimits default of 128000 must NOT silently override a
+            # model that is correctly registered in the hardcoded table below.
+            has_entry = self.name in providers or any(
+                _fnmatch.fnmatch(model, p) for p in models
+            )
+            if has_entry:
+                limits = get_provider_limits(self.name, model)
+                if limits.context_window:
+                    return limits.context_window
+        except Exception:
+            # Never let a config-load failure break the hot path; fall through
+            # to the hardcoded table below.
+            pass
+
         # Known models lookup table
         # Source: Model documentation as of 2025-04
         CONTEXT_WINDOWS = {
