@@ -52,12 +52,10 @@ def test_folded_tool_schemas_are_hidden_by_default_but_available_on_request() ->
 
     assert [schema["function"]["name"] for schema in registry.get_tool_schemas()] == ["shell"]
     assert [
-        schema["function"]["name"]
-        for schema in registry.get_tool_schemas(include_folded=True)
+        schema["function"]["name"] for schema in registry.get_tool_schemas(include_folded=True)
     ] == ["shell", "test"]
     assert [
-        schema["function"]["name"]
-        for schema in registry.get_tool_schemas(only_enabled=False)
+        schema["function"]["name"] for schema in registry.get_tool_schemas(only_enabled=False)
     ] == ["shell", "test"]
 
 
@@ -78,7 +76,24 @@ def test_shell_description_includes_folded_tool_guidance() -> None:
     description = shell.Tool.description
 
     assert is_folded_tool("docker")
-    assert folded_tool_names_for_target("shell") == ["database", "dependency", "docker", "test"]
+    assert folded_tool_names_for_target("shell") == [
+        "database",
+        "dependency",
+        "docker",
+        "extract",
+        "inline",
+        "organize_imports",
+        "rag_delete",
+        "rag_ingest",
+        "rag_list",
+        "rag_query",
+        "rag_search",
+        "rag_stats",
+        "rename",
+        "sandbox",
+        "scaffold",
+        "test",
+    ]
     assert "Folded tool guidance:" in description
     assert "docker:" in description
     assert "pytest" in description

@@ -35,11 +35,11 @@ class ToolFold:
 
 
 FOLDED_TOOLS: dict[str, ToolFold] = {
+    # Shell folds
     "database": ToolFold(
         target="shell",
         hint=(
-            "Use shell with sqlite3/psql/mysql for quick database inspection "
-            "and SQL queries."
+            "Use shell with sqlite3/psql/mysql for quick database inspection " "and SQL queries."
         ),
     ),
     "dependency": ToolFold(
@@ -53,6 +53,59 @@ FOLDED_TOOLS: dict[str, ToolFold] = {
     "test": ToolFold(
         target="shell",
         hint="Use shell with pytest, npm test, cargo test, go test, make test, or project test CLIs.",
+    ),
+    "rag_ingest": ToolFold(
+        target="shell",
+        hint="Use shell to execute scripts or CLI tools for knowledge base ingestion, similar to SQL/db tools.",
+    ),
+    "rag_query": ToolFold(
+        target="shell", hint="Use shell to execute scripts for querying the knowledge base."
+    ),
+    "rag_search": ToolFold(
+        target="shell", hint="Use shell to execute scripts for searching the knowledge base."
+    ),
+    "rag_list": ToolFold(
+        target="shell", hint="Use shell to execute scripts for listing the knowledge base."
+    ),
+    "rag_delete": ToolFold(
+        target="shell", hint="Use shell to execute scripts for modifying the knowledge base."
+    ),
+    "rag_stats": ToolFold(
+        target="shell", hint="Use shell to execute scripts for getting stats of the knowledge base."
+    ),
+    "rename": ToolFold(
+        target="shell",
+        hint="Use shell with standard tools (sed, fastmod) or fs edit/patch for renaming symbols.",
+    ),
+    "inline": ToolFold(
+        target="shell", hint="Use shell with standard tools (sed) or fs edit/patch for inlining."
+    ),
+    "extract": ToolFold(
+        target="shell", hint="Use shell with standard tools or fs edit/patch for extraction."
+    ),
+    "organize_imports": ToolFold(
+        target="shell", hint="Use shell with standard tools (isort, ruff) for organizing imports."
+    ),
+    "scaffold": ToolFold(
+        target="shell",
+        hint="Use shell to scaffold projects via npx, cookiecutter, cargo new, or equivalent CLI tools.",
+    ),
+    "sandbox": ToolFold(
+        target="shell",
+        hint="Use shell with the --sandbox flag to execute isolated containerized commands.",
+    ),
+    # Integration folds
+    "jira": ToolFold(
+        target="integrations",
+        hint="Use integrations tool to interact with Jira for ticket management.",
+    ),
+    "slack": ToolFold(target="integrations", hint="Use integrations tool to message Slack."),
+    "teams": ToolFold(
+        target="integrations", hint="Use integrations tool to message Microsoft Teams."
+    ),
+    # MCP folds
+    "mcp": ToolFold(
+        target="mcp_bridge", hint="Use mcp_bridge to access Model Context Protocol specific tools."
     ),
 }
 
@@ -96,4 +149,3 @@ def folded_tool_hints_for_target(target: str) -> list[str]:
         for name, fold in sorted(FOLDED_TOOLS.items())
         if fold.target == target
     ]
-

@@ -336,7 +336,7 @@ class UnifiedToolRegistry:
 
             # Default paths
             if paths is None:
-                paths = ["victor.tools"]
+                paths = ["victor.tools", "victor.tools.unified"]
 
             discovered = []
 
@@ -373,9 +373,25 @@ class UnifiedToolRegistry:
 
             module = importlib.import_module(path)
 
-            # Scan for BaseTool subclasses
+            # Scan for decorated tool callables, BaseTool instances, and subclasses.
             for member_name, obj in inspect.getmembers(module):
-                if self._is_tool_class(obj):
+                if callable(obj) and hasattr(obj, "Tool"):
+                    tool_name = obj.Tool.name
+
+                    if airgapped and tool_name in self._get_web_tools():
+                        continue
+
+                    await self.register(obj, enabled=True)
+                    discovered.append(tool_name)
+                elif isinstance(obj, BaseTool):
+                    tool_name = obj.name
+
+                    if airgapped and tool_name in self._get_web_tools():
+                        continue
+
+                    await self.register(obj, enabled=True)
+                    discovered.append(tool_name)
+                elif self._is_tool_class(obj):
                     try:
                         instance = obj()
                         tool_name = instance.name

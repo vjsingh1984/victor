@@ -50,6 +50,11 @@ from victor.tools.unified.adapters import (
     ToolRegistryAdapter,
     migrate_to_unified_registry,
 )
+from victor.tools.unified.code_tool import code_tool
+from victor.tools.unified.fs_tool import fs_tool
+from victor.tools.unified.search_tool import search_tool
+from victor.tools.unified.shell_tool import shell_tool
+from victor.tools.unified.web_tool import web_tool
 
 __all__ = [
     # Core
@@ -62,4 +67,10 @@ __all__ = [
     "SharedToolRegistryAdapter",
     "ToolRegistryAdapter",
     "migrate_to_unified_registry",
+    # Command tools
+    "code_tool",
+    "fs_tool",
+    "search_tool",
+    "shell_tool",
+    "web_tool",
 ]

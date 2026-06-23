@@ -418,7 +418,53 @@ class TurnExecutor:
 
     async def _execute_tool_calls(self, tool_calls: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Execute tool calls through the canonical tool-context surface."""
-        return await self._tool_context.execute_tool_calls(tool_calls)
+        from victor.agent.background_tasks import BackgroundTaskDef
+        import asyncio
+
+        tool_results = await self._tool_context.execute_tool_calls(tool_calls)
+
+        for i, res in enumerate(tool_results):
+            raw_result = res.get("result")
+            if isinstance(raw_result, BackgroundTaskDef):
+                task_id = raw_result.task_id
+
+                # Callback to inject a message when the background task completes
+                def on_background_task_done(fut: asyncio.Task):
+                    try:
+                        task_res = fut.result()
+                        # Format the result if needed
+                        if isinstance(task_res, dict):
+                            stdout = task_res.get("stdout", "").strip()
+                            stderr = task_res.get("stderr", "").strip()
+                            out = []
+                            if stdout:
+                                out.append(f"### STDOUT\\n```text\\n{stdout}\\n```")
+                            if stderr:
+                                out.append(f"### STDERR\\n```text\\n{stderr}\\n```")
+                            msg = (
+                                "\\n\\n".join(out)
+                                if out
+                                else "Command executed successfully with no output."
+                            )
+                        else:
+                            msg = str(task_res)
+                    except asyncio.CancelledError:
+                        msg = "### ❌ ERROR\\nBackground task was cancelled."
+                    except Exception as e:
+                        msg = f"### ❌ ERROR\\nBackground task failed: {e}"
+
+                    content = f"Background task {task_id} ({raw_result.context}) finished with result:\\n\\n{msg}"
+                    self._chat_context.add_message(role="system", content=content)
+
+                # The task is already executing in the background, just attach the callback
+                if isinstance(raw_result.task, asyncio.Task):
+                    raw_result.task.add_done_callback(on_background_task_done)
+
+                tool_results[i][
+                    "result"
+                ] = f"### 💡 SYSTEM HINT\\nTask is running in the background.\\nTask ID: {task_id}\\n\\nThe watcher will notify you when it completes."
+
+        return tool_results
 
     # =====================================================================
     # Public API

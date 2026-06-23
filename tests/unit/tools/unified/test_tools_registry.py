@@ -106,6 +106,15 @@ class TestUnifiedToolRegistry:
         assert retrieved.name == "dummy_tool"
 
     @pytest.mark.asyncio
+    async def test_default_discovery_registers_unified_command_tools(self):
+        """Default discovery should include packaged unified command tools."""
+        registry = UnifiedToolRegistry.get_instance()
+
+        names = await registry.discover()
+
+        assert {"code", "fs", "search", "shell", "web"}.issubset(set(names))
+
+    @pytest.mark.asyncio
     async def test_list_tools(self):
         """Test listing tools."""
         registry = UnifiedToolRegistry.get_instance()
