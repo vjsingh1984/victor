@@ -41,9 +41,9 @@ from typing import Any, Dict, List, Optional
 
 from victor.storage.proxima_runtime import (
     ProximaEmbeddingMode,
+    ProximaRepoConnection,
     ProximaUnavailableError,
     is_proxima_available,
-    start_embedded_db,
 )
 from victor.storage.vector_stores.base import (
     BaseEmbeddingProvider,
@@ -80,8 +80,8 @@ class ProximaDBProvider(BaseEmbeddingProvider):
         self._server_url: Optional[str] = extra.get("server_url")
         self._binary_path: Optional[str] = extra.get("binary_path")
 
-        self._db = None  # EmbeddedProximaDB (we own/stop it)
-        self._collection = None  # EmbeddedCollection
+        self._conn = None  # shared ProximaRepoConnection (per data_dir)
+        self._collection = None  # EmbeddedCollection on the shared instance
         self._model = None  # proximadb_sdk embedding model (in-process)
         self._data_dir: Optional[Path] = None
 
@@ -126,9 +126,12 @@ class ProximaDBProvider(BaseEmbeddingProvider):
         except Exception:  # pragma: no cover - model-specific
             pass
 
-        # Start the embedded engine and create the correlated collection.
-        self._db = await start_embedded_db(self._data_dir, binary_path=self._binary_path)
-        self._collection = await self._db.create_collection(
+        # Share ONE embedded instance per repo with ProximaGraphStore (keyed by
+        # data_dir) so graph nodes and their vectors are co-located (TD-11/12).
+        self._conn = await ProximaRepoConnection.acquire(
+            self._data_dir, binary_path=self._binary_path
+        )
+        self._collection = await self._conn.get_or_create_collection(
             self._collection_name,
             dimension=self._dimension,
             distance_metric=self.config.distance_metric or "cosine",
@@ -251,10 +254,11 @@ class ProximaDBProvider(BaseEmbeddingProvider):
         if not self._initialized:
             await self.initialize()
         try:
-            await self._db.delete_collection(self._collection_name)
+            await self._conn.embedded_db.delete_collection(self._collection_name)
+            self._conn.forget_collection(self._collection_name)
         except Exception as exc:  # pragma: no cover
             logger.debug("delete_collection failed: %s", exc)
-        self._collection = await self._db.create_collection(
+        self._collection = await self._conn.get_or_create_collection(
             self._collection_name,
             dimension=self._dimension,
             distance_metric=self.config.distance_metric or "cosine",
@@ -284,12 +288,9 @@ class ProximaDBProvider(BaseEmbeddingProvider):
         }
 
     async def close(self) -> None:
-        if self._db is not None:
-            try:
-                await self._db.stop()
-            except Exception:  # pragma: no cover
-                pass
-            self._db = None
+        if self._conn is not None:
+            await self._conn.release()
+            self._conn = None
         self._collection = None
         self._model = None
         self._initialized = False

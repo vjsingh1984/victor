@@ -51,11 +51,11 @@ from victor.storage.graph.protocol import (
 )
 from victor.storage.proxima_runtime import (
     ProximaEmbeddingMode,
+    ProximaRepoConnection,
     ProximaUnavailableError,
     graph_id_for_repo,
     is_proxima_available,
     repo_id_from_path,
-    start_embedded_db,
 )
 
 logger = logging.getLogger(__name__)
@@ -130,8 +130,15 @@ class ProximaGraphStore(GraphStoreProtocol):
 
         self._graph = graph
         self._client = client
-        self._db = None  # EmbeddedProximaDB we own (and must stop on close)
+        self._conn = None  # shared ProximaRepoConnection (embedded path)
         self._initialized = graph is not None
+
+        # Correlated vector collection: a symbol's 384-d embedding is co-indexed
+        # here under the SAME oid as its ORION graph node, so a vector hit maps to
+        # its graph node by identity (TD-12). Lives on the shared instance.
+        self._vector_dim = 384
+        self._symbol_collection_name = f"{self._repo}_codegraph_vectors"
+        self._symbol_collection: Any = None
 
         # In-memory sidecars for facts ProximaDBGraph does not yet persist
         # natively (relational Tier-C work lands with TD-127). Idempotent and
@@ -151,42 +158,43 @@ class ProximaGraphStore(GraphStoreProtocol):
                 "backend. Keep codebase_graph_store=sqlite or install proximadb."
             )
 
-        from proximadb_sdk.graph import ProximaDBGraph
-        from proximadb_sdk.unified_client import ProximaDBClient
-
         # Graph node/edge operations are served over REST (the gRPC client has no
         # graph RPCs), so the client must use the REST protocol explicitly —
         # otherwise it auto-selects gRPC and 404s against the REST port.
         if self._server_url:
             # Multi-tenant service path — WIP until TD-127/130/131 merge.
+            from proximadb_sdk.graph import ProximaDBGraph
+            from proximadb_sdk.unified_client import ProximaDBClient
+
             logger.warning(
                 "ProximaGraphStore service mode (server_url=%s) is WIP and gated on "
                 "ProximaDB TD-127/130/131; embedded mode is the supported path.",
                 self._server_url,
             )
             self._client = ProximaDBClient(url=self._server_url, protocol="rest")
+            try:
+                await asyncio.to_thread(self._client.create_graph, self._graph_id)
+            except Exception as exc:  # pragma: no cover - depends on live server
+                logger.debug("create_graph(%s) noop/failed: %s", self._graph_id, exc)
+            self._graph = ProximaDBGraph(self._client, self._graph_id)
         else:
-            self._db = await start_embedded_db(self._data_dir, binary_path=self._binary_path)
-            self._client = ProximaDBClient(url=self._db.rest_url, protocol="rest")
+            # Embedded path: share ONE instance per repo with the embedding
+            # provider so the graph and its vectors are co-located (TD-11/12).
+            self._conn = await ProximaRepoConnection.acquire(
+                self._data_dir, binary_path=self._binary_path
+            )
+            self._client = self._conn.client
+            self._graph = await self._conn.graph(self._graph_id)
 
-        # Ensure the graph exists (idempotent; ignore "already exists").
-        try:
-            await asyncio.to_thread(self._client.create_graph, self._graph_id)
-        except Exception as exc:  # pragma: no cover - depends on live server
-            logger.debug("create_graph(%s) noop/failed: %s", self._graph_id, exc)
-
-        self._graph = ProximaDBGraph(self._client, self._graph_id)
         self._initialized = True
 
     async def close(self) -> None:
-        if self._db is not None:
-            try:
-                await self._db.stop()
-            except Exception as exc:  # pragma: no cover
-                logger.debug("Embedded ProximaDB stop failed: %s", exc)
-            self._db = None
+        if self._conn is not None:
+            await self._conn.release()
+            self._conn = None
         self._client = None
         self._graph = None
+        self._symbol_collection = None
         self._initialized = False
 
     async def _ensure(self) -> Any:
@@ -296,25 +304,68 @@ class ProximaGraphStore(GraphStoreProtocol):
         node.metadata = merged
         await self.upsert_nodes([node])
 
-    async def set_node_embedding(self, node_id: str, embedding: List[float]) -> None:
-        """Associate a vector with a symbol — by oid, not a bridge column.
+    async def _symbol_vectors(self) -> Any:
+        """Get/create the correlated symbol-vector collection on the shared instance.
 
-        In the correlated substrate the ORION graph node and its HNSW vector
-        share one ``oid`` (the node_id), so the canonical place for the vector is
-        the co-keyed vector collection owned by ``ProximaDBProvider`` — there is
-        no ``embedding_ref`` to populate. We re-upsert the node carrying the
-        embedding on the proxima ``GraphNode.embedding`` field for forward
-        compatibility; this is best-effort and never raises on the hot path.
+        Vectors are keyed by the symbol ``oid`` (== graph node id), so the vector
+        index and the ORION graph share one identity — no ``embedding_ref`` bridge.
+        Returns ``None`` when there is no embedded connection (e.g. service mode or
+        an injected test graph without a real instance).
         """
-        node = await self.get_node_by_id(node_id)
-        if node is None:
+        if self._symbol_collection is not None:
+            return self._symbol_collection
+        if self._conn is None:
+            return None
+        self._symbol_collection = await self._conn.get_or_create_collection(
+            self._symbol_collection_name, dimension=self._vector_dim
+        )
+        return self._symbol_collection
+
+    async def set_node_embedding(self, node_id: str, embedding: List[float]) -> None:
+        """Co-index a symbol's vector under its ``oid`` (== graph node id).
+
+        Stores the raw vector in the correlated collection on the **same** embedded
+        instance as the ORION node, so a vector hit resolves to its graph node by
+        identity (TD-12) and the always-empty ``embedding_ref`` bridge is retired.
+        Best-effort: never raises on the indexing hot path.
+        """
+        vector = list(embedding)
+        self._vector_dim = len(vector) or self._vector_dim
+        collection = await self._symbol_vectors()
+        if collection is None:
             return
-        pnode = self._to_proxima_node(node)
         try:
-            pnode.embedding = list(embedding)
-        except Exception:  # pragma: no cover - defensive
-            return
-        await asyncio.to_thread(self._graph.batch_create_nodes, [pnode])
+            await collection.insert_records([{"id": node_id, "vector": vector}])
+        except Exception as exc:  # pragma: no cover - depends on live server
+            logger.debug("set_node_embedding(%s) failed: %s", node_id, exc)
+
+    async def semantic_search(
+        self,
+        query_vector: List[float],
+        *,
+        top_k: int = 10,
+        filters: Dict[str, Any] | None = None,
+    ) -> List[GraphNode]:
+        """Vector seed → graph node: search co-indexed symbol vectors, resolve oids.
+
+        Returns the graph nodes whose vectors are nearest to ``query_vector``,
+        ordered by similarity. This is the semantic-seed half of hybrid
+        seed→expand, served from the one correlated collection (vector hit → node
+        is identity, not a join). Empty when no vectors are co-indexed.
+        """
+        collection = await self._symbol_vectors()
+        if collection is None:
+            return []
+        hits = await collection.search(query_vector, top_k=top_k, filters=filters or None)
+        nodes: List[GraphNode] = []
+        for hit in hits or []:
+            oid = hit.get("id") if isinstance(hit, dict) else None
+            if not oid:
+                continue
+            node = await self.get_node_by_id(oid)
+            if node is not None:
+                nodes.append(node)
+        return nodes
 
     # ------------------------------------------------------------------
     # Reads / traversal
@@ -424,17 +475,18 @@ class ProximaGraphStore(GraphStoreProtocol):
     async def _delete_node(self, node_id: str) -> None:
         if self._client is None:
             return
-        for method in ("delete_node", "delete_vector"):
-            fn = getattr(self._client, method, None)
-            if fn is None:
-                continue
+        delete_node = getattr(self._client, "delete_node", None)
+        if delete_node is not None:
             try:
-                if method == "delete_node":
-                    await asyncio.to_thread(fn, node_id=node_id, graph_id=self._graph_id)
-                else:
-                    await asyncio.to_thread(fn, node_id)
+                await asyncio.to_thread(delete_node, node_id=node_id, graph_id=self._graph_id)
             except Exception as exc:  # pragma: no cover - depends on live server
-                logger.debug("%s(%s) failed: %s", method, node_id, exc)
+                logger.debug("delete_node(%s) failed: %s", node_id, exc)
+        # Drop the co-indexed vector under the same oid (one entity, one delete).
+        if self._symbol_collection is not None:
+            try:
+                await self._symbol_collection.delete([node_id])
+            except Exception as exc:  # pragma: no cover
+                logger.debug("vector delete(%s) failed: %s", node_id, exc)
 
     async def delete_by_repo(self) -> None:
         self._file_mtimes.clear()
