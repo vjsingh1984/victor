@@ -323,7 +323,21 @@ class TestStableToolOrderCoverage:
         "code_search",
     ]
 
-    # Every tool observed in a real coding-agent session (54 tools).
+    GRAPH_FOLDED_TOOLS = {
+        "graph_analytics",
+        "graph_dependencies",
+        "graph_neighbors",
+        "graph_path",
+        "graph_patterns",
+        "graph_query",
+        "graph_search",
+        "graph_semantic",
+        "graph_semantic_search",
+        "impact_analysis",
+    }
+
+    # Every tool observed in a real coding-agent session before graph aliases
+    # were folded into graph(mode=...).
     FULL_SESSION_TOOLS = {
         "graph", "graph_analytics", "graph_dependencies", "graph_neighbors",
         "graph_path", "graph_patterns", "graph_query", "graph_search",
@@ -336,6 +350,8 @@ class TestStableToolOrderCoverage:
         "refs", "symbol", "edit", "metrics", "analysis_checkpoint", "patch",
         "merge", "audit", "pipeline", "iac",
     }
+
+    DEFAULT_SESSION_TOOLS = FULL_SESSION_TOOLS - GRAPH_FOLDED_TOOLS
 
     def test_core_loop_tools_ranked_before_others(self):
         """read/edit/write/shell/ls/code_search must precede unranked tools."""
@@ -371,11 +387,17 @@ class TestStableToolOrderCoverage:
         alphabetical.
         """
         ranked = set(ToolService.STABLE_TOOL_ORDER)
-        unranked = self.FULL_SESSION_TOOLS - ranked
+        unranked = self.DEFAULT_SESSION_TOOLS - ranked
         assert not unranked, (
             f"These session tools are unranked and fall back to alphabetical "
             f"ordering: {sorted(unranked)}"
         )
+
+    def test_folded_graph_aliases_are_not_ranked_as_default_tools(self):
+        """Graph subtools are intentionally folded into graph(mode=...)."""
+        ranked = set(ToolService.STABLE_TOOL_ORDER)
+        assert self.GRAPH_FOLDED_TOOLS.isdisjoint(ranked)
+        assert "graph" in ranked
 
 
 # ---------------------------------------------------------------------------

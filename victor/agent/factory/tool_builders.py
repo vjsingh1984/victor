@@ -23,6 +23,7 @@ Part of CRITICAL-001: Monolithic Orchestrator decomposition.
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional, TYPE_CHECKING
 from unittest.mock import Mock
@@ -427,6 +428,15 @@ class ToolBuildersMixin:
         """
         from victor.agent.tool_registrar import ToolRegistrar, ToolRegistrarConfig
 
+        lazy_startup_env = os.getenv("VICTOR_TOOL_LAZY_STARTUP")
+        lazy_startup_default = not (
+            lazy_startup_env is not None
+            and lazy_startup_env.strip().lower() in {"0", "false", "no", "off"}
+        )
+        lazy_startup = bool(
+            getattr(self.settings, "tool_lazy_startup", lazy_startup_default)
+        )
+
         registrar = ToolRegistrar(
             tools=tools,
             settings=self.settings,
@@ -443,6 +453,7 @@ class ToolBuildersMixin:
                 plugin_packages=getattr(self.settings, "plugin_packages", []),
                 max_workers=4,
                 max_complexity=10,
+                lazy_startup=lazy_startup,
             ),
         )
 

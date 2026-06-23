@@ -49,7 +49,7 @@ import inspect
 import logging
 import os
 import threading
-from typing import Any, Dict, List, Optional, Set, Type
+from typing import Any, Dict, Iterable, List, Optional, Set, Type
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +62,63 @@ WEB_TOOL_NAMES: Set[str] = {
     "browser_tool",
     "http_request",
 }
+
+
+# Tools that remain callable through the umbrella ``graph(mode=...)`` surface but
+# should not be advertised as separate default schemas. Keeping them out of the
+# registered/default catalog reduces prompt size and avoids cache churn from a
+# long tail of near-duplicate graph functions.
+SCHEMA_HIDDEN_TOOL_NAMES: Set[str] = {
+    "graph_analytics",
+    "graph_dependencies",
+    "graph_neighbors",
+    "graph_path",
+    "graph_patterns",
+    "graph_query",
+    "graph_search",
+    "graph_semantic",
+    "graph_semantic_search",
+    "impact_analysis",
+}
+
+
+BOOTSTRAP_TOOL_SPECS: Dict[str, tuple[str, str]] = {
+    "read": ("victor.tools.filesystem", "read"),
+    "write": ("victor.tools.filesystem", "write"),
+    "ls": ("victor.tools.filesystem", "ls"),
+    "project_overview": ("victor.tools.filesystem", "project_overview"),
+    "edit": ("victor.tools.file_editor_tool", "edit"),
+    "code_search": ("victor.tools.code_search_tool", "code_search"),
+    "shell": ("victor.tools.bash", "shell"),
+    "git": ("victor.tools.git_tool", "git"),
+    "pr": ("victor.tools.git_tool", "pr"),
+    "web_search": ("victor.tools.web_search_tool", "web_search"),
+    "web_fetch": ("victor.tools.web_search_tool", "web_fetch"),
+}
+
+
+DEMAND_TOOL_SPECS: Dict[str, tuple[str, str]] = {
+    **BOOTSTRAP_TOOL_SPECS,
+    "graph": ("victor.tools.graph_tool", "graph"),
+}
+
+
+GRAPH_DEMAND_KEYWORDS = frozenset(
+    {
+        "graph",
+        "callers",
+        "callees",
+        "call graph",
+        "dependency graph",
+        "dependencies",
+        "impact analysis",
+        "pagerank",
+        "centrality",
+        "neighbors",
+        "trace",
+        "call flow",
+    }
+)
 
 
 class SharedToolRegistry:
@@ -242,6 +299,71 @@ class SharedToolRegistry:
             logger.debug(f"Failed to create instance of {tool_name}: {e}")
             return None
 
+    def _load_tool_spec(self, tool_name: str) -> Optional[Any]:
+        """Load one known tool without scanning/importing the full tools tree."""
+        spec = DEMAND_TOOL_SPECS.get(tool_name)
+        if spec is None:
+            return None
+
+        module_name, member_name = spec
+        try:
+            module = importlib.import_module(module_name)
+            tool_obj = getattr(module, member_name)
+        except Exception as exc:
+            logger.debug("Failed to load bootstrap tool %s from %s: %s", tool_name, module_name, exc)
+            return None
+
+        if inspect.isfunction(tool_obj) and getattr(tool_obj, "_is_tool", False):
+            tool_instance = tool_obj.Tool
+            self._tool_classes[tool_instance.name] = type(tool_instance)
+            self._decorated_tools[tool_instance.name] = tool_obj
+            return tool_obj
+
+        try:
+            tool_name_from_obj = getattr(tool_obj, "name", tool_name)
+            self._tool_classes[tool_name_from_obj] = type(tool_obj)
+            self._tool_instances[tool_name_from_obj] = tool_obj
+            return tool_obj
+        except Exception:
+            return tool_obj
+
+    def get_tools_for_names(
+        self,
+        tool_names: Iterable[str],
+        *,
+        airgapped_mode: bool = False,
+    ) -> List[Any]:
+        """Load specific known tools without forcing full catalog discovery."""
+        result: List[Any] = []
+        seen: Set[str] = set()
+        for tool_name in tool_names:
+            if tool_name in seen:
+                continue
+            seen.add(tool_name)
+            if airgapped_mode and tool_name in WEB_TOOL_NAMES:
+                continue
+            if tool_name in SCHEMA_HIDDEN_TOOL_NAMES:
+                continue
+            tool_obj = self._load_tool_spec(tool_name)
+            if tool_obj is not None:
+                result.append(tool_obj)
+        return result
+
+    def get_bootstrap_tools_for_registration(self, airgapped_mode: bool = False) -> List[Any]:
+        """Return the compact startup tool set without full filesystem discovery."""
+        return self.get_tools_for_names(
+            BOOTSTRAP_TOOL_SPECS.keys(),
+            airgapped_mode=airgapped_mode,
+        )
+
+    def infer_demand_tools(self, text: str) -> List[str]:
+        """Infer specialty tools that should be hydrated for a user request."""
+        lowered = (text or "").lower()
+        demand: List[str] = []
+        if any(keyword in lowered for keyword in GRAPH_DEMAND_KEYWORDS):
+            demand.append("graph")
+        return demand
+
     def _discover_tools(self) -> None:
         """Discover and cache all tool classes from victor/tools directory.
 
@@ -332,7 +454,12 @@ class SharedToolRegistry:
             f"({discovered_classes} classes, {discovered_decorated} decorated)"
         )
 
-    def get_all_tools_for_registration(self, airgapped_mode: bool = False) -> List[Any]:
+    def get_all_tools_for_registration(
+        self,
+        airgapped_mode: bool = False,
+        *,
+        include_schema_hidden: bool = False,
+    ) -> List[Any]:
         """Get tool instances and decorated functions for registration.
 
         This method returns a list suitable for registering with ToolRegistry.
@@ -351,6 +478,8 @@ class SharedToolRegistry:
 
         # Add decorated tools (functions with @tool decorator)
         for name, func in self.get_decorated_tools(airgapped_mode=airgapped_mode).items():
+            if not include_schema_hidden and name in SCHEMA_HIDDEN_TOOL_NAMES:
+                continue
             result.append(func)
 
         # Add class-based tools as lazy proxies (deferred initialization)
@@ -361,6 +490,8 @@ class SharedToolRegistry:
         decorated_names = set(self._decorated_tools.keys())
         for name, cls in self.get_tool_classes(airgapped_mode=airgapped_mode).items():
             if name not in decorated_names:
+                if not include_schema_hidden and name in SCHEMA_HIDDEN_TOOL_NAMES:
+                    continue
                 try:
                     cost_tier = getattr(cls, "cost_tier", CostTier.FREE)
                     if not isinstance(cost_tier, CostTier):

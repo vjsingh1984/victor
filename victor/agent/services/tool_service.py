@@ -684,7 +684,6 @@ class ToolService:
         # Tier 4 — analysis / quality
         "metrics",
         "scan",
-        "impact_analysis",
         "docs_coverage",
         "analysis_checkpoint",
         "lsp",
@@ -693,17 +692,7 @@ class ToolService:
         "web_fetch",
         "http",
         "jira",
-        # Tier 6 — graph query variants (keep grouped after the umbrella ``graph``)
-        "graph_semantic_search",
-        "graph_search",
-        "graph_semantic",
-        "graph_neighbors",
-        "graph_path",
-        "graph_patterns",
-        "graph_analytics",
-        "graph_dependencies",
-        "graph_query",
-        # Tier 7 — infra / data / generation (lower frequency)
+        # Tier 6 — infra / data / generation (lower frequency)
         "docker",
         "cicd",
         "pipeline",
@@ -766,6 +755,44 @@ class ToolService:
         self._tool_call_parser: Optional[Any] = ToolCallParser()
         self._tool_call_validator: Optional[Any] = ToolCallValidator()
         self._last_tool_call_parse_diagnostics: Optional[Dict[str, Any]] = None
+
+    def _hydrate_tools_for_context(self, context: Any) -> None:
+        """Hydrate demand tools before selection when startup is lazy."""
+        ensure_for_query = getattr(self._registrar, "ensure_tools_for_query", None)
+        if not callable(ensure_for_query):
+            return
+
+        fragments: List[str] = []
+        for attr in ("user_message", "message", "prompt", "query", "task_type"):
+            try:
+                value = getattr(context, attr, None)
+            except Exception:
+                value = None
+            if isinstance(value, str) and value:
+                fragments.append(value)
+
+        metadata = getattr(context, "metadata", None)
+        if isinstance(metadata, dict):
+            for key in ("user_message", "message", "prompt", "query", "task_type"):
+                value = metadata.get(key)
+                if isinstance(value, str) and value:
+                    fragments.append(value)
+
+        text = "\n".join(fragments)
+        if text:
+            try:
+                ensure_for_query(text)
+            except Exception:
+                self._logger.debug("Demand tool hydration failed", exc_info=True)
+
+    def _hydrate_tool_if_missing(self, tool_name: str) -> None:
+        """Hydrate one lazily registered tool if the registrar supports it."""
+        ensure_tool = getattr(self._registrar, "ensure_tool_registered", None)
+        if callable(ensure_tool):
+            try:
+                ensure_tool(tool_name)
+            except Exception:
+                self._logger.debug("Tool hydration failed for %s", tool_name, exc_info=True)
 
     @property
     def _enabled_tools(self) -> Optional[set[str]]:
@@ -904,6 +931,7 @@ class ToolService:
         self._logger.debug(f"Selecting tools (max={max_tools})")
 
         try:
+            self._hydrate_tools_for_context(context)
             # Use selector to choose tools
             selected = await self._selector.select(context, max_tools)
 
@@ -939,6 +967,7 @@ class ToolService:
             ToolExecutionError: If tool execution fails
         """
         self._logger.debug(f"Executing tool: {tool_name}")
+        self._hydrate_tool_if_missing(tool_name)
 
         # Check budget
         if self.is_budget_exhausted():
@@ -1623,6 +1652,7 @@ class ToolService:
             return False, "Tool call missing 'name' field"
 
         canonical_name = canonicalize_core_tool_name(self.resolve_tool_alias(str(tool_name)))
+        self._hydrate_tool_if_missing(canonical_name)
 
         # Check if tool is available
         if available_tools is None:
@@ -1848,6 +1878,7 @@ class ToolService:
             return None
 
         try:
+            self._hydrate_tool_if_missing(tool_name)
             tool = self._registrar.get_tool(tool_name)
             if tool and hasattr(tool, "get_schema"):
                 return tool.get_schema()
