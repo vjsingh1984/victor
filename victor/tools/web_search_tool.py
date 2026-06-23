@@ -574,6 +574,60 @@ def _extract_content(html: str, max_length: int = 5000) -> str:
     return ""
 
 
+async def _render_page_text(
+    url: str,
+    *,
+    timeout_seconds: float = 30.0,
+    max_length: int = _DEFAULT_MAX_CONTENT_LENGTH,
+) -> Dict[str, Any]:
+    """Render a JavaScript-backed page with Playwright and return plaintext.
+
+    This is intentionally isolated behind an explicit web_fetch render mode so
+    normal HTTP fetches stay cheap. The output is plaintext by default to reduce
+    LLM token pressure; the rendered HTML length is reported for diagnostics but
+    the full DOM is not returned.
+    """
+    try:
+        from playwright.async_api import async_playwright
+    except Exception as exc:
+        return {
+            "success": False,
+            "error": f"Playwright is not available: {exc}",
+        }
+
+    browser = None
+    try:
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(headless=True)
+            page = await browser.new_page(user_agent=_USER_AGENT)
+            await page.goto(
+                url,
+                wait_until="networkidle",
+                timeout=int(timeout_seconds * 1000),
+            )
+            text = await page.locator("body").inner_text(timeout=int(timeout_seconds * 1000))
+            html = await page.content()
+            text = re.sub(r"\n\s*\n", "\n\n", text or "")
+            text = re.sub(r" +", " ", text).strip()
+            return {
+                "success": True,
+                "content": text[:max_length],
+                "html_length": len(html or ""),
+                "rendered": True,
+            }
+    except Exception as exc:
+        return {
+            "success": False,
+            "error": f"Browser render failed: {exc}",
+        }
+    finally:
+        if browser is not None:
+            try:
+                await browser.close()
+            except Exception:
+                pass
+
+
 @tool(
     cost_tier=CostTier.MEDIUM,
     category="web",
@@ -755,19 +809,31 @@ async def web_search(
     keywords=["fetch", "url", "webpage", "download", "http", "content", "web fetch"],
     aliases=["fetch"],  # Backward compatibility alias
 )
-async def web_fetch(url: str, _exec_ctx: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+async def web_fetch(
+    url: str,
+    render: str = "auto",
+    _exec_ctx: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
     """Fetch and extract main text content from a URL.
 
     Args:
-        url: URL to fetch content from
+        url: URL to fetch content from.
+        render: "auto" (HTTP first, browser fallback), "http", or "browser".
     """
     if not url:
         return {"success": False, "error": "Missing required parameter: url"}
+    render_mode = (render or "auto").lower().strip()
+    if render_mode not in {"auto", "http", "browser"}:
+        return {
+            "success": False,
+            "error": "Invalid render mode. Use 'auto', 'http', or 'browser'.",
+        }
 
     config = _get_web_config(_exec_ctx)
     cache: Optional[GenericResultCache] = None
     cache_params = {
-        "max_content_length": int(config.get("max_content_length", _DEFAULT_MAX_CONTENT_LENGTH))
+        "max_content_length": int(config.get("max_content_length", _DEFAULT_MAX_CONTENT_LENGTH)),
+        "render": render_mode,
     }
     if config.get("generic_result_cache_enabled"):
         cache = _get_generic_web_cache(int(config.get("generic_result_cache_ttl", 300)))
@@ -778,6 +844,31 @@ async def web_fetch(url: str, _exec_ctx: Optional[Dict[str, Any]] = None) -> Dic
             return payload
 
     try:
+        max_content_length = int(config.get("max_content_length", _DEFAULT_MAX_CONTENT_LENGTH))
+        if render_mode == "browser":
+            rendered = await _render_page_text(
+                url,
+                timeout_seconds=30.0,
+                max_length=max_content_length,
+            )
+            if not rendered.get("success"):
+                return rendered
+            result_payload = {
+                "success": True,
+                "content": rendered.get("content", ""),
+                "url": url,
+                "render": "browser",
+                "html_length": rendered.get("html_length", 0),
+            }
+            if cache is not None:
+                cache.set(
+                    ResultType.SEARCH,
+                    f"fetch:{url}",
+                    dict(result_payload),
+                    params=cache_params,
+                )
+            return result_payload
+
         status_code, payload = await _request_text(
             "GET",
             url,
@@ -795,13 +886,37 @@ async def web_fetch(url: str, _exec_ctx: Optional[Dict[str, Any]] = None) -> Dic
         # Extract text content
         content = _extract_content(
             payload,
-            max_length=int(config.get("max_content_length", _DEFAULT_MAX_CONTENT_LENGTH)),
+            max_length=max_content_length,
         )
+
+        if render_mode == "auto" and len(content.strip()) < 200:
+            rendered = await _render_page_text(
+                url,
+                timeout_seconds=30.0,
+                max_length=max_content_length,
+            )
+            if rendered.get("success") and rendered.get("content"):
+                result_payload = {
+                    "success": True,
+                    "content": rendered.get("content", ""),
+                    "url": url,
+                    "render": "browser",
+                    "html_length": rendered.get("html_length", 0),
+                    "http_status_code": status_code,
+                }
+                if cache is not None:
+                    cache.set(
+                        ResultType.SEARCH,
+                        f"fetch:{url}",
+                        dict(result_payload),
+                        params=cache_params,
+                    )
+                return result_payload
 
         if not content:
             return {"success": False, "error": "No content could be extracted from URL"}
 
-        result_payload = {"success": True, "content": content, "url": url}
+        result_payload = {"success": True, "content": content, "url": url, "render": "http"}
         if cache is not None:
             cache.set(
                 ResultType.SEARCH,
