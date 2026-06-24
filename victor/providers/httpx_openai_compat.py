@@ -334,7 +334,7 @@ class HttpxOpenAICompatProvider(BaseProvider):
             self.name,
             model,
             len(formatted),
-            len(effective_tools),
+            len(effective_tools) if effective_tools else 0,
             stream,
             offered_tool_names,
             _sys_preview,

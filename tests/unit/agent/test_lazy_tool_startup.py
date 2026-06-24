@@ -133,7 +133,9 @@ def test_shared_registry_bootstrap_exposes_grouped_command_tools():
     finally:
         SharedToolRegistry.reset_instance()
 
-    assert {"fs", "search", "code", "web", "shell"}.issubset(names)
+    # Core grouped command tools available at bootstrap
+    assert {"fs", "code_search", "code", "web", "shell"}.issubset(names)
+    # Demand-loaded tools NOT in bootstrap
     assert "git" not in names
     assert "pr" not in names
 
@@ -159,6 +161,9 @@ def test_grouped_command_tool_schemas_use_cmd_parameter():
     finally:
         SharedToolRegistry.reset_instance()
 
-    for tool_name in ("fs", "search", "code", "web", "shell"):
-        assert "cmd" in schemas[tool_name]
-        assert "command" not in schemas[tool_name]
+    # Grouped command tools use "cmd" parameter (not "command")
+    for tool_name in ("fs", "code_search", "code", "web", "shell"):
+        assert "cmd" in schemas[tool_name], f"{tool_name} should have 'cmd' parameter"
+        assert (
+            "command" not in schemas[tool_name]
+        ), f"{tool_name} should not have 'command' parameter"
