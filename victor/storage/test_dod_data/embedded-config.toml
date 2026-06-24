@@ -1,0 +1,42 @@
+# ProximaDB Embedded Mode Configuration
+# Auto-generated - do not edit manually
+
+[server]
+node_id = "embedded-node"
+bind_address = "127.0.0.1"
+port = 15678
+data_dir = "test_dod_data"
+
+[storage]
+metadata_url = "file://test_dod_data/metadata"
+mmap_enabled = true
+
+[[storage.storage_locations]]
+url = "file://test_dod_data/data"
+weight = 1
+tags = ["embedded"]
+
+[storage.wal_config]
+enable_wal = true
+memory_flush_size_bytes = 16777216
+vector_count_threshold = 50000
+
+[storage.sst_config]
+cache_size_mb = 128
+compression = "lz4"
+compression_level = 3
+
+[api]
+grpc_port = 15679
+rest_port = 15678
+max_request_size_mb = 32
+timeout_seconds = 30
+
+[monitoring]
+metrics_enabled = false
+log_level = "warn"
+
+[graph]
+engine = "ORION"
+enable_prefetch = true
+prefetch_budget = 4

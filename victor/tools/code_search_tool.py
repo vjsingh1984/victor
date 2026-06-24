@@ -38,7 +38,7 @@ class SearchFilters:
             "SearchFilters from code_search_tool is deprecated. "
             "Use the new code_search tool in victor.tools.unified.search_tool instead.",
             DeprecationWarning,
-            stacklevel=2
+            stacklevel=2,
         )
 
 
@@ -46,13 +46,14 @@ class SearchFilters:
 def _normalize_search_filters(filters: Any) -> SearchFilters:
     """Normalize search filters (STUB - deprecated)."""
     warnings.warn(
-        "_normalize_search_filters is deprecated. "
-        "Use the new code_search tool instead.",
+        "_normalize_search_filters is deprecated. " "Use the new code_search tool instead.",
         DeprecationWarning,
-        stacklevel=2
+        stacklevel=2,
     )
     if isinstance(filters, dict):
-        return SearchFilters(**{k: v for k, v in filters.items() if k in SearchFilters.__dataclass_fields__})
+        return SearchFilters(
+            **{k: v for k, v in filters.items() if k in SearchFilters.__dataclass_fields__}
+        )
     if isinstance(filters, SearchFilters):
         return filters
     return SearchFilters()
@@ -61,9 +62,7 @@ def _normalize_search_filters(filters: Any) -> SearchFilters:
 def _build_codebase_embedding_config(settings: Any) -> Dict[str, Any]:
     """Build embedding config (STUB - deprecated)."""
     warnings.warn(
-        "_build_codebase_embedding_config is deprecated.",
-        DeprecationWarning,
-        stacklevel=2
+        "_build_codebase_embedding_config is deprecated.", DeprecationWarning, stacklevel=2
     )
     return {}
 
@@ -71,30 +70,23 @@ def _build_codebase_embedding_config(settings: Any) -> Dict[str, Any]:
 def _decorate_literal_fallback_result(result: Any, query: str) -> Dict[str, Any]:
     """Decorate literal search result (STUB - deprecated)."""
     warnings.warn(
-        "_decorate_literal_fallback_result is deprecated.",
-        DeprecationWarning,
-        stacklevel=2
+        "_decorate_literal_fallback_result is deprecated.", DeprecationWarning, stacklevel=2
     )
     return {"result": result, "query": query}
 
 
 def _get_index_build_failure_cache() -> Optional[Any]:
     """Get index build failure cache (STUB - deprecated)."""
-    warnings.warn(
-        "_get_index_build_failure_cache is deprecated.",
-        DeprecationWarning,
-        stacklevel=2
-    )
+    warnings.warn("_get_index_build_failure_cache is deprecated.", DeprecationWarning, stacklevel=2)
     return None
 
 
 def _get_or_build_index(settings: Any) -> Optional[Any]:
     """Get or build index (STUB - deprecated)."""
     warnings.warn(
-        "_get_or_build_index is deprecated. "
-        "Use victor.tools.unified.search_tool instead.",
+        "_get_or_build_index is deprecated. " "Use victor.tools.unified.search_tool instead.",
         DeprecationWarning,
-        stacklevel=2
+        stacklevel=2,
     )
     return None
 
@@ -102,21 +94,16 @@ def _get_or_build_index(settings: Any) -> Optional[Any]:
 def _literal_search(query: str, path: str, **kwargs) -> List[Dict[str, Any]]:
     """Literal search (STUB - deprecated)."""
     warnings.warn(
-        "_literal_search is deprecated. "
-        "Use victor.tools.unified.search_tool instead.",
+        "_literal_search is deprecated. " "Use victor.tools.unified.search_tool instead.",
         DeprecationWarning,
-        stacklevel=2
+        stacklevel=2,
     )
     return []
 
 
 def clear_index_cache() -> None:
     """Clear index cache (STUB - deprecated)."""
-    warnings.warn(
-        "clear_index_cache is deprecated.",
-        DeprecationWarning,
-        stacklevel=2
-    )
+    warnings.warn("clear_index_cache is deprecated.", DeprecationWarning, stacklevel=2)
 
 
 async def code_search(
@@ -124,7 +111,7 @@ async def code_search(
     path: str = ".",
     mode: str = "text",
     filters: Optional[SearchFilters] = None,
-    **kwargs
+    **kwargs,
 ) -> Dict[str, Any]:
     """Code search (STUB - deprecated).
 
@@ -134,14 +121,14 @@ async def code_search(
         "code_search is deprecated. "
         "Use victor.tools.unified.search_tool (name='code_search') instead.",
         DeprecationWarning,
-        stacklevel=2
+        stacklevel=2,
     )
     return {
         "results": [],
         "query": query,
         "path": path,
         "mode": mode,
-        "error": "Deprecated - use victor.tools.unified.search_tool"
+        "error": "Deprecated - use victor.tools.unified.search_tool",
     }
 
 
@@ -155,30 +142,18 @@ class IntegrityProbeOutcome:
     error: Optional[str] = None
 
     def __post_init__(self):
-        warnings.warn(
-            "IntegrityProbeOutcome is deprecated.",
-            DeprecationWarning,
-            stacklevel=2
-        )
+        warnings.warn("IntegrityProbeOutcome is deprecated.", DeprecationWarning, stacklevel=2)
 
 
 async def _probe_index_integrity(index: Any) -> IntegrityProbeOutcome:
     """Probe index integrity (STUB - deprecated)."""
-    warnings.warn(
-        "_probe_index_integrity is deprecated.",
-        DeprecationWarning,
-        stacklevel=2
-    )
+    warnings.warn("_probe_index_integrity is deprecated.", DeprecationWarning, stacklevel=2)
     return IntegrityProbeOutcome(healthy=True)
 
 
 def _calculate_index_build_timeout(file_count: int, base_timeout: float = 300.0) -> float:
     """Calculate index build timeout (STUB - deprecated)."""
-    warnings.warn(
-        "_calculate_index_build_timeout is deprecated.",
-        DeprecationWarning,
-        stacklevel=2
-    )
+    warnings.warn("_calculate_index_build_timeout is deprecated.", DeprecationWarning, stacklevel=2)
     return base_timeout
 
 
@@ -188,10 +163,9 @@ def extract_skeleton(source: str, language: str = "python") -> str:
     Use victor.tools.unified.search_tool or graph-based analysis instead.
     """
     warnings.warn(
-        "extract_skeleton is deprecated. "
-        "Use graph-based analysis or manual inspection instead.",
+        "extract_skeleton is deprecated. " "Use graph-based analysis or manual inspection instead.",
         DeprecationWarning,
-        stacklevel=2
+        stacklevel=2,
     )
     # Return a simple skeleton as placeholder
     lines = source.split("\n")
@@ -201,7 +175,7 @@ def extract_skeleton(source: str, language: str = "python") -> str:
         # Keep function/class definitions and important structural lines
         if stripped.startswith(("def ", "class ", "async def ", "import ", "from ")):
             skeleton.append(line)
-        elif stripped and not stripped.startswith("#") and not stripped.startswith(("\"\"\"", "'''")):
+        elif stripped and not stripped.startswith("#") and not stripped.startswith(('"""', "'''")):
             # Keep other non-empty, non-comment lines at a basic level
             if len(stripped) < 80:  # Short lines are likely structural
                 skeleton.append(line)
