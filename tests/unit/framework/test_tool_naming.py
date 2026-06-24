@@ -219,10 +219,19 @@ class TestToolAliases:
         assert TOOL_ALIASES["upload_files_to_sandbox"] == "sandbox_upload"
 
     def test_search_aliases(self):
-        """Verify search tool aliases."""
+        """Verify search tool aliases.
+
+        ``search`` (the unified grep/files search tool) and ``code_search``
+        are distinct canonical tools — ``search`` maps to itself, not to
+        ``code_search``. ``semantic_code_search`` remains a legacy alias.
+        """
+        # code_search is canonical and maps to itself
         assert TOOL_ALIASES["code_search"] == "code_search"
-        assert TOOL_ALIASES["search"] == "code_search"
+        # search is its own canonical name (the unified search tool)
+        assert TOOL_ALIASES["search"] == "search"
+        # semantic_code_search is a legacy alias for code_search
         assert TOOL_ALIASES["semantic_code_search"] == "code_search"
+        # web_summarize is an alias for summarize
         assert TOOL_ALIASES["web_summarize"] == "summarize"
 
     def test_code_intelligence_aliases(self):
