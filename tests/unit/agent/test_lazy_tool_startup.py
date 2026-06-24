@@ -133,10 +133,12 @@ def test_shared_registry_bootstrap_exposes_grouped_command_tools():
     finally:
         SharedToolRegistry.reset_instance()
 
-    # Core grouped command tools available at bootstrap
-    assert {"fs", "search", "code", "web", "shell"}.issubset(names)
-    # Demand-loaded tools NOT in bootstrap
-    assert "git" not in names
+    # Core bash-style command domains available at bootstrap
+    assert {"fs", "git", "code", "web", "shell"}.issubset(names)
+    # The deprecated `search` shim remains in bootstrap for back-compat
+    # (forwards `search grep` -> `code grep`, `search files` -> `fs search`).
+    assert "search" in names
+    # Demand-only tools NOT in bootstrap
     assert "pr" not in names
 
 
