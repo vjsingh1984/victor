@@ -103,6 +103,14 @@ devops-permissions = "victor_devops.protocols:DevOpsPermissionProvider"
 [project.entry-points."victor.hook.providers"]
 devops-hooks = "victor_devops.protocols:DevOpsHookProvider"
 
+# Unified command-tool delegation: the framework-owned `git` dispatcher resolves
+# these callables by logical key (see the victor.tool_callables group in victor-ai).
+[project.entry-points."victor.tool_callables"]
+git = "victor_devops.tools.git_tool:git"
+pr = "victor_devops.tools.git_tool:pr"
+docker = "victor_devops.tools.docker_tool:docker"
+cicd = "victor_devops.tools.cicd_tool:cicd"
+
 [tool.setuptools]
 packages = [
     "victor_devops",
