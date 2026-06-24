@@ -1,0 +1,1533 @@
+{
+  "action_stats": {
+    "2129": {
+      "alpha": 6.0,
+      "beta": 4.0
+    },
+    "295": {
+      "alpha": 5.0,
+      "beta": 5.0
+    },
+    "69924": {
+      "alpha": 5.0,
+      "beta": 5.0
+    },
+    "293": {
+      "alpha": 5.0,
+      "beta": 5.0
+    },
+    "12545": {
+      "alpha": 5.0,
+      "beta": 5.0
+    },
+    "292": {
+      "alpha": 5.0,
+      "beta": 5.0
+    },
+    "14401": {
+      "alpha": 6.0,
+      "beta": 4.0
+    },
+    "14337": {
+      "alpha": 6.0,
+      "beta": 4.0
+    },
+    "10247": {
+      "alpha": 6.0,
+      "beta": 4.0
+    },
+    "257": {
+      "alpha": 5.0,
+      "beta": 5.0
+    },
+    "4353": {
+      "alpha": 5.0,
+      "beta": 5.0
+    },
+    "2097": {
+      "alpha": 6.0,
+      "beta": 4.0
+    },
+    "2055": {
+      "alpha": 6.0,
+      "beta": 4.0
+    },
+    "8484": {
+      "alpha": 5.0,
+      "beta": 5.0
+    },
+    "2049": {
+      "alpha": 6.0,
+      "beta": 4.0
+    },
+    "69889": {
+      "alpha": 5.0,
+      "beta": 5.0
+    },
+    "16679": {
+      "alpha": 5.0,
+      "beta": 5.0
+    },
+    "8449": {
+      "alpha": 5.0,
+      "beta": 5.0
+    },
+    "769": {
+      "alpha": 5.0,
+      "beta": 5.0
+    },
+    "291": {
+      "alpha": 5.0,
+      "beta": 5.0
+    },
+    "2056": {
+      "alpha": 6.0,
+      "beta": 4.0
+    }
+  },
+  "context_weights": {},
+  "exploration_rate": 0.1,
+  "base_exploration_rate": 0.1,
+  "use_thompson_sampling": true,
+  "engine_action_spaces": {
+    "SST": {
+      "actions": [
+        {
+          "index_strategy": "DirectScan",
+          "secondary_index": null,
+          "search_mode": "Exact",
+          "quantization_stages": [
+            "FP32"
+          ],
+          "block_pruning": "Off",
+          "zone_map_enabled": false,
+          "bloom_filter_enabled": false,
+          "parallelism": {
+            "num_threads": 10,
+            "enable_simd": true,
+            "batch_size": 1024
+          },
+          "object_economy": {
+            "enabled": false,
+            "use_centroid_routing": false,
+            "use_zorder_pruning": false,
+            "max_blocks_to_scan": null,
+            "quantization_floor": null
+          }
+        },
+        {
+          "index_strategy": {
+            "HNSW": {
+              "m": 16,
+              "ef_search": 50
+            }
+          },
+          "secondary_index": null,
+          "search_mode": {
+            "Approximate": {
+              "expansion_factor": 1.0
+            }
+          },
+          "quantization_stages": [
+            "FP32"
+          ],
+          "block_pruning": "Off",
+          "zone_map_enabled": false,
+          "bloom_filter_enabled": false,
+          "parallelism": {
+            "num_threads": 10,
+            "enable_simd": true,
+            "batch_size": 1024
+          },
+          "object_economy": {
+            "enabled": false,
+            "use_centroid_routing": false,
+            "use_zorder_pruning": false,
+            "max_blocks_to_scan": null,
+            "quantization_floor": null
+          }
+        },
+        {
+          "index_strategy": {
+            "HNSW": {
+              "m": 16,
+              "ef_search": 100
+            }
+          },
+          "secondary_index": null,
+          "search_mode": {
+            "Approximate": {
+              "expansion_factor": 1.0
+            }
+          },
+          "quantization_stages": [
+            "FP32"
+          ],
+          "block_pruning": "Off",
+          "zone_map_enabled": false,
+          "bloom_filter_enabled": false,
+          "parallelism": {
+            "num_threads": 10,
+            "enable_simd": true,
+            "batch_size": 1024
+          },
+          "object_economy": {
+            "enabled": false,
+            "use_centroid_routing": false,
+            "use_zorder_pruning": false,
+            "max_blocks_to_scan": null,
+            "quantization_floor": null
+          }
+        },
+        {
+          "index_strategy": {
+            "HNSW": {
+              "m": 16,
+              "ef_search": 200
+            }
+          },
+          "secondary_index": null,
+          "search_mode": {
+            "Approximate": {
+              "expansion_factor": 1.0
+            }
+          },
+          "quantization_stages": [
+            "FP32"
+          ],
+          "block_pruning": "Off",
+          "zone_map_enabled": false,
+          "bloom_filter_enabled": false,
+          "parallelism": {
+            "num_threads": 10,
+            "enable_simd": true,
+            "batch_size": 1024
+          },
+          "object_economy": {
+            "enabled": false,
+            "use_centroid_routing": false,
+            "use_zorder_pruning": false,
+            "max_blocks_to_scan": null,
+            "quantization_floor": null
+          }
+        },
+        {
+          "index_strategy": {
+            "IVF": {
+              "n_probe": 4
+            }
+          },
+          "secondary_index": null,
+          "search_mode": {
+            "Approximate": {
+              "expansion_factor": 1.0
+            }
+          },
+          "quantization_stages": [
+            "FP32"
+          ],
+          "block_pruning": "Off",
+          "zone_map_enabled": false,
+          "bloom_filter_enabled": false,
+          "parallelism": {
+            "num_threads": 10,
+            "enable_simd": true,
+            "batch_size": 1024
+          },
+          "object_economy": {
+            "enabled": false,
+            "use_centroid_routing": false,
+            "use_zorder_pruning": false,
+            "max_blocks_to_scan": null,
+            "quantization_floor": null
+          }
+        },
+        {
+          "index_strategy": {
+            "IVF": {
+              "n_probe": 16
+            }
+          },
+          "secondary_index": null,
+          "search_mode": {
+            "Approximate": {
+              "expansion_factor": 1.0
+            }
+          },
+          "quantization_stages": [
+            "FP32"
+          ],
+          "block_pruning": "Off",
+          "zone_map_enabled": false,
+          "bloom_filter_enabled": false,
+          "parallelism": {
+            "num_threads": 10,
+            "enable_simd": true,
+            "batch_size": 1024
+          },
+          "object_economy": {
+            "enabled": false,
+            "use_centroid_routing": false,
+            "use_zorder_pruning": false,
+            "max_blocks_to_scan": null,
+            "quantization_floor": null
+          }
+        },
+        {
+          "index_strategy": {
+            "IVF": {
+              "n_probe": 32
+            }
+          },
+          "secondary_index": null,
+          "search_mode": {
+            "Approximate": {
+              "expansion_factor": 1.0
+            }
+          },
+          "quantization_stages": [
+            "FP32"
+          ],
+          "block_pruning": "Off",
+          "zone_map_enabled": false,
+          "bloom_filter_enabled": false,
+          "parallelism": {
+            "num_threads": 10,
+            "enable_simd": true,
+            "batch_size": 1024
+          },
+          "object_economy": {
+            "enabled": false,
+            "use_centroid_routing": false,
+            "use_zorder_pruning": false,
+            "max_blocks_to_scan": null,
+            "quantization_floor": null
+          }
+        },
+        {
+          "index_strategy": "DirectScan",
+          "secondary_index": null,
+          "search_mode": "Exact",
+          "quantization_stages": [
+            "FP32"
+          ],
+          "block_pruning": "Sqrt",
+          "zone_map_enabled": false,
+          "bloom_filter_enabled": true,
+          "parallelism": {
+            "num_threads": 10,
+            "enable_simd": true,
+            "batch_size": 1024
+          },
+          "object_economy": {
+            "enabled": false,
+            "use_centroid_routing": false,
+            "use_zorder_pruning": false,
+            "max_blocks_to_scan": null,
+            "quantization_floor": null
+          }
+        },
+        {
+          "index_strategy": {
+            "HNSW": {
+              "m": 16,
+              "ef_search": 100
+            }
+          },
+          "secondary_index": null,
+          "search_mode": {
+            "Approximate": {
+              "expansion_factor": 1.0
+            }
+          },
+          "quantization_stages": [
+            "FP32"
+          ],
+          "block_pruning": "Sqrt",
+          "zone_map_enabled": false,
+          "bloom_filter_enabled": true,
+          "parallelism": {
+            "num_threads": 10,
+            "enable_simd": true,
+            "batch_size": 1024
+          },
+          "object_economy": {
+            "enabled": false,
+            "use_centroid_routing": false,
+            "use_zorder_pruning": false,
+            "max_blocks_to_scan": null,
+            "quantization_floor": null
+          }
+        },
+        {
+          "index_strategy": "DirectScan",
+          "secondary_index": null,
+          "search_mode": {
+            "Approximate": {
+              "expansion_factor": 2.0
+            }
+          },
+          "quantization_stages": [
+            "Binary",
+            "INT8",
+            "FP32"
+          ],
+          "block_pruning": "Off",
+          "zone_map_enabled": false,
+          "bloom_filter_enabled": false,
+          "parallelism": {
+            "num_threads": 10,
+            "enable_simd": true,
+            "batch_size": 1024
+          },
+          "object_economy": {
+            "enabled": false,
+            "use_centroid_routing": false,
+            "use_zorder_pruning": false,
+            "max_blocks_to_scan": null,
+            "quantization_floor": null
+          }
+        }
+      ]
+    },
+    "SWIFT": {
+      "actions": [
+        {
+          "index_strategy": "DirectScan",
+          "secondary_index": null,
+          "search_mode": "Exact",
+          "quantization_stages": [
+            "FP32"
+          ],
+          "block_pruning": "Off",
+          "zone_map_enabled": false,
+          "bloom_filter_enabled": false,
+          "parallelism": {
+            "num_threads": 10,
+            "enable_simd": true,
+            "batch_size": 1024
+          },
+          "object_economy": {
+            "enabled": false,
+            "use_centroid_routing": false,
+            "use_zorder_pruning": false,
+            "max_blocks_to_scan": null,
+            "quantization_floor": null
+          }
+        },
+        {
+          "index_strategy": "DirectScan",
+          "secondary_index": null,
+          "search_mode": "Exact",
+          "quantization_stages": [
+            "INT8"
+          ],
+          "block_pruning": "Off",
+          "zone_map_enabled": false,
+          "bloom_filter_enabled": false,
+          "parallelism": {
+            "num_threads": 10,
+            "enable_simd": true,
+            "batch_size": 1024
+          },
+          "object_economy": {
+            "enabled": false,
+            "use_centroid_routing": false,
+            "use_zorder_pruning": false,
+            "max_blocks_to_scan": null,
+            "quantization_floor": null
+          }
+        },
+        {
+          "index_strategy": "DirectScan",
+          "secondary_index": null,
+          "search_mode": {
+            "Approximate": {
+              "expansion_factor": 2.0
+            }
+          },
+          "quantization_stages": [
+            "Binary",
+            "INT8",
+            "FP32"
+          ],
+          "block_pruning": "Off",
+          "zone_map_enabled": false,
+          "bloom_filter_enabled": false,
+          "parallelism": {
+            "num_threads": 10,
+            "enable_simd": true,
+            "batch_size": 1024
+          },
+          "object_economy": {
+            "enabled": false,
+            "use_centroid_routing": false,
+            "use_zorder_pruning": false,
+            "max_blocks_to_scan": null,
+            "quantization_floor": null
+          }
+        },
+        {
+          "index_strategy": {
+            "HNSW": {
+              "m": 16,
+              "ef_search": 50
+            }
+          },
+          "secondary_index": null,
+          "search_mode": {
+            "Approximate": {
+              "expansion_factor": 1.0
+            }
+          },
+          "quantization_stages": [
+            "FP32"
+          ],
+          "block_pruning": "Off",
+          "zone_map_enabled": false,
+          "bloom_filter_enabled": false,
+          "parallelism": {
+            "num_threads": 10,
+            "enable_simd": true,
+            "batch_size": 1024
+          },
+          "object_economy": {
+            "enabled": false,
+            "use_centroid_routing": false,
+            "use_zorder_pruning": false,
+            "max_blocks_to_scan": null,
+            "quantization_floor": null
+          }
+        },
+        {
+          "index_strategy": "DirectScan",
+          "secondary_index": null,
+          "search_mode": "Exact",
+          "quantization_stages": [
+            "Binary",
+            "INT8",
+            "FP32"
+          ],
+          "block_pruning": "Off",
+          "zone_map_enabled": false,
+          "bloom_filter_enabled": false,
+          "parallelism": {
+            "num_threads": 8,
+            "enable_simd": true,
+            "batch_size": 512
+          },
+          "object_economy": {
+            "enabled": false,
+            "use_centroid_routing": false,
+            "use_zorder_pruning": false,
+            "max_blocks_to_scan": null,
+            "quantization_floor": null
+          }
+        }
+      ]
+    },
+    "NOVA": {
+      "actions": [
+        {
+          "index_strategy": "DirectScan",
+          "secondary_index": null,
+          "search_mode": "Exact",
+          "quantization_stages": [
+            "FP32"
+          ],
+          "block_pruning": "Off",
+          "zone_map_enabled": false,
+          "bloom_filter_enabled": false,
+          "parallelism": {
+            "num_threads": 10,
+            "enable_simd": true,
+            "batch_size": 1024
+          },
+          "object_economy": {
+            "enabled": false,
+            "use_centroid_routing": false,
+            "use_zorder_pruning": false,
+            "max_blocks_to_scan": null,
+            "quantization_floor": null
+          }
+        },
+        {
+          "index_strategy": "DirectScan",
+          "secondary_index": null,
+          "search_mode": "Exact",
+          "quantization_stages": [
+            "FP32"
+          ],
+          "block_pruning": "Off",
+          "zone_map_enabled": true,
+          "bloom_filter_enabled": false,
+          "parallelism": {
+            "num_threads": 10,
+            "enable_simd": true,
+            "batch_size": 1024
+          },
+          "object_economy": {
+            "enabled": false,
+            "use_centroid_routing": false,
+            "use_zorder_pruning": false,
+            "max_blocks_to_scan": null,
+            "quantization_floor": null
+          }
+        },
+        {
+          "index_strategy": "DirectScan",
+          "secondary_index": null,
+          "search_mode": {
+            "Approximate": {
+              "expansion_factor": 2.0
+            }
+          },
+          "quantization_stages": [
+            "Binary",
+            "INT8",
+            "FP32"
+          ],
+          "block_pruning": "Off",
+          "zone_map_enabled": true,
+          "bloom_filter_enabled": false,
+          "parallelism": {
+            "num_threads": 10,
+            "enable_simd": true,
+            "batch_size": 1024
+          },
+          "object_economy": {
+            "enabled": false,
+            "use_centroid_routing": false,
+            "use_zorder_pruning": false,
+            "max_blocks_to_scan": null,
+            "quantization_floor": null
+          }
+        },
+        {
+          "index_strategy": {
+            "IVF": {
+              "n_probe": 16
+            }
+          },
+          "secondary_index": null,
+          "search_mode": {
+            "Approximate": {
+              "expansion_factor": 1.0
+            }
+          },
+          "quantization_stages": [
+            "FP32"
+          ],
+          "block_pruning": "Off",
+          "zone_map_enabled": false,
+          "bloom_filter_enabled": false,
+          "parallelism": {
+            "num_threads": 10,
+            "enable_simd": true,
+            "batch_size": 1024
+          },
+          "object_economy": {
+            "enabled": false,
+            "use_centroid_routing": false,
+            "use_zorder_pruning": false,
+            "max_blocks_to_scan": null,
+            "quantization_floor": null
+          }
+        },
+        {
+          "index_strategy": "DirectScan",
+          "secondary_index": null,
+          "search_mode": {
+            "Adaptive": {
+              "threshold": 5000
+            }
+          },
+          "quantization_stages": [
+            "Binary",
+            "INT8",
+            "FP32"
+          ],
+          "block_pruning": "Off",
+          "zone_map_enabled": false,
+          "bloom_filter_enabled": false,
+          "parallelism": {
+            "num_threads": 10,
+            "enable_simd": true,
+            "batch_size": 1024
+          },
+          "object_economy": {
+            "enabled": false,
+            "use_centroid_routing": false,
+            "use_zorder_pruning": false,
+            "max_blocks_to_scan": null,
+            "quantization_floor": null
+          }
+        }
+      ]
+    },
+    "HELIX": {
+      "actions": [
+        {
+          "index_strategy": "DirectScan",
+          "secondary_index": null,
+          "search_mode": "Exact",
+          "quantization_stages": [
+            "FP32"
+          ],
+          "block_pruning": "Off",
+          "zone_map_enabled": false,
+          "bloom_filter_enabled": false,
+          "parallelism": {
+            "num_threads": 10,
+            "enable_simd": true,
+            "batch_size": 1024
+          },
+          "object_economy": {
+            "enabled": false,
+            "use_centroid_routing": false,
+            "use_zorder_pruning": false,
+            "max_blocks_to_scan": null,
+            "quantization_floor": null
+          }
+        },
+        {
+          "index_strategy": {
+            "HNSW": {
+              "m": 16,
+              "ef_search": 100
+            }
+          },
+          "secondary_index": null,
+          "search_mode": {
+            "Approximate": {
+              "expansion_factor": 1.0
+            }
+          },
+          "quantization_stages": [
+            "FP32"
+          ],
+          "block_pruning": "Off",
+          "zone_map_enabled": true,
+          "bloom_filter_enabled": false,
+          "parallelism": {
+            "num_threads": 10,
+            "enable_simd": true,
+            "batch_size": 1024
+          },
+          "object_economy": {
+            "enabled": false,
+            "use_centroid_routing": false,
+            "use_zorder_pruning": false,
+            "max_blocks_to_scan": null,
+            "quantization_floor": null
+          }
+        },
+        {
+          "index_strategy": "DirectScan",
+          "secondary_index": null,
+          "search_mode": {
+            "Approximate": {
+              "expansion_factor": 2.0
+            }
+          },
+          "quantization_stages": [
+            "Binary",
+            "INT8",
+            "PQ8",
+            "FP32"
+          ],
+          "block_pruning": "Off",
+          "zone_map_enabled": false,
+          "bloom_filter_enabled": false,
+          "parallelism": {
+            "num_threads": 10,
+            "enable_simd": true,
+            "batch_size": 1024
+          },
+          "object_economy": {
+            "enabled": false,
+            "use_centroid_routing": false,
+            "use_zorder_pruning": false,
+            "max_blocks_to_scan": null,
+            "quantization_floor": null
+          }
+        },
+        {
+          "index_strategy": "DirectScan",
+          "secondary_index": null,
+          "search_mode": "Exact",
+          "quantization_stages": [
+            "Binary",
+            "INT8",
+            "FP32"
+          ],
+          "block_pruning": {
+            "CentroidDistance": {
+              "threshold": 1.5
+            }
+          },
+          "zone_map_enabled": false,
+          "bloom_filter_enabled": false,
+          "parallelism": {
+            "num_threads": 10,
+            "enable_simd": true,
+            "batch_size": 1024
+          },
+          "object_economy": {
+            "enabled": false,
+            "use_centroid_routing": false,
+            "use_zorder_pruning": false,
+            "max_blocks_to_scan": null,
+            "quantization_floor": null
+          }
+        },
+        {
+          "index_strategy": "DirectScan",
+          "secondary_index": null,
+          "search_mode": "Exact",
+          "quantization_stages": [
+            "FP32"
+          ],
+          "block_pruning": {
+            "CentroidDistance": {
+              "threshold": 2.0
+            }
+          },
+          "zone_map_enabled": false,
+          "bloom_filter_enabled": false,
+          "parallelism": {
+            "num_threads": 10,
+            "enable_simd": true,
+            "batch_size": 1024
+          },
+          "object_economy": {
+            "enabled": false,
+            "use_centroid_routing": false,
+            "use_zorder_pruning": false,
+            "max_blocks_to_scan": null,
+            "quantization_floor": null
+          }
+        },
+        {
+          "index_strategy": {
+            "IVF": {
+              "n_probe": 16
+            }
+          },
+          "secondary_index": null,
+          "search_mode": {
+            "Approximate": {
+              "expansion_factor": 1.0
+            }
+          },
+          "quantization_stages": [
+            "FP32"
+          ],
+          "block_pruning": "ZoneMap",
+          "zone_map_enabled": true,
+          "bloom_filter_enabled": false,
+          "parallelism": {
+            "num_threads": 10,
+            "enable_simd": true,
+            "batch_size": 1024
+          },
+          "object_economy": {
+            "enabled": false,
+            "use_centroid_routing": false,
+            "use_zorder_pruning": false,
+            "max_blocks_to_scan": null,
+            "quantization_floor": null
+          }
+        },
+        {
+          "index_strategy": {
+            "LSH": {
+              "n_tables": 10,
+              "n_hashes": 8
+            }
+          },
+          "secondary_index": null,
+          "search_mode": "Exact",
+          "quantization_stages": [
+            "Binary",
+            "INT8",
+            "FP32"
+          ],
+          "block_pruning": "Off",
+          "zone_map_enabled": false,
+          "bloom_filter_enabled": false,
+          "parallelism": {
+            "num_threads": 10,
+            "enable_simd": true,
+            "batch_size": 1024
+          },
+          "object_economy": {
+            "enabled": false,
+            "use_centroid_routing": false,
+            "use_zorder_pruning": false,
+            "max_blocks_to_scan": null,
+            "quantization_floor": null
+          }
+        },
+        {
+          "index_strategy": "DirectScan",
+          "secondary_index": null,
+          "search_mode": {
+            "Approximate": {
+              "expansion_factor": 3.0
+            }
+          },
+          "quantization_stages": [
+            "Binary",
+            "INT8",
+            "PQ4",
+            "PQ8",
+            "FP32"
+          ],
+          "block_pruning": {
+            "CentroidDistance": {
+              "threshold": 2.0
+            }
+          },
+          "zone_map_enabled": false,
+          "bloom_filter_enabled": false,
+          "parallelism": {
+            "num_threads": 10,
+            "enable_simd": true,
+            "batch_size": 1024
+          },
+          "object_economy": {
+            "enabled": false,
+            "use_centroid_routing": false,
+            "use_zorder_pruning": false,
+            "max_blocks_to_scan": null,
+            "quantization_floor": null
+          }
+        }
+      ]
+    },
+    "VIPER": {
+      "actions": [
+        {
+          "index_strategy": "DirectScan",
+          "secondary_index": null,
+          "search_mode": "Exact",
+          "quantization_stages": [
+            "FP32"
+          ],
+          "block_pruning": "Off",
+          "zone_map_enabled": false,
+          "bloom_filter_enabled": false,
+          "parallelism": {
+            "num_threads": 10,
+            "enable_simd": true,
+            "batch_size": 1024
+          },
+          "object_economy": {
+            "enabled": false,
+            "use_centroid_routing": false,
+            "use_zorder_pruning": false,
+            "max_blocks_to_scan": null,
+            "quantization_floor": null
+          }
+        },
+        {
+          "index_strategy": "DirectScan",
+          "secondary_index": null,
+          "search_mode": "Exact",
+          "quantization_stages": [
+            "FP32"
+          ],
+          "block_pruning": {
+            "Ratio": 0.5
+          },
+          "zone_map_enabled": false,
+          "bloom_filter_enabled": false,
+          "parallelism": {
+            "num_threads": 10,
+            "enable_simd": true,
+            "batch_size": 1024
+          },
+          "object_economy": {
+            "enabled": false,
+            "use_centroid_routing": false,
+            "use_zorder_pruning": false,
+            "max_blocks_to_scan": null,
+            "quantization_floor": null
+          }
+        },
+        {
+          "index_strategy": "DirectScan",
+          "secondary_index": null,
+          "search_mode": "Exact",
+          "quantization_stages": [
+            "FP32"
+          ],
+          "block_pruning": "Off",
+          "zone_map_enabled": false,
+          "bloom_filter_enabled": false,
+          "parallelism": {
+            "num_threads": 10,
+            "enable_simd": true,
+            "batch_size": 1024
+          },
+          "object_economy": {
+            "enabled": false,
+            "use_centroid_routing": false,
+            "use_zorder_pruning": false,
+            "max_blocks_to_scan": null,
+            "quantization_floor": null
+          }
+        },
+        {
+          "index_strategy": "DirectScan",
+          "secondary_index": null,
+          "search_mode": "Exact",
+          "quantization_stages": [
+            "Binary",
+            "FP32"
+          ],
+          "block_pruning": "Off",
+          "zone_map_enabled": false,
+          "bloom_filter_enabled": false,
+          "parallelism": {
+            "num_threads": 10,
+            "enable_simd": true,
+            "batch_size": 1024
+          },
+          "object_economy": {
+            "enabled": false,
+            "use_centroid_routing": false,
+            "use_zorder_pruning": false,
+            "max_blocks_to_scan": null,
+            "quantization_floor": null
+          }
+        },
+        {
+          "index_strategy": "DirectScan",
+          "secondary_index": null,
+          "search_mode": "Exact",
+          "quantization_stages": [
+            "INT8",
+            "FP32"
+          ],
+          "block_pruning": "Off",
+          "zone_map_enabled": false,
+          "bloom_filter_enabled": false,
+          "parallelism": {
+            "num_threads": 10,
+            "enable_simd": true,
+            "batch_size": 1024
+          },
+          "object_economy": {
+            "enabled": false,
+            "use_centroid_routing": false,
+            "use_zorder_pruning": false,
+            "max_blocks_to_scan": null,
+            "quantization_floor": null
+          }
+        },
+        {
+          "index_strategy": {
+            "HNSW": {
+              "m": 16,
+              "ef_search": 100
+            }
+          },
+          "secondary_index": null,
+          "search_mode": {
+            "Approximate": {
+              "expansion_factor": 1.0
+            }
+          },
+          "quantization_stages": [
+            "FP32"
+          ],
+          "block_pruning": {
+            "Ratio": 0.3
+          },
+          "zone_map_enabled": false,
+          "bloom_filter_enabled": false,
+          "parallelism": {
+            "num_threads": 10,
+            "enable_simd": true,
+            "batch_size": 1024
+          },
+          "object_economy": {
+            "enabled": false,
+            "use_centroid_routing": false,
+            "use_zorder_pruning": false,
+            "max_blocks_to_scan": null,
+            "quantization_floor": null
+          }
+        },
+        {
+          "index_strategy": {
+            "IVF": {
+              "n_probe": 16
+            }
+          },
+          "secondary_index": null,
+          "search_mode": "Exact",
+          "quantization_stages": [
+            "INT8",
+            "FP32"
+          ],
+          "block_pruning": "Off",
+          "zone_map_enabled": false,
+          "bloom_filter_enabled": false,
+          "parallelism": {
+            "num_threads": 10,
+            "enable_simd": true,
+            "batch_size": 1024
+          },
+          "object_economy": {
+            "enabled": false,
+            "use_centroid_routing": false,
+            "use_zorder_pruning": false,
+            "max_blocks_to_scan": null,
+            "quantization_floor": null
+          }
+        }
+      ]
+    },
+    "RAPTOR": {
+      "actions": [
+        {
+          "index_strategy": "DirectScan",
+          "secondary_index": null,
+          "search_mode": "Exact",
+          "quantization_stages": [
+            "FP32"
+          ],
+          "block_pruning": "Off",
+          "zone_map_enabled": false,
+          "bloom_filter_enabled": false,
+          "parallelism": {
+            "num_threads": 10,
+            "enable_simd": true,
+            "batch_size": 1024
+          },
+          "object_economy": {
+            "enabled": false,
+            "use_centroid_routing": false,
+            "use_zorder_pruning": false,
+            "max_blocks_to_scan": null,
+            "quantization_floor": null
+          }
+        },
+        {
+          "index_strategy": "DirectScan",
+          "secondary_index": null,
+          "search_mode": "Exact",
+          "quantization_stages": [
+            "FP32"
+          ],
+          "block_pruning": "Sqrt",
+          "zone_map_enabled": false,
+          "bloom_filter_enabled": false,
+          "parallelism": {
+            "num_threads": 10,
+            "enable_simd": true,
+            "batch_size": 1024
+          },
+          "object_economy": {
+            "enabled": false,
+            "use_centroid_routing": false,
+            "use_zorder_pruning": false,
+            "max_blocks_to_scan": null,
+            "quantization_floor": null
+          }
+        },
+        {
+          "index_strategy": "DirectScan",
+          "secondary_index": null,
+          "search_mode": "Exact",
+          "quantization_stages": [
+            "FP32"
+          ],
+          "block_pruning": {
+            "CentroidDistance": {
+              "threshold": 1.5
+            }
+          },
+          "zone_map_enabled": false,
+          "bloom_filter_enabled": false,
+          "parallelism": {
+            "num_threads": 10,
+            "enable_simd": true,
+            "batch_size": 1024
+          },
+          "object_economy": {
+            "enabled": false,
+            "use_centroid_routing": false,
+            "use_zorder_pruning": false,
+            "max_blocks_to_scan": null,
+            "quantization_floor": null
+          }
+        },
+        {
+          "index_strategy": "DirectScan",
+          "secondary_index": null,
+          "search_mode": {
+            "Adaptive": {
+              "threshold": 10000
+            }
+          },
+          "quantization_stages": [
+            "Binary",
+            "INT8",
+            "FP32"
+          ],
+          "block_pruning": "Off",
+          "zone_map_enabled": false,
+          "bloom_filter_enabled": false,
+          "parallelism": {
+            "num_threads": 10,
+            "enable_simd": true,
+            "batch_size": 1024
+          },
+          "object_economy": {
+            "enabled": false,
+            "use_centroid_routing": false,
+            "use_zorder_pruning": false,
+            "max_blocks_to_scan": null,
+            "quantization_floor": null
+          }
+        },
+        {
+          "index_strategy": {
+            "IVF": {
+              "n_probe": 16
+            }
+          },
+          "secondary_index": null,
+          "search_mode": "Exact",
+          "quantization_stages": [
+            "INT8",
+            "FP32"
+          ],
+          "block_pruning": {
+            "Ratio": 0.3
+          },
+          "zone_map_enabled": false,
+          "bloom_filter_enabled": false,
+          "parallelism": {
+            "num_threads": 10,
+            "enable_simd": true,
+            "batch_size": 1024
+          },
+          "object_economy": {
+            "enabled": false,
+            "use_centroid_routing": false,
+            "use_zorder_pruning": false,
+            "max_blocks_to_scan": null,
+            "quantization_floor": null
+          }
+        }
+      ]
+    }
+  },
+  "default_action_space": {
+    "actions": [
+      {
+        "index_strategy": "DirectScan",
+        "secondary_index": null,
+        "search_mode": "Exact",
+        "quantization_stages": [
+          "FP32"
+        ],
+        "block_pruning": "Off",
+        "zone_map_enabled": false,
+        "bloom_filter_enabled": false,
+        "parallelism": {
+          "num_threads": 10,
+          "enable_simd": true,
+          "batch_size": 1024
+        },
+        "object_economy": {
+          "enabled": false,
+          "use_centroid_routing": false,
+          "use_zorder_pruning": false,
+          "max_blocks_to_scan": null,
+          "quantization_floor": null
+        }
+      },
+      {
+        "index_strategy": {
+          "HNSW": {
+            "m": 16,
+            "ef_search": 50
+          }
+        },
+        "secondary_index": null,
+        "search_mode": {
+          "Approximate": {
+            "expansion_factor": 1.0
+          }
+        },
+        "quantization_stages": [
+          "FP32"
+        ],
+        "block_pruning": "Off",
+        "zone_map_enabled": false,
+        "bloom_filter_enabled": false,
+        "parallelism": {
+          "num_threads": 10,
+          "enable_simd": true,
+          "batch_size": 1024
+        },
+        "object_economy": {
+          "enabled": false,
+          "use_centroid_routing": false,
+          "use_zorder_pruning": false,
+          "max_blocks_to_scan": null,
+          "quantization_floor": null
+        }
+      },
+      {
+        "index_strategy": {
+          "HNSW": {
+            "m": 16,
+            "ef_search": 100
+          }
+        },
+        "secondary_index": null,
+        "search_mode": {
+          "Approximate": {
+            "expansion_factor": 1.0
+          }
+        },
+        "quantization_stages": [
+          "FP32"
+        ],
+        "block_pruning": "Off",
+        "zone_map_enabled": false,
+        "bloom_filter_enabled": false,
+        "parallelism": {
+          "num_threads": 10,
+          "enable_simd": true,
+          "batch_size": 1024
+        },
+        "object_economy": {
+          "enabled": false,
+          "use_centroid_routing": false,
+          "use_zorder_pruning": false,
+          "max_blocks_to_scan": null,
+          "quantization_floor": null
+        }
+      },
+      {
+        "index_strategy": {
+          "HNSW": {
+            "m": 16,
+            "ef_search": 200
+          }
+        },
+        "secondary_index": null,
+        "search_mode": {
+          "Approximate": {
+            "expansion_factor": 1.0
+          }
+        },
+        "quantization_stages": [
+          "FP32"
+        ],
+        "block_pruning": "Off",
+        "zone_map_enabled": false,
+        "bloom_filter_enabled": false,
+        "parallelism": {
+          "num_threads": 10,
+          "enable_simd": true,
+          "batch_size": 1024
+        },
+        "object_economy": {
+          "enabled": false,
+          "use_centroid_routing": false,
+          "use_zorder_pruning": false,
+          "max_blocks_to_scan": null,
+          "quantization_floor": null
+        }
+      },
+      {
+        "index_strategy": {
+          "IVF": {
+            "n_probe": 4
+          }
+        },
+        "secondary_index": null,
+        "search_mode": {
+          "Approximate": {
+            "expansion_factor": 1.0
+          }
+        },
+        "quantization_stages": [
+          "FP32"
+        ],
+        "block_pruning": "Off",
+        "zone_map_enabled": false,
+        "bloom_filter_enabled": false,
+        "parallelism": {
+          "num_threads": 10,
+          "enable_simd": true,
+          "batch_size": 1024
+        },
+        "object_economy": {
+          "enabled": false,
+          "use_centroid_routing": false,
+          "use_zorder_pruning": false,
+          "max_blocks_to_scan": null,
+          "quantization_floor": null
+        }
+      },
+      {
+        "index_strategy": {
+          "IVF": {
+            "n_probe": 16
+          }
+        },
+        "secondary_index": null,
+        "search_mode": {
+          "Approximate": {
+            "expansion_factor": 1.0
+          }
+        },
+        "quantization_stages": [
+          "FP32"
+        ],
+        "block_pruning": "Off",
+        "zone_map_enabled": false,
+        "bloom_filter_enabled": false,
+        "parallelism": {
+          "num_threads": 10,
+          "enable_simd": true,
+          "batch_size": 1024
+        },
+        "object_economy": {
+          "enabled": false,
+          "use_centroid_routing": false,
+          "use_zorder_pruning": false,
+          "max_blocks_to_scan": null,
+          "quantization_floor": null
+        }
+      },
+      {
+        "index_strategy": {
+          "IVF": {
+            "n_probe": 32
+          }
+        },
+        "secondary_index": null,
+        "search_mode": {
+          "Approximate": {
+            "expansion_factor": 1.0
+          }
+        },
+        "quantization_stages": [
+          "FP32"
+        ],
+        "block_pruning": "Off",
+        "zone_map_enabled": false,
+        "bloom_filter_enabled": false,
+        "parallelism": {
+          "num_threads": 10,
+          "enable_simd": true,
+          "batch_size": 1024
+        },
+        "object_economy": {
+          "enabled": false,
+          "use_centroid_routing": false,
+          "use_zorder_pruning": false,
+          "max_blocks_to_scan": null,
+          "quantization_floor": null
+        }
+      },
+      {
+        "index_strategy": "DirectScan",
+        "secondary_index": null,
+        "search_mode": "Exact",
+        "quantization_stages": [
+          "FP32"
+        ],
+        "block_pruning": "Sqrt",
+        "zone_map_enabled": false,
+        "bloom_filter_enabled": true,
+        "parallelism": {
+          "num_threads": 10,
+          "enable_simd": true,
+          "batch_size": 1024
+        },
+        "object_economy": {
+          "enabled": false,
+          "use_centroid_routing": false,
+          "use_zorder_pruning": false,
+          "max_blocks_to_scan": null,
+          "quantization_floor": null
+        }
+      },
+      {
+        "index_strategy": {
+          "HNSW": {
+            "m": 16,
+            "ef_search": 100
+          }
+        },
+        "secondary_index": null,
+        "search_mode": {
+          "Approximate": {
+            "expansion_factor": 1.0
+          }
+        },
+        "quantization_stages": [
+          "FP32"
+        ],
+        "block_pruning": "Sqrt",
+        "zone_map_enabled": false,
+        "bloom_filter_enabled": true,
+        "parallelism": {
+          "num_threads": 10,
+          "enable_simd": true,
+          "batch_size": 1024
+        },
+        "object_economy": {
+          "enabled": false,
+          "use_centroid_routing": false,
+          "use_zorder_pruning": false,
+          "max_blocks_to_scan": null,
+          "quantization_floor": null
+        }
+      },
+      {
+        "index_strategy": "DirectScan",
+        "secondary_index": null,
+        "search_mode": {
+          "Approximate": {
+            "expansion_factor": 2.0
+          }
+        },
+        "quantization_stages": [
+          "Binary",
+          "INT8",
+          "FP32"
+        ],
+        "block_pruning": "Off",
+        "zone_map_enabled": false,
+        "bloom_filter_enabled": false,
+        "parallelism": {
+          "num_threads": 10,
+          "enable_simd": true,
+          "batch_size": 1024
+        },
+        "object_economy": {
+          "enabled": false,
+          "use_centroid_routing": false,
+          "use_zorder_pruning": false,
+          "max_blocks_to_scan": null,
+          "quantization_floor": null
+        }
+      }
+    ]
+  },
+  "total_updates": 0,
+  "engine_update_counts": {}
+}
