@@ -78,6 +78,16 @@ rag-safety = "victor_rag.protocols:RAGSafetyProvider"
 rag-prompts = "victor_rag.protocols:RAGPromptProvider"
 rag-workflows = "victor_rag.protocols:RAGWorkflowProvider"
 
+# Unified command-tool delegation: the framework-owned `rag` dispatcher resolves
+# these BaseTool classes by logical key (see victor.tool_callables in victor-ai).
+[project.entry-points."victor.tool_callables"]
+rag_ingest = "victor_rag.tools.ingest:RAGIngestTool"
+rag_search = "victor_rag.tools.search:RAGSearchTool"
+rag_query = "victor_rag.tools.query:RAGQueryTool"
+rag_list = "victor_rag.tools.management:RAGListTool"
+rag_delete = "victor_rag.tools.management:RAGDeleteTool"
+rag_stats = "victor_rag.tools.management:RAGStatsTool"
+
 [tool.setuptools]
 packages = [
     "victor_rag",
