@@ -31,9 +31,7 @@ verticals:
       - lint
       - refactor
     semantic_pool:  # STUB schema - included based on query similarity
-      - docker
       - python_repl
-      - database
       - web_search
       - web_fetch
       - analyze
@@ -52,16 +50,13 @@ verticals:
       - grep
     vertical_tools:
       - docker
-      - kubernetes
-      - terraform
+      - cicd
       - git
-      - yaml
     semantic_pool:
       - write
       - edit
       - web_search
       - web_fetch
-      - database
       - test
     max_semantic_pool: 4
     readonly_only_for_analysis: false
@@ -141,8 +136,6 @@ default:
     - git
     - web_search
     - web_fetch
-    - docker
-    - database
     - test
   max_semantic_pool: 5
   readonly_only_for_analysis: true
