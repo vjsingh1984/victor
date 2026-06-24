@@ -339,16 +339,60 @@ class TestStableToolOrderCoverage:
     # Every tool observed in a real coding-agent session before graph aliases
     # were folded into graph(mode=...).
     FULL_SESSION_TOOLS = {
-        "graph", "graph_analytics", "graph_dependencies", "graph_neighbors",
-        "graph_path", "graph_patterns", "graph_query", "graph_search",
-        "graph_semantic", "lsp", "cicd", "docker", "git", "pr", "db", "test",
-        "find", "ls", "project_overview", "read", "write", "deps", "shell",
-        "workflow", "notebook_edit", "extract", "inline", "organize_imports",
-        "rename", "jira", "batch", "code_search", "http", "docs",
-        "docs_coverage", "scaffold", "cache", "web_fetch", "web_search",
-        "sandbox", "mcp", "scan", "graph_semantic_search", "impact_analysis",
-        "refs", "symbol", "edit", "metrics", "analysis_checkpoint", "patch",
-        "merge", "audit", "pipeline", "iac",
+        "graph",
+        "graph_analytics",
+        "graph_dependencies",
+        "graph_neighbors",
+        "graph_path",
+        "graph_patterns",
+        "graph_query",
+        "graph_search",
+        "graph_semantic",
+        "lsp",
+        "cicd",
+        "docker",
+        "git",
+        "pr",
+        "db",
+        "test",
+        "find",
+        "ls",
+        "project_overview",
+        "read",
+        "write",
+        "deps",
+        "shell",
+        "workflow",
+        "notebook_edit",
+        "extract",
+        "inline",
+        "organize_imports",
+        "rename",
+        "jira",
+        "batch",
+        "code_search",
+        "http",
+        "docs",
+        "docs_coverage",
+        "scaffold",
+        "cache",
+        "web_fetch",
+        "web_search",
+        "sandbox",
+        "mcp",
+        "scan",
+        "graph_semantic_search",
+        "impact_analysis",
+        "refs",
+        "symbol",
+        "edit",
+        "metrics",
+        "analysis_checkpoint",
+        "patch",
+        "merge",
+        "audit",
+        "pipeline",
+        "iac",
     }
 
     DEFAULT_SESSION_TOOLS = FULL_SESSION_TOOLS - GRAPH_FOLDED_TOOLS
@@ -375,6 +419,7 @@ class TestStableToolOrderCoverage:
         tools = [_make_tool(n, schema_level="full") for n in self.CORE_LOOP_TOOLS]
         # Shuffle so input order does not influence result.
         import random
+
         random.shuffle(tools)
         result = svc.sort_tools_for_kv_stability(tools, kv_optimization_enabled=True)
         assert [t.name for t in result] == self.CORE_LOOP_TOOLS

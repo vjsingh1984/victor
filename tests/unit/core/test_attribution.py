@@ -11,8 +11,7 @@ def test_default_victor_commit_attribution() -> None:
     assert message.startswith("feat: add thing")
     assert "Generated-by: victor-code-ai" in message
     assert (
-        "Co-authored-by: victor-code-ai "
-        "<296282796+victor-code-ai@users.noreply.github.com>"
+        "Co-authored-by: victor-code-ai " "<296282796+victor-code-ai@users.noreply.github.com>"
     ) in message
 
 

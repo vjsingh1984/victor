@@ -433,9 +433,7 @@ class ToolBuildersMixin:
             lazy_startup_env is not None
             and lazy_startup_env.strip().lower() in {"0", "false", "no", "off"}
         )
-        lazy_startup = bool(
-            getattr(self.settings, "tool_lazy_startup", lazy_startup_default)
-        )
+        lazy_startup = bool(getattr(self.settings, "tool_lazy_startup", lazy_startup_default))
 
         registrar = ToolRegistrar(
             tools=tools,

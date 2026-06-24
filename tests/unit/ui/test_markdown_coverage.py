@@ -503,6 +503,7 @@ class TestCollapsibleSections:
         result = render_collapsible_section("Test", content, lines_visible=10)
         # Should return markdown block, not Panel with collapse hint
         from rich.markdown import Markdown
+
         assert isinstance(result, Markdown)
 
     def test_long_content_collapsed(self):
@@ -512,6 +513,7 @@ class TestCollapsibleSections:
         # Should return Panel (not plain markdown block)
         from rich.panel import Panel
         from rich.markdown import Markdown
+
         assert isinstance(result, Panel)
         # Panel should contain more than just the markdown block
         assert hasattr(result, "renderable")
@@ -522,6 +524,7 @@ class TestCollapsibleSections:
         result = render_collapsible_section("Test", content, lines_visible=5)
         # Should return Panel (collapsed content)
         from rich.panel import Panel
+
         assert isinstance(result, Panel)
         # Should have a title indicating collapse
         assert result.title or hasattr(result, "renderable")
@@ -536,6 +539,7 @@ class TestEnhancedTableRendering:
         rows = [["Item 1", "100"], ["Item 2", "200"]]
         result = render_enhanced_table(headers, rows)
         from rich.table import Table
+
         assert isinstance(result, Table)
 
     def test_table_with_title(self):
@@ -550,6 +554,7 @@ class TestEnhancedTableRendering:
         headers = ["Col1", "Col2"]
         result = render_enhanced_table(headers, [])
         from rich.table import Table
+
         assert isinstance(result, Table)
 
 

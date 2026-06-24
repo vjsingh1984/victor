@@ -215,8 +215,7 @@ class StreamingChatExecutor:
     # through core_tool_aliases + tool_names so legacy aliases (edit_files,
     # str_replace_editor, apply_patch, ...) collapse onto the canonical surface.
     _WRITE_MUTATION_TOOL_NAMES = frozenset(
-        get_canonical_name(canonicalize_core_tool_name(name))
-        for name in get_write_tool_names()
+        get_canonical_name(canonicalize_core_tool_name(name)) for name in get_write_tool_names()
     )
 
     # Read-only exploration tools that nudge a write-intent turn toward action.

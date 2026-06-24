@@ -157,8 +157,7 @@ class TestAutoCommitter:
         assert message.startswith("feat(auth): Add user authentication")
         assert "Generated-by: victor-code-ai" in message
         assert (
-            "Co-authored-by: victor-code-ai "
-            "<296282796+victor-code-ai@users.noreply.github.com>"
+            "Co-authored-by: victor-code-ai " "<296282796+victor-code-ai@users.noreply.github.com>"
         ) in message
 
     def test_generate_commit_message_auto_detect_feat(self, committer):

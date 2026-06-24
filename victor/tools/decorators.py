@@ -616,9 +616,7 @@ def _resolve_tool_name(func_name: str, explicit_name: Optional[str] = None) -> s
 
         canonical = get_canonical_name(base_name)
         if canonical != base_name:
-            logger.debug(
-                f"Tool name resolved: '{base_name}' -> '{canonical}' (canonical form)"
-            )
+            logger.debug(f"Tool name resolved: '{base_name}' -> '{canonical}' (canonical form)")
         return canonical
     except ImportError:
         # Registry not available, use base name as-is

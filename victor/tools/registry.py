@@ -840,7 +840,8 @@ class ToolRegistry(BaseRegistry[str, _ToolType]):
             return [
                 tool
                 for name, tool in self._tools.items()
-                if self._tool_enabled.get(name, False) and self._tool_is_available(tool)
+                if self._tool_enabled.get(name, False)
+                and self._tool_is_available(tool)
                 and should_advertise_tool(name, include_folded=include_folded)
             ]
         return list(self._tools.values())
@@ -883,7 +884,8 @@ class ToolRegistry(BaseRegistry[str, _ToolType]):
                 schemas = [
                     tool.to_json_schema()
                     for name, tool in self._tools.items()
-                    if self._tool_enabled.get(name, False) and self._tool_is_available(tool)
+                    if self._tool_enabled.get(name, False)
+                    and self._tool_is_available(tool)
                     and should_advertise_tool(name, include_folded=include_folded)
                 ]
             else:

@@ -46,7 +46,9 @@ class TestTerminalCapabilityDetection:
             TerminalCapability.TRUECOLOR,
         }
 
-    @patch.dict("os.environ", {"TERM": "xterm-256color", "COLORTERM": "", "TERM_PROGRAM": ""}, clear=False)
+    @patch.dict(
+        "os.environ", {"TERM": "xterm-256color", "COLORTERM": "", "TERM_PROGRAM": ""}, clear=False
+    )
     def test_detect_256color_terminal(self):
         """Should detect 256-color terminal."""
         result = TerminalCapability.detect()
@@ -58,7 +60,11 @@ class TestTerminalCapabilityDetection:
         """Should detect basic terminal."""
         result = TerminalCapability.detect()
         # xterm alone should be detected as basic or standard
-        assert result in {TerminalCapability.BASIC, TerminalCapability.STANDARD, TerminalCapability.TRUECOLOR}
+        assert result in {
+            TerminalCapability.BASIC,
+            TerminalCapability.STANDARD,
+            TerminalCapability.TRUECOLOR,
+        }
 
     @patch.dict("os.environ", {"COLORTERM": "truecolor"})
     def test_detect_truecolor_via_colorterm(self):
@@ -79,6 +85,7 @@ class TestAdaptiveTheme:
     def test_get_adaptive_theme_returns_theme(self):
         """get_adaptive_theme should return a Rich Theme."""
         from rich.theme import Theme
+
         result = get_adaptive_theme()
         assert isinstance(result, Theme)
 
@@ -166,24 +173,28 @@ class TestThemeVariants:
         """Legacy victor_theme should exist."""
         assert victor_theme is not None
         from rich.theme import Theme
+
         assert isinstance(victor_theme, Theme)
 
     def test_dark_theme_exists(self):
         """dark_theme should exist."""
         assert dark_theme is not None
         from rich.theme import Theme
+
         assert isinstance(dark_theme, Theme)
 
     def test_light_theme_exists(self):
         """light_theme should exist."""
         assert light_theme is not None
         from rich.theme import Theme
+
         assert isinstance(light_theme, Theme)
 
     def test_high_contrast_theme_exists(self):
         """high_contrast_theme should exist."""
         assert high_contrast_theme is not None
         from rich.theme import Theme
+
         assert isinstance(high_contrast_theme, Theme)
 
     def test_all_themes_have_required_styles(self):

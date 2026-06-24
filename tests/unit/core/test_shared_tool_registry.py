@@ -414,9 +414,7 @@ class TestSharedToolRegistryNoDoubleInstantiation:
 
         # Build the registration list (creates LazyToolProxy objects)
         tools = registry.get_all_tools_for_registration()
-        proxy = next(
-            t for t in tools if getattr(t, "name", None) == "counting_instantiation_tool"
-        )
+        proxy = next(t for t in tools if getattr(t, "name", None) == "counting_instantiation_tool")
 
         # Simulate first use — this must NOT instantiate again
         loaded = proxy._ensure_loaded()

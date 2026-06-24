@@ -1092,9 +1092,7 @@ class BaseProvider(ABC):
             # match (provider block or model fnmatch pattern). The loader's
             # ProviderLimits default of 128000 must NOT silently override a
             # model that is correctly registered in the hardcoded table below.
-            has_entry = self.name in providers or any(
-                _fnmatch.fnmatch(model, p) for p in models
-            )
+            has_entry = self.name in providers or any(_fnmatch.fnmatch(model, p) for p in models)
             if has_entry:
                 limits = get_provider_limits(self.name, model)
                 if limits.context_window:

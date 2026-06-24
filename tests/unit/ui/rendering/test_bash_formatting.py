@@ -73,9 +73,7 @@ class TestBashStyleFormatting:
 
     def test_list_of_dicts_shows_summary(self):
         """List of dicts (edit ops) shows type:path summary."""
-        result = format_tool_args_bash_style(
-            {"ops": [{"type": "edit", "path": "main.py"}]}
-        )
+        result = format_tool_args_bash_style({"ops": [{"type": "edit", "path": "main.py"}]})
         assert result == "--ops=[edit:main.py]"
 
     def test_multiple_edit_ops_shows_count(self):
@@ -139,8 +137,7 @@ class TestBashCommandInvocation:
     def test_multiple_args_formatted_correctly(self):
         """Multiple arguments all formatted."""
         result = format_bash_command_invocation(
-            "grep",
-            {"pattern": "TODO", "path": "src/", "recursive": True}
+            "grep", {"pattern": "TODO", "path": "src/", "recursive": True}
         )
         assert "$" in result
         assert "grep" in result
@@ -152,7 +149,7 @@ class TestBashCommandInvocation:
         """Complex edit command with ops list."""
         result = format_bash_command_invocation(
             "edit_files",
-            {"ops": [{"type": "replace", "path": "main.py", "old": "foo", "new": "bar"}]}
+            {"ops": [{"type": "replace", "path": "main.py", "old": "foo", "new": "bar"}]},
         )
         assert "$" in result
         assert "edit_files" in result
@@ -165,8 +162,7 @@ class TestBashFormattingIntegration:
     def test_code_search_command(self):
         """Real code_search command scenario."""
         result = format_bash_command_invocation(
-            "code_search",
-            {"query": "authentication", "path": "src/auth/", "limit": 10}
+            "code_search", {"query": "authentication", "path": "src/auth/", "limit": 10}
         )
         assert "$" in result
         assert "code_search" in result
@@ -177,8 +173,7 @@ class TestBashFormattingIntegration:
     def test_grep_command(self):
         """Real grep command scenario."""
         result = format_bash_command_invocation(
-            "grep",
-            {"pattern": "TODO", "path": ".", "recursive": True}
+            "grep", {"pattern": "TODO", "path": ".", "recursive": True}
         )
         assert "$" in result
         assert "grep" in result
@@ -189,8 +184,7 @@ class TestBashFormattingIntegration:
     def test_edit_command(self):
         """Real edit command scenario."""
         result = format_bash_command_invocation(
-            "edit",
-            {"path": "main.py", "old_string": "foo", "new_string": "bar"}
+            "edit", {"path": "main.py", "old_string": "foo", "new_string": "bar"}
         )
         assert "$" in result
         assert "edit" in result
@@ -200,8 +194,7 @@ class TestBashFormattingIntegration:
     def test_execute_command(self):
         """Real execute_bash command scenario."""
         result = format_bash_command_invocation(
-            "execute_bash",
-            {"command": "pytest tests/unit/ui/ -v"}
+            "execute_bash", {"command": "pytest tests/unit/ui/ -v"}
         )
         assert "$" in result
         assert "execute_bash" in result
@@ -209,10 +202,7 @@ class TestBashFormattingIntegration:
 
     def test_file_read_command(self):
         """Real file read scenario."""
-        result = format_bash_command_invocation(
-            "read_file",
-            {"path": "README.md"}
-        )
+        result = format_bash_command_invocation("read_file", {"path": "README.md"})
         assert "$" in result
         assert "read_file" in result
         assert "--path='README.md'" in result
@@ -220,8 +210,7 @@ class TestBashFormattingIntegration:
     def test_list_directory_command(self):
         """Real list_directory scenario."""
         result = format_bash_command_invocation(
-            "list_directory",
-            {"path": "src/", "recursive": True}
+            "list_directory", {"path": "src/", "recursive": True}
         )
         assert "$" in result
         assert "list_directory" in result

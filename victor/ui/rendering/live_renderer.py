@@ -345,7 +345,9 @@ class LiveDisplayRenderer:
         )
 
         # Build bash-style result line with metadata badges
-        status_line = f"[dim]• [/][bold {color}][DONE][/] [bold cyan]{format_tool_display_name(name)}[/]"
+        status_line = (
+            f"[dim]• [/][bold {color}][DONE][/] [bold cyan]{format_tool_display_name(name)}[/]"
+        )
 
         # Add metadata badges if available
         if metadata_badges:
@@ -620,11 +622,12 @@ class LiveDisplayRenderer:
             if "match" in output_lower or "result" in output_lower:
                 # Try to extract count from output
                 import re
-                count_match = re.search(r'(\d+)\s+(matches?|results?|files?)', output_lower)
+
+                count_match = re.search(r"(\d+)\s+(matches?|results?|files?)", output_lower)
                 if count_match:
                     return f"{count_match.group(1)} {count_match.group(2)}"
             # Check for "found X" pattern
-            found_match = re.search(r'found\s+(\d+)', output_lower)
+            found_match = re.search(r"found\s+(\d+)", output_lower)
             if found_match:
                 return f"{found_match.group(1)} items"
             return "completed"
@@ -644,7 +647,8 @@ class LiveDisplayRenderer:
         if tool_name == "shell":
             if "exit code" in output_lower or "exited with" in output_lower:
                 import re
-                exit_match = re.search(r'exit\s+code:\s*(\d+)', output_lower)
+
+                exit_match = re.search(r"exit\s+code:\s*(\d+)", output_lower)
                 if exit_match:
                     code = exit_match.group(1)
                     if code == "0":

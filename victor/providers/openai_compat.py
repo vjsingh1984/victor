@@ -55,6 +55,7 @@ def _serialized_tools_fingerprint(converted: List[Dict[str, Any]]) -> str:
     payload = json.dumps(converted, sort_keys=True, separators=(",", ":"))
     return hashlib.md5(payload.encode("utf-8")).hexdigest()[:12]
 
+
 _LAST_TOOL_MESSAGE_CLEANUP_STATS: ContextVar[Optional[Dict[str, Any]]] = ContextVar(
     "victor_openai_compat_last_tool_message_cleanup_stats",
     default=None,

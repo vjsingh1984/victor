@@ -66,8 +66,7 @@ class TestToolNameConsistency:
         # not "search" (alias)
         # Access via .Tool property (the tool instance)
         assert search_tool.Tool.name == "code_search", (
-            f"Tool name should be 'code_search' (canonical), "
-            f"but got '{search_tool.Tool.name}'"
+            f"Tool name should be 'code_search' (canonical), " f"but got '{search_tool.Tool.name}'"
         )
 
     def test_search_tool_json_schema_has_canonical_name(self):

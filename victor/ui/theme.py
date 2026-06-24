@@ -8,6 +8,7 @@ from typing import Literal
 
 from rich.theme import Theme
 
+
 # Terminal capability levels
 class TerminalCapability:
     """Terminal capability detection for adaptive styling."""
@@ -29,16 +30,29 @@ class TerminalCapability:
         """
         # Check for truecolor support
         truecolor_terms = {
-            "iterm", "nv", "kitty", "wezterm", "alacritty",
-            "contour", "foot", "rio", "mintty", "windows-terminal"
+            "iterm",
+            "nv",
+            "kitty",
+            "wezterm",
+            "alacritty",
+            "contour",
+            "foot",
+            "rio",
+            "mintty",
+            "windows-terminal",
         }
         term = os.getenv("TERM", "").lower()
         term_program = os.getenv("TERM_PROGRAM", "").lower()
+        # Handle common TERM_PROGRAM values like "iTerm.app" -> "iterm"
+        term_program_base = term_program.split(".")[0]
 
-        if (os.getenv("COLORTERM") in {"truecolor", "24bit"} or
-                term_program in truecolor_terms or
-                "truecolor" in term or
-                "24bit" in term):
+        if (
+            os.getenv("COLORTERM") in {"truecolor", "24bit"}
+            or term_program_base in truecolor_terms
+            or term_program in truecolor_terms
+            or "truecolor" in term
+            or "24bit" in term
+        ):
             return TerminalCapability.TRUECOLOR
 
         # Check for 256-color support

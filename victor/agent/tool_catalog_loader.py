@@ -170,8 +170,7 @@ class ToolCatalogLoader:
 
         shared_registry = SharedToolRegistry.get_instance()
         already_registered = {
-            getattr(tool, "name", "")
-            for tool in self._registry.list_tools(only_enabled=False)
+            getattr(tool, "name", "") for tool in self._registry.list_tools(only_enabled=False)
         }
         needed = [name for name in tool_names if name not in already_registered]
         if not needed:

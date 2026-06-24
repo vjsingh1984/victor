@@ -785,8 +785,16 @@ def get_tool_metadata_for_display(tool_name: str) -> dict:
             return {
                 "category": metadata.category or "",
                 "access_mode": metadata.access_mode.value if metadata.access_mode else "readonly",
-                "cost_tier": metadata.cost_tier.value if hasattr(metadata, "cost_tier") and metadata.cost_tier else "free",
-                "execution_category": metadata.execution_category.value if metadata.execution_category else "read_only",
+                "cost_tier": (
+                    metadata.cost_tier.value
+                    if hasattr(metadata, "cost_tier") and metadata.cost_tier
+                    else "free"
+                ),
+                "execution_category": (
+                    metadata.execution_category.value
+                    if metadata.execution_category
+                    else "read_only"
+                ),
             }
     except Exception:
         pass

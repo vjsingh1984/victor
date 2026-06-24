@@ -1994,14 +1994,14 @@ class SemanticToolSelector:
         demoted_tools = self._get_excluded_tools_from_negations(
             classification_result.negated_keywords
         )
+        # Get mandatory tools from keywords (before using them below)
+        mandatory_tool_names = self._get_mandatory_tools(user_message)
         # Core/mandatory tools are never demoted: the agent must always be able to
         # reason with read/write/shell capabilities.
         excluded_tools = set()
         for name in demoted_tools:
             if name in mandatory_tool_names:
-                logger.debug(
-                    f"Negation would demote mandatory tool '{name}'; keeping FULL."
-                )
+                logger.debug(f"Negation would demote mandatory tool '{name}'; keeping FULL.")
                 continue
             excluded_tools.add(name)
         if demoted_tools:
@@ -2019,9 +2019,6 @@ class SemanticToolSelector:
         # Get task-type-specific tools
         task_tools = self._get_tools_for_task_type(task_type_str)
         logger.debug(f"Task-type tools ({len(task_tools)}): {task_tools[:5]}...")
-
-        # Get mandatory tools from keywords
-        mandatory_tool_names = self._get_mandatory_tools(user_message)
 
         # Remove negated tools from mandatory
         mandatory_tool_names = [t for t in mandatory_tool_names if t not in excluded_tools]

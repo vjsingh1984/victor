@@ -97,14 +97,20 @@ class ToolsCommand(BaseSlashCommand):
             cost_tier = metadata.get("cost_tier", "free")
 
             # Format with badges and colors
-            access_badge = format_access_mode_badge(access_mode) if access_mode != "readonly" else "[dim]readonly[/]"
+            access_badge = (
+                format_access_mode_badge(access_mode)
+                if access_mode != "readonly"
+                else "[dim]readonly[/]"
+            )
             cost_indicator = format_cost_tier_indicator(cost_tier) or "-"
 
             table.add_row(name, category, access_badge, cost_indicator, desc)
 
         ctx.console.print(table)
         ctx.console.print(f"\n[dim]Tool budget: {ctx.settings.tools.tool_call_budget}[/]")
-        ctx.console.print("[dim]Legend: [/][green]READ[/][dim] [yellow]WRITE[/][dim] [red]EXECUTE[/][dim] [blue]NETWORK[/][dim] [magenta]MIXED[/][dim] • Cost: [yellow]$[/] = low, [yellow]$$[/] = medium, [yellow]$$$[/] = high[/]")
+        ctx.console.print(
+            "[dim]Legend: [/][green]READ[/][dim] [yellow]WRITE[/][dim] [red]EXECUTE[/][dim] [blue]NETWORK[/][dim] [magenta]MIXED[/][dim] • Cost: [yellow]$[/] = low, [yellow]$$[/] = medium, [yellow]$$$[/] = high[/]"
+        )
 
 
 @register_command

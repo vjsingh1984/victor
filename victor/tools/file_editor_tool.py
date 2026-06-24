@@ -609,14 +609,16 @@ async def edit(
             if _otype == "replace":
                 _op_mode = _op.get("mode", mode)
                 if _op_mode == "existing" and not _fp.exists():
-                    failed_files.append({
-                        "path": _path,
-                        "op_index": _idx,
-                        "error": (
-                            "replace with mode='existing' refused: file does "
-                            "not exist. Use type='create' to make a new file."
-                        ),
-                    })
+                    failed_files.append(
+                        {
+                            "path": _path,
+                            "op_index": _idx,
+                            "error": (
+                                "replace with mode='existing' refused: file does "
+                                "not exist. Use type='create' to make a new file."
+                            ),
+                        }
+                    )
                     _group_ok = False
                     break
                 _old = _op.get("old_str")
@@ -661,15 +663,17 @@ async def edit(
             elif _otype == "create":
                 _op_mode = _op.get("mode", mode)
                 if _op_mode == "new" and _fp.exists():
-                    failed_files.append({
-                        "path": _path,
-                        "op_index": _idx,
-                        "error": (
-                            "create with mode='new' refused: file already "
-                            "exists. Use type='replace' or 'modify' to edit an "
-                            "existing file, or drop mode='new' to overwrite."
-                        ),
-                    })
+                    failed_files.append(
+                        {
+                            "path": _path,
+                            "op_index": _idx,
+                            "error": (
+                                "create with mode='new' refused: file already "
+                                "exists. Use type='replace' or 'modify' to edit an "
+                                "existing file, or drop mode='new' to overwrite."
+                            ),
+                        }
+                    )
                     _group_ok = False
                     break
                 _working = _op.get("content", "")

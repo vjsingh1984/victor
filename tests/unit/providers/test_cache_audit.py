@@ -17,7 +17,6 @@ from victor.providers.cache_audit import (
     generate_cache_audit,
 )
 
-
 # ── 1. CacheAuditRecord dataclass ─────────────────────────────────────────────
 
 
@@ -138,6 +137,7 @@ def _make_mock_provider(
             delattr(provider, has_serializer or "_serialize_message")
 
     if has_payload_builder:
+
         def _build_payload(**kwargs):
             keys_order = ["tools", "messages"] if tools_before else ["messages", "tools"]
             return {k: kwargs.get(k, []) for k in keys_order}
@@ -152,7 +152,10 @@ class TestBuildCacheAuditRecord:
 
     def test_auto_prefix_provider(self):
         provider = _make_mock_provider(
-            name="openai", supports_caching=True, has_boundary=False, has_serializer="build_openai_messages"
+            name="openai",
+            supports_caching=True,
+            has_boundary=False,
+            has_serializer="build_openai_messages",
         )
         record = build_cache_audit_record(provider)
         assert record.provider_name == "openai"
@@ -201,16 +204,12 @@ class TestBuildCacheAuditRecord:
         assert dt is not None
 
     def test_tools_ordering_before_messages(self):
-        provider = _make_mock_provider(
-            name="deepseek", has_payload_builder=True, tools_before=True
-        )
+        provider = _make_mock_provider(name="deepseek", has_payload_builder=True, tools_before=True)
         record = build_cache_audit_record(provider)
         assert record.tools_ordering == "before_messages"
 
     def test_tools_ordering_after_messages(self):
-        provider = _make_mock_provider(
-            name="weird", has_payload_builder=True, tools_before=False
-        )
+        provider = _make_mock_provider(name="weird", has_payload_builder=True, tools_before=False)
         record = build_cache_audit_record(provider)
         assert record.tools_ordering == "after_messages"
 
@@ -235,8 +234,15 @@ class TestGenerateCacheAudit:
 
     def test_generate_from_explicit_list(self):
         providers = [
-            _make_mock_provider(name="openai", supports_caching=True, has_serializer="build_openai_messages"),
-            _make_mock_provider(name="anthropic", supports_caching=True, has_boundary=True, has_serializer="_serialize_message"),
+            _make_mock_provider(
+                name="openai", supports_caching=True, has_serializer="build_openai_messages"
+            ),
+            _make_mock_provider(
+                name="anthropic",
+                supports_caching=True,
+                has_boundary=True,
+                has_serializer="_serialize_message",
+            ),
             _make_mock_provider(name="ollama", supports_caching=False, has_serializer=None),
         ]
         records = generate_cache_audit(providers)
@@ -256,10 +262,21 @@ class TestGenerateCacheAudit:
     def test_generate_classifies_two_paradigms(self):
         """Auto-prefix family vs explicit-markers family are distinguishable."""
         providers = [
-            _make_mock_provider(name="openai", supports_caching=True, has_serializer="build_openai_messages"),
-            _make_mock_provider(name="xai", supports_caching=True, has_serializer="build_openai_messages"),
-            _make_mock_provider(name="deepseek", supports_caching=True, has_serializer="build_openai_messages"),
-            _make_mock_provider(name="anthropic", supports_caching=True, has_boundary=True, has_serializer="_serialize_message"),
+            _make_mock_provider(
+                name="openai", supports_caching=True, has_serializer="build_openai_messages"
+            ),
+            _make_mock_provider(
+                name="xai", supports_caching=True, has_serializer="build_openai_messages"
+            ),
+            _make_mock_provider(
+                name="deepseek", supports_caching=True, has_serializer="build_openai_messages"
+            ),
+            _make_mock_provider(
+                name="anthropic",
+                supports_caching=True,
+                has_boundary=True,
+                has_serializer="_serialize_message",
+            ),
         ]
         records = generate_cache_audit(providers)
         types = {r.provider_name: r.cache_type for r in records}
