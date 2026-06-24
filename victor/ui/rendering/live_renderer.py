@@ -332,7 +332,6 @@ class LiveDisplayRenderer:
         self.pause()
 
         # Bash-style result line: [DONE] tool_name • result • duration
-        icon = "✓" if success else "✗"
         color = "success" if success else "error"
         duration_str = format_duration(elapsed)
 
