@@ -179,7 +179,9 @@ class TestDelegationPath:
             return_value=(mock_git, "victor_devops.tools.git_tool"),
         ):
             result = await git_tool('git commit -m "fix: x"')
-        mock_git.assert_awaited_once_with(operation="commit", message="fix: x", author_name=None, author_email=None)
+        mock_git.assert_awaited_once_with(
+            operation="commit", message="fix: x", author_name=None, author_email=None
+        )
         assert "Committed" in result
 
     @pytest.mark.asyncio

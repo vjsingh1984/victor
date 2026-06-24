@@ -290,7 +290,9 @@ async def git_tool(cmd: str) -> str:
     if parsed.subcommand == "commit" and getattr(parsed, "ai", False):
         return await _handle_ai_commit(parsed)
 
-    git_fn, _src = resolve_vertical_callable("git", fallback_module="victor_devops.tools.git_tool", fallback_attr="git")
+    git_fn, _src = resolve_vertical_callable(
+        "git", fallback_module="victor_devops.tools.git_tool", fallback_attr="git"
+    )
     if git_fn is not None:
         try:
             operation, kwargs = _git_kwarg_map(parsed)
@@ -312,7 +314,9 @@ async def git_tool(cmd: str) -> str:
 
 async def _handle_ai_commit(parsed: argparse.Namespace) -> str:
     """Generate a commit message via commit_msg, then commit it."""
-    git_fn, _src = resolve_vertical_callable("git", fallback_module="victor_devops.tools.git_tool", fallback_attr="git")
+    git_fn, _src = resolve_vertical_callable(
+        "git", fallback_module="victor_devops.tools.git_tool", fallback_attr="git"
+    )
     if git_fn is None:
         return (
             "### ❌ ERROR\nAI commit message generation requires the victor-devops package. "
@@ -351,7 +355,9 @@ def _extract_generated_message(result: Any) -> Optional[str]:
 
 async def _handle_pr(parsed: argparse.Namespace) -> str:
     """Create a pull request via the victor-devops ``pr`` callable."""
-    pr_fn, _src = resolve_vertical_callable("pr", fallback_module="victor_devops.tools.git_tool", fallback_attr="pr")
+    pr_fn, _src = resolve_vertical_callable(
+        "pr", fallback_module="victor_devops.tools.git_tool", fallback_attr="pr"
+    )
     if pr_fn is None:
         return (
             "### ❌ ERROR\nPR creation requires the victor-devops package and the GitHub CLI "

@@ -62,7 +62,9 @@ class TestFsEdit:
 
     @pytest.mark.asyncio
     async def test_edit_replace_builds_ops_and_delegates(self):
-        mock_edit = AsyncMock(return_value={"success": True, "summary": "Edited", "files": ["x.py"]})
+        mock_edit = AsyncMock(
+            return_value={"success": True, "summary": "Edited", "files": ["x.py"]}
+        )
         with patch("victor.tools.file_editor_tool.edit", mock_edit):
             result = await fs_tool('fs edit x.py --old "DEBUG = True" --new "DEBUG = False"')
         mock_edit.assert_awaited_once()
@@ -88,7 +90,9 @@ class TestFsEdit:
     async def test_edit_accepts_raw_ops_json(self):
         mock_edit = AsyncMock(return_value={"success": True, "summary": "done"})
         with patch("victor.tools.file_editor_tool.edit", mock_edit):
-            await fs_tool('fs edit x.py --ops \'[{"type": "create", "path": "n.py", "content": "x"}]\'')
+            await fs_tool(
+                'fs edit x.py --ops \'[{"type": "create", "path": "n.py", "content": "x"}]\''
+            )
         ops = mock_edit.call_args.kwargs["ops"]
         assert ops[0]["type"] == "create"
 
@@ -102,6 +106,6 @@ class TestFsEdit:
     async def test_edit_surfaces_failure(self):
         mock_edit = AsyncMock(return_value={"success": False, "error": "old_str not found"})
         with patch("victor.tools.file_editor_tool.edit", mock_edit):
-            result = await fs_tool('fs edit x.py --old a --new b')
+            result = await fs_tool("fs edit x.py --old a --new b")
         assert "### ❌ ERROR" in result
         assert "old_str not found" in result

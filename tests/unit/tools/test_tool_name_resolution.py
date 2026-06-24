@@ -69,9 +69,9 @@ class TestToolNameConsistency:
         from victor.tools.unified.search_tool import search_tool
 
         # Access via .Tool property (the tool instance)
-        assert search_tool.Tool.name == "search", (
-            f"Tool name should be 'search' (canonical), but got '{search_tool.Tool.name}'"
-        )
+        assert (
+            search_tool.Tool.name == "search"
+        ), f"Tool name should be 'search' (canonical), but got '{search_tool.Tool.name}'"
 
     def test_search_tool_json_schema_has_canonical_name(self):
         """Verify the search tool's JSON schema uses the canonical name."""

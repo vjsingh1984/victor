@@ -293,9 +293,9 @@ class TestDynamicToolRegistration:
         tool_names = [t.name for t in registrar.tools.list_tools()]
         # ``code`` and ``fs`` are the unified command domains that own search.
         has_search_domain = any(name in {"code", "fs", "search"} for name in tool_names)
-        assert has_search_domain, (
-            f"Expected a search-capable unified domain (code/fs/search), got: {tool_names[:10]}..."
-        )
+        assert (
+            has_search_domain
+        ), f"Expected a search-capable unified domain (code/fs/search), got: {tool_names[:10]}..."
 
     def test_excluded_files(self, registrar):
         """Test that excluded files are not loaded."""
