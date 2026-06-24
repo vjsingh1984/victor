@@ -87,18 +87,20 @@ def test_shell_description_includes_folded_tool_guidance() -> None:
         "extract",
         "inline",
         "organize_imports",
-        "rag_delete",
-        "rag_ingest",
-        "rag_list",
-        "rag_query",
-        "rag_search",
-        "rag_stats",
         "rename",
         "sandbox",
         "scaffold",
         "test",
     ]
     assert folded_tool_names_for_target("db") == ["database"]
+    assert folded_tool_names_for_target("rag") == [
+        "rag_delete",
+        "rag_ingest",
+        "rag_list",
+        "rag_query",
+        "rag_search",
+        "rag_stats",
+    ]
     assert "Folded tool guidance:" in description
     assert "pytest" in description
 
