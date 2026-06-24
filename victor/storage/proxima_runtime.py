@@ -221,18 +221,19 @@ async def start_embedded_db(
     data_path = Path(data_dir).expanduser()
     data_path.mkdir(parents=True, exist_ok=True)
 
+    # SDK default is now UDS (portless), so port-picking is unnecessary.
+    # Ports are only used when an explicit TCP transport is configured.
     if rest_port is None or grpc_port is None:
-        free_rest, free_grpc = _pick_free_ports(2)
-        rest_port = rest_port if rest_port is not None else free_rest
-        grpc_port = grpc_port if grpc_port is not None else free_grpc
+        # Leave the SDK defaults (ignored in UDS mode)
+        pass
 
     config = EmbeddedConfig(
         data_dir=str(data_path),
         log_level=log_level,
         vector_engine=vector_engine,
         graph_engine=graph_engine,
-        rest_port=rest_port,
-        grpc_port=grpc_port,
+        rest_port=rest_port or 15678,  # Fallback if explicitly set (ignored in UDS)
+        grpc_port=grpc_port or 15679,  # Fallback if explicitly set (ignored in UDS)
     )
     db = EmbeddedProximaDB(config=config, binary_path=binary_path)
     try:
