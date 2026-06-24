@@ -917,15 +917,17 @@ def _validate_single_readonly_command(cmd: str) -> tuple[bool, str]:
                     # Allow ls, inspect, history, prune is write
                     if "ls" in cmd or "inspect" in cmd or "history" in cmd:
                         return True, ""
-                    return False, f"docker image (write op)"
+                    return False, "docker image (write op)"
                 elif sub == "container":
                     if "ls" in cmd or "inspect" in cmd or "stats" in cmd:
                         return True, ""
-                    return False, f"docker container (write op)"
+                    return False, "docker container (write op)"
                 elif sub == "compose":
                     # Allow ps, logs, config, top, images
                     _compose_ro = {"ps", "logs", "config", "top", "images", "port"}
-                    _compose_sub = _extract_subcommand(cmd.replace("docker compose", "compose"), "compose")
+                    _compose_sub = _extract_subcommand(
+                        cmd.replace("docker compose", "compose"), "compose"
+                    )
                     if _compose_sub in _compose_ro:
                         return True, ""
                     return False, f"docker compose {_compose_sub or ''}"
@@ -1417,7 +1419,7 @@ async def shell(
     # Apply command optimizer pipeline (grep→rg, etc.)
     cmd = optimize_command(cmd)
 
-    # Redirect broad recursive search commands to code_search (when available).
+    # Redirect broad recursive search commands to the grouped search tool.
     # Models bypass the semantic index by calling shell("rg ...") directly.
     # Allow targeted single-file searches (grep -n "pattern" specific_file.py)
     # since those are precise and don't benefit from semantic search.
@@ -1451,10 +1453,10 @@ async def shell(
                 )
             else:
                 error_msg = (
-                    "Use code_search(query='...') instead of shell search commands for project code. "
-                    "code_search uses the semantic index and is more reliable. "
+                    "Use search(cmd='search grep \"...\" .') instead of shell search commands "
+                    "for project code. The grouped search tool is indexed and more reliable. "
                     "For library/venv files use read(path='...') directly. "
-                    "Example: code_search(query='FilePathField', mode='semantic')"
+                    "Example: search(cmd='search grep \"FilePathField\" .')"
                 )
             return {
                 "success": False,
@@ -1482,10 +1484,10 @@ async def shell(
     #   action="write"   -> mutate filesystem/git state
     #   action="exec"    -> arbitrary exec
     _ACTION_EFFECTIVE_READONLY = {
-        "read": None,       # honor the `readonly` arg as-is
-        "network": False,   # network ops are never readonly-allowlisted
-        "write": False,     # mutations must bypass the allowlist
-        "exec": False,      # arbitrary exec must bypass the allowlist
+        "read": None,  # honor the `readonly` arg as-is
+        "network": False,  # network ops are never readonly-allowlisted
+        "write": False,  # mutations must bypass the allowlist
+        "exec": False,  # arbitrary exec must bypass the allowlist
     }
     _eff = _ACTION_EFFECTIVE_READONLY.get(action)
     if _eff is not None:
@@ -1501,7 +1503,7 @@ async def shell(
                     f"Command '{failing_cmd}' is not allowed in readonly mode. "
                     f"Allowed commands: {', '.join(sorted(get_allowed_readonly_commands())[:15])}... "
                     "Re-run with readonly=False (or action='network'/'write'/'exec') "
-                    "to run mutating or network commands."""
+                    "to run mutating or network commands."
                 ),
                 "stdout": "",
                 "stderr": "",

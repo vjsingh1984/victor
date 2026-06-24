@@ -1,5 +1,6 @@
 import asyncio
 import argparse
+from dataclasses import dataclass
 import sys
 from io import StringIO
 
@@ -44,6 +45,98 @@ def create_shell_parser() -> UnifiedShellParser:
     return parser
 
 
+@dataclass
+class ParsedShellCommand:
+    cmd: str
+    sandbox: bool = False
+    readonly: bool = False
+    timebound_sync: int | None = None
+
+
+def _strip_shell_prefix(command: str) -> str:
+    stripped = command.lstrip()
+    if stripped == "shell":
+        return ""
+    if stripped.startswith("shell "):
+        return stripped[len("shell ") :]
+    return command
+
+
+def _consume_prefix_flags(command: str) -> tuple[ParsedShellCommand, str]:
+    parsed = ParsedShellCommand(cmd="")
+    remaining = command.lstrip()
+
+    while remaining.startswith("--"):
+        if remaining.startswith("--sandbox"):
+            after = remaining[len("--sandbox") :]
+            if after and not after[0].isspace():
+                break
+            parsed.sandbox = True
+            remaining = after.lstrip()
+            continue
+        if remaining.startswith("--readonly"):
+            after = remaining[len("--readonly") :]
+            if after and not after[0].isspace():
+                break
+            parsed.readonly = True
+            remaining = after.lstrip()
+            continue
+        if remaining.startswith("--timebound-sync"):
+            after = remaining[len("--timebound-sync") :].lstrip()
+            if not after:
+                raise ValueError("Argument parsing error: --timebound-sync requires seconds")
+            parts = after.split(maxsplit=1)
+            try:
+                parsed.timebound_sync = int(parts[0])
+            except ValueError as exc:
+                raise ValueError(
+                    "Argument parsing error: --timebound-sync requires integer seconds"
+                ) from exc
+            remaining = parts[1].lstrip() if len(parts) > 1 else ""
+            continue
+        break
+
+    return parsed, remaining
+
+
+def parse_shell_command(command: str) -> ParsedShellCommand:
+    """Parse Victor wrapper flags while preserving the bash command body."""
+    raw = _strip_shell_prefix(command)
+    parsed, remaining = _consume_prefix_flags(raw)
+
+    # Backward compatibility for the old form:
+    #   shell "python script.py" --sandbox
+    # Only use shlex-style parsing when the command body is a single quoted arg,
+    # so arbitrary bash syntax such as pipes, redirection, and heredocs stays raw.
+    if remaining[:1] in {"'", '"'} and "\n" not in remaining and "<<" not in remaining:
+        args = split_command(remaining)
+        command_parts = []
+        for arg in args:
+            if arg == "--sandbox":
+                parsed.sandbox = True
+            elif arg == "--readonly":
+                parsed.readonly = True
+            elif arg == "--timebound-sync":
+                # Leave malformed legacy suffixes to the argparse-compatible
+                # error below by appending this token as command content.
+                command_parts.append(arg)
+            elif command_parts and command_parts[-1] == "--timebound-sync":
+                try:
+                    parsed.timebound_sync = int(arg)
+                    command_parts.pop()
+                except ValueError:
+                    command_parts.append(arg)
+            else:
+                command_parts.append(arg)
+        parsed.cmd = " ".join(command_parts).strip()
+    else:
+        parsed.cmd = remaining.strip()
+
+    if not parsed.cmd:
+        raise ValueError("Argument parsing error: missing command")
+    return parsed
+
+
 @tool(
     name="shell",
     access_mode=AccessMode.MIXED,
@@ -57,13 +150,8 @@ async def shell_tool(cmd: str) -> str:
       shell "ls -la"
       shell "npm start" --timebound-sync 300
     """
-    parser = create_shell_parser()
-
     try:
-        args_list = split_command(cmd)
-        if args_list and args_list[0] == "shell":
-            args_list = args_list[1:]
-        parsed_args = parser.parse_args(args_list)
+        parsed_args = parse_shell_command(cmd)
     except ValueError as e:
         return f"### ❌ ERROR\n{e}"
     except Exception as e:

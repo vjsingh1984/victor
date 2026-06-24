@@ -30,6 +30,35 @@ async def test_code_tool_execute():
 
 
 @pytest.mark.asyncio
+async def test_code_tool_python_alias():
+    """`code python` should be the shell-style replacement for ad hoc Python execution."""
+    with patch(
+        "victor.tools.unified.code_tool.execute_python", new_callable=AsyncMock
+    ) as mock_exec:
+        mock_exec.return_value = "hello alias\n"
+
+        result = await code_tool("code python \"print('hello alias')\"")
+
+        mock_exec.assert_called_once_with("print('hello alias')")
+        assert "hello alias" in result
+
+
+@pytest.mark.asyncio
+async def test_code_tool_python_heredoc():
+    """`code python` should accept heredoc code without quote escaping."""
+    code = '"""module docstring"""\nprint("hello heredoc")'
+    with patch(
+        "victor.tools.unified.code_tool.execute_python", new_callable=AsyncMock
+    ) as mock_exec:
+        mock_exec.return_value = "hello heredoc\n"
+
+        result = await code_tool("code python <<'PY'\n" + code + "\nPY")
+
+        mock_exec.assert_called_once_with(code)
+        assert "hello heredoc" in result
+
+
+@pytest.mark.asyncio
 async def test_code_tool_metrics():
     """Test `code metrics` subcommand formatting."""
     with patch(

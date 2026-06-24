@@ -45,3 +45,15 @@ def test_shlex_handles_escaped_quotes():
     cmd = 'fs write -c "escaped \\"quote\\" test"'
     args = split_command(cmd)
     assert args == ["fs", "write", "-c", 'escaped "quote" test']
+
+
+def test_split_heredoc_as_single_argument():
+    cmd = "code python <<'PY'\nprint('hello')\nprint(\"world\")\nPY"
+    args = split_command(cmd)
+    assert args == ["code", "python", "print('hello')\nprint(\"world\")"]
+
+
+def test_split_heredoc_preserves_docstring_body():
+    cmd = 'code python <<EOF\n"""module docstring"""\nprint("ok")\nEOF'
+    args = split_command(cmd)
+    assert args == ["code", "python", '"""module docstring"""\nprint("ok")']

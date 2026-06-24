@@ -26,6 +26,27 @@ from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
+_FEW_SHOT_TOOL_ALIASES = {
+    "code_search": "search",
+    "semantic_code_search": "search",
+    "grep": "search",
+    "find": "search",
+    "run_tests": "code",
+}
+
+
+def _normalize_few_shot_tools(tools: List[str]) -> List[str]:
+    """Render mined traces with currently advertised grouped tool names."""
+    normalized: List[str] = []
+    seen = set()
+    for tool in tools:
+        name = _FEW_SHOT_TOOL_ALIASES.get(tool, tool)
+        if not name or name in seen:
+            continue
+        seen.add(name)
+        normalized.append(name)
+    return normalized
+
 
 class MIPROv2Strategy:
     """MIPROv2-inspired few-shot demonstration mining strategy.
@@ -120,9 +141,9 @@ class MIPROv2Strategy:
         descriptions = []
         for trace in traces:
             task = getattr(trace, "task_type", "default")
-            tools = [
-                getattr(d, "tool_name", "") for d in getattr(trace, "tool_call_details", [])[:5]
-            ]
+            tools = _normalize_few_shot_tools(
+                [getattr(d, "tool_name", "") for d in getattr(trace, "tool_call_details", [])[:5]]
+            )
             failures = list(getattr(trace, "tool_failures", {}).keys())
             desc = f"{task}: {' '.join(tools)} failures={','.join(failures)}"
             descriptions.append(desc)
@@ -191,6 +212,7 @@ class MIPROv2Strategy:
                 getattr(d, "tool_name", "unknown")
                 for d in getattr(trace, "tool_call_details", [])[:5]
             ]
+            tools = _normalize_few_shot_tools(tools)
             score = getattr(trace, "completion_score", 0)
             failures = list(getattr(trace, "tool_failures", {}).keys())[:3]
             if tools:
@@ -249,4 +271,5 @@ class MIPROv2Strategy:
             getattr(detail, "tool_name", "unknown")
             for detail in getattr(trace, "tool_call_details", [])[:5]
         ]
+        tools = _normalize_few_shot_tools(tools)
         return f"{task}:{','.join(tools)}"

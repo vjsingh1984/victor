@@ -71,9 +71,12 @@ def create_code_parser() -> UnifiedCodeParser:
     test_parser.add_argument("runner", help="Test runner (e.g. pytest)")
     test_parser.add_argument("path", nargs="?", default=".", help="Path to tests")
 
-    # `execute` subcommand
+    # `execute` / `python` subcommands
     exec_parser = subparsers.add_parser("execute", help="Execute python code")
     exec_parser.add_argument("code", help="Python code to execute")
+
+    python_parser = subparsers.add_parser("python", help="Execute python code")
+    python_parser.add_argument("code", help="Python code to execute")
 
     # `metrics` subcommand
     metrics_parser = subparsers.add_parser("metrics", help="Analyze code metrics")
@@ -93,8 +96,16 @@ async def code_tool(cmd: str) -> str:
     """Unified code tool.
     Example commands:
       code test pytest tests/
+      code python "print('hello')"
+      code python <<'PY'
+      print('hello')
+      PY
       code execute "print('hello')"
       code metrics src/
+
+    Args:
+        cmd: Bash-style grouped code command. Use `code python` for ad hoc
+            Python snippets and heredocs; use `code test` for test runners.
     """
     parser = create_code_parser()
 
@@ -124,7 +135,7 @@ async def code_tool(cmd: str) -> str:
         except Exception as e:
             return f"### ❌ ERROR\nTest execution failed: {e}"
 
-    elif parsed_args.subcommand == "execute":
+    elif parsed_args.subcommand in {"execute", "python"}:
         try:
             return str(await execute_python(parsed_args.code))
         except Exception as e:

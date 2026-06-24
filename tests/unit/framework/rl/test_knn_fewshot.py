@@ -138,3 +138,21 @@ class TestKNNFewShotSelection:
         assert "provider=zai" in result
         assert "model=glm-5.1" in result
         assert "tool_calls=4" in result
+
+    def test_reflect_normalizes_legacy_code_search_tool_name(self):
+        from victor.framework.rl.learners.strategies.miprov2_strategy import (
+            MIPROv2Strategy,
+        )
+
+        s = MIPROv2Strategy()
+        trace = self._make_trace(
+            task="analysis",
+            tools=["code_search", "semantic_code_search", "read"],
+            score=0.95,
+        )
+
+        result = s.reflect([trace], "FEW_SHOT_EXAMPLES", "")
+
+        assert "code_search" not in result
+        assert "semantic_code_search" not in result
+        assert "tools=[search, read]" in result

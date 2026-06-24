@@ -7,11 +7,27 @@ def split_command(command: str) -> list[str]:
     Splits a shell-like command string into arguments, supporting
     triple quotes (\"\"\" and ''') which shlex does not handle natively.
     """
-    # Regex to find triple quoted strings (both single and double)
-    # The non-greedy .*? ensures we don't accidentally swallow text between two separate triple quotes
-    pattern = re.compile(r"(\"\"\"(.*?)\"\"\"|\'\'\'(.*?)\'\'\')", re.DOTALL)
+    extracted_blocks: list[str] = []
 
-    extracted_blocks = []
+    def placeholder(index: int) -> str:
+        return f"__VICTOR_CMD_BLOCK_{index}__"
+
+    # Extract heredocs before triple quotes so Python docstrings inside
+    # heredoc bodies are preserved as raw content.
+    heredoc_pattern = re.compile(
+        r"<<-?\s*(['\"]?)([A-Za-z_][A-Za-z0-9_]*)\1[ \t]*\n(.*?)\n[ \t]*\2(?=\s|$)",
+        re.DOTALL,
+    )
+
+    def heredoc_replacer(match):
+        extracted_blocks.append(match.group(3))
+        return placeholder(len(extracted_blocks) - 1)
+
+    sanitized_cmd = heredoc_pattern.sub(heredoc_replacer, command)
+
+    # Regex to find triple quoted strings (both single and double).
+    # The non-greedy .*? avoids swallowing text between separate triple quotes.
+    pattern = re.compile(r"(\"\"\"(.*?)\"\"\"|\'\'\'(.*?)\'\'\')", re.DOTALL)
 
     def replacer(match):
         # We store the inner content, stripping the actual triple quotes
@@ -24,10 +40,10 @@ def split_command(command: str) -> list[str]:
 
         extracted_blocks.append(content)
         # Return a safe, unquoted placeholder string that shlex won't split
-        return f"__MAGIC_TRIPLE_QUOTE_{len(extracted_blocks)-1}__"
+        return placeholder(len(extracted_blocks) - 1)
 
     # Replace all triple quotes with placeholders
-    sanitized_cmd = pattern.sub(replacer, command)
+    sanitized_cmd = pattern.sub(replacer, sanitized_cmd)
 
     # Split using shlex
     try:
@@ -40,9 +56,9 @@ def split_command(command: str) -> list[str]:
     # Restore the extracted blocks
     restored_args = []
     for arg in args:
-        if arg.startswith("__MAGIC_TRIPLE_QUOTE_") and arg.endswith("__"):
+        if arg.startswith("__VICTOR_CMD_BLOCK_") and arg.endswith("__"):
             # Extract the index
-            idx_str = arg[21:-2]
+            idx_str = arg[len("__VICTOR_CMD_BLOCK_") : -2]
             try:
                 idx = int(idx_str)
                 restored_args.append(extracted_blocks[idx])

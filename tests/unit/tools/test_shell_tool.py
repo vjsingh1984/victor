@@ -31,6 +31,35 @@ async def test_shell_tool_sandbox():
 
 
 @pytest.mark.asyncio
+async def test_shell_tool_preserves_pipe_and_redirection():
+    """Shell wrapper must pass bash syntax through as an opaque command."""
+    with patch("victor.tools.unified.shell_tool.execute_bash", new_callable=AsyncMock) as mock_bash:
+        mock_bash.return_value = {"stdout": "ok", "stderr": ""}
+
+        result = await shell_tool(r"printf 'a\nb\n' \| sed -n '1p' > /tmp/out.txt")
+
+        mock_bash.assert_called_once_with(
+            cmd=r"printf 'a\nb\n' \| sed -n '1p' > /tmp/out.txt",
+            sandbox=False,
+            readonly=False,
+        )
+        assert "### STDOUT" in result
+
+
+@pytest.mark.asyncio
+async def test_shell_tool_preserves_python_heredoc_with_docstring():
+    """Heredoc Python cells should not be shlex-split before execution."""
+    command = 'python - <<\'PY\'\n"""module docstring"""\nprint(\'hello\')\nPY'
+    with patch("victor.tools.unified.shell_tool.execute_bash", new_callable=AsyncMock) as mock_bash:
+        mock_bash.return_value = {"stdout": "hello\n", "stderr": ""}
+
+        result = await shell_tool(command)
+
+        mock_bash.assert_called_once_with(cmd=command, sandbox=False, readonly=False)
+        assert "hello" in result
+
+
+@pytest.mark.asyncio
 async def test_shell_tool_timebound_sync_background():
     """Test `shell --timebound-sync` drops to background if it exceeds time."""
     import asyncio

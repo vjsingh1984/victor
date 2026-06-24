@@ -148,6 +148,16 @@ async def test_shell_heredoc_command():
     assert "print('hello')" in result["stdout"]
 
 
+@pytest.mark.asyncio
+async def test_shell_broad_search_guidance_uses_grouped_search_tool():
+    """Blocked broad searches should point at the advertised grouped search tool."""
+    result = await shell(cmd="rg FilePathField .", readonly=False)
+
+    assert result["success"] is False
+    assert "search(cmd=" in result["error"]
+    assert "code_search(" not in result["error"]
+
+
 class TestReadonlyControlFlow:
     """Read-only shell control-flow validation (glm-5.1 docs-audit regression).
 
@@ -249,7 +259,7 @@ class TestReadonlyCompoundCommands:
 
 
 class TestReadonlyQuoteAwareSubstitutions:
-    """Quote-aware substitution scanning (regression: literal backticks/pipes).
+    r"""Quote-aware substitution scanning (regression: literal backticks/pipes).
 
     Markdown/mermaid audits run `grep '^```mermaid'` and `grep -c '```\|```'`.
     A prior naive scanner treated the single-quoted backticks as command
