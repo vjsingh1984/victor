@@ -443,9 +443,12 @@ def render_thinking_indicator(console: Console) -> None:
 
     # Use high contrast colors if enabled
     if theme_settings.high_contrast:
+        # A rule separates the reasoning section from prior output for readability
+        console.rule(style="bold cyan")
         console.print("🤔 [bold cyan]Thinking...[/]")
     else:
         # Subtle theme-based indicator
+        console.rule(style="thinking.text")
         console.print("🤔 [thinking.indicator]Thinking...[/]", style="thinking.text")
 
 
