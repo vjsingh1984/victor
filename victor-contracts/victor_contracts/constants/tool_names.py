@@ -34,6 +34,7 @@ class ToolNames:
     SANDBOX = "sandbox"
     SANDBOX_UPLOAD = "sandbox_upload"
     GREP = "grep"
+    SEARCH = "search"
     CODE_SEARCH = "code_search"
     WEB_SEARCH = "web_search"
     WEB_FETCH = "web_fetch"
@@ -121,7 +122,9 @@ TOOL_ALIASES: Dict[str, str] = {
     "tool.list_directory": ToolNames.LS,
     "execute_python_in_sandbox": ToolNames.SANDBOX,
     "upload_files_to_sandbox": ToolNames.SANDBOX_UPLOAD,
-    "search": ToolNames.CODE_SEARCH,
+    # Unified search tool (grep, files subcommands)
+    "search": ToolNames.SEARCH,
+    # Legacy code_search aliases (kept for backward compatibility)
     "code_search": ToolNames.CODE_SEARCH,
     "semantic_code_search": ToolNames.CODE_SEARCH,
     "web_summarize": ToolNames.SUMMARIZE,
