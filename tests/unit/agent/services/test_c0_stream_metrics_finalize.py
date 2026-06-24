@@ -52,7 +52,7 @@ async def test_stream_chat_finalizes_metrics_with_cumulative_usage(monkeypatch):
     monkeypatch.setattr(rt, "_get_runtime_bindings", lambda *a, **k: bindings)
 
     class _Executor:
-        async def run(self, user_message, **kwargs):
+        async def run_unified(self, user_message, **kwargs):
             if False:  # async generator that yields nothing
                 yield None
 
@@ -83,7 +83,7 @@ async def test_finalize_failure_does_not_break_the_stream(monkeypatch):
     monkeypatch.setattr(rt, "_get_runtime_bindings", lambda *a, **k: bindings)
 
     class _Executor:
-        async def run(self, user_message, **kwargs):
+        async def run_unified(self, user_message, **kwargs):
             if False:
                 yield None
 
