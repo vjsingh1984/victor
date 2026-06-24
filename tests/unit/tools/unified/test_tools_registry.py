@@ -112,10 +112,9 @@ class TestUnifiedToolRegistry:
 
         names = await registry.discover()
 
-        # Note: search tool is registered as "code_search" (canonical name) after
-        # the tool naming fix. The tool was changed from "search" to "code_search"
-        # to match the canonical name in TOOL_ALIASES.
-        assert {"code", "fs", "code_search", "shell", "web"}.issubset(set(names))
+        # The unified command-shell domains: code, fs, git, search, shell, web.
+        # (``search`` remains as a back-compat shim during the domain retirement.)
+        assert {"code", "fs", "git", "search", "shell", "web"}.issubset(set(names))
 
     @pytest.mark.asyncio
     async def test_list_tools(self):

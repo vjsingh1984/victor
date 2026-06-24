@@ -268,11 +268,14 @@ class TestDynamicToolRegistration:
         assert count >= 0
 
     def test_register_dynamic_tools_includes_graph_tool(self):
-        """Dynamic tool registration should include graph-related tools.
+        """Dynamic tool registration should include search functionality.
 
-        NOTE: The unified graph tool has been split into specialized tools
-        (graph_analytics, graph_dependencies, etc.). This test verifies that
-        at least one graph-related tool is registered via dynamic discovery.
+        Graph-related tools (graph_semantic_search, etc.) are intentionally kept
+        out of the default registration set via ``SCHEMA_HIDDEN_TOOL_NAMES``.
+        Search functionality is instead provided by the unified command domains:
+        ``code`` (``code grep`` / ``code search``) and ``fs`` (``fs search``).
+        This test verifies at least one of those search-capable domains is
+        registered via dynamic discovery.
         """
         settings = MagicMock()
         settings.load_tool_config.return_value = {}
@@ -287,12 +290,12 @@ class TestDynamicToolRegistration:
         count = registrar._register_dynamic_tools()
 
         assert count > 0
-        # Check for any graph-related tool (graph_* or code_search which provides graph access)
         tool_names = [t.name for t in registrar.tools.list_tools()]
-        has_graph_tool = any(
-            name.startswith("graph_") or name == "code_search" for name in tool_names
+        # ``code`` and ``fs`` are the unified command domains that own search.
+        has_search_domain = any(name in {"code", "fs", "search"} for name in tool_names)
+        assert has_search_domain, (
+            f"Expected a search-capable unified domain (code/fs/search), got: {tool_names[:10]}..."
         )
-        assert has_graph_tool, f"Expected at least one graph-related tool, got: {tool_names[:5]}..."
 
     def test_excluded_files(self, registrar):
         """Test that excluded files are not loaded."""

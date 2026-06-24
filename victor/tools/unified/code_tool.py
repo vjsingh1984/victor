@@ -82,6 +82,30 @@ def create_code_parser() -> UnifiedCodeParser:
     metrics_parser = subparsers.add_parser("metrics", help="Analyze code metrics")
     metrics_parser.add_argument("path", nargs="?", default=".", help="Directory to analyze")
 
+    # `grep` subcommand — literal content search (the canonical grep surface)
+    grep_parser = subparsers.add_parser("grep", help="Search file contents (literal/regex)")
+    grep_parser.add_argument("query", help="Text or regex to search for")
+    grep_parser.add_argument("path", nargs="?", default=".", help="File or directory to search")
+    grep_parser.add_argument("--regex", action="store_true", help="Treat query as a regex")
+    grep_parser.add_argument(
+        "--case-sensitive",
+        "-C",
+        action="store_true",
+        help="Case-sensitive match (default is case-insensitive)",
+    )
+
+    # `search` subcommand — semantic/graph code search (delegates to victor-coding)
+    search_parser = subparsers.add_parser("search", help="Semantic code search")
+    search_parser.add_argument("query", help="Natural-language search query")
+    search_parser.add_argument("path", nargs="?", default=".", help="Scope of the search")
+    search_parser.add_argument(
+        "--mode",
+        choices=["semantic", "literal", "hybrid", "graph"],
+        default="semantic",
+        help="Search mode (default: semantic)",
+    )
+    search_parser.add_argument("--k", type=int, default=10, help="Max results")
+
     return parser
 
 
@@ -154,9 +178,102 @@ async def code_tool(cmd: str) -> str:
             return "\n".join(out)
         except Exception as e:
             return f"### ❌ ERROR\nMetrics analysis failed: {e}"
+
+    elif parsed_args.subcommand == "grep":
+        from victor.tools.unified._search_helpers import format_grep_results, grep_search
+
+        try:
+            results = await grep_search(
+                query=parsed_args.query,
+                path=parsed_args.path,
+                regex=parsed_args.regex,
+                case_sensitive=parsed_args.case_sensitive,
+            )
+            return format_grep_results(results)
+        except Exception as e:
+            return f"### ❌ ERROR\ngrep failed: {e}"
+
+    elif parsed_args.subcommand == "search":
+        return await _code_search(parsed_args)
+
     else:
         old_stdout = sys.stdout
         sys.stdout = capture = StringIO()
         parser.print_help()
         sys.stdout = old_stdout
         return f"### ❌ ERROR\nInvalid subcommand '{parsed_args.subcommand}'.\n\n```text\n{capture.getvalue()}```"
+
+
+async def _code_search(parsed_args) -> str:
+    """``code search`` — semantic/graph code search with a literal fallback.
+
+    Delegates to ``victor_coding.code_search`` when the package is available;
+    otherwise (and for ``--mode literal``) falls back to a literal grep so the
+    surface always works, per the graceful-degradation principle.
+    """
+    from victor.tools.unified._search_helpers import format_grep_results, grep_search
+
+    if parsed_args.mode == "literal":
+        results = await grep_search(query=parsed_args.query, path=parsed_args.path)
+        return format_grep_results(results)
+
+    from victor.tools.unified._vertical_resolver import resolve_vertical_callable
+
+    search_fn, _src = resolve_vertical_callable(
+        "victor_coding.tools.code_search_tool", "code_search"
+    )
+    if search_fn is None:
+        # No semantic backend available — degrade to literal with a hint.
+        results = await grep_search(query=parsed_args.query, path=parsed_args.path)
+        return (
+            "### 💡 SYSTEM HINT\nSemantic code search requires the victor-coding "
+            "package, which is not installed. Showing literal matches instead.\n\n"
+            + format_grep_results(results)
+        )
+
+    try:
+        result = await search_fn(
+            query=parsed_args.query,
+            path=parsed_args.path,
+            mode=parsed_args.mode,
+            k=parsed_args.k,
+        )
+    except TypeError:
+        # Signature drift between versions — retry without the ``k`` kwarg.
+        try:
+            result = await search_fn(
+                query=parsed_args.query, path=parsed_args.path, mode=parsed_args.mode
+            )
+        except Exception as e:
+            return f"### ❌ ERROR\nSemantic search failed: {e}"
+    except Exception as e:
+        return f"### ❌ ERROR\nSemantic search failed: {e}"
+
+    return _format_code_search_result(result)
+
+
+def _format_code_search_result(result: object) -> str:
+    """Normalize a ``code_search`` result (dict/list/str) into a display string."""
+    if isinstance(result, dict):
+        if result.get("success") is False:
+            return f"### ❌ ERROR\n{result.get('error', 'code search failed')}"
+        results = result.get("results") or result.get("matches") or result.get("output")
+        if isinstance(results, list):
+            out = []
+            for item in results:
+                if isinstance(item, dict):
+                    loc = item.get("file") or item.get("path") or item.get("location", "?")
+                    line = item.get("line", "")
+                    score = item.get("score")
+                    snippet = (item.get("content") or item.get("snippet") or "").strip()
+                    head = f"{loc}:{line}" if line else str(loc)
+                    if score is not None:
+                        head += f" (score: {score})"
+                    out.append(f"- {head}\n  {snippet}" if snippet else f"- {head}")
+                else:
+                    out.append(f"- {item}")
+            return "\n".join(out) if out else "No matches found."
+        return str(results) if results is not None else "No matches found."
+    if isinstance(result, list):
+        return "\n".join(f"- {item}" for item in result) or "No matches found."
+    return str(result)

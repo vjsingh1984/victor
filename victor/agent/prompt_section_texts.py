@@ -61,7 +61,7 @@ HEADLESS MODE: AUTOMATED EXECUTION
 - You are running in an automated, non-interactive environment (CI/CD or batch).
 - Favor autonomous decision-making. If an action is safe and necessary, perform it.
 - Do not ask for user confirmation for safe (read-only or LOW risk) operations.
-- Avoid using `grep` or `shell` search commands for project code; the `graph` and `code_search` tools are your primary architectural and semantic navigation tools.
+- Avoid raw `grep`/`shell` search for project code; use the unified surfaces: `code search "query" --mode semantic` (semantic navigation) and `code grep "query" path` (literal content search). Use `graph` for architectural/call-graph navigation.
 - If multiple paths are possible, select the most likely successful one based on codebase evidence.
 - Signal completion clearly when the objective is met or if a fatal error occurs.
 - Be extremely surgical and precise to avoid unnecessary file churn.
@@ -124,8 +124,9 @@ Do not assume content is missing from truncated output. Use offset/search to acc
 ASI_TOOL_EFFECTIVENESS_GUIDANCE = """
 TOOL EFFECTIVENESS:
 
-1. Search first, read second. Use code_search(query='...', mode='semantic') to locate relevant files, then read only specific files or segments after confirming relevance.
-   - Use mode='literal' only for exact known identifiers.
+1. Search first, read second. Use code search to locate relevant files, then read only specific files or segments after confirming relevance:
+   - Semantic: code(cmd='search "how auth works" --mode semantic')
+   - Literal: code(cmd='grep "def login" src') or code(cmd='search "login" --mode literal')
    - Do not browse files sequentially when a search can identify the target set.
 
 2. Verify paths before access. Run ls() to confirm files or directories exist before read() or edit operations. Use ls('.') to verify the working directory when path errors occur.

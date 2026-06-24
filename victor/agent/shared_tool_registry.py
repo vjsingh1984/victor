@@ -69,6 +69,14 @@ WEB_TOOL_NAMES: Set[str] = {
 # should not be advertised as separate default schemas. Keeping them out of the
 # registered/default catalog reduces prompt size and avoids cache churn from a
 # long tail of near-duplicate graph functions.
+#
+# NOTE: This set currently only affects the non-lazy full-discovery registration
+# path (``get_all_tools_for_registration``). The production lazy path
+# (``get_bootstrap_tools_for_registration``) and ``tool_selection`` do not yet
+# consult it, so it is not a general "hide from LLM schema" lever. True
+# advertisement-hiding for the granular primitives subsumed by the unified
+# command domains (fs/shell/git/web/code) is a follow-up that belongs at the
+# selection/schema-build layer.
 SCHEMA_HIDDEN_TOOL_NAMES: Set[str] = {
     "graph_analytics",
     "graph_dependencies",
@@ -85,6 +93,7 @@ SCHEMA_HIDDEN_TOOL_NAMES: Set[str] = {
 
 BOOTSTRAP_TOOL_SPECS: Dict[str, tuple[str, str]] = {
     "fs": ("victor.tools.unified.fs_tool", "fs_tool"),
+    "git": ("victor.tools.unified.git_tool", "git_tool"),
     "search": ("victor.tools.unified.search_tool", "search_tool"),
     "code": ("victor.tools.unified.code_tool", "code_tool"),
     "web": ("victor.tools.unified.web_tool", "web_tool"),

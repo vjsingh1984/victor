@@ -358,61 +358,93 @@ class UnifiedToolRegistry:
     ) -> List[str]:
         """Discover tools from a specific path.
 
+        Scans the module at ``path`` and, when it is a package, its immediate
+        submodules. Recursing into submodules means discovery does NOT depend on
+        ``__init__`` re-exports — those re-exports shadow the submodule object
+        with the tool function and break ``mock.patch`` on Python 3.10, so the
+        command tools are intentionally not re-exported.
+
         Args:
-            path: Module path (e.g., "victor.tools")
+            path: Module path (e.g., "victor.tools", "victor.tools.unified")
             airgapped: Filter web tools
 
         Returns:
             List of discovered tool names
         """
-        discovered = []
+        discovered: List[str] = []
 
-        # Import the module
         try:
             import importlib
+            import pkgutil
 
             module = importlib.import_module(path)
+            modules_to_scan = [module]
 
-            # Scan for decorated tool callables, BaseTool instances, and subclasses.
-            for member_name, obj in inspect.getmembers(module):
-                if callable(obj) and hasattr(obj, "Tool"):
-                    tool_name = obj.Tool.name
-
-                    if airgapped and tool_name in self._get_web_tools():
-                        continue
-
-                    await self.register(obj, enabled=True)
-                    discovered.append(tool_name)
-                elif isinstance(obj, BaseTool):
-                    tool_name = obj.name
-
-                    if airgapped and tool_name in self._get_web_tools():
-                        continue
-
-                    await self.register(obj, enabled=True)
-                    discovered.append(tool_name)
-                elif self._is_tool_class(obj):
+            # If this is a package, also scan its immediate submodules so the
+            # command tools (git_tool, fs_tool, ...) are found in their own
+            # modules without requiring __init__ re-exports.
+            if hasattr(module, "__path__"):
+                for _finder, sub_name, _is_pkg in pkgutil.iter_modules(module.__path__):
+                    sub_path = f"{path}.{sub_name}"
                     try:
-                        instance = obj()
-                        tool_name = instance.name
+                        modules_to_scan.append(importlib.import_module(sub_path))
+                    except Exception as e:  # optional deps / import errors
+                        logger.debug(f"Skipping submodule {sub_path}: {e}")
 
-                        # Skip web tools in airgapped mode
-                        if airgapped and tool_name in self._get_web_tools():
-                            continue
-
-                        await self.register(
-                            instance,
-                            enabled=True,
-                            # Metadata from class properties
-                        )
-
-                        discovered.append(tool_name)
-
-                    except Exception as e:
-                        logger.debug(f"Failed to instantiate {member_name}: {e}")
+            for mod in modules_to_scan:
+                discovered.extend(await self._scan_module_members(mod, airgapped))
 
         except Exception as e:
             logger.warning(f"Failed to discover tools from {path}: {e}")
+
+        return discovered
+
+    async def _scan_module_members(
+        self,
+        module: Any,
+        airgapped: bool = False,
+    ) -> List[str]:
+        """Register every tool defined directly in ``module``.
+
+        Args:
+            module: Already-imported module to scan.
+            airgapped: Filter web tools.
+
+        Returns:
+            List of tool names registered from this module.
+        """
+        discovered: List[str] = []
+
+        for member_name, obj in inspect.getmembers(module):
+            if callable(obj) and hasattr(obj, "Tool"):
+                tool_name = obj.Tool.name
+
+                if airgapped and tool_name in self._get_web_tools():
+                    continue
+
+                await self.register(obj, enabled=True)
+                discovered.append(tool_name)
+            elif isinstance(obj, BaseTool):
+                tool_name = obj.name
+
+                if airgapped and tool_name in self._get_web_tools():
+                    continue
+
+                await self.register(obj, enabled=True)
+                discovered.append(tool_name)
+            elif self._is_tool_class(obj):
+                try:
+                    instance = obj()
+                    tool_name = instance.name
+
+                    # Skip web tools in airgapped mode
+                    if airgapped and tool_name in self._get_web_tools():
+                        continue
+
+                    await self.register(instance, enabled=True)
+                    discovered.append(tool_name)
+                except Exception as e:
+                    logger.debug(f"Failed to instantiate {member_name}: {e}")
 
         return discovered
 

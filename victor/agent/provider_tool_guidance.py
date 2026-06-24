@@ -212,18 +212,28 @@ IMPORTANT - Tool Usage Guidelines:
 3. Prefer broad queries over multiple narrow ones
 4. Consolidate findings and synthesize before continuing exploration
 
-For git operations (status, diff, log, branch):
-- Use shell(cmd="git status", readonly=True) to check repository status
-- Use shell(cmd="git diff", readonly=True) to see uncommitted changes
-- Use shell(cmd="git log --oneline -10", readonly=True) to view commit history
-- Use git(operation="status") or git(operation="log") for git-specific operations
+For git operations (status, diff, log, branch, commit, push):
+- PREFER the unified ``git`` tool for version control, NOT raw shell git:
+  • git(cmd="status")  /  git(cmd="diff")  /  git(cmd="diff --staged")
+  • git(cmd="log -n 10")  /  git(cmd="stage <files>")  /  git(cmd="commit -m \\"msg\\"")
+  • git(cmd="commit --ai") to auto-generate a commit message
+  • git(cmd="push origin <branch>")
+- It delegates to the richer git implementation (AI commit messages, conflict
+  analysis, PRs) when available and falls back to plain ``git`` otherwise.
+- Reserve ``shell`` for ad-hoc git plumbing the ``git`` tool does not cover.
 
 For executing shell commands:
-- shell() defaults to readonly=True for safe inspection commands (ls, cat, grep, git status, etc.)
+- shell() defaults to readonly=True for safe inspection commands (ls, cat, etc.)
 - When the task involves file modifications, content creation, or consolidation:
   • Use shell(cmd=..., readonly=False) for commands that write files (>, >>, tee, etc.)
-  • Use write() and edit() tools for direct file modifications
+  • Use the unified ``fs`` tool (fs write / fs edit / fs patch) for direct file
+    modifications; prefer it over shell redirection.
 - Use dangerous=True only for genuinely destructive commands such as rm or kill
+
+Code & file search:
+- Use ``code grep "query" path`` for literal content search (add --regex / -C).
+- Use ``code search "query" --mode semantic`` for semantic code search.
+- Use ``fs search "pattern" path`` to find files by name.
 """
 
         if task_type == "simple":

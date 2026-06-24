@@ -9,8 +9,8 @@ class TestToolNameResolution:
 
     def test_explicit_name_resolves_to_canonical(self):
         """When an explicit name is provided that has an alias, it should resolve to canonical."""
-        # "search" is an alias for "code_search" in TOOL_ALIASES
-        result = _resolve_tool_name("search_tool", "search")
+        # "semantic_code_search" is an alias for "code_search" in TOOL_ALIASES
+        result = _resolve_tool_name("code_search_tool", "semantic_code_search")
         assert result == "code_search", f"Expected 'code_search', got '{result}'"
 
     def test_function_name_resolves_to_canonical(self):
@@ -59,14 +59,18 @@ class TestToolNameConsistency:
     """Tests for consistency between tool registration and LLM-facing names."""
 
     def test_search_tool_has_canonical_name(self):
-        """Verify the search tool is registered with canonical name 'code_search'."""
+        """Verify the search tool is registered with its canonical name 'search'.
+
+        ``search`` is its own canonical name in TOOL_ALIASES (``"search" ->
+        ToolNames.SEARCH``). It is NOT an alias of ``code_search``; the two are
+        distinct surfaces. The ``search`` domain is being retired into a
+        back-compat shim, but it keeps its canonical name while it exists.
+        """
         from victor.tools.unified.search_tool import search_tool
 
-        # The tool should be registered as "code_search" (canonical)
-        # not "search" (alias)
         # Access via .Tool property (the tool instance)
-        assert search_tool.Tool.name == "code_search", (
-            f"Tool name should be 'code_search' (canonical), " f"but got '{search_tool.Tool.name}'"
+        assert search_tool.Tool.name == "search", (
+            f"Tool name should be 'search' (canonical), but got '{search_tool.Tool.name}'"
         )
 
     def test_search_tool_json_schema_has_canonical_name(self):
@@ -74,9 +78,9 @@ class TestToolNameConsistency:
         from victor.tools.unified.search_tool import search_tool
 
         schema = search_tool.Tool.to_json_schema()
-        # Schema structure: {"type": "function", "function": {"name": "code_search", ...}}
+        # Schema structure: {"type": "function", "function": {"name": "search", ...}}
         function_schema = schema.get("function", schema)  # Handle both formats
-        assert function_schema["name"] == "code_search", (
-            f"Schema name should be 'code_search' (canonical), "
+        assert function_schema["name"] == "search", (
+            f"Schema name should be 'search' (canonical), "
             f"but got '{function_schema.get('name')}'"
         )

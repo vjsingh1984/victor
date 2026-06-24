@@ -47,6 +47,13 @@ class ToolNames:
     OVERVIEW = "overview"
     SCAFFOLD = "scaffold"
 
+    # Unified command-shell domains (bash-style `domain action args`).
+    # These are the primary LLM-facing tools; granular primitives above are
+    # the implementations behind them (schema-hidden but still callable).
+    FS = "fs"
+    CODE = "code"
+    WEB = "web"
+
     # Coding Vertical Specific (To be migrated)
     SYMBOL = "symbol"
     REFS = "refs"
