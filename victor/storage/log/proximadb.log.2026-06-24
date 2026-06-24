@@ -1113,3 +1113,21 @@
 2026-06-24T14:06:47.702842Z DEBUG proximadb::services::collection::manager: src/services/collection/manager.rs:1291: 📋 Listing all collections
 2026-06-24T14:06:47.727583Z  INFO proximadb::query::rl_planner::bandit: src/query/rl_planner/bandit.rs:428: Saved RL planner state to /Users/vijaysingh/code/codingagent/victor/storage/test_dod_data/rl_policy.json
 2026-06-24T14:06:47.800282Z DEBUG proximadb::services::collection::manager: src/services/collection/manager.rs:1291: 📋 Listing all collections
+2026-06-24T14:07:47.803074Z DEBUG proximadb::services::collection::manager: src/services/collection/manager.rs:1291: 📋 Listing all collections
+2026-06-24T14:08:47.806008Z DEBUG proximadb::services::collection::manager: src/services/collection/manager.rs:1291: 📋 Listing all collections
+2026-06-24T14:09:47.812618Z DEBUG proximadb::services::collection::manager: src/services/collection/manager.rs:1291: 📋 Listing all collections
+2026-06-24T14:10:47.817002Z DEBUG proximadb::services::collection::manager: src/services/collection/manager.rs:1291: 📋 Listing all collections
+2026-06-24T14:11:46.982120Z  INFO proximadb::storage::cache::orchestrator: src/storage/cache/orchestrator.rs:1161: Starting periodic cache memory rebalancing
+2026-06-24T14:11:46.982472Z DEBUG proximadb::storage::cache::orchestrator: src/storage/cache/orchestrator.rs:1167: Cache memory rebalancing completed successfully
+2026-06-24T14:11:47.706875Z DEBUG proximadb::services::collection::manager: src/services/collection/manager.rs:1291: 📋 Listing all collections
+2026-06-24T14:11:47.730766Z  INFO proximadb::query::rl_planner::bandit: src/query/rl_planner/bandit.rs:428: Saved RL planner state to /Users/vijaysingh/code/codingagent/victor/storage/test_dod_data/rl_policy.json
+2026-06-24T14:11:47.819994Z DEBUG proximadb::services::collection::manager: src/services/collection/manager.rs:1291: 📋 Listing all collections
+2026-06-24T14:12:47.824128Z DEBUG proximadb::services::collection::manager: src/services/collection/manager.rs:1291: 📋 Listing all collections
+2026-06-24T14:13:47.827739Z DEBUG proximadb::services::collection::manager: src/services/collection/manager.rs:1291: 📋 Listing all collections
+2026-06-24T14:14:47.830359Z DEBUG proximadb::services::collection::manager: src/services/collection/manager.rs:1291: 📋 Listing all collections
+2026-06-24T14:15:47.833033Z DEBUG proximadb::services::collection::manager: src/services/collection/manager.rs:1291: 📋 Listing all collections
+2026-06-24T14:16:46.983688Z  INFO proximadb::storage::cache::orchestrator: src/storage/cache/orchestrator.rs:1161: Starting periodic cache memory rebalancing
+2026-06-24T14:16:46.983774Z DEBUG proximadb::storage::cache::orchestrator: src/storage/cache/orchestrator.rs:1167: Cache memory rebalancing completed successfully
+2026-06-24T14:16:47.710879Z DEBUG proximadb::services::collection::manager: src/services/collection/manager.rs:1291: 📋 Listing all collections
+2026-06-24T14:16:47.731659Z  INFO proximadb::query::rl_planner::bandit: src/query/rl_planner/bandit.rs:428: Saved RL planner state to /Users/vijaysingh/code/codingagent/victor/storage/test_dod_data/rl_policy.json
+2026-06-24T14:16:47.834511Z DEBUG proximadb::services::collection::manager: src/services/collection/manager.rs:1291: 📋 Listing all collections
