@@ -107,6 +107,27 @@ FOLDED_TOOLS: dict[str, ToolFold] = {
     "mcp": ToolFold(
         target="mcp_bridge", hint="Use mcp_bridge to access Model Context Protocol specific tools."
     ),
+    # Unified command-domain folds: granular primitives represented by the
+    # fs/web/code bash-style surfaces. Folded tools stay REGISTERED and
+    # EXECUTABLE (callable) — they are only removed from the default advertised
+    # schema so the LLM is offered the cleaner `fs`/`web`/`code` domains.
+    "read": ToolFold(target="fs", hint="Use fs cat <path> to read file contents."),
+    "write": ToolFold(target="fs", hint="Use fs write <path> -c <content> to write files."),
+    "ls": ToolFold(target="fs", hint="Use fs ls <path> to list a directory."),
+    "edit": ToolFold(
+        target="fs",
+        hint="Use fs edit <path> --old/--new (or --ops JSON) for atomic edits with undo.",
+    ),
+    "find": ToolFold(target="fs", hint="Use fs search <pattern> <path> to find files by name."),
+    "web_search": ToolFold(target="web", hint="Use web search <query> for web search."),
+    "web_fetch": ToolFold(target="web", hint="Use web fetch <url> to fetch a URL as markdown."),
+    "search": ToolFold(
+        target="code",
+        hint=(
+            "Deprecated. Use code grep <query> <path> for content search and "
+            "fs search <pattern> <path> for file-name search."
+        ),
+    ),
 }
 
 
