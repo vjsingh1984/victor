@@ -37,42 +37,32 @@ class ToolFold:
 FOLDED_TOOLS: dict[str, ToolFold] = {
     # Shell folds
     "database": ToolFold(
-        target="shell",
-        hint=(
-            "Use shell with sqlite3/psql/mysql for quick database inspection " "and SQL queries."
-        ),
+        target="db",
+        hint="Use db query/tables/schema/describe for SQL and database inspection.",
     ),
     "dependency": ToolFold(
         target="shell",
         hint="Use shell with pip, pipdeptree, uv, poetry, npm, cargo, or equivalent package CLIs.",
-    ),
-    "docker": ToolFold(
-        target="shell",
-        hint="Use shell with docker/docker compose for container, image, log, build, and run commands.",
     ),
     "test": ToolFold(
         target="shell",
         hint="Use shell with pytest, npm test, cargo test, go test, make test, or project test CLIs.",
     ),
     "rag_ingest": ToolFold(
-        target="shell",
-        hint="Use shell to execute scripts or CLI tools for knowledge base ingestion, similar to SQL/db tools.",
+        target="rag",
+        hint="Use rag ingest --path/--url/--content to ingest into the knowledge base.",
     ),
     "rag_query": ToolFold(
-        target="shell", hint="Use shell to execute scripts for querying the knowledge base."
+        target="rag", hint='Use rag query "<question>" to query the knowledge base.'
     ),
     "rag_search": ToolFold(
-        target="shell", hint="Use shell to execute scripts for searching the knowledge base."
+        target="rag", hint='Use rag search "<query>" to search the knowledge base.'
     ),
-    "rag_list": ToolFold(
-        target="shell", hint="Use shell to execute scripts for listing the knowledge base."
-    ),
+    "rag_list": ToolFold(target="rag", hint="Use rag list to list knowledge-base documents."),
     "rag_delete": ToolFold(
-        target="shell", hint="Use shell to execute scripts for modifying the knowledge base."
+        target="rag", hint="Use rag delete <doc_id> to remove a knowledge-base document."
     ),
-    "rag_stats": ToolFold(
-        target="shell", hint="Use shell to execute scripts for getting stats of the knowledge base."
-    ),
+    "rag_stats": ToolFold(target="rag", hint="Use rag stats for knowledge-base statistics."),
     "rename": ToolFold(
         target="shell",
         hint="Use shell with standard tools (sed, fastmod) or fs edit/patch for renaming symbols.",
