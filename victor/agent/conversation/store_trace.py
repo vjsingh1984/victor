@@ -280,13 +280,21 @@ class ConversationStoreTrace:
 
         # Semantic embedding search if available
         if has_embeddings:
+            semantic_results = []  # Initialize for exception handler
             try:
-                semantic_results = await embedding_store.asearch_relevant_messages(
-                    session_id=session_id,
+                hits = await embedding_store.search_similar(
                     query=query,
+                    session_id=session_id,
                     limit=semantic_limit,
                     min_similarity=min_similarity,
                 )
+                # Build message lookup from session
+                message_by_id = {msg.id: msg for msg in session.messages}
+                # Convert hits (message_id, similarity) to (ConversationMessage, similarity)
+                for hit in hits:
+                    msg = message_by_id.get(hit.message_id)
+                    if msg:
+                        semantic_results.append((msg, hit.similarity))
             except Exception as e:
                 logger.warning(f"Embedding search failed, using empty results: {e}")
                 semantic_results = []
