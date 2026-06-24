@@ -37,18 +37,12 @@ class ToolFold:
 FOLDED_TOOLS: dict[str, ToolFold] = {
     # Shell folds
     "database": ToolFold(
-        target="shell",
-        hint=(
-            "Use shell with sqlite3/psql/mysql for quick database inspection " "and SQL queries."
-        ),
+        target="db",
+        hint="Use db query/tables/schema/describe for SQL and database inspection.",
     ),
     "dependency": ToolFold(
         target="shell",
         hint="Use shell with pip, pipdeptree, uv, poetry, npm, cargo, or equivalent package CLIs.",
-    ),
-    "docker": ToolFold(
-        target="shell",
-        hint="Use shell with docker/docker compose for container, image, log, build, and run commands.",
     ),
     "test": ToolFold(
         target="shell",

@@ -90,7 +90,7 @@ verticals:
       - shell
     vertical_tools:
       - python_repl
-      - database
+      - db
       - visualization
       - analyze
     semantic_pool:

@@ -36,16 +36,16 @@ class _NamedTool(BaseTool):
 def test_folded_tools_are_hidden_from_default_enabled_advertisements() -> None:
     registry = ToolRegistry()
     registry.register(_NamedTool("shell"))
-    registry.register(_NamedTool("docker"))
+    registry.register(_NamedTool("test"))
 
     assert [tool.name for tool in registry.list_tools()] == ["shell"]
     assert [tool.name for tool in registry.list_tools(include_folded=True)] == [
         "shell",
-        "docker",
+        "test",
     ]
     assert [tool.name for tool in registry.list_tools(only_enabled=False)] == [
         "shell",
-        "docker",
+        "test",
     ]
 
 
@@ -79,11 +79,11 @@ def test_shell_description_includes_folded_tool_guidance() -> None:
 
     description = shell.Tool.description
 
-    assert is_folded_tool("docker")
+    # `docker` is now its own DevOps domain (advertised via vertical_tools.yaml),
+    # and `database` folds into the `db` domain — so neither is in the shell set.
+    assert not is_folded_tool("docker")
     assert folded_tool_names_for_target("shell") == [
-        "database",
         "dependency",
-        "docker",
         "extract",
         "inline",
         "organize_imports",
@@ -98,8 +98,8 @@ def test_shell_description_includes_folded_tool_guidance() -> None:
         "scaffold",
         "test",
     ]
+    assert folded_tool_names_for_target("db") == ["database"]
     assert "Folded tool guidance:" in description
-    assert "docker:" in description
     assert "pytest" in description
 
 
