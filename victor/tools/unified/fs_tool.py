@@ -20,13 +20,14 @@ operations (read, write, list) via a single entrypoint using bash-like syntax
 """
 
 import argparse
+import json
 from pathlib import Path
 import sys
 from io import StringIO
 
 from victor.tools.base import AccessMode, DangerLevel, ExecutionCategory, Priority
 from victor.tools.decorators import tool
-from victor.tools.filesystem import read, write, ls
+from victor.tools.filesystem import find, read, write, ls
 
 
 class UnifiedFsParser(argparse.ArgumentParser):
@@ -62,6 +63,29 @@ def create_fs_parser() -> UnifiedFsParser:
     patch_parser.add_argument("path", help="Path to the file")
     patch_parser.add_argument("--search", required=True, help="Text to search for")
     patch_parser.add_argument("--replace", required=True, help="Text to replace with")
+
+    # `edit` subcommand — delegates to the structured edit() tool (atomic, undoable)
+    edit_parser = subparsers.add_parser("edit", help="Edit files atomically with undo")
+    edit_parser.add_argument("path", help="Path to the file")
+    edit_parser.add_argument("--old", default=None, help="Text to find (replace op)")
+    edit_parser.add_argument("--new", default=None, help="Replacement text (replace op)")
+    edit_parser.add_argument(
+        "--ops",
+        default=None,
+        help="Raw JSON ops list for advanced multi-op edits",
+    )
+
+    # `search` subcommand — find files by name/metadata (delegates to find())
+    search_parser = subparsers.add_parser("search", help="Find files by name pattern")
+    search_parser.add_argument("pattern", help="Glob pattern (e.g. *.py, *_tool.py)")
+    search_parser.add_argument("path", nargs="?", default=".", help="Root directory")
+    search_parser.add_argument(
+        "--type",
+        choices=["file", "dir", "all"],
+        default="all",
+        help="Restrict to files or directories (default: all)",
+    )
+    search_parser.add_argument("--limit", type=int, default=50, help="Max results")
 
     return parser
 
@@ -148,6 +172,12 @@ async def fs_tool(cmd: str) -> str:
         except Exception as e:
             return f"### ❌ ERROR\nPatch failed: {e}\n\n### 💡 SYSTEM HINT\nUse `fs cat {parsed_args.path}` to refresh your view of the code before editing."
 
+    elif parsed_args.subcommand == "edit":
+        return await _fs_edit(parsed_args)
+
+    elif parsed_args.subcommand == "search":
+        return await _fs_search(parsed_args)
+
     else:
         # Provide help if no subcommand is recognized
         old_stdout = sys.stdout
@@ -155,3 +185,72 @@ async def fs_tool(cmd: str) -> str:
         parser.print_help()
         sys.stdout = old_stdout
         return f"### ❌ ERROR\nInvalid subcommand '{parsed_args.subcommand}'.\n\n```text\n{capture.getvalue()}```"
+
+
+async def _fs_edit(parsed_args) -> str:
+    """``fs edit`` — delegate to the structured, atomic ``edit()`` tool."""
+    from victor.tools.file_editor_tool import edit
+
+    if parsed_args.ops:
+        try:
+            ops = json.loads(parsed_args.ops)
+        except json.JSONDecodeError as e:
+            return f"### ❌ ERROR\n--ops must be a valid JSON list: {e}"
+    else:
+        if parsed_args.old is None or parsed_args.new is None:
+            return (
+                "### ❌ ERROR\nfs edit requires --old/--new (replace) or --ops (JSON). "
+                "Example: fs edit path.py --old 'DEBUG = True' --new 'DEBUG = False'"
+            )
+        ops = [
+            {
+                "type": "replace",
+                "path": parsed_args.path,
+                "old_str": parsed_args.old,
+                "new_str": parsed_args.new,
+            }
+        ]
+
+    try:
+        result = await edit(ops=ops)
+    except Exception as e:
+        return f"### ❌ ERROR\nEdit failed: {e}"
+
+    if isinstance(result, dict):
+        if result.get("success") is False:
+            return f"### ❌ ERROR\n{result.get('error', 'edit failed')}"
+        # Surface a compact summary; the structured tool returns rich details.
+        summary = result.get("summary") or result.get("message") or "Edit applied."
+        changed = result.get("changed_files") or result.get("files") or []
+        if changed:
+            return f"{summary}\nChanged: {', '.join(map(str, changed))}"
+        return str(summary)
+    return str(result)
+
+
+async def _fs_search(parsed_args) -> str:
+    """``fs search`` — find files by name/metadata via the granular ``find()``."""
+    try:
+        results = await find(
+            name=parsed_args.pattern,
+            path=parsed_args.path,
+            type=parsed_args.type,
+            limit=parsed_args.limit,
+        )
+    except Exception as e:
+        return f"### ❌ ERROR\nSearch failed: {e}"
+
+    if not isinstance(results, list):
+        return str(results)
+    if not results:
+        return f"No files matching '{parsed_args.pattern}' under {parsed_args.path}."
+
+    out = [f"Found {len(results)} match(es) for '{parsed_args.pattern}':"]
+    for item in results:
+        if isinstance(item, dict):
+            p = item.get("path") or item.get("name", "")
+            t = item.get("type", "")
+            out.append(f"- [{t}] {p}" if t else f"- {p}")
+        else:
+            out.append(f"- {item}")
+    return "\n".join(out)

@@ -1,56 +1,61 @@
-import pytest
-from unittest.mock import patch, AsyncMock
-import argparse
+import warnings
+from unittest.mock import AsyncMock, patch
 
-# We will create this module in the next step
+import pytest
+
 from victor.tools.unified.search_tool import search_tool
 
 
 @pytest.mark.asyncio
-async def test_search_tool_grep():
-    """Test `search grep` subcommand."""
-    with patch("victor.tools.unified.search_tool.grep_search", new_callable=AsyncMock) as mock_grep:
-        mock_grep.return_value = [
-            {"file": "app.py", "line": 10, "content": "def foo():"},
-            {"file": "app.py", "line": 12, "content": "    return 'bar'"},
-        ]
+async def test_search_grep_forwards_to_code_grep():
+    """``search grep`` is a shim that forwards to ``code grep``."""
+    mock_code = AsyncMock(return_value="code-grep-output")
+    with patch("victor.tools.unified.code_tool.code_tool", mock_code):
+        result = await search_tool('search grep "def foo" app.py --case-sensitive')
 
-        result = await search_tool('search grep "def foo" app.py')
-
-        mock_grep.assert_called_once_with(
-            query="def foo", path="app.py", regex=False, case_sensitive=False
-        )
-        assert "app.py:10: def foo():" in result
+    mock_code.assert_awaited_once()
+    forwarded = mock_code.call_args.args[0]
+    assert forwarded.startswith("code grep")
+    assert "def foo" in forwarded
+    assert "app.py" in forwarded
+    assert result == "code-grep-output"
 
 
 @pytest.mark.asyncio
-async def test_search_tool_grep_truncation_hint():
-    """Test truncation hints for huge grep results."""
-    with patch("victor.tools.unified.search_tool.grep_search", new_callable=AsyncMock) as mock_grep:
-        # Create 150 fake matches
-        mock_grep.return_value = [
-            {"file": f"file{i}.py", "line": 1, "content": "foo"} for i in range(150)
-        ]
+async def test_search_files_forwards_to_fs_search():
+    """``search files`` is a shim that forwards to ``fs search``."""
+    mock_fs = AsyncMock(return_value="fs-search-output")
+    with patch("victor.tools.unified.fs_tool.fs_tool", mock_fs):
+        result = await search_tool('search files "*.py" src')
 
-        result = await search_tool('search grep "foo" .')
-
-        assert "### 💡 SYSTEM HINT" in result
-        assert "Too many matches" in result
-        # Ensure it truncated the output
-        assert result.count("foo") < 150
+    mock_fs.assert_awaited_once()
+    forwarded = mock_fs.call_args.args[0]
+    assert forwarded.startswith("fs search")
+    assert "*.py" in forwarded
+    assert "src" in forwarded
+    assert result == "fs-search-output"
 
 
 @pytest.mark.asyncio
-async def test_search_tool_files():
-    """Test `search files` subcommand."""
-    with patch("victor.tools.unified.search_tool.find", new_callable=AsyncMock) as mock_find:
-        mock_find.return_value = [
-            {"path": "src/app.py", "type": "file", "size": "10KB"},
-            {"path": "tests/test_app.py", "type": "file", "size": "2KB"},
-        ]
+async def test_search_emits_deprecation_warning():
+    """Calling the deprecated tool emits a DeprecationWarning."""
+    with patch("victor.tools.unified.code_tool.code_tool", AsyncMock(return_value="ok")):
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            await search_tool('search grep "x" .')
 
-        result = await search_tool('search files "*.py" .')
+    assert any(issubclass(w.category, DeprecationWarning) for w in caught)
 
-        mock_find.assert_called_once_with(name="*.py", path=".")
-        assert "src/app.py" in result
-        assert "tests/test_app.py" in result
+
+@pytest.mark.asyncio
+async def test_search_unknown_subcommand_returns_error():
+    result = await search_tool("search frobnicate")
+    assert "### ❌ ERROR" in result
+    assert "Unknown search subcommand" in result
+
+
+@pytest.mark.asyncio
+async def test_search_no_subcommand_returns_error():
+    result = await search_tool("search")
+    assert "### ❌ ERROR" in result
+    assert "deprecated" in result
