@@ -60,15 +60,20 @@ class TestCodeIntelligencePrewarm:
         fake_graph_store.stats = AsyncMock(return_value={"nodes": 12, "edges": 34})
         fake_index = MagicMock(graph_store=fake_graph_store)
 
-        async def fake_get_or_build_index(*args, **kwargs):
-            return fake_index, False
+        # Patch the capability loader seam that production actually uses.
+        # Production resolves the index builder via load_code_search_module()
+        # (victor-coding or the contrib vertical), NOT via
+        # victor.tools.code_search_tool directly, so patching that module's
+        # _get_or_build_index was inert whenever a different module resolved.
+        fake_module = MagicMock()
+        fake_module._get_or_build_index = AsyncMock(return_value=(fake_index, False))
 
         with (
             patch("victor.config.settings.load_settings", return_value=MagicMock()),
             patch(
-                "victor.tools.code_search_tool._get_or_build_index",
-                side_effect=fake_get_or_build_index,
-            ) as mock_get,
+                "victor.core.utils.capability_loader.load_code_search_module",
+                return_value=fake_module,
+            ),
         ):
             first = await _prewarm_code_intelligence_index(tmp_path, warmed, timeout=1.0)
             second = await _prewarm_code_intelligence_index(tmp_path, warmed, timeout=1.0)
@@ -78,7 +83,7 @@ class TestCodeIntelligencePrewarm:
         assert first.graph_edges == 34
         assert second.cached_hit is True
         assert second.status == "ready"
-        assert mock_get.call_count == 1
+        assert fake_module._get_or_build_index.call_count == 1
 
     @pytest.mark.asyncio
     async def test_prewarm_failure_is_cached_for_repo(self, tmp_path: Path):
@@ -86,15 +91,19 @@ class TestCodeIntelligencePrewarm:
 
         warmed = {}
 
-        async def fake_get_or_build_index(*args, **kwargs):
-            raise RuntimeError("missing embedding dependency")
+        # See test_prewarm_success_caches_graph_stats: patch the loader seam,
+        # not the (resolution-dependent) module attribute.
+        fake_module = MagicMock()
+        fake_module._get_or_build_index = AsyncMock(
+            side_effect=RuntimeError("missing embedding dependency")
+        )
 
         with (
             patch("victor.config.settings.load_settings", return_value=MagicMock()),
             patch(
-                "victor.tools.code_search_tool._get_or_build_index",
-                side_effect=fake_get_or_build_index,
-            ) as mock_get,
+                "victor.core.utils.capability_loader.load_code_search_module",
+                return_value=fake_module,
+            ),
         ):
             first = await _prewarm_code_intelligence_index(tmp_path, warmed, timeout=1.0)
             second = await _prewarm_code_intelligence_index(tmp_path, warmed, timeout=1.0)
@@ -103,7 +112,7 @@ class TestCodeIntelligencePrewarm:
         assert "missing embedding dependency" in first.message
         assert second.cached_hit is True
         assert second.status == "failed"
-        assert mock_get.call_count == 1
+        assert fake_module._get_or_build_index.call_count == 1
 
 
 class TestBenchmarkRuntimeReadiness:
