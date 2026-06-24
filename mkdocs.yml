@@ -54,7 +54,6 @@ plugins:
           paths: [.]
           # Static analysis only (griffe parses source) — the docs build never imports victor, so
           # CI needs no heavy runtime deps (torch etc.) and there are no import side effects.
-          allow_inspection: false
           options:
             docstring_style: google
             show_source: false
