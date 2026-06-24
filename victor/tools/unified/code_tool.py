@@ -220,7 +220,9 @@ async def _code_search(parsed_args) -> str:
     from victor.tools.unified._vertical_resolver import resolve_vertical_callable
 
     search_fn, _src = resolve_vertical_callable(
-        "victor_coding.tools.code_search_tool", "code_search"
+        "code_search",
+        fallback_module="victor_coding.tools.code_search_tool",
+        fallback_attr="code_search",
     )
     if search_fn is None:
         # No semantic backend available — degrade to literal with a hint.
