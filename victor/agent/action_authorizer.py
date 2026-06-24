@@ -693,7 +693,7 @@ IMPORTANT: The user wants to SEE code, not save it to a file.
 """,
     ActionIntent.READ_ONLY: """
 IMPORTANT: This is a read-only query.
-- Only use read operations (read, ls, code_search)
+- Only use read operations (read, ls, grep)
 - Be concise and answer directly
 - Do NOT ask follow-up questions - just provide the information requested
 - Do NOT write, create, or modify any files

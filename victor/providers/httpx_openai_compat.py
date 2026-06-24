@@ -306,6 +306,39 @@ class HttpxOpenAICompatProvider(BaseProvider):
                         msg.get("name", ""),
                     )
 
+        # System prompt visibility: log the full payload shape (tool names + system
+        # message) at INFO so the actual offer the model receives is auditable in the
+        # session log. This is the single source of truth for "what the LLM sees"
+        # before the API call — critical for diagnosing tool-description/registry
+        # drift (e.g. a stale tool like `code_search` being advertised).
+        offered_tool_names = []
+        if effective_tools:
+            for _tool in effective_tools:
+                # ToolDefinition may expose name directly or via .function.name
+                _tname = getattr(_tool, "name", None)
+                if _tname is None:
+                    _tname = getattr(getattr(_tool, "function", None), "name", None)
+                if _tname:
+                    offered_tool_names.append(_tname)
+
+        _sys_preview = ""
+        for _msg in formatted:
+            if _msg.get("role") == "system":
+                _content = _msg.get("content", "") or ""
+                _sys_preview = _content[:160].replace("\n", " ")
+                break
+
+        self._provider_logger.logger.info(
+            "%s payload: model=%s messages=%d tools=%d stream=%s "
+            "tool_names=%s system_prompt_preview=%r",
+            self.name,
+            model,
+            len(formatted),
+            len(effective_tools),
+            stream,
+            offered_tool_names,
+            _sys_preview,
+        )
         self._provider_logger.logger.debug(
             "%s payload: model=%s messages=%d tools=%s stream=%s",
             self.name,
