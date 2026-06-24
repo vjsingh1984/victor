@@ -37,7 +37,8 @@ class TestToolNecessityGate:
         from victor.agent.orchestrator import AgentOrchestrator
 
         orch = MagicMock(spec=AgentOrchestrator)
-        # Bind the real methods
+        # Bind the real methods (include _tool_skip_mode since it's called by _should_skip_tools_for_turn)
+        orch._tool_skip_mode = AgentOrchestrator._tool_skip_mode.__get__(orch)
         orch._should_skip_tools_for_turn = AgentOrchestrator._should_skip_tools_for_turn.__get__(
             orch
         )
@@ -47,6 +48,7 @@ class TestToolNecessityGate:
         # Copy class-level frozensets and tuples
         orch._TOOL_SIGNAL_KEYWORDS = AgentOrchestrator._TOOL_SIGNAL_KEYWORDS
         orch._QA_SIGNAL_PATTERNS = AgentOrchestrator._QA_SIGNAL_PATTERNS
+        orch._CONTINUATION_TOKENS = AgentOrchestrator._CONTINUATION_TOKENS
         orch._container = overrides.get("container", None)
         return orch
 

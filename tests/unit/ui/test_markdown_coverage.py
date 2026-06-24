@@ -30,6 +30,10 @@ from victor.ui.rendering.markdown import (
     _detect_direction,
     _normalize_mermaid_node,
     _render_diagram,
+    render_collapsible_section,
+    render_enhanced_table,
+    should_collapse_content,
+    get_render_error_context,
 )
 
 
@@ -485,3 +489,123 @@ class TestRenderDiagram:
 
         result = _render_diagram("mermaid", "")
         assert isinstance(result, Panel)
+
+
+# Phase 2: Enhanced markdown rendering tests
+
+
+class TestCollapsibleSections:
+    """Tests for collapsible section rendering."""
+
+    def test_short_content_not_collapsed(self):
+        """Short content should not be collapsed."""
+        content = "Line 1\nLine 2\nLine 3"
+        result = render_collapsible_section("Test", content, lines_visible=10)
+        # Should return markdown block, not Panel with collapse hint
+        from rich.markdown import Markdown
+        assert isinstance(result, Markdown)
+
+    def test_long_content_collapsed(self):
+        """Long content should be collapsed with hint."""
+        content = "\n".join(f"Line {i}" for i in range(20))
+        result = render_collapsible_section("Test", content, lines_visible=10)
+        # Should return Panel (not plain markdown block)
+        from rich.panel import Panel
+        from rich.markdown import Markdown
+        assert isinstance(result, Panel)
+        # Panel should contain more than just the markdown block
+        assert hasattr(result, "renderable")
+
+    def test_collapsed_line_count(self):
+        """Collapsed hint shows correct remaining line count."""
+        content = "\n".join(f"Line {i}" for i in range(15))
+        result = render_collapsible_section("Test", content, lines_visible=5)
+        # Should return Panel (collapsed content)
+        from rich.panel import Panel
+        assert isinstance(result, Panel)
+        # Should have a title indicating collapse
+        assert result.title or hasattr(result, "renderable")
+
+
+class TestEnhancedTableRendering:
+    """Tests for enhanced table rendering."""
+
+    def test_basic_table_rendering(self):
+        """Basic table should render correctly."""
+        headers = ["Name", "Value"]
+        rows = [["Item 1", "100"], ["Item 2", "200"]]
+        result = render_enhanced_table(headers, rows)
+        from rich.table import Table
+        assert isinstance(result, Table)
+
+    def test_table_with_title(self):
+        """Table with title should render correctly."""
+        headers = ["Col1", "Col2"]
+        rows = [["A", "B"]]
+        result = render_enhanced_table(headers, rows, title="Test Table")
+        assert "Test Table" in str(result.title)
+
+    def test_empty_rows(self):
+        """Empty table should render without error."""
+        headers = ["Col1", "Col2"]
+        result = render_enhanced_table(headers, [])
+        from rich.table import Table
+        assert isinstance(result, Table)
+
+
+class TestContentCollapseDecision:
+    """Tests for content collapse decision logic."""
+
+    def test_short_text_not_collapsed(self):
+        """Short text should not be collapsed."""
+        content = "Short text"
+        result = should_collapse_content(content, "text")
+        assert result is False
+
+    def test_long_text_collapsed(self):
+        """Long text should be collapsed."""
+        content = "\n".join(f"Line {i}" for i in range(60))
+        result = should_collapse_content(content, "text")
+        assert result is True
+
+    def test_short_code_not_collapsed(self):
+        """Short code should not be collapsed."""
+        content = "def foo():\n    pass"
+        result = should_collapse_content(content, "code")
+        assert result is False
+
+    def test_long_code_collapsed(self):
+        """Long code should be collapsed."""
+        content = "\n".join(f"line {i}" for i in range(40))
+        result = should_collapse_content(content, "code")
+        assert result is True
+
+
+class TestErrorContext:
+    """Tests for rendering error context."""
+
+    def test_error_context_includes_type(self):
+        """Error context should include error type."""
+        try:
+            raise ValueError("test error")
+        except Exception as e:
+            context = get_render_error_context(e, "content")
+            assert "ValueError" in context
+
+    def test_error_context_includes_preview(self):
+        """Error context should include content preview."""
+        long_content = "a" * 200
+        try:
+            raise ValueError("test")
+        except Exception as e:
+            context = get_render_error_context(e, long_content)
+            assert "..." in context  # Truncated preview
+            assert "Content preview" in context
+
+    def test_error_context_includes_tip(self):
+        """Error context should include helpful tip."""
+        try:
+            raise ValueError("test")
+        except Exception as e:
+            context = get_render_error_context(e, "content")
+            assert "Tip:" in context

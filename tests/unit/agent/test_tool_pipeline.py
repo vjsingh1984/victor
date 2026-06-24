@@ -207,10 +207,13 @@ class TestExecuteToolCalls:
             execution_time=0.01,
         )
 
+        # Patch load_code_search_module at the source to return a mock with mark_index_cache_stale_for_path
+        mock_module = MagicMock()
+        mock_module.mark_index_cache_stale_for_path = MagicMock(return_value=2)
         with patch(
-            "victor.tools.code_search_tool.mark_index_cache_stale_for_path",
-            return_value=2,
-        ) as mark_stale:
+            "victor.core.utils.capability_loader.load_code_search_module",
+            return_value=mock_module,
+        ):
             await pipeline.execute_tool_calls(
                 [
                     {
@@ -220,7 +223,7 @@ class TestExecuteToolCalls:
                 ]
             )
 
-        mark_stale.assert_called_once()
+        mock_module.mark_index_cache_stale_for_path.assert_called_once()
 
     async def test_duplicate_read_sets_structured_skip_metadata(self, pipeline):
         with patch.object(pipeline, "_is_duplicate_read", return_value=True):
@@ -380,9 +383,12 @@ class TestExecuteToolCalls:
         first = await pipeline.execute_tool_calls(search_call, {})
         assert first.results[0].skipped is False
 
+        # Patch load_code_search_module at the source to return a mock with mark_index_cache_stale_for_path
+        mock_module = MagicMock()
+        mock_module.mark_index_cache_stale_for_path = MagicMock(return_value=1)
         with patch(
-            "victor.tools.code_search_tool.mark_index_cache_stale_for_path",
-            return_value=1,
+            "victor.core.utils.capability_loader.load_code_search_module",
+            return_value=mock_module,
         ):
             await pipeline.execute_tool_calls(write_call, {})
 

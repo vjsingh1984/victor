@@ -5,12 +5,15 @@ from __future__ import annotations
 import re
 from collections import defaultdict
 from typing import Iterable, List, Tuple
+from dataclasses import dataclass
+from enum import Enum
 
 from rich.console import Group, RenderableType
 from rich.markdown import Markdown
 from rich.markup import escape as escape_markup
 from rich.panel import Panel
 from rich.syntax import Syntax
+from rich.table import Table
 from rich.text import Text
 from rich.tree import Tree
 
@@ -25,6 +28,10 @@ _TOKEN_PATTERN = re.compile(
 # Pattern to detect Rich markup tags that could cause parsing errors
 # Matches: [tag], [/tag], [tag=value], [tag=value1,value2]
 _RICH_MARKUP_PATTERN = re.compile(r"\[/?[\w]+(?:=[^\]]+)?(?:,\s*[^\]]+)*\]")
+
+# Phase 2: Long content threshold for collapsible sections
+_LONG_CONTENT_LINES = 50
+_LONG_CODE_BLOCK_LINES = 30
 
 
 def _escape_rich_markup_from_text(text: str) -> str:
@@ -124,14 +131,24 @@ def render_markdown_with_hooks(content: str) -> RenderableType:
         import logging
 
         logger = logging.getLogger(__name__)
+        error_context = get_render_error_context(e, content)
         logger.warning(
             "Rich rendering failed, falling back to plain text: %s",
-            str(e)[:200],
+            error_context,
         )
         # Return as plain text (Rich Text object, not Markdown)
         from rich.text import Text
+        from rich.panel import Panel
 
-        return Text(content, style="dim")
+        # Show helpful error panel
+        error_panel = Panel(
+            Text(error_context, style="dim"),
+            title="[yellow]⚠ Markdown Rendering Error[/]",
+            border_style="yellow",
+            padding=(0, 1),
+        )
+        # Return error panel plus fallback text
+        return Group(error_panel, Text(content, style="dim"))
 
 
 def _render_diagram(lang: str, code: str) -> RenderableType:
@@ -299,3 +316,123 @@ def _detect_direction(code: str) -> str:
         if text.startswith("graph "):
             return text.split()[1].upper()
     return "TD"
+
+
+# Phase 2: Enhanced markdown rendering features
+
+
+def render_collapsible_section(
+    title: str,
+    content: str,
+    lines_visible: int = 10,
+    collapsed: bool = True,
+) -> RenderableType:
+    """Render a collapsible section for long content.
+
+    Args:
+        title: Section title
+        content: Content to display
+        lines_visible: Number of lines to show when collapsed
+        collapsed: Whether to start collapsed
+
+    Returns:
+        Panel with truncated content hint
+    """
+    content_lines = content.splitlines()
+    total_lines = len(content_lines)
+
+    if total_lines <= lines_visible:
+        # No need to collapse
+        return _markdown_block(content)
+
+    visible_lines = content_lines[:lines_visible]
+    visible_content = "\n".join(visible_lines)
+    remaining = total_lines - lines_visible
+
+    hint = f"[dim italic]... {remaining} more line{'s' if remaining != 1 else ''} • expand to see full content[/]"
+
+    from rich import box
+
+    return Panel(
+        Group(_markdown_block(visible_content), Text(hint)),
+        title=title,
+        title_align="left",
+        border_style="blue",
+        box=box.MINIMAL,
+        padding=(0, 2),
+    )
+
+
+def render_enhanced_table(
+    headers: List[str],
+    rows: List[List[str]],
+    title: str = "",
+    style: str = "cyan",
+) -> RenderableType:
+    """Render an enhanced table with better styling.
+
+    Args:
+        headers: Table headers
+        rows: Table rows (list of lists)
+        title: Optional table title
+        style: Color style for headers
+
+    Returns:
+        Rich Table with enhanced styling
+    """
+    table = Table(
+        title=title,
+        title_style=f"bold {style}",
+        box=None,  # Use default box
+        show_header=True,
+        header_style=f"bold {style}",
+        border_style="dim",
+        padding=(0, 1),
+    )
+
+    for header in headers:
+        table.add_column(header, no_wrap=len(header) < 20)
+
+    for row in rows:
+        table.add_row(*[str(cell) for cell in row])
+
+    return table
+
+
+def should_collapse_content(content: str, content_type: str = "text") -> bool:
+    """Determine if content should be collapsed.
+
+    Args:
+        content: Content to check
+        content_type: Type of content (text, code, etc.)
+
+    Returns:
+        True if content is long enough to collapse
+    """
+    line_count = len(content.splitlines())
+    threshold = _LONG_CODE_BLOCK_LINES if content_type == "code" else _LONG_CONTENT_LINES
+    return line_count > threshold
+
+
+def get_render_error_context(error: Exception, content: str) -> str:
+    """Get helpful context for rendering errors.
+
+    Args:
+        error: The exception that occurred
+        content: Content that failed to render
+
+    Returns:
+        Helpful error message with context
+    """
+    error_type = type(error).__name__
+    error_msg = str(error)[:200]
+
+    content_preview = content[:100].replace("\n", "\\n")
+    if len(content) > 100:
+        content_preview += "..."
+
+    return (
+        f"[{error_type}] {error_msg}\n\n"
+        f"[dim]Content preview:[/]\n{content_preview}\n\n"
+        f"[dim yellow]Tip: If this continues, try simplifying the markdown or avoiding special characters.[/]"
+    )

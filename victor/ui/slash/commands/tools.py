@@ -24,6 +24,12 @@ from rich.panel import Panel
 from rich.table import Table
 
 from victor.config.settings import VICTOR_CONTEXT_FILE, VICTOR_DIR_NAME
+from victor.ui.rendering.utils import (
+    format_access_mode_badge,
+    format_cost_tier_indicator,
+    format_execution_category_hint,
+    get_tool_metadata_for_display,
+)
 from victor.ui.slash.protocol import BaseSlashCommand, CommandContext, CommandMetadata
 from victor.ui.slash.registry import register_command
 
@@ -71,22 +77,34 @@ class ToolsCommand(BaseSlashCommand):
             return
 
         table = Table(title=f"Available Tools ({len(tools)})", show_header=True)
-        table.add_column("Tool", style="cyan", no_wrap=True)
-        table.add_column("Description")
-        table.add_column("Cost", style="yellow", justify="right")
+        table.add_column("Tool", style="cyan", no_wrap=True, width=20)
+        table.add_column("Category", style="dim", width=12)
+        table.add_column("Access", width=10)
+        table.add_column("Cost", style="yellow", justify="right", width=6)
+        table.add_column("Description", width=50)
 
         for tool in sorted(tools, key=lambda t: getattr(t, "name", "")):
             name = getattr(tool, "name", "unknown")
             full_desc = getattr(tool, "description", "")
-            desc = full_desc[:60]
-            if len(full_desc) > 60:
+            desc = full_desc[:50]
+            if len(full_desc) > 50:
                 desc += "..."
-            cost_tier = getattr(tool, "cost_tier", None)
-            cost = cost_tier.value if cost_tier else "unknown"
-            table.add_row(name, desc, cost)
+
+            # Get metadata from unified registry (Phase 4)
+            metadata = get_tool_metadata_for_display(name)
+            category = metadata.get("category", "") or "-"
+            access_mode = metadata.get("access_mode", "readonly")
+            cost_tier = metadata.get("cost_tier", "free")
+
+            # Format with badges and colors
+            access_badge = format_access_mode_badge(access_mode) if access_mode != "readonly" else "[dim]readonly[/]"
+            cost_indicator = format_cost_tier_indicator(cost_tier) or "-"
+
+            table.add_row(name, category, access_badge, cost_indicator, desc)
 
         ctx.console.print(table)
         ctx.console.print(f"\n[dim]Tool budget: {ctx.settings.tools.tool_call_budget}[/]")
+        ctx.console.print("[dim]Legend: [/][green]READ[/][dim] [yellow]WRITE[/][dim] [red]EXECUTE[/][dim] [blue]NETWORK[/][dim] [magenta]MIXED[/][dim] • Cost: [yellow]$[/] = low, [yellow]$$[/] = medium, [yellow]$$$[/] = high[/]")
 
 
 @register_command

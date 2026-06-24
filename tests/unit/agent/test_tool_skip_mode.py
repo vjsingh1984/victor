@@ -15,6 +15,7 @@ class _Gate:
 
     _TOOL_SIGNAL_KEYWORDS = AgentOrchestrator._TOOL_SIGNAL_KEYWORDS
     _QA_SIGNAL_PATTERNS = AgentOrchestrator._QA_SIGNAL_PATTERNS
+    _CONTINUATION_TOKENS = AgentOrchestrator._CONTINUATION_TOKENS
     _tool_skip_mode = AgentOrchestrator._tool_skip_mode
     _should_skip_tools_for_turn = AgentOrchestrator._should_skip_tools_for_turn
 

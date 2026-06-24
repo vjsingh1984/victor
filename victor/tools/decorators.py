@@ -582,28 +582,48 @@ def _resolve_tool_name(func_name: str, explicit_name: Optional[str] = None) -> s
     """Resolve the canonical tool name.
 
     Resolution order:
-    1. Explicit name parameter (highest priority)
-    2. Auto-resolve from TOOL_ALIASES registry
-    3. Function name as-is (fallback)
+    1. Start with explicit name if provided, otherwise function name
+    2. Auto-resolve to canonical form from TOOL_ALIASES registry
+    3. Use name as-is if not in registry (fallback)
+
+    CRITICAL: We ALWAYS resolve through the canonical name registry to ensure
+    the tool name in the schema matches what the LLM expects. This prevents
+    mismatches where a tool is registered as "search" but the canonical name
+    is "code_search", causing "Unknown or disabled tool" errors.
 
     Args:
         func_name: The original function name
-        explicit_name: Explicitly provided name (overrides all)
+        explicit_name: Explicitly provided name (used as starting point for resolution)
 
     Returns:
         The resolved canonical tool name
-    """
-    if explicit_name:
-        return explicit_name
 
-    # Try to auto-resolve from registry
+    Examples:
+        >>> _resolve_tool_name("search_tool", "search")
+        "code_search"  # Resolved through registry
+        >>> _resolve_tool_name("execute_bash", None)
+        "shell"  # Auto-resolved through registry
+        >>> _resolve_tool_name("custom_tool", None)
+        "custom_tool"  # Not in registry, used as-is
+    """
+    # Start with explicit name or function name
+    base_name = explicit_name if explicit_name else func_name
+
+    # Always try to resolve to canonical form through registry
+    # This ensures the tool name matches the canonical system
     try:
         from victor.tools.tool_names import get_canonical_name
 
-        return get_canonical_name(func_name)
+        canonical = get_canonical_name(base_name)
+        if canonical != base_name:
+            logger.debug(
+                f"Tool name resolved: '{base_name}' -> '{canonical}' (canonical form)"
+            )
+        return canonical
     except ImportError:
-        # Registry not available, use function name
-        return func_name
+        # Registry not available, use base name as-is
+        logger.debug(f"Tool name registry unavailable, using '{base_name}' as-is")
+        return base_name
 
 
 def _create_tool_class(

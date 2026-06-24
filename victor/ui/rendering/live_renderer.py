@@ -29,9 +29,13 @@ logger = logging.getLogger(__name__)
 
 from victor.ui.rendering.utils import (
     expand_tool_output,
+    format_bash_command_invocation,
     format_duration,
     format_tool_args,
+    format_tool_args_bash_style,
     format_tool_display_name,
+    format_tool_metadata_badges,
+    get_tool_metadata_for_display,
     render_content_badge,
     render_edit_preview,
     render_file_preview,
@@ -165,13 +169,24 @@ class LiveDisplayRenderer:
         """
         self._pending_tool = {"name": name, "arguments": arguments}
         self._current_tool_start_time = time.monotonic()
+
+        # Print bash-style command invocation
+        if self._live and not self._is_paused:
+            # Format bash-style invocation and add to content buffer
+            args_str = format_tool_args_bash_style(arguments)
+            if args_str:
+                invocation_line = f"[dim]$[/] [bold cyan]{name}[/] [dim]{args_str}[/]\n"
+            else:
+                invocation_line = f"[dim]$[/] [bold cyan]{name}[/]\n"
+            self.on_content(invocation_line)
+
         if not self._tool_section_shown:
             self.pause()
             self._print_section_separator("Tool Execution")
             self._tool_section_shown = True
             self.resume()
 
-        # Always activate progress panel to show the spinner
+        # Always activate progress panel to show the spinner with [RUNNING] status
         if self._live and not self._is_paused:
             self._tool_progress_name = name
             self._tool_progress_active = True
@@ -222,14 +237,16 @@ class LiveDisplayRenderer:
 
         body_text = "\n".join(self._tool_progress_lines)
         tool_label = format_tool_display_name(self._tool_progress_name)
+        # Show [RUNNING] status with bash-style format
+        running_text = f"[dim]• [/][bold yellow][RUNNING][/] [bold cyan]{tool_label}[/]"
         if body_text:
             body = Text(body_text, style="dim")
             content = Group(
-                Spinner("dots", text=f"[bold blue]{tool_label}[/] [dim]running...[/]"),
+                Spinner("dots", text=running_text),
                 body,
             )
         else:
-            content = Spinner("dots", text=f"[bold blue]{tool_label}[/] [dim]starting...[/]")
+            content = Spinner("dots", text=running_text)
 
         panel = Panel(
             content,
@@ -314,13 +331,36 @@ class LiveDisplayRenderer:
 
         self.pause()
 
-        args_display = format_tool_args(arguments)
+        # Bash-style result line: [DONE] tool_name • result • duration
         icon = "✓" if success else "✗"
         color = "success" if success else "error"
-        status_line = f"[{color}]{icon}[/] [tool.name]{format_tool_display_name(name)}[/]"
-        if args_display:
-            status_line += f" [tool.args]{args_display}[/]"
-        status_line += f" [tool.time]• {format_duration(elapsed)}[/]"
+        duration_str = format_duration(elapsed)
+
+        # Get tool metadata from unified registry (Phase 1)
+        metadata = get_tool_metadata_for_display(name)
+        metadata_badges = format_tool_metadata_badges(
+            category=metadata.get("category", ""),
+            access_mode=metadata.get("access_mode", ""),
+            cost_tier=metadata.get("cost_tier", ""),
+            execution_category=metadata.get("execution_category", ""),
+        )
+
+        # Build bash-style result line with metadata badges
+        status_line = f"[dim]• [/][bold {color}][DONE][/] [bold cyan]{format_tool_display_name(name)}[/]"
+
+        # Add metadata badges if available
+        if metadata_badges:
+            status_line += f" {metadata_badges}"
+
+        # Add result summary (file count, match count, etc.)
+        if success:
+            # Try to extract result summary from output
+            result_summary = self._extract_result_summary(name, preview_output)
+            if result_summary:
+                status_line += f" [dim]•[/] [green]{result_summary}[/]"
+
+        status_line += f" [dim]•[/] [tool.time]{duration_str}[/]"
+
         if error:
             # Show more context for errors - up to 150 chars with better formatting
             error_text = error[:150] + "..." if len(error) > 150 else error
@@ -560,6 +600,66 @@ class LiveDisplayRenderer:
             dots = "." * (int(elapsed) % 3 + 1)
             display_name = format_tool_display_name(tool_name)
             self.console.print(f"[dim]  {display_name} still running{dots} ({elapsed:.1f}s)[/]")
+
+    def _extract_result_summary(self, tool_name: str, output: str | None) -> str | None:
+        """Extract a meaningful summary from tool output for display.
+
+        Args:
+            tool_name: Name of the tool that was executed
+            output: Tool output string
+
+        Returns:
+            Summary string like "3 matches", "file written", etc. or None
+        """
+        if not output:
+            return None
+
+        output_lower = output.lower()
+
+        # Search tools - show match/file counts
+        if tool_name in ("code_search", "grep", "search"):
+            if "match" in output_lower or "result" in output_lower:
+                # Try to extract count from output
+                import re
+                count_match = re.search(r'(\d+)\s+(matches?|results?|files?)', output_lower)
+                if count_match:
+                    return f"{count_match.group(1)} {count_match.group(2)}"
+            # Check for "found X" pattern
+            found_match = re.search(r'found\s+(\d+)', output_lower)
+            if found_match:
+                return f"{found_match.group(1)} items"
+            return "completed"
+
+        # File tools - show action taken
+        if tool_name in ("write", "edit", "create_file"):
+            if "written" in output_lower or "saved" in output_lower:
+                return "file saved"
+            return "file modified"
+
+        # Read tools
+        if tool_name in ("read", "file_read"):
+            lines = len(output.splitlines())
+            return f"{lines} lines"
+
+        # Shell tools - show exit code if available
+        if tool_name == "shell":
+            if "exit code" in output_lower or "exited with" in output_lower:
+                import re
+                exit_match = re.search(r'exit\s+code:\s*(\d+)', output_lower)
+                if exit_match:
+                    code = exit_match.group(1)
+                    if code == "0":
+                        return "success"
+                    return f"exit {code}"
+            return "completed"
+
+        # Git tools
+        if tool_name in ("git_commit", "git_push"):
+            if "committed" in output_lower or "pushed" in output_lower:
+                return "committed"
+            return "git operation"
+
+        return None
 
     def had_tool_calls(self) -> bool:
         """Return True if at least one tool call was processed this turn."""

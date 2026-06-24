@@ -75,7 +75,7 @@ def create_search_parser() -> UnifiedSearchParser:
 
 
 @tool(
-    name="search",
+    name="code_search",
     access_mode=AccessMode.READONLY,
     danger_level=DangerLevel.SAFE,
     execution_category=ExecutionCategory.MIXED,
