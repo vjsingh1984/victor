@@ -31,6 +31,15 @@ This supersedes the heuristic stack the FEP-0007 cutover left in `AgenticLoop._e
 `_is_terminal_answer` override) with one calibrated, explainable decision — keeping those as the
 behavioral baseline the new path must match-or-beat on the acceptance batteries.
 
+**Benefits**: Replacing heuristics with calibrated, multi-dimensional scoring eliminates false
+completion signals, reduces restatement loops, and provides explainable decisions grounded in
+verifiable effects. The judge-reliability gate prevents untrusted LLM-as-judge calls, and the
+trajectory-level harness enables measurement-driven optimization rather than assumption-driven
+development.
+
+**Cost impact**: Minimal due to per-task-family rubric caching (>95% cost reduction per AdaRubric)
+and edge-model auditing. The effect gate reuses existing verification tools.
+
 ## Motivation
 
 The FEP-0007 live verification exposed the core defect: `EnhancedCompletionEvaluator` scores a
@@ -54,6 +63,32 @@ Specific gaps (grounded against the code):
   uses heuristic scores; there is no harness scoring *full trajectories* on planning / tool-grounding
   / recovery / refusal with confidence intervals.
 
+## Benefits
+
+**Calibrated completion decisions**: Rubric-based scoring with confidence intervals replaces
+opaque scalar scores, providing explainable decisions for each completion judgement. Users
+and developers can see exactly which dimensions passed/failed and why.
+
+**Reduced restatement loops**: The DimensionAwareFilter prevents premature completion from one
+strong signal masking weak ones, while also avoiding the under-scoring problem that causes
+valid answers to be marked incomplete and restated.
+
+**Verifiable effects before completion**: The effect gate ensures the agent never declares
+COMPLETE without a verifiable workspace delta or passed check, eliminating "completion-without-effect"
+failures where the model claims success but makes no changes.
+
+**Early failure detection**: The per-turn auditor flags problematic trajectories before they
+cascade into spin/repetition loops, enabling intervention at the point of deviation rather than
+after wasting tokens.
+
+**Judge reliability gating**: The Krippendorff α / Cohen κ gate ensures no LLM-as-judge is
+trusted in production without demonstrated reliability, preventing biased or inconsistent
+judgments from affecting real behavior.
+
+**Measurement-driven optimization**: The trajectory-level harness provides confidence-interval-
+bounded scores on planning, tool-grounding, recovery, and refusal, enabling data-driven decisions
+rather than assumptions.
+
 ## Design principles
 
 - **One decision point.** All signals resolve inside `AgenticLoop._evaluate` → `EvaluationResult`.
@@ -65,7 +100,7 @@ Specific gaps (grounded against the code):
 - **Fail safe toward not-stopping-early.** The DimensionAwareFilter + effect gate make premature
   completion *harder*, not easier; the auditor only raises alarms, never force-completes.
 
-## Proposed change
+## Proposed Change
 
 ### Phase A — Rubric-based completion evaluator (AdaRubric)
 
@@ -122,7 +157,7 @@ Extend `victor/evaluation/` with a `trajectory_eval/` harness that scores *full 
 length-balanced cases and **confidence intervals** on reported scores (`2605.10448`). This is the
 measurement substrate for Phases A–D and feeds the acceptance oracle (P5 / ADR-012).
 
-## Implementation plan
+## Implementation Plan
 
 Each phase is independently landable, behavior-gated, and reversible.
 
@@ -137,6 +172,63 @@ Each phase is independently landable, behavior-gated, and reversible.
 
 Recommended order for *measurement-first* discipline: **E → D → A → B → C.**
 
+## Unresolved Questions
+
+1. **Rubric calibration across domains**: How many per-task-family rubrics are needed? AdaRubric
+   shows >95% cache hit for similar tasks, but the diversity of Victor workflows needs empirical
+   validation.
+
+2. **Judge agreement thresholds**: Is α ≥ 0.7 the right gate? AgentProp-Bench shows human-LLM agreement
+   varies widely by task type; we may need per-category thresholds.
+
+3. **Effect definition for Q&A tasks**: For pure question-answering, "verifiable effect" needs a
+   grounded definition. Is a claim-verification check sufficient, or do we need external grounding?
+
+4. **Auditor latency budget**: The per-turn auditor adds one edge-model call per turn. Is the
+   latency acceptable for interactive use, or should we batch audits every N turns?
+
+5. **Trajectory eval coverage**: TRBench provides trajectory-level scoring, but which failure modes
+   should it prioritize? Planning errors vs tool misuse vs recovery failure vs refusal quality?
+
+## Migration Path
+
+**Phase 1 (Pre-cutover)**: Deploy `RubricCompletionEvaluator` and trajectory harness behind
+feature flags. Run A/B tests against `EnhancedCompletionEvaluator` baseline on existing traces.
+Establish judge-agreement metrics (α/κ) on the labeled trajectory set.
+
+**Phase 2 (Limited rollout)**: Enable rubric-based completion for opt-in users via
+`completion_strategy="rubric"` setting. Monitor restatement rate, completion latency, and
+user-reported completion accuracy. Collect production traces for calibration.
+
+**Phase 3 (Judge gating)**: Once α ≥ 0.7 is achieved on the human-labeled set, enable
+judge-reliability gate for all rubric scoring. Roll out TurnAuditor for early failure detection.
+
+**Phase 4 (Effect gate)**: Deploy verifiable-effect precondition for all completion strategies.
+Start with code-generation tasks (file effects are clear), extend to Q&A (claim verification).
+
+**Phase 5 (Default cutover)**: After parity battery passes with confidence intervals,
+flip default `completion_strategy` from `"enhanced"` to `"rubric"`. Keep enhanced as fallback.
+
+**Rollback**: All phases are gated by `settings.evaluation.completion_strategy` and existing
+feature flags. Instant rollback by flipping the setting or disabling flags.
+
+## Compatibility
+
+**Existing deployments**: No breaking changes. The new evaluator is opt-in via settings; existing
+behavior is preserved under `completion_strategy="enhanced"` (current default).
+
+**Plugin compatibility**: Tools exposing completion signals (e.g., custom verification tools)
+work unchanged. The effect gate uses existing `tool_results` and verification interfaces.
+
+**Provider compatibility**: All providers benefit from calibrated completion; no provider-specific
+changes required. Judge calls use the existing provider abstraction.
+
+**Streaming parity**: FEP-0007 unified loop ensures streaming and buffered paths share the
+`_evaluate` seam; rubric-based completion applies to both without separate implementation.
+
+**API compatibility**: No public API changes. `victor/evaluation/` extensions remain compatible;
+new trajectory harness is additive, not a replacement.
+
 ## Acceptance criteria
 
 - **Parity battery 14/14 and characterization battery byte-stable-or-justified** (FEP-0007 gate) for
@@ -149,7 +241,7 @@ Recommended order for *measurement-first* discipline: **E → D → A → B → 
   sequences; the DimensionAwareFilter + effect gate must not stop before the task's effect exists.
 - Eval results reported with confidence intervals at *(model, completion_strategy)* granularity.
 
-## Drawbacks / alternatives
+## Drawbacks and Alternatives
 
 - **Cost/latency of a judge per turn.** Mitigated by per-task-family rubric caching, a small edge
   auditor, and the α-gate (don't run an untrusted judge). Alternative — keep the algorithmic
