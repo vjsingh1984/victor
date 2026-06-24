@@ -12,44 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Unified Tool Registry
+"""Bash-style unified command tools (`domain action args`).
 
-Consolidates tool discovery, registration, selection, and lifecycle
-management into a single, coherent interface.
+This package hosts the command-shell tool dispatchers — ``fs``, ``shell``,
+``git``, ``web``, ``code`` — each a ``@tool`` taking a single ``cmd: str``
+parsed via :mod:`victor.tools.unified.parser`, plus their shared helpers
+(``_search_helpers``, ``_vertical_resolver``).
 
-Usage:
-    from victor.tools.unified import UnifiedToolRegistry
-
-    registry = UnifiedToolRegistry.get_instance()
-
-    # Discover tools
-    await registry.discover()
-
-    # Select tools
-    tools = await registry.select_tools("Read files")
-
-    # Get tool
-    tool = registry.get("read_file")
-
-Migration:
-    from victor.tools.unified.adapters import migrate_to_unified_registry
-
-    migrate_to_unified_registry()
+Tool discovery and execution do **not** live here. Discovery is owned by
+:class:`victor.agent.shared_tool_registry.SharedToolRegistry` (process-wide
+cache) and per-session execution by :class:`victor.tools.registry.ToolRegistry`;
+selection by :mod:`victor.tools.unified`-independent
+:mod:`victor.agent.tool_selection`. The former ``UnifiedToolRegistry`` /
+adapters that lived here were dead code and have been removed.
 """
-
-from victor.tools.unified.registry import (
-    HookPhase,
-    SelectionStrategy,
-    ToolMetadata,
-    ToolMetrics,
-    UnifiedToolRegistry,
-)
-
-from victor.tools.unified.adapters import (
-    SharedToolRegistryAdapter,
-    ToolRegistryAdapter,
-    migrate_to_unified_registry,
-)
 
 # NOTE: The bash-style command tools (code_tool, fs_tool, git_tool, search_tool,
 # shell_tool, web_tool) are intentionally NOT re-exported here. Importing them as
@@ -60,16 +36,3 @@ from victor.tools.unified.adapters import (
 # canonical import path
 # ``from victor.tools.unified.<name>_tool import <name>_tool`` remains the
 # supported way to access these tools.
-
-__all__ = [
-    # Core
-    "UnifiedToolRegistry",
-    "SelectionStrategy",
-    "HookPhase",
-    "ToolMetadata",
-    "ToolMetrics",
-    # Adapters
-    "SharedToolRegistryAdapter",
-    "ToolRegistryAdapter",
-    "migrate_to_unified_registry",
-]
