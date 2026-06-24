@@ -50,11 +50,16 @@ from victor.tools.unified.adapters import (
     ToolRegistryAdapter,
     migrate_to_unified_registry,
 )
-from victor.tools.unified.code_tool import code_tool
-from victor.tools.unified.fs_tool import fs_tool
-from victor.tools.unified.search_tool import search_tool
-from victor.tools.unified.shell_tool import shell_tool
-from victor.tools.unified.web_tool import web_tool
+
+# NOTE: The bash-style command tools (code_tool, fs_tool, git_tool, search_tool,
+# shell_tool, web_tool) are intentionally NOT re-exported here. Importing them as
+# ``from victor.tools.unified.<name>_tool import <name>_tool`` rebinds the
+# submodule name to the function and shadows the module object. That breaks
+# ``mock.patch("victor.tools.unified.<name>_tool.<func>")`` on Python 3.10,
+# whose ``mock`` dotted resolver does not fall back to ``sys.modules``. The
+# canonical import path
+# ``from victor.tools.unified.<name>_tool import <name>_tool`` remains the
+# supported way to access these tools.
 
 __all__ = [
     # Core
@@ -67,10 +72,4 @@ __all__ = [
     "SharedToolRegistryAdapter",
     "ToolRegistryAdapter",
     "migrate_to_unified_registry",
-    # Command tools
-    "code_tool",
-    "fs_tool",
-    "search_tool",
-    "shell_tool",
-    "web_tool",
 ]
