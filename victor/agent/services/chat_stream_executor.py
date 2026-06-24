@@ -20,9 +20,12 @@ from dataclasses import dataclass
 from typing import Any, AsyncIterator, List, Optional, Protocol, Tuple
 
 from victor.agent.output_deduplicator import OutputDeduplicator
+from victor.agent.safety import get_write_tool_names
 from victor.agent.services.protocols.streaming_runtime import (
     StreamingExecutionRuntimeProtocol,
 )
+from victor.tools.core_tool_aliases import canonicalize_core_tool_name
+from victor.tools.tool_names import get_canonical_name
 from victor.core.completion_markers import (
     FILE_DONE_MARKER,
     strip_active_completion_markers,
@@ -206,26 +209,35 @@ class StreamingActPort(Protocol):
 class StreamingChatExecutor:
     """Canonical streaming chat executor bound to a runtime owner."""
 
-    _WRITE_MUTATION_TOOL_NAMES = {
-        "apply_patch",
-        "edit",
-        "multi_edit",
-        "patch",
-        "replace",
-        "str_replace_editor",
-        "write",
-    }
-    _WRITE_EXPLORATION_TOOL_NAMES = {
-        "cat",
-        "code_search",
-        "find",
-        "grep",
-        "ls",
-        "read",
-        "rg",
-        "search",
-        "shell",
-    }
+    # Canonical write/mutation tool names sourced from the unified registry
+    # (victor.tools.metadata_registry decorator-driven, with a static fallback in
+    # victor.agent.safety). Resolved once at class-definition time and canonicalized
+    # through core_tool_aliases + tool_names so legacy aliases (edit_files,
+    # str_replace_editor, apply_patch, ...) collapse onto the canonical surface.
+    _WRITE_MUTATION_TOOL_NAMES = frozenset(
+        get_canonical_name(canonicalize_core_tool_name(name))
+        for name in get_write_tool_names()
+    )
+
+    # Read-only exploration tools that nudge a write-intent turn toward action.
+    # These are the compact read surface; aliases (read_file, list_directory,
+    # grep/rg, cat) collapse via canonicalize_core_tool_name below.
+    _WRITE_EXPLORATION_TOOL_NAMES = frozenset(
+        {
+            get_canonical_name(canonicalize_core_tool_name(name))
+            for name in (
+                "cat",
+                "code_search",
+                "find",
+                "grep",
+                "ls",
+                "read",
+                "rg",
+                "search",
+                "shell",
+            )
+        }
+    )
     _WRITE_ACTION_GUARD_THRESHOLD = 8
     _WRITE_ACTION_GUARD_ESCALATE_THRESHOLD = 12
 
@@ -520,7 +532,7 @@ class StreamingChatExecutor:
 
     def _has_mutation_tool_executed(self, stream_ctx: Any) -> bool:
         tool_names = {
-            self._tool_name_value(name)
+            get_canonical_name(canonicalize_core_tool_name(self._tool_name_value(name)))
             for name in (getattr(stream_ctx, "executed_tool_names", set()) or set())
             if name
         }
@@ -541,7 +553,7 @@ class StreamingChatExecutor:
             return False
 
         executed_names = {
-            self._tool_name_value(name)
+            get_canonical_name(canonicalize_core_tool_name(self._tool_name_value(name)))
             for name in (getattr(stream_ctx, "executed_tool_names", set()) or set())
             if name
         }
@@ -1520,13 +1532,18 @@ class StreamingChatExecutor:
         own collaborators (the same ``turn_executor`` + ``runtime_intelligence`` the buffered loop
         uses), and yields ``run_streaming``'s chunks.
 
-        DRAFT / not yet wired into ``ChatStreamRuntime``: the legacy ``run()`` remains the live
-        streaming path until the repoint. **Behavior change vs run():** the UI path adopts the
-        unified loop's EVALUATE — including its requirement-driven completion (EnhancedCompletion /
-        fulfillment) — so it may complete earlier on multi-step tasks than today's streaming loop,
-        which simply follows the model's tool calls. That convergence is the whole point of the
-        unification; whether the completion threshold is well-tuned for real tasks is verified live
-        (zai), not on the scripted parity battery. See the run/stream parity battery.
+        DRAFT / not yet wired as the sole live path into ``ChatStreamRuntime``
+        (``chat_stream_runtime.py`` already calls ``run_unified``; the legacy
+        ``run()`` entry point is preserved as a thin alias delegating here so the
+        callers that still reference it — notably ``AgenticLoop.run_streaming`` —
+        keep working during the cutover). **Behavior change vs the removed legacy
+        run() body:** the UI path adopts the unified loop's EVALUATE — including
+        its requirement-driven completion (EnhancedCompletion / fulfillment) —
+        so it may complete earlier on multi-step tasks than the old streaming
+        loop, which simply followed the model's tool calls. That convergence is
+        the whole point of the unification; whether the completion threshold is
+        well-tuned for real tasks is verified live (zai), not on the scripted
+        parity battery. See the run/stream parity battery.
         """
         from victor.agent.services.streaming_act_adapter import StreamingActAdapter
         from victor.framework.agentic_loop import AgenticLoop
@@ -1585,6 +1602,29 @@ class StreamingChatExecutor:
         async for chunk in loop.run_streaming(
             user_message, conversation_history=conversation_history
         ):
+            yield chunk
+
+    async def run(self, user_message: str, **kwargs: Any) -> AsyncIterator[StreamChunk]:
+        """Backward-compatible streaming entry point (LTS-deprecated).
+
+        .. deprecated:: 0.8.0
+            Use :meth:`run_unified` instead. ``run()`` is a thin alias retained
+            only for the FEP-0007 cutover period so the one remaining internal
+            caller (``AgenticLoop.run_streaming``) and the streaming parity test
+            battery keep working. It delegates directly to ``run_unified`` so
+            there is a single live code path, and will be removed once the last
+            caller migrates. Do NOT add new callers of ``run()`` — that re-opens
+            the wrong (legacy) streaming seam the unification closed.
+        """
+        import warnings
+
+        warnings.warn(
+            "StreamingChatExecutor.run() is deprecated; use run_unified() instead. "
+            "run() is a temporary FEP-0007 cutover alias and will be removed.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        async for chunk in self.run_unified(user_message, **kwargs):
             yield chunk
 
 

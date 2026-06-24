@@ -1620,7 +1620,15 @@ class AgenticLoop:
         # ACT via streaming executor (yields chunks token-by-token)
         if streaming_executor is not None:
             try:
-                async for chunk in streaming_executor.run(query):
+                # FEP-0007: use the canonical run_unified() entry point. The
+                # legacy run() alias on StreamingChatExecutor is LTS-deprecated;
+                # the hasattr fallback keeps the duck-typed test executors
+                # (which may only implement run()) working during the cutover.
+                if hasattr(streaming_executor, "run_unified"):
+                    run_streaming = streaming_executor.run_unified
+                else:
+                    run_streaming = streaming_executor.run
+                async for chunk in run_streaming(query):
                     yield chunk
             except Exception as e:
                 if "request format error" in str(e).lower():
