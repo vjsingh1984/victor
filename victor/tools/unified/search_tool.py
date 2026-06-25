@@ -6,8 +6,8 @@ from victor.tools.decorators import tool
 from victor.tools.unified.parser import split_command
 
 _SEARCH_DEPRECATED_MSG = (
-    "The 'search' tool is deprecated. Use 'code grep' for file-content search "
-    "and 'fs search' for file-name search."
+    "The 'search' tool is deprecated; slated for removal in 0.9.0. "
+    "Use 'code grep' for file-content search and 'fs search' for file-name search."
 )
 
 
