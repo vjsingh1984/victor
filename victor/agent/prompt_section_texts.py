@@ -61,7 +61,7 @@ HEADLESS MODE: AUTOMATED EXECUTION
 - You are running in an automated, non-interactive environment (CI/CD or batch).
 - Favor autonomous decision-making. If an action is safe and necessary, perform it.
 - Do not ask for user confirmation for safe (read-only or LOW risk) operations.
-- Avoid using `grep` or `shell` search commands for project code; the `graph` and `code_search` tools are your primary architectural and semantic navigation tools.
+- Avoid raw `grep`/`shell` search for project code; use the unified surfaces: `code search "query" --mode semantic` (semantic navigation) and `code grep "query" path` (literal content search). Use `graph` for architectural/call-graph navigation.
 - If multiple paths are possible, select the most likely successful one based on codebase evidence.
 - Signal completion clearly when the objective is met or if a fatal error occurs.
 - Be extremely surgical and precise to avoid unnecessary file churn.
@@ -124,8 +124,9 @@ Do not assume content is missing from truncated output. Use offset/search to acc
 ASI_TOOL_EFFECTIVENESS_GUIDANCE = """
 TOOL EFFECTIVENESS:
 
-1. Search first, read second. Use code_search(query='...', mode='semantic') to locate relevant files, then read only specific files or segments after confirming relevance.
-   - Use mode='literal' only for exact known identifiers.
+1. Search first, read second. Use code search to locate relevant files, then read only specific files or segments after confirming relevance:
+   - Semantic: code(cmd='search "how auth works" --mode semantic')
+   - Literal: code(cmd='grep "def login" src') or code(cmd='search "login" --mode literal')
    - Do not browse files sequentially when a search can identify the target set.
 
 2. Verify paths before access. Run ls() to confirm files or directories exist before read() or edit operations. Use ls('.') to verify the working directory when path errors occur.
@@ -143,6 +144,12 @@ TOOL EFFECTIVENESS:
 8. Recover from failed edits by re-reading the exact location and copying text character-for-character. Do not guess from memory.
 
 9. Retry discipline: analyze the root cause before retrying. Never repeat the same failing call unchanged.
+
+10. Overview before deep search for broad questions. For architecture / "how does X work overall" / whole-codebase questions, START with overview() or graph(mode='patterns') / graph(mode='stats') to get structure and the important modules — do NOT answer by issuing many narrow code_search calls. Use code_search to drill into specifics only AFTER the overview.
+
+11. Large files: structure first. For a large file, use extract_skeleton (or code_search within the file) to see signatures before reading it in full or in many chunks. Do not re-read overlapping chunks.
+
+12. Stop when you have enough. Once you can answer or your searches are mostly re-surfacing files you've already seen, STOP searching and write the answer/summary. Breadth of evidence matters less than synthesizing what you already have.
 """.strip()
 
 __all__ = [

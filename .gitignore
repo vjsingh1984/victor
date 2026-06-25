@@ -262,3 +262,6 @@ docs/archive/sessions/*.md
 .chainlit/
 chainlit.md
 .files/
+
+# ProximaDB embedded server stray logs
+log/proximadb.log.*

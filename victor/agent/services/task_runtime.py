@@ -481,13 +481,8 @@ class TaskCoordinator:
             conversation_controller: Conversation controller for message injection
         """
         if is_analysis_task:
-            # Increase temperature for more creative analysis
-            analysis_temp = min(self._temperature + 0.2, 1.0)
-            logger.info(
-                f"Analysis task: increasing temperature {self._temperature:.1f} -> {analysis_temp:.1f}"
-            )
-            self._temperature = analysis_temp
-
+            # Temperature for analysis is owned by the unified resolver (ADR-013): the "analyze"
+            # task-hint constant is applied at the provider seam — no scalar mutation here.
             conversation_controller.add_message(
                 "user",
                 "[ANALYSIS-APPROACH: Work through the codebase one module at a time. "

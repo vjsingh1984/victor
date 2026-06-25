@@ -341,6 +341,14 @@ def _start_file_watcher_initialization(settings: Any) -> asyncio.Task[None]:
     )
 
 
+def _should_start_file_watchers_on_startup(settings: Any) -> bool:
+    """Return True when chat should eagerly start repository file watchers."""
+    env_value = os.getenv("VICTOR_CHAT_FILE_WATCHERS")
+    if env_value is not None:
+        return env_value.strip().lower() in {"1", "true", "yes", "on"}
+    return bool(getattr(settings, "chat_file_watchers_on_startup", False))
+
+
 async def _cancel_file_watcher_initialization(
     task: Optional[asyncio.Task[None]],
 ) -> None:
@@ -2132,9 +2140,10 @@ async def run_interactive(
             # Note: Observability (shim) is handled by AgentFactory internally
             # The factory creates the agent with framework features already wired
 
-            # Initialize file watchers for automatic cache invalidation without
-            # blocking first prompt render on large repositories.
-            watcher_init_task = _start_file_watcher_initialization(settings)
+            if _should_start_file_watchers_on_startup(settings):
+                # Optional eager watcher mode. Default is demand-driven startup
+                # through graph/code_search so large repos do not cold-scan here.
+                watcher_init_task = _start_file_watcher_initialization(settings)
         except InitializationError as e:
             console.print(f"[red]Error ({e.stage}):[/] {e.message}")
             for s in e.suggestions:

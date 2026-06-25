@@ -287,10 +287,9 @@ class AnthropicProvider(BaseProvider):
                         # FULL+COMPACT prefix means STUB tools can change per-turn
                         # without invalidating the cached prefix.
                         cache_idx = self._find_cache_boundary(tools, converted)
-                        converted[cache_idx]["cache_control"] = {"type": "ephemeral"}
+                        if 0 <= cache_idx < len(converted):
+                            converted[cache_idx]["cache_control"] = {"type": "ephemeral"}
                     request_params["tools"] = converted
-
-                # Make API call with circuit breaker protection
                 response: AnthropicMessage = await self._execute_with_circuit_breaker(
                     self.client.messages.create, **request_params
                 )
@@ -402,7 +401,8 @@ class AnthropicProvider(BaseProvider):
                 converted = self._convert_tools(tools)
                 if converted:
                     cache_idx = self._find_cache_boundary(tools, converted)
-                    converted[cache_idx]["cache_control"] = {"type": "ephemeral"}
+                    if 0 <= cache_idx < len(converted):
+                        converted[cache_idx]["cache_control"] = {"type": "ephemeral"}
                 request_params["tools"] = converted
 
             tool_calls: Dict[str, Dict[str, Any]] = {}

@@ -51,9 +51,13 @@ from victor.storage.graph.edge_types import (
     CCG_EDGE_TYPES,
     LEGACY_EDGE_TYPES,
 )
-from victor.storage.graph.registry import create_graph_store
+from victor.storage.graph.registry import (
+    create_graph_store,
+    resolve_graph_backend,
+)
 from victor.storage.graph.sqlite_store import SqliteGraphStore
 from victor.storage.graph.memory_store import MemoryGraphStore
+from victor.storage.graph.proxima_store import ProximaGraphStore
 
 __all__ = [
     # Protocol
@@ -73,7 +77,9 @@ __all__ = [
     "LEGACY_EDGE_TYPES",
     # Factory
     "create_graph_store",
+    "resolve_graph_backend",
     # Stores
     "SqliteGraphStore",
     "MemoryGraphStore",
+    "ProximaGraphStore",
 ]

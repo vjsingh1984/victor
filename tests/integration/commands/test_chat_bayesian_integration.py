@@ -379,17 +379,28 @@ class TestChatCommandBayesianFlags:
         assert config.bayesian.complex_threshold == 0.7
 
     def test_bayesian_flags_validation_ranges(self):
-        """Test Bayesian flag ranges are handled."""
-        # Test that thresholds outside [0, 1] are accepted (no validation in typer)
-        # In production, we'd add custom validation
-        config = SessionConfig.from_cli_flags(
-            simple_threshold=1.5,  # Invalid but accepted
-            complex_threshold=2.0,  # Invalid but accepted
-        )
+        """Test Bayesian flag ranges are validated by SessionConfig.
 
-        # Values are stored as-is (validation would be added separately)
-        assert config.bayesian.simple_threshold == 1.5
-        assert config.bayesian.complex_threshold == 2.0
+        Thresholds outside [0, 1] must raise ValueError so invalid CLI input
+        cannot silently produce a malformed config. This mirrors the range
+        validation already applied to ``compaction.threshold``.
+        """
+        # simple_threshold below 0
+        with pytest.raises(ValueError, match="simple_threshold"):
+            SessionConfig.from_cli_flags(simple_threshold=-0.1)
+
+        # simple_threshold above 1
+        with pytest.raises(ValueError, match="simple_threshold"):
+            SessionConfig.from_cli_flags(simple_threshold=1.5)
+
+        # complex_threshold above 1
+        with pytest.raises(ValueError, match="complex_threshold"):
+            SessionConfig.from_cli_flags(complex_threshold=2.0)
+
+        # In-range values are accepted and stored verbatim
+        valid = SessionConfig.from_cli_flags(simple_threshold=0.3, complex_threshold=0.7)
+        assert valid.bayesian.simple_threshold == 0.3
+        assert valid.bayesian.complex_threshold == 0.7
 
 
 @pytest.mark.integration

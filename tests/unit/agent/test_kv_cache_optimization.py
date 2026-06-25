@@ -303,6 +303,30 @@ class TestDeterministicToolOrdering:
 
         assert [t.name for t in result] == ["z_tool", "a_tool"]
 
+    def test_context_aware_profile_sorts_large_no_cache_provider(self):
+        """Large context-aware profiles use stable ordering even without KV flag."""
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        orch = MagicMock(spec=AgentOrchestrator)
+        type(orch)._kv_optimization_enabled = PropertyMock(return_value=False)
+        orch._resolve_kv_strategy_setting = lambda: "context_aware"
+        orch._get_context_window.return_value = 128000
+        orch.provider = MagicMock()
+        orch.provider.supports_prompt_caching.return_value = False
+        orch.provider.supports_kv_prefix_caching.return_value = False
+        orch.model = "glm-5.2"
+        orch.settings = SimpleNamespace(tools=SimpleNamespace(budget=20))
+        _attach_legacy_tool_service(orch)
+
+        tool_z = MagicMock()
+        tool_z.name = "z_tool"
+        tool_a = MagicMock()
+        tool_a.name = "a_tool"
+
+        result = AgentOrchestrator._sort_tools_for_kv_stability(orch, [tool_z, tool_a])
+
+        assert [t.name for t in result] == ["a_tool", "z_tool"]
+
     def test_none_tools_returns_none(self):
         """None tools input returns None."""
         from victor.agent.orchestrator import AgentOrchestrator

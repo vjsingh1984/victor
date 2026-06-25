@@ -478,6 +478,7 @@ _STRATEGY_MAP: Dict[str, _ToolPreviewStrategy] = {
     "read": _ReadPreviewStrategy(),
     "view": _ReadPreviewStrategy(),
     "cat": _ReadPreviewStrategy(),
+    "fs": _GenericPreviewStrategy(),
     # Shell / execution
     "shell": _ShellPreviewStrategy(),
     "bash": _ShellPreviewStrategy(),
@@ -492,6 +493,7 @@ _STRATEGY_MAP: Dict[str, _ToolPreviewStrategy] = {
     "code_search": _SearchPreviewStrategy(),
     "search": _SearchPreviewStrategy(),
     "semantic_search": _SearchPreviewStrategy(),
+    "web": _SearchPreviewStrategy(),
     # Directory listing
     "ls": _DirectoryPreviewStrategy(),
     "list_dir": _DirectoryPreviewStrategy(),

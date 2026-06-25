@@ -205,6 +205,77 @@ class TestRuntimeInfraIntegration:
         assert second["success"] is True
         assert second["cached"] is True
 
+    @pytest.mark.asyncio
+    async def test_web_fetch_browser_render_skips_http_request(self):
+        with (
+            patch(
+                "victor.tools.web_search_tool._request_text",
+                new=AsyncMock(side_effect=AssertionError("http fetch should not be called")),
+            ),
+            patch(
+                "victor.tools.web_search_tool._render_page_text",
+                new=AsyncMock(
+                    return_value={
+                        "success": True,
+                        "content": "Rendered page text",
+                        "html_length": 1234,
+                    }
+                ),
+            ) as mock_render,
+        ):
+            result = await web_fetch("https://example.com/app", render="browser")
+
+        assert result["success"] is True
+        assert result["content"] == "Rendered page text"
+        assert result["render"] == "browser"
+        assert result["html_length"] == 1234
+        mock_render.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_web_fetch_auto_falls_back_to_browser_for_low_text_pages(self):
+        short_html = "<html><body><div id='root'></div><script>app()</script></body></html>"
+        with (
+            patch(
+                "victor.tools.web_search_tool._request_text",
+                new=AsyncMock(return_value=(200, short_html)),
+            ),
+            patch(
+                "victor.tools.web_search_tool._render_page_text",
+                new=AsyncMock(
+                    return_value={
+                        "success": True,
+                        "content": "Rendered SPA content",
+                        "html_length": 4096,
+                    }
+                ),
+            ) as mock_render,
+        ):
+            result = await web_fetch("https://example.com/spa", render="auto")
+
+        assert result["success"] is True
+        assert result["content"] == "Rendered SPA content"
+        assert result["render"] == "browser"
+        assert result["http_status_code"] == 200
+        mock_render.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_web_fetch_http_mode_does_not_browser_fallback(self):
+        short_html = "<html><body><div id='root'></div><script>app()</script></body></html>"
+        with (
+            patch(
+                "victor.tools.web_search_tool._request_text",
+                new=AsyncMock(return_value=(200, short_html)),
+            ),
+            patch(
+                "victor.tools.web_search_tool._render_page_text",
+                new=AsyncMock(side_effect=AssertionError("browser should not be called")),
+            ),
+        ):
+            result = await web_fetch("https://example.com/spa", render="http")
+
+        assert result["success"] is False
+        assert "No content" in result["error"]
+
 
 class TestWebSearchExecContext:
     """Tests that web_search and web_fetch use _exec_ctx properly."""
@@ -221,6 +292,7 @@ class TestWebSearchExecContext:
         props = web_fetch.Tool.parameters.get("properties", {})
         assert "_exec_ctx" not in props
         assert "context" not in props
+        assert "render" in props
 
     @pytest.mark.asyncio
     async def test_web_search_receives_exec_context(self):

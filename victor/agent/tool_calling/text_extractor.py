@@ -132,6 +132,15 @@ MULTILINE_CALL_PATTERN = re.compile(
     re.VERBOSE | re.DOTALL,
 )
 
+EXECUTION_CELL_PATTERN = re.compile(
+    r"""
+    ```(?P<lang>bash|sh|shell|zsh|python|py)\s*\n
+    (?P<code>.*?)
+    \n```
+    """,
+    re.IGNORECASE | re.VERBOSE | re.DOTALL,
+)
+
 # Known tool name patterns (common Victor tools)
 KNOWN_TOOL_PATTERNS = frozenset(
     [
@@ -235,8 +244,36 @@ class PythonCallExtractor:
         warnings: List[str] = []
         positions_to_remove: List[Tuple[int, int]] = []
 
+        if "shell" in filter_names:
+            for match in EXECUTION_CELL_PATTERN.finditer(content):
+                if not self._has_execution_cell_intent_context(content, match.start()):
+                    continue
+                lang = match.group("lang").lower()
+                code = match.group("code").strip("\n")
+                if not code.strip():
+                    continue
+
+                if lang in {"python", "py"}:
+                    cmd = f"python - <<'PY'\n{code}\nPY"
+                else:
+                    cmd = code
+
+                tool_calls.append(
+                    ExtractedToolCall(
+                        name="shell",
+                        arguments={"cmd": cmd},
+                        raw_text=match.group(0),
+                        start_pos=match.start(),
+                        end_pos=match.end(),
+                        confidence=0.85,
+                    )
+                )
+                positions_to_remove.append((match.start(), match.end()))
+
         # Try simple pattern first
         for match in PYTHON_CALL_PATTERN.finditer(content):
+            if any(start <= match.start() < end for start, end in positions_to_remove):
+                continue
             name = match.group("name")
             canonical_name = canonicalize_core_tool_name(name)
             args_str = match.group("args")
@@ -306,6 +343,23 @@ class PythonCallExtractor:
             confidence=overall_confidence,
             warnings=warnings,
         )
+
+    def _has_execution_cell_intent_context(self, content: str, start_pos: int) -> bool:
+        """Return True when a fenced shell/python cell is meant to be executed."""
+        prefix = content[:start_pos].rsplit("\n", 2)
+        context = "\n".join(prefix[-2:]).lower()
+        if not context.strip():
+            return False
+        intent_words = (
+            "use shell",
+            "with shell",
+            "run this",
+            "execute this",
+            "run the following",
+            "execute the following",
+            "tool call",
+        )
+        return any(word in context for word in intent_words)
 
     def _is_definition_context(self, content: str, start_pos: int) -> bool:
         """Return True when a match occurs inside a Python definition header."""

@@ -129,7 +129,7 @@ async def test_service_streaming_runtime_supports_protocol_adapter_host(monkeypa
     chunk = StreamChunk(content="service", is_final=True)
 
     class DummyExecutor:
-        async def run(self, user_message: str, **kwargs):
+        async def run_unified(self, user_message: str, **kwargs):
             assert user_message == "hello"
             assert kwargs == {"mode": "test"}
             yield chunk
@@ -170,7 +170,7 @@ async def test_service_streaming_runtime_stream_chat_uses_executor(monkeypatch):
         def __init__(self):
             self.calls = []
 
-        async def run(self, user_message: str, **kwargs):
+        async def run_unified(self, user_message: str, **kwargs):
             self.calls.append((user_message, kwargs))
             yield chunk
 
@@ -617,7 +617,7 @@ async def test_service_streaming_runtime_stream_chat_restores_runtime_overrides(
     orch._current_stream_context = ctx
 
     class DummyExecutor:
-        async def run(self, user_message: str, **kwargs):
+        async def run_unified(self, user_message: str, **kwargs):
             yield StreamChunk(content="service", is_final=True)
 
     runtime._streaming_executor = DummyExecutor()
@@ -984,7 +984,7 @@ async def test_service_streaming_runtime_stream_chat_normalizes_recovery_events(
     orch._current_stream_context = ctx
 
     class DummyExecutor:
-        async def run(self, user_message: str, **kwargs):
+        async def run_unified(self, user_message: str, **kwargs):
             yield StreamChunk(content="service", is_final=True)
 
     runtime._streaming_executor = DummyExecutor()

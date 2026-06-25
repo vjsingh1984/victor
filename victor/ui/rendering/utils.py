@@ -303,6 +303,76 @@ def format_duration(elapsed: float) -> str:
     return f"{elapsed:.0f}s"
 
 
+def format_tool_args_bash_style(arguments: dict[str, Any], max_args: int = 5) -> str:
+    """Format tool arguments in bash CLI style (--key=value).
+
+    Args:
+        arguments: Tool arguments dict
+        max_args: Maximum number of arguments to show (rest truncated)
+
+    Returns:
+        Formatted args string like "--path='file.py' --limit=100"
+    """
+    if not arguments:
+        return ""
+
+    parts = []
+    for i, (k, v) in enumerate(arguments.items()):
+        if i >= max_args:
+            parts.append("...")
+            break
+
+        if isinstance(v, str):
+            # Escape single quotes in string values
+            escaped = v.replace("'", "\\'") if "'" in v else v
+            # Truncate long strings
+            display = escaped if len(escaped) <= 60 else escaped[:57] + "..."
+            part = f"--{k}='{display}'"
+        elif isinstance(v, bool):
+            # Boolean flags: --flag for True, omitted for False
+            if v:
+                part = f"--{k}"
+            else:
+                continue
+        elif isinstance(v, (int, float)):
+            part = f"--{k}={v}"
+        elif v is None:
+            continue
+        elif isinstance(v, list):
+            # List args: show count or first element
+            if v and isinstance(v[0], dict):
+                first = v[0]
+                op_type = first.get("type", "")
+                op_path = first.get("path", "")
+                summary = f"{op_type}:{op_path}" if op_type and op_path else str(len(v))
+                part = f"--{k}=[{summary}]" if len(v) == 1 else f"--{k}=[{summary} +{len(v)-1}]"
+            else:
+                part = f"--{k}=[{len(v)}]"
+        else:
+            part = f"--{k}=..."
+
+        parts.append(part)
+
+    return " ".join(parts)
+
+
+def format_bash_command_invocation(tool_name: str, arguments: dict[str, Any]) -> str:
+    """Format a complete bash-style command invocation.
+
+    Args:
+        tool_name: Name of the tool/command
+        arguments: Tool arguments dict
+
+    Returns:
+        Formatted command like "$ code_search --query='auth' --path='src/'"
+    """
+    args_str = format_tool_args_bash_style(arguments)
+    if args_str:
+        return f"[dim]$[/] [bold cyan]{tool_name}[/] [dim]{args_str}[/]"
+    else:
+        return f"[dim]$[/] [bold cyan]{tool_name}[/]"
+
+
 def render_file_preview(console: Console, path: str, content: str) -> None:
     """Render a file content preview panel.
 
@@ -373,11 +443,13 @@ def render_thinking_indicator(console: Console) -> None:
 
     # Use high contrast colors if enabled
     if theme_settings.high_contrast:
-        console.rule("[bold cyan]Reasoning[/]", style="bold", align="left")
-        console.print("[bold cyan]◌[/] [bold]Thinking[/]")
+        # A rule separates the reasoning section from prior output for readability
+        console.rule(style="bold cyan")
+        console.print("🤔 [bold cyan]Thinking...[/]")
     else:
-        console.rule("[dim cyan]Reasoning[/]", style="dim", align="left")
-        console.print("[cyan]◌[/] [dim italic]Thinking[/]")
+        # Subtle theme-based indicator
+        console.rule(style="thinking.text")
+        console.print("🤔 [thinking.indicator]Thinking...[/]", style="thinking.text")
 
 
 def render_thinking_text(console: Console, text: str) -> None:
@@ -387,7 +459,7 @@ def render_thinking_text(console: Console, text: str) -> None:
         console: Rich Console to render to
         text: Thinking text to display
     """
-    styled = Text(text, style="italic color(246)")
+    styled = Text(text, style="thinking.text")
     console.print(styled, end="")
 
 
@@ -479,22 +551,35 @@ def render_tool_preview(
         contains_rich_markup: If True, preview_text contains Rich markup and should
                              be rendered directly. If False, wrap with [dim] tags.
     """
-    for line in preview_text.split("\n"):
-        if line:
-            if contains_rich_markup:
-                # Line already contains Rich markup (e.g., formatted diffs)
-                # Just add the gutter prefix without wrapping the whole line
-                console.print(f"[dim]│ [/]{line}")
-            else:
-                # Plain text - wrap with dim for subtle preview
-                console.print(f"[dim]│ {line}[/]")
+    from rich import box
+    from rich.panel import Panel
+    from rich.text import Text
 
+    if not preview_text.strip():
+        return
+
+    # If it contains rich markup, we must construct a Text object using from_markup
+    # Otherwise we just use a dimmed Text object
+    if contains_rich_markup:
+        content = Text.from_markup(preview_text)
+    else:
+        content = Text(preview_text, style="dim")
+
+    footer = None
     if total_lines > preview_lines:
         remaining = total_lines - preview_lines
         suffix = "s" if remaining != 1 else ""
-        console.print(
-            f"[dim italic]└ {remaining} more line{suffix} • {hotkey} at prompt or /expand[/]"
-        )
+        footer = f"[dim italic]... {remaining} more line{suffix} • {hotkey} at prompt or /expand[/]"
+
+    panel = Panel(
+        content,
+        border_style="dim",
+        box=box.MINIMAL,
+        padding=(0, 2),
+        subtitle=footer,
+        subtitle_align="left",
+    )
+    console.print(panel)
 
 
 # Tools whose names map to valid Pygments lexer identifiers.
@@ -575,3 +660,152 @@ def expand_tool_output(
 
     if resume_fn is not None:
         resume_fn()
+
+
+# Tool metadata formatting helpers (Phase 1: Unified Registry Display)
+
+_ACCESS_MODE_COLORS = {
+    "readonly": "green",
+    "write": "yellow",
+    "execute": "red",
+    "network": "blue",
+    "mixed": "magenta",
+}
+
+_COST_TIER_SYMBOLS = {
+    "free": "",
+    "low": "$",
+    "medium": "$$",
+    "high": "$$$",
+}
+
+_EXECUTION_CATEGORY_ICONS = {
+    "read_only": "🔍",
+    "write": "📝",
+    "compute": "⚙️",
+    "network": "🌐",
+    "execute": "⚡",
+    "mixed": "🔀",
+}
+
+
+def format_access_mode_badge(access_mode: str) -> str:
+    """Format access mode as a colored badge.
+
+    Args:
+        access_mode: Access mode value (readonly, write, execute, network, mixed)
+
+    Returns:
+        Rich markup for colored badge
+    """
+    color = _ACCESS_MODE_COLORS.get(str(access_mode).lower(), "dim")
+    mode_upper = str(access_mode).upper() if access_mode else "UNKNOWN"
+    return f"[{color}]{mode_upper}[/]"
+
+
+def format_cost_tier_indicator(cost_tier: str) -> str:
+    """Format cost tier as dollar sign indicator.
+
+    Args:
+        cost_tier: Cost tier value (free, low, medium, high)
+
+    Returns:
+        Dollar sign indicator (empty for free, $ for low, etc.)
+    """
+    return _COST_TIER_SYMBOLS.get(str(cost_tier).lower(), "")
+
+
+def format_execution_category_hint(execution_category: str) -> str:
+    """Format execution category with icon hint.
+
+    Args:
+        execution_category: Execution category (read_only, write, compute, network, execute, mixed)
+
+    Returns:
+        Icon + category name
+    """
+    icon = _EXECUTION_CATEGORY_ICONS.get(str(execution_category).lower(), "•")
+    cat_label = str(execution_category).replace("_", " ").title()
+    return f"{icon} {cat_label}"
+
+
+def format_tool_metadata_badges(
+    category: str = "",
+    access_mode: str = "",
+    cost_tier: str = "",
+    execution_category: str = "",
+) -> str:
+    """Format complete tool metadata badges for display.
+
+    Args:
+        category: Tool category
+        access_mode: Access mode (readonly, write, execute, network, mixed)
+        cost_tier: Cost tier (free, low, medium, high)
+        execution_category: Execution category
+
+    Returns:
+        Rich markup with all applicable badges
+    """
+    badges = []
+
+    # Category badge (dimmed, no special styling)
+    if category:
+        badges.append(f"[dim dim]{category}[/]")
+
+    # Access mode badge (colored)
+    if access_mode and access_mode != "readonly":
+        badges.append(format_access_mode_badge(access_mode))
+
+    # Cost tier indicator
+    if cost_tier:
+        cost_indicator = format_cost_tier_indicator(cost_tier)
+        if cost_indicator:
+            badges.append(f"[yellow]{cost_indicator}[/]")
+
+    # Execution category hint
+    if execution_category:
+        badges.append(f"[dim]{format_execution_category_hint(execution_category)}[/]")
+
+    return " ".join(badges) if badges else ""
+
+
+def get_tool_metadata_for_display(tool_name: str) -> dict:
+    """Get tool metadata from unified registry for display.
+
+    Args:
+        tool_name: Name of the tool
+
+    Returns:
+        Dict with category, access_mode, cost_tier, execution_category
+    """
+    try:
+        from victor.tools.metadata_registry import ToolMetadataRegistry
+
+        registry = ToolMetadataRegistry.get_instance()
+        metadata = registry.get_metadata(tool_name)
+
+        if metadata:
+            return {
+                "category": metadata.category or "",
+                "access_mode": metadata.access_mode.value if metadata.access_mode else "readonly",
+                "cost_tier": (
+                    metadata.cost_tier.value
+                    if hasattr(metadata, "cost_tier") and metadata.cost_tier
+                    else "free"
+                ),
+                "execution_category": (
+                    metadata.execution_category.value
+                    if metadata.execution_category
+                    else "read_only"
+                ),
+            }
+    except Exception:
+        pass
+
+    # Fallback defaults
+    return {
+        "category": "",
+        "access_mode": "readonly",
+        "cost_tier": "free",
+        "execution_category": "read_only",
+    }

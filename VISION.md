@@ -54,3 +54,7 @@ Victor exists to be the open-source framework for building agentic systems that 
 1. Runtime trust: safer async boundaries, cleaner secrets handling, and smaller operational hotspots.
 2. SDK clarity: a cleaner external vertical and capability story with fewer implicit framework contracts.
 3. Proof, not posture: published benchmarks, clearer onboarding, and more honest observability narratives.
+4. Durable code memory: drive the agent from a correlated code graph + embedding backend (one entity =
+   row + node + vector) so it is less LLM-dependent and remembers structure and relationships across
+   sessions — embedded locally, and multi-tenant as a service. See
+   [ProximaDB as the CCG Backend](docs/architecture/proximadb-codegraph-backend.md).

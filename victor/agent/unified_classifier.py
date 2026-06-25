@@ -101,6 +101,27 @@ class ClassifierTaskType(Enum):
     EDIT = "edit"  # Modify, refactor, fix existing code
     DEFAULT = "default"  # Ambiguous or conversational
 
+    def to_canonical(self) -> str:
+        """Canonical task-type name in the TaskTypeRegistry (tool-supply P7).
+
+        Collapses this adapter enum onto the single registry taxonomy; coarse values
+        (analysis/generation/default) resolve through the registry's alias map.
+        """
+        from victor.framework.task_types import canonicalize_task_type
+
+        return canonicalize_task_type(self.value)
+
+    @classmethod
+    def from_canonical(cls, name: str) -> "Optional[ClassifierTaskType]":
+        """Best-effort reverse map: a canonical name -> the member that yields it."""
+        from victor.framework.task_types import canonicalize_task_type
+
+        target = canonicalize_task_type(name)
+        for member in cls:
+            if member.to_canonical() == target:
+                return member
+        return None
+
 
 @dataclass
 class KeywordMatch:

@@ -365,7 +365,12 @@ class ProfileConfig(BaseSettings):
 
     provider: str = Field(..., description="Provider name (ollama, anthropic, openai, google)")
     model: str = Field(..., description="Model identifier")
-    temperature: float = Field(0.7, ge=0.0, le=2.0)
+    temperature: float = Field(0.6, ge=0.0, le=2.0)  # ADR-013 default flip 0.7→0.6 (A/B 2026-06-22)
+    temperatures: Optional[Dict[str, float]] = Field(
+        None,
+        description="Per-task temperature overrides (task_type -> temperature), e.g. {'plan': 0.5}. "
+        "Highest precedence in the ADR-013 resolution chain; absent keys defer to settings/constants.",
+    )
     max_tokens: int = Field(4096, gt=0)
     description: Optional[str] = Field(None, description="Optional profile description")
     tool_selection: Optional[Dict[str, Any]] = Field(
@@ -585,6 +590,7 @@ from victor.config.prompt_optimization_settings import (
 from victor.config.credit_assignment_settings import (
     CreditAssignmentSettings,
 )  # noqa: E402
+from victor.config.temperature_settings import TemperatureSettings  # noqa: E402
 
 # Module-level mapping of group names to nested model classes
 _NESTED_GROUPS = {
@@ -634,6 +640,7 @@ _NESTED_GROUPS = {
     "tool_selection": ToolSelectionSettings,
     "fuzzy_matching": FuzzyMatchingSettings,
     "governance": GovernanceSettings,
+    "temperature_policy": TemperatureSettings,
 }
 
 
@@ -1137,6 +1144,9 @@ class Settings(BaseSettings):
     tool_selection: Optional[ToolSelectionSettings] = Field(default=None, exclude=True, repr=False)
     fuzzy_matching: Optional[FuzzyMatchingSettings] = Field(default=None, exclude=True, repr=False)
     governance: Optional[GovernanceSettings] = Field(default=None, exclude=True, repr=False)
+    temperature_policy: Optional[TemperatureSettings] = Field(
+        default=None, exclude=True, repr=False
+    )
 
     tool_settings: Optional[ToolSettings] = Field(
         default_factory=ToolSettings, exclude=True, repr=False
@@ -2296,7 +2306,7 @@ class Settings(BaseSettings):
                 "default": ProfileConfig(
                     provider="lmstudio",
                     model=default_model,
-                    temperature=0.7,
+                    temperature=0.6,
                     max_tokens=4096,
                     description=None,
                     tool_selection=None,
@@ -2587,3 +2597,53 @@ def validate_default_model(settings: "Settings") -> tuple[bool, str | None]:
     except Exception:
         # Unexpected error - don't block startup
         return True, None
+
+
+_warned_graph_writer_compatibility = False
+
+
+def _get_settings_group_value(
+    settings: Any, group_name: str, field_name: str, default: Any = None
+) -> Any:
+    """Resolve a setting from its nested group, with flat fallback for test doubles."""
+    group = getattr(settings, group_name, None)
+    if group is not None and hasattr(group, field_name):
+        return getattr(group, field_name)
+    return getattr(settings, field_name, default)
+
+
+def _get_search_setting(settings: Any, field_name: str, default: Any = None) -> Any:
+    """Resolve a code-search setting from the canonical search group."""
+    return _get_settings_group_value(settings, "search", field_name, default)
+
+
+def _resolve_graph_writer_mode(settings: Any) -> str:
+    """Resolve graph writer mode with explicit compatibility-mode warning."""
+    global _warned_graph_writer_compatibility
+
+    graph_writer_mode = _get_search_setting(settings, "codebase_graph_writer_mode", "")
+    if not graph_writer_mode:
+        graph_writer_mode = os.environ.get("VICTOR_CODEBASE_GRAPH_WRITER_MODE", "off")
+
+    mode = str(graph_writer_mode).strip().lower()
+    if mode in {"", "off", "false", "0"}:
+        return "off"
+    if mode == "compatibility":
+        if not _warned_graph_writer_compatibility:
+            warnings.warn(
+                "codebase_graph_writer_mode='compatibility' is deprecated compatibility "
+                "support. Victor-coding graph writes should be treated as explicit, "
+                "temporary compatibility behavior and are not the primary graph source.",
+                UserWarning,
+                stacklevel=2,
+            )
+            _warned_graph_writer_compatibility = True
+        return "compatibility"
+    if mode in {"on", "true", "1"}:
+        warnings.warn(
+            "codebase_graph_writer_mode only supports 'off' (default) and "
+            "'compatibility' (deprecated). Treating value as 'off'.",
+            UserWarning,
+            stacklevel=2,
+        )
+    return "off"

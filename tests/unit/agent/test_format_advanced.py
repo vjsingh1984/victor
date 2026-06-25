@@ -38,6 +38,22 @@ from victor.agent.custom_format_examples import (
 class TestFormatPerformanceMonitor:
     """Test performance monitoring for format strategies."""
 
+    @pytest.fixture(autouse=True)
+    def _reset_monitor(self):
+        """Reset the singleton before each test.
+
+        FormatPerformanceMonitor is a process-wide singleton, and several
+        tests below toggle ``disable()`` (e.g. test_disabled_monitoring leaves
+        it disabled). Without a reset, that state leaks into later tests and
+        gates off ``record_format_metric``, making results order-dependent
+        (test_clear_metrics failed under CI shard ordering because recording
+        was silently skipped).
+        """
+        monitor = FormatPerformanceMonitor.get_instance()
+        monitor.clear_metrics()
+        monitor.enable()
+        yield
+
     def test_singleton_instance(self):
         """Monitor should be a singleton."""
         monitor1 = FormatPerformanceMonitor.get_instance()

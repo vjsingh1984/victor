@@ -41,6 +41,8 @@ from enum import Enum
 from pathlib import Path
 from typing import List, Optional
 
+from victor.core.attribution import append_victor_commit_attribution
+
 logger = logging.getLogger(__name__)
 
 
@@ -84,7 +86,8 @@ class AutoCommitter:
     - Configurable auto-commit behavior
     """
 
-    COMMIT_SIGNATURE = "[Victor]"
+    COMMIT_SIGNATURE = "Generated-by: victor-code-ai"
+    LEGACY_COMMIT_SIGNATURE = "[Victor]"
 
     def __init__(
         self,
@@ -230,10 +233,7 @@ class AutoCommitter:
                 parts.append(f"  ... and {len(files) - 10} more")
             parts.append("")
 
-        # Add signature
-        parts.append(self.COMMIT_SIGNATURE)
-
-        return "\n".join(parts)
+        return append_victor_commit_attribution("\n".join(parts))
 
     def _detect_change_type(self, description: str, files: Optional[List[str]] = None) -> str:
         """Auto-detect change type from description and files.
@@ -402,7 +402,11 @@ class AutoCommitter:
                         "author_name": parts[2],
                         "author_email": parts[3],
                         "date": parts[4],
-                        "is_victor": self.COMMIT_SIGNATURE in full_message,
+                        "is_victor": (
+                            self.COMMIT_SIGNATURE in full_message
+                            or self.LEGACY_COMMIT_SIGNATURE in full_message
+                            or "Co-authored-by: victor-code-ai" in full_message
+                        ),
                     }
         except Exception as e:
             logger.debug("Failed to retrieve last commit info: %s", e)

@@ -134,7 +134,9 @@ class TestE3TIRSelector:
 
     def test_demonstration_boost_reranks(self):
         store = ToolExperienceStore()
-        config = E3TIRConfig(min_demonstrations=1)
+        # R4: demonstration-reward reranking is OFF by default (RL Q-value owns tool
+        # success). This test exercises the opt-in feature, so it enables it explicitly.
+        config = E3TIRConfig(min_demonstrations=1, enable_demonstration_reranking=True)
         selector = E3TIRToolSelector(store=store, config=config)
 
         # Add demonstrations for "web_search" (normally last)
@@ -149,6 +151,28 @@ class TestE3TIRSelector:
         # web_search should be boosted toward the top
         web_idx = result.index("web_search") if "web_search" in result else len(result)
         assert web_idx < 7, f"web_search at index {web_idx}, expected < 7 after demo boost"
+
+    def test_demonstration_boost_gate(self, monkeypatch):
+        # R4: demonstration-reward reranking is gated OFF by default (RL Q-value owns
+        # tool success) and runs only when explicitly enabled. Verify the gate directly
+        # (robust to E3-TIR's other transforms like exploration injection).
+        def _make(enabled):
+            store = ToolExperienceStore()
+            cfg = E3TIRConfig(min_demonstrations=1, enable_demonstration_reranking=enabled)
+            sel = E3TIRToolSelector(store=store, config=cfg)
+            calls = []
+            orig = sel._apply_demonstration_boost
+
+            def spy(candidates, task_type):
+                calls.append(1)
+                return orig(candidates, task_type)
+
+            monkeypatch.setattr(sel, "_apply_demonstration_boost", spy)
+            sel.select(TOOLS, task_type="research", base_ranking=list(TOOLS))
+            return calls
+
+        assert _make(False) == []  # default: not invoked
+        assert _make(True) == [1]  # opt-in: invoked once
 
     def test_targeted_exploration_injects_underutilized(self):
         store = ToolExperienceStore()

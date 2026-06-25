@@ -22,7 +22,7 @@ from collections import defaultdict
 from dataclasses import asdict, dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -95,6 +95,10 @@ class ToolExperienceStore:
         self._persist_path = persist_path
         self._tool_stats: Dict[str, ToolStats] = defaultdict(ToolStats)
         self._all_known_tools: set = set()
+        # R3: this in-memory store is a *projection* of the durable RL_OUTCOME
+        # stream. It is empty on restart, so it is warm-started once from the DB
+        # (see warm_start_from_outcomes) to avoid drifting from the durable truth.
+        self._warm_started: bool = False
 
         if persist_path and persist_path.exists():
             self._load()
@@ -141,6 +145,46 @@ class ToolExperienceStore:
                 context=context or {},
             )
         )
+
+    def warm_start_from_outcomes(
+        self,
+        outcomes: Iterable[tuple],
+        *,
+        experience_type: ExperienceType = ExperienceType.DEMONSTRATION,
+    ) -> int:
+        """Rebuild the projection from durable tool-execution outcomes (R3).
+
+        The store is an in-memory *projection* of the durable RL_OUTCOME stream;
+        it is otherwise empty on restart, drifting from the durable truth. This
+        replays historical outcomes (chronological order expected) so the
+        projection reflects what was already recorded.
+
+        Idempotent: runs at most once per store instance (guarded by
+        ``_warm_started``) so it cannot double-count alongside the live feed.
+
+        Args:
+            outcomes: iterable of ``(tool_name, task_type, success, reward)``.
+            experience_type: classification for replayed history.
+
+        Returns:
+            Number of outcomes replayed.
+        """
+        if self._warm_started:
+            return 0
+        self._warm_started = True
+        count = 0
+        for tool_name, task_type, success, reward in outcomes:
+            if not tool_name:
+                continue
+            self.record_outcome(
+                tool_name=tool_name,
+                task_type=task_type or "general",
+                success=bool(success),
+                reward=float(reward),
+                experience_type=experience_type,
+            )
+            count += 1
+        return count
 
     def register_tools(self, tool_names: List[str]) -> None:
         """Register known tools for exploration tracking."""

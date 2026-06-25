@@ -5,7 +5,124 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased] (develop)
 
-_No changes yet._
+## [0.7.2] - TBD
+
+### ⚠️ Breaking Changes
+- **`StreamingChatExecutor.run()` deprecated** — The legacy entry point is now a thin alias to `run_unified()` with `DeprecationWarning` (target removal: 0.8.0). Migrate to `run_unified()` or `AgenticLoop.run_streaming()`. (#199)
+- **ToolCategory enum consolidation** — Single authority in `victor.tools.enums`; YAML-derived category views are now validated, not authoritive. (#238)
+- **pattern_registry.TaskType collapsed** — 42-member enum migrated to canonical registry; 6 real orphans overridden. (#240)
+
+### Added
+- **FEP-0007: Streaming Loop Extraction** — Complete decomposition of `StreamingChatExecutor.run()` into explicit per-turn primitives:
+  - Per-turn ACT sub-steps: `_stream_provider_turn`, `_execute_tools_turn` (#180, #181)
+  - Per-turn EVALUATE bands: `_evaluate_provider_turn_stops`, `_evaluate_post_tool_turn` (#182, #183)
+  - Turn lifecycle: `_extract_task_requirements`, `_apply_run_guidance`, `_initialize_task_intent` (#176-#179)
+  - Decision points: `_detect_task_completion_and_mentions`, `_apply_turn_recovery`, `_emit_assistant_turn`, `_handle_continuation_decision` (#184, #185, #187, #189, #190)
+  - Single `_stream_turn()` primitive assembling the full per-turn body (#192)
+  - Streaming parity battery (14 baseline byte-identical tests) (#186, #188)
+  - `AgenticLoop.run_streaming()` over the streaming ACT seam (#195-#197)
+  - FEP-0007 cutover: unified streaming onto PPAED loop + legacy removal (#199)
+
+- **Evaluation-Centric Runtime (FEP-0008 + ADR-009-012)**:
+  - EVR-1: Trajectory-level evaluation harness (#201)
+  - EVR-2: LLM-judge reliability gating (ADR-011) (#202)
+  - EVR-3: Rubric-based completion evaluator machinery (ADR-009) (#203, #216, #217)
+  - ADR-009: LLM rubric judge + judge-eval harness, completion_strategy threading, A/B harnesses (#216, #217, #219, #223)
+  - Vision P6: RL-from-traces with credit-assignment framework (#222)
+  - Correlation spine joining offered/invoked/resulted by session+turn (R1) (#224)
+  - One canonical default reward; deleted inline reward path (R2) (#225)
+  - ToolExperienceStore as projection of durable outcomes (R3) (#226)
+  - RL Q-value as sole tool-success signal at Gate 1 (R4) (#227)
+
+- **ADR-013: Unified Temperature Policy**:
+  - Single composed TemperatureResolver from 6 scattered paths (Source/Modifier Protocols) (#206)
+  - TemperatureSettings group + ProfileConfig.temperatures + settings adapter (#207)
+  - Task-hint-aware routing with profile›settings›task-hint›base›0.6 precedence (#208)
+  - Streaming cutover + parity regression fixes (#209)
+  - Spin-escape ratchet (step 0.05, cap 0.9) + AST boundary guard (#210, #213)
+  - Default temperature flip 0.7→0.6 (#243)
+  - Recovery ramps folded into shared escalate_temperature (#215)
+  - Temperature A/B harness (#214)
+
+- **Tool Supply & RL/Trace Consolidation** (16 PRs: #220-#240):
+  - Per-turn tool-supply telemetry (duration, real-output, pruning, follow-ups) (#220)
+  - ToolSupplyProfile provider-economics resolver (#228)
+  - Cap demotes to STUB instead of dropping tools (#229)
+  - Q&A necessity gate returns read-core, not None (#230)
+  - Additive session_stable KV tool set (#231)
+  - Capability-first prompt-tool split (#232)
+  - Single resolve_contract() metadata authority (#234)
+  - ACT selection pipeline as explicit ordered stages, on by default (#237)
+  - TaskType adapters collapsed onto canonical registry (#236)
+  - ToolCategory enum + YAML onto one vocabulary authority (#238)
+  - pattern_registry.TaskType collapsed onto canonical registry (#240)
+
+- **FEP-0009: SDK Tool Contract**:
+  - Phase 1: `victor_contracts.tools` with ToolContract + trait enums (#245)
+  - Phase 2: Duck-typed `resolve_contract()` bridge (version-skew-safe) (#246)
+  - Dev story: editable-install local victor-contracts first (#247)
+  - Retargeted to 0.7.1 release (#248)
+
+- **ProximaDB CodeGraph Backend (TD-11/12/13)**:
+  - Per-repo flag for ProximaDB Code Context Graph backend (#249)
+  - Unified ProximaDB correlated collection — vectors + graph on one oid (#250)
+  - Optional `proximadb` extra (`proximadb-python>=0.2,<0.3`) (#212)
+
+- **Vertical Tools Extraction**:
+  - Core/vertical boundary enforcement via capability_loader (#253)
+  - Vertical imports routed through sanctioned pattern; boundary guard test (5/5 pass)
+  - ConversationSession extraction + workflow escape hatch purification (#251, #252)
+
+- **Provider Enhancements**:
+  - GLM-5.2 registration with context_window() override (fix 128K freeze) (#254)
+  - Config-driven provider context windows via `provider_context_limits.yaml` (#255)
+  - Z.AI API + KV prefix caching support (#256)
+  - Provider cache audit contracts (#257)
+
+- **Tool Improvements**:
+  - Grouped command tools (shell-style, standardized args, runtime wiring) (#258-#260)
+  - AI attribution logic for commits/PRs + tool folding (#261)
+  - Context-aware tool supply stabilization (#258)
+  - Lazy load specialty tool schemas (#264)
+  - Write-intent guards + action signaling on core tools (#266)
+  - STABLE_TOOL_ORDER priority ranking for all 54 session tools (#267)
+  - Fold thin CLI wrappers into shell + canonical cwd parameter (#268)
+
+- **Shell & Readonly Hardening**:
+  - Expanded readonly validation (bare flags, docker compose, npm, pipdeptree, terraform) (#269)
+  - Readonly shell command validation hardening (#270)
+  - Browser render mode for web fetch (#271)
+
+- **Chat-UX Polish**:
+  - Victor console rendering polish (#265)
+
+- **Auth & Config**:
+  - Unified accounts+profiles list, show & env commands, status leak fixes (#168)
+  - Convergence-guard thresholds surfaced as ExplorationSettings (#175)
+  - Shared TurnEvaluationController — dedupe per-turn guards across agentic loops (#170)
+  - Convergence follow-on: FEP-0007, plateau, search-novelty, fulfillment-complete (#173)
+
+- **Docs & CI**:
+  - Auto-generate API reference (mkdocstrings) + single-source version stamp (#169)
+  - Overview-first tool steering + large-file skeleton hint (#172)
+  - Docs-drift gate to ci-fast (#167)
+  - Black aligned to 26.3.1 (CI + pre-commit) (#242)
+  - ProximaDB Code Context Graph backend documentation (#233)
+
+- **Deps**:
+  - typer>=0.15 for click>=8.2 compatibility (#211)
+
+### Fixed
+- **Streaming fulfillment criteria** — Now built via real builder API instead of dead code (#184)
+- **Tool budget** — Made honestly advisory; removed dead hard-stop (#191)
+- **ProximaDB provider lifecycle** — Logs instead of stdout prints (#218)
+- **ProximaDB UDS transport** — Respects default transport in embedded config (#273)
+- **Conversation semantic search** — Uses correct embedding store method (#277)
+- **Bayesian SessionConfig validation** — Asserts threshold ranges (0.0-1.0) with ValueError for out-of-range (#272)
+- **Agentic iteration count** — Surfaced correctly for A/B turn metric (#235)
+- **Prompt-guard tool names** — Aligned with canonical read surface (grep, not stale code_search hint) (#274)
+- **Write/mutation/exploration tool-name sets** — Sourced from unified registry via core_tool_aliases + tool_names (#199)
+- **Formatting** — Black applied to proximadb_provider.py (#239)
 
 ## [0.7.1] - 2026-06-21
 

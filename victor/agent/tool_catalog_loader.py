@@ -57,6 +57,7 @@ class ToolCatalogConfig:
     airgapped_mode: bool = False
     enabled_tools: List[str] = field(default_factory=list)
     disabled_tools: List[str] = field(default_factory=list)
+    lazy_startup: bool = True
 
 
 @dataclass
@@ -72,6 +73,7 @@ class CatalogLoadResult:
     tools_loaded: int = 0
     tools_disabled: int = 0
     errors: List[str] = field(default_factory=list)
+    full_catalog_loaded: bool = False
 
 
 class ToolCatalogLoader:
@@ -104,6 +106,7 @@ class ToolCatalogLoader:
         self._settings = settings
         self._config = config or ToolCatalogConfig()
         self._loaded = False
+        self._bootstrap_loaded = False
 
     @property
     def is_loaded(self) -> bool:
@@ -124,12 +127,14 @@ class ToolCatalogLoader:
         result = CatalogLoadResult()
 
         # Register dynamic tools
-        result.tools_loaded = self._register_from_shared_registry()
+        result.tools_loaded = self._register_from_shared_registry(full=True)
+        result.full_catalog_loaded = True
 
         # Apply configuration
         result.tools_disabled = self._apply_configuration()
 
         self._loaded = True
+        self._bootstrap_loaded = True
         logger.debug(
             f"ToolCatalogLoader: loaded {result.tools_loaded} tools, "
             f"disabled {result.tools_disabled}"
@@ -137,7 +142,56 @@ class ToolCatalogLoader:
 
         return result
 
-    def _register_from_shared_registry(self) -> int:
+    def load_bootstrap(self) -> CatalogLoadResult:
+        """Load the compact startup tool set.
+
+        This keeps session startup from importing/registering the full specialty
+        catalog. Use ``load`` for the old eager behavior or ``ensure_tools`` for
+        targeted hydration.
+        """
+        result = CatalogLoadResult()
+        result.tools_loaded = self._register_from_shared_registry(full=False)
+        result.tools_disabled = self._apply_configuration()
+        self._bootstrap_loaded = True
+        logger.debug(
+            f"ToolCatalogLoader: bootstrap-loaded {result.tools_loaded} tools, "
+            f"disabled {result.tools_disabled}"
+        )
+        return result
+
+    def ensure_tools(self, tool_names: List[str]) -> CatalogLoadResult:
+        """Register specific known tools without full catalog discovery."""
+        result = CatalogLoadResult()
+        if not tool_names:
+            return result
+
+        from victor.agent.shared_tool_registry import SharedToolRegistry
+        from victor.tools.batch_registration import BatchRegistrar
+
+        shared_registry = SharedToolRegistry.get_instance()
+        already_registered = {
+            getattr(tool, "name", "") for tool in self._registry.list_tools(only_enabled=False)
+        }
+        needed = [name for name in tool_names if name not in already_registered]
+        if not needed:
+            return result
+
+        tools_to_register = shared_registry.get_tools_for_names(
+            needed,
+            airgapped_mode=self._config.airgapped_mode,
+        )
+        registrar = BatchRegistrar(self._registry)
+        batch_result = registrar.register_batch(tools_to_register, fail_fast=False)
+        result.tools_loaded = batch_result.success_count
+        if batch_result.failure_count > 0:
+            result.errors.extend(f"{name}: {error}" for name, error in batch_result.failed)
+            for tool_name, error_msg in batch_result.failed:
+                logger.debug(f"Skipped registering {tool_name}: {error_msg}")
+        if result.tools_loaded:
+            self._apply_configuration()
+        return result
+
+    def _register_from_shared_registry(self, *, full: bool) -> int:
         """Register tools from the shared tool registry.
 
         Uses SharedToolRegistry to get pre-discovered tool definitions,
@@ -150,9 +204,14 @@ class ToolCatalogLoader:
 
         shared_registry = SharedToolRegistry.get_instance()
 
-        tools_to_register = shared_registry.get_all_tools_for_registration(
-            airgapped_mode=self._config.airgapped_mode
-        )
+        if full:
+            tools_to_register = shared_registry.get_all_tools_for_registration(
+                airgapped_mode=self._config.airgapped_mode
+            )
+        else:
+            tools_to_register = shared_registry.get_bootstrap_tools_for_registration(
+                airgapped_mode=self._config.airgapped_mode
+            )
 
         # Use batch registration for performance (30-50 tools → single cache invalidation)
         from victor.tools.batch_registration import BatchRegistrar

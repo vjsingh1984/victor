@@ -32,15 +32,35 @@ from typing import Dict, List, Optional, Pattern
 
 from victor.framework.task.protocols import TaskComplexity
 
+# Adapter-local pre-map (tool-supply P7 follow-on) for the handful of members that have
+# NO alias or canonical name in the *default* (core) ``TaskTypeRegistry``. Everything
+# else is either a core type, an existing core alias (``implement`` -> create,
+# ``plan`` / ``architecture`` -> design), or a vertical-scoped type that resolves to
+# itself (kubernetes, terraform, data_profiling, …). These six are the genuine orphans;
+# they map to the closest core type so ``to_canonical()`` never yields an unregistered
+# name. ``bug_fix`` / ``issue_resolution`` follow the registry's existing
+# ``bugfix`` / ``fix_bug`` -> edit decision for consistency.
+_CANONICAL_OVERRIDES: Dict[str, str] = {
+    "bug_fix": "edit",
+    "issue_resolution": "edit",
+    "data_analysis": "analyze",
+    "security": "analyze",
+    "explain": "analyze",
+    "general_query": "general",
+}
+
 
 class TaskType(Enum):
-    """Types of tasks that can be detected from prompts.
+    """Prompt-classification task labels (an *adapter* over the canonical registry).
 
-    This is the CANONICAL TaskType enum for prompt classification.
-    Other modules should import from here.
+    These labels are the fine-grained output of pattern classification. The single
+    authority for task-type identity/aliasing is
+    ``victor.framework.task_types.TaskTypeRegistry``; use :meth:`to_canonical` to
+    collapse a member onto a registered canonical name (tool-supply P7 follow-on)
+    rather than treating this enum as a parallel taxonomy.
 
     Semantic Variants (all different purposes):
-    - TaskType (here): Canonical prompt classification with all task types
+    - TaskType (here): Prompt classification labels (this adapter)
     - TrackerTaskType: Progress tracking with milestones
     - LoopDetectorTaskType: Loop detection thresholds
     - ClassifierTaskType: Unified classification output
@@ -101,6 +121,34 @@ class TaskType(Enum):
     ARCHITECTURE = "architecture"
     PLAN = "plan"
     EXPLAIN = "explain"
+
+    def to_canonical(self) -> str:
+        """Canonical task-type name in the ``TaskTypeRegistry`` (tool-supply P7).
+
+        Collapses this adapter enum onto the single registry taxonomy. Core members
+        and existing core aliases resolve directly; vertical-scoped members
+        (kubernetes, terraform, …) resolve to themselves (they are registered under
+        their vertical); the genuine orphans route through ``_CANONICAL_OVERRIDES``.
+        """
+        from victor.framework.task_types import canonicalize_task_type
+
+        return canonicalize_task_type(self.value, overrides=_CANONICAL_OVERRIDES)
+
+    @classmethod
+    def from_canonical(cls, name: str) -> "Optional[TaskType]":
+        """Best-effort reverse map: a canonical name -> the member that yields it.
+
+        Several members may share a canonical name (e.g. bug_fix/issue_resolution ->
+        edit); the first definition-order member is returned, which is canonical-stable
+        on round trip.
+        """
+        from victor.framework.task_types import canonicalize_task_type
+
+        target = canonicalize_task_type(name, overrides=_CANONICAL_OVERRIDES)
+        for member in cls:
+            if member.to_canonical() == target:
+                return member
+        return None
 
 
 @dataclass(frozen=True)

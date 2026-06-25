@@ -20,6 +20,7 @@ OpenAI-compatible APIs (OpenAI, xAI, LMStudio, vLLM, Ollama).
 These utilities help reduce code duplication across provider implementations.
 """
 
+import hashlib
 import json
 import logging
 import re
@@ -32,6 +33,28 @@ import httpx
 from victor.providers.base import Message, ToolDefinition
 
 logger = logging.getLogger(__name__)
+
+# Last-computed stability fingerprints for the serialized tools arrays.
+# Exposed for observability/diagnostics so callers (or tests) can compare the
+# serialized payload across turns without re-serializing. A changed fingerprint
+# between turns means the `tools[]` field changed and any prefix cache keyed on
+# it will miss.
+_LAST_TOOLS_FINGERPRINT_OPENAI: Optional[str] = None
+_LAST_TOOLS_FINGERPRINT_ANTHROPIC: Optional[str] = None
+
+
+def _serialized_tools_fingerprint(converted: List[Dict[str, Any]]) -> str:
+    """Compute a short stability hash of a serialized tools array.
+
+    Identical ``tools[]`` arrays (same names, descriptions, and JSON schemas,
+    regardless of insertion order) produce identical hashes. This is the core
+    first-principles debugging signal for KV/prefix-cache behavior: if the
+    fingerprint is stable across turns, the provider can cache the tools
+    prefix; if it churns, the prefix cache misses every turn.
+    """
+    payload = json.dumps(converted, sort_keys=True, separators=(",", ":"))
+    return hashlib.md5(payload.encode("utf-8")).hexdigest()[:12]
+
 
 _LAST_TOOL_MESSAGE_CLEANUP_STATS: ContextVar[Optional[Dict[str, Any]]] = ContextVar(
     "victor_openai_compat_last_tool_message_cleanup_stats",
@@ -86,15 +109,22 @@ def convert_tools_to_openai_format(tools: List[ToolDefinition]) -> List[Dict[str
         }
         for tool in tools
     ]
-    # Log tool schemas sent to provider
+    # Log serialized tool schemas at INFO so the payload is visible per-call for
+    # first-principles debugging. The fingerprint is a stability hash of the
+    # *serialized* array: stable across turns => prefix cache eligible; churning
+    # => prefix cache misses every turn.
     tool_sigs = []
     for t in result:
         fn = t["function"]
         props = fn.get("parameters", {}).get("properties", {})
         tool_sigs.append(f"{fn['name']}({list(props.keys())})")
-    logger.debug(
-        "[ToolSchemas→LLM] OpenAI format: %d tools: %s",
+    fingerprint = _serialized_tools_fingerprint(result)
+    global _LAST_TOOLS_FINGERPRINT_OPENAI
+    _LAST_TOOLS_FINGERPRINT_OPENAI = fingerprint
+    logger.info(
+        "[ToolSchemas→LLM] OpenAI format: %d tools (fingerprint=%s): %s",
         len(result),
+        fingerprint,
         ", ".join(tool_sigs),
     )
     return result
@@ -119,14 +149,20 @@ def convert_tools_to_anthropic_format(
         }
         for tool in tools
     ]
-    # Log tool schemas sent to provider
+    # Log serialized tool schemas at INFO for first-principles debugging. The
+    # fingerprint reflects tool content/schema only (cache_control markers are
+    # added later by the provider and are intentionally NOT part of this hash).
     tool_sigs = []
     for t in result:
         props = t.get("input_schema", {}).get("properties", {})
         tool_sigs.append(f"{t['name']}({list(props.keys())})")
-    logger.debug(
-        "[ToolSchemas→LLM] Anthropic format: %d tools: %s",
+    fingerprint = _serialized_tools_fingerprint(result)
+    global _LAST_TOOLS_FINGERPRINT_ANTHROPIC
+    _LAST_TOOLS_FINGERPRINT_ANTHROPIC = fingerprint
+    logger.info(
+        "[ToolSchemas→LLM] Anthropic format: %d tools (fingerprint=%s): %s",
         len(result),
+        fingerprint,
         ", ".join(tool_sigs),
     )
     return result

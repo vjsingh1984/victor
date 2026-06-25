@@ -177,6 +177,10 @@ READONLY_COMMANDS_UNIX: Set[str] = {
     "black",
     "ruff",
     "eslint",
+    # Dependency tree visualization (readonly)
+    "pipdeptree",
+    # Infrastructure as Code inspection (readonly)
+    "terraform",
 }
 
 READONLY_COMMANDS_WINDOWS: Set[str] = {
@@ -356,10 +360,12 @@ def _extract_subcommand(cmd: str, base_cmd: str) -> Optional[str]:
 
 
 def _split_compound_command(cmd: str) -> List[str]:
-    """Split a compound command into individual components.
+    """Split a compound command into individual command segments.
 
-    Handles &&, ||, and ; operators while respecting quoted strings.
-    Returns a list of command strings.
+    Handles ``&&``, ``||``, ``;`` and pipeline ``|`` operators while respecting
+    quoted strings. Every returned segment is validated independently for
+    readonly mode, so a safe command cannot hide a mutating command later in a
+    chain or pipeline.
     """
     components = []
     current = []
@@ -414,6 +420,15 @@ def _split_compound_command(cmd: str) -> List[str]:
                 current = []
                 i += 2
                 continue
+            # Check for single pipeline |. A pipeline is readonly only if every
+            # segment is readonly; `cat f | tee out` must fail on the tee segment.
+            if char == "|":
+                component = "".join(current).strip()
+                if component:
+                    components.append(component)
+                current = []
+                i += 1
+                continue
             # Check for ; (not part of ;; or other constructs)
             if char == ";":
                 # Skip if it's ;; (used in some shells like case statements)
@@ -437,6 +452,127 @@ def _split_compound_command(cmd: str) -> List[str]:
         components.append(component)
 
     return components if components else [cmd.strip()]
+
+
+def _redirection_target(cmd: str, start: int) -> tuple[str, int]:
+    """Return the target token after a redirection operator.
+
+    ``start`` points just after the operator. The target is read until shell
+    whitespace or another unquoted shell operator. Quotes are stripped by
+    ``shlex`` later; here we only need enough lexical awareness to distinguish
+    ``>/dev/null`` from ``> output.txt``.
+    """
+    n = len(cmd)
+    i = start
+    while i < n and cmd[i].isspace():
+        i += 1
+    out: List[str] = []
+    in_quote = None
+    escape = False
+    while i < n:
+        ch = cmd[i]
+        if escape:
+            out.append(ch)
+            escape = False
+            i += 1
+            continue
+        if ch == "\\":
+            escape = True
+            i += 1
+            continue
+        if ch in {"'", '"'} and (in_quote is None or in_quote == ch):
+            in_quote = None if in_quote == ch else ch
+            i += 1
+            continue
+        if in_quote is None and (ch.isspace() or ch in {";", "|", "&", "<", ">"}):
+            break
+        out.append(ch)
+        i += 1
+    return "".join(out), i
+
+
+def _validate_readonly_redirections(cmd: str) -> tuple[bool, str]:
+    """Reject output redirection that can write files in readonly mode.
+
+    Allowed:
+      * stderr/stdout suppression to ``/dev/null``: ``>/dev/null``, ``2>/dev/null``
+      * descriptor duplication/closure: ``2>&1``, ``1>&2``, ``2>&-``
+      * input-only redirection: ``less < file``
+
+    Rejected:
+      * file writes/appends: ``> out``, ``>> out``, ``2> err``, ``&> out``
+    """
+    i, n = 0, len(cmd)
+    in_single = False
+    in_double = False
+    escape = False
+    while i < n:
+        ch = cmd[i]
+        if escape:
+            escape = False
+            i += 1
+            continue
+        if ch == "\\" and not in_single:
+            escape = True
+            i += 1
+            continue
+        if ch == "'" and not in_double:
+            in_single = not in_single
+            i += 1
+            continue
+        if ch == '"' and not in_single:
+            in_double = not in_double
+            i += 1
+            continue
+        if in_single or in_double:
+            i += 1
+            continue
+
+        # Input redirection is readonly; skip `< file` and here-strings/docs.
+        if ch == "<":
+            i += 2 if i + 1 < n and cmd[i + 1] == "<" else 1
+            continue
+
+        # stdout/stderr redirection. Include optional leading fd and &>.
+        op_start = i
+        if ch.isdigit():
+            j = i
+            while j < n and cmd[j].isdigit():
+                j += 1
+            if j >= n or cmd[j] != ">":
+                i += 1
+                continue
+            op_start = j
+        elif ch == "&" and i + 1 < n and cmd[i + 1] == ">":
+            op_start = i + 1
+        elif ch != ">":
+            i += 1
+            continue
+
+        # Do not confuse comparison operators in test/[ with redirection; this
+        # scanner is conservative, but `-gt`/`>` comparisons are usually quoted
+        # or spaced inside test. Redirection requires an operator token here.
+        if op_start > 0 and cmd[op_start - 1] not in " \t\n\r&0123456789":
+            i += 1
+            continue
+
+        j = op_start + 1
+        if j < n and cmd[j] == ">":
+            j += 1
+        if j < n and cmd[j] == "&":
+            target, next_i = _redirection_target(cmd, j + 1)
+            if target in {"1", "2", "-"}:
+                i = next_i
+                continue
+            return False, "redirection (>&)"
+
+        target, next_i = _redirection_target(cmd, j)
+        if target == "/dev/null":
+            i = next_i
+            continue
+        return False, "redirection (>)"
+
+    return True, ""
 
 
 # Shell control-flow keywords are structural — they run no command themselves.
@@ -641,6 +777,27 @@ def _validate_single_readonly_command(cmd: str) -> tuple[bool, str]:
     if base_cmd not in readonly_commands and base_cmd not in _SHELL_SAFE_BUILTINS:
         return False, base_cmd
 
+    # Allow bare --version / --help / -V / -h for any command (they're always readonly)
+    # This must come BEFORE subcommand handlers because _extract_subcommand
+    # returns None for bare flags, which would cause false rejections.
+    _bare_info = {"--version", "-v", "-V", "--help", "-h", "version", "help"}
+    try:
+        _tokens = shlex.split(cmd.strip())
+    except ValueError:
+        _tokens = cmd.strip().split()
+
+    redirect_valid, redirect_reason = _validate_readonly_redirections(cmd)
+    if not redirect_valid:
+        return False, redirect_reason
+
+    # sed is readonly unless it edits in place. Tokenize this check so a pattern
+    # containing the text "-i" is not misclassified.
+    if base_cmd == "sed" and any(t == "-i" or t.startswith("-i") for t in _tokens[1:]):
+        return False, "sed -i"
+
+    if len(_tokens) <= 2 and any(t in _bare_info for t in _tokens[1:]):
+        return True, ""
+
     # Special handling for commands with subcommands
     if base_cmd == "git":
         subcommand = _extract_subcommand(cmd, "git")
@@ -736,6 +893,14 @@ def _validate_single_readonly_command(cmd: str) -> tuple[bool, str]:
             "info",
             "version",
             "system",
+            "stats",
+            "history",
+            "context",
+            "buildx",
+            "compose",
+            "manifest",
+            "image",
+            "container",
         }
         for sub in readonly_docker:
             if f"docker {sub}" in cmd:
@@ -743,10 +908,31 @@ def _validate_single_readonly_command(cmd: str) -> tuple[bool, str]:
                 if sub in {"network", "volume"}:
                     if "ls" in cmd or "inspect" in cmd:
                         return True, ""
+                elif sub == "system":
+                    # Allow df, info, events but not prune
+                    if "prune" in cmd:
+                        return False, "docker system prune"
+                    return True, ""
+                elif sub == "image":
+                    # Allow ls, inspect, history, prune is write
+                    if "ls" in cmd or "inspect" in cmd or "history" in cmd:
+                        return True, ""
+                    return False, "docker image (write op)"
+                elif sub == "container":
+                    if "ls" in cmd or "inspect" in cmd or "stats" in cmd:
+                        return True, ""
+                    return False, "docker container (write op)"
+                elif sub == "compose":
+                    # Allow ps, logs, config, top, images
+                    _compose_ro = {"ps", "logs", "config", "top", "images", "port"}
+                    _compose_sub = _extract_subcommand(
+                        cmd.replace("docker compose", "compose"), "compose"
+                    )
+                    if _compose_sub in _compose_ro:
+                        return True, ""
+                    return False, f"docker compose {_compose_sub or ''}"
                 else:
                     return True, ""
-        if "docker" in cmd and ("--version" in cmd or "version" in cmd):
-            return True, ""
         return False, "docker (write operation)"
 
     # podman handling: same as docker
@@ -828,6 +1014,13 @@ def _validate_single_readonly_command(cmd: str) -> tuple[bool, str]:
                 return True, ""
         return False, "pnpm (write operation)"
 
+    # npm handling: similar to pip — only allow readonly subcommands
+    if base_cmd == "npm":
+        subcommand = _extract_subcommand(cmd, "npm")
+        if subcommand and subcommand in NPM_READONLY_SUBCOMMANDS:
+            return True, ""
+        return False, f"npm {subcommand or ''}"
+
     # Code quality tools: allow --check, --version, help
     if base_cmd in {"flake8", "pylint", "mypy", "ruff", "eslint"}:
         if (
@@ -856,16 +1049,6 @@ def _validate_single_readonly_command(cmd: str) -> tuple[bool, str]:
         # If it's just 'python script.py', it depends on the script, but we allow it
         # as python is in the readonly set. We could be stricter here.
         return True, ""
-
-    # Check for sed with -i (in-place edit)
-    if base_cmd == "sed" and "-i" in cmd:
-        return False, "sed -i"
-
-    # Check for dangerous redirect patterns in readonly mode.
-    redirect_check = re.sub(r"\s*\d?>\s*/dev/null\b", "", cmd)
-    redirect_check = re.sub(r"\s*\d?>&\d\b", "", redirect_check)
-    if ">" in redirect_check or ">>" in redirect_check:
-        return False, "redirection (>)"
 
     # Check for pipe to shell
     if any(p in cmd for p in ["| sh", "| bash", "|sh", "|bash"]):
@@ -1154,24 +1337,52 @@ async def _stream_subprocess_output(process: Any, tool_name: str) -> tuple[bytes
 )
 async def shell(
     cmd: str,
-    cwd: Optional[str] = None,
+    cwd: str = ".",
     timeout: Optional[int] = None,
     dangerous: bool = False,
     readonly: bool = True,
+    action: str = "read",
     stdout_limit: Optional[int] = None,
     stderr_limit: Optional[int] = None,
 ) -> Dict[str, Any]:
-    """Execute a shell command. The `cmd` parameter is required.
+    """Execute a shell command from a working directory.
+
+    The `cmd` parameter is required. The `cwd` parameter sets the working
+    directory the command runs from — its canonical path. Default is `"."`
+    (the current/present working directory). Prefer passing `cwd` over
+    embedding `cd dir && cmd` in the command string, since `cwd` is validated,
+    logged, and preserved across the execution pipeline.
+
+    Args:
+        cmd: The shell command to execute.
+        cwd: Canonical working directory to run the command from.
+            Defaults to `"."` (present working directory). Must exist.
+        timeout: Max seconds before the command is killed.
+        dangerous: Allow mutating/network commands when `readonly` blocks them.
+        readonly: When True (default), block commands that mutate state.
+        action: "read" (default) or "write" — the caller's intent.
+        stdout_limit: Max stdout lines to return.
+        stderr_limit: Max stderr lines to return.
 
     Examples:
-        shell(cmd="ls -la")
-        shell(cmd="git status")
-        shell(cmd='sqlite3 data.db ".tables"')  # Database operations
+        shell(cmd="ls -la")                       # runs in present working dir
+        shell(cmd="pytest -q", cwd="tests/unit")  # run from a subdirectory
+        shell(cmd="git status")                   # git via shell (no git tool needed)
+        shell(cmd='sqlite3 data.db ".tables"')    # Database operations
         shell(cmd='sqlite3 data.db "SELECT * FROM users LIMIT 10"')
 
     For database files (SQLite, PostgreSQL, MySQL):
     - Use shell(cmd='sqlite3 file.db ".tables"') to list tables
     - Use shell(cmd='sqlite3 file.db "SELECT * FROM table LIMIT 10"') to query
+
+    Feasible CLI commands (use shell for these instead of dedicated tools):
+        git status, git diff, git log, git branch, git checkout, git push
+        docker ps, docker build, docker run, docker exec, docker images
+        pip install, pip list, pip show, pipdeptree
+        pytest, make test, npm test, cargo test
+        gh pr create, gh pr list, gh issue list
+        terraform validate, terraform plan, docker-compose config
+        make, npm, cargo, go build, yarn, pnpm
     - Use shell(cmd='psql -h localhost -U user -d db -c "SELECT * FROM table"') for PostgreSQL
     - Use shell(cmd='mysql -u user -p db -e "SHOW TABLES"') for MySQL
 
@@ -1208,7 +1419,7 @@ async def shell(
     # Apply command optimizer pipeline (grep→rg, etc.)
     cmd = optimize_command(cmd)
 
-    # Redirect broad recursive search commands to code_search (when available).
+    # Redirect broad recursive search commands to the grouped search tool.
     # Models bypass the semantic index by calling shell("rg ...") directly.
     # Allow targeted single-file searches (grep -n "pattern" specific_file.py)
     # since those are precise and don't benefit from semantic search.
@@ -1242,10 +1453,10 @@ async def shell(
                 )
             else:
                 error_msg = (
-                    "Use code_search(query='...') instead of shell search commands for project code. "
-                    "code_search uses the semantic index and is more reliable. "
+                    "Use search(cmd='search grep \"...\" .') instead of shell search commands "
+                    "for project code. The grouped search tool is indexed and more reliable. "
                     "For library/venv files use read(path='...') directly. "
-                    "Example: code_search(query='FilePathField', mode='semantic')"
+                    "Example: search(cmd='search grep \"FilePathField\" .')"
                 )
             return {
                 "success": False,
@@ -1265,6 +1476,23 @@ async def shell(
             "return_code": -1,
         }
 
+    # Map explicit `action` intent to a readonly override so the model can
+    # declare what KIND of command it is running (read|write|network|exec)
+    # instead of guessing the inverted `readonly` boolean.
+    #   action="read"    -> readonly stays as passed (enforce allowlist)
+    #   action="network" -> allow curl/wget/ping/ssh (network class)
+    #   action="write"   -> mutate filesystem/git state
+    #   action="exec"    -> arbitrary exec
+    _ACTION_EFFECTIVE_READONLY = {
+        "read": None,  # honor the `readonly` arg as-is
+        "network": False,  # network ops are never readonly-allowlisted
+        "write": False,  # mutations must bypass the allowlist
+        "exec": False,  # arbitrary exec must bypass the allowlist
+    }
+    _eff = _ACTION_EFFECTIVE_READONLY.get(action)
+    if _eff is not None:
+        readonly = _eff
+
     # Check readonly mode restrictions
     if readonly:
         is_valid, failing_cmd = _validate_readonly_command(cmd)
@@ -1274,7 +1502,8 @@ async def shell(
                 "error": (
                     f"Command '{failing_cmd}' is not allowed in readonly mode. "
                     f"Allowed commands: {', '.join(sorted(get_allowed_readonly_commands())[:15])}... "
-                    "Use 'shell' tool without readonly=True for other commands."
+                    "Re-run with readonly=False (or action='network'/'write'/'exec') "
+                    "to run mutating or network commands."
                 ),
                 "stdout": "",
                 "stderr": "",

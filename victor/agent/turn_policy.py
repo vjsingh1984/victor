@@ -27,13 +27,18 @@ behavior. No path-specific logic belongs here — only shared decisions.
 
 from __future__ import annotations
 
+import hashlib
 import logging
+import re
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Tuple
 
 from victor.core.loop_thresholds import DEFAULT_BLOCKED_CONSECUTIVE_THRESHOLD
 from victor.tools.tool_names import get_canonical_name
+
+if TYPE_CHECKING:
+    from victor.framework.search_novelty import SearchNoveltyTracker
 
 logger = logging.getLogger(__name__)
 
@@ -499,3 +504,443 @@ class FulfillmentCriteriaBuilder:
         self._test_files.clear()
         self._doc_files.clear()
         self._errors.clear()
+
+
+# =============================================================================
+# Shared per-turn evaluation: content-repetition, plateau, and the controller
+# that both the headless (AgenticLoop) and streaming (StreamingChatExecutor)
+# loops call so the "continue / nudge / stop" decision lives in ONE place.
+# =============================================================================
+
+
+def evaluate_overlap_repetition(overlap: float, repetition_count: int) -> Tuple[int, str]:
+    """Decide repetition handling from word-overlap between consecutive turns.
+
+    Returns ``(updated_repetition_count, action)`` where ``action`` is one of:
+      - ``"near_duplicate"`` — ``overlap >= 0.8``: a single strong repeat is enough to
+        force completion (breaks a narration spin immediately).
+      - ``"high_overlap"``  — ``overlap > 0.5`` and the running count has reached 2.
+      - ``"accumulating"``  — ``overlap > 0.5`` but only the first such turn so far.
+      - ``"reset"``         — ``overlap <= 0.3``: genuinely distinct, clear the count.
+      - ``"hold"``          — ``0.3 < overlap <= 0.5``: ambiguous; keep the count without
+        decaying it, so an oscillating loop still converges to the threshold.
+    """
+    if overlap >= 0.8:
+        return repetition_count + 1, "near_duplicate"
+    if overlap > 0.5:
+        new_count = repetition_count + 1
+        return new_count, ("high_overlap" if new_count >= 2 else "accumulating")
+    if overlap <= 0.3:
+        return 0, "reset"
+    return repetition_count, "hold"
+
+
+# Actions that mean "stop now — the agent is repeating itself."
+_TERMINAL_REPETITION_ACTIONS = frozenset({"exact_repeat", "near_duplicate", "high_overlap"})
+
+
+class ContentRepetitionDetector:
+    """Detect a narration/output spin from consecutive assistant content.
+
+    Canonical implementation (previously copy-pasted into both loops, with the headless
+    loop using a cruder content-length heuristic). Uses an exact MD5-hash match over the
+    last 3 turns plus a Jaccard word-overlap check via :func:`evaluate_overlap_repetition`.
+    Stateful per conversation; call :meth:`record` once per turn with the turn's full
+    assistant content and read ``action`` — the caller decides how to stop (the headless
+    loop marks the turn FAILED, the streaming loop force-completes and emits a chunk).
+    """
+
+    def __init__(self, min_content_len: int = 20, history: int = 5) -> None:
+        self._min_content_len = min_content_len
+        self._history = history
+        self._content_hashes: List[str] = []
+        self._repetition_count = 0
+        self._prev_full_content = ""
+
+    def record(self, content: Optional[str]) -> str:
+        """Record one turn's content; return a repetition action.
+
+        Actions: ``"exact_repeat"`` / ``"near_duplicate"`` / ``"high_overlap"`` are terminal
+        (see :data:`_TERMINAL_REPETITION_ACTIONS`); ``"accumulating"`` / ``"hold"`` /
+        ``"reset"`` / ``"none"`` are non-terminal.
+        """
+        if not content or len(content.strip()) <= self._min_content_len:
+            return "none"
+
+        normalized = re.sub(r"\s+", " ", content.strip().lower())
+        content_hash = hashlib.md5(normalized.encode()).hexdigest()
+        self._content_hashes.append(content_hash)
+        if len(self._content_hashes) > self._history:
+            self._content_hashes.pop(0)
+
+        # Exact repeat: the same content three turns running.
+        if len(self._content_hashes) >= 3 and len(set(self._content_hashes[-3:])) == 1:
+            self._repetition_count += 1
+            return "exact_repeat"
+
+        action = "none"
+        if self._prev_full_content and len(self._prev_full_content) > 50:
+            prev_words = set(re.sub(r"\s+", " ", self._prev_full_content.strip().lower()).split())
+            curr_words = set(normalized.split())
+            if prev_words and curr_words:
+                overlap = len(prev_words & curr_words) / len(prev_words | curr_words)
+                self._repetition_count, action = evaluate_overlap_repetition(
+                    overlap, self._repetition_count
+                )
+        else:
+            self._repetition_count = 0
+
+        self._prev_full_content = content
+        return action
+
+    @property
+    def repetition_count(self) -> int:
+        return self._repetition_count
+
+    def reset(self) -> None:
+        self._content_hashes.clear()
+        self._repetition_count = 0
+        self._prev_full_content = ""
+
+
+@dataclass
+class PlateauResult:
+    """Outcome of a plateau check for one turn."""
+
+    is_plateau: bool = False
+    should_nudge: bool = False
+    score: float = 0.0
+    recent_scores: List[float] = field(default_factory=list)
+
+
+class PlateauDetector:
+    """Detect a progress plateau from a productivity-weighted score history.
+
+    Canonical implementation using the streaming loop's formula (more informative than the
+    headless loop's bare evaluation score): ``productive_count * 0.3 + min(content_len/2000,
+    0.7)``. A plateau is the last ``window`` scores spanning < ``tolerance`` while still
+    below ``ceiling``. A plateau only warrants a nudge when the turn was *unproductive*
+    (productive_count == 0) — real work (read → search → edit) flattens the score legitimately.
+    """
+
+    def __init__(self, window: int = 3, tolerance: float = 0.05, ceiling: float = 0.8) -> None:
+        self._window = window
+        self._tolerance = tolerance
+        self._ceiling = ceiling
+        self._scores: List[float] = []
+
+    def record(self, productive_count: int, content_len: int) -> PlateauResult:
+        score = min(1.0, (productive_count * 0.3 + min(content_len / 2000, 0.7)))
+        self._scores.append(score)
+        if len(self._scores) < self._window:
+            return PlateauResult(score=score, recent_scores=list(self._scores))
+        recent = self._scores[-self._window :]
+        is_plateau = (max(recent) - min(recent) < self._tolerance) and recent[-1] < self._ceiling
+        # Productive turns flatten the score legitimately — don't nudge those.
+        should_nudge = is_plateau and productive_count == 0
+        return PlateauResult(
+            is_plateau=is_plateau, should_nudge=should_nudge, score=score, recent_scores=recent
+        )
+
+    @property
+    def scores(self) -> List[float]:
+        return self._scores
+
+    def reset(self) -> None:
+        self._scores.clear()
+
+
+@dataclass(frozen=True)
+class TurnObservation:
+    """Normalized per-turn input both loops adapt to from their native turn output.
+
+    Lets one :class:`TurnEvaluationController` serve a buffered ``TurnResult`` (headless) and
+    the streaming ``ToolExecutionResult`` (streaming) without either loop's execution code
+    leaking into the shared decision logic.
+    """
+
+    content: str = ""
+    productive_count: int = 0
+    has_tool_calls: bool = False
+    all_blocked: bool = False
+    tool_names: Set[str] = field(default_factory=set)
+    tool_count: int = 0
+    tool_signatures: Optional[Set[str]] = None
+    iteration: int = 1
+    max_iterations: int = 1
+    intent_is_write: bool = False
+    intent: Optional[Any] = None
+    tool_results: Optional[List[Dict[str, Any]]] = None
+
+
+@dataclass(frozen=True)
+class TurnDecision:
+    """The shared continue/nudge/stop verdict for one turn; the loop applies it.
+
+    ``stop`` ends the loop. ``terminal_success`` distinguishes a clean finish (map to
+    COMPLETE / force-completion) from a degraded stop (map to FAIL). ``stop_message`` is the
+    user-facing chunk text for the streaming loop. ``nudge_message`` (if set) is injected by
+    the loop via its own message channel (headless ``chat_ctx.add_message`` vs streaming
+    ``orch.add_message``), so injection mechanics stay loop-local.
+    """
+
+    stop: bool = False
+    terminal_success: bool = False
+    stop_reason: Optional[str] = None
+    stop_message: Optional[str] = None
+    nudge_message: Optional[str] = None
+    nudge_role: str = "system"
+    nudge_kind: Optional[str] = None
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+
+_REPETITION_STOP_MESSAGE = (
+    "\n\n[Content repetition detected — stopping to prevent infinite output loop.]"
+)
+
+
+class TurnEvaluationController:
+    """One per-turn decision point shared by the headless and streaming loops.
+
+    Composes the already-shared guards (:class:`SpinDetector`, :class:`NudgePolicy`) with the
+    now-shared :class:`ContentRepetitionDetector` and :class:`PlateauDetector`. Both loops
+    feed a :class:`TurnObservation` and apply the returned :class:`TurnDecision`, so spin /
+    repetition / plateau / nudge logic exists once. Turn *execution* (streamed vs buffered)
+    stays loop-local. Convergence (fulfillment-completion + search-novelty) plugs in here in a
+    follow-up so both loops gain it at once.
+    """
+
+    def __init__(
+        self,
+        spin_detector: Optional[SpinDetector] = None,
+        nudge_policy: Optional[NudgePolicy] = None,
+        content_repetition: Optional[ContentRepetitionDetector] = None,
+        plateau: Optional[PlateauDetector] = None,
+        search_novelty: Optional["SearchNoveltyTracker"] = None,
+        *,
+        enable_budget_warning: bool = True,
+        enable_plateau_nudge: bool = True,
+        enable_search_novelty: bool = True,
+        min_iterations_before_force_complete: int = 2,
+        enable_fulfillment_complete: bool = True,
+        fulfillment_summary_min_chars: int = 800,
+        fulfillment_min_findings: int = 3,
+        min_iterations_before_fulfillment: int = 4,
+    ) -> None:
+        from victor.framework.search_novelty import SearchNoveltyTracker
+
+        self.spin_detector = spin_detector or SpinDetector()
+        self.nudge_policy = nudge_policy or NudgePolicy()
+        self.content_repetition = content_repetition or ContentRepetitionDetector()
+        self.plateau = plateau or PlateauDetector()
+        self.search_novelty = search_novelty or SearchNoveltyTracker()
+        # Per-loop preservation of genuine current differences: the headless loop owns plateau
+        # via its own adaptive-termination (FAIL/extend) and emits budget warnings; the streaming
+        # loop nudges on plateau and never warned on budget. Flags keep each exact until a
+        # deliberate convergence pass.
+        self._enable_budget_warning = enable_budget_warning
+        self._enable_plateau_nudge = enable_plateau_nudge
+        self._enable_search_novelty = enable_search_novelty
+        self._min_iterations_before_force_complete = min_iterations_before_force_complete
+        # Fulfillment-complete: stop the redundant turns once a substantial answer exists AND
+        # enough findings were gathered AND the latest search is no longer adding much. The
+        # large summary threshold + findings floor + low-novelty gate keep it conservative.
+        self._enable_fulfillment_complete = enable_fulfillment_complete
+        self._fulfillment_summary_min_chars = fulfillment_summary_min_chars
+        self._fulfillment_min_findings = fulfillment_min_findings
+        self._min_iterations_before_fulfillment = min_iterations_before_fulfillment
+        self._best_content_len = 0
+
+    def reset(self) -> None:
+        self.spin_detector.reset()
+        self.content_repetition.reset()
+        self.plateau.reset()
+        self.search_novelty.reset()
+        self._best_content_len = 0
+
+    @classmethod
+    def from_exploration_settings(
+        cls,
+        exploration: Any = None,
+        *,
+        spin_detector: Optional[SpinDetector] = None,
+        nudge_policy: Optional[NudgePolicy] = None,
+        enable_plateau_nudge: bool = True,
+        enable_budget_warning: bool = True,
+        enable_search_novelty: bool = True,
+    ) -> "TurnEvaluationController":
+        """Build a controller with convergence thresholds from ``ExplorationSettings``.
+
+        ``exploration`` is an ``ExplorationSettings`` (or ``None`` for defaults). Read
+        defensively via getattr so a partial/old settings object still works. Per-loop flags
+        (plateau/budget/novelty) stay caller-controlled; the numeric thresholds and the
+        guard on/off switches come from settings.
+        """
+        from victor.framework.search_novelty import NoveltyConfig, SearchNoveltyTracker
+
+        def _g(name: str, default: Any) -> Any:
+            return getattr(exploration, name, default) if exploration is not None else default
+
+        novelty_cfg = NoveltyConfig.from_exploration(exploration)
+        return cls(
+            spin_detector=spin_detector,
+            nudge_policy=nudge_policy,
+            search_novelty=SearchNoveltyTracker(novelty_cfg),
+            enable_plateau_nudge=enable_plateau_nudge,
+            enable_budget_warning=enable_budget_warning,
+            enable_search_novelty=enable_search_novelty
+            and bool(_g("search_novelty_guard_enabled", True)),
+            min_iterations_before_force_complete=_g("min_iterations_before_force_complete", 2),
+            enable_fulfillment_complete=bool(_g("fulfillment_completion_enabled", True)),
+            fulfillment_summary_min_chars=_g("fulfillment_summary_min_chars", 800),
+            fulfillment_min_findings=_g("fulfillment_min_findings", 3),
+            min_iterations_before_fulfillment=_g("min_iterations_before_fulfillment", 4),
+        )
+
+    def evaluate(self, observation: TurnObservation, *, record_spin: bool = True) -> TurnDecision:
+        """Run the shared per-turn guards and return a single decision.
+
+        ``record_spin`` lets a caller that already feeds its own ``SpinDetector`` (both loops do
+        today) skip the re-recording and have the controller read the current spin state — so
+        wiring the controller in doesn't double-count turns.
+        """
+        # 1. Spin detection (shared component; already fed by both loops today).
+        if record_spin:
+            self.spin_detector.record_turn(
+                has_tool_calls=observation.has_tool_calls,
+                all_blocked=observation.all_blocked,
+                tool_names=observation.tool_names,
+                tool_count=observation.tool_count,
+                tool_signatures=observation.tool_signatures,
+            )
+
+        # 2. Content repetition — a hard stop (degraded) when the agent repeats itself.
+        action = self.content_repetition.record(observation.content)
+        if action in _TERMINAL_REPETITION_ACTIONS:
+            logger.warning(
+                "[content-repetition] action=%s (consecutive=%s, content_len=%s) — stopping.",
+                action,
+                self.content_repetition.repetition_count,
+                len(observation.content or ""),
+            )
+            return TurnDecision(
+                stop=True,
+                terminal_success=False,
+                stop_reason="content_repetition",
+                stop_message=_REPETITION_STOP_MESSAGE,
+                metadata={"repetition_action": action},
+            )
+
+        # 2.5 Search novelty — diminishing returns on successive searches. After persistent
+        # saturation, force-complete so the agent SYNTHESIZES the gathered context (a clean
+        # finish, not a failure) instead of thrashing distinct queries to the iteration cap.
+        novelty = self.search_novelty.record_turn(observation.tool_results)
+        _editing = bool(
+            {get_canonical_name(t) for t in (observation.tool_names or set())}
+            & {"edit", "write", "create_file", "replace_in_file"}
+        )
+        if (
+            self._enable_search_novelty
+            and novelty.should_force_complete
+            and not _editing  # never cut short a turn that is actively making edits
+            and observation.iteration >= self._min_iterations_before_force_complete
+        ):
+            logger.info(
+                "[search-novelty] %d consecutive low-novelty searches (ratio=%.2f) — "
+                "force-completing to synthesize.",
+                novelty.consecutive_low_novelty,
+                novelty.novelty_ratio,
+            )
+            return TurnDecision(
+                stop=True,
+                terminal_success=True,
+                stop_reason="search_saturated",
+                stop_message="\n\n[Enough context gathered — synthesizing the answer.]",
+                metadata={"novelty_ratio": novelty.novelty_ratio},
+            )
+
+        # 2.6 Fulfillment-complete — stop redundant turns once a SUBSTANTIAL answer has been
+        # produced AND enough findings gathered AND the latest search is no longer adding much.
+        # Fires earlier than pure saturation (1 low-novelty turn vs N) but only when a real
+        # answer already exists, so it trims over-verification without cutting analysis short.
+        self._best_content_len = max(self._best_content_len, len(observation.content or ""))
+        if (
+            self._enable_fulfillment_complete
+            and not _editing
+            and self._best_content_len >= self._fulfillment_summary_min_chars
+            and novelty.total_distinct_hits >= self._fulfillment_min_findings
+            and novelty.had_search
+            and novelty.consecutive_low_novelty >= 1
+            and observation.iteration >= self._min_iterations_before_fulfillment
+        ):
+            logger.info(
+                "[fulfillment] answer produced (%d chars) + %d findings + low-novelty search "
+                "— finalizing.",
+                self._best_content_len,
+                novelty.total_distinct_hits,
+            )
+            return TurnDecision(
+                stop=True,
+                terminal_success=True,
+                stop_reason="fulfilled",
+                stop_message="\n\n[Sufficient findings and an answer produced — finalizing.]",
+                metadata={"findings": novelty.total_distinct_hits},
+            )
+
+        # 3. Plateau (productivity-weighted) — may warrant a nudge (when enabled for this loop).
+        plateau = self.plateau.record(observation.productive_count, len(observation.content or ""))
+        plateau_should_nudge = plateau.should_nudge and self._enable_plateau_nudge
+
+        # 4. Nudge selection: spin > synthesize (search saturation) > plateau > budget warning.
+        nudge_message: Optional[str] = None
+        nudge_role = "system"
+        nudge_kind: Optional[str] = None
+
+        spin_nudge = self.nudge_policy.evaluate(
+            self.spin_detector,
+            iteration=observation.iteration,
+            max_iterations=observation.max_iterations,
+            intent=observation.intent,
+        )
+        if spin_nudge.should_inject:
+            nudge_message, nudge_role = spin_nudge.message, spin_nudge.role
+            nudge_kind = spin_nudge.nudge_type.value
+        elif self._enable_search_novelty and novelty.should_nudge:
+            from victor.framework.search_novelty import synthesize_nudge_message
+
+            nudge_message = synthesize_nudge_message()
+            nudge_kind = "synthesize"
+        elif plateau_should_nudge:
+            nudge_message = self._plateau_message(observation.intent_is_write)
+            nudge_kind = "plateau"
+        elif self._enable_budget_warning:
+            budget_nudge = self.nudge_policy.budget_warning(
+                observation.iteration, observation.max_iterations
+            )
+            if budget_nudge.should_inject:
+                nudge_message, nudge_role = budget_nudge.message, budget_nudge.role
+                nudge_kind = budget_nudge.nudge_type.value
+
+        return TurnDecision(
+            nudge_message=nudge_message,
+            nudge_role=nudge_role,
+            nudge_kind=nudge_kind,
+            metadata={"plateau": plateau.is_plateau, "score": plateau.score},
+        )
+
+    @staticmethod
+    def _plateau_message(intent_is_write: bool) -> str:
+        return plateau_nudge_message(intent_is_write)
+
+
+def plateau_nudge_message(intent_is_write: bool) -> str:
+    """The shared plateau nudge text (write-intent aware) used by both loops."""
+    if intent_is_write:
+        return (
+            "Progress stalled. You have enough context — stop reading and apply the change "
+            'now with edit(ops=[{"type": "replace", "path": "file", "old_str": "exact text", '
+            '"new_str": "replacement"}]).'
+        )
+    return (
+        "Progress seems stalled. Try a different approach or summarize what you've found " "so far."
+    )

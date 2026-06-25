@@ -51,6 +51,17 @@ ZAI_BASE_URLS = {
 # Reference: https://open.bigmodel.cn/dev/api
 ZAI_MODELS = {
     # Paid flagship models (context windows from docs.z.ai and OpenRouter)
+    # GLM-5.2 (2026-06-16): 753B MoE (~40B active), 1M context window.
+    # MUST be listed here so get_context_window() matches it EXACTLY — otherwise
+    # the prefix fallback mis-resolves it to the glm-5 family's 200K and the
+    # base-class context_window() falls back to 8192 (see context_window() below).
+    "glm-5.2": {
+        "description": "GLM-5.2 - Latest SOTA model (753B MoE), 1M context",
+        "context_window": 1000000,
+        "max_output": 65535,
+        "supports_tools": True,
+        "supports_thinking": True,
+    },
     "glm-5.1": {
         "description": "GLM-5.1 - Latest SOTA model, rivals Claude Opus 4.6",
         "context_window": 200000,
@@ -265,6 +276,52 @@ class ZAIProvider(HttpxOpenAICompatProvider):
     def supports_streaming(self) -> bool:
         return True
 
+    def supports_prompt_caching(self) -> bool:
+        """Z.AI GLM API-level context caching (~50% discount on cached tokens).
+
+        Z.AI provides automatic, implicit context caching for GLM-5 / GLM-4.7 /
+        GLM-4.6 / GLM-4.5 series models. The cache key is the repeated prefix
+        content (system prompt +, when stable, the tool definitions), so keeping
+        the system prompt and tools[] byte-stable across turns maximizes the
+        cached-token share and the resulting billing discount.
+
+        Evidence (Z.AI official docs, ``docs.z.ai/guides/capabilities/cache.md``):
+        - "Automatic Cache Recognition: Implicit caching that intelligently
+          identifies repeated context content without manual configuration"
+        - "Cached tokens are billed at discounted prices (usually 50% of
+          standard price)"
+        - Cache status is reported via ``usage.prompt_tokens_details.cached_tokens``.
+        - No explicit ``cache_control`` marker is required (unlike Anthropic).
+
+        ``HttpxOpenAICompatProvider`` does NOT override this; before this override
+        the inherited ``BaseProvider.supports_prompt_caching()`` returned
+        ``False``, so the framework treated ZAI like a non-caching provider and
+        never attempted prefix-stable tool selection.
+        """
+        return True
+
+    def supports_kv_prefix_caching(self) -> bool:
+        """Z.AI reuses computed KV state for matching prompt prefixes.
+
+        Same automatic prefix-similarity mechanism as the billing cache: when
+        consecutive requests share an identical leading prefix (system prompt +
+        tools), the inference engine reuses the precomputed key-value state,
+        reducing time-to-first-token. Declaring this enables the framework's
+        ``_kv_optimization_enabled`` gate chain (see
+        ``victor/agent/services/prompt_builder_runtime.py``) which in turn
+        activates:
+
+        - ``_apply_kv_tool_strategy()`` -- freezes the turn-1 tool set for the
+          session under the ``session_stable`` / ``additive`` strategies.
+        - ``_sort_tools_for_kv_stability()`` -- deterministic name-ordering so the
+          serialized ``tools[]`` hashes identically across turns.
+
+        The context cache has a bounded TTL (Z.AI notes "reasonable time limits")
+        and is invalidated by any prefix mutation, hence the need for stable
+        ordering and a frozen selection.
+        """
+        return True
+
     # ── Template Method overrides ─────────────────────────────────────────────
 
     def _clean_model_name(self, model: str) -> str:
@@ -384,20 +441,52 @@ class ZAIProvider(HttpxOpenAICompatProvider):
 
     # ── ZAI-specific helpers ──────────────────────────────────────────────────
 
+    def context_window(self, model: str) -> int:
+        """Context window in tokens — the method the runtime actually calls.
+
+        Resolution order (all config-driven, no code edit needed for new models):
+          1. provider_context_limits.yaml  (BaseProvider.context_window() — see base.py)
+          2. ZAI_MODELS registry            (see get_context_window() below)
+          3. 128000 safe default
+        To register a new GLM model, add a pattern to the `models:` block of
+        victor/config/provider_context_limits.yaml — it takes precedence over
+        the hardcoded ZAI_MODELS table.
+        """
+        return self.get_context_window(model)
+
     def get_context_window(self, model: str) -> int:
         """Get context window size for a GLM model.
 
+        Resolution order:
+          1. provider_context_limits.yaml (explicit provider/model match)
+          2. ZAI_MODELS registry (exact name, then prefix match)
+          3. 128000 safe default
+
         Args:
-            model: Model name (e.g., "glm-4.7", "glm-4.6")
+            model: Model name (e.g., "glm-5.2", "glm-4.7", "glm-4.6")
 
         Returns:
             Context window size in tokens (default 128K for unknown models)
         """
+        # 1. Config-driven override: consult provider_context_limits.yaml.
+        # Reuses BaseProvider's YAML-first logic so registration stays a YAML
+        # edit (no code change). Falls back to ZAI_MODELS below if no entry.
+        try:
+            from victor.providers.base import BaseProvider
+
+            yaml_cw = BaseProvider.context_window(self, model)
+            if yaml_cw:
+                return yaml_cw
+        except Exception:
+            pass
+
+        # 2. Hardcoded registry (legacy / offline fallback)
         if model in ZAI_MODELS:
             return ZAI_MODELS[model]["context_window"]
         for prefix, info in ZAI_MODELS.items():
             if model.startswith(prefix):
                 return info["context_window"]
+        # 3. Safe default
         return 128000
 
     async def list_models(self) -> List[Dict[str, Any]]:

@@ -938,15 +938,6 @@ class TestToolDecorators:
         assert filters_schema["properties"]["top_k"] == {"type": "integer"}
         assert params["properties"]["filters"]["properties"]["file_pattern"]["type"] == "string"
 
-    def test_code_search_filters_schema_is_object(self):
-        """`code_search` filters should be typed as an object, not a string."""
-        from victor.tools.code_search_tool import code_search
-
-        filters_schema = code_search.Tool.parameters["properties"].get("filters")
-        assert filters_schema is not None
-        assert filters_schema["type"] == "object"
-        assert "file_pattern" in filters_schema["properties"]
-
 
 # =============================================================================
 # TOOL ENUMS TESTS

@@ -148,6 +148,16 @@ async def test_shell_heredoc_command():
     assert "print('hello')" in result["stdout"]
 
 
+@pytest.mark.asyncio
+async def test_shell_broad_search_guidance_uses_grouped_search_tool():
+    """Blocked broad searches should point at the advertised grouped search tool."""
+    result = await shell(cmd="rg FilePathField .", readonly=False)
+
+    assert result["success"] is False
+    assert "search(cmd=" in result["error"]
+    assert "code_search(" not in result["error"]
+
+
 class TestReadonlyControlFlow:
     """Read-only shell control-flow validation (glm-5.1 docs-audit regression).
 
@@ -201,8 +211,55 @@ class TestReadonlyControlFlow:
         assert self._valid("git push") is False
 
 
+class TestReadonlyCompoundCommands:
+    """Common observed readonly command chains and write escape regressions."""
+
+    @staticmethod
+    def _valid(cmd: str) -> bool:
+        from victor.tools.bash import _validate_readonly_command
+
+        return _validate_readonly_command(cmd)[0]
+
+    @pytest.mark.parametrize(
+        "cmd",
+        [
+            "cd victor && cat tools/bash.py",
+            "cat victor/tools/bash.py && sed -n '1,40p' victor/tools/bash.py",
+            "cat victor/tools/bash.py | sed -n '1,80p' | grep readonly",
+            "sed -n '1,80p' victor/tools/bash.py && grep -n readonly victor/tools/bash.py",
+            "grep -rn readonly victor/tools 2>/dev/null | head -20",
+            "less < README.md",
+            "git status >/dev/null 2>&1",
+            "cat README.md | wc -l",
+            "find victor -name '*.py' | sort | uniq | head -50",
+        ],
+    )
+    def test_observed_readonly_chains_allowed(self, cmd):
+        assert self._valid(cmd) is True
+
+    @pytest.mark.parametrize(
+        "cmd",
+        [
+            "cat README.md > /tmp/readme.copy",
+            "git status > status.txt",
+            "grep -rn readonly victor 2> errors.txt",
+            "cat README.md | tee /tmp/readme.copy",
+            "cat README.md | sed -n '1p' | tee output.txt",
+            "cat README.md && rm README.md",
+            "cat README.md || rm README.md",
+            "cat README.md | sh",
+            "cat README.md | bash",
+            "sed -i 's/a/b/' README.md",
+            "sed -i.bak 's/a/b/' README.md",
+            "grep foo README.md > matches.txt || cat README.md",
+        ],
+    )
+    def test_write_or_exec_hidden_in_chains_rejected(self, cmd):
+        assert self._valid(cmd) is False
+
+
 class TestReadonlyQuoteAwareSubstitutions:
-    """Quote-aware substitution scanning (regression: literal backticks/pipes).
+    r"""Quote-aware substitution scanning (regression: literal backticks/pipes).
 
     Markdown/mermaid audits run `grep '^```mermaid'` and `grep -c '```\|```'`.
     A prior naive scanner treated the single-quoted backticks as command

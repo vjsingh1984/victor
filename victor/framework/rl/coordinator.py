@@ -45,6 +45,25 @@ from victor.core.constants import DEFAULT_VERTICAL
 logger = logging.getLogger(__name__)
 
 
+def _correlation_for_outcome(outcome: Any) -> tuple:
+    """Resolve (session_id, turn_id) for an RL outcome (R1 correlation spine).
+
+    Prefers the live request context (set per session/turn in
+    ``victor.core.context``); falls back to values stashed on ``outcome.metadata``.
+    Returns ``(None, None)`` if unavailable — the columns are nullable, and
+    correlation must never break outcome recording.
+    """
+    try:
+        from victor.core.context import get_session_id, get_turn_id
+
+        meta = getattr(outcome, "metadata", None) or {}
+        sid = get_session_id() or meta.get("session_id") or None
+        tid = get_turn_id() or meta.get("turn_id") or None
+        return (sid, tid)
+    except Exception:  # correlation is non-critical
+        return (None, None)
+
+
 @dataclass
 class PromptCandidateSuiteWorkflowResult:
     """Result of processing a prompt-candidate benchmark suite."""
@@ -279,8 +298,8 @@ class AsyncWriterQueue:
                     f"""
                     INSERT INTO {Tables.RL_OUTCOME} (
                         learner_id, provider, model, task_type, vertical,
-                        repo_id, success, quality_score, metadata
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        repo_id, success, quality_score, metadata, session_id, turn_id
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         learner_name,  # Maps to learner_id column
@@ -292,6 +311,7 @@ class AsyncWriterQueue:
                         1 if outcome.success else 0,
                         outcome.quality_score,
                         outcome.to_dict()["metadata"],
+                        *_correlation_for_outcome(outcome),
                     ),
                 )
                 count += 1
@@ -428,8 +448,8 @@ class BatchedOutcomeWriter:
                     f"""
                     INSERT INTO {Tables.RL_OUTCOME} (
                         learner_id, provider, model, task_type, vertical,
-                        repo_id, success, quality_score, metadata
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        repo_id, success, quality_score, metadata, session_id, turn_id
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         learner_name,  # Maps to learner_id column
@@ -441,6 +461,7 @@ class BatchedOutcomeWriter:
                         1 if outcome.success else 0,
                         outcome.quality_score,
                         outcome.to_dict()["metadata"],
+                        *_correlation_for_outcome(outcome),
                     ),
                 )
 
@@ -632,6 +653,9 @@ class RLCoordinator:
             "correction": "TEXT DEFAULT NULL",
             "session_summary": "TEXT DEFAULT NULL",
             "session_id": "TEXT DEFAULT NULL",
+            # Correlation spine (R1): turn_id joins an outcome to the offered/invoked
+            # capture records (tool.supply / tool.intent) for the same turn.
+            "turn_id": "TEXT DEFAULT NULL",
         }
         try:
             cursor = self.db.cursor()
@@ -650,6 +674,10 @@ class RLCoordinator:
                 cursor.execute(
                     f"CREATE INDEX IF NOT EXISTS idx_rl_outcome_session_id "
                     f"ON {Tables.RL_OUTCOME}(session_id)"
+                )
+                cursor.execute(
+                    f"CREATE INDEX IF NOT EXISTS idx_rl_outcome_session_turn "
+                    f"ON {Tables.RL_OUTCOME}(session_id, turn_id)"
                 )
                 self.db.commit()
                 logger.info("RL: Migrated rl_outcome — added columns: %s", added)

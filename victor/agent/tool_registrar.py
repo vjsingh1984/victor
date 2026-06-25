@@ -107,6 +107,7 @@ class ToolRegistrarConfig:
     plugin_packages: List[str] = field(default_factory=list)
     max_workers: int = 4
     max_complexity: int = 10
+    lazy_startup: bool = True
 
 
 @dataclass
@@ -246,6 +247,7 @@ class ToolRegistrar:
                 settings=self.settings,
                 config=ToolCatalogConfig(
                     airgapped_mode=self.config.airgapped_mode,
+                    lazy_startup=self.config.lazy_startup,
                 ),
             )
         return self._catalog_loader
@@ -321,7 +323,7 @@ class ToolRegistrar:
         logger.debug(f"Lazy-loaded {self._stats.dynamic_tools} tools via CatalogLoader")
 
     def get_tool(self, name: str) -> Optional[Any]:
-        """Get a tool by name, triggering lazy loading if needed.
+        """Get a tool by name, hydrating only that tool when possible.
 
         Args:
             name: The name of the tool to retrieve
@@ -329,7 +331,10 @@ class ToolRegistrar:
         Returns:
             The tool if found, None otherwise
         """
-        self._ensure_tools_loaded()
+        tool = self.tools.get(name)
+        if tool is not None:
+            return tool
+        self.ensure_tool_registered(name)
         return self.tools.get(name)
 
     def get_all_tools(self) -> List[Any]:
@@ -360,9 +365,13 @@ class ToolRegistrar:
         # 1. Dynamic tool registration via CatalogLoader
         if not self._tools_loaded:
             catalog_loader = self._get_catalog_loader()
-            result = catalog_loader.load()
+            result = (
+                catalog_loader.load_bootstrap()
+                if self.config.lazy_startup
+                else catalog_loader.load()
+            )
             self._stats.dynamic_tools = result.tools_loaded
-            self._tools_loaded = True
+            self._tools_loaded = result.full_catalog_loaded
 
         # 2. Plugin loading via PluginLoader
         if self.config.enable_plugins:
@@ -475,13 +484,60 @@ class ToolRegistrar:
         """
         self._setup_providers()
 
-        registered_count = self._register_dynamic_tools()
+        registered_count = (
+            self._register_bootstrap_tools()
+            if self.config.lazy_startup
+            else self._register_dynamic_tools()
+        )
         total_registered = registered_count
 
         if self.config.enable_mcp or getattr(self.settings, "use_mcp_tools", False):
             total_registered += self._setup_mcp_integration()
 
         return total_registered
+
+    def _register_bootstrap_tools(self) -> int:
+        """Register the compact startup tool set without full catalog discovery."""
+        catalog_loader = self._get_catalog_loader()
+        result = catalog_loader.load_bootstrap()
+        self._stats.dynamic_tools += result.tools_loaded
+        logger.info("Tool bootstrap registration complete: %s tools", result.tools_loaded)
+        return result.tools_loaded
+
+    def ensure_tool_registered(self, tool_name: str) -> bool:
+        """Hydrate one tool into the registry when startup used lazy loading."""
+        if not tool_name:
+            return False
+        if self.tools.get(tool_name) is not None:
+            return True
+
+        catalog_loader = self._get_catalog_loader()
+        result = catalog_loader.ensure_tools([tool_name])
+        if result.tools_loaded:
+            logger.info("Lazy-registered tool on demand: %s", tool_name)
+            return self.tools.get(tool_name) is not None
+
+        if not self._tools_loaded and not self.config.lazy_startup:
+            self._ensure_tools_loaded()
+            return self.tools.get(tool_name) is not None
+
+        return False
+
+    def ensure_tools_for_query(self, text: str) -> int:
+        """Hydrate specialty tools implied by a user message."""
+        if not text:
+            return 0
+        from victor.agent.shared_tool_registry import SharedToolRegistry
+
+        shared_registry = SharedToolRegistry.get_instance()
+        needed = shared_registry.infer_demand_tools(text)
+        if not needed:
+            return 0
+        catalog_loader = self._get_catalog_loader()
+        result = catalog_loader.ensure_tools(needed)
+        if result.tools_loaded:
+            logger.info("Lazy-registered demand tools: %s", needed)
+        return result.tools_loaded
 
     def _load_tool_configurations(self) -> None:
         """Load tool configurations from profiles.yaml.

@@ -91,8 +91,58 @@ async def test_get_context_window(zai_provider):
     assert zai_provider.get_context_window("glm-4.6") == 128000
     assert zai_provider.get_context_window("glm-4.5") == 128000
     assert zai_provider.get_context_window("glm-4.5-air") == 128000
-    # Default for unknown models
-    assert zai_provider.get_context_window("glm-unknown") == 128000
+    # Unknown GLM models fall back to the `zai:` provider default in
+    # provider_context_limits.yaml (config-driven), not the hardcoded 128000.
+    assert zai_provider.get_context_window("glm-unknown") == 200000
+
+
+@pytest.mark.asyncio
+async def test_context_window_config_driven_override(zai_provider):
+    """Config-driven registration: context_window() reads provider_context_limits.yaml.
+
+    Adding a new GLM model is a YAML edit (under `models:`), NOT a code change.
+    This test proves the YAML layer is consulted at runtime: glm-5.2 is
+    registered ONLY in provider_context_limits.yaml (not in ZAI_MODELS) yet
+    resolves to its 1M context window.
+    """
+    # glm-5.2 has a 1M-context entry in provider_context_limits.yaml only
+    assert zai_provider.context_window("glm-5.2") == 1000000
+    assert zai_provider.context_window("glm-5.2:coding") == 1000000
+    # glm-5.1 is also YAML-registered at 200000
+    assert zai_provider.context_window("glm-5.1") == 200000
+
+
+@pytest.mark.asyncio
+async def test_context_window_runtime_method_matches_get(zai_provider):
+    """Regression: the runtime path calls context_window(), not get_context_window().
+
+    BaseProvider.context_window() has its own lookup table that does not include
+    GLM models and falls back to 8192 for unknown models. ZAIProvider must
+    override context_window() so both methods agree for every supported model.
+    See docs/guides/TROUBLESHOOTING.md (Provider Model Registration).
+    """
+    for model in ("glm-5.2", "glm-5.2:coding", "glm-5.1", "glm-4.7", "glm-4.6"):
+        assert zai_provider.context_window(model) == zai_provider.get_context_window(model)
+
+
+@pytest.mark.asyncio
+async def test_glm_5_2_registered_with_1m_context(zai_provider):
+    """Regression: glm-5.2 advertises 1M context and must not fall back to 8192.
+
+    Mis-resolution to the base class default of 8192 collapses the tool-token
+    budget to 2048 and disables KV session-locking, causing the empty-response /
+    aggressive-recovery freeze documented in the runbook.
+    """
+    from victor.providers.zai_provider import ZAI_MODELS
+
+    # Exact registry entry exists
+    assert "glm-5.2" in ZAI_MODELS
+    assert ZAI_MODELS["glm-5.2"]["context_window"] == 1000000
+
+    # Both methods resolve the true window for the model name and its coding suffix
+    for model in ("glm-5.2", "glm-5.2:coding"):
+        assert zai_provider.context_window(model) == 1000000
+        assert zai_provider.get_context_window(model) == 1000000
 
 
 @pytest.mark.asyncio

@@ -88,7 +88,7 @@ BASIC_PROFILE = ProfileTemplate(
         # Use Ollama by default (local, free)
         "default_provider": "ollama",
         "default_model": "qwen3.5:27b-q4_K_M",  # Fast MoE model with good knowledge
-        "default_temperature": 0.7,
+        "default_temperature": 0.6,
         "default_max_tokens": 4096,
         # Conservative tool budget
         "fallback_max_tools": 5,
@@ -123,7 +123,7 @@ ADVANCED_PROFILE = ProfileTemplate(
         # Detect available provider or default to Ollama
         "default_provider": "auto",
         "default_model": "auto",
-        "default_temperature": 0.7,
+        "default_temperature": 0.6,
         "default_max_tokens": 8192,
         # Higher tool budget for complex tasks
         "fallback_max_tools": 10,
@@ -169,7 +169,7 @@ EXPERT_PROFILE = ProfileTemplate(
         # Expert chooses their provider
         "default_provider": "auto",
         "default_model": "auto",
-        "default_temperature": 0.7,
+        "default_temperature": 0.6,
         "default_max_tokens": 16384,
         # Maximum flexibility
         "fallback_max_tools": 20,
@@ -425,7 +425,7 @@ def generate_profile_yaml(
             "default": {
                 "provider": provider,
                 "model": model,
-                "temperature": profile.settings.get("default_temperature", 0.7),
+                "temperature": profile.settings.get("default_temperature", 0.6),
                 "max_tokens": profile.settings.get("default_max_tokens", 4096),
             }
         },

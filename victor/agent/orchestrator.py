@@ -244,7 +244,6 @@ from victor.core.errors import (
 )
 from victor.tools.enums import CostTier
 from victor.tools.registry import ToolRegistry
-from victor.tools.code_executor_tool import CodeSandbox
 from victor.tools.mcp_bridge_tool import get_mcp_tool_definitions
 from victor.tools.plugin_registry import ToolPluginRegistry
 from victor.tools.semantic_selector import SemanticToolSelector
@@ -3579,21 +3578,62 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         "good evening",
     )
 
-    def _should_skip_tools_for_turn(self, context_msg: str) -> bool:
-        """Determine if tools are unnecessary for this turn (HDPO-inspired).
+    # Bare continuation/affirmation messages from a user mid-task. These are short
+    # (< 15 chars) and carry no tool-signal keyword, so the length gate below would
+    # otherwise short-circuit to "skip" and drop the working tool set. A bare
+    # "continue" / "proceed" / "go" typed as a NEW user turn should preserve the
+    # read-only core (so the model can still reason over the in-progress work)
+    # rather than going tool-less. Matches the 3-valued return contract of
+    # _tool_skip_mode (skip / read_core / tools).
+    _CONTINUATION_TOKENS = frozenset(
+        {
+            "continue",
+            "proceed",
+            "go",
+            "go on",
+            "keep going",
+            "next",
+            "more",
+            "again",
+            "yes",
+            "y",
+            "ok",
+            "okay",
+            "sure",
+            "do it",
+            "apply",
+            "apply it",
+        }
+    )
 
-        Uses a fast heuristic first (keyword scan), then optionally consults
-        the edge model via DecisionService if confidence is ambiguous.
-        Returns True to skip tool selection entirely for pure Q&A turns.
+    def _tool_skip_mode(self, context_msg: str) -> str:
+        """Decide tool supply for a (possibly conversational) turn (tool-supply P3).
+
+        Uses a fast heuristic first (keyword scan), then optionally consults the edge
+        model via DecisionService for borderline Q&A. Returns one of:
+
+        - ``"skip"``      — trivially-safe conversational turn (short greeting): no tools.
+        - ``"read_core"`` — borderline Q&A: provide ONLY a minimal read-only core so the
+          model can look something up if it turns out it needs to, rather than removing
+          the entire tool set (the old behavior left "how does X work?" unable to read X).
+        - ``"tools"``     — proceed with normal tool selection.
         """
         msg_lower = context_msg.lower().strip()
 
-        # Very short messages are almost always Q&A or greetings
+        # Bare continuation/affirmation of an in-progress task ("continue",
+        # "proceed", "go", "yes", "apply it", ...). These are short and carry no
+        # tool-signal keyword, so the length gate below would drop the tool set.
+        # Preserve the read-only core instead so the model can keep working the
+        # active task. Checked BEFORE the length short-circuit on purpose.
+        if msg_lower in self._CONTINUATION_TOKENS:
+            return "read_core"
+
+        # Very short messages are almost always greetings/Q&A — the only hard no-tools path.
         if len(msg_lower) < 15:
             # Unless they look like commands: "fix it", "run tests", etc.
             if any(kw in msg_lower for kw in ("fix", "run", "edit", "create", "delete")):
-                return False
-            return True
+                return "tools"
+            return "skip"
 
         # Heuristic: count tool-signal keywords vs Q&A patterns
         words = set(msg_lower.split())
@@ -3602,16 +3642,27 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
 
         # High-confidence heuristic paths
         if tool_signals >= 2:
-            return False  # Clearly needs tools
+            return "tools"  # Clearly needs tools
         if qa_match and tool_signals == 0:
-            # Consult edge model for borderline Q&A (might still need tools)
-            return self._check_tool_necessity_via_edge(context_msg, heuristic_conf=0.85)
+            # Consult edge model for borderline Q&A (might still need tools). Even when it
+            # says "skip", give the read-only core rather than nothing.
+            skip = self._check_tool_necessity_via_edge(context_msg, heuristic_conf=0.85)
+            return "read_core" if skip else "tools"
 
-        # Ambiguous: 0-1 tool signals, no Q&A pattern — default to providing tools
+        # Ambiguous: 0-1 tool signals — default to providing tools
         if tool_signals == 0 and qa_match:
-            return self._check_tool_necessity_via_edge(context_msg, heuristic_conf=0.6)
+            skip = self._check_tool_necessity_via_edge(context_msg, heuristic_conf=0.6)
+            return "read_core" if skip else "tools"
 
-        return False  # Default: provide tools
+        return "tools"  # Default: provide tools
+
+    def _should_skip_tools_for_turn(self, context_msg: str) -> bool:
+        """Back-compat shim: True when full tool selection is not needed this turn.
+
+        Prefer :meth:`_tool_skip_mode`, which distinguishes a hard ``"skip"`` (greeting)
+        from ``"read_core"`` (borderline Q&A still gets read tools).
+        """
+        return self._tool_skip_mode(context_msg) != "tools"
 
     def _check_tool_necessity_via_edge(self, context_msg: str, heuristic_conf: float) -> bool:
         """Consult edge model for tool necessity decision.
@@ -3667,7 +3718,11 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         """Sort tools for KV-cache stability; session-local cache is managed here."""
         if tools is None:
             return None
-        if not self._kv_optimization_enabled:
+        if self._kv_optimization_enabled:
+            stabilize_order = True
+        else:
+            stabilize_order = AgentOrchestrator._should_stabilize_tool_order(self)
+        if not stabilize_order:
             return tools
         current_names = frozenset(t.name for t in tools)
         last_names = getattr(self, "_last_sorted_tool_names", None)
@@ -3675,11 +3730,23 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         if last_names == current_names and last_tools is not None:
             return last_tools
         sorted_tools = self._tool_service.sort_tools_for_kv_stability(
-            tools, kv_optimization_enabled=self._kv_optimization_enabled
+            tools, kv_optimization_enabled=stabilize_order
         )
         self._last_sorted_tool_names = current_names
         self._last_sorted_tools = sorted_tools
         return sorted_tools
+
+    def _should_stabilize_tool_order(self) -> bool:
+        """Return whether this turn should use byte-stable tool ordering."""
+        if self._kv_optimization_enabled:
+            return True
+
+        strategy = self._resolve_kv_strategy_setting()
+        if strategy in ("session_stable", "additive"):
+            return True
+        if strategy != "context_aware":
+            return False
+        return self._context_aware_profile_session_locked()
 
     def _resolve_kv_strategy_setting(self) -> str:
         """Read kv_tool_strategy from settings; default to 'context_aware'."""
@@ -3696,9 +3763,15 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
     def _apply_kv_tool_strategy(self, tools):
         """Delegate KV tool strategy to ToolService; manage session-stable cache here."""
         if self._is_tool_strategy_v2_enabled():
-            return self._tool_service.apply_context_aware_strategy(
-                tools, provider=self.provider, model=self.model
+            result = self._tool_service.apply_context_aware_strategy(
+                tools,
+                provider=self.provider,
+                model=self.model,
+                session_semantic_tools=getattr(self, "_session_semantic_tools", None),
             )
+            if self._context_aware_profile_session_locked():
+                self._session_semantic_tools = result
+            return result
         strategy = self._resolve_kv_strategy_setting()
         result = self._tool_service.apply_kv_tool_strategy(
             tools,
@@ -3708,10 +3781,34 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
             session_semantic_tools=getattr(self, "_session_semantic_tools", None),
             kv_tool_strategy=strategy,
         )
-        # Persist session-stable selection at orchestrator level (ToolService is a singleton)
-        if strategy == "session_stable" and not getattr(self, "_session_semantic_tools", None):
+        # Persist the (grow-only) session-stable selection at orchestrator level
+        # (ToolService is a singleton). P4: persist EVERY turn — not just the first —
+        # so newly-added tools join the cached set and stay available next turn.
+        if strategy in ("session_stable", "additive") or (
+            strategy == "context_aware" and self._context_aware_profile_session_locked()
+        ):
             self._session_semantic_tools = result
         return result
+
+    def _context_aware_profile_session_locked(self) -> bool:
+        """Whether the provider-economics profile wants session-stable tools."""
+        try:
+            from victor.config.tool_tiers import resolve_tool_supply_profile
+
+            context_window = self._get_context_window(self.provider, self.model)
+            fallback_max_tools = None
+            try:
+                fallback_max_tools = getattr(getattr(self.settings, "tools", None), "budget", None)
+            except Exception:
+                fallback_max_tools = None
+            profile = resolve_tool_supply_profile(
+                self.provider,
+                context_window,
+                fallback_max_tools=int(fallback_max_tools or 8),
+            )
+            return profile.session_lock != "off"
+        except Exception:
+            return False
 
     def _is_tool_strategy_v2_enabled(self) -> bool:
         """Check if the new context-aware tool strategy is enabled.

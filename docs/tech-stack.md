@@ -3,7 +3,7 @@
 > Canonical technology reference for Victor AI Framework.
 > Supersedes scattered tech-debt and stack documents across docs/.
 
-**Version**: 0.7.1 | **Last Updated**: 2026-06 | **Status**: Canonical
+**Version**: {{ victor_version }} | **Last Updated**: 2026-06 | **Status**: Canonical
 
 ---
 
@@ -224,7 +224,7 @@ erDiagram
 |----|------|-------------|----------|--------|--------|
 | TD-1 | API Server | `victor/integrations/api/server.py` hotspot decomposition | High | Planned | `victor/integrations/` |
 | TD-2 | Vertical Integration | `victor/framework/vertical_integration.py` cleanup | Medium | Planned | `victor/framework/` |
-| TD-3 | Conversation Memory | `victor/agent/conversation/store.py` refactoring | Medium | Planned | `victor/agent/` |
+| TD-3 | Conversation Memory | `victor/agent/conversation/store.py` refactoring | Medium | Complete | `victor/agent/` |
 | TD-4 | Secret Handling | Normalize across provider, server, session settings | High | In Progress | `victor/providers/` |
 | TD-5 | Observability | Decide: prototype or supported surface | Medium | Pending | `victor/core/` |
 | TD-6 | Benchmark Publication | Publish SWE-bench results publicly | High | Planned | `benchmarks/` |
@@ -232,6 +232,9 @@ erDiagram
 | TD-8 | Legacy Verticals | Built-in contrib verticals emit DeprecationWarning | Low | Complete | `victor/verticals/` |
 | TD-9 | Streaming + AgenticLoop | StreamingChatPipeline not yet integrated with AgenticLoop | Medium | Planned | `victor/agent/` |
 | TD-10 | Workspace Isolation | Rename internals from worktree-only to workspace-first | Medium | In Progress | `victor/teams/` |
+| TD-11 | ProximaDB CCG Backend | Make `proximadb_provider.py` real and add a `ProximaGraphStore` implementing `GraphStoreProtocol`, so the SQLite + LanceDB pair can be replaced by one correlated ProximaDB collection (graph + vector + relational on one `oid`). See `docs/architecture/proximadb-codegraph-backend.md`. | Medium | Planned | `victor/storage/` |
+| TD-12 | Embedding↔Node Correlation | Retire the unpopulated `graph_node.embedding_ref`: correlate embedding to node by shared `oid` (= `graph/{repo}/node/{symbol_oid}`) so a code change rewrites text + re-embedding in one atomic upsert. Removes SQLite↔Lance dual-write skew. | Medium | Planned | `victor/storage/graph/` |
+| TD-13 | Tier-A/Tier-B CCG split | Index symbols (~80K) + cross-fn edges (~96K) into the traversable graph; offload intra-procedural CPG (statements + DDG/CFG/CDG, ~96% of edges, 100% intra-file) to columnar fragments fetched on dataflow drill-down. Keeps the live graph ~120 MB f32 / ~35 MB SQ8 in-RAM. | Medium | Planned | `victor/core/graph_rag/` |
 
 ### Tech Debt Timeline
 
@@ -246,7 +249,7 @@ gantt
         TD-7 Onboarding          :active, a4, 2026-05-01, 2026-06-15
     section Medium Priority
         TD-5 Observability       : b1, 2026-07-01, 2026-08-01
-        TD-3 Conv Memory         : b2, 2026-07-01, 2026-08-01
+        TD-3 Conv Memory         :done, b2, 2026-07-01, 2026-08-01
         TD-9 Streaming Loop      : b3, 2026-08-01, 2026-09-01
         TD-10 Workspace Rename   :active, b4, 2026-05-15, 2026-06-30
     section Low Priority

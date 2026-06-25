@@ -147,7 +147,14 @@ def test_web_search_survives_full_selection_to_dispatch_pipeline(
         cap_mcp_tools=lambda current, _max: current,
     )
     assert "web_search" in [t.name for t in pruned], "dropped at post-selection truncation (#157)"
-    assert len(pruned) <= selector.fallback_max_tools
+    # tool-supply P2: the cap no longer DROPS the over-cap tail — it keeps every tool and
+    # demotes the tail to STUB. So nothing is dropped, the budget is respected via schema
+    # tiering (top-N kept at full schema), and web_search is preserved at full schema.
+    assert len(pruned) == len(candidates), "P2 cap=stub must not drop tools"
+    full_tools = [t for t in pruned if getattr(t, "schema_level", None) is None]
+    assert len(full_tools) <= selector.fallback_max_tools, "budget respected via FULL-schema cap"
+    web = next(t for t in pruned if t.name == "web_search")
+    assert web.schema_level is None, "selected web tool kept at full schema, not stubbed"
 
     # Stage 2 — stage prioritization (#149).
     final = selector.prioritize_by_stage(prompt, pruned)

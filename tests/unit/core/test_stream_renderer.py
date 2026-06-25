@@ -338,8 +338,12 @@ class TestLiveDisplayRenderer:
     def test_on_tool_start_prints_starting_hint_for_slow_tools(
         self, mock_live_class, renderer, mock_console
     ):
-        """on_tool_start stores state, shows the Tool Execution section, and prints
-        a "starting…" hint for slow tools (fast tools stay silent until result)."""
+        """on_tool_start stores pending state and emits the Tool Execution section.
+
+        The per-tool "running" indicator now renders inside the live progress
+        panel (gated on an active Live), so the deterministic console output is
+        the section separator plus the recorded pending-tool state.
+        """
         mock_live = MagicMock()
         mock_live_class.return_value = mock_live
 
@@ -349,13 +353,17 @@ class TestLiveDisplayRenderer:
         assert renderer._pending_tool is not None
         assert renderer._pending_tool["name"] == "code_search"
         assert renderer._pending_tool["arguments"] == {"query": "foo"}
+        assert renderer._tool_section_shown is True
         printed_calls = [str(call_args) for call_args in mock_console.print.call_args_list]
         assert any("Tool Execution" in call_str for call_str in printed_calls)
-        assert any("starting" in call_str for call_str in printed_calls)
 
     @patch("victor.ui.rendering.live_renderer.Live")
     def test_on_tool_result_success_prints_checkmark(self, mock_live_class, renderer, mock_console):
-        """Test on_tool_result() prints green checkmark for success."""
+        """Test on_tool_result() prints a success indicator for success.
+
+        The canonical bash-style result line uses the ``success`` style and a
+        ``[DONE]`` marker (see live_renderer.on_tool_result).
+        """
         mock_live = MagicMock()
         mock_live_class.return_value = mock_live
 
@@ -369,8 +377,8 @@ class TestLiveDisplayRenderer:
 
         mock_console.print.assert_called()
         call_str = str(mock_console.print.call_args)
-        assert "green" in call_str
-        assert "✓" in call_str
+        assert "success" in call_str
+        assert "DONE" in call_str
 
     @patch("victor.ui.rendering.live_renderer.Live")
     def test_on_tool_result_formats_tool_name_for_display(
@@ -401,7 +409,11 @@ class TestLiveDisplayRenderer:
 
     @patch("victor.ui.rendering.live_renderer.Live")
     def test_on_tool_result_failure_prints_x(self, mock_live_class, renderer, mock_console):
-        """Test on_tool_result() prints red X for failure."""
+        """Test on_tool_result() prints an error indicator for failure.
+
+        The canonical result line uses the ``error`` style + ``[DONE]`` marker,
+        followed by an ``Error:`` line (see live_renderer.on_tool_result).
+        """
         mock_live = MagicMock()
         mock_live_class.return_value = mock_live
 
@@ -416,8 +428,9 @@ class TestLiveDisplayRenderer:
 
         mock_console.print.assert_called()
         call_str = str(mock_console.print.call_args)
-        assert "red" in call_str
-        assert "✗" in call_str
+        assert "error" in call_str
+        assert "DONE" in call_str
+        assert "Error:" in call_str
 
     @patch("victor.ui.rendering.live_renderer.Live")
     def test_on_tool_result_prints_follow_up_suggestions(

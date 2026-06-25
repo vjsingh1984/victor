@@ -360,6 +360,71 @@ class MockBaseTool(BaseTool):
         return ToolResult(success=True, output="mock result")
 
 
+class CountingInstantiationTool(BaseTool):
+    """Tool that counts how many times its class is instantiated.
+
+    Used to verify that discovery and LazyToolProxy loading do not cause
+    double-instantiation of the same tool.
+    """
+
+    instantiation_count: int = 0
+
+    def __init__(self) -> None:
+        super().__init__()
+        CountingInstantiationTool.instantiation_count += 1
+
+    @property
+    def name(self) -> str:
+        return "counting_instantiation_tool"
+
+    @property
+    def description(self) -> str:
+        return "Counts instantiations for double-init regression tests"
+
+    @property
+    def parameters(self) -> Dict[str, Any]:
+        return {"type": "object", "properties": {}}
+
+    async def execute(self, _exec_ctx: Dict[str, Any], **kwargs: Any) -> ToolResult:
+        return ToolResult(success=True, output="counting result")
+
+
+class TestSharedToolRegistryNoDoubleInstantiation:
+    """Regression tests: discovery must not cause duplicate tool instantiation."""
+
+    def test_proxy_reuses_discovery_instance_not_reinstantiated(self):
+        """LazyToolProxy must reuse the instance created during discovery.
+
+        Regression: previously _discover_tools() created an instance via obj()
+        to read .name, then LazyToolProxy._ensure_loaded() called cls() again,
+        instantiating every used tool twice.
+        """
+        from victor.agent.shared_tool_registry import SharedToolRegistry
+
+        CountingInstantiationTool.instantiation_count = 0
+        SharedToolRegistry.reset_instance()
+        registry = SharedToolRegistry.get_instance()
+
+        # Simulate discovery having instantiated the tool to harvest its name
+        cached_instance = CountingInstantiationTool()
+        assert CountingInstantiationTool.instantiation_count == 1
+        registry._tool_classes["counting_instantiation_tool"] = CountingInstantiationTool
+        registry._tool_instances["counting_instantiation_tool"] = cached_instance
+        registry._initialized = True
+
+        # Build the registration list (creates LazyToolProxy objects)
+        tools = registry.get_all_tools_for_registration()
+        proxy = next(t for t in tools if getattr(t, "name", None) == "counting_instantiation_tool")
+
+        # Simulate first use — this must NOT instantiate again
+        loaded = proxy._ensure_loaded()
+
+        assert loaded is cached_instance, "Proxy should reuse the cached discovery instance"
+        assert (
+            CountingInstantiationTool.instantiation_count == 1
+        ), "Tool was instantiated more than once (double-instantiation regression)"
+
+
 class TestSharedToolRegistryGetToolNames:
     """Tests for get_tool_names method."""
 

@@ -38,6 +38,15 @@ async def test(
     """
     Runs tests using pytest and returns a structured summary of the results.
 
+    NOTE: For simple test runs, PREFER the ``shell`` tool:
+        shell(cmd="pytest -q")
+        shell(cmd="pytest tests/unit -v", cwd=".")
+        shell(cmd="pytest -k test_foo --tb=short")
+
+    This tool wraps pytest via subprocess. Use it when you want structured
+    JSON test output (pass/fail summary). For quick ad-hoc test runs,
+    ``shell(cmd="pytest ...")`` is more efficient.
+
     This tool runs pytest on the specified path and captures the output in JSON format,
     providing a clean summary of test outcomes.
 

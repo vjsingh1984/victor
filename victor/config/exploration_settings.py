@@ -30,3 +30,17 @@ class ExplorationSettings(BaseModel):
     max_continuation_prompts_analysis: int = 6
     continuation_prompt_overrides: Dict[str, Dict[str, int]] = Field(default_factory=dict)
     enable_continuation_rl_learning: bool = True
+
+    # Convergence guards (shared TurnEvaluationController; both agentic loops).
+    # Search-novelty safety-net: stop a re-search loop that is no longer surfacing new files.
+    search_novelty_guard_enabled: bool = True
+    novelty_ratio_threshold: float = 0.34
+    novelty_consecutive_low_limit: int = 3
+    novelty_nudge_after_low: int = 2
+    novelty_min_search_turns: int = 2
+    min_iterations_before_force_complete: int = 2
+    # Fulfillment-complete: stop redundant verification once a substantial answer + findings exist.
+    fulfillment_completion_enabled: bool = True
+    fulfillment_summary_min_chars: int = 800
+    fulfillment_min_findings: int = 3
+    min_iterations_before_fulfillment: int = 4

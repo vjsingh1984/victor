@@ -48,6 +48,27 @@ theme:
 plugins:
   - search
   - git-revision-date-localized
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [.]
+          # Static analysis only (griffe parses source) — the docs build never imports victor, so
+          # CI needs no heavy runtime deps (torch etc.) and there are no import side effects.
+          options:
+            docstring_style: google
+            show_source: false
+            show_root_heading: true
+            show_signature_annotations: true
+            separate_signature: false
+            merge_init_into_class: true
+            members_order: source
+            filters: ["!^_"]
+
+# Single-source the docs version stamp ({{ victor_version }}) from the repo-root VERSION file.
+# A targeted hook, not mkdocs-macros: the docs contain literal {{ ... }} examples (cookiecutter
+# trees, Cypher, workflow prompts) that a full Jinja pass would mangle.
+hooks:
+  - mkdocs_hooks/version_stamp.py
 
 markdown_extensions:
   - markdown.extensions.admonition
@@ -146,6 +167,7 @@ nav:
       - Session Management: user-guide/session-management.md
       - Troubleshooting: user-guide/troubleshooting.md
   - API Reference:
+      - Auto-generated (from docstrings): api-reference/auto-api.md
       - Protocols: api-reference/protocols.md
       - Providers: api-reference/providers.md
       - Tools: api-reference/tools.md

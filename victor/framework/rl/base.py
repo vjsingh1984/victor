@@ -74,6 +74,9 @@ class RLOutcome:
     timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
     metadata: Dict[str, Any] = field(default_factory=dict)
     vertical: str = DEFAULT_VERTICAL
+    # Per-segment process reward {turn/action index: credit} (Vision P6). Transient/observability —
+    # blended into quality_score at outcome construction, so it is not persisted to the DB.
+    segment_rewards: Optional[Dict[int, float]] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for storage."""
@@ -236,17 +239,25 @@ class BaseLearner(ABC):
         """
         pass
 
-    @abstractmethod
     def _compute_reward(self, outcome: RLOutcome) -> float:
         """Compute reward signal from outcome.
+
+        Default = the canonical reward derived from the outcome's success +
+        quality_score (``victor.framework.rl.reward.reward_from_outcome``). Learners
+        MAY override this for domain-specific *shaping* (e.g. ``tool_selector`` weights
+        success/completion/grounding/efficiency); overriding is fully supported. This
+        concrete default removes the need to reimplement the trivial case and gives
+        one canonical formula instead of several drifting ones.
 
         Args:
             outcome: Outcome to compute reward for
 
         Returns:
-            Reward value (typically -1.0 to 1.0)
+            Reward value in ``[0.0, 1.0]``.
         """
-        pass
+        from victor.framework.rl.reward import reward_from_outcome
+
+        return reward_from_outcome(outcome)
 
     def _get_provider_baseline(self, param_name: str) -> Any:
         """Get baseline value from provider adapter if available.

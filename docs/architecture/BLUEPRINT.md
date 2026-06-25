@@ -4,7 +4,7 @@
 > bottom-up orientation map of the entire codebase — grounded in real modules
 > and integration points. All diagrams are Mermaid and render inline.
 
-**Version**: 0.7.1 | **Status**: Canonical orientation document
+**Version**: {{ victor_version }} | **Status**: Canonical orientation document
 
 ---
 

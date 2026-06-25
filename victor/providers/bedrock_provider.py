@@ -442,6 +442,15 @@ class BedrockProvider(BaseProvider):
                     for tool in tools
                 ]
             }
+            # INFO log of the serialized tool payload (first-principles debugging).
+            _tool_names = ", ".join(
+                t["toolSpec"]["name"] for t in request_params["toolConfig"]["tools"]
+            )
+            logger.info(
+                "[ToolSchemas→LLM] Bedrock converse payload: %d tools: %s",
+                len(request_params["toolConfig"]["tools"]),
+                _tool_names,
+            )
 
         # Run synchronous boto3 call in thread pool
         loop = asyncio.get_event_loop()
@@ -577,6 +586,15 @@ class BedrockProvider(BaseProvider):
                         for tool in tools
                     ]
                 }
+                # INFO log of the serialized tool payload (first-principles debugging).
+                _tool_names = ", ".join(
+                    t["toolSpec"]["name"] for t in request_params["toolConfig"]["tools"]
+                )
+                logger.info(
+                    "[ToolSchemas→LLM] Bedrock converse_stream payload: %d tools: %s",
+                    len(request_params["toolConfig"]["tools"]),
+                    _tool_names,
+                )
 
             # Run synchronous streaming call
             loop = asyncio.get_event_loop()

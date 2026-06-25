@@ -70,6 +70,10 @@ class AgentSettings(BaseModel):
     planning_min_complexity: str = "moderate"
     planning_show_plan: bool = True
 
+    # Completion strategy (ADR-009): "enhanced" (default) | "rubric" | "hybrid" | "legacy".
+    # Threaded into AgenticLoop construction; default leaves behavior unchanged.
+    completion_strategy: str = "enhanced"
+
     @field_validator("planning_min_complexity")
     @classmethod
     def validate_complexity(cls, v: str) -> str:

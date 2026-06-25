@@ -19,7 +19,9 @@ breaking: a moderate-overlap turn used to decay the counter, so an oscillating
 loop never reached the force-completion threshold.
 """
 
-from victor.agent.services.chat_stream_executor import _evaluate_overlap_repetition
+# The overlap-repetition helper moved to the shared turn_policy module (consolidated so the
+# headless and streaming loops share one content-repetition detector).
+from victor.agent.turn_policy import evaluate_overlap_repetition as _evaluate_overlap_repetition
 
 
 def test_near_duplicate_forces_on_first_occurrence() -> None:

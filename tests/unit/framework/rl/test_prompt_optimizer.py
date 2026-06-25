@@ -30,6 +30,18 @@ from victor.framework.rl.learners.prompt_optimizer import (
 )
 
 
+def _accepted_hygiene_report():
+    """A PromptHygieneReport that always passes the persist hygiene gate."""
+    from victor.framework.rl.prompt_hygiene import PromptHygieneReport
+
+    return PromptHygieneReport(
+        accepted=True,
+        growth_chars=0,
+        seed_similarity=1.0,
+        repeated_trigrams=0,
+    )
+
+
 @pytest.fixture
 def db():
     """In-memory SQLite database."""
@@ -395,6 +407,13 @@ class TestPromptOptimizerLearner:
             patch.object(learner, "_collect_learning_traces", return_value=traces),
             patch.object(learner, "_enrich_traces_with_credit"),
             patch.object(learner, "_apply_section_strategies", return_value="mutated prompt"),
+            # The persist hygiene gate runs on the (placeholder) mutated text and
+            # would otherwise reject it; this test exercises strategy-chain
+            # metadata recording, not hygiene, so accept the candidate.
+            patch(
+                "victor.framework.rl.prompt_hygiene.evaluate_prompt_candidate",
+                return_value=_accepted_hygiene_report(),
+            ),
         ):
             candidate = learner.evolve(
                 "ASI_TOOL_EFFECTIVENESS_GUIDANCE",
@@ -1089,10 +1108,14 @@ class TestPromptOptimizerLearner:
 
         with patch.object(learner, "_collect_learning_traces", return_value=traces):
             with patch.object(learner, "_enrich_traces_with_credit") as enrich_mock:
-                candidate = learner.evolve(
-                    "GROUNDING_RULES",
-                    "Base responses on tool output only.",
-                )
+                with patch(
+                    "victor.framework.rl.prompt_hygiene.evaluate_prompt_candidate",
+                    return_value=_accepted_hygiene_report(),
+                ):
+                    candidate = learner.evolve(
+                        "GROUNDING_RULES",
+                        "Base responses on tool output only.",
+                    )
 
         assert candidate is not None
         assert candidate.is_active is False

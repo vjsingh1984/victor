@@ -367,6 +367,7 @@ async def edit(
     commit: bool = True,
     desc: str = "",
     ctx: int = 3,
+    mode: str = "auto",
 ) -> Dict[str, Any]:
     """Edit files atomically with undo. REQUIRED: 'ops' parameter with operation list.
 
@@ -383,6 +384,15 @@ async def edit(
         - modify: Overwrite file content. Requires: path, content
         - delete: Remove file. Requires: path
         - rename: Rename/move file. Requires: path, new_path
+
+    Mode (write-intent, overrides per-op 'mode' field):
+        - "auto": Backward-compat default - no existence guard on create.
+        - "new": create ops MUST target a non-existing path. Rejects overwrite
+          of existing files (safe "write new file" semantics; use replace/modify
+          to edit existing files).
+        - "existing": replace/modify ops MUST target an existing path. Rejects
+          edits to missing files.
+
 
     Args:
         ops: REQUIRED! List of operations. Each op must have 'type' and 'path'.
@@ -597,6 +607,20 @@ async def edit(
             if _working is None:
                 _working = _fp.read_text(encoding="utf-8") if _fp.exists() else ""
             if _otype == "replace":
+                _op_mode = _op.get("mode", mode)
+                if _op_mode == "existing" and not _fp.exists():
+                    failed_files.append(
+                        {
+                            "path": _path,
+                            "op_index": _idx,
+                            "error": (
+                                "replace with mode='existing' refused: file does "
+                                "not exist. Use type='create' to make a new file."
+                            ),
+                        }
+                    )
+                    _group_ok = False
+                    break
                 _old = _op.get("old_str")
                 _new = _op.get("new_str")
                 if _old is None:
@@ -637,6 +661,21 @@ async def edit(
                     break
                 _working = _content
             elif _otype == "create":
+                _op_mode = _op.get("mode", mode)
+                if _op_mode == "new" and _fp.exists():
+                    failed_files.append(
+                        {
+                            "path": _path,
+                            "op_index": _idx,
+                            "error": (
+                                "create with mode='new' refused: file already "
+                                "exists. Use type='replace' or 'modify' to edit an "
+                                "existing file, or drop mode='new' to overwrite."
+                            ),
+                        }
+                    )
+                    _group_ok = False
+                    break
                 _working = _op.get("content", "")
             # delete / rename: no text content to validate at this stage
         if _group_ok:

@@ -421,7 +421,8 @@ class TestTaskGuidance:
         message = "Analyze the project structure"
 
         # Set initial temperature
-        task_coordinator.temperature = 0.7
+        initial_temperature = 0.7
+        task_coordinator.temperature = initial_temperature
 
         task_coordinator.apply_task_guidance(
             user_message=message,
@@ -433,8 +434,10 @@ class TestTaskGuidance:
             conversation_controller=mock_conversation_controller,
         )
 
-        # Verify temperature was increased for analysis
-        assert task_coordinator.temperature > 0.7
+        # Note: Temperature for analysis is handled by the unified resolver (ADR-013)
+        # at the provider seam, not by scalar mutation in apply_task_guidance.
+        # The temperature remains unchanged here - the policy is applied elsewhere.
+        assert task_coordinator.temperature == initial_temperature
 
         # Verify system messages were added
         assert mock_conversation_controller.add_message.call_count >= 2

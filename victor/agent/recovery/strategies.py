@@ -37,6 +37,7 @@ from victor.agent.recovery.protocols import (
     RecoveryResult,
     RecoveryStrategy,
 )
+from victor.framework.temperature import escalate_temperature
 
 logger = logging.getLogger(__name__)
 
@@ -224,7 +225,7 @@ class EmptyResponseRecovery(BaseRecoveryStrategy):
                 action=RecoveryAction.ADJUST_TEMPERATURE,
                 success=True,
                 message=prompt,
-                new_temperature=min(1.0, context.current_temperature + 0.2),
+                new_temperature=escalate_temperature(context.current_temperature, 0.2, cap=1.0),
                 strategy_name=self.name,
                 confidence=0.7,
                 reason=f"Empty response retry {context.consecutive_failures + 1} with temperature boost",

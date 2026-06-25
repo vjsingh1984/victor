@@ -38,8 +38,19 @@ class ToolCategory(str, Enum):
     """Built-in tool categories.
 
     Categories group related tools together for easy selection.
-    This is the canonical source for tool categories - used by both
-    tools.py (ToolSet) and tool_config.py (ToolConfigurator).
+
+    This enum is the **single identity authority for category names**. The
+    ``victor/config/tool_categories.yaml`` file is a *derived view*: it supplies
+    per-category membership, descriptions, and presets, but may only name
+    categories that exist here — a guard test
+    (``tests/unit/framework/test_tool_category_yaml_parity.py``) pins the two
+    vocabularies equal so they cannot silently drift. Runtime *membership* (which
+    tools are in a category) is owned by ``ToolMetadataRegistry`` (decorator /
+    ``resolve_contract``-driven, tier 1 of :meth:`ToolCategoryRegistry.get_tools`);
+    the YAML provides the built-in fallback.
+
+    Consumed by both ``tools.py`` (ToolSet) and ``tool_config.py``
+    (ToolConfigurator).
     """
 
     CORE = "core"
@@ -81,6 +92,15 @@ class ToolCategory(str, Enum):
 
     COMMUNICATION = "communication"
     """Communication tools: slack, teams, jira."""
+
+    NOTEBOOK = "notebook"
+    """Jupyter notebook operations: notebook_edit."""
+
+    TASK_MANAGEMENT = "task_management"
+    """Session-scoped task tracking: task_create, task_update, task_list, task_get."""
+
+    VERIFICATION = "verification"
+    """Codebase verification: codebase_verify, codebase_verify_batch."""
 
     CUSTOM = "custom"
     """Custom/user-defined tools."""

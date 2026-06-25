@@ -14,6 +14,7 @@ from victor.ui.rendering.buffered import BufferedRenderer
 from victor.ui.rendering.formatter_renderer import FormatterRenderer
 from victor.ui.rendering.handler import stream_response
 from victor.ui.rendering.live_renderer import LiveDisplayRenderer
+from victor.ui.theme import victor_theme
 
 
 class _ProgressRecorder:
@@ -92,7 +93,7 @@ def test_handler_registers_and_clears_sink_around_turn():
 
 
 def test_live_renderer_progress_does_not_raise_and_clears_panel():
-    console = Console(file=io.StringIO(), force_terminal=True, width=80)
+    console = Console(theme=victor_theme, file=io.StringIO(), force_terminal=True, width=80)
     renderer = LiveDisplayRenderer(console)
     renderer.start()
     try:
@@ -111,7 +112,7 @@ def test_live_renderer_progress_does_not_raise_and_clears_panel():
 
 
 def test_live_renderer_progress_noop_when_not_live():
-    console = Console(file=io.StringIO(), force_terminal=True, width=80)
+    console = Console(theme=victor_theme, file=io.StringIO(), force_terminal=True, width=80)
     renderer = LiveDisplayRenderer(console)
     # Never started -> no Live display -> must be a safe no-op.
     renderer.on_tool_progress("shell", stdout="x")

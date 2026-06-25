@@ -95,7 +95,25 @@ jobs:
           # self-referential extras, which can leave async/test plugins unresolved in matrix jobs.
           # NOTE: Do NOT use --force-reinstall here — it overwrites the local editable
           # victor-contracts (0.7.0 with cli module) with the older PyPI release (0.6.0 without it).
-          pip install --no-cache-dir -e ".[dev,ci,api]"
+          #
+          # Retry the heavy install: under 48 parallel shards PyPI's index occasionally
+          # returns a transient empty response for a transitive dependency (e.g. mpmath,
+          # pulled in by sympy), which surfaces as 'No matching distribution found'. pip's
+          # built-in retries do NOT cover this case (an empty index response is treated as
+          # "no versions", not a network error), so an explicit retry loop is required. The
+          # loop succeeds once the index is reachable again. Mirrors the retry pattern used
+          # for the embedding-model pre-cache below.
+          for attempt in 1 2 3 4 5; do
+            if pip install --no-cache-dir -e ".[dev,ci,api]"; then
+              break
+            fi
+            if [ "$attempt" = "5" ]; then
+              echo "Dependency install failed after 5 attempts"
+              exit 1
+            fi
+            echo "Dependency install attempt ${attempt} failed; retrying in $((attempt * 10))s..."
+            sleep $((attempt * 10))
+          done
           # Re-install SDK editably to guarantee the local version wins even if
           # pip resolved victor-contracts from PyPI as a transitive dependency above.
           pip install --no-cache-dir --no-deps -e ./victor-contracts
@@ -221,7 +239,18 @@ jobs:
           pip install --no-cache-dir -e ./victor-contracts
           # Install victor-ai with embeddings extra (needed for CLI import chain).
           # Do NOT use --force-reinstall — it overwrites local editable SDK with PyPI version.
-          pip install --no-cache-dir -e ".[embeddings]"
+          # Retry to survive transient PyPI index blips (see main install step for rationale).
+          for attempt in 1 2 3 4 5; do
+            if pip install --no-cache-dir -e ".[embeddings]"; then
+              break
+            fi
+            if [ "$attempt" = "5" ]; then
+              echo "Dependency install failed after 5 attempts"
+              exit 1
+            fi
+            echo "Dependency install attempt ${attempt} failed; retrying in $((attempt * 10))s..."
+            sleep $((attempt * 10))
+          done
           # Re-install SDK editably to guarantee the local version wins
           pip install --no-cache-dir --no-deps -e ./victor-contracts
 

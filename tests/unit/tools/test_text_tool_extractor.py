@@ -166,6 +166,33 @@ class TestPythonCallExtractor:
         assert result.success
         assert result.tool_calls[0].name == "read"
 
+    def test_shell_fenced_cell_extracts_to_shell_cmd(self):
+        """Shell fenced cells with explicit tool intent should execute via shell(cmd=...)."""
+        content = "Run this with shell:\n```bash\nprintf 'a\\nb\\n' | sed -n '1p'\n```"
+        result = self.extractor.extract_from_text(content, valid_tool_names={"shell"})
+
+        assert result.success
+        assert result.tool_calls[0].name == "shell"
+        assert result.tool_calls[0].arguments == {"cmd": "printf 'a\\nb\\n' | sed -n '1p'"}
+
+    def test_python_fenced_cell_extracts_to_shell_heredoc(self):
+        """Python fenced cells should be wrapped in a shell heredoc."""
+        content = 'Use shell for this python cell:\n```python\n"""docstring"""\nprint("ok")\n```'
+        result = self.extractor.extract_from_text(content, valid_tool_names={"shell"})
+
+        assert result.success
+        assert result.tool_calls[0].name == "shell"
+        assert result.tool_calls[0].arguments == {
+            "cmd": 'python - <<\'PY\'\n"""docstring"""\nprint("ok")\nPY'
+        }
+
+    def test_python_fenced_cell_without_tool_intent_is_not_executed(self):
+        """Narrative code examples should not become tool calls accidentally."""
+        content = 'Example:\n```python\nprint("do not execute")\n```'
+        result = self.extractor.extract_from_text(content, valid_tool_names={"shell"})
+
+        assert not result.success
+
 
 class TestPythonCallExtractorEdgeCases:
     """Edge case tests for PythonCallExtractor."""

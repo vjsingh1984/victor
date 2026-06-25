@@ -223,6 +223,10 @@ jobs:
 
       - name: Install dependencies
         run: |
+          # victor-contracts is an in-repo package (not on PyPI); install it first so
+          # victor-ai's `victor-contracts>=0.6.0,<1.0` dependency resolves locally instead
+          # of failing with "No matching distribution found for victor-contracts".
+          pip install -e ./victor-contracts
           pip install -e ".[build]"
 
       - name: Build binary
