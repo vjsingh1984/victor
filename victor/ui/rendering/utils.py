@@ -388,37 +388,89 @@ def render_file_preview(console: Console, path: str, content: str) -> None:
     console.print(Panel(syntax, title=f"[dim]{path}[/]", border_style="dim"))
 
 
+def _append_inline_diff(body: "Text", old: str, new: str) -> None:
+    """Append a `-`/`+` line pair with word-level change highlighting.
+
+    Unchanged words are dim; removed words (in the `-` line) are bold red and
+    inserted words (in the `+` line) are bold green — so a small edit reads as a
+    few highlighted words rather than two fully-colored lines.
+    """
+    import difflib
+
+    sm = difflib.SequenceMatcher(a=old.split(), b=new.split())
+    # Removed line: context dim red, removed words bold red.
+    body.append("-", style="red")
+    for tag, i1, i2, _j1, _j2 in sm.get_opcodes():
+        style = "red" if tag == "equal" else "bold red"
+        if tag in ("equal", "delete", "replace"):
+            for word in sm.a[i1:i2]:
+                body.append(" " + word, style=style)
+    body.append("\n")
+    # Added line: context dim green, inserted words bold green.
+    body.append("+", style="green")
+    for tag, _i1, _i2, j1, j2 in sm.get_opcodes():
+        style = "green" if tag == "equal" else "bold green"
+        if tag in ("equal", "insert", "replace"):
+            for word in sm.b[j1:j2]:
+                body.append(" " + word, style=style)
+    body.append("\n")
+
+
 def render_edit_preview(console: Console, path: str, diff: str) -> None:
     """Render an edit diff preview as a compact unified diff.
 
     Lines are colored: +additions green, -deletions red, @@hunks cyan,
-    file headers dim, everything else dim. Diff is wrapped in a Panel
-    keyed by path for visual grouping.
+    file headers dim, context dim. Modified lines (a ``-`` run directly followed
+    by a ``+`` run of equal length) are rendered with **word-level** change
+    highlighting; pure additions/deletions stay line-level. Diff is wrapped in a
+    Panel keyed by path for visual grouping.
 
     Args:
         console: Rich Console to render to
         path: File path being edited (panel title)
         diff: Unified-diff content
     """
+    from rich.panel import Panel
     from rich.text import Text
 
     body = Text()
     lines = diff.split("\n")
-    for idx, line in enumerate(lines):
+    i = 0
+    n = len(lines)
+    while i < n:
+        line = lines[i]
         if line.startswith("@@"):
-            body.append(line, style="cyan")
+            body.append(line + "\n", style="cyan")
+            i += 1
         elif line.startswith("+++") or line.startswith("---"):
-            body.append(line, style="dim bold")
-        elif line.startswith("+"):
-            body.append(line, style="green")
+            body.append(line + "\n", style="dim bold")
+            i += 1
         elif line.startswith("-"):
-            body.append(line, style="red")
+            # Collect a run of removals, then any immediately-following additions.
+            removed = []
+            while i < n and lines[i].startswith("-") and not lines[i].startswith("--"):
+                removed.append(lines[i][1:])
+                i += 1
+            added = []
+            while i < n and lines[i].startswith("+") and not lines[i].startswith("++"):
+                added.append(lines[i][1:])
+                i += 1
+            if removed and added and len(removed) == len(added):
+                # Modification: word-level inline diff per paired line.
+                for old, new in zip(removed, added):
+                    _append_inline_diff(body, old, new)
+            else:
+                # Pure deletion / addition, or mismatched counts: line-level.
+                for old in removed:
+                    body.append("-" + old + "\n", style="red")
+                for new in added:
+                    body.append("+" + new + "\n", style="green")
+        elif line.startswith("+"):
+            body.append(line + "\n", style="green")
+            i += 1
         else:
-            body.append(line, style="dim")
-        if idx < len(lines) - 1:
-            body.append("\n")
-
-    from rich.panel import Panel
+            body.append(line + "\n", style="dim")
+            i += 1
 
     console.print(
         Panel(
