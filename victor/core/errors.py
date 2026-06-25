@@ -334,6 +334,50 @@ class ProviderInvalidResponseError(ProviderError):
             self.details["response_keys"] = list(response_data.keys())[:10]
 
 
+class ModelNotFoundError(ProviderError):
+    """Requested model is not available on the provider.
+
+    Distinguishes a recoverable, user-actionable condition — the configured
+    model is not installed or does not exist (e.g. an Ollama tag that was never
+    pulled) — from generic HTTP failures. Surfacing this as its own type lets
+    callers show a clear "pull it or pick another model" hint instead of a raw
+    stack trace.
+    """
+
+    def __init__(
+        self,
+        message: Optional[str] = None,
+        provider: Optional[str] = None,
+        model: Optional[str] = None,
+        available_models: Optional[List[str]] = None,
+        status_code: Optional[int] = None,
+        raw_error: Optional[Any] = None,
+        recovery_hint: Optional[str] = None,
+        **kwargs: Any,
+    ):
+        self.available_models = available_models or []
+        if message is None:
+            message = f"Model not found: {model}" if model else "Model not found"
+            if self.available_models:
+                message += f". Installed: {', '.join(self.available_models[:8])}"
+        if recovery_hint is None:
+            recovery_hint = (
+                "The configured model is not available on this provider. Install it "
+                "or set your profile's `model` to one of the installed models."
+            )
+        super().__init__(
+            message,
+            provider=provider,
+            model=model,
+            status_code=status_code,
+            raw_error=raw_error,
+            category=ErrorCategory.CONFIG_INVALID,
+            recovery_hint=recovery_hint,
+            **kwargs,
+        )
+        self.details["available_models"] = self.available_models
+
+
 class ToolError(AgentError):
     """Errors related to tool execution."""
 

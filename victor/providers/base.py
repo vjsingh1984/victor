@@ -305,6 +305,7 @@ class StreamChunk(BaseModel):
 # Provider error classes - re-exported from victor/core/errors for backward compatibility
 # All error classes are defined in victor/core/errors.py as the single source of truth
 from victor.core.errors import (
+    ModelNotFoundError,
     ProviderError,
     ProviderNotFoundError,
     ProviderTimeoutError,
@@ -818,6 +819,15 @@ class BaseProvider(ABC):
                     message=f"Rate limit exceeded: {error}",
                     provider=self.name,
                     status_code=429,
+                    raw_error=error,
+                )
+            # A 404 whose body mentions a missing model is a user-actionable
+            # configuration problem, not a transient/internal failure. Guard on
+            # the message so unrelated 404s (e.g. a wrong endpoint) stay generic.
+            if status == 404 and "model" in error_str and "not found" in error_str:
+                return ModelNotFoundError(
+                    provider=self.name,
+                    status_code=404,
                     raw_error=error,
                 )
 

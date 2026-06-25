@@ -12,6 +12,7 @@ class _RecorderRenderer:
         self.tool_calls: list[tuple[str, dict[str, Any]]] = []
         self.tool_results: list[dict[str, Any]] = []
         self.content: list[str] = []
+        self.statuses: list[str] = []
 
     def start(self) -> None:
         pass
@@ -52,7 +53,7 @@ class _RecorderRenderer:
         )
 
     def on_status(self, message: str) -> None:
-        pass
+        self.statuses.append(message)
 
     def on_file_preview(self, path: str, content: str) -> None:
         pass
@@ -145,3 +146,24 @@ def test_stream_response_normalizes_agent_tool_events() -> None:
         }
     ]
     assert result == "analysis complete"
+
+
+def test_stream_response_surfaces_error_events() -> None:
+    """A terminal ERROR event must be shown to the user, not silently dropped."""
+    agent = _AgentStreamSource(
+        [
+            AgentExecutionEvent(
+                type=EventType.ERROR,
+                error="Model not found: gpt-oss:latest\n💡 Run `ollama pull gpt-oss:latest`",
+                recoverable=False,
+            ),
+        ]
+    )
+    renderer = _RecorderRenderer()
+
+    result = asyncio.run(stream_response(agent, "hi", renderer))
+
+    # No content, but the error was surfaced via a status line (with a marker).
+    assert result == ""
+    assert any("Model not found: gpt-oss:latest" in s for s in renderer.statuses)
+    assert any(s.startswith("❌") for s in renderer.statuses)

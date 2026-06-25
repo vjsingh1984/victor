@@ -189,6 +189,53 @@ async def test_chat_http_error(ollama_provider):
             await ollama_provider.chat(messages=messages, model="llama3:8b")
 
 
+def test_is_model_not_found_error_detection():
+    """The 404 detector must require both a 404 status and a model-shaped body."""
+    assert OllamaProvider._is_model_not_found_error(
+        404, '{"error":"model \'gpt-oss:latest\' not found"}'
+    )
+    # Unrelated 404s (e.g. wrong endpoint) must not be misclassified.
+    assert not OllamaProvider._is_model_not_found_error(404, "404 page not found")
+    # A model-shaped body on a non-404 status is not a missing-model error.
+    assert not OllamaProvider._is_model_not_found_error(500, "model x not found")
+    assert not OllamaProvider._is_model_not_found_error(404, "")
+
+
+@pytest.mark.asyncio
+async def test_chat_model_not_found_raises_typed_error(ollama_provider):
+    """A 404 'model not found' surfaces as ModelNotFoundError with an actionable hint."""
+    from victor.providers.base import ModelNotFoundError
+
+    mock_response = MagicMock()
+    mock_response.status_code = 404
+    mock_response.text = '{"error":"model \'gpt-oss:latest\' not found"}'
+
+    # /api/tags lookup used to enrich the error with installed models.
+    tags_response = MagicMock()
+    tags_response.raise_for_status = lambda: None
+    tags_response.json = lambda: {"models": [{"name": "gpt-oss:20b"}, {"name": "qwen3.6:latest"}]}
+
+    with (
+        patch.object(ollama_provider.client, "post", new_callable=AsyncMock) as mock_post,
+        patch.object(ollama_provider.client, "get", new_callable=AsyncMock) as mock_get,
+    ):
+        mock_post.side_effect = httpx.HTTPStatusError(
+            "Not Found", request=MagicMock(), response=mock_response
+        )
+        mock_get.return_value = tags_response
+
+        messages = [Message(role="user", content="Hello")]
+
+        with pytest.raises(ModelNotFoundError) as exc_info:
+            await ollama_provider.chat(messages=messages, model="gpt-oss:latest")
+
+    err = exc_info.value
+    assert err.model == "gpt-oss:latest"
+    assert err.status_code == 404
+    assert "gpt-oss:20b" in err.available_models
+    assert "ollama pull gpt-oss:latest" in (err.recovery_hint or "")
+
+
 @pytest.mark.asyncio
 async def test_chat_generic_error(ollama_provider):
     """Test chat generic error handling."""
