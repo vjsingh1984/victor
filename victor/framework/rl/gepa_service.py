@@ -224,14 +224,20 @@ class GEPAService:
                 len(sanitized) < original_len,
             )
 
-        # Run the same hygiene gate as PrefPO so fence-wrapped / duplicate-line
-        # candidates cannot slip through the GEPA-service path.
+        # Structural hygiene gate. sanitize_prompt_candidate() already stripped
+        # fences and collapsed duplicate lines, so the only remaining concerns
+        # here are runaway growth and repetitive-garbage trigrams. Seed-
+        # similarity and unsupported-addition violations are intentionally NOT
+        # enforced on the mutation path: a mutation is expected to rewrite the
+        # prompt, which legitimately has low overlap with the seed.
         report = evaluate_prompt_candidate(current_text, sanitized)
-        if not report.accepted:
+        structural = {"growth_exceeded", "repeated_trigrams"}
+        triggered = structural & set(report.violations)
+        if triggered:
             logger.info(
-                "GEPA rejected candidate for %s due to hygiene violations: %s",
+                "GEPA rejected candidate for %s due to structural hygiene " "violations: %s",
                 section_name,
-                ",".join(report.violations),
+                ",".join(sorted(triggered)),
             )
             return current_text
         return sanitized

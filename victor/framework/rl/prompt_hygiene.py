@@ -10,7 +10,7 @@ from __future__ import annotations
 import re
 from collections import Counter
 from dataclasses import dataclass, field
-from typing import Iterable, List
+from typing import Iterable, List, Optional
 
 
 @dataclass
@@ -106,3 +106,72 @@ def _normalize_line(line: str) -> str:
 
 def _tokens(text: str) -> List[str]:
     return re.findall(r"[a-z0-9_()]+", text.lower())
+
+
+# ── Sanitization (transform) ───────────────────────────────────────────────
+# evaluate_prompt_candidate() above is a *validation* gate (report-only). The
+# two helpers below are the matching *transform* used by GEPA/PrefPO mutation
+# paths to clean a candidate before it is stored. They were referenced by
+# gepa_service.mutate / prompt_optimizer but never defined, which surfaced as
+# ImportError on those code paths.
+
+
+def boundary_aware_truncate(text: str, limit: int) -> tuple[str, bool]:
+    """Truncate ``text`` to ``limit`` chars without splitting a token.
+
+    When truncation is required the cut lands on the last whitespace at or
+    before ``limit`` so words/sentences are never severed mid-token. If no
+    whitespace is found, a hard cut at ``limit`` is used as a last resort.
+
+    Returns ``(truncated_text, was_truncated)``.
+    """
+    if limit <= 0 or len(text) <= limit:
+        return text, False
+    cut = text.rfind(" ", 0, limit)
+    if cut <= 0:
+        cut = limit
+    return text[:cut].rstrip(), True
+
+
+def sanitize_prompt_candidate(
+    result: str,
+    limit: int = 0,
+    seed_text: str = "",
+) -> str:
+    """Clean a mutated prompt before storage.
+
+    Applies, in order:
+      1. code-fence stripping — drop ```` ``` ```` delimiters, keep inner text
+      2. consecutive-line dedupe — collapse immediately-repeated lines
+      3. boundary-aware truncation to ``limit`` chars (when ``limit > 0``)
+
+    ``seed_text`` is accepted for API symmetry with ``evaluate_prompt_candidate``
+    and for future similarity-preserving strategies; it does not alter the
+    transform today.
+    """
+    text = _strip_code_fences(result)
+    text = _dedupe_consecutive_lines(text)
+    if limit > 0 and len(text) > limit:
+        text, _ = boundary_aware_truncate(text, limit)
+    return text
+
+
+def _strip_code_fences(text: str) -> str:
+    """Remove ```` ``` ```` fence delimiters, preserving the fenced content."""
+    out: List[str] = []
+    for line in text.splitlines():
+        if line.strip().startswith("```"):
+            continue
+        out.append(line)
+    return "\n".join(out)
+
+
+def _dedupe_consecutive_lines(text: str) -> str:
+    """Collapse runs of immediately-repeated identical lines to a single line."""
+    out: List[str] = []
+    prev: Optional[str] = None
+    for line in text.splitlines():
+        if line != prev:
+            out.append(line)
+        prev = line
+    return "\n".join(out)
