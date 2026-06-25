@@ -99,10 +99,8 @@ def _format_result(result: Any) -> str:
     task_types=["action", "generation"],
 )
 async def cicd_tool(cmd: str) -> str:
-    """Unified CI/CD tool with bash-like syntax. Delegates to the victor-devops
-    cicd implementation when available; otherwise reports it is unavailable
-    (there is no plain-shell equivalent). Examples: ``cicd list``,
-    ``cicd generate --workflow python-test``.
+    """CI/CD domain (bash-style): list, generate, validate.
+    Delegates to victor-devops (no plain-shell equivalent). e.g. cicd list · cicd generate --workflow python-test.
     """
     parser = create_cicd_parser()
     try:

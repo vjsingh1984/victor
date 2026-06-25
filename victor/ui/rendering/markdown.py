@@ -63,12 +63,45 @@ def _escape_rich_markup_from_text(text: str) -> str:
 def _markdown_block(text: str) -> Markdown:
     """Consistently style markdown output with a lighter base.
 
-    Content is escaped to prevent Rich markup parsing errors when LLM
-    output contains strings that look like Rich tags (e.g., file paths).
+    ``rich.markdown.Markdown`` does not interpret Rich inline markup (it parses
+    Markdown, not Rich ``[tags]``), so the text is passed through unescaped.
+    Pre-escaping here was both redundant and counterproductive: it matched the
+    ``[text]`` portion of markdown links and broke ``[text](url)`` rendering.
+    ``_escape_rich_markup_from_text`` is retained as a utility for any
+    markup-aware Rich path (e.g. ``console.print(Text(...))``) that may need it.
     """
-    # Escape Rich markup to prevent parsing errors
-    safe_text = _escape_rich_markup_from_text(text)
-    return Markdown(safe_text, style="markdown.text", justify="left")
+    return Markdown(text, style="markdown.text", justify="left")
+
+
+def find_safe_split(content: str) -> int:
+    """Return the char offset where the in-progress markdown TAIL begins.
+
+    ``content[:offset]`` is the stable HEAD (complete markdown blocks) and
+    ``content[offset:]`` is the active TAIL (the in-progress last block). The
+    split is placed just after the last blank-line block boundary that is NOT
+    inside an open fenced code block, so the HEAD can be rendered once and
+    cached while only the TAIL is re-rendered each streaming tick.
+
+    Returns 0 when inside an open fence (don't split a code block mid-stream) or
+    when no safe boundary exists yet (the first block is still streaming).
+    """
+    last_safe = 0
+    in_fence = False
+    pos = 0
+    for line in content.splitlines(keepends=True):
+        stripped = line.strip()
+        if in_fence:
+            # A fence line (``` or ~~~) closes the block.
+            if stripped[:3] in ("```", "~~~"):
+                in_fence = False
+        elif stripped[:3] in ("```", "~~~"):
+            # Opening a fenced code block — no safe split inside it.
+            in_fence = True
+        elif stripped == "":
+            # Blank line outside a fence = a completed block boundary.
+            last_safe = pos + len(line)
+        pos += len(line)
+    return last_safe
 
 
 def render_markdown_with_hooks(content: str) -> RenderableType:
