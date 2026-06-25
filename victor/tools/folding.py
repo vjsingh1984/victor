@@ -111,13 +111,11 @@ FOLDED_TOOLS: dict[str, ToolFold] = {
     "find": ToolFold(target="fs", hint="Use fs search <pattern> <path> to find files by name."),
     "web_search": ToolFold(target="web", hint="Use web search <query> for web search."),
     "web_fetch": ToolFold(target="web", hint="Use web fetch <url> to fetch a URL as markdown."),
-    "search": ToolFold(
-        target="code",
-        hint=(
-            "Deprecated. Use code grep <query> <path> for content search and "
-            "fs search <pattern> <path> for file-name search."
-        ),
-    ),
+    # `search` is a deprecated back-compat shim. It stays folded (hidden from the
+    # advertised schema) but gets an EMPTY hint so no deprecation text leaks into
+    # `code`'s description — the LLM can't act on a deprecation, so telling it is
+    # pure token noise. The DeprecationWarning in search_tool.py is for logs/devs.
+    "search": ToolFold(target="code", hint=""),
 }
 
 
@@ -158,5 +156,5 @@ def folded_tool_hints_for_target(target: str) -> list[str]:
     return [
         f"{name}: {fold.hint}"
         for name, fold in sorted(FOLDED_TOOLS.items())
-        if fold.target == target
+        if fold.target == target and fold.hint
     ]

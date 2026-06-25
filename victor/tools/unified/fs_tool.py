@@ -104,6 +104,8 @@ async def fs_tool(cmd: str) -> str:
       fs cat /path/to/file
       fs write /path/to/file -c "Hello"
       fs patch /path/to/file --search "old" --replace "new"
+      fs edit /path --old "a" --new "b"
+      fs search "*.py" /path
     """
     parser = create_fs_parser()
 

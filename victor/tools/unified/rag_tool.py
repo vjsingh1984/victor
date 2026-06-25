@@ -148,9 +148,8 @@ def _format_tool_result(result: Any) -> str:
     task_types=["search", "analysis", "action"],
 )
 async def rag_tool(cmd: str) -> str:
-    """Unified RAG tool with bash-like syntax. Delegates to the victor-rag
-    BaseTool classes (instantiate + execute). Examples: ``rag search "x"``,
-    ``rag ingest --path f.md``, ``rag list``.
+    """RAG domain (bash-style): ingest, search, query, list, delete, stats.
+    Delegates to victor-rag. e.g. rag search "x" · rag ingest --path f.md · rag list.
     """
     parser = create_rag_parser()
     try:

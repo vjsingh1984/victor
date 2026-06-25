@@ -116,10 +116,8 @@ def _format_result(result: Any) -> str:
     task_types=["action", "analysis"],
 )
 async def db_tool(cmd: str) -> str:
-    """Unified database tool with bash-like syntax.
-
-    Delegates to the main-repo ``database(action=…)`` tool (which is SQL-write-
-    guarded). Examples: ``db tables``, ``db query "SELECT 1"``, ``db schema``.
+    """Database domain (bash-style): connect, query, tables, describe, schema, disconnect.
+    SQL-write-guarded; delegates to the main-repo database tool. e.g. db query "SELECT 1" · db tables.
     """
     parser = create_db_parser()
     try:

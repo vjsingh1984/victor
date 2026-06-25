@@ -248,20 +248,8 @@ def _fallback_command(args: argparse.Namespace) -> Tuple[str, List[str], bool]:
     task_types=["action", "analysis"],
 )
 async def git_tool(cmd: str) -> str:
-    """Unified git tool with bash-like syntax. Use subcommands for version
-    control. Examples:
-      git status
-      git diff --staged
-      git log -n 20
-      git stage src/app.py
-      git commit -m "fix: handle empty input"
-      git commit --ai
-      git branch feature/auth
-      git push origin main
-
-    Delegates to the victor-devops git implementation when available (AI commit
-    messages, conflict analysis, PR creation); otherwise runs plain ``git``
-    via the shell tool.
+    """Git domain (bash-style): status, diff, log, stage, commit (--ai), branch, push, conflicts, pr.
+    Delegates to victor-devops git; falls back to shell git. e.g. git status · git commit -m "x".
     """
     parser = create_git_parser()
 
