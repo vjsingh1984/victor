@@ -63,12 +63,14 @@ def _escape_rich_markup_from_text(text: str) -> str:
 def _markdown_block(text: str) -> Markdown:
     """Consistently style markdown output with a lighter base.
 
-    Content is escaped to prevent Rich markup parsing errors when LLM
-    output contains strings that look like Rich tags (e.g., file paths).
+    ``rich.markdown.Markdown`` does not interpret Rich inline markup (it parses
+    Markdown, not Rich ``[tags]``), so the text is passed through unescaped.
+    Pre-escaping here was both redundant and counterproductive: it matched the
+    ``[text]`` portion of markdown links and broke ``[text](url)`` rendering.
+    ``_escape_rich_markup_from_text`` is retained as a utility for any
+    markup-aware Rich path (e.g. ``console.print(Text(...))``) that may need it.
     """
-    # Escape Rich markup to prevent parsing errors
-    safe_text = _escape_rich_markup_from_text(text)
-    return Markdown(safe_text, style="markdown.text", justify="left")
+    return Markdown(text, style="markdown.text", justify="left")
 
 
 def find_safe_split(content: str) -> int:
