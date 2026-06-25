@@ -26,6 +26,7 @@ from victor.providers.base import (
     BaseProvider,
     CompletionResponse,
     Message,
+    ModelNotFoundError,
     ProviderAuthError,
     ProviderError,
     ProviderRateLimitError,
@@ -557,6 +558,9 @@ class OllamaProvider(BaseProvider):
                         status_code=status_code,
                         raw_error=e,
                     ) from e
+                elif self._is_model_not_found_error(status_code, error_body):
+                    # The configured model is not installed — user-actionable.
+                    raise await self._model_not_found_error(model, status_code, e) from e
                 else:
                     # Other HTTP errors
                     self._provider_logger.logger.error(
@@ -755,6 +759,9 @@ class OllamaProvider(BaseProvider):
                     status_code=status_code,
                     raw_error=e,
                 ) from e
+            elif self._is_model_not_found_error(status_code, error_body):
+                # The configured model is not installed — user-actionable.
+                raise await self._model_not_found_error(model, status_code, e) from e
             else:
                 # Other HTTP errors
                 self._provider_logger.logger.error(
@@ -775,6 +782,54 @@ class OllamaProvider(BaseProvider):
                 provider=self.name,
                 raw_error=e,
             ) from e
+
+    @staticmethod
+    def _is_model_not_found_error(status_code: int, error_body: str) -> bool:
+        """Detect Ollama's "model not found" 404.
+
+        Ollama returns ``404`` with a body like
+        ``{"error":"model 'gpt-oss:latest' not found"}`` when the requested tag
+        was never pulled. Guard on the body text so unrelated 404s (e.g. a wrong
+        endpoint) are not misclassified.
+        """
+        if status_code != 404:
+            return False
+        lowered = (error_body or "").lower()
+        return "not found" in lowered and "model" in lowered
+
+    async def _list_available_models_safe(self) -> List[str]:
+        """Best-effort list of installed Ollama models for error hints.
+
+        Never raises: returns an empty list if the tags endpoint is unreachable.
+        """
+        try:
+            response = await self._get_client().get("/api/tags")
+            response.raise_for_status()
+            data = response.json()
+            return [m.get("name", "") for m in data.get("models", []) if m.get("name")]
+        except Exception:  # best-effort only — used while building an error message
+            return []
+
+    async def _model_not_found_error(
+        self, model: str, status_code: int, raw_error: Exception
+    ) -> ModelNotFoundError:
+        """Build a ModelNotFoundError with an actionable, Ollama-specific hint."""
+        available = await self._list_available_models_safe()
+        hint = (
+            f"Run `ollama pull {model}` to download it, or set your profile "
+            f"`model:` to an installed model"
+        )
+        if available:
+            hint += f" ({', '.join(available[:6])})"
+        hint += "."
+        return ModelNotFoundError(
+            provider=self.name,
+            model=model,
+            available_models=available,
+            status_code=status_code,
+            raw_error=raw_error,
+            recovery_hint=hint,
+        )
 
     def _build_request_payload(
         self,

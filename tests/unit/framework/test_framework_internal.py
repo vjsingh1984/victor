@@ -634,3 +634,32 @@ class TestCollectToolCalls:
         assert result[0]["tool_id"] == "call_1"
         assert result[0]["success"] is True
         assert result[1]["tool"] == "write"
+
+
+class TestSanitizeStreamErrorMessage:
+    """_sanitize_stream_error_message prefers structured, user-facing errors."""
+
+    def test_structured_victor_error_uses_message_and_hint(self):
+        from victor.core.errors import ModelNotFoundError
+        from victor.framework._internal import _sanitize_stream_error_message
+
+        err = ModelNotFoundError(
+            provider="ollama",
+            model="gpt-oss:latest",
+            available_models=["gpt-oss:20b"],
+            status_code=404,
+        )
+
+        msg = _sanitize_stream_error_message(err)
+
+        # Clean message (no correlation-id prefix from str(error)) + recovery hint.
+        assert msg.startswith("Model not found: gpt-oss:latest")
+        assert "💡" in msg
+        assert "gpt-oss:20b" in msg
+
+    def test_plain_exception_falls_back_to_str(self):
+        from victor.framework._internal import _sanitize_stream_error_message
+
+        msg = _sanitize_stream_error_message(ValueError("boom"))
+
+        assert "boom" in msg

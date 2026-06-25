@@ -147,6 +147,7 @@ async def stream_response(
             reasoning_normalizer.reset()
             was_thinking = False
 
+    error_surfaced = False
     try:
         async for event in stream_gen:
             chunk_count += 1
@@ -211,6 +212,18 @@ async def stream_response(
                 renderer.on_tool_result(
                     **tool_result_kwargs,
                 )
+            # Surface terminal stream errors (e.g. provider model-not-found) to
+            # the user instead of dropping them — otherwise the stream simply
+            # ends empty and we misreport it as a possible bug below.
+            elif event_type == EventType.ERROR:
+                error_text = (
+                    getattr(event, "error", None)
+                    or event_content
+                    or "The provider returned an error."
+                )
+                renderer.on_status(f"❌ {error_text}")
+                error_surfaced = True
+                break
             # Handle streamed tool progress (live terminal block). UI-ephemeral:
             # never added to conversation or sent to the model.
             elif (
@@ -325,8 +338,9 @@ async def stream_response(
         # FAIL-SAFE: Verify content was displayed
         final_content = renderer.finalize()
         # Empty content is valid in some flows (e.g. empty stream or metadata-only events),
-        # so return the renderer output directly and only log for visibility.
-        if not final_content and not renderer.had_tool_calls():
+        # so return the renderer output directly and only log for visibility. A surfaced
+        # error already explains the empty result, so don't misreport it as a bug.
+        if not final_content and not renderer.had_tool_calls() and not error_surfaced:
             logger.warning("stream_response returned empty content - this may indicate a bug")
 
         return final_content
