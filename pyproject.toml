@@ -221,8 +221,14 @@ ci = [
     "mkdocs>=1.5",
     "mkdocs-material>=9.5",
     "mkdocstrings[python]>=0.24",
-    # Pygments 2.19 escapes the formatter filename; pymdownx passes filename=None for
-    # mkdocstrings' block signatures -> html.escape(None) crash. Cap until upstream fixes it.
+    # Pygments >=2.19 escapes the formatter filename; pymdownx passes filename=None for
+    # mkdocstrings' block signatures -> html.escape(None) crash (verified still present
+    # with pygments 2.20.0 + mkdocstrings-python 2.0.1). Cap kept until pymdownx/pygments
+    # resolve the filename=None interaction.
+    # SECURITY TRADE-OFF: this cap pins the docs build to pygments <2.19, which is
+    # affected by CVE-2026-4539 (ReDoS in AdlLexer, fixed in 2.20.0). Accepted as
+    # low-risk — the runtime (non-docs) pygments is unpinned (>=2.17) and the CVE only
+    # triggers when highlighting untrusted ADL input, which a coding assistant does not.
     "pygments<2.19",
 ]
 
@@ -230,7 +236,8 @@ docs = [
     "mkdocs>=1.5",
     "mkdocs-material>=9.5",
     "mkdocstrings[python]>=0.24",
-    # See note in [dev]: cap Pygments to avoid the mkdocstrings signature-render crash.
+    # See note in [dev]: cap Pygments to avoid the mkdocstrings signature-render crash
+    # (CVE-2026-4539 trade-off documented there).
     "pygments<2.19",
 ]
 
