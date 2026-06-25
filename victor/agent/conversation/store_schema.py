@@ -777,6 +777,19 @@ class ConversationStoreSchema:
 
         table_sql = result[0]
 
+        # Self-heal very old `sessions` tables that predate the session_id key.
+        # Without this, ConversationStore init fails hard with "table sessions has
+        # no column named session_id". ALTER cannot re-add a PRIMARY KEY, but a
+        # plain column is enough to unblock INSERT OR REPLACE on this cache table.
+        existing_cols = {row[1] for row in conn.execute("PRAGMA table_info(sessions)")}
+        if "session_id" not in existing_cols:
+            try:
+                conn.execute("ALTER TABLE sessions ADD COLUMN session_id TEXT")
+                logger.warning("Healed legacy sessions table: added missing session_id column")
+            except sqlite3.OperationalError as e:
+                if "duplicate column name" not in str(e).lower():
+                    logger.warning(f"Failed to add session_id to sessions: {e}")
+
         new_columns = [
             ("provider_id", "INTEGER"),
             ("model_family_id", "INTEGER"),

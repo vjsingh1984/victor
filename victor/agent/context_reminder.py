@@ -275,7 +275,13 @@ class ContextReminderManager:
             if len(files) > 10:
                 files = files[:10] + [f"... and {len(files) - 10} more"]
             return f"[FILES: {', '.join(files)}]"
-        return "[NO FILES READ]"
+        # Phrase as an actionable status, not a bare flag. Small models read a
+        # terse "[NO FILES READ]" as a prohibition ("I am not allowed to read
+        # files") and refuse, instead of as "you have not read any files yet".
+        # Stay tool-name-agnostic: the tool surface varies by config/vertical
+        # (discrete read/ls vs domain-based `fs ls`/`fs cat`), so naming specific
+        # tools risks pointing at one that is not registered.
+        return "[No files read yet — gather evidence with the available tools before answering.]"
 
     def _format_budget_reminder(self) -> str:
         """Format the budget reminder."""

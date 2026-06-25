@@ -1102,6 +1102,7 @@ models:
   "gpt-oss*":
     training:
       tool_calling: true
+      thinking_mode: true   # Harmony analysis/commentary channels (request `think`)
       code_generation: true
 
     providers:

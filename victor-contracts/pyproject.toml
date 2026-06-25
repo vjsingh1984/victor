@@ -68,7 +68,8 @@ package-dir = { "" = "." }
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["victor_contracts*"]
+# victor_sdk* is a deprecation shim re-exporting victor_contracts (old package name).
+include = ["victor_contracts*", "victor_sdk*"]
 exclude = ["tests*"]
 
 [tool.black]

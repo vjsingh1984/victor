@@ -565,3 +565,19 @@ class TestToolServiceValidationIntegration:
         # Verify validation results
         assert len(valid) == 2
         assert len(invalid) == 1
+
+
+def test_all_tool_calls_are_channel_artifacts():
+    """Harmony/role channel tokens leaked as tool names are recognized as artifacts."""
+    from victor.agent.services.tool_service import ToolService
+
+    svc = ToolService.__new__(ToolService)
+    # gpt-oss harmony leak: the channel role token surfaces as the tool name.
+    assert svc._all_tool_calls_are_channel_artifacts([{"name": "assistant", "arguments": {}}])
+    assert svc._all_tool_calls_are_channel_artifacts([{"name": "analysis"}, {"name": "commentary"}])
+    # A real tool name is never an artifact.
+    assert not svc._all_tool_calls_are_channel_artifacts([{"name": "read", "arguments": {}}])
+    # Mixed batch with at least one real tool must not be discarded wholesale.
+    assert not svc._all_tool_calls_are_channel_artifacts([{"name": "assistant"}, {"name": "read"}])
+    assert not svc._all_tool_calls_are_channel_artifacts([])
+    assert not svc._all_tool_calls_are_channel_artifacts(None)

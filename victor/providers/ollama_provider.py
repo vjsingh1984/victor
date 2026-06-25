@@ -110,6 +110,7 @@ class OllamaProvider(BaseProvider):
         super().__init__(base_url=chosen_base, timeout=timeout, **kwargs)
         self._raw_base_urls = base_url
         self._models_without_tools: set = set()  # Cache models that don't support tools
+        self._models_without_thinking: set = set()  # Cache models that reject think mode
         self._context_window_cache: Dict[str, int] = {}  # Cache model context windows
         self._base_url_for_client = chosen_base
         self._timeout_for_client = timeout
@@ -472,6 +473,31 @@ class OllamaProvider(BaseProvider):
                     provider=self.name,
                 ) from e
             except httpx.HTTPStatusError as e:
+                # Model rejected think mode (HTTP 400) → disable it and retry.
+                if e.response.status_code == 400 and self._supports_thinking(model):
+                    try:
+                        if "think" in e.response.text.lower():
+                            self._provider_logger.logger.warning(
+                                f"Model {model} rejected Ollama think mode; retrying without it."
+                            )
+                            self._models_without_thinking.add(model)
+                            payload = self._build_request_payload(
+                                messages=messages,
+                                model=model,
+                                temperature=temperature,
+                                max_tokens=max_tokens,
+                                tools=tools,
+                                stream=False,
+                                **kwargs,
+                            )
+                            response = await self._execute_with_circuit_breaker(
+                                self._get_client().post, "/api/chat", json=payload
+                            )
+                            response.raise_for_status()
+                            return self._parse_response(response.json(), model)
+                    except Exception:
+                        pass  # Fall through to original error handling
+
                 # Check for "does not support tools" error (HTTP 400)
                 # Retry without tools if model doesn't support them
                 if e.response.status_code == 400 and tools:
@@ -673,13 +699,34 @@ class OllamaProvider(BaseProvider):
             self._provider_logger.logger.debug(f"Connecting to Ollama endpoint: {endpoint_url}")
 
             async with self._get_client().stream("POST", "/api/chat", json=payload) as response:
-                # Check for HTTP 400 "does not support tools" error
-                if response.status_code == 400 and tools and retry_without_tools:
+                # Check for recoverable HTTP 400 errors (unsupported think mode or
+                # unsupported tools) before raising.
+                if response.status_code == 400:
                     error_body = await response.aread()
                     error_text = error_body.decode()
+                    lowered = error_text.lower()
                     self._provider_logger.logger.debug(f"Ollama error response (400): {error_text}")
 
-                    if "does not support tools" in error_text.lower():
+                    # Model rejected think mode → disable it for this model and retry.
+                    # The rebuilt payload omits `think` (model now cached as unsupported).
+                    if "think" in lowered and self._supports_thinking(model):
+                        self._provider_logger.logger.warning(
+                            f"Model {model} rejected Ollama think mode; retrying without it."
+                        )
+                        self._models_without_thinking.add(model)
+                        async for chunk in self._stream_impl(
+                            messages=messages,
+                            model=model,
+                            temperature=temperature,
+                            max_tokens=max_tokens,
+                            tools=tools,
+                            retry_without_tools=retry_without_tools,
+                            **kwargs,
+                        ):
+                            yield chunk
+                        return
+
+                    if tools and retry_without_tools and "does not support tools" in lowered:
                         self._provider_logger.logger.warning(
                             f"Model {model} doesn't support tools via Ollama API. "
                             "Retrying stream without tools (will use fallback parsing)."
@@ -782,6 +829,24 @@ class OllamaProvider(BaseProvider):
                 provider=self.name,
                 raw_error=e,
             ) from e
+
+    # Models that support Ollama's native "think" mode (harmony/reasoning
+    # channel separated into a dedicated `thinking` field). Conservative
+    # allow-list: a wrong guess is self-correcting via the 400 fallback below.
+    _THINKING_MODEL_PATTERNS = ("gpt-oss", "deepseek-r1", "qwq", "qwen3")
+
+    def _supports_thinking(self, model: str) -> bool:
+        """Whether to request Ollama think mode for this model.
+
+        Think mode makes Ollama route reasoning to a separate ``thinking`` field
+        (mapped to ``reasoning_content``) and parse harmony tool calls correctly,
+        instead of leaking the analysis channel into ``content`` and mangling the
+        tool name. Returns False once a model has rejected think mode.
+        """
+        if model in self._models_without_thinking:
+            return False
+        lowered = model.lower()
+        return any(pattern in lowered for pattern in self._THINKING_MODEL_PATTERNS)
 
     @staticmethod
     def _is_model_not_found_error(status_code: int, error_body: str) -> bool:
@@ -892,6 +957,14 @@ class OllamaProvider(BaseProvider):
                 _tool_names,
             )
 
+        # Request native think mode for reasoning models so Ollama separates the
+        # analysis/harmony channel into a `thinking` field (→ reasoning_content)
+        # and parses tool calls correctly, instead of leaking chain-of-thought
+        # into content and surfacing the channel token ("assistant") as the tool
+        # name. Caller can override by passing think explicitly.
+        if "think" not in kwargs and self._supports_thinking(model):
+            payload["think"] = True
+
         # Merge additional options
         if "options" in kwargs:
             payload["options"].update(kwargs.pop("options"))
@@ -1000,11 +1073,14 @@ class OllamaProvider(BaseProvider):
         """
         message = result.get("message", {})
         content = message.get("content", "")
+        thinking = message.get("thinking")
 
-        # Some models (e.g., gemma3/4) put output in a "thinking" field with empty content.
-        # Use thinking as fallback content so responses aren't silently dropped.
-        if not content and message.get("thinking"):
-            content = message["thinking"]
+        # gemma-style models put their answer in `thinking` with empty content —
+        # mirror it so responses aren't silently dropped. Reasoning models (think
+        # mode) keep `thinking` as private reasoning (surfaced via metadata below),
+        # so don't copy it into content and re-leak chain-of-thought.
+        if not content and thinking and not self._supports_thinking(model):
+            content = thinking
 
         tool_calls = self._normalize_tool_calls(message.get("tool_calls"))
 
@@ -1036,6 +1112,7 @@ class OllamaProvider(BaseProvider):
             usage=usage,
             model=model,
             raw_response=result,
+            metadata={"reasoning_content": thinking} if thinking else None,
         )
 
     def _parse_stream_chunk(self, chunk_data: Dict[str, Any]) -> StreamChunk:
@@ -1050,13 +1127,17 @@ class OllamaProvider(BaseProvider):
         message = chunk_data.get("message", {})
         content = message.get("content", "")
         thinking = message.get("thinking")
+        model_name = chunk_data.get("model", "")
         tool_calls = self._normalize_tool_calls(message.get("tool_calls"))
         is_done = chunk_data.get("done", False)
         metadata = {"reasoning_content": thinking} if thinking else None
 
-        # Some local reasoning models stream tokens via `thinking` with empty `content`.
-        # Mirror the non-streaming fallback so callers don't receive a blank response.
-        if not content and thinking:
+        # Some local models (e.g. gemma3/4) stream their answer via `thinking`
+        # with empty `content`; mirror it into content so callers aren't blank.
+        # BUT for genuine reasoning models (think mode) `thinking` is the private
+        # analysis channel — copying it into content would re-leak chain-of-thought,
+        # so route it to reasoning_content (above) only.
+        if not content and thinking and not self._supports_thinking(model_name):
             content = thinking
 
         # Fallback: Check if this is a final chunk with JSON tool call in content
