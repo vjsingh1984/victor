@@ -7,6 +7,7 @@ suitable for interactive CLI usage.
 from __future__ import annotations
 
 import logging
+import os
 import time
 from collections import deque
 from typing import Any
@@ -21,7 +22,7 @@ from rich.panel import Panel
 from rich.spinner import Spinner
 from rich.text import Text
 
-from victor.ui.rendering.markdown import render_markdown_with_hooks
+from victor.ui.rendering.markdown import find_safe_split, render_markdown_with_hooks
 
 from victor.ui.rendering.metrics import StreamingMetrics
 
@@ -89,6 +90,10 @@ class LiveDisplayRenderer:
         self._tool_progress_active = False
         self._tool_progress_name = ""
         self._last_progress_render_ms = 0.0
+        # Incremental streaming render: cached HEAD (complete markdown blocks) so
+        # only the active TAIL (in-progress last block) is re-rendered each tick.
+        self._rendered_head: Any = None  # cached renderable for the HEAD
+        self._rendered_head_source: str = ""  # source string the HEAD was rendered from
 
     def start(self) -> None:
         """Start the Live display."""
@@ -98,6 +103,7 @@ class LiveDisplayRenderer:
         self._live.start()
         self._is_paused = False
         self._pause_count = 0
+        self._invalidate_head_cache()
 
     def get_metrics(self) -> StreamingMetrics:
         """Return accumulated streaming metrics for this session."""
@@ -142,6 +148,8 @@ class LiveDisplayRenderer:
             )
             self._live.start()
             self._is_paused = False
+            # New visible slice begins — discard the stale HEAD cache.
+            self._invalidate_head_cache()
             logger.debug("LiveDisplayRenderer: resumed (depth=0)")
 
     # Tools that frequently take >2s — show a starting hint so users don't
@@ -522,12 +530,57 @@ class LiveDisplayRenderer:
         """
         t0 = time.monotonic() * 1000
         if self._live:
-            visible = self._content_buffer[len(self._content_shown_before_pause) :]
-            self._live.update(render_markdown_with_hooks(visible))
+            try:
+                self._update_live_incremental()
+            except Exception:
+                # Incremental render must never break the stream — fall back to the
+                # original full-slice re-render, then reset the HEAD cache.
+                logger.debug("LiveDisplayRenderer: incremental render failed; full-render fallback")
+                self._invalidate_head_cache()
+                visible = self._content_buffer[len(self._content_shown_before_pause) :]
+                self._live.update(render_markdown_with_hooks(visible))
         duration_ms = time.monotonic() * 1000 - t0
         self._metrics.record_content_chunk(duration_ms)
         if duration_ms > 100:
             logger.debug("LiveDisplayRenderer: slow render %.1fms", duration_ms)
+
+    @staticmethod
+    def _incremental_render_enabled() -> bool:
+        """Incremental (head/tail) streaming render — default on, env-gated."""
+        raw = os.getenv("VICTOR_INCREMENTAL_RENDER", "1").strip().lower()
+        return raw not in {"0", "false", "no", "off"}
+
+    def _invalidate_head_cache(self) -> None:
+        """Drop the cached HEAD render (new slice / fallback / reset)."""
+        self._rendered_head = None
+        self._rendered_head_source = ""
+
+    def _update_live_incremental(self) -> None:
+        """Render the visible slice incrementally: cache the stable HEAD (complete
+        markdown blocks) and re-render only the active TAIL (in-progress last
+        block) each tick. Falls back to a full re-render when disabled/empty.
+
+        This turns per-tick cost from O(turn size) into O(one block) — the McGugan
+        incremental-streaming technique applied to the existing Rich pipeline.
+        """
+        visible = self._content_buffer[len(self._content_shown_before_pause) :]
+        if not self._incremental_render_enabled() or not visible:
+            self._live.update(render_markdown_with_hooks(visible))
+            return
+
+        split = find_safe_split(visible)
+        head_source = visible[:split]
+        # Re-render HEAD only when its source changed (grew a complete block, or the
+        # slice shifted). Keying on content (not offset) is robust to buffer trims.
+        if head_source != self._rendered_head_source:
+            self._rendered_head = render_markdown_with_hooks(head_source) if head_source else None
+            self._rendered_head_source = head_source
+
+        tail_render = render_markdown_with_hooks(visible[split:])
+        if self._rendered_head is not None:
+            self._live.update(Group(self._rendered_head, tail_render))
+        else:
+            self._live.update(tail_render)
 
     def on_thinking_content(self, text: str) -> None:
         """Display thinking content immediately during streaming.
