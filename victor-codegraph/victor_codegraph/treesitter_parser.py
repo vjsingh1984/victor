@@ -72,20 +72,36 @@ def _text(node, src: bytes) -> str:
     return src[node.start_byte : node.end_byte].decode("utf-8", errors="replace")
 
 
+def _attr(obj, name):
+    """Access a tree-sitter attribute that may be a property OR a zero-arg method.
+
+    tree-sitter-language-pack's bundled binding exposes `root_node`/`children` as
+    *methods* (callables), whereas the canonical `tree_sitter` exposes them as
+    properties. A list/Node is never callable, so this is safe for both shapes.
+    """
+
+    v = getattr(obj, name)
+    return v() if callable(v) else v
+
+
+def _children(node):
+    return _attr(node, "children")
+
+
 def _name_of(node, src: bytes) -> str | None:
     """Find the declared name of a function/class node (grammar-agnostic)."""
 
     field = node.child_by_field_name("name")
     if field is not None:
         return _text(field, src)
-    for child in node.children:
+    for child in _children(node):
         if child.type in ("identifier", "type_identifier", "field_identifier", "property_identifier"):
             return _text(child, src)
     return None
 
 
 def _walk_collect(node, src, file_path, language, scope, symbols, relations):
-    for child in node.children:
+    for child in _children(node):
         t = child.type
         if t in _CLASS_NODES:
             name = _name_of(child, src) or "<anonymous>"
@@ -126,7 +142,7 @@ def _walk_collect(node, src, file_path, language, scope, symbols, relations):
 def _handle_const_arrow(node, src, file_path, language, symbols):
     """JS/TS: ``const foo = (...) => {...}`` / ``export const foo = () => {}``."""
 
-    for decl in node.children:
+    for decl in _children(node):
         if decl.type != "variable_declarator":
             continue
         name_node = decl.child_by_field_name("name")
@@ -180,13 +196,13 @@ def parse_treesitter(content: str, file_path: str, language: str) -> ParsedCode:
         tree = parser.parse(src)
     except TypeError:
         tree = parser.parse(content)
-    root = tree.root_node
+    root = _attr(tree, "root_node")
 
     symbols: list[CodeSymbol] = []
     relations: list[CodeRelation] = []
     imports: list[str] = []
 
-    for child in root.children:
+    for child in _children(root):
         if child.type in _IMPORT_NODES:
             imports.append(_text(child, src))
 
@@ -194,11 +210,11 @@ def parse_treesitter(content: str, file_path: str, language: str) -> ParsedCode:
 
     # JS/TS arrow-function-as-const: a real surface the stub missed.
     if language in ("javascript", "typescript", "tsx"):
-        for child in root.children:
+        for child in _children(root):
             target = child
             # unwrap `export const ...`
             if child.type in ("export_statement",) and child.child_count:
-                for c in child.children:
+                for c in _children(child):
                     if c.type in ("lexical_declaration", "variable_declaration"):
                         target = c
                         break
