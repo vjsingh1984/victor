@@ -1,0 +1,142 @@
+[build-system]
+requires = [
+    "setuptools>=61.0",
+    "wheel",
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "victor-devops"
+version = "0.7.0"
+description = "DevOps vertical for Victor AI - Infrastructure automation, CI/CD, and cloud operations"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "Apache-2.0"
+authors = [
+    { name = "Vijaykumar Singh", email = "singhvjd@gmail.com" },
+]
+maintainers = [
+    { name = "Vijaykumar Singh", email = "singhvjd@gmail.com" },
+]
+keywords = [
+    "victor",
+    "vertical",
+    "devops",
+    "infrastructure",
+    "ci-cd",
+    "docker",
+    "kubernetes",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development",
+    "Topic :: System :: Systems Administration",
+]
+dependencies = [
+    "victor-contracts[yaml]>=0.7.0,<1.0",  # Definition-layer contract for external verticals
+    "numpy>=1.24,<2.3",  # Required by victor.storage.embeddings; numba-compatible
+]
+
+[project.optional-dependencies]
+runtime = [
+    "victor-ai>=0.7.0,<1.0",
+]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "pytest-cov>=4.1",
+    "pytest-xdist>=3.0",
+    "black==26.1.0",
+    "ruff>=0.5",
+    "mypy>=1.10",
+]
+
+[project.urls]
+Homepage = "https://github.com/vjsingh1984/victor-devops"
+Repository = "https://github.com/vjsingh1984/victor-devops"
+Documentation = "https://docs.victor.dev/verticals/devops"
+Issues = "https://github.com/vjsingh1984/victor-devops/issues"
+
+[project.entry-points."victor.plugins"]
+devops = "victor_devops.plugin:plugin"
+
+[project.entry-points."victor.tool_dependencies"]
+devops = "victor_devops.tool_dependencies:get_provider"
+
+[project.entry-points."victor.safety_rules"]
+devops = "victor_devops.safety:create_all_devops_safety_rules"
+
+[project.entry-points."victor.prompt_contributors"]
+devops = "victor_devops.prompts:DevOpsPromptContributor"
+
+[project.entry-points."victor.mode_configs"]
+devops = "victor_devops.mode_config:DevOpsModeConfigProvider"
+
+[project.entry-points."victor.workflow_providers"]
+devops = "victor_devops.workflows:DevOpsWorkflowProvider"
+
+[project.entry-points."victor.capability_providers"]
+devops = "victor_devops.capabilities:DevOpsCapabilityProvider"
+
+[project.entry-points."victor.team_spec_providers"]
+devops = "victor_devops.teams:DevOpsTeamSpecProvider"
+
+# Victor extension protocol implementations
+[project.entry-points."victor.extension.protocols"]
+devops-tools = "victor_devops.protocols:DevOpsToolProvider"
+devops-safety = "victor_devops.protocols:DevOpsSafetyProvider"
+devops-prompts = "victor_devops.protocols:DevOpsPromptProvider"
+devops-workflows = "victor_devops.protocols:DevOpsWorkflowProvider"
+
+# Extended providers: sandbox isolation, permission hierarchy, hooks
+[project.entry-points."victor.sandbox.providers"]
+devops-sandbox = "victor_devops.protocols:DevOpsSandboxProvider"
+
+[project.entry-points."victor.permission.providers"]
+devops-permissions = "victor_devops.protocols:DevOpsPermissionProvider"
+
+[project.entry-points."victor.hook.providers"]
+devops-hooks = "victor_devops.protocols:DevOpsHookProvider"
+
+# Unified command-tool delegation: the framework-owned `git` dispatcher resolves
+# these callables by logical key (see the victor.tool_callables group in victor-ai).
+[project.entry-points."victor.tool_callables"]
+git = "victor_devops.tools.git_tool:git"
+pr = "victor_devops.tools.git_tool:pr"
+docker = "victor_devops.tools.docker_tool:docker"
+cicd = "victor_devops.tools.cicd_tool:cicd"
+
+[tool.setuptools]
+packages = [
+    "victor_devops",
+    "victor_devops.rl",
+    "victor_devops.teams",
+    "victor_devops.workflows",
+]
+
+[tool.black]
+line-length = 100
+target-version = [
+    "py310",
+    "py311",
+    "py312",
+]
+
+[tool.ruff]
+line-length = 100
+select = [
+    "E",
+    "W",
+    "F",
+    "B",
+    "C4",
+]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
