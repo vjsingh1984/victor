@@ -48,10 +48,13 @@ jobs:
           pip install torch --index-url https://download.pytorch.org/whl/cpu
           pip install -e ./victor-contracts
           pip install -e ".[dev]"
+          # Foundational shared code->CPG parser (verticals delegate to it, ADR-014).
+          pip install -e ./victor-codegraph
 
       - name: Install vertical
         run: |
-          pip install git+https://github.com/vjsingh1984/${{ matrix.vertical }}.git@main
+          # Verticals' standalone repos are archived; they now live in this monorepo.
+          pip install -e ./verticals/${{ matrix.vertical }}
 
       - name: Run vertical import test
         run: |

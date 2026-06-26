@@ -107,17 +107,19 @@ jobs:
           # Install the in-repo SDK and core first.
           pip install -e ./victor-contracts
           pip install -e .
+          # Foundational shared code->CPG parser (verticals delegate to it, ADR-014).
+          pip install -e ./victor-codegraph
 
       - name: Install external vertical packages
         run: |
-          # Extracted verticals live outside this repo and are not guaranteed to be available
-          # from PyPI at the versions declared in local meta-extras. Install them directly from
-          # their source repositories to exercise the current external integration path.
-          pip install git+https://github.com/vjsingh1984/victor-coding.git@main
-          pip install git+https://github.com/vjsingh1984/victor-devops.git@main
-          pip install git+https://github.com/vjsingh1984/victor-rag.git@main
-          pip install git+https://github.com/vjsingh1984/victor-dataanalysis.git@main
-          pip install git+https://github.com/vjsingh1984/victor-research.git@main
+          # All verticals' standalone repos are archived — they now live in this monorepo.
+          # Install the local copies so integration tests exercise the tracked source.
+          # Folds verified complete (superset of each archived repo; all import cleanly).
+          pip install -e ./verticals/victor-coding
+          pip install -e ./verticals/victor-devops
+          pip install -e ./verticals/victor-rag
+          pip install -e ./verticals/victor-dataanalysis
+          pip install -e ./verticals/victor-research
 
       - name: Verify vertical packages are installed
         run: |
