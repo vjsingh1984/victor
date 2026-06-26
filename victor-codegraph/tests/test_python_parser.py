@@ -71,6 +71,26 @@ def test_calls_relation_resolved_to_ids():
         assert r.to_symbol_id in ids  # resolved to a real symbol, not a bare name
 
 
+def test_unresolved_callee_is_retained():
+    """An outgoing call to a symbol not defined in-file is KEPT (bare-name target,
+    confidence < 1.0, with a call_site) so cross-file/external references survive for
+    CPG blast-radius / impact analysis rather than being silently dropped."""
+    parsed = parse("def authenticate():\n    return verify()\n", file_path="svc/auth.py")
+    calls = list(parsed.relations)
+    assert len(calls) == 1
+    r = calls[0]
+    assert r.to_symbol_id == "verify"  # bare name — NOT dropped
+    assert r.confidence < 1.0
+    assert r.call_site is not None
+    assert r.call_site.start_line == 2  # the verify() call line (1-based)
+
+
+def test_recursive_self_call_is_dropped():
+    """A recursive call to the enclosing symbol emits no self-edge."""
+    parsed = parse("def f():\n    return f()\n", file_path="m.py")
+    assert [r for r in parsed.relations] == []
+
+
 def test_extends_relation():
     parsed = parse(SAMPLE, file_path="pkg/mod.py")
     cls = next(s for s in parsed.symbols if s.simple_name == "Greeter")
