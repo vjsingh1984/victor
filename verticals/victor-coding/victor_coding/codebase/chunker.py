@@ -59,6 +59,25 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# ADR-014 step 2: optionally delegate code chunking to the shared, neutral
+# ``victor-codegraph`` package (Victor owns it; ProximaDB SDK + AnvaiOps also consume
+# it). Soft import so the vertical works without it (editable-only until published:
+# ``pip install -e ../../victor-codegraph``). Default OFF — set
+# ``VICTOR_CODING_USE_CODEGRAPH=1`` to enable — because this vertical's tests assert its
+# legacy hierarchical chunk-ID/line format; delegation is opt-in until that is reconciled.
+try:  # pragma: no cover - availability depends on the optional package
+    import victor_codegraph as _victor_codegraph
+except Exception:
+    _victor_codegraph = None
+
+
+def _codegraph_delegation_enabled() -> bool:
+    import os
+
+    return _victor_codegraph is not None and os.getenv(
+        "VICTOR_CODING_USE_CODEGRAPH", ""
+    ).strip().lower() in ("1", "true", "yes", "on")
+
 # Language detection mapping (file extension -> language name)
 EXTENSION_TO_LANGUAGE = {
     ".py": "python",
@@ -245,6 +264,48 @@ class CodeChunker:
         """
         self.config = config or ChunkConfig()
 
+    def _chunk_via_victor_codegraph(
+        self, content: str, file_path: Path, relative_path: str
+    ) -> Optional[List["CodeChunk"]]:
+        """Delegate to ``victor-codegraph`` and adapt its chunks to ``CodeChunk``.
+
+        Returns ``None`` on any failure so the caller falls back to the legacy AST
+        chunker (ADR-014, mixed-read-safe).
+        """
+        try:
+            vg_chunks = _victor_codegraph.chunk(
+                content,
+                language="python",
+                file_path=relative_path,
+                config=_victor_codegraph.ChunkConfig(
+                    max_chunk_tokens=self.config.max_chunk_tokens,
+                    chunk_overlap_tokens=self.config.overlap_tokens,
+                ),
+            )
+        except Exception as e:  # noqa: BLE001 - fall back on any delegation failure
+            logger.debug(f"victor-codegraph delegation failed for {file_path}: {e}")
+            return None
+
+        out: List[CodeChunk] = []
+        for c in vg_chunks:
+            meta = c.metadata or {}
+            stype = (meta.get("symbol_type") or "").lower()
+            ctype = ChunkType.CLASS_SUMMARY if stype == "class" else ChunkType.METHOD_BODY
+            out.append(
+                CodeChunk(
+                    id=c.chunk_id,
+                    content=c.text,
+                    chunk_type=ctype,
+                    file_path=relative_path,
+                    symbol_name=meta.get("simple_name"),
+                    symbol_type=stype or None,
+                    line_start=meta.get("start_line", 0) or 0,
+                    line_end=meta.get("end_line", 0) or 0,
+                    metadata=dict(meta),
+                )
+            )
+        return out
+
     def chunk_file(
         self,
         file_path: Path,
@@ -267,6 +328,12 @@ class CodeChunker:
             except Exception as e:
                 logger.warning(f"Failed to read {file_path}: {e}")
                 return []
+
+        # ADR-014: prefer the shared chunker when delegation is enabled.
+        if _codegraph_delegation_enabled():
+            delegated = self._chunk_via_victor_codegraph(content, file_path, relative_path)
+            if delegated is not None:
+                return delegated
 
         try:
             tree = ast.parse(content, filename=str(file_path))

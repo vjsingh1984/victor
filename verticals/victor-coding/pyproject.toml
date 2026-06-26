@@ -53,7 +53,13 @@ native = [
 # victor_coding/codebase/embeddings/proximadb_provider.py. Pin kept identical
 # to victor-ai's proximadb extra so the backend version stays aligned.
 proximadb = [
-    "proximadb-python>=0.2,<0.3",
+    "proximadb>=0.2,<0.3",
+]
+# Shared code->CPG chunker (ADR-014). Opt-in: when installed AND
+# VICTOR_CODING_USE_CODEGRAPH=1, CodeChunker delegates to it. Editable-only until
+# published: pip install -e ../../victor-codegraph
+codegraph = [
+    "victor-codegraph>=0.1.0,<1.0",
 ]
 dev = [
     "pytest>=8.0",
