@@ -1,8 +1,7 @@
 # In-repo first-party verticals (folded under verticals/).
 # - Contract-boundary audit is BLOCKING: verticals must import only
 #   victor_contracts, never victor framework internals.
-# - Per-vertical test suites are advisory for now (continue-on-error) until each
-#   is validated running inside the monorepo; flip to blocking once green.
+# - Per-vertical test suites are BLOCKING (they pass green in-monorepo).
 name: Verticals
 
 on:
@@ -55,5 +54,4 @@ jobs:
       - name: Install framework + contracts + verticals (editable)
         run: make install-verticals
       - name: Run vertical test suites
-        continue-on-error: true  # advisory until each suite is validated in-monorepo
         run: make test-verticals
