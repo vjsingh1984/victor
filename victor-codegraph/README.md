@@ -1,0 +1,60 @@
+# victor-codegraph
+
+Shared **code → Code-Property-Graph chunker**: tree-sitter symbol + relation extraction,
+size-capped embeddable chunks, and a `ProximaRecord` projection. One chunker, three
+consumers — Victor (owner), the ProximaDB SDK (`[codegraph]` extra), and AnvaiOps (SaaS
+code-graph vertical).
+
+> Design: ProximaDB `ADR-028` (authoritative) · Victor `ADR-014` (owner/donor) ·
+> AnvaiOps `ADR-0018` (consumer). This package is the **TD-CG1** scaffold.
+
+## Why
+
+The same tree-sitter code→symbol+relation chunker existed twice (ProximaDB SDK `code.py`
+and Victor `victor-coding`) and was about to be written a third time in AnvaiOps. This
+package is the single neutral home. It merges the best of both donors and fixes their two
+gaps:
+
+- **Size-capping** — ProximaDB's `code.py` emitted one chunk per symbol with *no* size
+  bound (a huge function became a huge chunk). Here, oversized symbols are body-split with
+  overlap (LlamaIndex `CodeSplitter` discipline). See `sizing.py`.
+- **Real JS/TS** — the donor JS/TS parser was a stub returning no symbols. Here JS/TS get a
+  real tree-sitter extractor (functions, classes, methods, `const … = () =>`, imports).
+
+## Install
+
+```bash
+pip install victor-codegraph              # Python (stdlib ast) path, zero native deps
+pip install "victor-codegraph[treesitter]"  # + multi-language via tree-sitter grammars
+```
+
+## Use
+
+```python
+from victor_codegraph import chunk, parse, to_proxima_records, ChunkConfig
+
+# Size-capped, embeddable chunks:
+chunks = chunk(source, file_path="app/service.py", config=ChunkConfig(max_chunk_tokens=512))
+
+# Symbols + relations:
+parsed = parse(source, file_path="app/service.py")
+
+# Project to the ProximaDB substrate-keystone record shape (one symbol = row+node+vector):
+records = to_proxima_records(parsed, repo_graph_id="myrepo", branch_id="main",
+                             embedder=my_embed_fn)  # embedder optional
+```
+
+## Design principles (the "best posture" this encodes)
+
+1. Chunk at **symbol** granularity (not statement, not fixed-size).
+2. **AST-aligned and size-capped** — never split mid-statement, never exceed the budget.
+3. Extract **relations** (CALLS/EXTENDS/CONTAINS/…) and project to a CPG.
+4. **Deterministic IDs + content hash** → idempotent incremental re-index.
+5. **Graceful fallback chain**: python-ast → tree-sitter → sliding-window.
+6. Token budget **matched to the embedding model** (BGE-small 384-d ≈ 512 tokens).
+
+## Status
+
+`0.1.0` — TD-CG1 scaffold. Python (stdlib `ast`) is the primary, fully-offline path.
+Multi-language extraction is best-effort via tree-sitter; deeper per-language relation
+extraction (the donor parsers' Rust/Go/Java specifics) lands incrementally.

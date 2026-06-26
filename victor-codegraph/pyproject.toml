@@ -1,0 +1,65 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "victor-codegraph"
+version = "0.1.0"
+description = "Code->CPG chunker: tree-sitter symbol + relation extraction, size-capped chunks, ProximaRecord projection. Shared by Victor, ProximaDB SDK, and AnvaiOps."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+authors = [
+    { name = "Vijaykumar Singh", email = "singhvjd@gmail.com" },
+]
+keywords = [
+    "code-graph",
+    "cpg",
+    "chunking",
+    "tree-sitter",
+    "ast",
+    "embeddings",
+    "rag",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries",
+]
+
+# Thin + neutral by design (ADR-014 / ProximaDB ADR-028). The Python path uses the
+# stdlib `ast` and needs no native grammars; victor-contracts is the boundary dep so
+# the package can expose its parser as a contracts Protocol without coupling to the
+# framework. Multi-language (tree-sitter) is an opt-in extra to keep the base install light.
+dependencies = [
+    "victor-contracts>=0.7.0,<1.0",
+]
+
+[project.optional-dependencies]
+treesitter = [
+    "tree-sitter>=0.23",
+    "tree-sitter-language-pack>=1.0",
+]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.5",
+    "tree-sitter>=0.23",
+    "tree-sitter-language-pack>=1.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/vjsingh1984/victor"
+Repository = "https://github.com/vjsingh1984/victor"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["victor_codegraph*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
