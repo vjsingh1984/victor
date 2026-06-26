@@ -101,7 +101,7 @@ demand, use its **workflow_dispatch** entry.
 
 Main continuous integration workflow:
 - Linting (Black, Ruff, MyPy)
-- Unit tests across Python 3.10, 3.11, 3.12
+- Unit tests across Python 3.11, 3.12, 3.13
 - Security scanning (Gitleaks, pip-audit)
 - Guards (legacy code protection, import checks)
 - Rust native extensions build
@@ -205,7 +205,7 @@ Test across multiple Python versions:
 ```yaml
 strategy:
   matrix:
-    python-version: ["3.10", "3.11", "3.12"]
+    python-version: ["3.11", "3.12"]
 ```
 
 ### Artifact Upload

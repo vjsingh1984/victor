@@ -5,7 +5,7 @@
 **An contract-first agentic AI framework for building reliable agents across local and cloud models.**
 
 [![PyPI version](https://badge.fury.io/py/victor-ai.svg)](https://pypi.org/project/victor-ai/)
-[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![Fast Checks](https://github.com/vjsingh1984/victor/actions/workflows/ci-fast.yml/badge.svg)](https://github.com/vjsingh1984/victor/actions/workflows/ci-fast.yml)
 [![Tests](https://github.com/vjsingh1984/victor/actions/workflows/ci-test.yml/badge.svg)](https://github.com/vjsingh1984/victor/actions/workflows/ci-test.yml)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
