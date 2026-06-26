@@ -172,7 +172,14 @@ def parse_treesitter(content: str, file_path: str, language: str) -> ParsedCode:
     parser = _get_parser(grammar)
 
     src = content.encode("utf-8")
-    tree = parser.parse(src)
+    # tree-sitter's Parser.parse() takes bytes on most builds, but some
+    # (notably via tree-sitter-language-pack) require a str and raise
+    # TypeError on bytes. Node byte offsets are UTF-8 positions either way,
+    # so `src` stays valid for slicing in _text() regardless of which we pass.
+    try:
+        tree = parser.parse(src)
+    except TypeError:
+        tree = parser.parse(content)
     root = tree.root_node
 
     symbols: list[CodeSymbol] = []
