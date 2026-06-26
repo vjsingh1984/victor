@@ -1,0 +1,28 @@
+# Rust build artifacts
+/target
+Cargo.lock
+
+# Python build artifacts
+*.pyc
+__pycache__/
+*.pyd
+*.so
+*.dylib
+*.dll
+
+# Maturin
+*.egg-info/
+dist/
+wheels/
+build/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
