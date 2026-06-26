@@ -45,7 +45,7 @@ class CodingPlugin(VictorPlugin):
         if not callable(register_capability):
             return
         try:
-            from victor.framework.vertical_protocols import TreeSitterAnalysisProtocol
+            from victor_contracts.verticals.protocols import TreeSitterAnalysisProtocol
         except Exception:
             logger.debug("Root TreeSitterAnalysisProtocol unavailable; skipping registration")
             return
