@@ -85,7 +85,17 @@ def _attr(obj, name):
 
 
 def _children(node):
-    return _attr(node, "children")
+    """Return a node's children across tree-sitter binding flavors.
+
+    `children` may be a property, a zero-arg method, or absent entirely (the
+    bundled binding exposes only `child_count` + `child(i)`, the universal C API).
+    """
+
+    children = getattr(node, "children", None)
+    if children is not None:
+        return children() if callable(children) else children
+    count = _attr(node, "child_count")
+    return [node.child(i) for i in range(count)]
 
 
 def _name_of(node, src: bytes) -> str | None:
