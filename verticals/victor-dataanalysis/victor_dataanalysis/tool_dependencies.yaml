@@ -1,0 +1,199 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Data Analysis Tool Dependencies
+# YAML-based configuration for tool relationships in analysis workflows.
+#
+# Uses canonical tool names from victor.tools.tool_names.ToolNames:
+#   - read (read_file)
+#   - write (write_file)
+#   - edit (edit_files)
+#   - ls (list_directory)
+#   - shell (execute_bash)
+#   - grep (code_search keyword)
+#   - code_search (semantic_code_search)
+#   - overview (get_project_overview)
+#   - web_search
+#   - web_fetch
+
+version: "1.0"
+vertical: data_analysis
+
+# Tool transition probabilities for data analysis workflows
+# Maps: current_tool -> list of (next_tool, probability)
+transitions:
+  # Reading data files
+  read:
+    - tool: shell
+      weight: 0.5  # Run Python for analysis
+    - tool: write
+      weight: 0.2  # Save processed data
+    - tool: grep
+      weight: 0.2  # Find related analysis
+    - tool: read
+      weight: 0.1  # Read more files
+
+  # Python/shell for analysis
+  shell:
+    - tool: write
+      weight: 0.3  # Save results/charts
+    - tool: shell
+      weight: 0.3  # Continue analysis
+    - tool: read
+      weight: 0.2  # Check outputs
+    - tool: edit
+      weight: 0.2  # Modify scripts
+
+  # Writing results
+  write:
+    - tool: shell
+      weight: 0.4  # Run more analysis
+    - tool: read
+      weight: 0.3  # Verify written
+    - tool: write
+      weight: 0.2  # Write more outputs
+    - tool: edit
+      weight: 0.1  # Refine
+
+  # Code search for patterns
+  grep:
+    - tool: read
+      weight: 0.5  # Read found code
+    - tool: shell
+      weight: 0.3  # Run found analysis
+    - tool: code_search
+      weight: 0.2  # Refine search
+
+  # Web for documentation
+  web_search:
+    - tool: web_fetch
+      weight: 0.6  # Fetch documentation
+    - tool: shell
+      weight: 0.2  # Try example code
+    - tool: web_search
+      weight: 0.2  # Refine search
+
+  web_fetch:
+    - tool: shell
+      weight: 0.4  # Apply learnings
+    - tool: write
+      weight: 0.3  # Save reference
+    - tool: web_fetch
+      weight: 0.2  # Fetch more
+    - tool: web_search
+      weight: 0.1  # Find related
+
+# Tools that work well together in data analysis
+clusters:
+  file_operations:
+    - read
+    - write
+    - edit
+    - ls
+
+  code_execution:
+    - shell  # Python runs through shell
+
+  code_exploration:
+    - grep
+    - code_search
+    - overview
+
+  documentation:
+    - web_search
+    - web_fetch
+
+# Recommended sequences for common analysis patterns
+sequences:
+  data_profiling:
+    - read
+    - shell
+    - shell
+    - write
+
+  visualization:
+    - read
+    - shell
+    - write
+
+  statistical_test:
+    - read
+    - shell
+    - shell
+    - write
+
+  ml_pipeline:
+    - read
+    - shell
+    - shell
+    - shell
+    - write
+
+  report_generation:
+    - read
+    - shell
+    - write
+    - write
+
+# Tool dependency definitions
+# Defines prerequisite relationships and enabled successors
+dependencies:
+  - tool: shell
+    depends_on:
+      - read
+    enables:
+      - write
+      - shell
+    weight: 0.6
+
+  - tool: write
+    depends_on:
+      - shell
+    enables:
+      - read
+    weight: 0.5
+
+  - tool: grep
+    depends_on: []
+    enables:
+      - read
+      - shell
+    weight: 0.4
+
+# Required tools for data analysis
+required_tools:
+  - read
+  - write
+  - shell
+
+# Optional tools that enhance data analysis
+optional_tools:
+  - grep
+  - code_search
+  - edit
+  - ls
+  - web_search
+  - web_fetch
+
+# Default sequence when task type is unknown
+default_sequence:
+  - read
+  - shell
+  - write
+
+# Metadata for extensibility
+metadata:
+  description: "Data Analysis vertical tool dependencies for data exploration, visualization, and ML workflows"
+  migrated_from: "victor/dataanalysis/tool_dependencies.py"
+  migration_date: "2025-01-03"

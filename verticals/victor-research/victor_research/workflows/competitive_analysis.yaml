@@ -1,0 +1,532 @@
+# Competitive Analysis Workflow
+# =============================
+# Market and competitive research with:
+# - Competitor identification and profiling
+# - Feature and positioning analysis
+# - Market trend research
+# - Strategic recommendations
+#
+# ┌─────────────────────────────────────────────────────────────────────────────┐
+# │ EXECUTION ENVIRONMENT                                                        │
+# ├─────────────────────────────────────────────────────────────────────────────┤
+# │ Default: in-process (Python) + LLM API calls                                │
+# │ Supported: in-process only (no subprocess/docker needed)                    │
+# │                                                                              │
+# │ Requirements:                                                                │
+# │   - LLM provider API access (for agent nodes)                               │
+# │   - Network access (for market research and competitor websites)            │
+# │   - Write access (for competitive analysis report output)                   │
+# │                                                                              │
+# │ Network requirements:                                                        │
+# │   - web_search: Market size data, industry reports, news                    │
+# │   - web_fetch: Competitor websites, pricing pages, feature lists            │
+# │   - External APIs: Crunchbase, LinkedIn (if available)                      │
+# └─────────────────────────────────────────────────────────────────────────────┘
+#
+# ┌─────────────────────────────────────────────────────────────────────────────┐
+# │ DEFAULT VALUES                                                               │
+# ├─────────────────────────────────────────────────────────────────────────────┤
+# │ competitor_limit: 10 (max competitors for detailed analysis)                │
+# │ threat_levels: HIGH, MEDIUM, EMERGING, LOW                                  │
+# │ analysis_depth: comprehensive (alt: quick_scan for competitive_scan)        │
+# │ hitl_timeout: 900s (15 min for review and feedback)                         │
+# │ report_max_tokens: 10000 (comprehensive competitive analysis)               │
+# │ quick_scan_limit: 5 competitors (for competitive_scan workflow)             │
+# └─────────────────────────────────────────────────────────────────────────────┘
+#
+# ┌─────────────────────────────────────────────────────────────────────────────┐
+# │ COMPUTE vs AGENT NODE RATIONALE                                              │
+# ├─────────────────────────────────────────────────────────────────────────────┤
+# │ COMPUTE nodes: NONE in this workflow                                         │
+# │                                                                              │
+# │ AGENT nodes (ALL require LLM reasoning):                                     │
+# │   - define_market: INTERPRETING market boundaries and segments              │
+# │   - identify_competitors: CATEGORIZING companies by competitive threat      │
+# │   - product_analysis: COMPARING features (not just listing them)            │
+# │   - pricing_research: ANALYZING pricing strategy intent                     │
+# │   - positioning_research: UNDERSTANDING brand perception and messaging      │
+# │   - threat_assessment: EVALUATING competitive strength (subjective)         │
+# │   - swot_analysis: SYNTHESIZING strengths/weaknesses/opps/threats           │
+# │   - generate_recommendations: STRATEGIC advice requiring business acumen    │
+# │   - generate_report: WRITING executive-level analysis                       │
+# │                                                                              │
+# │ Competitive analysis is strategic work requiring:                           │
+# │   - Understanding market dynamics and customer needs                        │
+# │   - Interpreting competitor positioning and strategy                        │
+# │   - Evaluating competitive threats (not just listing features)              │
+# │   - Synthesizing SWOT with actionable recommendations                       │
+# │   - Writing persuasive business recommendations                             │
+# │                                                                              │
+# │ Even "aggregate research" requires understanding what each data point       │
+# │ means for competitive positioning - pure merging would lose context.        │
+# └─────────────────────────────────────────────────────────────────────────────┘
+
+workflows:
+  competitive_analysis:
+    description: "Comprehensive competitive and market analysis"
+
+    metadata:
+      version: "1.0"
+      author: "victor"
+      vertical: research
+
+    nodes:
+      # =====================================================================
+      # Stage 1: Market Landscape
+      # =====================================================================
+      - id: define_market
+        type: agent
+        name: "Define Market Landscape"
+        role: analyst
+        goal: |
+          Define the competitive landscape:
+
+          1. **Market Definition**
+             - Industry/sector
+             - Geographic scope
+             - Market size estimates
+             - Growth trajectory
+
+          2. **Segmentation**
+             - Customer segments
+             - Product categories
+             - Price tiers
+             - Distribution channels
+
+          3. **Key Success Factors**
+             - What differentiates winners?
+             - Critical capabilities needed
+             - Barriers to entry
+
+          Output structured market definition.
+        tool_budget: 20
+        tools: [web_search, web_fetch]
+        llm_config:
+          temperature: 0.3
+        input_mapping:
+          company: target_company
+          industry: target_industry
+        output: market_definition
+        next: [identify_competitors]
+
+      - id: identify_competitors
+        type: agent
+        name: "Identify Competitors"
+        role: researcher
+        goal: |
+          Identify and categorize competitors:
+
+          **Direct Competitors:**
+          - Same product/service category
+          - Same target market
+          - Head-to-head competition
+
+          **Indirect Competitors:**
+          - Alternative solutions
+          - Adjacent markets
+          - Potential substitutes
+
+          **Emerging Competitors:**
+          - New entrants
+          - Startups to watch
+          - International players entering
+
+          For each competitor, capture:
+          - Company name and HQ
+          - Product/service offering
+          - Approximate size/funding
+          - Market position
+        tool_budget: 30
+        tools: [web_search, web_fetch]
+        llm_config:
+          temperature: 0.3
+        input_mapping:
+          market: market_definition
+          company: target_company
+        output: competitor_list
+        next: [parallel_research]
+
+      # =====================================================================
+      # Stage 2: Competitor Research (Parallel)
+      # =====================================================================
+      - id: parallel_research
+        type: parallel
+        name: "Research Competitors in Parallel"
+        parallel_nodes: [product_analysis, pricing_research, positioning_research]
+        join_strategy: all
+        next: [aggregate_research]
+
+      - id: product_analysis
+        type: agent
+        name: "Analyze Product/Features"
+        role: analyst
+        goal: |
+          Analyze competitor products and features:
+
+          For each competitor:
+          1. **Core Product/Service**
+             - Main offering description
+             - Key features
+             - Technology stack (if visible)
+
+          2. **Feature Comparison**
+             - Feature checklist vs. our product
+             - Unique features
+             - Missing features
+
+          3. **Product Evolution**
+             - Recent launches
+             - Roadmap hints
+             - Patent filings
+
+          Create feature comparison matrix.
+        tool_budget: 30
+        tools: [web_search, web_fetch, read]
+        llm_config:
+          temperature: 0.2
+        input_mapping:
+          competitors: competitor_list
+        output: product_analysis
+
+      - id: pricing_research
+        type: agent
+        name: "Research Pricing Strategies"
+        role: researcher
+        goal: |
+          Research competitor pricing:
+
+          For each competitor:
+          1. **Pricing Model**
+             - Subscription vs. one-time
+             - Tiered pricing
+             - Usage-based components
+
+          2. **Price Points**
+             - Entry-level pricing
+             - Enterprise pricing
+             - Discounts/promotions
+
+          3. **Packaging**
+             - Feature bundles
+             - Add-on pricing
+             - Free tier/trial
+
+          Create pricing comparison table.
+        tool_budget: 25
+        tools: [web_search, web_fetch]
+        input_mapping:
+          competitors: competitor_list
+        output: pricing_analysis
+
+      - id: positioning_research
+        type: agent
+        name: "Analyze Market Positioning"
+        role: analyst
+        goal: |
+          Analyze competitor positioning:
+
+          For each competitor:
+          1. **Brand Positioning**
+             - Value proposition
+             - Key messages
+             - Target audience
+
+          2. **Go-to-Market**
+             - Distribution channels
+             - Sales approach
+             - Marketing focus
+
+          3. **Customer Perception**
+             - Reviews and ratings
+             - Customer testimonials
+             - Social media sentiment
+
+          Identify positioning gaps/opportunities.
+        tool_budget: 25
+        tools: [web_search, web_fetch]
+        input_mapping:
+          competitors: competitor_list
+        output: positioning_analysis
+
+      - id: aggregate_research
+        type: transform
+        name: "Aggregate Research"
+        transform: |
+          competitor_profiles = merge(
+            product_analysis,
+            pricing_analysis,
+            positioning_analysis
+          )
+        next: [threat_assessment]
+
+      # =====================================================================
+      # Stage 3: Threat Assessment
+      # =====================================================================
+      - id: threat_assessment
+        type: agent
+        name: "Assess Competitive Threats"
+        role: analyst
+        goal: |
+          Assess competitive threat levels:
+
+          For each competitor, evaluate:
+
+          1. **Current Threat**
+             - Market share
+             - Growth rate
+             - Customer overlap
+
+          2. **Future Threat**
+             - Investment/funding
+             - Product roadmap
+             - Strategic moves
+
+          3. **Competitive Advantages**
+             - Where they're stronger
+             - Sustainable advantages
+             - Vulnerabilities
+
+          Rank competitors by threat level:
+          - HIGH: Immediate competitive pressure
+          - MEDIUM: Significant but manageable
+          - EMERGING: Growing threat to watch
+          - LOW: Minimal competitive impact
+        tool_budget: 20
+        llm_config:
+          temperature: 0.3
+        input_mapping:
+          profiles: competitor_profiles
+          market: market_definition
+        output: threat_assessment
+        next: [swot_analysis]
+
+      # =====================================================================
+      # Stage 4: SWOT Analysis
+      # =====================================================================
+      - id: swot_analysis
+        type: agent
+        name: "Generate SWOT Analysis"
+        role: analyst
+        goal: |
+          Create SWOT analysis for the target company:
+
+          **Strengths** (Internal positives)
+          - Competitive advantages
+          - Unique capabilities
+          - Resource advantages
+
+          **Weaknesses** (Internal challenges)
+          - Competitive gaps
+          - Resource limitations
+          - Areas needing improvement
+
+          **Opportunities** (External positives)
+          - Market gaps
+          - Emerging trends
+          - Competitor vulnerabilities
+
+          **Threats** (External challenges)
+          - Competitive pressures
+          - Market changes
+          - Potential disruptions
+
+          Link each point to research findings.
+        tool_budget: 15
+        llm_config:
+          temperature: 0.4
+        input_mapping:
+          threat_data: threat_assessment
+          market: market_definition
+          profiles: competitor_profiles
+        output: swot
+        next: [review_analysis]
+
+      - id: review_analysis
+        type: hitl
+        name: "Review Competitive Analysis"
+        hitl_type: review
+        prompt: |
+          ## Competitive Analysis Ready for Review
+
+          **Competitors Analyzed:** {competitor_count}
+          **Market:** {market_name}
+
+          **Top Threats:**
+          {top_threats}
+
+          **SWOT Summary:**
+          - Strengths: {strength_count}
+          - Weaknesses: {weakness_count}
+          - Opportunities: {opportunity_count}
+          - Threats: {threat_count}
+
+          Please review and provide feedback.
+        context_keys:
+          - competitor_count
+          - market_name
+          - top_threats
+          - strength_count
+          - weakness_count
+          - opportunity_count
+          - threat_count
+        timeout: 900
+        fallback: continue
+        next: [generate_recommendations]
+
+      # =====================================================================
+      # Stage 5: Recommendations
+      # =====================================================================
+      - id: generate_recommendations
+        type: agent
+        name: "Generate Strategic Recommendations"
+        role: analyst
+        goal: |
+          Generate strategic recommendations based on analysis:
+
+          1. **Immediate Actions**
+             - Quick wins to pursue
+             - Defensive moves needed
+             - Low-hanging fruit
+
+          2. **Short-term Strategy** (6-12 months)
+             - Product priorities
+             - Positioning adjustments
+             - Competitive responses
+
+          3. **Long-term Strategy** (1-3 years)
+             - Market expansion opportunities
+             - Capability building
+             - Strategic partnerships
+
+          4. **Competitors to Watch**
+             - Key competitors to monitor
+             - Metrics to track
+             - Trigger points for action
+
+          Prioritize recommendations by impact and feasibility.
+        tool_budget: 20
+        llm_config:
+          temperature: 0.4
+        input_mapping:
+          swot: swot
+          threats: threat_assessment
+          market: market_definition
+          feedback: review_feedback
+        output: recommendations
+        next: [generate_report]
+
+      # =====================================================================
+      # Stage 6: Report Generation
+      # =====================================================================
+      - id: generate_report
+        type: agent
+        name: "Generate Competitive Analysis Report"
+        role: writer
+        goal: |
+          Generate a comprehensive competitive analysis report:
+
+          ## Structure
+
+          1. **Executive Summary**
+             - Key findings
+             - Top 3 recommendations
+             - Competitive position summary
+
+          2. **Market Overview**
+             - Market definition and size
+             - Key trends
+             - Success factors
+
+          3. **Competitive Landscape**
+             - Competitor profiles
+             - Market share analysis
+             - Positioning map
+
+          4. **Product Comparison**
+             - Feature matrix
+             - Pricing comparison
+             - Technology assessment
+
+          5. **Threat Assessment**
+             - Threat rankings
+             - Detailed competitor analysis
+             - Emerging threats
+
+          6. **SWOT Analysis**
+             - Full SWOT with explanations
+             - Priority areas
+
+          7. **Strategic Recommendations**
+             - Prioritized recommendations
+             - Implementation roadmap
+             - Success metrics
+
+          8. **Appendix**
+             - Data sources
+             - Methodology
+             - Detailed competitor profiles
+
+          Use professional business writing.
+        tool_budget: 30
+        tools: [write]
+        llm_config:
+          temperature: 0.5
+          max_tokens: 10000
+        input_mapping:
+          market: market_definition
+          competitors: competitor_profiles
+          threats: threat_assessment
+          swot: swot
+          recommendations: recommendations
+        output: report
+        next: [complete]
+
+      - id: complete
+        type: transform
+        name: "Analysis Complete"
+        transform: |
+          workflow_status = "completed"
+          output_files = [report]
+
+
+  # =========================================================================
+  # Quick Competitive Scan
+  # =========================================================================
+  competitive_scan:
+    description: "Quick competitive overview for rapid assessment"
+
+    metadata:
+      vertical: research
+
+    nodes:
+      - id: quick_research
+        type: agent
+        name: "Quick Competitor Research"
+        role: researcher
+        goal: |
+          Quickly identify top 5 competitors and their key differentiators:
+          - Who are the main players?
+          - What's their value proposition?
+          - Approximate market position?
+        tool_budget: 20
+        tools: [web_search, web_fetch]
+        llm_config:
+          temperature: 0.3
+          model_hint: claude-3-sonnet
+        output: competitors
+        next: [quick_summary]
+
+      - id: quick_summary
+        type: agent
+        name: "Generate Quick Summary"
+        role: writer
+        goal: |
+          Create a 1-page competitive summary:
+          - Top 5 competitors with 1-sentence descriptions
+          - Key competitive threats
+          - Immediate opportunities
+        tool_budget: 10
+        llm_config:
+          temperature: 0.4
+          model_hint: claude-3-haiku
+        output: summary

@@ -7,7 +7,7 @@
 #   make build        # Build distribution packages
 #   make release      # Create a release (requires version)
 
-.PHONY: help install install-dev test test-definition-boundaries lint check-repo-hygiene check-extracted-vertical-boundaries format clean build build-binary docker release sync-version check-version
+.PHONY: help install install-dev install-verticals test-verticals check-vertical-boundaries test test-definition-boundaries lint check-repo-hygiene check-extracted-vertical-boundaries format clean build build-binary docker release sync-version check-version
 
 PYTEST_TIMEOUT_ARG := $(shell pytest --help 2>/dev/null | grep -q -- "--timeout" && echo --timeout=120)
 
@@ -59,6 +59,27 @@ install-dev:
 	pip install -e ".[dev,docs,build]"
 	pip install pre-commit pytest-split
 	pre-commit install || true
+
+# First-party verticals folded into the monorepo under verticals/. Installed as
+# their own editable packages (they register via the victor.plugins entry point).
+VERTICALS := coding devops research rag dataanalysis
+
+install-verticals: install-dev
+	@for v in $(VERTICALS); do \
+		echo "== install verticals/victor-$$v =="; \
+		pip install -e ./verticals/victor-$$v || exit 1; \
+	done
+
+test-verticals:
+	@for v in $(VERTICALS); do \
+		echo "== test verticals/victor-$$v =="; \
+		pytest verticals/victor-$$v/tests -q || exit 1; \
+	done
+
+# Contract-boundary audit for the in-repo verticals (verticals import only
+# victor_contracts, never victor framework internals — the monorepo discipline).
+check-vertical-boundaries:
+	python scripts/ci/check_extracted_vertical_boundaries.py
 
 test:
 	pytest tests/unit -v --tb=short $(PYTEST_TIMEOUT_ARG)

@@ -1,0 +1,110 @@
+[build-system]
+requires = [
+    "setuptools>=61.0",
+    "wheel",
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "victor-dataanalysis"
+version = "0.7.0"
+description = "Data Analysis vertical for Victor AI - Data processing, analysis, and visualization"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "Apache-2.0"
+authors = [
+    { name = "Vijaykumar Singh", email = "singhvjd@gmail.com" },
+]
+maintainers = [
+    { name = "Vijaykumar Singh", email = "singhvjd@gmail.com" },
+]
+keywords = [
+    "victor",
+    "vertical",
+    "data-analysis",
+    "pandas",
+    "visualization",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "victor-contracts[yaml]>=0.6.0,<1.0",
+    "pandas>=2.0",
+    "numpy>=1.24,<2.3",
+]
+
+[project.optional-dependencies]
+runtime = [
+    # victor-ai runtime support - optional, contract-first architecture
+    # "victor-ai>=0.6.0,<1.0",
+]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "pytest-cov>=4.1",
+    "black==26.1.0",
+    "ruff>=0.5",
+    "mypy>=1.10",
+]
+
+[project.urls]
+Homepage = "https://github.com/vjsingh1984/victor-dataanalysis"
+Repository = "https://github.com/vjsingh1984/victor-dataanalysis"
+Documentation = "https://docs.victor.dev/verticals/dataanalysis"
+Issues = "https://github.com/vjsingh1984/victor-dataanalysis/issues"
+
+[project.entry-points."victor.plugins"]
+dataanalysis = "victor_dataanalysis.plugin:plugin"
+
+[project.entry-points."victor.tool_dependencies"]
+dataanalysis = "victor_dataanalysis.tool_dependencies:get_provider"
+
+[project.entry-points."victor.safety_rules"]
+dataanalysis = "victor_dataanalysis.safety:create_all_dataanalysis_safety_rules"
+
+[project.entry-points."victor.framework.teams.providers"]
+dataanalysis = "victor_dataanalysis.teams:DataAnalysisTeamSpecProvider"
+
+# Victor extension protocol implementations
+[project.entry-points."victor.extension.protocols"]
+dataanalysis-tools = "victor_dataanalysis.protocols:DataAnalysisToolProvider"
+dataanalysis-safety = "victor_dataanalysis.protocols:DataAnalysisSafetyProvider"
+dataanalysis-prompts = "victor_dataanalysis.protocols:DataAnalysisPromptProvider"
+dataanalysis-workflows = "victor_dataanalysis.protocols:DataAnalysisWorkflowProvider"
+
+[tool.setuptools]
+packages = [
+    "victor_dataanalysis",
+    "victor_dataanalysis.rl",
+    "victor_dataanalysis.teams",
+    "victor_dataanalysis.workflows",
+]
+
+[tool.black]
+line-length = 100
+target-version = [
+    "py310",
+    "py311",
+    "py312",
+]
+
+[tool.ruff]
+line-length = 100
+select = [
+    "E",
+    "W",
+    "F",
+    "B",
+    "C4",
+]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true

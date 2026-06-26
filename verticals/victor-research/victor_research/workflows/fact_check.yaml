@@ -1,0 +1,369 @@
+# Fact Check Workflow
+# ====================
+# Systematic fact verification with:
+# - Claim extraction and parsing
+# - Multi-source evidence gathering
+# - Evidence evaluation
+# - Verdict generation with confidence
+#
+# ┌─────────────────────────────────────────────────────────────────────────────┐
+# │ EXECUTION ENVIRONMENT                                                        │
+# ├─────────────────────────────────────────────────────────────────────────────┤
+# │ Default: in-process (Python) + LLM API calls                                │
+# │ Supported: in-process only (no subprocess/docker needed)                    │
+# │                                                                              │
+# │ Requirements:                                                                │
+# │   - LLM provider API access (for agent nodes)                               │
+# │   - Network access (for evidence gathering from multiple sources)           │
+# │   - Write access (for fact-check report output)                             │
+# │                                                                              │
+# │ Network requirements:                                                        │
+# │   - primary_sources: Government sites, official company pages               │
+# │   - fact_check_sites: Snopes, PolitiFact, Reuters Fact Check                │
+# │   - news_archives: Major news outlets, AP/Reuters wire services             │
+# │   - web_fetch: Retrieve full content from sources                           │
+# └─────────────────────────────────────────────────────────────────────────────┘
+#
+# ┌─────────────────────────────────────────────────────────────────────────────┐
+# │ DEFAULT VALUES                                                               │
+# ├─────────────────────────────────────────────────────────────────────────────┤
+# │ source_credibility_threshold: 0.6 (minimum acceptable credibility)          │
+# │ confidence_levels: high (>0.85), medium (0.6-0.85), low (<0.6)              │
+# │ verdict_categories: TRUE, MOSTLY TRUE, MIXED, MOSTLY FALSE, FALSE, UNVERIF. │
+# │ hitl_timeout: 600s (10 min for additional source decisions)                 │
+# │ review_timeout: 900s (15 min for verdict review)                            │
+# │ report_max_tokens: 6000 (fact-check report length)                          │
+# └─────────────────────────────────────────────────────────────────────────────┘
+#
+# ┌─────────────────────────────────────────────────────────────────────────────┐
+# │ COMPUTE vs AGENT NODE RATIONALE                                              │
+# ├─────────────────────────────────────────────────────────────────────────────┤
+# │ COMPUTE nodes: NONE in this workflow                                         │
+# │                                                                              │
+# │ AGENT nodes (ALL require LLM reasoning):                                     │
+# │   - parse_claims: IDENTIFYING verifiable vs. opinion statements             │
+# │   - primary_sources: EVALUATING government/official source relevance        │
+# │   - fact_check_sites: INTERPRETING existing fact-check verdicts             │
+# │   - news_archives: JUDGING original reporting vs. syndicated content        │
+# │   - evaluate_evidence: WEIGHING evidence quality and conflicts              │
+# │   - generate_verdicts: REASONING about truth with nuanced categories        │
+# │   - generate_report: WRITING clear explanations for non-experts             │
+# │                                                                              │
+# │ Fact-checking is inherently interpretive work requiring:                    │
+# │   - Understanding claim semantics and context                               │
+# │   - Evaluating source credibility and potential bias                        │
+# │   - Weighing conflicting evidence from multiple sources                     │
+# │   - Making nuanced verdicts (not just true/false)                           │
+# │   - Explaining reasoning in accessible language                             │
+# │                                                                              │
+# │ No purely mechanical steps exist - even "aggregate evidence" requires       │
+# │ semantic understanding of what each source actually says.                   │
+# └─────────────────────────────────────────────────────────────────────────────┘
+
+workflows:
+  fact_check:
+    description: "Systematic fact verification with evidence evaluation"
+
+    metadata:
+      version: "1.0"
+      author: "victor"
+      vertical: research
+
+    nodes:
+      # =====================================================================
+      # Stage 1: Claim Parsing
+      # =====================================================================
+      - id: parse_claims
+        type: agent
+        name: "Parse and Extract Claims"
+        role: analyst
+        goal: |
+          Analyze the input and extract specific factual claims:
+
+          1. **Identify Verifiable Claims**
+             - Extract statements that can be fact-checked
+             - Ignore opinions and subjective statements
+             - Note context for each claim
+
+          2. **Classify Claims**
+             - Statistical claims (numbers, percentages)
+             - Historical claims (events, dates)
+             - Scientific claims (research findings)
+             - Quote attributions
+             - Current event claims
+
+          3. **Prioritize**
+             - Rank by importance/impact
+             - Note any interconnected claims
+
+          Output structured list of claims to verify.
+        tool_budget: 15
+        tools: [read]
+        llm_config:
+          temperature: 0.2
+        input_mapping:
+          content: content_to_check
+        output: claims
+        next: [parallel_search]
+
+      # =====================================================================
+      # Stage 2: Evidence Gathering (Parallel)
+      # =====================================================================
+      - id: parallel_search
+        type: parallel
+        name: "Gather Evidence from Multiple Sources"
+        parallel_nodes: [primary_sources, fact_check_sites, news_archives]
+        join_strategy: all
+        next: [aggregate_evidence]
+
+      - id: primary_sources
+        type: agent
+        name: "Search Primary Sources"
+        role: researcher
+        goal: |
+          Search for primary/official sources for each claim:
+          - Government data and statistics
+          - Official company statements
+          - Academic publications
+          - Original documents or recordings
+
+          Document source authority and date.
+        tool_budget: 25
+        tools: [web_search, web_fetch]
+        llm_config:
+          temperature: 0.2
+        input_mapping:
+          claims: claims
+        output: primary_evidence
+
+      - id: fact_check_sites
+        type: agent
+        name: "Check Fact-Checking Sites"
+        role: researcher
+        goal: |
+          Check established fact-checking organizations:
+          - Snopes, PolitiFact, FactCheck.org
+          - Reuters Fact Check, AP Fact Check
+          - Full Fact, AFP Fact Check
+
+          Note: These may have already verified similar claims.
+        tool_budget: 20
+        tools: [web_search, web_fetch]
+        input_mapping:
+          claims: claims
+        output: fact_check_results
+
+      - id: news_archives
+        type: agent
+        name: "Search News Archives"
+        role: researcher
+        goal: |
+          Search news sources for corroboration:
+          - Major news outlets
+          - Wire services (AP, Reuters)
+          - Local news if relevant
+
+          Note original reporting vs. syndicated content.
+        tool_budget: 20
+        tools: [web_search, web_fetch]
+        input_mapping:
+          claims: claims
+        output: news_evidence
+
+      - id: aggregate_evidence
+        type: transform
+        name: "Aggregate All Evidence"
+        transform: |
+          all_evidence = merge(primary_evidence, fact_check_results, news_evidence)
+          supporting_evidence = filter(all_evidence, supports=true)
+          refuting_evidence = filter(all_evidence, refutes=true)
+        next: [evaluate_evidence]
+
+      # =====================================================================
+      # Stage 3: Evidence Evaluation
+      # =====================================================================
+      - id: evaluate_evidence
+        type: agent
+        name: "Evaluate Evidence Quality"
+        role: analyst
+        goal: |
+          Evaluate the gathered evidence:
+
+          For each piece of evidence:
+          1. **Assess Source Quality**
+             - Authority of source
+             - Date/timeliness
+             - Potential bias
+
+          2. **Determine Relevance**
+             - Directly addresses claim?
+             - Context match?
+             - Complete or partial?
+
+          3. **Weigh Evidence**
+             - Primary vs secondary
+             - Corroboration level
+             - Conflicting evidence
+
+          Assign confidence scores to each piece of evidence.
+        tool_budget: 20
+        llm_config:
+          temperature: 0.3
+        input_mapping:
+          evidence: all_evidence
+          claims: claims
+        output: evaluated_evidence
+        next: [check_evidence_quality]
+
+      - id: check_evidence_quality
+        type: condition
+        name: "Check Evidence Sufficiency"
+        condition: "source_credibility_check"
+        branches:
+          "high_credibility": generate_verdicts
+          "acceptable": generate_verdicts
+          "low_credibility": request_additional_sources
+          "default": generate_verdicts
+
+      - id: request_additional_sources
+        type: hitl
+        name: "Request Additional Sources"
+        hitl_type: input
+        prompt: |
+          ## Evidence Quality Concerns
+
+          The gathered evidence has low overall credibility.
+
+          **Current Evidence:**
+          - Supporting: {supporting_count} sources
+          - Refuting: {refuting_count} sources
+          - Average credibility: {avg_credibility}
+
+          **Concerns:**
+          {credibility_concerns}
+
+          Would you like to:
+          1. Proceed with available evidence
+          2. Search for additional sources
+          3. Mark claims as unverifiable
+        context_keys:
+          - supporting_count
+          - refuting_count
+          - avg_credibility
+          - credibility_concerns
+        timeout: 600
+        fallback: continue
+        next: [generate_verdicts]
+
+      # =====================================================================
+      # Stage 4: Verdict Generation
+      # =====================================================================
+      - id: generate_verdicts
+        type: agent
+        name: "Generate Fact-Check Verdicts"
+        role: reviewer
+        goal: |
+          For each claim, provide a verdict:
+
+          **Verdict Categories:**
+          - TRUE: Claim is accurate
+          - MOSTLY TRUE: Substantially accurate with minor issues
+          - MIXED: Contains both true and false elements
+          - MOSTLY FALSE: Contains significant inaccuracies
+          - FALSE: Claim is inaccurate
+          - UNVERIFIABLE: Cannot be verified with available evidence
+
+          For each verdict:
+          1. State the verdict clearly
+          2. Summarize key evidence
+          3. Explain reasoning
+          4. Note any caveats
+          5. Provide confidence level (high/medium/low)
+        tool_budget: 20
+        llm_config:
+          temperature: 0.3
+        input_mapping:
+          claims: claims
+          evidence: evaluated_evidence
+        output: verdicts
+        next: [review_verdicts]
+
+      - id: review_verdicts
+        type: hitl
+        name: "Review Verdicts"
+        hitl_type: review
+        prompt: |
+          ## Fact-Check Verdicts Ready for Review
+
+          **Claims Checked:** {claim_count}
+
+          **Verdict Summary:**
+          {verdict_summary}
+
+          **Confidence Levels:**
+          - High confidence: {high_confidence_count}
+          - Medium confidence: {medium_confidence_count}
+          - Low confidence: {low_confidence_count}
+
+          Please review and approve the verdicts.
+        context_keys:
+          - claim_count
+          - verdict_summary
+          - high_confidence_count
+          - medium_confidence_count
+          - low_confidence_count
+        timeout: 900
+        fallback: continue
+        next: [generate_report]
+
+      # =====================================================================
+      # Stage 5: Report Generation
+      # =====================================================================
+      - id: generate_report
+        type: agent
+        name: "Generate Fact-Check Report"
+        role: writer
+        goal: |
+          Generate a comprehensive fact-check report:
+
+          ## Structure
+
+          1. **Executive Summary**
+             - Overall findings
+             - Key verdicts at a glance
+
+          2. **Claims Analyzed**
+             For each claim:
+             - Original claim (quoted)
+             - Verdict with confidence
+             - Evidence summary
+             - Detailed explanation
+             - Sources cited
+
+          3. **Methodology**
+             - Sources consulted
+             - Evaluation criteria
+             - Limitations
+
+          4. **Conclusion**
+             - Overall assessment
+             - Recommendations
+
+          Use clear, accessible language.
+        tool_budget: 20
+        tools: [write]
+        llm_config:
+          temperature: 0.4
+          max_tokens: 6000
+        input_mapping:
+          verdicts: verdicts
+          evidence: evaluated_evidence
+        output: report
+        next: [complete]
+
+      - id: complete
+        type: transform
+        name: "Fact-Check Complete"
+        transform: |
+          workflow_status = "completed"
+          output_files = [report]

@@ -1,0 +1,209 @@
+[build-system]
+requires = [
+    "setuptools>=61.0",
+    "wheel",
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "victor-coding"
+version = "0.7.0"
+description = "Coding vertical for Victor AI - Software development, debugging, and code generation"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "Apache-2.0"
+authors = [
+    { name = "Vijaykumar Singh", email = "singhvjd@gmail.com" },
+]
+maintainers = [
+    { name = "Vijaykumar Singh", email = "singhvjd@gmail.com" },
+]
+keywords = [
+    "victor",
+    "vertical",
+    "coding",
+    "development",
+    "debugging",
+    "refactoring",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development",
+]
+dependencies = [
+    "victor-contracts[yaml]>=0.6.0,<1.0",  # Definition-layer contract for external verticals
+    "numpy>=1.24,<2.3",  # Required by victor.storage.embeddings; numba-compatible
+]
+
+[project.optional-dependencies]
+runtime = [
+    "victor-ai>=0.6.0,<1.0",  # Runtime support - optional, contract-first architecture
+]
+native = [
+    # Native extensions are handled by maturin
+    # Install with: pip install -e .[native]
+    # or build with: maturin develop --release
+]
+# ProximaDB embedding provider (optional backend).
+# Imported lazily with graceful ImportError fallback in
+# victor_coding/codebase/embeddings/proximadb_provider.py. Pin kept identical
+# to victor-ai's proximadb extra so the backend version stays aligned.
+proximadb = [
+    "proximadb-python>=0.2,<0.3",
+]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "pytest-cov>=4.1",
+    "pytest-xdist>=3.0",
+    "pytest-benchmark>=5.0",
+    "black==26.1.0",
+    "ruff>=0.5",
+    "mypy>=1.10",
+]
+native-dev = [
+    "maturin>=1.0,<2.0",  # Build Rust extensions
+]
+
+[project.urls]
+Homepage = "https://github.com/vjsingh1984/victor-coding"
+Repository = "https://github.com/vjsingh1984/victor-coding"
+Documentation = "https://docs.victor.dev/verticals/coding"
+Issues = "https://github.com/vjsingh1984/victor-coding/issues"
+
+[project.entry-points."victor.plugins"]
+coding = "victor_coding.plugin:plugin"
+
+[project.entry-points."victor.tool_dependencies"]
+coding = "victor_coding.tool_dependencies:get_provider"
+
+[project.entry-points."victor.safety_rules"]
+coding = "victor_coding.safety:create_all_coding_safety_rules"
+
+[project.entry-points."victor.api_routers"]
+coding = "victor_coding.api.router_provider:get_fastapi_router_provider"
+
+[project.entry-points."victor.prompt_contributors"]
+coding = "victor_coding.prompts:CodingPromptContributor"
+
+[project.entry-points."victor.mode_configs"]
+coding = "victor_coding.mode_config:CodingModeConfigProvider"
+
+[project.entry-points."victor.workflow_providers"]
+coding = "victor_coding.workflows.provider:CodingWorkflowProvider"
+
+[project.entry-points."victor.capability_providers"]
+coding = "victor_coding.capabilities:CodingCapabilityProvider"
+
+[project.entry-points."victor.service_providers"]
+coding = "victor_coding.service_provider:CodingServiceProvider"
+coding-performance = "victor_coding.performance.service_provider:PerformanceServiceProvider"
+
+[project.entry-points."victor.team_spec_providers"]
+coding = "victor_coding.teams:CodingTeamSpecProvider"
+
+# Victor extension protocol implementations
+[project.entry-points."victor.extension.protocols"]
+coding-tools = "victor_coding.protocols:CodingToolProvider"
+coding-safety = "victor_coding.protocols:CodingSafetyProvider"
+coding-prompts = "victor_coding.protocols:CodingPromptProvider"
+coding-workflows = "victor_coding.protocols:CodingWorkflowProvider"
+
+# Victor extension capability providers
+[project.entry-points."victor.extension.capabilities"]
+coding-lsp = "victor_coding.protocols:LSPCapabilityProvider"
+coding-git = "victor_coding.protocols:GitCapabilityProvider"
+coding-style = "victor_coding.protocols:CodeStyleCapabilityProvider"
+coding-test = "victor_coding.protocols:TestingCapabilityProvider"
+coding-refactor = "victor_coding.protocols:RefactoringCapabilityProvider"
+
+# Extended providers: sandbox isolation, permission hierarchy, hooks, compaction
+[project.entry-points."victor.sandbox.providers"]
+coding-sandbox = "victor_coding.protocols:CodingSandboxProvider"
+
+[project.entry-points."victor.permission.providers"]
+coding-permissions = "victor_coding.protocols:CodingPermissionProvider"
+
+[project.entry-points."victor.hook.providers"]
+coding-hooks = "victor_coding.protocols:CodingHookProvider"
+
+[project.entry-points."victor.compaction.providers"]
+coding-compaction = "victor_coding.protocols:CodingCompactionProvider"
+
+[tool.setuptools]
+packages = [
+    "victor_coding",
+    "victor_coding.api",
+    "victor_coding.codebase",
+    "victor_coding.completion",
+    "victor_coding.coverage",
+    "victor_coding.docgen",
+    "victor_coding.editing",
+    "victor_coding.languages",
+    "victor_coding.lsp",
+    "victor_coding.refactor",
+    "victor_coding.review",
+    "victor_coding.rl",
+    "victor_coding.teams",
+    "victor_coding.testgen",
+    "victor_coding.workflows",
+]
+
+[tool.black]
+line-length = 100
+target-version = [
+    "py310",
+    "py311",
+    "py312",
+]
+
+[tool.ruff]
+line-length = 100
+select = [
+    "E",
+    "W",
+    "F",
+    "B",
+    "C4",
+]
+
+# E501 (line-too-long) is ignored for files whose primary content is
+# string literals where wrapping would either change the literal's
+# byte content (tree-sitter query S-expressions) or fragment a prompt /
+# template / visualization output that is meant to be read whole.
+[tool.ruff.per-file-ignores]
+# Tree-sitter query S-expression literals (plugins + indexer helper map).
+"victor_coding/languages/plugins/*.py" = ["E501"]
+"victor_coding/languages/base.py" = ["E501"]
+"victor_coding/codebase/indexer.py" = ["E501"]
+# SQL DDL/DML literals in symbol-store schema and queries.
+"victor_coding/codebase/symbol_store.py" = ["E501"]
+# AI prompt templates, analysis-output text, Pydantic Field descriptions.
+"victor_coding/prompts.py" = ["E501"]
+"victor_coding/codebase_analyzer.py" = ["E501"]
+"victor_coding/testgen/generator.py" = ["E501"]
+"victor_coding/review/analyzers.py" = ["E501"]
+"victor_coding/coverage/visualizer.py" = ["E501"]
+"victor_coding/docgen/formatter.py" = ["E501"]
+"victor_coding/skills.py" = ["E501"]
+"victor_coding/codebase/embeddings/base.py" = ["E501"]
+# User-facing code snippet bodies (literal text — can't be safely wrapped).
+"victor_coding/completion/providers/snippet.py" = ["E501"]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+
+[tool.victor.contract_audit]
+# TEMPORARY exception: plugin.py defensively probes the host for the
+# framework-internal TreeSitterAnalysisProtocol to register an optional
+# tree-sitter analysis capability. The proper fix is to promote that protocol
+# into victor_contracts and import it from there; until then this one file is
+# excluded from the contract-boundary audit. TODO: remove after the protocol
+# lands in victor_contracts.
+exclude = ["victor_coding/plugin.py"]

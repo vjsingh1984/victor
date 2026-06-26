@@ -1,0 +1,570 @@
+# AutoML Pipeline Workflow
+# ========================
+# Automated machine learning pipeline using:
+# - PyCaret for low-code model comparison
+# - Auto-sklearn for Bayesian optimization
+# - Reinforcement Learning for sequential decision tasks
+#
+# Supports:
+# - Classification (binary/multiclass)
+# - Regression
+# - Clustering
+# - Anomaly Detection
+# - Reinforcement Learning
+
+workflows:
+  automl:
+    description: "Automated ML pipeline with framework selection and model comparison"
+
+    metadata:
+      version: "1.0"
+      author: "victor"
+      vertical: dataanalysis
+
+    batch_config:
+      batch_size: 1
+      max_concurrent: 1
+      retry_strategy: exponential_backoff
+      max_retries: 2
+
+    nodes:
+      # =====================================================================
+      # Stage 1: Data Loading and Validation
+      # =====================================================================
+      - id: load_data
+        type: compute
+        name: "Load Dataset"
+        tools: [read, shell]
+        inputs:
+          data_path: $ctx.data_path
+          target_column: $ctx.target
+        output: raw_data
+        constraints:
+          llm_allowed: false
+          max_cost_tier: FREE
+          timeout: 120
+        next: [analyze_task]
+
+      - id: analyze_task
+        type: agent
+        name: "Analyze ML Task"
+        role: analyst
+        goal: |
+          Analyze the dataset and determine:
+          1. Task type (classification, regression, clustering, anomaly, rl)
+          2. Data quality issues
+          3. Recommended preprocessing steps
+          4. Best AutoML framework to use
+        tool_budget: 10
+        tools: [shell, read]
+        llm_config:
+          temperature: 0.2
+        input_mapping:
+          data: raw_data
+        output: task_analysis
+        next: [route_task]
+
+      - id: route_task
+        type: condition
+        name: "Route by Task Type"
+        condition: "task_type"
+        branches:
+          "classification": preprocess_supervised
+          "regression": preprocess_supervised
+          "clustering": preprocess_unsupervised
+          "anomaly": preprocess_unsupervised
+          "rl": setup_rl_env
+
+      # =====================================================================
+      # Stage 2: Preprocessing
+      # =====================================================================
+      - id: preprocess_supervised
+        type: compute
+        name: "Preprocess for Supervised Learning"
+        handler: stats_compute
+        inputs:
+          data: $ctx.raw_data
+          operations: [describe, correlation]
+        output: preprocessed_data
+        constraints:
+          llm_allowed: false
+          timeout: 120
+        next: [select_framework]
+
+      - id: preprocess_unsupervised
+        type: compute
+        name: "Preprocess for Unsupervised Learning"
+        handler: stats_compute
+        inputs:
+          data: $ctx.raw_data
+          operations: [describe, skewness]
+        output: preprocessed_data
+        constraints:
+          llm_allowed: false
+          timeout: 120
+        next: [run_pycaret]
+
+      # =====================================================================
+      # Stage 3: Framework Selection for Supervised Learning
+      # =====================================================================
+      - id: select_framework
+        type: hitl
+        name: "Select AutoML Framework"
+        hitl_type: input
+        prompt: |
+          ## AutoML Framework Selection
+
+          **Task Type:** {task_type}
+          **Dataset Size:** {data_rows} rows x {data_cols} features
+          **Target:** {target_column}
+
+          **Recommendations:**
+          {framework_recommendation}
+
+          Select AutoML framework:
+          - **PyCaret**: Fast, low-code, great for quick comparisons
+          - **Auto-sklearn**: Bayesian optimization, better for production
+          - **Both**: Run both and compare
+        context_keys:
+          - task_type
+          - data_rows
+          - data_cols
+          - target_column
+          - framework_recommendation
+        choices:
+          - "PyCaret"
+          - "Auto-sklearn"
+          - "Both"
+        timeout: 300
+        fallback: continue
+        next: [route_framework]
+
+      - id: route_framework
+        type: condition
+        name: "Route by Framework"
+        condition: "framework_choice"
+        branches:
+          "PyCaret": run_pycaret
+          "Auto-sklearn": run_autosklearn
+          "Both": run_both_frameworks
+
+      # =====================================================================
+      # Stage 4a: PyCaret AutoML
+      # =====================================================================
+      - id: run_pycaret
+        type: compute
+        name: "Run PyCaret AutoML"
+        handler: pycaret_automl
+        inputs:
+          data: $ctx.preprocessed_data
+          target: $ctx.target_column
+          task: $ctx.task_type
+          top_n: 5
+          time_budget: $ctx.time_budget
+          fold: 5
+          sort_by: $ctx.sort_metric
+        output: pycaret_result
+        constraints:
+          llm_allowed: false
+          timeout: 3600
+        next: [check_pycaret]
+
+      - id: check_pycaret
+        type: condition
+        name: "Check PyCaret Success"
+        condition: "pycaret_success"
+        branches:
+          "true": analyze_pycaret
+          "false": pycaret_fallback
+
+      - id: pycaret_fallback
+        type: agent
+        name: "Handle PyCaret Failure"
+        role: executor
+        goal: |
+          PyCaret failed with error: {pycaret_error}
+
+          Analyze the error and suggest:
+          1. Potential fixes
+          2. Alternative approaches
+          3. Whether to try Auto-sklearn instead
+        tool_budget: 10
+        output: pycaret_diagnosis
+        next: [suggest_alternative]
+
+      - id: suggest_alternative
+        type: hitl
+        name: "Try Alternative Framework?"
+        hitl_type: approval
+        prompt: |
+          ## PyCaret Failed
+
+          **Error:** {pycaret_error}
+          **Diagnosis:** {pycaret_diagnosis}
+
+          Try Auto-sklearn instead?
+        context_keys:
+          - pycaret_error
+          - pycaret_diagnosis
+        timeout: 300
+        fallback: abort
+        next: [route_alternative]
+
+      - id: route_alternative
+        type: condition
+        name: "Route Alternative"
+        condition: "try_alternative"
+        branches:
+          "true": run_autosklearn
+          "false": complete_failed
+
+      - id: analyze_pycaret
+        type: agent
+        name: "Analyze PyCaret Results"
+        role: analyst
+        goal: |
+          Analyze PyCaret AutoML results:
+          - Best model performance
+          - Leaderboard comparison
+          - Model interpretability
+          - Production readiness assessment
+        tool_budget: 10
+        llm_config:
+          temperature: 0.3
+        input_mapping:
+          results: pycaret_result
+        output: pycaret_analysis
+        next: [finalize_model]
+
+      # =====================================================================
+      # Stage 4b: Auto-sklearn AutoML
+      # =====================================================================
+      - id: run_autosklearn
+        type: compute
+        name: "Run Auto-sklearn"
+        handler: autosklearn_automl
+        inputs:
+          X: $ctx.features
+          y: $ctx.target_values
+          task: $ctx.task_type
+          time_limit: $ctx.time_budget
+          memory_limit: $ctx.memory_limit
+          n_jobs: -1
+          ensemble_size: 50
+        output: autosklearn_result
+        constraints:
+          llm_allowed: false
+          timeout: 7200
+        next: [check_autosklearn]
+
+      - id: check_autosklearn
+        type: condition
+        name: "Check Auto-sklearn Success"
+        condition: "autosklearn_success"
+        branches:
+          "true": analyze_autosklearn
+          "false": complete_failed
+
+      - id: analyze_autosklearn
+        type: agent
+        name: "Analyze Auto-sklearn Results"
+        role: analyst
+        goal: |
+          Analyze Auto-sklearn results:
+          - Cross-validation score
+          - Model ensemble composition
+          - Hyperparameter configurations
+          - Comparison to baseline
+        tool_budget: 10
+        llm_config:
+          temperature: 0.3
+        input_mapping:
+          results: autosklearn_result
+        output: autosklearn_analysis
+        next: [finalize_model]
+
+      # =====================================================================
+      # Stage 4c: Run Both Frameworks
+      # =====================================================================
+      - id: run_both_frameworks
+        type: parallel
+        name: "Run Both AutoML Frameworks"
+        parallel_nodes: [pycaret_parallel, autosklearn_parallel]
+        join_strategy: all
+        next: [compare_frameworks]
+
+      - id: pycaret_parallel
+        type: compute
+        name: "PyCaret (Parallel)"
+        handler: pycaret_automl
+        inputs:
+          data: $ctx.preprocessed_data
+          target: $ctx.target_column
+          task: $ctx.task_type
+          top_n: 3
+          time_budget: $ctx.time_budget
+        output: pycaret_parallel_result
+        constraints:
+          llm_allowed: false
+          timeout: 1800
+
+      - id: autosklearn_parallel
+        type: compute
+        name: "Auto-sklearn (Parallel)"
+        handler: autosklearn_automl
+        inputs:
+          X: $ctx.features
+          y: $ctx.target_values
+          task: $ctx.task_type
+          time_limit: $ctx.time_budget
+        output: autosklearn_parallel_result
+        constraints:
+          llm_allowed: false
+          timeout: 3600
+
+      - id: compare_frameworks
+        type: agent
+        name: "Compare Framework Results"
+        role: analyst
+        goal: |
+          Compare results from both AutoML frameworks:
+          1. Best model from each framework
+          2. Performance metrics comparison
+          3. Training time comparison
+          4. Recommendation for production
+
+          PyCaret Result: {pycaret_parallel_result}
+          Auto-sklearn Result: {autosklearn_parallel_result}
+        tool_budget: 15
+        llm_config:
+          temperature: 0.3
+        output: framework_comparison
+        next: [select_best]
+
+      - id: select_best
+        type: hitl
+        name: "Select Best Model"
+        hitl_type: approval
+        prompt: |
+          ## Framework Comparison Complete
+
+          {framework_comparison}
+
+          **Recommendation:** {recommended_model}
+
+          Approve this model for finalization?
+        context_keys:
+          - framework_comparison
+          - recommended_model
+        timeout: 600
+        fallback: continue
+        next: [finalize_model]
+
+      # =====================================================================
+      # Stage 5: RL Training Path
+      # =====================================================================
+      - id: setup_rl_env
+        type: agent
+        name: "Setup RL Environment"
+        role: executor
+        goal: |
+          Configure the reinforcement learning environment:
+          1. Identify environment type (Gymnasium env ID or custom)
+          2. Define state/action spaces
+          3. Select appropriate algorithm (PPO, A2C, DQN, SAC, TD3)
+          4. Set training parameters
+        tool_budget: 15
+        output: rl_config
+        next: [run_rl_training]
+
+      - id: run_rl_training
+        type: compute
+        name: "Train RL Agent"
+        handler: rl_training
+        inputs:
+          env: $ctx.env_id
+          algorithm: $ctx.rl_algorithm
+          total_timesteps: $ctx.total_timesteps
+          policy: $ctx.policy
+          learning_rate: $ctx.learning_rate
+          n_eval_episodes: 10
+          save_path: $ctx.model_save_path
+        output: rl_result
+        constraints:
+          llm_allowed: false
+          timeout: 7200
+        next: [analyze_rl]
+
+      - id: analyze_rl
+        type: agent
+        name: "Analyze RL Results"
+        role: analyst
+        goal: |
+          Analyze RL training results:
+          - Mean/std reward achieved
+          - Training stability
+          - Policy performance
+          - Recommendations for improvement
+        tool_budget: 10
+        input_mapping:
+          results: rl_result
+        output: rl_analysis
+        next: [finalize_model]
+
+      # =====================================================================
+      # Stage 6: Model Finalization
+      # =====================================================================
+      - id: finalize_model
+        type: parallel
+        name: "Finalize Best Model"
+        parallel_nodes: [save_model, generate_report]
+        join_strategy: all
+        next: [complete]
+
+      - id: save_model
+        type: compute
+        name: "Save Model Artifacts"
+        tools: [shell, write]
+        inputs:
+          model: $ctx.best_model
+          output_dir: $ctx.output_dir
+          formats: [pickle, joblib, onnx]
+        output: saved_artifacts
+        constraints:
+          write_allowed: true
+          timeout: 300
+
+      - id: generate_report
+        type: agent
+        name: "Generate AutoML Report"
+        role: writer
+        goal: |
+          Generate a comprehensive AutoML report including:
+          1. Executive summary
+          2. Data overview
+          3. Model selection process
+          4. Best model details and performance
+          5. Deployment recommendations
+          6. Limitations and next steps
+        tool_budget: 15
+        tools: [write]
+        llm_config:
+          temperature: 0.5
+        output: automl_report
+
+      - id: complete
+        type: transform
+        name: "Pipeline Complete"
+        transform: |
+          status = "completed"
+          best_model = selected_model
+          report = automl_report
+
+      - id: complete_failed
+        type: transform
+        name: "Pipeline Failed"
+        transform: |
+          status = "failed"
+          error = failure_reason
+
+
+  # =========================================================================
+  # Quick AutoML - Fast Model Comparison
+  # =========================================================================
+  automl_quick:
+    description: "Quick AutoML for fast model comparison using PyCaret"
+
+    metadata:
+      vertical: dataanalysis
+
+    nodes:
+      - id: load
+        type: compute
+        name: "Load Data"
+        tools: [read]
+        output: data
+        constraints:
+          llm_allowed: false
+          timeout: 60
+        next: [quick_automl]
+
+      - id: quick_automl
+        type: compute
+        name: "Quick PyCaret AutoML"
+        handler: pycaret_automl
+        inputs:
+          data: $ctx.data
+          target: $ctx.target
+          task: $ctx.task
+          top_n: 3
+          time_budget: 60
+        output: result
+        constraints:
+          llm_allowed: false
+          timeout: 300
+        next: [summary]
+
+      - id: summary
+        type: agent
+        name: "Quick Summary"
+        role: analyst
+        goal: "Provide a brief summary of the AutoML results with top 3 models."
+        tool_budget: 5
+        llm_config:
+          temperature: 0.2
+          model_hint: claude-3-haiku
+        output: summary
+
+
+  # =========================================================================
+  # RL Training Workflow
+  # =========================================================================
+  rl_training:
+    description: "Reinforcement Learning agent training workflow"
+
+    metadata:
+      vertical: dataanalysis
+
+    nodes:
+      - id: setup
+        type: agent
+        name: "Configure RL Environment"
+        role: researcher
+        goal: |
+          Configure RL training:
+          1. Validate environment exists
+          2. Check action/observation spaces
+          3. Recommend algorithm based on env type
+        tool_budget: 10
+        output: rl_setup
+        next: [train]
+
+      - id: train
+        type: compute
+        name: "Train RL Agent"
+        handler: rl_training
+        inputs:
+          env: $ctx.env
+          algorithm: $ctx.algorithm
+          total_timesteps: $ctx.timesteps
+          policy: MlpPolicy
+          n_eval_episodes: 10
+        output: training_result
+        constraints:
+          llm_allowed: false
+          timeout: 3600
+        next: [evaluate]
+
+      - id: evaluate
+        type: agent
+        name: "Evaluate Agent"
+        role: analyst
+        goal: |
+          Evaluate RL agent performance:
+          - Mean reward: {mean_reward}
+          - Std reward: {std_reward}
+          - Training time: {training_time}
+
+          Provide assessment and recommendations.
+        tool_budget: 10
+        output: evaluation

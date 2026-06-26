@@ -1,0 +1,121 @@
+[build-system]
+requires = [
+    "setuptools>=61.0",
+    "wheel",
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "victor-research"
+version = "0.7.0"
+description = "Research vertical for Victor AI - Web research, information gathering, and knowledge synthesis"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "Apache-2.0"
+authors = [
+    { name = "Vijaykumar Singh", email = "singhvjd@gmail.com" },
+]
+maintainers = [
+    { name = "Vijaykumar Singh", email = "singhvjd@gmail.com" },
+]
+keywords = [
+    "victor",
+    "vertical",
+    "research",
+    "web-search",
+    "information-gathering",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "victor-contracts[yaml]>=0.7.0,<1.0",
+    "numpy>=1.24,<2.3",  # Required by victor.storage.embeddings; numba-compatible
+]
+
+[project.optional-dependencies]
+runtime = [
+    "victor-ai>=0.7.0,<1.0",
+]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "pytest-cov>=4.1",
+    "pytest-xdist>=3.0",
+    "black==26.1.0",
+    "ruff>=0.5",
+    "mypy>=1.10",
+]
+
+[project.urls]
+Homepage = "https://github.com/vjsingh1984/victor-research"
+Repository = "https://github.com/vjsingh1984/victor-research"
+Documentation = "https://docs.victor.dev/verticals/research"
+Issues = "https://github.com/vjsingh1984/victor-research/issues"
+
+[project.entry-points."victor.plugins"]
+research = "victor_research.plugin:plugin"
+
+[project.entry-points."victor.tool_dependencies"]
+research = "victor_research.tool_dependencies:get_provider"
+
+[project.entry-points."victor.safety_rules"]
+research = "victor_research.safety:create_all_research_safety_rules"
+
+[project.entry-points."victor.prompt_contributors"]
+research = "victor_research.prompts:ResearchPromptContributor"
+
+[project.entry-points."victor.mode_configs"]
+research = "victor_research.mode_config:ResearchModeConfigProvider"
+
+[project.entry-points."victor.workflow_providers"]
+research = "victor_research.workflows:ResearchWorkflowProvider"
+
+[project.entry-points."victor.capability_providers"]
+research = "victor_research.capabilities:ResearchCapabilityProvider"
+
+[project.entry-points."victor.team_spec_providers"]
+research = "victor_research.teams:ResearchTeamSpecProvider"
+
+# Victor extension protocol implementations
+[project.entry-points."victor.extension.protocols"]
+research-tools = "victor_research.protocols:ResearchToolProvider"
+research-safety = "victor_research.protocols:ResearchSafetyProvider"
+research-prompts = "victor_research.protocols:ResearchPromptProvider"
+research-workflows = "victor_research.protocols:ResearchWorkflowProvider"
+
+[tool.setuptools]
+packages = [
+    "victor_research",
+    "victor_research.rl",
+    "victor_research.teams",
+    "victor_research.workflows",
+]
+
+[tool.black]
+line-length = 100
+target-version = [
+    "py310",
+    "py311",
+    "py312",
+]
+
+[tool.ruff]
+line-length = 100
+select = [
+    "E",
+    "W",
+    "F",
+    "B",
+    "C4",
+]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
