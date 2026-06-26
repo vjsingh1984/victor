@@ -58,14 +58,25 @@ _IMPORT_NODES = {
 
 
 def _get_parser(grammar: str):
+    # Build an OFFICIAL `tree_sitter.Parser` from the pack's Language, rather than
+    # `tree_sitter_language_pack.get_parser()` — the latter can return a vendored
+    # binding whose nodes are a minimal `builtins.Node` lacking `.type`/`.children`.
+    # The official Parser yields standard nodes (type/children/start_byte properties).
     try:
-        from tree_sitter_language_pack import get_parser
+        from tree_sitter import Parser
+        from tree_sitter_language_pack import get_language
     except Exception as e:  # ImportError or native load failure
-        raise GrammarUnavailable(f"tree-sitter-language-pack unavailable: {e}") from e
+        raise GrammarUnavailable(f"tree-sitter unavailable: {e}") from e
     try:
-        return get_parser(grammar)
+        language = get_language(grammar)
     except Exception as e:
         raise GrammarUnavailable(f"grammar '{grammar}' unavailable: {e}") from e
+    try:
+        return Parser(language)  # tree_sitter >= 0.23
+    except TypeError:
+        parser = Parser()  # older API: set the language attribute
+        parser.language = language
+        return parser
 
 
 def _text(node, src: bytes) -> str:
