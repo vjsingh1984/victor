@@ -48,15 +48,37 @@ def create_fs_parser() -> UnifiedFsParser:
     # `cat` / `read` subcommand
     cat_parser = subparsers.add_parser("cat", help="Read file contents")
     cat_parser.add_argument("path", help="Path to the file to read")
+    cat_parser.add_argument(
+        "--offset", type=int, default=0, help="Start line (1-based) for paging large files"
+    )
+    cat_parser.add_argument("--limit", type=int, default=0, help="Max lines to read (0 = all/auto)")
+    cat_parser.add_argument(
+        "--search", default="", help="Only show lines matching this pattern (in-file search)"
+    )
+    cat_parser.add_argument(
+        "--ctx", type=int, default=2, help="Context lines around --search matches"
+    )
+    cat_parser.add_argument("--regex", action="store_true", help="Treat --search as a regex")
 
     # `ls` / `list` subcommand
     ls_parser = subparsers.add_parser("ls", help="List directory contents")
     ls_parser.add_argument("path", nargs="?", default=".", help="Directory path to list")
+    ls_parser.add_argument("-r", "--recursive", action="store_true", help="List recursively")
+    ls_parser.add_argument("--depth", type=int, default=2, help="Directory depth to descend")
+    ls_parser.add_argument("--pattern", default="", help="Glob filter (e.g. '*.py', 'test_*')")
+    ls_parser.add_argument("--limit", type=int, default=1000, help="Max entries to return")
 
     # `write` subcommand
     write_parser = subparsers.add_parser("write", help="Write content to a file")
     write_parser.add_argument("path", help="Path to the file")
     write_parser.add_argument("--content", "-c", required=True, help="Content to write")
+    write_parser.add_argument("--validate", action="store_true", help="LSP-validate before writing")
+    write_parser.add_argument(
+        "--format", action="store_true", help="Auto-format with a language formatter"
+    )
+    write_parser.add_argument(
+        "--dry-run", action="store_true", help="Validate/preview without writing"
+    )
 
     # `patch` subcommand
     patch_parser = subparsers.add_parser("patch", help="Patch file contents")
@@ -100,12 +122,15 @@ def create_fs_parser() -> UnifiedFsParser:
 async def fs_tool(cmd: str) -> str:
     """Unified filesystem tool with bash-like syntax. Use subcommands to
     interact with the file system. Example commands:
-      fs ls /path/to/dir
-      fs cat /path/to/file
-      fs write /path/to/file -c "Hello"
+      fs ls /path/to/dir [-r] [--depth N] [--pattern '*.py']
+      fs cat /path/to/file [--offset N --limit N] [--search PAT [--ctx N] [--regex]]
+      fs write /path/to/file -c "Hello" [--validate] [--format] [--dry-run]
       fs patch /path/to/file --search "old" --replace "new"
       fs edit /path --old "a" --new "b"
       fs search "*.py" /path
+
+    Paging: `fs cat big.py --offset 200 --limit 100` reads a slice of a large file.
+    In-file search: `fs cat app.py --search "def login" --ctx 3`.
     """
     parser = create_fs_parser()
 
@@ -125,13 +150,28 @@ async def fs_tool(cmd: str) -> str:
     # Delegate to the underlying granular tools
     if parsed_args.subcommand == "cat":
         try:
-            return str(await read(parsed_args.path))
+            return str(
+                await read(
+                    parsed_args.path,
+                    offset=parsed_args.offset,
+                    limit=parsed_args.limit,
+                    search=parsed_args.search,
+                    ctx=parsed_args.ctx,
+                    regex=parsed_args.regex,
+                )
+            )
         except Exception as e:
             return f"Error reading file: {e}"
 
     elif parsed_args.subcommand == "ls":
         try:
-            results = await ls(parsed_args.path)
+            results = await ls(
+                parsed_args.path,
+                recursive=parsed_args.recursive,
+                depth=parsed_args.depth,
+                pattern=parsed_args.pattern,
+                limit=parsed_args.limit,
+            )
             # Format results into a markdown table instead of raw JSON
             if not isinstance(results, list):
                 return str(results)
@@ -158,7 +198,15 @@ async def fs_tool(cmd: str) -> str:
 
     elif parsed_args.subcommand == "write":
         try:
-            return str(await write(parsed_args.path, parsed_args.content))
+            return str(
+                await write(
+                    parsed_args.path,
+                    parsed_args.content,
+                    validate=parsed_args.validate,
+                    format_code=parsed_args.format,
+                    dry_run=parsed_args.dry_run,
+                )
+            )
         except Exception as e:
             return f"### ❌ ERROR\nError writing file: {e}"
 
