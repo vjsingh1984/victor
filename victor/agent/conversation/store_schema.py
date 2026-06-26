@@ -777,18 +777,35 @@ class ConversationStoreSchema:
 
         table_sql = result[0]
 
-        # Self-heal very old `sessions` tables that predate the session_id key.
-        # Without this, ConversationStore init fails hard with "table sessions has
-        # no column named session_id". ALTER cannot re-add a PRIMARY KEY, but a
-        # plain column is enough to unblock INSERT OR REPLACE on this cache table.
+        # Self-heal very old `sessions` tables that predate the current core
+        # columns. Without this, ConversationStore init fails hard (e.g. "table
+        # sessions has no column named session_id" / "... last_activity"). Add the
+        # whole core set in one pass rather than one column per restart. ALTER
+        # cannot re-add a PRIMARY KEY or a NOT NULL without a default, but plain/
+        # defaulted columns are enough to unblock INSERT OR REPLACE on this cache.
+        core_columns = [
+            ("session_id", "TEXT"),
+            ("created_at", "TIMESTAMP"),
+            ("last_activity", "TIMESTAMP"),
+            ("project_path", "TEXT"),
+            ("model", "TEXT"),
+            ("profile", "TEXT"),
+            ("max_tokens", "INTEGER DEFAULT 100000"),
+            ("reserved_tokens", "INTEGER DEFAULT 4096"),
+            ("metadata", "TEXT"),
+        ]
         existing_cols = {row[1] for row in conn.execute("PRAGMA table_info(sessions)")}
-        if "session_id" not in existing_cols:
-            try:
-                conn.execute("ALTER TABLE sessions ADD COLUMN session_id TEXT")
-                logger.warning("Healed legacy sessions table: added missing session_id column")
-            except sqlite3.OperationalError as e:
-                if "duplicate column name" not in str(e).lower():
-                    logger.warning(f"Failed to add session_id to sessions: {e}")
+        healed = []
+        for col_name, col_def in core_columns:
+            if col_name not in existing_cols:
+                try:
+                    conn.execute(f"ALTER TABLE sessions ADD COLUMN {col_name} {col_def}")
+                    healed.append(col_name)
+                except sqlite3.OperationalError as e:
+                    if "duplicate column name" not in str(e).lower():
+                        logger.warning(f"Failed to add {col_name} to sessions: {e}")
+        if healed:
+            logger.warning(f"Healed legacy sessions table: added missing columns {healed}")
 
         new_columns = [
             ("provider_id", "INTEGER"),
