@@ -37,6 +37,10 @@ def test_edge_records_reference_node_oids():
     assert e["edge"]["from_oid"].startswith("graph/repo1/node/")
     assert e["edge"]["to_oid"].startswith("graph/repo1/node/")
     assert e["edge"]["edge_type"] == "CALLS"
+    # edge props always carry a call-site line (0 when unknown; >0 once the parser
+    # preserves call_site through resolution — see the call-site-fidelity change).
+    assert "line" in e["props"]
+    assert isinstance(e["props"]["line"], int)
 
 
 def test_embedder_populates_embedding_cell():

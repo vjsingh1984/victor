@@ -73,7 +73,12 @@ def relation_to_record(relation: CodeRelation, repo_graph_id: str, branch_id: st
             "to_oid": f"graph/{repo_graph_id}/node/{relation.to_symbol_id}",
             "edge_type": relation.relation_type.name,
         },
-        "props": {"confidence": relation.confidence, "context": relation.context},
+        "props": {
+            "confidence": relation.confidence,
+            "context": relation.context,
+            # call-site line (0 when unknown) — lets the graph carry where the edge fires.
+            "line": relation.call_site.start_line if relation.call_site is not None else 0,
+        },
     }
 
 
