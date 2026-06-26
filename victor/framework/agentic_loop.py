@@ -2697,9 +2697,41 @@ class AgenticLoop:
         is_substantial = len(content) > 100
         if not (had_prior_tool_usage or is_substantial):
             return False
-        return not self._is_continuation_request(content) and not self._is_intent_only_response(
-            content
+        # A refusal / "I can't do this" is not a delivered answer. Treating it as
+        # terminal would force a high-confidence COMPLETE (success=True) for a turn
+        # that declined the task — so exclude it like narration and questions.
+        return (
+            not self._is_continuation_request(content)
+            and not self._is_intent_only_response(content)
+            and not self._is_refusal_response(content)
         )
+
+    # Phrases where the model declines/aborts the task itself (not findings like
+    # "I cannot find any bugs"). Kept tight to avoid misclassifying real answers.
+    _REFUSAL_MARKERS = (
+        "i can't read",
+        "i cannot read",
+        "i can't access",
+        "i cannot access",
+        "unable to read",
+        "unable to access",
+        "i'm unable to",
+        "i am unable to",
+        "cannot comply",
+        "can't comply",
+        "the information needed",  # "...don't have the information needed..."
+        "i can't provide a grounded",
+        "can't give a grounded",
+        "i'm sorry, but i can't",
+        "i am sorry, but i can't",
+    )
+
+    def _is_refusal_response(self, content: str) -> bool:
+        """True when the final answer declines/aborts the task (a non-answer)."""
+        if not content:
+            return False
+        lowered = content.lower()
+        return any(marker in lowered for marker in self._REFUSAL_MARKERS)
 
     async def _evaluate(
         self,

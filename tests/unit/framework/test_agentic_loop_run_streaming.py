@@ -291,3 +291,34 @@ def test_is_terminal_answer_intent_only_false():
 def test_is_terminal_answer_continuation_request_false():
     text = "Here is the summary so far. Would you like me to continue with the next file? " * 2
     assert _terminal_loop()._is_terminal_answer(_turn(text)) is False
+
+
+def test_is_terminal_answer_refusal_false():
+    # A refusal must not be treated as a delivered answer (would force a
+    # high-confidence COMPLETE / success=True for a turn that declined the task),
+    # even after prior tools ran.
+    loop = _terminal_loop(total_tool_calls=2)
+    refusal = (
+        "I'm sorry, but I can't read any files right now, so I don't have the "
+        "information needed to give a grounded review of this codebase."
+    )
+    assert loop._is_terminal_answer(_turn(refusal)) is False
+
+
+def test_is_terminal_answer_findings_not_misclassified_as_refusal():
+    # A genuine completion that merely contains "cannot find" is still terminal.
+    loop = _terminal_loop(total_tool_calls=2)
+    answer = "I reviewed the modules and cannot find any correctness bugs. " * 3
+    assert loop._is_terminal_answer(_turn(answer)) is True
+
+
+def test_is_refusal_response_patterns():
+    loop = AgenticLoop.__new__(AgenticLoop)
+    assert loop._is_refusal_response("I can't read any files right now")
+    assert loop._is_refusal_response("I cannot access that path")
+    assert loop._is_refusal_response("...don't have the information needed...")
+    assert loop._is_refusal_response("I'm unable to complete this")
+    # Negatives: legitimate findings / answers
+    assert not loop._is_refusal_response("I cannot find any bugs in this file.")
+    assert not loop._is_refusal_response("Here are three improvement areas: ...")
+    assert not loop._is_refusal_response("")

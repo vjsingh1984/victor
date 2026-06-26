@@ -314,7 +314,10 @@ class TestReminderFormatters:
 
         reminder = manager._format_evidence_reminder()
 
-        assert reminder == "[NO FILES READ]"
+        # Phrased as an actionable status (not a bare flag a small model misreads
+        # as a prohibition). Assert intent rather than exact wording.
+        assert "No files read yet" in reminder
+        assert "read" in reminder.lower()
 
     def test_format_evidence_reminder_many_files(self):
         """Test evidence reminder truncates many files."""
@@ -659,7 +662,7 @@ class TestConvenienceFunctions:
         """Test get_evidence_reminder with empty files."""
         reminder = get_evidence_reminder(set())
 
-        assert reminder == "[NO FILES READ]"
+        assert "No files read yet" in reminder
 
 
 # =============================================================================

@@ -236,6 +236,67 @@ async def test_chat_model_not_found_raises_typed_error(ollama_provider):
     assert "ollama pull gpt-oss:latest" in (err.recovery_hint or "")
 
 
+def test_supports_thinking_allowlist(ollama_provider):
+    """Think mode is requested for known reasoning models only."""
+    assert ollama_provider._supports_thinking("gpt-oss:20b")
+    assert ollama_provider._supports_thinking("deepseek-r1:32b")
+    assert ollama_provider._supports_thinking("qwen3.6:latest")
+    assert ollama_provider._supports_thinking("qwq:latest")
+    assert not ollama_provider._supports_thinking("llama3.1:8b")
+    assert not ollama_provider._supports_thinking("gemma3:4b")
+
+
+def test_supports_thinking_respects_disabled_cache(ollama_provider):
+    """A model that rejected think mode is not asked again."""
+    assert ollama_provider._supports_thinking("gpt-oss:20b")
+    ollama_provider._models_without_thinking.add("gpt-oss:20b")
+    assert not ollama_provider._supports_thinking("gpt-oss:20b")
+
+
+def test_payload_sets_think_for_reasoning_models(ollama_provider):
+    """Reasoning models get think=True; others omit it."""
+    msgs = [Message(role="user", content="hi")]
+    p = ollama_provider._build_request_payload(
+        messages=msgs,
+        model="gpt-oss:20b",
+        temperature=0.7,
+        max_tokens=100,
+        tools=None,
+        stream=False,
+    )
+    assert p.get("think") is True
+    p2 = ollama_provider._build_request_payload(
+        messages=msgs,
+        model="llama3.1:8b",
+        temperature=0.7,
+        max_tokens=100,
+        tools=None,
+        stream=False,
+    )
+    assert "think" not in p2
+
+
+def test_reasoning_not_leaked_into_content_for_think_models(ollama_provider):
+    """For reasoning models the analysis channel stays in reasoning_content."""
+    chunk = ollama_provider._parse_stream_chunk(
+        {
+            "model": "gpt-oss:20b",
+            "message": {"content": "", "thinking": "deliberating"},
+            "done": False,
+        }
+    )
+    assert chunk.content == ""
+    assert chunk.metadata == {"reasoning_content": "deliberating"}
+
+
+def test_thinking_mirrored_to_content_for_nonreasoning_models(ollama_provider):
+    """gemma-style models that answer via `thinking` still surface that as content."""
+    chunk = ollama_provider._parse_stream_chunk(
+        {"model": "gemma3:4b", "message": {"content": "", "thinking": "the answer"}, "done": True}
+    )
+    assert chunk.content == "the answer"
+
+
 @pytest.mark.asyncio
 async def test_chat_generic_error(ollama_provider):
     """Test chat generic error handling."""

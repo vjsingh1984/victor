@@ -1954,6 +1954,24 @@ class ToolService:
 
         return tool_calls
 
+    # Harmony/chat-template role and channel tokens that some providers (notably
+    # gpt-oss via Ollama) leak as a tool-call name when the response format is not
+    # parsed correctly. These are never real tool names.
+    _CHANNEL_ARTIFACT_NAMES = frozenset(
+        {"assistant", "user", "system", "developer", "tool", "analysis", "commentary", "final"}
+    )
+
+    def _all_tool_calls_are_channel_artifacts(
+        self, tool_calls: Optional[List[Dict[str, Any]]]
+    ) -> bool:
+        """True if every tool call's name is a harmony/role channel artifact."""
+        names = [
+            str(tc.get("name", "")).strip().lower()
+            for tc in (tool_calls or [])
+            if isinstance(tc, dict)
+        ]
+        return bool(names) and all(name in self._CHANNEL_ARTIFACT_NAMES for name in names)
+
     def parse_and_validate_tool_calls(
         self,
         tool_calls: Optional[List[Dict[str, Any]]],
@@ -1967,6 +1985,23 @@ class ToolService:
         extracted_tool_call_count = raw_tool_call_count
         parse_confidence = 1.0
         parse_warnings: List[str] = []
+
+        # gpt-oss / harmony artifact: a provider can surface the channel role token
+        # ("assistant") as the function name instead of the real tool. Such names are
+        # never valid tools — drop them so content fallback parsing can recover the
+        # actual call below, instead of passing a bogus call straight through.
+        if tool_calls and self._all_tool_calls_are_channel_artifacts(tool_calls):
+            artifact_names = [tc.get("name") for tc in tool_calls if isinstance(tc, dict)]
+            self._logger.warning(
+                "Discarding %d native tool call(s) with channel-artifact name(s) %s; "
+                "falling back to content parsing",
+                raw_tool_call_count,
+                artifact_names,
+            )
+            tool_calls = None
+            raw_tool_call_count = 0
+            parse_method = "none"
+            extracted_tool_call_count = 0
 
         if not tool_calls and full_content:
             self._logger.debug(
