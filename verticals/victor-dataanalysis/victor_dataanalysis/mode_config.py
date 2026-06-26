@@ -27,7 +27,7 @@ from victor.framework.extensions import (
     ModeConfigRegistry,
     RegistryBasedModeConfigProvider,
 )
-from victor_contracts.verticals.mode_config import ModeConfig, ModeDefinition
+from victor_contracts.verticals.mode_config import ModeDefinition
 
 # =============================================================================
 # Data Analysis-Specific Modes (Registered with Central Registry)

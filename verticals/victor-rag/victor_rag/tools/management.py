@@ -16,7 +16,7 @@
 
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Dict
 
 from victor.tools.base import BaseTool, CostTier, ToolResult
 
@@ -45,7 +45,6 @@ class RAGListTool(BaseTool):
         Returns:
             ToolResult with document list
         """
-        from victor_rag.document_store import DocumentStore
 
         try:
             store = self._get_document_store()
@@ -172,7 +171,6 @@ class RAGDeleteTool(BaseTool):
         Returns:
             ToolResult with deletion status
         """
-        from victor_rag.document_store import DocumentStore
 
         try:
             store = self._get_document_store()
@@ -232,7 +230,6 @@ class RAGStatsTool(BaseTool):
         Returns:
             ToolResult with statistics
         """
-        from victor_rag.document_store import DocumentStore
 
         try:
             store = self._get_document_store()

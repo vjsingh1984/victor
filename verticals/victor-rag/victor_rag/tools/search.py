@@ -15,7 +15,7 @@
 """RAG Search Tool - Search for relevant chunks in the RAG store."""
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 
 from victor.tools.base import BaseTool, CostTier, ToolResult
 
@@ -87,7 +87,6 @@ class RAGSearchTool(BaseTool):
         Returns:
             ToolResult with search results
         """
-        from victor_rag.document_store import DocumentStore
 
         try:
             store = self._get_document_store()

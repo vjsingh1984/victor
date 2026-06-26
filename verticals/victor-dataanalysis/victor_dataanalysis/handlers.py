@@ -62,12 +62,12 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, Optional
 
 if TYPE_CHECKING:
     from victor.tools.registry import ToolRegistry
     from victor_contracts.workflow_runtime import ComputeNode
-    from victor_contracts.workflow_runtime import NodeResult, ExecutorNodeStatus, WorkflowContext
+    from victor_contracts.workflow_runtime import NodeResult, WorkflowContext
 
 logger = logging.getLogger(__name__)
 

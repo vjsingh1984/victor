@@ -1,7 +1,6 @@
 # Tests for victor-rag safety rules
 # Migrated from victor/tests/unit/framework/test_config.py
 
-import pytest
 
 from victor.framework.config import SafetyConfig, SafetyEnforcer, SafetyLevel
 

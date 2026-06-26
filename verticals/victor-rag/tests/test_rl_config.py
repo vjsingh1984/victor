@@ -14,7 +14,6 @@
 
 """Tests for RAG RL configuration."""
 
-import pytest
 
 from victor.framework.rl import LearnerType
 

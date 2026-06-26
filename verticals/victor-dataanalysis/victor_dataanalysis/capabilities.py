@@ -50,7 +50,7 @@ from victor_contracts.capabilities import (
 from victor_contracts import BaseCapabilityProvider, CapabilityMetadata
 
 if TYPE_CHECKING:
-    from victor_contracts.protocols import OrchestratorProtocol as AgentOrchestrator
+    pass
 
 logger = logging.getLogger(__name__)
 
