@@ -196,12 +196,3 @@ select = [
 [tool.mypy]
 python_version = "3.11"
 warn_return_any = true
-
-[tool.victor.contract_audit]
-# TEMPORARY exception: plugin.py defensively probes the host for the
-# framework-internal TreeSitterAnalysisProtocol to register an optional
-# tree-sitter analysis capability. The proper fix is to promote that protocol
-# into victor_contracts and import it from there; until then this one file is
-# excluded from the contract-boundary audit. TODO: remove after the protocol
-# lands in victor_contracts.
-exclude = ["victor_coding/plugin.py"]
