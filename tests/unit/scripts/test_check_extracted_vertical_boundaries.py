@@ -57,9 +57,11 @@ dependencies = ["victor-contracts>=0.1.0"]
 def test_discover_default_paths_only_returns_existing_repos(tmp_path: Path) -> None:
     core_repo = tmp_path / "victor"
     core_repo.mkdir()
-    (tmp_path / "victor-coding").mkdir()
-    (tmp_path / "victor-devops").mkdir()
-    (tmp_path / "victor-rag").mkdir()
+    # First-party verticals are folded in-repo under verticals/; only victor-invest
+    # remains an external sibling next to the core repo.
+    (core_repo / "verticals" / "victor-coding").mkdir(parents=True)
+    (core_repo / "verticals" / "victor-devops").mkdir(parents=True)
+    (core_repo / "verticals" / "victor-rag").mkdir(parents=True)
     (tmp_path / "victor-invest").mkdir()
 
     discovered = check_extracted_vertical_boundaries.discover_default_extracted_repo_paths(
@@ -67,9 +69,9 @@ def test_discover_default_paths_only_returns_existing_repos(tmp_path: Path) -> N
     )
 
     assert discovered == [
-        (tmp_path / "victor-coding").resolve(),
-        (tmp_path / "victor-devops").resolve(),
-        (tmp_path / "victor-rag").resolve(),
+        (core_repo / "verticals" / "victor-coding").resolve(),
+        (core_repo / "verticals" / "victor-devops").resolve(),
+        (core_repo / "verticals" / "victor-rag").resolve(),
         (tmp_path / "victor-invest").resolve(),
     ]
 
