@@ -10,8 +10,8 @@ name = "victor-coding"
 version = "0.7.0"
 description = "Coding vertical for Victor AI - Software development, debugging, and code generation"
 readme = "README.md"
-requires-python = ">=3.10"
-license = "Apache-2.0"
+requires-python = ">=3.11"
+license = {text = "Apache-2.0"}
 authors = [
     { name = "Vijaykumar Singh", email = "singhvjd@gmail.com" },
 ]
@@ -30,7 +30,6 @@ classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Topic :: Software Development",
@@ -157,7 +156,6 @@ packages = [
 [tool.black]
 line-length = 100
 target-version = [
-    "py310",
     "py311",
     "py312",
 ]
@@ -196,5 +194,5 @@ select = [
 "victor_coding/completion/providers/snippet.py" = ["E501"]
 
 [tool.mypy]
-python_version = "3.10"
+python_version = "3.11"
 warn_return_any = true
