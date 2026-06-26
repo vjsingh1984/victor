@@ -33,7 +33,6 @@ from victor.ui.rendering.utils import (
     format_bash_command_invocation,
     format_duration,
     format_tool_args,
-    format_tool_args_bash_style,
     format_tool_display_name,
     format_tool_metadata_badges,
     get_tool_metadata_for_display,
@@ -178,20 +177,17 @@ class LiveDisplayRenderer:
         self._pending_tool = {"name": name, "arguments": arguments}
         self._current_tool_start_time = time.monotonic()
 
-        # Print bash-style command invocation
-        if self._live and not self._is_paused:
-            # Format bash-style invocation and add to content buffer
-            args_str = format_tool_args_bash_style(arguments)
-            if args_str:
-                invocation_line = f"[dim]$[/] [bold cyan]{name}[/] [dim]{args_str}[/]\n"
-            else:
-                invocation_line = f"[dim]$[/] [bold cyan]{name}[/]\n"
-            self.on_content(invocation_line)
-
-        if not self._tool_section_shown:
+        # Tool chrome (the section separator + the bash-style invocation line) is
+        # styled with Rich markup, so it must go through the Rich-markup console
+        # path — the same one the [RUNNING]/[DONE] lines use — NOT the markdown
+        # content buffer, which renders Rich [tags] literally. Use the single shared
+        # formatter (format_bash_command_invocation) rather than an inline copy.
+        if self._live:
             self.pause()
-            self._print_section_separator("Tool Execution")
-            self._tool_section_shown = True
+            if not self._tool_section_shown:
+                self._print_section_separator("Tool Execution")
+                self._tool_section_shown = True
+            self.console.print(format_bash_command_invocation(name, arguments))
             self.resume()
 
         # Always activate progress panel to show the spinner with [RUNNING] status
