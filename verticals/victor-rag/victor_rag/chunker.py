@@ -45,8 +45,7 @@ import json
 import logging
 import re
 import uuid
-from dataclasses import dataclass, field
-from pathlib import Path
+from dataclasses import dataclass
 from typing import Any, Callable, Coroutine, List, Optional, Tuple
 
 from victor_rag.document_store import Document, DocumentChunk

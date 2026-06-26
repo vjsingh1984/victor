@@ -44,7 +44,7 @@ from typing import TYPE_CHECKING, Any, Dict, List
 if TYPE_CHECKING:
     from victor.tools.registry import ToolRegistry
     from victor_contracts.workflow_runtime import ComputeNode
-    from victor_contracts.workflow_runtime import NodeResult, ExecutorNodeStatus, WorkflowContext
+    from victor_contracts.workflow_runtime import NodeResult, WorkflowContext
 
 logger = logging.getLogger(__name__)
 

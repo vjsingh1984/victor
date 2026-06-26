@@ -59,7 +59,7 @@ from victor_contracts.enrichment_runtime import (
 if TYPE_CHECKING:
     from victor_rag.document_store import DocumentStore
     from victor_rag.entity_resolver import EntityInfo, EntityResolver
-    from victor_rag.query_enhancer import QueryEnhancer, EnhancementTechnique
+    from victor_rag.query_enhancer import QueryEnhancer
 
 logger = logging.getLogger(__name__)
 

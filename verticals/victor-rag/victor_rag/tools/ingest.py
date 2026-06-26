@@ -14,12 +14,11 @@
 
 """RAG Ingest Tool - Ingest documents into the RAG store."""
 
-import asyncio
 import logging
 import re
 import uuid
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 from urllib.parse import urlparse
 
 import aiohttp
@@ -129,7 +128,7 @@ class RAGIngestTool(BaseTool):
         Returns:
             ToolResult with ingestion status
         """
-        from victor_rag.document_store import Document, DocumentStore
+        from victor_rag.document_store import Document
 
         try:
             # Get or create document store

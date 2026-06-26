@@ -39,7 +39,7 @@ from victor_rag.capabilities.handlers import (
 )
 
 if TYPE_CHECKING:
-    from victor_contracts.protocols import OrchestratorProtocol as AgentOrchestrator
+    pass
 
 logger = logging.getLogger(__name__)
 

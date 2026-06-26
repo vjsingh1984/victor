@@ -160,7 +160,6 @@ class RAGQueryTool(BaseTool):
         Returns:
             ToolResult with synthesized answer or formatted context
         """
-        from victor_rag.document_store import DocumentStore
 
         try:
             store = self._get_document_store()
@@ -173,7 +172,6 @@ class RAGQueryTool(BaseTool):
             # Initialize enrichment strategy with document store for entity resolution
             from victor_rag.enrichment import (
                 get_rag_enrichment_strategy,
-                reset_rag_enrichment_strategy,
             )
 
             # Get or create enrichment strategy with document store
