@@ -1,16 +1,14 @@
 #!/usr/bin/env python3
-"""Audit extracted vertical repositories against Victor's contract boundary.
+"""Audit vertical packages against Victor's contract boundary.
 
-By default this script looks for the extracted plugin repos that currently
-track the contract-first migration:
-  - ../victor-coding
-  - ../victor-research
-  - ../victor-devops
-  - ../victor-rag
-  - ../victor-dataanalysis
-  - ../victor-invest
+The first-party verticals now live in-repo under ``verticals/`` (folded in from
+their former standalone repos). This audit enforces that they import only the
+``victor_contracts`` contract surface — never ``victor`` framework internals —
+which is what keeps the monorepo from eroding the decoupling that the separate
+repos used to provide.
 
-Additional repos can be audited by passing explicit paths.
+Additional repos/paths can be audited by passing explicit paths (e.g. a still
+external ``../victor-invest``).
 """
 
 from __future__ import annotations
@@ -23,11 +21,13 @@ from pathlib import Path
 from typing import Iterable, Sequence
 
 DEFAULT_RELATIVE_EXTRACTED_REPO_PATHS = (
-    "../victor-coding",
-    "../victor-research",
-    "../victor-devops",
-    "../victor-rag",
-    "../victor-dataanalysis",
+    # In-repo first-party verticals (folded in under verticals/).
+    "verticals/victor-coding",
+    "verticals/victor-research",
+    "verticals/victor-devops",
+    "verticals/victor-rag",
+    "verticals/victor-dataanalysis",
+    # Still-external verticals are audited only when checked out next to the repo.
     "../victor-invest",
 )
 

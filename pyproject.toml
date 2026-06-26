@@ -601,7 +601,9 @@ benchmark = "victor.benchmark:plugin"
 
 [tool.setuptools.packages.find]
 include = ["victor", "victor.*"]
-exclude = ["tests*", "docs*", "victor_test*"]
+# verticals/ holds separately-installed packages (victor_coding, …) folded into
+# the monorepo — they must NOT be bundled into the victor-ai dist.
+exclude = ["tests*", "docs*", "victor_test*", "verticals*"]
 
 # Ensure verticals.contrib packages are included
 namespaces = true
