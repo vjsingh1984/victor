@@ -59,6 +59,13 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# TD-CG / ADR-014: shared code->CPG chunker. Soft import so the legacy in-repo
+# tree-sitter path stays the fallback when the package is absent.
+try:
+    import victor_codegraph as _victor_codegraph
+except Exception:  # ImportError, or a partial/native load failure
+    _victor_codegraph = None
+
 # Language detection mapping (file extension -> language name)
 EXTENSION_TO_LANGUAGE = {
     ".py": "python",
@@ -1034,14 +1041,18 @@ class TierAwareChunker:
         if language == "python":
             return [ChunkingFallback.PYTHON_AST, ChunkingFallback.SLIDING_WINDOW]
 
-        # Check if language has tree-sitter support
+        # Check if language has tree-sitter support. The shared victor_codegraph
+        # parser (TD-CG / ADR-014) stands in for an injected TreeSitterExtractor,
+        # so its presence also enables the tree-sitter fallback.
         try:
             from victor_coding.languages.tiers import get_tier
 
             tier_config = get_tier(language)
-            has_tree_sitter = tier_config.has_tree_sitter and self._ts is not None
+            has_tree_sitter = (
+                tier_config.has_tree_sitter and self._ts is not None
+            ) or _victor_codegraph is not None
         except ImportError:
-            has_tree_sitter = self._ts is not None
+            has_tree_sitter = self._ts is not None or _victor_codegraph is not None
 
         # Config files get special treatment
         config_languages = {"yaml", "json", "toml", "xml", "ini", "properties", "hocon"}
@@ -1116,7 +1127,23 @@ class TierAwareChunker:
         language: str,
         content: str,
     ) -> List[CodeChunk]:
-        """Chunk using tree-sitter symbol extraction."""
+        """Chunk using tree-sitter symbol extraction.
+
+        TD-CG / ADR-014: prefers the shared ``victor_codegraph`` parser when
+        installed (removes per-repo tree-sitter duplication, adds JS/TS + size-
+        capping); falls back to the injected ``TreeSitterExtractor`` otherwise.
+        """
+        if _victor_codegraph is not None:
+            try:
+                vc_chunks = self._chunk_via_victor_codegraph(relative_path, language, content)
+                if vc_chunks:
+                    return vc_chunks
+            except Exception as e:
+                logger.debug(
+                    f"victor_codegraph tree-sitter delegation failed for "
+                    f"{relative_path}: {e}; using legacy extractor"
+                )
+
         if not self._ts:
             return []
 
@@ -1186,6 +1213,88 @@ class TierAwareChunker:
                     line_end=sym.end_line or sym.line_number,
                     parent_id=f"{relative_path}:{parent}" if parent else None,
                     metadata={"language": language, "line_count": end - start + 1},
+                )
+            )
+
+        return chunks
+
+    def _chunk_via_victor_codegraph(
+        self,
+        relative_path: str,
+        language: str,
+        content: str,
+    ) -> List[CodeChunk]:
+        """Delegate tree-sitter symbol extraction to ``victor_codegraph`` (ADR-014).
+
+        Maps ``victor_codegraph.CodeSymbol`` into this module's hierarchical
+        ``CodeChunk`` shape, mirroring the FILE_SUMMARY + per-symbol structure
+        emitted by ``_chunk_with_tree_sitter``. Returns ``[]`` when no symbols are
+        extracted so the fallback chain can continue.
+        """
+        parsed = _victor_codegraph.parse(content, language=language, file_path=relative_path)
+        symbols = parsed.symbols
+        if not symbols:
+            return []
+
+        lines = content.split("\n")
+        chunks: List[CodeChunk] = []
+        class_kinds = {"CLASS", "STRUCT", "INTERFACE", "TRAIT", "ENUM"}
+
+        if self._config.include_file_summary:
+            symbol_names = [s.simple_name for s in symbols[:10]]
+            summary = (
+                f"File: {relative_path}\nLanguage: {language}\n"
+                f"Contains: {', '.join(symbol_names)}"
+            )
+            if len(symbols) > 10:
+                summary += f"\n  ... and {len(symbols) - 10} more"
+            chunks.append(
+                CodeChunk(
+                    id=f"{relative_path}:__file__",
+                    content=summary,
+                    chunk_type=ChunkType.FILE_SUMMARY,
+                    file_path=relative_path,
+                    line_start=1,
+                    line_end=len(lines),
+                    metadata={
+                        "symbol_count": len(symbols),
+                        "language": language,
+                        "source": "victor_codegraph",
+                    },
+                )
+            )
+
+        for sym in symbols:
+            kind = sym.symbol_type.name
+            if kind in {"FILE", "MODULE", "PACKAGE"}:
+                continue
+            start_line = sym.location.start_line or 1
+            end_line = sym.location.end_line or start_line
+            body = sym.source_code or ""
+            if len(body) > self._config.max_chunk_chars:
+                body = body[: self._config.max_chunk_chars] + "\n# ... truncated"
+
+            scope = list(sym.scope_chain or [])
+            qualified = ".".join(scope + [sym.simple_name]) if scope else sym.simple_name
+
+            chunks.append(
+                CodeChunk(
+                    id=f"{relative_path}:{qualified}",
+                    content=f"{kind.title()}: {sym.simple_name}\n{body}",
+                    chunk_type=(
+                        ChunkType.CLASS_SUMMARY if kind in class_kinds else ChunkType.METHOD_HEADER
+                    ),
+                    file_path=relative_path,
+                    symbol_name=sym.simple_name,
+                    symbol_type=kind.lower(),
+                    line_start=start_line,
+                    line_end=end_line,
+                    parent_id=(f"{relative_path}:{'.'.join(scope)}" if scope else None),
+                    metadata={
+                        "language": language,
+                        "line_count": end_line - start_line + 1,
+                        "source": "victor_codegraph",
+                    },
                 )
             )
 

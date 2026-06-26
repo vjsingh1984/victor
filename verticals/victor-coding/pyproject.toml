@@ -37,6 +37,7 @@ classifiers = [
 dependencies = [
     "victor-contracts[yaml]>=0.6.0,<1.0",  # Definition-layer contract for external verticals
     "numpy>=1.24,<2.3",  # Required by victor.storage.embeddings; numba-compatible
+    "victor-codegraph>=0.1.0",  # Shared code->CPG chunker (TD-CG / ADR-014); tree-sitter chunkers delegate to it
 ]
 
 [project.optional-dependencies]
