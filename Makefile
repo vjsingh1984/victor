@@ -7,7 +7,7 @@
 #   make build        # Build distribution packages
 #   make release      # Create a release (requires version)
 
-.PHONY: help install install-dev install-verticals test-verticals check-vertical-boundaries lint-verticals test test-definition-boundaries lint check-repo-hygiene check-extracted-vertical-boundaries format clean build build-binary docker release sync-version check-version
+.PHONY: help install install-dev install-verticals test-verticals check-vertical-boundaries lint-verticals lint-verticals-ruff lint-verticals-fmt-types test test-definition-boundaries lint check-repo-hygiene check-extracted-vertical-boundaries format clean build build-binary docker release sync-version check-version
 
 PYTEST_TIMEOUT_ARG := $(shell pytest --help 2>/dev/null | grep -q -- "--timeout" && echo --timeout=120)
 
@@ -76,17 +76,23 @@ test-verticals:
 		pytest verticals/victor-$$v/tests -q || exit 1; \
 	done
 
-# Lint each vertical with its OWN tooling config (ruff/black/mypy run from the
-# vertical dir so they pick up that package's pyproject). Runs all checks for
-# every vertical and exits non-zero if any failed (blocking-ready); currently
-# wired ADVISORY in CI while the folded verticals' lint debt is cleared.
-lint-verticals:
+# Vertical lint, each package using its OWN tooling config. Ruff is aligned with
+# the framework's ruff config and clean across all verticals → BLOCKING. Black
+# (formatting) and mypy (types) still carry folded-in debt → ADVISORY for now.
+lint-verticals-ruff:
+	@for v in $(VERTICALS); do \
+		echo "== ruff verticals/victor-$$v =="; \
+		ruff check verticals/victor-$$v || exit 1; \
+	done
+
+lint-verticals-fmt-types:
 	@fail=0; for v in $(VERTICALS); do \
-		echo "== lint verticals/victor-$$v =="; \
-		ruff check verticals/victor-$$v || fail=1; \
+		echo "== black+mypy verticals/victor-$$v =="; \
 		black --check verticals/victor-$$v || fail=1; \
 		( cd verticals/victor-$$v && mypy victor_$$v ) || fail=1; \
 	done; exit $$fail
+
+lint-verticals: lint-verticals-ruff lint-verticals-fmt-types
 
 # Contract-boundary audit for the in-repo verticals (verticals import only
 # victor_contracts, never victor framework internals — the monorepo discipline).

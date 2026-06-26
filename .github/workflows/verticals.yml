@@ -2,9 +2,9 @@
 # - Contract-boundary audit is BLOCKING: verticals must import only
 #   victor_contracts, never victor framework internals.
 # - Per-vertical test suites are BLOCKING (they pass green in-monorepo).
-# - Per-vertical lint (ruff/black/mypy, each package's own config) is ADVISORY
-#   for now while the folded verticals' lint debt is cleared; flip to blocking
-#   after the cleanup (mirrors how the test suites were handled).
+# - Per-vertical lint: ruff is BLOCKING (each package's ruff config aligned with
+#   the framework's); black (formatting) + mypy (types) are ADVISORY while that
+#   folded-in debt is cleared.
 name: Verticals
 
 on:
@@ -60,7 +60,7 @@ jobs:
         run: make test-verticals
 
   lint:
-    name: Vertical lint (advisory)
+    name: Vertical lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -69,6 +69,8 @@ jobs:
           python-version: "3.12"
       - name: Install framework + contracts + verticals (editable)
         run: make install-verticals
-      - name: Lint verticals (ruff + black + mypy, per-package config)
-        continue-on-error: true  # advisory until the folded verticals' lint debt is cleared
-        run: make lint-verticals
+      - name: Ruff (blocking)
+        run: make lint-verticals-ruff
+      - name: Black + mypy (advisory)
+        continue-on-error: true  # advisory while the folded verticals' format/type debt is cleared
+        run: make lint-verticals-fmt-types
