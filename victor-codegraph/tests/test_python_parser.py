@@ -71,6 +71,16 @@ def test_calls_relation_resolved_to_ids():
         assert r.to_symbol_id in ids  # resolved to a real symbol, not a bare name
 
 
+def test_calls_relation_carries_call_site_line():
+    parsed = parse(SAMPLE, file_path="pkg/mod.py")
+    calls = [r for r in parsed.relations if r.relation_type == CodeRelationType.CALLS]
+    assert calls
+    # The call-site line must survive resolution (was dropped to 0 before).
+    for r in calls:
+        assert r.call_site is not None
+        assert r.call_site.start_line > 0
+
+
 def test_extends_relation():
     parsed = parse(SAMPLE, file_path="pkg/mod.py")
     cls = next(s for s in parsed.symbols if s.simple_name == "Greeter")

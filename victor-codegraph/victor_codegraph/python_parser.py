@@ -185,6 +185,11 @@ class _Visitor:
                             to_symbol_id=callee,  # resolved to a real id in parse()
                             relation_type=CodeRelationType.CALLS,
                             context=callee,
+                            call_site=SourceLocation(
+                                file_path=self.file_path,
+                                start_line=getattr(child, "lineno", 0),
+                                start_column=getattr(child, "col_offset", 0),
+                            ),
                         )
                     )
         return sym
@@ -240,6 +245,7 @@ def parse_python(content: str, file_path: str) -> ParsedCode:
                     to_symbol_id=target_id,
                     relation_type=r.relation_type,
                     context=r.context,
+                    call_site=r.call_site,  # preserve the call-site line through resolution
                 )
             )
     return ParsedCode(
