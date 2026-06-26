@@ -203,6 +203,9 @@ jobs:
           pip install -e ./victor-contracts
           # Then install victor-ai (which depends on victor-contracts)
           pip install -e .
+          # Foundational shared code->CPG parser; the verticals delegate symbol extraction
+          # to it (ADR-014), so install it before them to exercise the real path.
+          pip install -e ./victor-codegraph
 
       - name: Install external vertical packages
         run: |

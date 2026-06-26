@@ -48,6 +48,8 @@ jobs:
           pip install torch --index-url https://download.pytorch.org/whl/cpu
           pip install -e ./victor-contracts
           pip install -e ".[dev]"
+          # Foundational shared code->CPG parser (verticals delegate to it, ADR-014).
+          pip install -e ./victor-codegraph
 
       - name: Install vertical
         run: |

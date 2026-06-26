@@ -107,6 +107,8 @@ jobs:
           # Install the in-repo SDK and core first.
           pip install -e ./victor-contracts
           pip install -e .
+          # Foundational shared code->CPG parser (verticals delegate to it, ADR-014).
+          pip install -e ./victor-codegraph
 
       - name: Install external vertical packages
         run: |
