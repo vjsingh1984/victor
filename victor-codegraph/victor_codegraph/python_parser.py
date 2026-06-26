@@ -144,9 +144,11 @@ class _Visitor:
             ),
             source_code=self._src(node),
             language="python",
-            documentation=ast.get_docstring(node) if isinstance(
-                node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
-            ) else None,
+            documentation=(
+                ast.get_docstring(node)
+                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
+                else None
+            ),
             signature=signature,
             modifiers=modifiers or [],
             scope_chain=list(scope),
@@ -174,7 +176,11 @@ class _Visitor:
             modifiers=_modifiers(name, node.decorator_list, isinstance(node, ast.AsyncFunctionDef)),
         )
         self.symbols.append(sym)
-        # CALLS edges (name-resolved best-effort, like both donors).
+        # CALLS edges. ``to_symbol_id`` is the textual callee here; ``parse_python``
+        # resolves it to a real in-file symbol id when the callee is defined locally
+        # and otherwise keeps it as a bare name (so cross-file/external calls — e.g.
+        # a CPG's blast radius — are not silently dropped). ``call_site`` records the
+        # call line for consumers that need it.
         for child in ast.walk(node):
             if isinstance(child, ast.Call):
                 callee = _callee_name(child)
@@ -182,9 +188,14 @@ class _Visitor:
                     self.relations.append(
                         CodeRelation(
                             from_symbol_id=sym.id,
-                            to_symbol_id=callee,  # resolved to a real id in parse()
+                            to_symbol_id=callee,
                             relation_type=CodeRelationType.CALLS,
                             context=callee,
+                            call_site=SourceLocation(
+                                file_path=self.file_path,
+                                start_line=getattr(child, "lineno", 0),
+                                start_column=getattr(child, "col_offset", 0),
+                            ),
                         )
                     )
         return sym
@@ -228,20 +239,27 @@ def parse_python(content: str, file_path: str) -> ParsedCode:
     tree = ast.parse(content)
     v = _Visitor(file_path, content)
     v.run(tree)
-    # Resolve CALLS/EXTENDS targets (currently names) to real symbol ids; drop unresolved.
+    # Resolve CALLS/EXTENDS targets to real in-file symbol ids when possible.
+    # Unresolved targets (external / cross-file callees and bases) are RETAINED with
+    # ``to_symbol_id`` = the textual name and ``confidence`` < 1.0, so consumers that
+    # need outgoing-call coverage (e.g. a CPG's blast radius) are not silently lossy.
+    # Only self-references (recursive calls) are dropped.
     by_name: dict[str, str] = {s.simple_name: s.id for s in v.symbols}
     resolved: list[CodeRelation] = []
     for r in v.relations:
         target_id = by_name.get(r.to_symbol_id)
-        if target_id is not None and target_id != r.from_symbol_id:
-            resolved.append(
-                CodeRelation(
-                    from_symbol_id=r.from_symbol_id,
-                    to_symbol_id=target_id,
-                    relation_type=r.relation_type,
-                    context=r.context,
-                )
+        if target_id == r.from_symbol_id:
+            continue  # self-reference (recursive call) — emit no self-edge
+        resolved.append(
+            CodeRelation(
+                from_symbol_id=r.from_symbol_id,
+                to_symbol_id=target_id if target_id is not None else r.to_symbol_id,
+                relation_type=r.relation_type,
+                context=r.context,
+                call_site=r.call_site,
+                confidence=1.0 if target_id is not None else 0.5,
             )
+        )
     return ParsedCode(
         file_path=file_path,
         language="python",
