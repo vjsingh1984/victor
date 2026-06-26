@@ -236,11 +236,13 @@ models/
 **/sentence-transformers/
 **/bge-*/
 /embeddings/  # Only root-level embeddings, not victor/contrib/embeddings
-victor-coding/
-victor-dataanalysis/
-victor-devops/
-victor-rag/
-victor-research/
+# Root-anchored so these ignore stray root-level vertical clones WITHOUT shadowing the
+# folded copies under verticals/ (verticals/victor-coding etc. are tracked monorepo source).
+/victor-coding/
+/victor-dataanalysis/
+/victor-devops/
+/victor-rag/
+/victor-research/
 
 # Scratch / temp files
 *.bak

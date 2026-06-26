@@ -113,7 +113,9 @@ jobs:
           # Extracted verticals live outside this repo and are not guaranteed to be available
           # from PyPI at the versions declared in local meta-extras. Install them directly from
           # their source repositories to exercise the current external integration path.
-          pip install git+https://github.com/vjsingh1984/victor-coding.git@main
+          # victor-coding's standalone repo is archived — it now lives in this monorepo; install
+          # the local copy so integration tests exercise the tracked source.
+          pip install -e ./verticals/victor-coding
           pip install git+https://github.com/vjsingh1984/victor-devops.git@main
           pip install git+https://github.com/vjsingh1984/victor-rag.git@main
           pip install git+https://github.com/vjsingh1984/victor-dataanalysis.git@main
