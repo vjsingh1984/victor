@@ -7,7 +7,7 @@
 #   make build        # Build distribution packages
 #   make release      # Create a release (requires version)
 
-.PHONY: help install install-dev install-verticals test-verticals check-vertical-boundaries lint-verticals lint-verticals-ruff lint-verticals-fmt-types test test-definition-boundaries lint check-repo-hygiene check-extracted-vertical-boundaries format clean build build-binary docker release sync-version check-version
+.PHONY: help install install-dev install-standalone install-verticals test-verticals check-vertical-boundaries lint-verticals lint-verticals-ruff lint-verticals-fmt-types test test-definition-boundaries lint check-repo-hygiene check-extracted-vertical-boundaries format clean build build-binary docker release sync-version check-version
 
 PYTEST_TIMEOUT_ARG := $(shell pytest --help 2>/dev/null | grep -q -- "--timeout" && echo --timeout=120)
 
@@ -18,6 +18,7 @@ help:
 	@echo "Development:"
 	@echo "  make install       Install for development"
 	@echo "  make install-dev   Install with all dev dependencies"
+	@echo "  make install-standalone PY=...  Bootstrap a venv from a standalone Python (+ contracts + verticals)"
 	@echo "  make test          Run unit tests"
 	@echo "  make test-all      Run all tests including integration"
 	@echo "  make test-definition-boundaries  Run SDK-definition import guardrails"
@@ -69,6 +70,32 @@ install-verticals: install-dev
 		echo "== install verticals/victor-$$v =="; \
 		pip install -e ./verticals/victor-$$v || exit 1; \
 	done
+
+# Bootstrap a complete dev env into a fresh venv built FROM an arbitrary Python
+# (e.g. a standalone / relocatable build). Drives every install through the venv
+# interpreter so it never depends on which pip is on PATH. Usage:
+#   make install-standalone PY=/path/to/standalone/bin/python3
+# Override the venv location with VENV=... (default: .venv).
+VENV ?= .venv
+install-standalone:
+	@test -n "$(PY)" || { echo "ERROR: set PY=/path/to/standalone/bin/python3"; exit 1; }
+	@test -x "$(PY)" || { echo "ERROR: PY=$(PY) is not an executable"; exit 1; }
+	"$(PY)" -m venv "$(VENV)"
+	"$(VENV)/bin/python" -m pip install --upgrade pip setuptools wheel
+	# Contracts FIRST (see `install`) so victor-ai resolves the local
+	# victor-contracts, not the last PyPI release.
+	"$(VENV)/bin/python" -m pip install -e ./victor-contracts
+	"$(VENV)/bin/python" -m pip install -e ".[dev,docs,build]"
+	"$(VENV)/bin/python" -m pip install pre-commit pytest-split
+	@for v in $(VERTICALS); do \
+		echo "== install verticals/victor-$$v =="; \
+		"$(VENV)/bin/python" -m pip install -e ./verticals/victor-$$v || exit 1; \
+	done
+	"$(VENV)/bin/pre-commit" install || true
+	@echo ""
+	@echo "✓ Victor dev env ready in $(VENV)/ (built from $(PY))"
+	@echo "  activate: source $(VENV)/bin/activate"
+	@echo "  verify:   $(VENV)/bin/victor --version"
 
 test-verticals:
 	@for v in $(VERTICALS); do \
