@@ -5,7 +5,7 @@ size-capped embeddable chunks, and a `ProximaRecord` projection. One chunker, th
 consumers — Victor (owner), the ProximaDB SDK (`[codegraph]` extra), and AnvaiOps (SaaS
 code-graph vertical).
 
-> Design: ProximaDB `ADR-028` (authoritative) · Victor `ADR-014` (owner/donor) ·
+> Design: ProximaDB `ADR-029` (authoritative) · Victor `ADR-014` (owner/donor) ·
 > AnvaiOps `ADR-0018` (consumer). This package is the **TD-CG1** scaffold.
 
 ## Why

@@ -32,7 +32,7 @@ classifiers = [
     "Topic :: Software Development :: Libraries",
 ]
 
-# Thin + neutral by design (ADR-014 / ProximaDB ADR-028). The base install is
+# Thin + neutral by design (ADR-014 / ProximaDB ADR-029). The base install is
 # ZERO-dependency: the Python path uses the stdlib `ast` and needs no native grammars,
 # so `pip install -e .` works fully offline. Opt-in extras add multi-language grammars
 # (`treesitter`) and the contracts Protocol boundary (`contracts`). victor-contracts
@@ -65,3 +65,10 @@ include = ["victor_codegraph*"]
 [tool.ruff]
 line-length = 100
 target-version = "py310"
+
+# Self-contained pytest config so running `pytest` from this package directory uses
+# THIS file as the rootdir/inifile and does NOT inherit the victor monorepo root's
+# `addopts = --cov=victor` (pytest-cov isn't a dep here -> "unrecognized arguments").
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ""

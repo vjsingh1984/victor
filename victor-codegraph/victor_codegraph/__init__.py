@@ -1,7 +1,7 @@
 """victor-codegraph — shared code->CPG chunker.
 
 One tree-sitter symbol+relation chunker, three consumers (Victor, ProximaDB SDK,
-AnvaiOps). See ProximaDB ADR-028 / Victor ADR-014.
+AnvaiOps). See ProximaDB ADR-029 / Victor ADR-014.
 
     from victor_codegraph import chunk, parse, to_proxima_records, ChunkConfig
 
