@@ -627,7 +627,86 @@ def validate_stage_contract(
 # They are exported from the SDK's protocols/__init__.py.
 
 
+# =============================================================================
+# Tree-sitter Analysis Protocol
+# (promoted from victor.framework.vertical_protocols)
+# =============================================================================
+
+
+@runtime_checkable
+class TreeSitterAnalysisProtocol(Protocol):
+    """Protocol for plugin-backed tree-sitter code analysis.
+
+    Analysis-level (not parser-level) so root framework code can ask vertical
+    packages for symbols, relationships, imports, and chunking context without
+    importing language-specific internals. Implementations return JSON-like
+    dictionaries for cross-package stability.
+    """
+
+    def supports_language(self, language: str) -> bool:
+        """Return whether enhanced tree-sitter analysis supports a language."""
+        ...
+
+    def parse(
+        self,
+        content: bytes,
+        language: str,
+        *,
+        file_path: Optional[str] = None,
+    ) -> Any:
+        """Parse source content and return an implementation-specific result.
+
+        Returns None when parsing is unavailable or unsupported.
+        """
+        ...
+
+    def extract_symbols(
+        self,
+        content: bytes,
+        language: str,
+        *,
+        file_path: str,
+    ) -> List[Dict[str, Any]]:
+        """Extract symbol dictionaries from source content."""
+        ...
+
+    def extract_edges(
+        self,
+        content: bytes,
+        language: str,
+        *,
+        file_path: str,
+    ) -> List[Dict[str, Any]]:
+        """Extract relationship edge dictionaries from source content."""
+        ...
+
+    def extract_imports(
+        self,
+        content: bytes,
+        language: str,
+        *,
+        file_path: Optional[str] = None,
+    ) -> List[str]:
+        """Extract import/module reference strings from source content."""
+        ...
+
+    def build_chunk_context(
+        self,
+        content: str,
+        language: str,
+        *,
+        file_path: Optional[str] = None,
+    ) -> Any:
+        """Build an implementation-specific AST chunking context.
+
+        Returns None when no structural chunking context is available.
+        """
+        ...
+
+
 __all__ = [
+    # Tree-sitter analysis
+    "TreeSitterAnalysisProtocol",
     # Tool Selection
     "ToolSelectionContext",
     "ToolSelectionResult",
