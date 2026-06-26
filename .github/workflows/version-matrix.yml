@@ -51,7 +51,8 @@ jobs:
 
       - name: Install vertical
         run: |
-          pip install git+https://github.com/vjsingh1984/${{ matrix.vertical }}.git@main
+          # Verticals' standalone repos are archived; they now live in this monorepo.
+          pip install -e ./verticals/${{ matrix.vertical }}
 
       - name: Run vertical import test
         run: |
