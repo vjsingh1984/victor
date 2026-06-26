@@ -32,18 +32,20 @@ classifiers = [
     "Topic :: Software Development :: Libraries",
 ]
 
-# Thin + neutral by design (ADR-014 / ProximaDB ADR-028). The Python path uses the
-# stdlib `ast` and needs no native grammars; victor-contracts is the boundary dep so
-# the package can expose its parser as a contracts Protocol without coupling to the
-# framework. Multi-language (tree-sitter) is an opt-in extra to keep the base install light.
-dependencies = [
-    "victor-contracts>=0.7.0,<1.0",
-]
+# Thin + neutral by design (ADR-014 / ProximaDB ADR-028). The base install is
+# ZERO-dependency: the Python path uses the stdlib `ast` and needs no native grammars,
+# so `pip install -e .` works fully offline. Opt-in extras add multi-language grammars
+# (`treesitter`) and the contracts Protocol boundary (`contracts`). victor-contracts
+# becomes a hard dep once the parser is exposed as a contracts Protocol (ADR-014).
+dependencies = []
 
 [project.optional-dependencies]
 treesitter = [
     "tree-sitter>=0.23",
     "tree-sitter-language-pack>=1.0",
+]
+contracts = [
+    "victor-contracts>=0.7.0,<1.0",
 ]
 dev = [
     "pytest>=8.0",

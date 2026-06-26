@@ -23,10 +23,29 @@ gaps:
 
 ## Install
 
+Not yet published to PyPI — use an **editable install** from the monorepo for now. Consumers
+(Victor, the ProximaDB SDK, AnvaiOps) reference it editable until the first `victor-codegraph-v*`
+release is cut.
+
 ```bash
-pip install victor-codegraph              # Python (stdlib ast) path, zero native deps
-pip install "victor-codegraph[treesitter]"  # + multi-language via tree-sitter grammars
+# dev: editable, with tree-sitter grammars + test tooling
+make -C victor-codegraph dev          # = pip install -e ../victor-contracts && pip install -e ".[dev]"
+
+# minimal: Python-only (stdlib ast) path, zero native deps
+pip install -e ./victor-codegraph
+
+# once published:
+#   pip install victor-codegraph                 # Python path
+#   pip install "victor-codegraph[treesitter]"   # + multi-language grammars
 ```
+
+### Releasing
+
+CI: `.github/workflows/ci-codegraph.yml` runs the suite (editable install, grammars on) for every
+PR touching `victor-codegraph/**`. Publishing: push a tag `victor-codegraph-v0.1.0` to trigger
+`.github/workflows/release-codegraph.yml`, which builds and publishes via **PyPI Trusted Publishing**
+(OIDC — no API token). Configure the publisher once on PyPI (owner `vjsingh1984`, repo `victor`,
+workflow `release-codegraph.yml`, environments `pypi` / `testpypi`); see the header of that workflow.
 
 ## Use
 
