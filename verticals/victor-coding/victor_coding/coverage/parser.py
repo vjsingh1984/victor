@@ -20,8 +20,10 @@ different coverage formats.
 
 import json
 import logging
-import xml.etree.ElementTree as ET
+import xml.etree.ElementTree as ET  # noqa: S405 -- ET.Element used only as a type; parsing goes through defusedxml
 from abc import ABC, abstractmethod
+
+from defusedxml.ElementTree import parse as _safe_xml_parse
 from pathlib import Path
 from typing import Optional, Protocol, runtime_checkable
 
@@ -117,7 +119,7 @@ class CoberturaParser(BaseCoverageParser):
         report = CoverageReport()
 
         try:
-            tree = ET.parse(file_path)
+            tree = _safe_xml_parse(file_path)
             root = tree.getroot()
 
             # Parse packages/classes
@@ -478,7 +480,7 @@ class CloverParser(BaseCoverageParser):
         report = CoverageReport()
 
         try:
-            tree = ET.parse(file_path)
+            tree = _safe_xml_parse(file_path)
             root = tree.getroot()
 
             for file_elem in root.findall(".//file"):

@@ -38,6 +38,7 @@ dependencies = [
     "victor-contracts[yaml]>=0.6.0,<1.0",  # Definition-layer contract for external verticals
     "numpy>=1.24,<2.3",  # Required by victor.storage.embeddings; numba-compatible
     "victor-codegraph[treesitter]>=0.1.0",  # Shared code->CPG chunker (ADR-014); [treesitter] supplies the grammars the delegation parses JS/Go/TS/Rust with
+    "defusedxml>=0.7,<1.0",  # XXE-hardened XML parsing for coverage reports
 ]
 
 [project.optional-dependencies]
