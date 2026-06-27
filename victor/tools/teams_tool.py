@@ -20,10 +20,15 @@ This tool provides:
 3. Listing teams and channels
 4. Creating channels
 
-Requires Microsoft Graph API credentials:
-- TEAMS_CLIENT_ID: Azure AD application client ID
-- TEAMS_CLIENT_SECRET: Azure AD application client secret
-- TEAMS_TENANT_ID: Azure AD tenant ID
+Authentication (app-only, Entra/Azure AD client-credentials) — the tool mints
+its own Microsoft Graph token from these environment variables:
+- AZURE_CLIENT_ID     (alias: TEAMS_CLIENT_ID)     — Entra app client ID
+- AZURE_CLIENT_SECRET (alias: TEAMS_CLIENT_SECRET)  — Entra app client secret
+- AZURE_TENANT_ID     (alias: TEAMS_TENANT_ID)      — Entra tenant (directory) ID
+
+Alternatively, a pre-acquired Graph token may be supplied out-of-band as
+``context["teams_access_token"]`` (e.g. from a delegated/SSO flow). Token
+acquisition is delegated to ``victor.core.identity`` (a TokenCredential).
 
 Setup:
 1. Register an app in Azure AD (https://portal.azure.com)
@@ -70,17 +75,48 @@ def _get_teams_access_token(context: Optional[Dict[str, Any]] = None) -> Optiona
 
 
 def is_teams_configured(context: Optional[Dict[str, Any]] = None) -> bool:
-    """Check if Teams client is configured and has valid token."""
-    return _get_teams_access_token(context) is not None
+    """True when Teams is usable: a context token, or Entra creds in the env.
+
+    Used as the tool's availability check (must stay synchronous), so it only
+    confirms credentials are *present* — the token itself is minted lazily at
+    call time by :func:`_resolve_access_token`.
+    """
+    if _get_teams_access_token(context):
+        return True
+    import os
+
+    tenant = os.getenv("AZURE_TENANT_ID") or os.getenv("TEAMS_TENANT_ID")
+    client = os.getenv("AZURE_CLIENT_ID") or os.getenv("TEAMS_CLIENT_ID")
+    secret = os.getenv("AZURE_CLIENT_SECRET") or os.getenv("TEAMS_CLIENT_SECRET")
+    return bool(tenant and client and secret)
 
 
-def _get_headers(context: Optional[Dict[str, Any]] = None) -> Dict[str, str]:
-    """Get headers for Graph API requests."""
-    access_token = _get_teams_access_token(context) or ""
+def _get_headers(access_token: str) -> Dict[str, str]:
+    """Build Graph API request headers for a bearer ``access_token``."""
     return {
         "Authorization": f"Bearer {access_token}",
         "Content-Type": "application/json",
     }
+
+
+async def _resolve_access_token(context: Optional[Dict[str, Any]] = None) -> Optional[str]:
+    """Resolve a Microsoft Graph token.
+
+    Prefers a token supplied out-of-band via ``context["teams_access_token"]``;
+    otherwise mints one via the Entra client-credentials
+    :class:`~victor.core.identity.TokenCredential` built from the environment.
+    Returns ``None`` when neither is available.
+    """
+    token = _get_teams_access_token(context)
+    if token:
+        return token
+
+    from victor.core.identity import GRAPH_DEFAULT_SCOPE, graph_credential_from_env
+
+    credential = graph_credential_from_env()
+    if credential is None:
+        return None
+    return (await credential.get_token(GRAPH_DEFAULT_SCOPE)).token
 
 
 @tool(
@@ -142,28 +178,37 @@ async def teams(
             "error": "httpx not installed. Install with: pip install httpx",
         }
 
-    if not _get_teams_access_token(context):
+    access_token = await _resolve_access_token(context)
+    if not access_token:
         return {
             "success": False,
-            "error": "Teams not configured. Provide teams_access_token in context.",
+            "error": (
+                "Teams not configured. Supply a token via context['teams_access_token'], "
+                "or set AZURE_TENANT_ID / AZURE_CLIENT_ID / AZURE_CLIENT_SECRET "
+                "(TEAMS_* aliases accepted)."
+            ),
         }
+
+    headers = _get_headers(access_token)
 
     try:
         async with httpx.AsyncClient() as client:
             if operation == "send_message":
-                return await _send_message(client, team_id, channel_id, text)
+                return await _send_message(client, headers, team_id, channel_id, text)
 
             elif operation == "search_messages":
-                return await _search_messages(client, query)
+                return await _search_messages(client, headers, query)
 
             elif operation == "list_teams":
-                return await _list_teams(client)
+                return await _list_teams(client, headers)
 
             elif operation == "list_channels":
-                return await _list_channels(client, team_id)
+                return await _list_channels(client, headers, team_id)
 
             elif operation == "create_channel":
-                return await _create_channel(client, team_id, channel_name, channel_description)
+                return await _create_channel(
+                    client, headers, team_id, channel_name, channel_description
+                )
 
             else:
                 return {
@@ -183,6 +228,7 @@ async def teams(
 
 async def _send_message(
     client: "httpx.AsyncClient",
+    headers: Dict[str, str],
     team_id: Optional[str],
     channel_id: Optional[str],
     text: Optional[str],
@@ -199,7 +245,7 @@ async def _send_message(
     url = f"{_GRAPH_API_BASE}/teams/{team_id}/channels/{channel_id}/messages"
     response = await client.post(
         url,
-        headers=_get_headers(),
+        headers=headers,
         json={
             "body": {
                 "content": text,
@@ -219,6 +265,7 @@ async def _send_message(
 
 async def _search_messages(
     client: "httpx.AsyncClient",
+    headers: Dict[str, str],
     query: Optional[str],
 ) -> Dict[str, Any]:
     """Search for messages across Teams."""
@@ -231,7 +278,7 @@ async def _search_messages(
     url = f"{_GRAPH_API_BASE}/search/query"
     response = await client.post(
         url,
-        headers=_get_headers(),
+        headers=headers,
         json={
             "requests": [
                 {
@@ -268,12 +315,15 @@ async def _search_messages(
     return {"success": True, "results": results, "count": len(results)}
 
 
-async def _list_teams(client: "httpx.AsyncClient") -> Dict[str, Any]:
+async def _list_teams(
+    client: "httpx.AsyncClient",
+    headers: Dict[str, str],
+) -> Dict[str, Any]:
     """List all teams the app has access to."""
     logger.info("[teams] Listing teams")
 
     url = f"{_GRAPH_API_BASE}/groups?$filter=resourceProvisioningOptions/Any(x:x eq 'Team')"
-    response = await client.get(url, headers=_get_headers())
+    response = await client.get(url, headers=headers)
     response.raise_for_status()
     data = response.json()
 
@@ -293,6 +343,7 @@ async def _list_teams(client: "httpx.AsyncClient") -> Dict[str, Any]:
 
 async def _list_channels(
     client: "httpx.AsyncClient",
+    headers: Dict[str, str],
     team_id: Optional[str],
 ) -> Dict[str, Any]:
     """List channels in a team."""
@@ -302,7 +353,7 @@ async def _list_channels(
     logger.info(f"[teams] Listing channels for team '{team_id}'")
 
     url = f"{_GRAPH_API_BASE}/teams/{team_id}/channels"
-    response = await client.get(url, headers=_get_headers())
+    response = await client.get(url, headers=headers)
     response.raise_for_status()
     data = response.json()
 
@@ -322,6 +373,7 @@ async def _list_channels(
 
 async def _create_channel(
     client: "httpx.AsyncClient",
+    headers: Dict[str, str],
     team_id: Optional[str],
     channel_name: Optional[str],
     channel_description: Optional[str],
@@ -338,7 +390,7 @@ async def _create_channel(
     url = f"{_GRAPH_API_BASE}/teams/{team_id}/channels"
     response = await client.post(
         url,
-        headers=_get_headers(),
+        headers=headers,
         json={
             "displayName": channel_name,
             "description": channel_description or "",

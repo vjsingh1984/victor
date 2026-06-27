@@ -1,9 +1,10 @@
 """Unit tests for the Microsoft Teams HITL transport.
 
-Covers the Entra (Azure AD) client-credentials delivery path, the legacy
-incoming-webhook fallback, token caching, and the unconfigured error. A fake
-``aiohttp`` module is injected so the tests never touch the network and do not
-require aiohttp to be installed.
+Token acquisition is injected as a ``TokenCredential`` (Dependency Inversion),
+so these tests inject a fake credential rather than mocking the Entra token HTTP
+(the token flow itself is covered in tests/unit/core/identity). A fake
+``aiohttp`` module is injected for the Graph/webhook POST so the tests never
+touch the network and don't require aiohttp to be installed.
 """
 
 from __future__ import annotations
@@ -15,6 +16,7 @@ from typing import Any, Dict, List
 
 import pytest
 
+from victor.core.identity import AccessToken
 from victor.workflows.hitl import HITLNodeType, HITLRequest
 
 
@@ -34,7 +36,7 @@ class _FakeResponse:
 
 
 class _FakeSession:
-    """Records every POST and returns canned token / Graph / webhook responses."""
+    """Records every POST and returns canned Graph / webhook responses."""
 
     def __init__(self) -> None:
         self.calls: List[Dict[str, Any]] = []
@@ -50,11 +52,23 @@ class _FakeSession:
 
     def post(self, url, data=None, json=None, headers=None):  # noqa: A002 - mirror aiohttp API
         self.calls.append({"url": url, "data": data, "json": json, "headers": headers})
-        if "oauth2/v2.0/token" in url:
-            return _FakeResponse(200, {"access_token": "FAKE_TOKEN", "expires_in": 3600})
         if "graph.microsoft.com" in url:
             return _FakeResponse(201, {"id": "graph-msg-123"})
-        return _FakeResponse(200, {})
+        return _FakeResponse(200, {})  # webhook
+
+
+class _FakeCredential:
+    """A TokenCredential that hands back a fixed token and records the scope."""
+
+    def __init__(self, token: str = "FAKE_TOKEN") -> None:
+        self.token = token
+        self.calls = 0
+        self.scopes: tuple = ()
+
+    async def get_token(self, *scopes: str) -> AccessToken:
+        self.calls += 1
+        self.scopes = scopes
+        return AccessToken(token=self.token, expires_on=2_000_000_000.0)
 
 
 @pytest.fixture()
@@ -78,60 +92,46 @@ def request_obj() -> HITLRequest:
     )
 
 
-async def test_graph_path_uses_client_credentials_then_bearer(fake_aiohttp, request_obj):
+async def test_graph_path_uses_injected_credential_token(fake_aiohttp, request_obj):
     from victor.workflows.hitl_transports import TeamsConfig, TeamsTransport
 
-    cfg = TeamsConfig(
-        tenant_id="tenantA",
-        client_id="C",
-        client_secret="S",
-        team_id="team1",
-        channel_id="chan1",
-        callback_url="https://cb.example",
-    )
-    transport = TeamsTransport(cfg)
+    cred = _FakeCredential("INJECTED_TOKEN")
+    cfg = TeamsConfig(team_id="team1", channel_id="chan1", callback_url="https://cb.example")
+    transport = TeamsTransport(cfg, credential=cred)
 
     ref = await transport.send(request_obj, "wf-1")
 
-    token_call = next(c for c in fake_aiohttp.calls if "oauth2" in c["url"])
     graph_call = next(c for c in fake_aiohttp.calls if "graph.microsoft" in c["url"])
-
-    # tenant_id only scopes the token URL; the secret is what authenticates.
-    assert "tenantA/oauth2/v2.0/token" in token_call["url"]
-    assert token_call["data"]["grant_type"] == "client_credentials"
-    assert token_call["data"]["client_secret"] == "S"
-    assert token_call["data"]["scope"] == "https://graph.microsoft.com/.default"
-    # Graph call carries the bearer token, never the tenant_id as a credential.
-    assert graph_call["headers"]["Authorization"] == "Bearer FAKE_TOKEN"
+    # The token came from the injected credential, scoped to Graph.
+    assert cred.calls == 1
+    assert cred.scopes == ("https://graph.microsoft.com/.default",)
+    assert graph_call["headers"]["Authorization"] == "Bearer INJECTED_TOKEN"
     assert "teams/team1/channels/chan1/messages" in graph_call["url"]
-    # An adaptive card is attached.
     attachment = graph_call["json"]["attachments"][0]
     assert attachment["contentType"] == "application/vnd.microsoft.card.adaptive"
     assert json.loads(attachment["content"])["type"] == "AdaptiveCard"
     assert ref == "graph-msg-123"
 
 
-async def test_token_is_cached_across_sends(fake_aiohttp, request_obj):
+async def test_credential_built_from_config_when_not_injected(fake_aiohttp, request_obj):
     from victor.workflows.hitl_transports import TeamsConfig, TeamsTransport
 
-    transport = TeamsTransport(
-        TeamsConfig(tenant_id="T", client_id="C", client_secret="S", team_id="t", channel_id="c")
+    # No credential injected, but Entra config present -> one is built lazily.
+    cfg = TeamsConfig(
+        tenant_id="T", client_id="C", client_secret="S", team_id="t", channel_id="c"
     )
-    await transport.send(request_obj, "wf")
-    await transport.send(request_obj, "wf")
-
-    token_calls = [c for c in fake_aiohttp.calls if "oauth2" in c["url"]]
-    assert len(token_calls) == 1  # second send reuses the cached token
+    transport = TeamsTransport(cfg)
+    assert transport._resolve_credential() is not None  # built from config
+    assert transport._can_use_graph() is True
 
 
-async def test_webhook_fallback_does_not_authenticate(fake_aiohttp, request_obj):
+async def test_webhook_fallback_when_no_credential(fake_aiohttp, request_obj):
     from victor.workflows.hitl_transports import TeamsConfig, TeamsTransport
 
     transport = TeamsTransport(TeamsConfig(webhook_url="https://wh.example/x"))
     ref = await transport.send(request_obj, "wf-2")
 
     assert fake_aiohttp.calls[0]["url"] == "https://wh.example/x"
-    assert "oauth2" not in json.dumps(fake_aiohttp.calls)  # no token acquisition
     assert ref == request_obj.request_id
 
 
@@ -144,13 +144,7 @@ async def test_unconfigured_raises(fake_aiohttp, request_obj):
 
 def test_teams_transport_is_registered():
     from victor.workflows.hitl import HITLMode
-    from victor.workflows.hitl_transports import TeamsTransport, get_transport
+    from victor.workflows.hitl_transports import TeamsConfig, TeamsTransport, get_transport
 
-    transport = get_transport(HITLMode.TEAMS, TeamsConfig_none())
+    transport = get_transport(HITLMode.TEAMS, TeamsConfig())
     assert isinstance(transport, TeamsTransport)
-
-
-def TeamsConfig_none():
-    from victor.workflows.hitl_transports import TeamsConfig
-
-    return TeamsConfig()

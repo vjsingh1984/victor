@@ -55,10 +55,10 @@ import html
 import json
 import logging
 import os
-import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import (
+    TYPE_CHECKING,
     Any,
     Callable,
     Dict,
@@ -75,6 +75,9 @@ from victor.workflows.hitl import (
     HITLResponse,
     HITLStatus,
 )
+
+if TYPE_CHECKING:
+    from victor.core.identity import TokenCredential
 
 logger = logging.getLogger(__name__)
 
@@ -689,10 +692,9 @@ class SlackTransport(BaseTransport):
         return blocks
 
 
-# Microsoft Graph base for authenticated Teams delivery.
+# Microsoft Graph base for authenticated Teams delivery. Token acquisition lives
+# in victor.core.identity (a TokenCredential), injected into this transport.
 _GRAPH_API_BASE = "https://graph.microsoft.com/v1.0"
-# Entra v2 token endpoint template (tenant_id only scopes the request).
-_ENTRA_TOKEN_URL = "https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token"
 
 
 class TeamsTransport(BaseTransport):
@@ -705,74 +707,53 @@ class TeamsTransport(BaseTransport):
     ``tenant_id`` is only the directory scope in the token URL — it is not a
     credential and is never sent as one.
 
-    If Entra credentials (and a Graph target ``team_id``/``channel_id``) are not
-    configured, the transport falls back to a legacy Teams *incoming webhook*,
-    which is only a secret URL (no Entra authentication) and is logged as such.
+    Token acquisition is delegated to an injected
+    :class:`~victor.core.identity.TokenCredential` (Dependency Inversion). When
+    none is supplied, one is built lazily from the config's Entra
+    client-credentials. If neither a credential nor a Graph target
+    (``team_id``/``channel_id``) is available, the transport falls back to a
+    legacy Teams *incoming webhook* — a secret URL (no Entra auth), logged as such.
     """
 
-    def __init__(self, config: TeamsConfig):
+    def __init__(
+        self,
+        config: TeamsConfig,
+        credential: Optional["TokenCredential"] = None,
+    ):
         super().__init__(config)
         self.teams_config = config
         self._message_ids: Dict[str, str] = {}  # request_id -> Graph message id
-        self._token: Optional[str] = None
-        self._token_expires_at: float = 0.0  # monotonic seconds
+        # Injected token source (DIP); built lazily from config when not provided.
+        self._credential = credential
 
     @property
     def mode(self) -> HITLMode:
         return HITLMode.TEAMS
 
+    def _resolve_credential(self) -> Optional["TokenCredential"]:
+        """Return the injected credential, or build one from config (cached).
+
+        Returns None when neither an explicit credential nor Entra
+        client-credentials config is available, so the caller can fall back to
+        the webhook path.
+        """
+        if self._credential is not None:
+            return self._credential
+        cfg = self.teams_config
+        if cfg.tenant_id and cfg.client_id and cfg.client_secret:
+            from victor.core.identity import build_entra_credential
+
+            self._credential = build_entra_credential(
+                tenant_id=cfg.tenant_id,
+                client_id=cfg.client_id,
+                client_secret=cfg.client_secret,
+            )
+        return self._credential
+
     def _can_use_graph(self) -> bool:
-        """True when Entra client-credentials + a Graph target are configured."""
+        """True when a token credential AND a Graph target are available."""
         cfg = self.teams_config
-        return bool(
-            cfg.tenant_id
-            and cfg.client_id
-            and cfg.client_secret
-            and cfg.team_id
-            and cfg.channel_id
-        )
-
-    async def _get_access_token(self) -> str:
-        """Acquire (and cache) a Graph token via Entra client-credentials."""
-        now = time.monotonic()
-        if self._token and now < self._token_expires_at:
-            return self._token
-
-        cfg = self.teams_config
-        missing = [
-            name
-            for name, value in (
-                ("AZURE_TENANT_ID", cfg.tenant_id),
-                ("AZURE_CLIENT_ID", cfg.client_id),
-                ("AZURE_CLIENT_SECRET", cfg.client_secret),
-            )
-            if not value
-        ]
-        if missing:
-            raise ValueError(
-                "Teams Entra auth not configured; missing: " + ", ".join(missing)
-            )
-
-        import aiohttp
-
-        token_url = _ENTRA_TOKEN_URL.format(tenant_id=cfg.tenant_id)
-        form = {
-            "grant_type": "client_credentials",
-            "client_id": cfg.client_id,
-            "client_secret": cfg.client_secret,
-            "scope": "https://graph.microsoft.com/.default",
-        }
-        async with aiohttp.ClientSession() as session:
-            async with session.post(token_url, data=form) as resp:
-                payload = await resp.json()
-                if resp.status != 200 or "access_token" not in payload:
-                    detail = payload.get("error_description") or payload.get("error") or payload
-                    raise RuntimeError(f"Entra token request failed ({resp.status}): {detail}")
-                self._token = str(payload["access_token"])
-                # Refresh 60s before the real expiry to avoid edge-of-expiry 401s.
-                expires_in = int(payload.get("expires_in", 3600))
-                self._token_expires_at = now + max(0, expires_in - 60)
-                return self._token
+        return bool(self._resolve_credential() and cfg.team_id and cfg.channel_id)
 
     async def send(self, request: HITLRequest, workflow_id: str) -> str:
         """Send a Teams approval card; returns the external message reference."""
@@ -782,9 +763,13 @@ class TeamsTransport(BaseTransport):
         urls = self._build_callback_urls(request.request_id)
         card = self._build_adaptive_card(request, workflow_id, urls)
 
-        # Preferred path: authenticated Microsoft Graph (Entra client-credentials).
-        if self._can_use_graph():
-            token = await self._get_access_token()
+        # Preferred path: authenticated Microsoft Graph. The token comes from the
+        # injected/derived TokenCredential — this transport never mints it itself.
+        credential = self._resolve_credential()
+        if credential is not None and cfg.team_id and cfg.channel_id:
+            from victor.core.identity import GRAPH_DEFAULT_SCOPE
+
+            token = (await credential.get_token(GRAPH_DEFAULT_SCOPE)).token
             url = f"{_GRAPH_API_BASE}/teams/{cfg.team_id}/channels/{cfg.channel_id}/messages"
             body = {
                 "body": {
