@@ -55,7 +55,6 @@ import html
 import json
 import logging
 import os
-import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import (
@@ -720,6 +719,9 @@ class SlackTransport(BaseTransport):
 # Microsoft Graph base for authenticated Teams delivery. Token acquisition lives
 # in victor.core.identity (a TokenCredential), injected into this transport.
 _GRAPH_API_BASE = "https://graph.microsoft.com/v1.0"
+=======
+
+>>>>>>> b09eb5ddf (feat(identity): provider-agnostic TokenCredential layer; inject into Teams auth)
 
 class TeamsTransport(BaseTransport):
     """Microsoft Teams HITL transport.
@@ -749,7 +751,7 @@ class TeamsTransport(BaseTransport):
         self._message_ids: Dict[str, str] = {}  # request_id -> Graph message id
         # Injected token source (DIP); built lazily from config when not provided.
         self._credential = credential
-    @property
+<<<<<<< HEAD    @property
     def mode(self) -> HITLMode:
         return HITLMode.TEAMS
 
@@ -777,6 +779,9 @@ class TeamsTransport(BaseTransport):
         """True when a token credential AND a Graph target are available."""
         cfg = self.teams_config
         return bool(self._resolve_credential() and cfg.team_id and cfg.channel_id)
+=======
+
+>>>>>>> b09eb5ddf (feat(identity): provider-agnostic TokenCredential layer; inject into Teams auth)
     async def send(self, request: HITLRequest, workflow_id: str) -> str:
         """Send a Teams approval card; returns the external message reference."""
         import aiohttp
@@ -791,8 +796,8 @@ class TeamsTransport(BaseTransport):
         if credential is not None and cfg.team_id and cfg.channel_id:
             from victor.core.identity import GRAPH_DEFAULT_SCOPE
 
-            token = (await credential.get_token(GRAPH_DEFAULT_SCOPE)).token            url = f"{_GRAPH_API_BASE}/teams/{cfg.team_id}/channels/{cfg.channel_id}/messages"
-            body = {
+<<<<<<< HEAD
+            token = (await credential.get_token(GRAPH_DEFAULT_SCOPE)).token            url = f"{_GRAPH_API_BASE}/teams/{cfg.team_id}/channels/{cfg.channel_id}/messages"            body = {
                 "body": {
                     "contentType": "html",
                     "content": '<attachment id="approval-card"></attachment>',
