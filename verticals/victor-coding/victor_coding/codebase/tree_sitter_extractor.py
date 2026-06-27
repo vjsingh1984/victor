@@ -35,6 +35,26 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# ADR-014 step 2 (parse-layer de-duplication): source symbol extraction from the shared,
+# neutral ``victor-codegraph`` package — the genuinely-duplicated tree-sitter parsing —
+# rather than re-implementing it here. Victor-coding keeps its own hierarchical embedding
+# chunker (CodeChunker); only the underlying symbol *extraction* is delegated. Soft import
+# so the extractor works without the package (editable-only until published:
+# ``pip install -e ../../victor-codegraph``); default ON when available, disable with
+# ``VICTOR_CODING_USE_CODEGRAPH=0``.
+try:  # pragma: no cover - availability depends on the optional package
+    import victor_codegraph as _victor_codegraph
+except Exception:
+    _victor_codegraph = None
+
+
+def _codegraph_enabled() -> bool:
+    import os
+
+    return _victor_codegraph is not None and os.getenv(
+        "VICTOR_CODING_USE_CODEGRAPH", "1"
+    ).strip().lower() not in ("0", "false", "no", "off")
+
 
 @dataclass
 class ExtractedSymbol:
@@ -137,6 +157,36 @@ class TreeSitterExtractor:
         """
         return self.registry.detect_language(file_path)
 
+    def _extract_symbols_via_codegraph(
+        self, file_path: Path, language: str
+    ) -> Optional[List[ExtractedSymbol]]:
+        """Delegate symbol extraction to victor-codegraph (ADR-014, parse layer).
+
+        Returns ``None`` on failure or empty result so the caller falls back to the
+        registry/tree-sitter path. Maps ``CodeSymbol`` -> ``ExtractedSymbol``.
+        """
+        try:
+            content = Path(file_path).read_text(encoding="utf-8", errors="ignore")
+            parsed = _victor_codegraph.parse(
+                content, language=language, file_path=str(file_path)
+            )
+        except Exception as e:  # noqa: BLE001 - fall back on any delegation failure
+            logger.debug(f"victor-codegraph symbol delegation failed for {file_path}: {e}")
+            return None
+        if not parsed.symbols:
+            return None
+        return [
+            ExtractedSymbol(
+                name=s.simple_name,
+                type=s.symbol_type.name.lower(),
+                file_path=str(file_path),
+                line_number=s.location.start_line,
+                end_line=s.location.end_line or None,
+                parent_symbol=s.scope_chain[-1] if s.scope_chain else None,
+            )
+            for s in parsed.symbols
+        ]
+
     def extract_symbols(
         self, file_path: Path, language: Optional[str] = None
     ) -> List[ExtractedSymbol]:
@@ -153,6 +203,12 @@ class TreeSitterExtractor:
             language = self.detect_language(file_path)
             if language is None:
                 return []
+
+        # ADR-014: prefer the shared parser for symbol extraction when available.
+        if _codegraph_enabled():
+            delegated = self._extract_symbols_via_codegraph(file_path, language)
+            if delegated is not None:
+                return delegated
 
         try:
             plugin = self.registry.get(language)
