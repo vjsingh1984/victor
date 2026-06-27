@@ -13,6 +13,23 @@ from dataclasses import dataclass, field
 from enum import IntEnum
 from typing import Any
 
+# ─────────────────────────────────────────────────────────────────────────────
+# CANONICAL LINE-NUMBER CONTRACT
+#
+# Every line number this package emits (``SourceLocation.start_line`` / ``end_line``,
+# ``CodeChunk.metadata['start_line']``/``['end_line']``, the ``call_site`` line on a
+# ``CodeRelation``) is **1-based** — line 1 is the first line of the file. This matches
+# editors (Monaco/VS Code), pgwire, and how humans reference code.
+#
+# victor-codegraph is the SHARED parser across Victor, the ProximaDB SDK, and AnvaiOps,
+# so this convention is the cross-surface contract: a symbol's ``(file, name, line)``
+# coordinate must be identical in every consumer for the correlated code-graph to
+# reconcile. Consumers MUST pass these line numbers through unchanged — do NOT convert
+# to 0-based (a `- 1` shift) for an internal/tree-sitter-compat convention; that breaks
+# cross-surface reconciliation. Byte offsets (``byte_offset``/``start_pos``) are 0-based.
+LINE_BASE = 1
+# ─────────────────────────────────────────────────────────────────────────────
+
 
 class CodeSymbolType(IntEnum):
     """Kinds of code symbol that can be extracted (superset across languages)."""
@@ -62,7 +79,13 @@ class CodeRelationType(IntEnum):
 
 @dataclass
 class SourceLocation:
-    """Where a symbol lives in source. Lines are 1-based; bytes are 0-based."""
+    """Where a symbol lives in source.
+
+    Lines (``start_line``/``end_line``) are **1-based** (see ``LINE_BASE`` and the
+    canonical line-number contract at the top of this module); byte offsets
+    (``byte_offset``/``byte_length``) are 0-based. Pass line numbers through
+    unchanged — do not convert to 0-based.
+    """
 
     file_path: str
     start_line: int = 0
