@@ -44,6 +44,13 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# TD-CG / ADR-014: shared code->CPG chunker. Soft import so the legacy in-repo
+# tree-sitter path stays the fallback when the package is absent.
+try:
+    import victor_codegraph as _victor_codegraph
+except Exception:  # ImportError, or a partial/native load failure
+    _victor_codegraph = None
+
 
 class ASTAwareChunker:
     """Chunks code at AST boundaries for better embeddings.
@@ -116,6 +123,18 @@ class ASTAwareChunker:
                 # Fallback to simple line-based chunking
                 return self._chunk_by_lines(file_path)
 
+        # TD-CG / ADR-014: when the shared victor_codegraph chunker is installed it
+        # is the source of truth for tree-sitter code chunking (size-capping + a
+        # real JS/TS parser). Any failure falls through to the legacy path below.
+        if _victor_codegraph is not None:
+            try:
+                return self._chunk_via_victor_codegraph(file_path, language)
+            except Exception as e:
+                logger.debug(
+                    f"victor_codegraph delegation failed for {file_path}: "
+                    f"{e}; using legacy tree-sitter path"
+                )
+
         parser = self._get_parser(language)
         if parser is None:
             return self._chunk_by_lines(file_path)
@@ -127,6 +146,43 @@ class ASTAwareChunker:
         except Exception as e:
             logger.debug(f"Failed to parse {file_path} for chunking: {e}")
             return self._chunk_by_lines(file_path)
+
+    def _chunk_via_victor_codegraph(self, file_path: Path, language: str) -> List[CodeChunk]:
+        """Delegate chunking to the shared ``victor_codegraph`` package (ADR-014).
+
+        Adapts each ``victor_codegraph.CodeChunk`` into this module's ``CodeChunk``
+        shape (used for embeddings). ``victor_codegraph`` already applies size-capping
+        and ships a real JS/TS parser; line range and symbol kind ride on each chunk's
+        metadata. Window chunks (no symbol) map to ``chunk_type="text"`` so the
+        existing line-fallback contract is preserved.
+        """
+        content = file_path.read_text(encoding="utf-8", errors="ignore")
+        cfg = _victor_codegraph.ChunkConfig(
+            max_chunk_tokens=max(1, int(self.max_chunk_size / 3.5)),
+            chunk_overlap_tokens=0,
+            include_private=True,
+        )
+        chunks: List[CodeChunk] = []
+        for vc in _victor_codegraph.chunk(
+            content, language=language, file_path=str(file_path), config=cfg
+        ):
+            meta = vc.metadata
+            start_line = int(meta.get("start_line") or 1)
+            end_line = int(meta.get("end_line") or start_line)
+            symbol_type = meta.get("symbol_type")
+            is_body_split = bool(meta.get("is_body_split"))
+            chunks.append(
+                CodeChunk(
+                    text=vc.text,
+                    start_line=start_line,
+                    end_line=max(end_line, start_line),
+                    chunk_type=symbol_type.lower() if symbol_type else "text",
+                    symbol_name=meta.get("simple_name"),
+                    parent_symbol=meta.get("simple_name") if is_body_split else None,
+                    file_path=str(file_path),
+                )
+            )
+        return chunks
 
     def _chunk_from_tree(
         self,
