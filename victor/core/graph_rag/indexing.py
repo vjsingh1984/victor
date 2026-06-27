@@ -2139,9 +2139,7 @@ class GraphIndexingPipeline:
                 for s in parsed.symbols:
                     name = s.simple_name
                     line = s.location.start_line
-                    node_id = hashlib.sha256(
-                        f"{file_path}:{name}:{line}".encode()
-                    ).hexdigest()[:16]
+                    node_id = hashlib.sha256(f"{file_path}:{name}:{line}".encode()).hexdigest()[:16]
                     stype = s.symbol_type.name.lower()
                     delegated.append(
                         GraphNode(
