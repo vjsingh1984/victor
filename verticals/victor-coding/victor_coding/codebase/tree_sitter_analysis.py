@@ -165,7 +165,9 @@ class TreeSitterAnalysisProvider:
         """Source symbols from victor-codegraph (ADR-015). Returns None on failure so the
         caller falls back to the tree-sitter path. Output matches the symbol-dict contract."""
         try:
-            src = content.decode("utf-8", errors="replace") if isinstance(content, bytes) else content
+            src = (
+                content.decode("utf-8", errors="replace") if isinstance(content, bytes) else content
+            )
             parsed = _victor_codegraph.parse(src, language=language, file_path=file_path)
         except Exception as e:  # noqa: BLE001 - fall back on any failure
             logger.debug("victor-codegraph symbol delegation failed for %s: %s", file_path, e)
