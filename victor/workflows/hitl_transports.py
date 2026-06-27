@@ -52,8 +52,10 @@ from __future__ import annotations
 
 import asyncio
 import html
+import json
 import logging
 import os
+import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import (
@@ -170,19 +172,28 @@ class SlackConfig(BaseTransportConfig):
 class TeamsConfig(BaseTransportConfig):
     """Configuration for Microsoft Teams approvals."""
 
+    # Entra (Azure AD) client-credentials — the authenticated delivery path.
+    # tenant_id is NOT a credential; it only scopes the token request. The
+    # client_id + client_secret are what authenticate the app.
+    tenant_id: Optional[str] = None  # Azure AD / Entra tenant (directory) ID
+    client_id: Optional[str] = None  # Entra app registration client ID
+    client_secret: Optional[str] = None  # Entra app client secret
+    # Microsoft Graph target for the approval message (required for Graph path).
+    team_id: Optional[str] = None  # Graph team (group) ID
+    channel_id: Optional[str] = None  # Graph channel ID
+    # Legacy incoming-webhook fallback (a secret URL, NOT Entra-authenticated).
     webhook_url: Optional[str] = None  # Incoming webhook URL
-    tenant_id: Optional[str] = None  # Azure AD tenant
-    client_id: Optional[str] = None  # Azure AD app client ID
-    client_secret: Optional[str] = None  # Azure AD app secret
 
     @classmethod
     def from_env(cls) -> "TeamsConfig":
         """Create config from environment variables."""
         return cls(
-            webhook_url=os.getenv("TEAMS_WEBHOOK_URL"),
             tenant_id=os.getenv("AZURE_TENANT_ID"),
             client_id=os.getenv("AZURE_CLIENT_ID"),
             client_secret=os.getenv("AZURE_CLIENT_SECRET"),
+            team_id=os.getenv("TEAMS_TEAM_ID"),
+            channel_id=os.getenv("TEAMS_CHANNEL_ID"),
+            webhook_url=os.getenv("TEAMS_WEBHOOK_URL"),
         )
 
 
@@ -678,6 +689,218 @@ class SlackTransport(BaseTransport):
         return blocks
 
 
+# Microsoft Graph base for authenticated Teams delivery.
+_GRAPH_API_BASE = "https://graph.microsoft.com/v1.0"
+# Entra v2 token endpoint template (tenant_id only scopes the request).
+_ENTRA_TOKEN_URL = "https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token"
+
+
+class TeamsTransport(BaseTransport):
+    """Microsoft Teams HITL transport.
+
+    Authenticated delivery uses the Entra (Azure AD) **client-credentials**
+    flow: ``client_id`` + ``client_secret`` are exchanged at the tenant's token
+    endpoint for a Microsoft Graph access token, which is then used as a Bearer
+    token to post an Adaptive Card approval message to a channel. The
+    ``tenant_id`` is only the directory scope in the token URL — it is not a
+    credential and is never sent as one.
+
+    If Entra credentials (and a Graph target ``team_id``/``channel_id``) are not
+    configured, the transport falls back to a legacy Teams *incoming webhook*,
+    which is only a secret URL (no Entra authentication) and is logged as such.
+    """
+
+    def __init__(self, config: TeamsConfig):
+        super().__init__(config)
+        self.teams_config = config
+        self._message_ids: Dict[str, str] = {}  # request_id -> Graph message id
+        self._token: Optional[str] = None
+        self._token_expires_at: float = 0.0  # monotonic seconds
+
+    @property
+    def mode(self) -> HITLMode:
+        return HITLMode.TEAMS
+
+    def _can_use_graph(self) -> bool:
+        """True when Entra client-credentials + a Graph target are configured."""
+        cfg = self.teams_config
+        return bool(
+            cfg.tenant_id
+            and cfg.client_id
+            and cfg.client_secret
+            and cfg.team_id
+            and cfg.channel_id
+        )
+
+    async def _get_access_token(self) -> str:
+        """Acquire (and cache) a Graph token via Entra client-credentials."""
+        now = time.monotonic()
+        if self._token and now < self._token_expires_at:
+            return self._token
+
+        cfg = self.teams_config
+        missing = [
+            name
+            for name, value in (
+                ("AZURE_TENANT_ID", cfg.tenant_id),
+                ("AZURE_CLIENT_ID", cfg.client_id),
+                ("AZURE_CLIENT_SECRET", cfg.client_secret),
+            )
+            if not value
+        ]
+        if missing:
+            raise ValueError(
+                "Teams Entra auth not configured; missing: " + ", ".join(missing)
+            )
+
+        import aiohttp
+
+        token_url = _ENTRA_TOKEN_URL.format(tenant_id=cfg.tenant_id)
+        form = {
+            "grant_type": "client_credentials",
+            "client_id": cfg.client_id,
+            "client_secret": cfg.client_secret,
+            "scope": "https://graph.microsoft.com/.default",
+        }
+        async with aiohttp.ClientSession() as session:
+            async with session.post(token_url, data=form) as resp:
+                payload = await resp.json()
+                if resp.status != 200 or "access_token" not in payload:
+                    detail = payload.get("error_description") or payload.get("error") or payload
+                    raise RuntimeError(f"Entra token request failed ({resp.status}): {detail}")
+                self._token = str(payload["access_token"])
+                # Refresh 60s before the real expiry to avoid edge-of-expiry 401s.
+                expires_in = int(payload.get("expires_in", 3600))
+                self._token_expires_at = now + max(0, expires_in - 60)
+                return self._token
+
+    async def send(self, request: HITLRequest, workflow_id: str) -> str:
+        """Send a Teams approval card; returns the external message reference."""
+        import aiohttp
+
+        cfg = self.teams_config
+        urls = self._build_callback_urls(request.request_id)
+        card = self._build_adaptive_card(request, workflow_id, urls)
+
+        # Preferred path: authenticated Microsoft Graph (Entra client-credentials).
+        if self._can_use_graph():
+            token = await self._get_access_token()
+            url = f"{_GRAPH_API_BASE}/teams/{cfg.team_id}/channels/{cfg.channel_id}/messages"
+            body = {
+                "body": {
+                    "contentType": "html",
+                    "content": '<attachment id="approval-card"></attachment>',
+                },
+                "attachments": [
+                    {
+                        "id": "approval-card",
+                        "contentType": "application/vnd.microsoft.card.adaptive",
+                        "content": json.dumps(card),
+                    }
+                ],
+            }
+            headers = {
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json",
+            }
+            async with aiohttp.ClientSession() as session:
+                async with session.post(url, json=body, headers=headers) as resp:
+                    data = await resp.json()
+                    if resp.status >= 300:
+                        logger.error(f"Teams Graph API error ({resp.status}): {data}")
+                        raise RuntimeError(
+                            f"Teams message send failed: {data.get('error', data)}"
+                        )
+                    external_ref = str(data.get("id", request.request_id))
+            self._message_ids[request.request_id] = external_ref
+            logger.info(f"Sent Teams approval card via Graph for {request.request_id}")
+            return external_ref
+
+        # Fallback: legacy incoming webhook — a secret URL, NOT Entra-authenticated.
+        if cfg.webhook_url:
+            payload = {
+                "type": "message",
+                "attachments": [
+                    {
+                        "contentType": "application/vnd.microsoft.card.adaptive",
+                        "content": card,
+                    }
+                ],
+            }
+            async with aiohttp.ClientSession() as session:
+                async with session.post(cfg.webhook_url, json=payload) as resp:
+                    if resp.status >= 300:
+                        logger.error(f"Teams webhook error ({resp.status})")
+            logger.warning(
+                "Sent Teams approval via incoming webhook (no Entra auth). Configure "
+                "AZURE_TENANT_ID/AZURE_CLIENT_ID/AZURE_CLIENT_SECRET + "
+                "TEAMS_TEAM_ID/TEAMS_CHANNEL_ID for authenticated delivery."
+            )
+            return request.request_id
+
+        raise ValueError(
+            "Teams transport not configured. Provide Entra client-credentials "
+            "(AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET) plus a Graph "
+            "target (TEAMS_TEAM_ID, TEAMS_CHANNEL_ID), or a TEAMS_WEBHOOK_URL fallback."
+        )
+
+    async def poll(
+        self,
+        request_id: str,
+        external_ref: str,
+        timeout: Optional[float] = None,
+    ) -> Optional[HITLResponse]:
+        """Responses arrive via the approve/reject callback URLs — nothing to poll."""
+        return None
+
+    def _build_adaptive_card(
+        self,
+        request: HITLRequest,
+        workflow_id: str,
+        urls: Dict[str, str],
+    ) -> Dict[str, Any]:
+        """Build an Adaptive Card payload for the approval request."""
+        body: List[Dict[str, Any]] = [
+            {"type": "TextBlock", "size": "Large", "weight": "Bolder", "text": "🔔 Approval Required"},
+            {
+                "type": "FactSet",
+                "facts": [
+                    {"title": "Workflow", "value": workflow_id},
+                    {"title": "Request ID", "value": f"{request.request_id[:12]}..."},
+                    {"title": "Timeout", "value": f"{request.timeout}s"},
+                ],
+            },
+            {"type": "TextBlock", "text": request.prompt, "wrap": True},
+        ]
+        if request.context:
+            body.append(
+                {
+                    "type": "FactSet",
+                    "facts": [
+                        {"title": str(k), "value": str(v)} for k, v in request.context.items()
+                    ],
+                }
+            )
+
+        actions: List[Dict[str, Any]] = []
+        if urls.get("approve_url"):
+            actions.append(
+                {"type": "Action.OpenUrl", "title": "✓ Approve", "url": urls["approve_url"]}
+            )
+        if urls.get("reject_url"):
+            actions.append(
+                {"type": "Action.OpenUrl", "title": "✗ Reject", "url": urls["reject_url"]}
+            )
+
+        return {
+            "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+            "type": "AdaptiveCard",
+            "version": "1.4",
+            "body": body,
+            "actions": actions,
+        }
+
+
 class SMSTransport(BaseTransport):
     """SMS-based HITL transport via Twilio."""
 
@@ -1023,6 +1246,7 @@ _TRANSPORT_REGISTRY: Dict[HITLMode, Type[BaseTransport]] = {
     HITLMode.EMAIL: EmailTransport,
     HITLMode.SMS: SMSTransport,
     HITLMode.SLACK: SlackTransport,
+    HITLMode.TEAMS: TeamsTransport,
     HITLMode.GITHUB_PR: GitHubPRTransport,
     HITLMode.GITHUB_CHECK: GitHubCheckTransport,
     HITLMode.CUSTOM_HOOK: CustomHookTransport,
@@ -1129,6 +1353,7 @@ __all__ = [
     "EmailTransport",
     "SMSTransport",
     "SlackTransport",
+    "TeamsTransport",
     "GitHubPRTransport",
     "GitHubCheckTransport",
     "CustomHookTransport",
