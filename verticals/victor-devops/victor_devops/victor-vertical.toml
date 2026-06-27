@@ -16,7 +16,7 @@ category = "devops"
 tags = ["devops", "docker", "kubernetes", "ci-cd", "infrastructure", "terraform"]
 
 [vertical.class]
-module = "victor_devops.devops_assistant"
+module = "victor_devops.assistant"
 class_name = "DevOpsAssistant"
 provides_tools = [
     "docker_build",
