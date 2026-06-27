@@ -445,14 +445,38 @@ class BaseTransport(ABC):
         return None
 
     def _build_callback_urls(self, request_id: str) -> Dict[str, str]:
-        """Build callback URLs for approve/reject actions."""
-        base_url = self.config.callback_url or ""
+        """Build approve/reject/details URLs for the approval message.
+
+        The public base URL comes from ``config.callback_url`` or the
+        ``VICTOR_HITL_CALLBACK_URL`` env var; without one the buttons are omitted
+        rather than rendered as dead links. When a signing secret is configured,
+        each approve/reject link carries an HMAC token binding (request_id,
+        action, expiry) so the decision cannot be forged, flipped or replayed.
+        """
+        base_url = (self.config.callback_url or os.getenv("VICTOR_HITL_CALLBACK_URL") or "").rstrip(
+            "/"
+        )
         if not base_url:
             return {}
 
+        from victor.workflows.hitl_signing import get_signing_secret, sign_action
+
+        secret = get_signing_secret()
+        if not secret:
+            logger.warning(
+                "HITL callback links are unsigned; set VICTOR_HITL_SIGNING_SECRET to "
+                "make approve/reject links tamper-proof."
+            )
+
+        def _action_url(action: str) -> str:
+            url = f"{base_url}/hitl/respond/{request_id}?action={action}"
+            if secret:
+                url += f"&token={sign_action(request_id, action, secret=secret)}"
+            return url
+
         return {
-            "approve_url": f"{base_url}/hitl/respond/{request_id}?action=approve",
-            "reject_url": f"{base_url}/hitl/respond/{request_id}?action=reject",
+            "approve_url": _action_url("approve"),
+            "reject_url": _action_url("reject"),
             "details_url": f"{base_url}/hitl/requests/{request_id}",
         }
 
