@@ -58,8 +58,8 @@ proximadb = [
     "proximadb>=0.2,<0.3",
 ]
 # Shared code->CPG chunker (ADR-014). Opt-in: when installed AND
-# VICTOR_CODING_USE_CODEGRAPH=1, CodeChunker delegates to it. Editable-only until
-# published: pip install -e ../../victor-codegraph
+# VICTOR_CODING_USE_CODEGRAPH=1, CodeChunker delegates to it. Published on PyPI
+# (`pip install victor-codegraph`); for local source work: pip install -e ../../victor-codegraph
 codegraph = [
     "victor-codegraph>=0.1.0,<1.0",
 ]
