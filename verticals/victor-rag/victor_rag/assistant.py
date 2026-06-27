@@ -70,6 +70,14 @@ class RAGAssistant(VerticalBase):
     version = "1.0.0"
 
     @classmethod
+    def get_name(cls) -> str:
+        return cls.name
+
+    @classmethod
+    def get_description(cls) -> str:
+        return cls.description
+
+    @classmethod
     def get_tools(cls) -> List[str]:
         """Get tools for RAG operations.
 
