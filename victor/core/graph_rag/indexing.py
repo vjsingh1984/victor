@@ -2114,6 +2114,46 @@ class GraphIndexingPipeline:
         import re
         import hashlib
 
+        # ADR-015 (Phase 1): prefer the shared victor-codegraph parser when importable —
+        # real AST (functions/classes/methods, multi-language) instead of the Python-only
+        # def/class regex below. The node_id scheme (sha256 of file:name:line) is preserved
+        # so downstream edge-matching is unchanged; falls back to the regex on any failure.
+        try:
+            import victor_codegraph as _vcg
+        except Exception:
+            _vcg = None
+        if _vcg is not None:
+            try:
+                parsed = _vcg.parse(source_code, language=language, file_path=str(file_path))
+            except Exception:
+                parsed = None
+            if parsed is not None and parsed.symbols:
+                _AST_KIND = {
+                    "class": "class_definition",
+                    "struct": "class_definition",
+                    "interface": "class_definition",
+                    "trait": "class_definition",
+                    "enum": "enum_definition",
+                }
+                delegated: List[Any] = []
+                for s in parsed.symbols:
+                    name = s.simple_name
+                    line = s.location.start_line
+                    node_id = hashlib.sha256(f"{file_path}:{name}:{line}".encode()).hexdigest()[:16]
+                    stype = s.symbol_type.name.lower()
+                    delegated.append(
+                        GraphNode(
+                            node_id=node_id,
+                            type=stype,
+                            name=name,
+                            file=str(file_path),
+                            line=line,
+                            lang=language,
+                            ast_kind=_AST_KIND.get(stype, "function_definition"),
+                        )
+                    )
+                return delegated
+
         nodes: List[Any] = []
 
         if language == "python":
