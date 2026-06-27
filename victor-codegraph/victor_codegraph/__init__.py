@@ -25,6 +25,7 @@ from .model import (
     SourceLocation,
 )
 from .parser import chunk, parse
+from .repo import chunk_path, chunk_repo, iter_source_files, parse_path
 
 __version__ = "0.1.0"
 
@@ -32,6 +33,10 @@ __all__ = [
     "__version__",
     "chunk",
     "parse",
+    "chunk_repo",
+    "chunk_path",
+    "parse_path",
+    "iter_source_files",
     "ChunkConfig",
     "detect_language",
     "to_proxima_records",
