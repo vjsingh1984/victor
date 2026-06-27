@@ -793,9 +793,7 @@ class TeamsTransport(BaseTransport):
                     data = await resp.json()
                     if resp.status >= 300:
                         logger.error(f"Teams Graph API error ({resp.status}): {data}")
-                        raise RuntimeError(
-                            f"Teams message send failed: {data.get('error', data)}"
-                        )
+                        raise RuntimeError(f"Teams message send failed: {data.get('error', data)}")
                     external_ref = str(data.get("id", request.request_id))
             self._message_ids[request.request_id] = external_ref
             logger.info(f"Sent Teams approval card via Graph for {request.request_id}")
@@ -846,7 +844,12 @@ class TeamsTransport(BaseTransport):
     ) -> Dict[str, Any]:
         """Build an Adaptive Card payload for the approval request."""
         body: List[Dict[str, Any]] = [
-            {"type": "TextBlock", "size": "Large", "weight": "Bolder", "text": "🔔 Approval Required"},
+            {
+                "type": "TextBlock",
+                "size": "Large",
+                "weight": "Bolder",
+                "text": "🔔 Approval Required",
+            },
             {
                 "type": "FactSet",
                 "facts": [

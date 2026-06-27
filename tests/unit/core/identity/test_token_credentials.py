@@ -261,8 +261,14 @@ def test_build_entra_credential_rejects_both_or_neither():
 
 
 def test_graph_credential_from_env_prefers_azure_then_teams_alias(monkeypatch):
-    for var in ("AZURE_TENANT_ID", "AZURE_CLIENT_ID", "AZURE_CLIENT_SECRET",
-                "TEAMS_TENANT_ID", "TEAMS_CLIENT_ID", "TEAMS_CLIENT_SECRET"):
+    for var in (
+        "AZURE_TENANT_ID",
+        "AZURE_CLIENT_ID",
+        "AZURE_CLIENT_SECRET",
+        "TEAMS_TENANT_ID",
+        "TEAMS_CLIENT_ID",
+        "TEAMS_CLIENT_SECRET",
+    ):
         monkeypatch.delenv(var, raising=False)
     assert graph_credential_from_env() is None  # nothing configured
 

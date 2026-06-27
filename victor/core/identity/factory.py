@@ -67,9 +67,7 @@ def build_entra_credential(
     :class:`CachingTokenCredential` unless ``cache=False``.
     """
     if bool(client_secret) == bool(client_assertion):
-        raise ValueError(
-            "Provide exactly one of client_secret or client_assertion (certificate)"
-        )
+        raise ValueError("Provide exactly one of client_secret or client_assertion (certificate)")
     base: TokenCredential
     if client_assertion is not None:
         base = ClientAssertionCredential(
@@ -77,9 +75,7 @@ def build_entra_credential(
         )
     else:
         assert client_secret is not None  # narrowed by the xor check above
-        base = ClientSecretCredential(
-            tenant_id, client_id, client_secret, authority=authority
-        )
+        base = ClientSecretCredential(tenant_id, client_id, client_secret, authority=authority)
     return CachingTokenCredential(base) if cache else base
 
 

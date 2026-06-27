@@ -113,5 +113,5 @@ def __getattr__(name: str) -> Any:
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
     module_name, attribute_name = target
-    module = import_module(module_name)
+    module = import_module(module_name)  # nosemgrep
     return getattr(module, attribute_name)

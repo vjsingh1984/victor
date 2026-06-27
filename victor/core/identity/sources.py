@@ -67,9 +67,7 @@ async def _post_token(url: str, form: dict) -> AccessToken:
         async with session.post(url, data=form) as resp:
             payload = await resp.json()
             if resp.status != 200 or "access_token" not in payload:
-                detail = (
-                    payload.get("error_description") or payload.get("error") or payload
-                )
+                detail = payload.get("error_description") or payload.get("error") or payload
                 raise RuntimeError(f"Entra token request failed ({resp.status}): {detail}")
             expires_in = int(payload.get("expires_in", 3600))
             return AccessToken(

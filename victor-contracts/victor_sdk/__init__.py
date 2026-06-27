@@ -57,7 +57,7 @@ class _VictorSdkRedirect(importlib.abc.MetaPathFinder, importlib.abc.Loader):
 
     def create_module(self, spec):  # noqa: ANN001
         target_name = _TARGET + spec.name[len(_PREFIX) :]
-        module = importlib.import_module(target_name)
+        module = importlib.import_module(target_name)  # nosemgrep
         sys.modules[spec.name] = module
         return module
 

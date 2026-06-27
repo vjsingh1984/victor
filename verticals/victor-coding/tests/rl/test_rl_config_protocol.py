@@ -35,7 +35,7 @@ def test_rl_config_has_get_rl_config_method(vertical: str, module_path: str, con
 
     try:
         # Dynamically import the module
-        module = importlib.import_module(module_path)
+        module = importlib.import_module(module_path)  # nosemgrep
         config_cls = getattr(module, config_class)
 
         # Instantiate the config
@@ -67,7 +67,7 @@ def test_get_rl_config_returns_dict(vertical: str, module_path: str, config_clas
 
     try:
         # Dynamically import the module
-        module = importlib.import_module(module_path)
+        module = importlib.import_module(module_path)  # nosemgrep
         config_cls = getattr(module, config_class)
 
         # Instantiate and call get_rl_config

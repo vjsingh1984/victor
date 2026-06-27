@@ -117,9 +117,7 @@ async def test_credential_built_from_config_when_not_injected(fake_aiohttp, requ
     from victor.workflows.hitl_transports import TeamsConfig, TeamsTransport
 
     # No credential injected, but Entra config present -> one is built lazily.
-    cfg = TeamsConfig(
-        tenant_id="T", client_id="C", client_secret="S", team_id="t", channel_id="c"
-    )
+    cfg = TeamsConfig(tenant_id="T", client_id="C", client_secret="S", team_id="t", channel_id="c")
     transport = TeamsTransport(cfg)
     assert transport._resolve_credential() is not None  # built from config
     assert transport._can_use_graph() is True
