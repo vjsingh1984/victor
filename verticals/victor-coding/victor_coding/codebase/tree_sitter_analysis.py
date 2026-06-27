@@ -42,6 +42,33 @@ from victor_coding.languages.registry import LanguageRegistry, get_language_regi
 
 logger = logging.getLogger(__name__)
 
+# ADR-014/015: source symbols from the shared victor-codegraph parser when importable,
+# so the symbol ids/shape are consistent across Victor core, ProximaDB, and AnvaiOps.
+# Soft import; default ON when available (disable with VICTOR_CODING_USE_CODEGRAPH=0).
+try:  # pragma: no cover - availability depends on the optional package
+    import victor_codegraph as _victor_codegraph
+except Exception:
+    _victor_codegraph = None
+
+# victor-codegraph symbol-type -> ast_kind (the analysis provider's tree-sitter node-type
+# field). Functions/methods/constructors map to a function-definition kind; class-likes to
+# their definition kind.
+_CODEGRAPH_AST_KIND = {
+    "class": "class_definition",
+    "struct": "struct_item",
+    "interface": "interface_declaration",
+    "trait": "trait_item",
+    "enum": "enum_declaration",
+}
+
+
+def _codegraph_symbols_enabled() -> bool:
+    import os
+
+    return _victor_codegraph is not None and os.getenv(
+        "VICTOR_CODING_USE_CODEGRAPH", "1"
+    ).strip().lower() not in ("0", "false", "no", "off")
+
 
 # AST parent-types that indicate a captured callee is a method dispatch.
 _METHOD_CALL_PARENT_TYPES = frozenset(
@@ -123,10 +150,43 @@ class TreeSitterAnalysisProvider:
         *,
         file_path: str,
     ) -> List[Dict[str, Any]]:
+        if _codegraph_symbols_enabled():
+            delegated = self._symbols_via_codegraph(content, language, file_path)
+            if delegated is not None:
+                return delegated
         parsed = self.parse(content, language, file_path=file_path)
         if parsed is None:
             return []
         return self._symbols_from_parsed(parsed, file_path)
+
+    def _symbols_via_codegraph(
+        self, content: bytes, language: str, file_path: str
+    ) -> Optional[List[Dict[str, Any]]]:
+        """Source symbols from victor-codegraph (ADR-015). Returns None on failure so the
+        caller falls back to the tree-sitter path. Output matches the symbol-dict contract."""
+        try:
+            src = content.decode("utf-8", errors="replace") if isinstance(content, bytes) else content
+            parsed = _victor_codegraph.parse(src, language=language, file_path=file_path)
+        except Exception as e:  # noqa: BLE001 - fall back on any failure
+            logger.debug("victor-codegraph symbol delegation failed for %s: %s", file_path, e)
+            return None
+        if not parsed.symbols:
+            return None
+        out: List[Dict[str, Any]] = []
+        for s in parsed.symbols:
+            stype = s.symbol_type.name.lower()
+            out.append(
+                {
+                    "name": s.simple_name,
+                    "symbol_type": stype,
+                    "file_path": s.location.file_path or file_path,
+                    "line_start": s.location.start_line,
+                    "line_end": s.location.end_line,
+                    "parent_symbol": s.scope_chain[-1] if s.scope_chain else None,
+                    "ast_kind": _CODEGRAPH_AST_KIND.get(stype, "function_definition"),
+                }
+            )
+        return out
 
     def extract_edges(
         self,
