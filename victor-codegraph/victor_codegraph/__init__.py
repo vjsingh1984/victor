@@ -16,6 +16,7 @@ from .adapter import relation_to_record, symbol_to_record, to_proxima_records
 from .config import ChunkConfig
 from .languages import detect_language
 from .model import (
+    LINE_BASE,
     CodeChunk,
     CodeRelation,
     CodeRelationType,
@@ -38,6 +39,7 @@ __all__ = [
     "parse_path",
     "iter_source_files",
     "ChunkConfig",
+    "LINE_BASE",
     "detect_language",
     "to_proxima_records",
     "symbol_to_record",
