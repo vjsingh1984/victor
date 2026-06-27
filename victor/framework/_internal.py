@@ -28,6 +28,7 @@ from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional, Type
 
 from victor.agent.config import FrameworkCompatibleAgentConfig, normalize_agent_config
 from victor.core.completion_markers import strip_active_completion_markers
+from victor.core.errors import VictorError
 from victor.framework.event_registry import EventTarget, get_event_registry
 from victor.framework.events import (
     AgentExecutionEvent,
@@ -55,6 +56,18 @@ if TYPE_CHECKING:
 
 def _sanitize_stream_error_message(error: Exception) -> str:
     """Return a bounded error string suitable for streaming UI surfaces."""
+    # Structured Victor errors already carry a clean, user-facing message plus an
+    # actionable recovery hint — prefer them over the raw HTTP response body
+    # (which for e.g. a missing model is an opaque JSON 404 payload).
+    if isinstance(error, VictorError):
+        parts = [error.message.strip()] if error.message and error.message.strip() else []
+        hint = getattr(error, "recovery_hint", None)
+        if isinstance(hint, str) and hint.strip():
+            parts.append(f"💡 {hint.strip()}")
+        if parts:
+            combined = "\n".join(parts)
+            return combined if len(combined) <= 1200 else f"{combined[:1200].rstrip()}..."
+
     response = getattr(error, "response", None)
     status_code = getattr(response, "status_code", None)
     response_text = getattr(response, "text", None)

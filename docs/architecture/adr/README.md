@@ -23,6 +23,8 @@ Architecture Decision Records (ADRs) document significant architectural decision
 | [ADR-006](006-provider-integration-improvements.md) | Provider Integration Improvements for Non-Interactive Environments | Proposed | 2026-02-28 |
 | [ADR-007](007-vertical-distribution-and-sdk-boundary.md) | Vertical Distribution Model and Contracts Boundary | Proposed | 2026-03-10 |
 | [ADR-008](008-registry-performance-optimization.md) | Tool Registry Performance Optimization | Accepted | 2025-04-19 |
+| [ADR-014](014-shared-codegraph-chunker-package.md) | Extract the code→CPG chunker into a shared `victor-codegraph` package | Proposed | 2026-06-26 |
+| [ADR-015](015-victor-core-adopts-codegraph.md) | Victor Core adopts victor-codegraph as the foundational code parser (phased) | Proposed | 2026-06-26 |
 
 ## ADR Summaries
 

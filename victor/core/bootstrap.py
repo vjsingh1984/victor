@@ -781,6 +781,12 @@ def bootstrap_capabilities() -> None:
 # Capability registration ultimately runs inside plugin.register(HostPluginContext),
 # so this entry-point is the *single* side-effecting registration path. Do not
 # add a parallel entry-point scan here — PluginRegistry owns discovery.
+# Emit the "CodebaseIndex not enhanced" warning at most once per process. Plugin
+# discovery runs several times (bootstrap + lazy ensure_bootstrapped), and the
+# repeated warning is pure noise.
+_codebase_index_unenhanced_warned = False
+
+
 def _discover_plugin_capabilities(registry: Any) -> None:
     """Discover enhanced capabilities from installed plugin verticals.
 
@@ -812,12 +818,15 @@ def _discover_plugin_capabilities(registry: Any) -> None:
         # Force full registration — capabilities are missing even if
         # the plugin context was set by a previous (now stale) bootstrap.
         plugin_registry.register_all()
-        # Verify registration succeeded
+        # Verify registration succeeded (warn once per process — see flag above)
         if not cap_registry.is_enhanced(CodebaseIndexFactoryProtocol):
-            logger.warning(
-                "Plugin capability discovery completed but CodebaseIndex "
-                "still not enhanced — check victor-coding plugin registration"
-            )
+            global _codebase_index_unenhanced_warned
+            if not _codebase_index_unenhanced_warned:
+                _codebase_index_unenhanced_warned = True
+                logger.warning(
+                    "Plugin capability discovery completed but CodebaseIndex "
+                    "still not enhanced — check victor-coding plugin registration"
+                )
     except Exception as e:
         logger.warning("Plugin capability discovery failed: %s", e, exc_info=True)
 

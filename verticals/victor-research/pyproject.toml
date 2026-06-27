@@ -1,0 +1,135 @@
+[build-system]
+requires = [
+    "setuptools>=61.0",
+    "wheel",
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "victor-research"
+version = "0.7.0"
+description = "Research vertical for Victor AI - Web research, information gathering, and knowledge synthesis"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "Apache-2.0"}
+authors = [
+    { name = "Vijaykumar Singh", email = "singhvjd@gmail.com" },
+]
+maintainers = [
+    { name = "Vijaykumar Singh", email = "singhvjd@gmail.com" },
+]
+keywords = [
+    "victor",
+    "vertical",
+    "research",
+    "web-search",
+    "information-gathering",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "victor-contracts[yaml]>=0.7.0,<1.0",
+    "numpy>=1.24,<2.3",  # Required by victor.storage.embeddings; numba-compatible
+]
+
+[project.optional-dependencies]
+runtime = [
+    "victor-ai>=0.7.0,<1.0",
+]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "pytest-cov>=4.1",
+    "pytest-xdist>=3.0",
+    "black==26.1.0",
+    "ruff>=0.5",
+    "mypy>=1.10",
+]
+
+[project.urls]
+Homepage = "https://github.com/vjsingh1984/victor-research"
+Repository = "https://github.com/vjsingh1984/victor-research"
+Documentation = "https://docs.victor.dev/verticals/research"
+Issues = "https://github.com/vjsingh1984/victor-research/issues"
+
+[project.entry-points."victor.plugins"]
+research = "victor_research.plugin:plugin"
+
+[project.entry-points."victor.tool_dependencies"]
+research = "victor_research.tool_dependencies:get_provider"
+
+[project.entry-points."victor.safety_rules"]
+research = "victor_research.safety:create_all_research_safety_rules"
+
+[project.entry-points."victor.prompt_contributors"]
+research = "victor_research.prompts:ResearchPromptContributor"
+
+[project.entry-points."victor.mode_configs"]
+research = "victor_research.mode_config:ResearchModeConfigProvider"
+
+[project.entry-points."victor.workflow_providers"]
+research = "victor_research.workflows:ResearchWorkflowProvider"
+
+[project.entry-points."victor.capability_providers"]
+research = "victor_research.capabilities:ResearchCapabilityProvider"
+
+[project.entry-points."victor.team_spec_providers"]
+research = "victor_research.teams:ResearchTeamSpecProvider"
+
+# Victor extension protocol implementations
+[project.entry-points."victor.extension.protocols"]
+research-tools = "victor_research.protocols:ResearchToolProvider"
+research-safety = "victor_research.protocols:ResearchSafetyProvider"
+research-prompts = "victor_research.protocols:ResearchPromptProvider"
+research-workflows = "victor_research.protocols:ResearchWorkflowProvider"
+
+[tool.setuptools]
+packages = [
+    "victor_research",
+    "victor_research.rl",
+    "victor_research.teams",
+    "victor_research.workflows",
+]
+
+[tool.black]
+line-length = 100
+target-version = [
+    "py311",
+    "py312",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "B", "C4"]
+ignore = [
+    "E501",  # line too long (handled by formatter)
+    "E402",  # module level import not at top of file (sometimes necessary)
+    "F401",  # unused imports (often intentional re-exports)
+    "F811",  # redefined while unused (type imports shadowing runtime)
+    "B007",  # loop control variable not used within loop body
+    "B008",  # do not perform function calls in argument defaults
+    "B019",  # lru_cache on methods (valid pattern for class methods)
+    "B023",  # function uses loop variable (common pattern)
+    "B024",  # abstract class with no abstract methods (valid for protocols)
+    "B025",  # try-except with empty except clause (handled elsewhere)
+    "B904",  # allow broad raising for now
+    "B905",  # zip() without strict= parameter (not critical)
+    "C401",  # unnecessary generator (minor optimization)
+    "C414",  # unnecessary list/set call (minor optimization)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+"tests/**/*.py" = ["B017", "B018", "E741", "F841"]
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true

@@ -396,3 +396,34 @@ class TestLiveDisplayRendererSimplifiedAPI:
         thinking_pos = renderer._content_buffer.index("Thinking content")
         normal_2_pos = renderer._content_buffer.index("More normal content")
         assert normal_1_pos < thinking_pos < normal_2_pos
+
+
+class TestToolInvocationRendering:
+    """The bash invocation line is styled chrome, not markdown content."""
+
+    @patch("victor.ui.rendering.live_renderer.Live")
+    def test_invocation_not_raw_markup_in_content_buffer(self, mock_live_class):
+        import io
+
+        mock_live_class.return_value = MagicMock()
+        buf = io.StringIO()
+        console = Console(
+            file=buf, theme=victor_theme, force_terminal=False, no_color=True, width=100
+        )
+        renderer = LiveDisplayRenderer(console)
+        renderer.start()
+
+        renderer.on_tool_start("ls", {"path": "victor/"})
+
+        # Regression: the invocation must NOT be dumped into the markdown content
+        # buffer as Rich markup — that is what made [dim]/[bold cyan] print literally.
+        assert "[bold cyan]" not in renderer._content_buffer
+        assert "[dim]$[/]" not in renderer._content_buffer
+
+        # It is printed via the Rich-markup console path, with markup interpreted
+        # (no_color strips styling) — so the command shows, not the raw tags.
+        output = buf.getvalue()
+        assert "ls" in output
+        assert "victor/" in output
+        assert "[bold cyan]" not in output
+        assert "[dim]" not in output

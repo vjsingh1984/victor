@@ -1,0 +1,74 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "victor-codegraph"
+version = "0.1.0"
+description = "Code->CPG chunker: tree-sitter symbol + relation extraction, size-capped chunks, ProximaRecord projection. Shared by Victor, ProximaDB SDK, and AnvaiOps."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+authors = [
+    { name = "Vijaykumar Singh", email = "singhvjd@gmail.com" },
+]
+keywords = [
+    "code-graph",
+    "cpg",
+    "chunking",
+    "tree-sitter",
+    "ast",
+    "embeddings",
+    "rag",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries",
+]
+
+# Thin + neutral by design (ADR-014 / ProximaDB ADR-029). The base install is
+# ZERO-dependency: the Python path uses the stdlib `ast` and needs no native grammars,
+# so `pip install -e .` works fully offline. Opt-in extras add multi-language grammars
+# (`treesitter`) and the contracts Protocol boundary (`contracts`). victor-contracts
+# becomes a hard dep once the parser is exposed as a contracts Protocol (ADR-014).
+dependencies = []
+
+[project.optional-dependencies]
+treesitter = [
+    "tree-sitter>=0.23",
+    "tree-sitter-language-pack>=1.0",
+]
+contracts = [
+    "victor-contracts>=0.7.0,<1.0",
+]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.5",
+    "tree-sitter>=0.23",
+    "tree-sitter-language-pack>=1.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/vjsingh1984/victor"
+Repository = "https://github.com/vjsingh1984/victor"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["victor_codegraph*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+# Self-contained pytest config so running `pytest` from this package directory uses
+# THIS file as the rootdir/inifile and does NOT inherit the victor monorepo root's
+# `addopts = --cov=victor` (pytest-cov isn't a dep here -> "unrecognized arguments").
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ""

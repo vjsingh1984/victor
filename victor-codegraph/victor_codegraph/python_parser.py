@@ -1,0 +1,270 @@
+"""Python parser using the stdlib ``ast`` module.
+
+This is the primary Python path (Victor's approach): it needs no native grammar, is
+deterministic, and works fully offline. Extracts modules/classes/functions/methods with
+signatures, docstrings, decorators, parameters, cyclomatic complexity, and CALLS edges.
+"""
+
+from __future__ import annotations
+
+import ast
+
+from .model import (
+    CodeRelation,
+    CodeRelationType,
+    CodeSymbol,
+    CodeSymbolType,
+    ParsedCode,
+    SourceLocation,
+    content_hash,
+    deterministic_symbol_id,
+)
+
+_BRANCH_NODES = (
+    ast.If,
+    ast.For,
+    ast.AsyncFor,
+    ast.While,
+    ast.With,
+    ast.AsyncWith,
+    ast.Try,
+    ast.ExceptHandler,
+    ast.BoolOp,
+    ast.IfExp,
+    ast.comprehension,
+)
+
+
+def _cyclomatic(node: ast.AST) -> dict[str, int]:
+    count = 1
+    for child in ast.walk(node):
+        if isinstance(child, _BRANCH_NODES):
+            count += 1
+    lineno = getattr(node, "lineno", 1)
+    end = getattr(node, "end_lineno", lineno) or lineno
+    return {"cyclomatic": count, "lines": end - lineno + 1}
+
+
+def _params(args: ast.arguments) -> list[dict]:
+    out: list[dict] = []
+    posonly = getattr(args, "posonlyargs", [])
+    for a in [*posonly, *args.args]:
+        if a.arg in ("self", "cls"):
+            continue
+        p: dict = {"name": a.arg}
+        if a.annotation is not None:
+            p["type"] = ast.unparse(a.annotation)
+        out.append(p)
+    if args.vararg is not None:
+        out.append({"name": f"*{args.vararg.arg}", "is_variadic": True})
+    for a in args.kwonlyargs:
+        p = {"name": a.arg, "is_kwonly": True}
+        if a.annotation is not None:
+            p["type"] = ast.unparse(a.annotation)
+        out.append(p)
+    if args.kwarg is not None:
+        out.append({"name": f"**{args.kwarg.arg}", "is_variadic": True})
+    return out
+
+
+def _signature(name: str, args: ast.arguments, returns: ast.AST | None) -> str:
+    parts = []
+    for p in _params(args):
+        s = p["name"]
+        if p.get("type"):
+            s += f": {p['type']}"
+        parts.append(s)
+    sig = f"{name}({', '.join(parts)})"
+    if returns is not None:
+        sig += f" -> {ast.unparse(returns)}"
+    return sig
+
+
+def _modifiers(name: str, decorators: list[ast.expr], is_async: bool) -> list[str]:
+    mods = [f"@{ast.unparse(d)}" for d in decorators]
+    if is_async:
+        mods.append("async")
+    if name.startswith("__") and name.endswith("__"):
+        mods.append("dunder")
+    elif name.startswith("_"):
+        mods.append("private")
+    return mods
+
+
+def _callee_name(call: ast.Call) -> str | None:
+    f = call.func
+    if isinstance(f, ast.Name):
+        return f.id
+    if isinstance(f, ast.Attribute):
+        return f.attr
+    return None
+
+
+class _Visitor:
+    def __init__(self, file_path: str, source: str) -> None:
+        self.file_path = file_path
+        self.source = source
+        self.symbols: list[CodeSymbol] = []
+        self.relations: list[CodeRelation] = []
+        self.imports: list[str] = []
+        self._fqn_prefix = file_path.replace("/", ".").replace("\\", ".")
+
+    def _src(self, node: ast.AST) -> str:
+        try:
+            return ast.get_source_segment(self.source, node) or ""
+        except Exception:
+            return ""
+
+    def _make_symbol(
+        self,
+        node: ast.AST,
+        name: str,
+        symbol_type: CodeSymbolType,
+        scope: list[str],
+        signature: str | None = None,
+        params: list[dict] | None = None,
+        return_type: str | None = None,
+        modifiers: list[str] | None = None,
+    ) -> CodeSymbol:
+        lineno = getattr(node, "lineno", 1)
+        end = getattr(node, "end_lineno", lineno) or lineno
+        col = getattr(node, "col_offset", 0)
+        fqn = "::".join([self._fqn_prefix, *scope, name])
+        return CodeSymbol(
+            id=deterministic_symbol_id(self.file_path, name, lineno, col),
+            symbol_type=symbol_type,
+            fully_qualified_name=fqn,
+            simple_name=name,
+            location=SourceLocation(
+                file_path=self.file_path,
+                start_line=lineno,
+                start_column=col,
+                end_line=end,
+                end_column=getattr(node, "end_col_offset", 0) or 0,
+            ),
+            source_code=self._src(node),
+            language="python",
+            documentation=(
+                ast.get_docstring(node)
+                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
+                else None
+            ),
+            signature=signature,
+            modifiers=modifiers or [],
+            scope_chain=list(scope),
+            parameters=params or [],
+            return_type=return_type,
+            complexity=_cyclomatic(node),
+        )
+
+    def visit_function(
+        self, node: ast.FunctionDef | ast.AsyncFunctionDef, scope: list[str]
+    ) -> CodeSymbol:
+        name = node.name
+        if scope:
+            stype = CodeSymbolType.CONSTRUCTOR if name == "__init__" else CodeSymbolType.METHOD
+        else:
+            stype = CodeSymbolType.FUNCTION
+        sym = self._make_symbol(
+            node,
+            name,
+            stype,
+            scope,
+            signature=_signature(name, node.args, node.returns),
+            params=_params(node.args),
+            return_type=ast.unparse(node.returns) if node.returns is not None else None,
+            modifiers=_modifiers(name, node.decorator_list, isinstance(node, ast.AsyncFunctionDef)),
+        )
+        self.symbols.append(sym)
+        # CALLS edges. ``to_symbol_id`` is the textual callee here; ``parse_python``
+        # resolves it to a real in-file symbol id when the callee is defined locally
+        # and otherwise keeps it as a bare name (so cross-file/external calls — e.g.
+        # a CPG's blast radius — are not silently dropped). ``call_site`` records the
+        # call line for consumers that need it.
+        for child in ast.walk(node):
+            if isinstance(child, ast.Call):
+                callee = _callee_name(child)
+                if callee:
+                    self.relations.append(
+                        CodeRelation(
+                            from_symbol_id=sym.id,
+                            to_symbol_id=callee,
+                            relation_type=CodeRelationType.CALLS,
+                            context=callee,
+                            call_site=SourceLocation(
+                                file_path=self.file_path,
+                                start_line=getattr(child, "lineno", 0),
+                                start_column=getattr(child, "col_offset", 0),
+                            ),
+                        )
+                    )
+        return sym
+
+    def visit_class(self, node: ast.ClassDef, scope: list[str]) -> None:
+        bases = [ast.unparse(b) for b in node.bases]
+        mods = [f"@{ast.unparse(d)}" for d in node.decorator_list]
+        if bases:
+            mods.append(f"extends({','.join(bases)})")
+        cls = self._make_symbol(node, node.name, CodeSymbolType.CLASS, scope, modifiers=mods)
+        self.symbols.append(cls)
+        for base in bases:
+            self.relations.append(
+                CodeRelation(
+                    from_symbol_id=cls.id,
+                    to_symbol_id=base,
+                    relation_type=CodeRelationType.EXTENDS,
+                    context=base,
+                )
+            )
+        inner = [*scope, node.name]
+        for child in node.body:
+            if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                self.visit_function(child, inner)
+            elif isinstance(child, ast.ClassDef):
+                self.visit_class(child, inner)
+
+    def run(self, tree: ast.Module) -> None:
+        for node in tree.body:
+            if isinstance(node, (ast.Import, ast.ImportFrom)):
+                self.imports.append(ast.unparse(node))
+            elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                self.visit_function(node, [])
+            elif isinstance(node, ast.ClassDef):
+                self.visit_class(node, [])
+
+
+def parse_python(content: str, file_path: str) -> ParsedCode:
+    """Parse Python source into symbols + relations using the stdlib ``ast``."""
+
+    tree = ast.parse(content)
+    v = _Visitor(file_path, content)
+    v.run(tree)
+    # Resolve CALLS/EXTENDS targets to real in-file symbol ids when possible.
+    # Unresolved targets (external / cross-file callees and bases) are RETAINED with
+    # ``to_symbol_id`` = the textual name and ``confidence`` < 1.0, so consumers that
+    # need outgoing-call coverage (e.g. a CPG's blast radius) are not silently lossy.
+    # Only self-references (recursive calls) are dropped.
+    by_name: dict[str, str] = {s.simple_name: s.id for s in v.symbols}
+    resolved: list[CodeRelation] = []
+    for r in v.relations:
+        target_id = by_name.get(r.to_symbol_id)
+        if target_id == r.from_symbol_id:
+            continue  # self-reference (recursive call) — emit no self-edge
+        resolved.append(
+            CodeRelation(
+                from_symbol_id=r.from_symbol_id,
+                to_symbol_id=target_id if target_id is not None else r.to_symbol_id,
+                relation_type=r.relation_type,
+                context=r.context,
+                call_site=r.call_site,
+                confidence=1.0 if target_id is not None else 0.5,
+            )
+        )
+    return ParsedCode(
+        file_path=file_path,
+        language="python",
+        symbols=v.symbols,
+        relations=resolved,
+        imports=v.imports,
+        content_hash=content_hash(content),
+    )

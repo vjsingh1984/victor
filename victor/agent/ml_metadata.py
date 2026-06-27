@@ -105,7 +105,14 @@ _MOE_EFFECTIVE_PARAMS = {
 }
 
 # Reasoning model patterns
-_REASONING_PATTERNS = [r"deepseek[-_]?r1", r"o1[-_]?", r"r1[-_]?", r"reasoning"]
+_REASONING_PATTERNS = [
+    r"deepseek[-_]?r1",
+    r"o1[-_]?",
+    r"r1[-_]?",
+    r"reasoning",
+    r"gpt[-_]?oss",  # OpenAI gpt-oss uses the harmony analysis/commentary channels
+    r"qwq",
+]
 
 # Context size patterns (extract from model name like "32k", "128k")
 _CONTEXT_PATTERN = re.compile(r"(\d+)k", re.IGNORECASE)

@@ -18,7 +18,10 @@ Provides embedded, persistent storage for conversation state checkpoints
 with support for large states via compression.
 """
 
-import aiosqlite
+try:
+    import aiosqlite
+except ImportError:  # optional dependency — provided by victor-ai[checkpoints]
+    aiosqlite = None  # type: ignore[assignment]
 import json
 import logging
 from datetime import datetime
@@ -90,7 +93,16 @@ class SQLiteCheckpointBackend(CheckpointManagerProtocol):
         Args:
             storage_path: Directory for database file (default: ~/.victor/)
             db_name: Database filename
+
+        Raises:
+            RuntimeError: If the optional ``aiosqlite`` dependency is missing.
         """
+        if aiosqlite is None:
+            raise RuntimeError(
+                "Conversation checkpoints require the optional 'aiosqlite' package. "
+                "Install it with `pip install victor-ai[checkpoints]` "
+                "(or `pip install aiosqlite`)."
+            )
         if storage_path is None:
             storage_path = Path.home() / ".victor"
 

@@ -13,7 +13,9 @@ async def test_fs_tool_cat_output_shape():
         # Test the NEW input shape (single bash-like command string)
         result = await fs_tool("fs cat main.py")
 
-        mock_read.assert_called_once_with("main.py")
+        mock_read.assert_called_once_with(
+            "main.py", offset=0, limit=0, search="", ctx=2, regex=False
+        )
         # Ensure it returns the pure plaintext, not JSON
         assert "print('hello')" in result
         assert "{" not in result  # No JSON wrapper
@@ -30,11 +32,42 @@ async def test_fs_tool_ls_markdown_formatting():
 
         result = await fs_tool("fs ls .")
 
-        mock_ls.assert_called_once_with(".")
+        mock_ls.assert_called_once_with(".", recursive=False, depth=2, pattern="", limit=1000)
         # Verify markdown table formatting
         assert "| Type | Size/Lines | Path |" in result
         assert "| file | 14KB | main.py |" in result
         assert "| dir | - | src |" in result
+
+
+@pytest.mark.asyncio
+async def test_fs_tool_cat_paging_and_search_options():
+    """`fs cat` forwards paging + in-file search flags to read()."""
+    with patch("victor.tools.unified.fs_tool.read", new_callable=AsyncMock) as mock_read:
+        mock_read.return_value = "slice"
+        await fs_tool("fs cat big.py --offset 200 --limit 50 --search 'def login' --ctx 3 --regex")
+        mock_read.assert_called_once_with(
+            "big.py", offset=200, limit=50, search="def login", ctx=3, regex=True
+        )
+
+
+@pytest.mark.asyncio
+async def test_fs_tool_ls_options():
+    """`fs ls` forwards recursive/depth/pattern/limit to ls()."""
+    with patch("victor.tools.unified.fs_tool.ls", new_callable=AsyncMock) as mock_ls:
+        mock_ls.return_value = []
+        await fs_tool("fs ls src -r --depth 4 --pattern '*.py' --limit 25")
+        mock_ls.assert_called_once_with("src", recursive=True, depth=4, pattern="*.py", limit=25)
+
+
+@pytest.mark.asyncio
+async def test_fs_tool_write_options():
+    """`fs write` forwards validate/format/dry-run to write()."""
+    with patch("victor.tools.unified.fs_tool.write", new_callable=AsyncMock) as mock_write:
+        mock_write.return_value = "ok"
+        await fs_tool("fs write app.py -c 'x = 1' --validate --dry-run")
+        mock_write.assert_called_once_with(
+            "app.py", "x = 1", validate=True, format_code=False, dry_run=True
+        )
 
 
 @pytest.mark.asyncio

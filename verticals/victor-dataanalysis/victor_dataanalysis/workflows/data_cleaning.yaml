@@ -1,0 +1,476 @@
+# Data Cleaning Pipeline Workflow
+# ================================
+# Systematic data cleaning with validation loop for tabular data.
+#
+# ┌─────────────────────────────────────────────────────────────────────────────┐
+# │ EXECUTION ENVIRONMENT                                                        │
+# ├─────────────────────────────────────────────────────────────────────────────┤
+# │ Default: in-process (Python with pandas/numpy)                               │
+# │ Supported: in-process, subprocess, docker                                    │
+# │                                                                              │
+# │ Requirements:                                                                │
+# │   - pandas, numpy, scipy for data operations                                │
+# │   - scikit-learn for advanced imputation (KNN, MICE)                        │
+# │   - great_expectations for validation (optional)                            │
+# │                                                                              │
+# │ Docker execution:                                                            │
+# │   - Image: victor-dataanalysis:latest                                       │
+# │   - Build: docker build -f docker/Dockerfile.dataanalysis -t victor-da .    │
+# │   - Useful for: Large datasets, memory isolation, reproducibility           │
+# │                                                                              │
+# │ Memory considerations:                                                       │
+# │   - For datasets > 1GB, consider chunked processing                         │
+# │   - Set max_memory_gb in ctx for memory limits                              │
+# └─────────────────────────────────────────────────────────────────────────────┘
+#
+# ┌─────────────────────────────────────────────────────────────────────────────┐
+# │ DEFAULT VALUES                                                               │
+# ├─────────────────────────────────────────────────────────────────────────────┤
+# │ missing_threshold: 0.05 (columns with >5% missing get imputed)              │
+# │ drop_threshold: 0.30 (columns with >30% missing get dropped)                │
+# │ outlier_method: zscore (alternative: iqr, isolation_forest)                 │
+# │ outlier_threshold: 3.0 (standard deviations)                                │
+# │ duplicate_keep: first (alternative: last, none)                             │
+# │ quality_threshold: 0.8 (minimum quality score to pass)                      │
+# │ max_iterations: 3 (retry cleaning if validation fails)                      │
+# │ backup_suffix: .bak (original data backup extension)                        │
+# └─────────────────────────────────────────────────────────────────────────────┘
+#
+# ┌─────────────────────────────────────────────────────────────────────────────┐
+# │ COMPUTE vs AGENT NODE RATIONALE                                              │
+# ├─────────────────────────────────────────────────────────────────────────────┤
+# │ COMPUTE nodes (no LLM reasoning):                                            │
+# │   - Quality assessment: Statistical metrics (pandas.describe, isna, etc.)   │
+# │   - Execute cleaning: Pandas transformations (fillna, dropna, etc.)         │
+# │   - Validate cleaning: Comparison metrics (before/after stats)              │
+# │                                                                              │
+# │ AGENT nodes (require LLM reasoning):                                         │
+# │   - Plan cleaning: Deciding strategy based on domain knowledge              │
+# │   - Document changes: Writing human-readable explanation                    │
+# └─────────────────────────────────────────────────────────────────────────────┘
+#
+# Pipeline stages:
+# 1. Quality Assessment - Compute statistics on data (COMPUTE)
+# 2. Quality Gate - Branch based on score (CONDITION)
+# 3. Plan Cleaning - Decide strategy (AGENT - needs reasoning)
+# 4. Execute Cleaning - Apply transformations (COMPUTE)
+# 5. Validate Results - Compare before/after (COMPUTE)
+# 6. Retry Loop - Repeat if validation fails (CONDITION)
+# 7. Document Changes - Write report (AGENT - needs writing)
+
+workflows:
+  data_cleaning:
+    description: "Systematic data cleaning with validation loop"
+
+    metadata:
+      version: "1.0"
+      author: "victor"
+      vertical: dataanalysis
+
+    # =========================================================================
+    # SERVICE DEFINITIONS
+    # =========================================================================
+    # Data cleaning requires access to project database for tracking
+    services:
+      # Project database for tracking cleaning history
+      project_db:
+        type: sqlite
+        config:
+          path: $ctx.project_dir/.victor/project.db
+          journal_mode: WAL
+        lifecycle:
+          start: auto
+          cleanup: preserve
+
+      # Temporary workspace for intermediate files
+      workspace:
+        type: filesystem
+        config:
+          path: $ctx.project_dir/.victor/workspace
+          auto_cleanup: true         # Delete temp files after workflow
+          max_size_gb: 10            # Limit workspace size
+        lifecycle:
+          start: auto
+          cleanup: delete            # Clean workspace on completion
+
+    batch_config:
+      batch_size: 1          # Process one dataset at a time
+      max_concurrent: 1      # No parallel cleaning (data races)
+      retry_strategy: immediate
+      max_retries: 2
+
+    nodes:
+      # =====================================================================
+      # Stage 1: Quality Assessment
+      # =====================================================================
+      - id: init
+        type: transform
+        name: "Initialize State"
+        transform: |
+          iteration = 0
+          max_iterations = 3
+          validation_passed = false
+        next: [assess_quality]
+
+      # COMPUTE: Quality assessment is pure statistical computation
+      # ─────────────────────────────────────────────────────────────────────
+      # Algorithm: Aggregation functions from pandas (isna, duplicated, describe)
+      #   - Missing: df.isna().sum() / len(df) per column
+      #   - Duplicates: df.duplicated().sum() with subset options
+      #   - Outliers: scipy.stats.zscore(df[col]) > threshold
+      #   - Types: pd.api.types.is_numeric_dtype, is_datetime64_dtype
+      #   - Score: Weighted combination (configurable weights)
+      #
+      # WHY NOT AGENT: All operations are deterministic statistical formulas.
+      # No judgment needed - thresholds are configurable, not reasoned about.
+      #
+      # Execution: in-process (pandas/scipy)
+      # Docker alternative: For datasets >1GB, use docker executor with
+      #   increased memory limits (set in batch_config)
+      #
+      # Constraints:
+      #   - filesystem_allowed: true (needs to read data file)
+      #   - network_allowed: false (no external calls)
+      #   - write_allowed: false (read-only assessment)
+      - id: assess_quality
+        type: compute
+        name: "Assess Data Quality"
+        handler: quality_assessor
+        tools: [read, shell]
+        inputs:
+          data_path: $ctx.data_path
+          assessments:
+            missing_values:
+              count_per_column: true
+              locate_rows: true
+            duplicates:
+              count: true
+              get_indices: true
+            outliers:
+              method: zscore
+              threshold: 3.0
+            type_consistency:
+              validate_types: true
+              check_ranges: true
+            quality_score:
+              weighted: true
+        output: quality_report
+        constraints:
+          llm_allowed: false
+          filesystem_allowed: true     # Read data file
+          network_allowed: false       # No external calls
+          write_allowed: false         # Read-only
+          timeout: 120
+        next: [check_quality]
+
+      # =====================================================================
+      # Stage 2: Quality Gate
+      # =====================================================================
+      - id: check_quality
+        type: condition
+        name: "Check Quality Threshold"
+        condition: "quality_threshold"
+        branches:
+          "high_quality": document_changes
+          "acceptable": plan_cleaning
+          "needs_cleanup": plan_cleaning
+          "default": plan_cleaning
+
+      # =====================================================================
+      # Stage 3: Plan Cleaning Strategy
+      # =====================================================================
+      - id: plan_cleaning
+        type: agent
+        name: "Plan Cleaning Strategy"
+        role: planner
+        goal: |
+          Based on the quality report, create a detailed cleaning plan:
+
+          **Missing Values Strategy:**
+          - Columns with < 5% missing: Impute (mean/median/mode based on type)
+          - Columns with 5-30% missing: Consider advanced imputation (KNN, MICE)
+          - Columns with > 30% missing: Consider dropping or domain expertise
+
+          **Duplicate Handling:**
+          - Define which duplicates to keep (first, last, none)
+          - Identify partial duplicates that need merge logic
+
+          **Outlier Treatment:**
+          - Statistical outliers (> 3 std): Winsorize or remove
+          - Domain-based outliers: Flag for review
+
+          **Type Corrections:**
+          - List columns needing type conversion
+          - Define parsing formats (dates, numbers)
+
+          Output a structured cleaning_plan with ordered steps.
+        tool_budget: 15
+        tools: [read]
+        llm_config:
+          temperature: 0.2
+        input_mapping:
+          report: quality_report
+          data_path: data_path
+        output: cleaning_plan
+        next: [execute_cleaning]
+
+      # =====================================================================
+      # Stage 4: Execute Cleaning (Compute - data transformations)
+      # =====================================================================
+      # COMPUTE: Cleaning is pandas transformation pipeline execution
+      # ─────────────────────────────────────────────────────────────────────
+      # Algorithm: Sequential pandas operations based on plan from agent:
+      #   - Missing: df.fillna(strategy), df.dropna(thresh)
+      #   - Duplicates: df.drop_duplicates(subset, keep)
+      #   - Outliers: df.clip(lower, upper) or df[mask]
+      #   - Types: df.astype(), pd.to_datetime(), pd.to_numeric()
+      #   - Backup: shutil.copy() before transformations
+      #
+      # WHY NOT AGENT: The plan_cleaning agent DECIDED the strategy.
+      # This node only EXECUTES those decisions - no reasoning needed.
+      # All transformations are deterministic pandas operations.
+      #
+      # Execution: in-process (pandas) or docker (large datasets)
+      # Docker: Recommended for datasets >500MB to isolate memory
+      #   Build: docker build -f docker/Dockerfile.dataanalysis -t victor-da .
+      #
+      # Constraints:
+      #   - filesystem_allowed: true (read input, write output + backup)
+      #   - write_allowed: true (creates cleaned file + backup)
+      #   - network_allowed: false (pure local operation)
+      - id: execute_cleaning
+        type: compute
+        name: "Execute Cleaning"
+        handler: data_cleaner
+        tools: [shell, read, write]
+        inputs:
+          data_path: $ctx.data_path
+          cleaning_plan: $ctx.cleaning_plan
+          options:
+            create_backup: true
+            preserve_column_order: true
+            preserve_types: true
+            log_transformations: true
+            handle_edge_cases: true
+        output: cleaned_data_path
+        constraints:
+          llm_allowed: false
+          filesystem_allowed: true     # Read/write data files
+          write_allowed: true          # Create cleaned output + backup
+          network_allowed: false       # Local operation only
+          timeout: 300
+        next: [validate_cleaning]
+
+      # =====================================================================
+      # Stage 5: Validation (Compute - statistical comparison)
+      # =====================================================================
+      # COMPUTE: Validation is deterministic comparison of metrics
+      # ─────────────────────────────────────────────────────────────────────
+      # Algorithm: Before/after statistical comparison:
+      #   - Re-run quality assessment on cleaned data
+      #   - Compare: new_score > old_score (quality_improved)
+      #   - Check: len(cleaned_df) >= 0.8 * len(original_df) (row_validation)
+      #   - Verify: critical_columns still exist and have valid types
+      #   - Corruption: Hash comparison or row count validation
+      #
+      # WHY NOT AGENT: All checks are boolean expressions with clear thresholds.
+      # "Did quality improve?" is comparing two numbers, not a judgment call.
+      # Pass/fail criteria are configured, not reasoned about.
+      #
+      # Execution: in-process (pandas, same as assessment)
+      #
+      # Constraints:
+      #   - filesystem_allowed: true (read cleaned file)
+      #   - write_allowed: false (validation is read-only)
+      #   - network_allowed: false (local comparison)
+      - id: validate_cleaning
+        type: compute
+        name: "Validate Cleaned Data"
+        handler: data_validator
+        tools: [read, shell]
+        inputs:
+          original_report: $ctx.quality_report
+          cleaned_path: $ctx.cleaned_data_path
+          validations:
+            quality_assessment:
+              run_full_assessment: true
+            comparisons:
+              before_after_metrics: true
+              check_corruption: true
+            row_validation:
+              expected_range: [0.8, 1.0]  # Allow up to 20% row reduction
+            column_validation:
+              critical_columns: $ctx.critical_columns
+              verify_intact: true
+          pass_criteria:
+            quality_improved: true
+            no_critical_loss: true
+            planned_fixes_applied: true
+        output: validation_result
+        constraints:
+          llm_allowed: false
+          filesystem_allowed: true     # Read cleaned file
+          write_allowed: false         # Validation is read-only
+          network_allowed: false       # Local comparison
+          timeout: 120
+        next: [update_iteration]
+
+      - id: update_iteration
+        type: transform
+        name: "Update Iteration Count"
+        transform: |
+          iteration = iteration + 1
+          validation_passed = validation_result.passed
+        next: [retry_check]
+
+      # =====================================================================
+      # Stage 6: Retry Loop
+      # =====================================================================
+      - id: retry_check
+        type: condition
+        name: "Check Retry Condition"
+        condition: "should_retry_cleaning"
+        branches:
+          "retry": assess_quality
+          "done": human_review
+          "default": human_review
+
+      # =====================================================================
+      # Stage 7: Human Review (Optional)
+      # =====================================================================
+      - id: human_review
+        type: hitl
+        name: "Review Cleaning Results"
+        hitl_type: review
+        prompt: |
+          ## Data Cleaning Complete
+
+          **Iterations:** {iteration}
+          **Final Quality Score:** {validation_result.quality_score}
+
+          **Summary of Changes:**
+          {cleaning_summary}
+
+          **Remaining Issues:**
+          {remaining_issues}
+
+          Please review and approve the cleaning results.
+        context_keys:
+          - iteration
+          - validation_result
+          - cleaning_summary
+          - remaining_issues
+        timeout: 900
+        fallback: continue
+        next: [document_changes]
+
+      # =====================================================================
+      # Stage 8: Documentation
+      # =====================================================================
+      - id: document_changes
+        type: agent
+        name: "Document Changes"
+        role: writer
+        goal: |
+          Create comprehensive documentation of the cleaning process:
+
+          1. **Data Lineage Report**
+             - Original data location and characteristics
+             - Cleaned data location
+             - All transformations applied
+
+          2. **Quality Improvement Summary**
+             - Before/after quality metrics
+             - Issues resolved
+
+          3. **Recommendations**
+             - Remaining data quality concerns
+             - Suggested process improvements
+
+          Save documentation as markdown file.
+        tool_budget: 15
+        tools: [write]
+        llm_config:
+          temperature: 0.4
+        input_mapping:
+          original_report: quality_report
+          final_result: validation_result
+          plan: cleaning_plan
+        output: documentation_path
+        next: [complete]
+
+      - id: complete
+        type: transform
+        name: "Mark Complete"
+        transform: |
+          workflow_status = "completed"
+          output_files = [cleaned_data_path, documentation_path]
+
+
+  # =========================================================================
+  # Quick Data Cleaning - Automated Fixes Only
+  # =========================================================================
+  # Lightweight variant for fast iteration without human review.
+  # Execution: in-process only (no docker overhead for quick mode)
+  # Use case: Initial exploration, CI pipelines, automated preprocessing
+  data_cleaning_quick:
+    description: "Quick automated data cleaning without human review"
+
+    metadata:
+      vertical: dataanalysis
+
+    nodes:
+      # COMPUTE: Quick assessment runs basic pandas stats only
+      # ─────────────────────────────────────────────────────────────────────
+      # Algorithm: df.describe() + df.isna().sum()
+      # Much lighter than full quality_assessor - no outlier detection,
+      # no type validation, no weighted scoring.
+      #
+      # WHY NOT AGENT: describe() and isna() are pure statistical summaries.
+      #
+      # Execution: in-process (pandas only)
+      # Constraints: Read-only, no network
+      - id: quick_assess
+        type: compute
+        name: "Quick Quality Assessment"
+        handler: stats_compute
+        inputs:
+          data: $ctx.data_path
+          operations: [describe, missing_counts]
+        output: quick_report
+        constraints:
+          llm_allowed: false
+          filesystem_allowed: true     # Read data file
+          network_allowed: false       # Local only
+          write_allowed: false         # Read-only
+          timeout: 30
+        next: [auto_clean]
+
+      - id: auto_clean
+        type: agent
+        name: "Automated Cleaning"
+        role: executor
+        goal: |
+          Apply standard cleaning operations:
+          1. Drop rows with > 50% missing values
+          2. Fill numeric missing with median
+          3. Fill categorical missing with mode
+          4. Remove exact duplicates
+          Be fast and don't overthink.
+        tool_budget: 15
+        tools: [shell, write]
+        llm_config:
+          temperature: 0.0
+          model_hint: claude-3-haiku
+        output: cleaned_path
+        next: [quick_summary]
+
+      - id: quick_summary
+        type: agent
+        name: "Quick Summary"
+        role: writer
+        goal: "Write a 3-sentence summary of what was cleaned."
+        tool_budget: 5
+        llm_config:
+          model_hint: claude-3-haiku
+        output: summary

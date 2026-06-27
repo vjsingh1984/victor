@@ -1,0 +1,76 @@
+# In-repo first-party verticals (folded under verticals/).
+# - Contract-boundary audit is BLOCKING: verticals must import only
+#   victor_contracts, never victor framework internals.
+# - Per-vertical test suites are BLOCKING (they pass green in-monorepo).
+# - Per-vertical lint: ruff is BLOCKING (each package's ruff config aligned with
+#   the framework's); black (formatting) + mypy (types) are ADVISORY while that
+#   folded-in debt is cleared.
+name: Verticals
+
+on:
+  push:
+    branches: [develop, main]
+    paths:
+      - 'verticals/**'
+      - 'victor/**'
+      - 'victor-contracts/**'
+      - 'scripts/ci/check_extracted_vertical_boundaries.py'
+      - '.github/workflows/verticals.yml'
+  pull_request:
+    branches: [develop, main]
+    paths:
+      - 'verticals/**'
+      - 'victor/**'
+      - 'victor-contracts/**'
+      - 'scripts/ci/check_extracted_vertical_boundaries.py'
+      - '.github/workflows/verticals.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  boundaries:
+    name: Contract-boundary audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Audit vertical contract boundaries
+        run: python scripts/ci/check_extracted_vertical_boundaries.py
+
+  test:
+    name: Vertical tests (Py${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install framework + contracts + verticals (editable)
+        run: make install-verticals
+      - name: Run vertical test suites
+        run: make test-verticals
+
+  lint:
+    name: Vertical lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install framework + contracts + verticals (editable)
+        run: make install-verticals
+      - name: Ruff (blocking)
+        run: make lint-verticals-ruff
+      - name: Black + mypy (advisory)
+        continue-on-error: true  # advisory while the folded verticals' format/type debt is cleared
+        run: make lint-verticals-fmt-types

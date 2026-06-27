@@ -50,6 +50,13 @@ from typing import (
     runtime_checkable,
 )
 
+# TreeSitterAnalysisProtocol now lives in victor_contracts (the contract
+# boundary). Re-export it here so existing
+# `from victor.framework.vertical_protocols import TreeSitterAnalysisProtocol`
+# keeps working AND the framework + verticals share the SAME protocol object
+# (the capability registry keys capabilities by class identity).
+from victor_contracts.verticals.protocols import TreeSitterAnalysisProtocol
+
 # =============================================================================
 # File Editing Protocols
 # =============================================================================
@@ -823,76 +830,8 @@ class TreeSitterExtractorProtocol(Protocol):
         ...
 
 
-@runtime_checkable
-class TreeSitterAnalysisProtocol(Protocol):
-    """Protocol for plugin-backed tree-sitter code analysis.
-
-    This protocol is intentionally analysis-level rather than parser-level so
-    root framework code can ask vertical packages for symbols, relationships,
-    imports, and chunking context without importing language-specific internals.
-    Implementations should return JSON-like dictionaries for cross-package
-    stability until these contracts are promoted to victor-contracts.
-    """
-
-    def supports_language(self, language: str) -> bool:
-        """Return whether enhanced tree-sitter analysis supports a language."""
-        ...
-
-    def parse(
-        self,
-        content: bytes,
-        language: str,
-        *,
-        file_path: Optional[str] = None,
-    ) -> Any:
-        """Parse source content and return an implementation-specific parse result.
-
-        Returns None when parsing is unavailable or unsupported.
-        """
-        ...
-
-    def extract_symbols(
-        self,
-        content: bytes,
-        language: str,
-        *,
-        file_path: str,
-    ) -> List[Dict[str, Any]]:
-        """Extract symbol dictionaries from source content."""
-        ...
-
-    def extract_edges(
-        self,
-        content: bytes,
-        language: str,
-        *,
-        file_path: str,
-    ) -> List[Dict[str, Any]]:
-        """Extract relationship edge dictionaries from source content."""
-        ...
-
-    def extract_imports(
-        self,
-        content: bytes,
-        language: str,
-        *,
-        file_path: Optional[str] = None,
-    ) -> List[str]:
-        """Extract import/module reference strings from source content."""
-        ...
-
-    def build_chunk_context(
-        self,
-        content: str,
-        language: str,
-        *,
-        file_path: Optional[str] = None,
-    ) -> Any:
-        """Build an implementation-specific AST chunking context.
-
-        Returns None when no structural chunking context is available.
-        """
-        ...
+# TreeSitterAnalysisProtocol is defined in victor_contracts and re-exported at
+# the top of this module (see the import there).
 
 
 # =============================================================================

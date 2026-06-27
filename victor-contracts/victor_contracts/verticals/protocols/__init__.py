@@ -51,6 +51,8 @@ from victor_contracts.verticals.protocols.capabilities import CapabilityProvider
 # Promoted protocols from victor.core.verticals.protocols
 # These allow external verticals to import from SDK instead of victor.core.*
 from victor_contracts.verticals.protocols.promoted import (
+    # Tree-sitter analysis
+    TreeSitterAnalysisProtocol,
     # Tool Selection
     ToolSelectionStrategyProtocol,
     VerticalToolSelectionProviderProtocol,
@@ -151,6 +153,8 @@ from victor_contracts.verticals.protocols.tool_plugins import (
 )
 
 __all__ = [
+    # Tree-sitter analysis (promoted from framework)
+    "TreeSitterAnalysisProtocol",
     # SDK-native protocols
     "ToolProvider",
     "ToolSelectionStrategy",
