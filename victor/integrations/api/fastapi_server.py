@@ -560,7 +560,7 @@ class VictorFastAPIServer:
         # Initialize EventBridge for real-time event streaming
         event_bus = get_observability_bus()
         self._event_bridge = EventBridge(event_bus)
-        self._event_bridge.start()
+        await self._event_bridge.async_start()
         logger.info("EventBridge started for real-time event streaming")
 
         # Initialize WorkflowEventBridge for workflow visualization
@@ -572,7 +572,7 @@ class VictorFastAPIServer:
 
         # Cleanup
         if self._event_bridge:
-            self._event_bridge.stop()
+            await self._event_bridge.async_stop()
         if self._workflow_event_bridge:
             await self._workflow_event_bridge.stop()
         if self._orchestrator:

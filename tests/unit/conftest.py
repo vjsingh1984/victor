@@ -627,6 +627,23 @@ def cleanup_dangling_asyncio_tasks():
         pass  # No event loop
 
 
+@pytest.fixture(autouse=True)
+def _reset_event_broadcaster_singleton():
+    """Isolate the process-wide ``EventBroadcaster`` singleton per unit test.
+
+    ``EventBroadcaster`` owns a loop-bound ``DeliveryEngine`` (event queue +
+    broadcast/sender tasks). Across pytest's function-scoped loops a leaked
+    singleton would be bound to a *closed* loop. ``reset_instance()`` disposes
+    it loop-safely (drops references when the bound loop is foreign/closed).
+    Shared here so EVERY bridge test file is isolated, not just one.
+    """
+    from victor.integrations.api.event_bridge import EventBroadcaster
+
+    EventBroadcaster.reset_instance()
+    yield
+    EventBroadcaster.reset_instance()
+
+
 @pytest.fixture(autouse=True, scope="session")
 def set_test_mode():
     """Set TEST_MODE environment variable to redirect test telemetry.
