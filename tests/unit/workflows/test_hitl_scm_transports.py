@@ -102,12 +102,24 @@ async def test_gitlab_mr_send_posts_note_and_poll_detects_approval(monkeypatch):
         monkeypatch,
         lambda m, u: (201, {"id": 99}) if m == "POST" else (200, {"approved": True}),
     )
-    t = GitLabMRTransport(GitLabConfig(token="tok", project_id="group/proj", mr_iid=7))
+    # Approve/reject links are only rendered when a callback URL is configured
+    # (_build_callback_urls omits them otherwise, to avoid dead links); a signing
+    # secret makes them tamper-proof. Configure both so the signed link renders.
+    monkeypatch.setenv("VICTOR_HITL_SIGNING_SECRET", "s3cr3t")
+    t = GitLabMRTransport(
+        GitLabConfig(
+            token="tok",
+            project_id="group/proj",
+            mr_iid=7,
+            callback_url="https://victor.test",
+        )
+    )
     ref = await t.send(_request(), "wf")
     note = next(c for c in calls if c["verb"] == "POST")
     assert "/merge_requests/7/notes" in note["url"]
     assert note["headers"]["PRIVATE-TOKEN"] == "tok"
     assert "Approve:" in note["json"]["body"]  # signed callback link rendered when configured
+    assert "token=" in note["json"]["body"]  # HMAC-signed
     assert ref == "gitlab:mr:7:note:99"
 
     resp = await t.poll("rid", ref)
