@@ -219,7 +219,8 @@ class RenameFileTransform(BaseTransform):
                             end_column=len(line),
                         ),
                         new_text=new_line,
-                        description=f"Update import from '{old_module}' to '{new_module}'",
+                        # human-readable preview text, not SQL
+                        description=f"Update import from '{old_module}' to '{new_module}'",  # nosemgrep: python.django.security.injection.tainted-sql-string.tainted-sql-string
                     )
                     preview.edits.append(edit)
 

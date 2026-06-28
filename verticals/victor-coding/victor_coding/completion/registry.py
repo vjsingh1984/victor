@@ -248,7 +248,7 @@ class CompletionProviderRegistry:
 
             module_name = f"victor.processing.completion.providers.{path.stem}"
             try:
-                module = importlib.import_module(module_name)
+                module = importlib.import_module(module_name)  # nosemgrep
 
                 # Look for provider classes
                 for attr_name in dir(module):

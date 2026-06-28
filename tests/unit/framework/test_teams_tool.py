@@ -69,15 +69,16 @@ class TestGetHeaders:
     """Tests for _get_headers function."""
 
     def test_headers_with_token(self):
-        """Should return headers with token."""
-        context = {"teams_access_token": "test_token"}
-        headers = _get_headers(context)
+        """Should return headers for an already-resolved bearer token."""
+        # _get_headers takes a resolved access-token string (token resolution
+        # lives in _resolve_access_token, covered in test_teams_tool_auth.py).
+        headers = _get_headers("test_token")
         assert headers["Authorization"] == "Bearer test_token"
         assert headers["Content-Type"] == "application/json"
 
     def test_headers_without_token(self):
-        """Should return headers with empty token."""
-        headers = _get_headers(None)
+        """An empty token yields an empty bearer (no credential)."""
+        headers = _get_headers("")
         assert headers["Authorization"] == "Bearer "
 
 

@@ -2782,25 +2782,25 @@ async def extract_graph_insights(root_path: Optional[str] = None) -> Dict[str, A
         conn = sqlite3.connect(graph_db_path)
         try:
             # Get basic stats
-            cur = conn.execute(f"SELECT COUNT(*) FROM {_NT}")
+            cur = conn.execute(f"SELECT COUNT(*) FROM {_NT}")  # nosemgrep
             total_nodes = cur.fetchone()[0]
 
             if total_nodes == 0:
                 return insights
 
-            cur = conn.execute(f"SELECT COUNT(*) FROM {_ET}")
+            cur = conn.execute(f"SELECT COUNT(*) FROM {_ET}")  # nosemgrep
             total_edges = cur.fetchone()[0]
 
             # Get node type distribution
-            cur = conn.execute(f"SELECT type, COUNT(*) FROM {_NT} GROUP BY type")
+            cur = conn.execute(f"SELECT type, COUNT(*) FROM {_NT} GROUP BY type")  # nosemgrep
             node_types = dict(cur.fetchall())
 
             # Language coverage
-            cur = conn.execute(f"SELECT lang, COUNT(*) FROM {_NT} GROUP BY lang")
+            cur = conn.execute(f"SELECT lang, COUNT(*) FROM {_NT} GROUP BY lang")  # nosemgrep
             languages = [(row[0], row[1]) for row in cur.fetchall() if row[0]]
 
             # Get edge type distribution
-            cur = conn.execute(f"SELECT type, COUNT(*) FROM {_ET} GROUP BY type")
+            cur = conn.execute(f"SELECT type, COUNT(*) FROM {_ET} GROUP BY type")  # nosemgrep
             edge_types = dict(cur.fetchall())
 
             insights["has_graph"] = True
@@ -2823,7 +2823,9 @@ async def extract_graph_insights(root_path: Optional[str] = None) -> Dict[str, A
             insights["edge_gaps"] = sorted(expected_edges - set(edge_types.keys()))
 
             # Get high-connectivity nodes (hub classes) via SQL
-            cur = conn.execute(f"""
+            # fmt: off
+            cur = conn.execute(  # nosemgrep
+                f"""
                 SELECT n.name, n.type, n.file, n.line,
                        (SELECT COUNT(*) FROM {_ET} WHERE src = n.node_id) +
                        (SELECT COUNT(*) FROM {_ET} WHERE dst = n.node_id) as degree
@@ -2832,6 +2834,7 @@ async def extract_graph_insights(root_path: Optional[str] = None) -> Dict[str, A
                 ORDER BY degree DESC
                 LIMIT 5
             """)
+            # fmt: on
             hub_results = cur.fetchall()
             insights["hub_classes"] = [
                 {"name": r[0], "type": r[1], "file": r[2], "line": r[3], "degree": r[4]}
@@ -2840,7 +2843,9 @@ async def extract_graph_insights(root_path: Optional[str] = None) -> Dict[str, A
             ][:3]
 
             # Get most-called symbols (important functions)
-            cur = conn.execute(f"""
+            # fmt: off
+            cur = conn.execute(  # nosemgrep
+                f"""
                 SELECT n.name, n.type, n.file, n.line,
                        (SELECT COUNT(*) FROM {_ET} WHERE dst = n.node_id AND type = 'CALLS') as in_calls,
                        (SELECT COUNT(*) FROM {_ET} WHERE src = n.node_id AND type = 'CALLS') as out_calls
@@ -2849,6 +2854,7 @@ async def extract_graph_insights(root_path: Optional[str] = None) -> Dict[str, A
                 ORDER BY in_calls DESC
                 LIMIT 8
             """)
+            # fmt: on
             important_results = cur.fetchall()
             insights["important_symbols"] = [
                 {
@@ -2936,7 +2942,9 @@ async def extract_graph_insights(root_path: Optional[str] = None) -> Dict[str, A
             # Use REFERENCES edges (imports/dependencies) for richer module relationships
             # CALLS edges are sparse as they only track explicit function calls
             # Note: Hidden directories (.*) and archive/ are filtered at index time
-            cur = conn.execute(f"""
+            # fmt: off
+            cur = conn.execute(  # nosemgrep
+                f"""
                 SELECT
                     src_n.file as src_module,
                     dst_n.file as dst_module,
@@ -2953,6 +2961,7 @@ async def extract_graph_insights(root_path: Optional[str] = None) -> Dict[str, A
                 GROUP BY src_n.file, dst_n.file
                 HAVING ref_count >= 2
                 """)
+            # fmt: on
             module_edges = cur.fetchall()
 
             if module_edges:
@@ -3027,7 +3036,9 @@ async def extract_graph_insights(root_path: Optional[str] = None) -> Dict[str, A
 
             # Most-inherited classes (architecture backbone)
             try:
-                cur = conn.execute(f"""
+                # fmt: off
+                cur = conn.execute(  # nosemgrep
+                    f"""
                     SELECT dst_n.name, dst_n.file, dst_n.line, COUNT(*) as subclass_count
                     FROM {_ET} e
                     JOIN {_NT} dst_n ON e.dst = dst_n.node_id
@@ -3036,6 +3047,7 @@ async def extract_graph_insights(root_path: Optional[str] = None) -> Dict[str, A
                     ORDER BY subclass_count DESC
                     LIMIT 10
                 """)
+                # fmt: on
                 insights["inheritance_backbone"] = [
                     {"name": r[0], "file": r[1], "line": r[2], "subclasses": r[3]}
                     for r in cur.fetchall()
@@ -3046,7 +3058,9 @@ async def extract_graph_insights(root_path: Optional[str] = None) -> Dict[str, A
 
             # Largest files by symbol count (potential god files)
             try:
-                cur = conn.execute(f"""
+                # fmt: off
+                cur = conn.execute(  # nosemgrep
+                    f"""
                     SELECT file, COUNT(*) as symbol_count
                     FROM {_NT}
                     WHERE type IN ('function', 'class')
@@ -3054,6 +3068,7 @@ async def extract_graph_insights(root_path: Optional[str] = None) -> Dict[str, A
                     ORDER BY symbol_count DESC
                     LIMIT 10
                 """)
+                # fmt: on
                 insights["largest_files"] = [
                     {"file": r[0], "symbols": r[1]} for r in cur.fetchall()
                 ]

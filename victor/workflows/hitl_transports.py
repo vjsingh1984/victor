@@ -52,11 +52,13 @@ from __future__ import annotations
 
 import asyncio
 import html
+import json
 import logging
 import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import (
+    TYPE_CHECKING,
     Any,
     Callable,
     Dict,
@@ -73,6 +75,9 @@ from victor.workflows.hitl import (
     HITLResponse,
     HITLStatus,
 )
+
+if TYPE_CHECKING:
+    from victor.core.identity import TokenCredential
 
 logger = logging.getLogger(__name__)
 
@@ -170,19 +175,28 @@ class SlackConfig(BaseTransportConfig):
 class TeamsConfig(BaseTransportConfig):
     """Configuration for Microsoft Teams approvals."""
 
+    # Entra (Azure AD) client-credentials — the authenticated delivery path.
+    # tenant_id is NOT a credential; it only scopes the token request. The
+    # client_id + client_secret are what authenticate the app.
+    tenant_id: Optional[str] = None  # Azure AD / Entra tenant (directory) ID
+    client_id: Optional[str] = None  # Entra app registration client ID
+    client_secret: Optional[str] = None  # Entra app client secret
+    # Microsoft Graph target for the approval message (required for Graph path).
+    team_id: Optional[str] = None  # Graph team (group) ID
+    channel_id: Optional[str] = None  # Graph channel ID
+    # Legacy incoming-webhook fallback (a secret URL, NOT Entra-authenticated).
     webhook_url: Optional[str] = None  # Incoming webhook URL
-    tenant_id: Optional[str] = None  # Azure AD tenant
-    client_id: Optional[str] = None  # Azure AD app client ID
-    client_secret: Optional[str] = None  # Azure AD app secret
 
     @classmethod
     def from_env(cls) -> "TeamsConfig":
         """Create config from environment variables."""
         return cls(
-            webhook_url=os.getenv("TEAMS_WEBHOOK_URL"),
             tenant_id=os.getenv("AZURE_TENANT_ID"),
             client_id=os.getenv("AZURE_CLIENT_ID"),
             client_secret=os.getenv("AZURE_CLIENT_SECRET"),
+            team_id=os.getenv("TEAMS_TEAM_ID"),
+            channel_id=os.getenv("TEAMS_CHANNEL_ID"),
+            webhook_url=os.getenv("TEAMS_WEBHOOK_URL"),
         )
 
 
@@ -431,14 +445,38 @@ class BaseTransport(ABC):
         return None
 
     def _build_callback_urls(self, request_id: str) -> Dict[str, str]:
-        """Build callback URLs for approve/reject actions."""
-        base_url = self.config.callback_url or ""
+        """Build approve/reject/details URLs for the approval message.
+
+        The public base URL comes from ``config.callback_url`` or the
+        ``VICTOR_HITL_CALLBACK_URL`` env var; without one the buttons are omitted
+        rather than rendered as dead links. When a signing secret is configured,
+        each approve/reject link carries an HMAC token binding (request_id,
+        action, expiry) so the decision cannot be forged, flipped or replayed.
+        """
+        base_url = (self.config.callback_url or os.getenv("VICTOR_HITL_CALLBACK_URL") or "").rstrip(
+            "/"
+        )
         if not base_url:
             return {}
 
+        from victor.workflows.hitl_signing import get_signing_secret, sign_action
+
+        secret = get_signing_secret()
+        if not secret:
+            logger.warning(
+                "HITL callback links are unsigned; set VICTOR_HITL_SIGNING_SECRET to "
+                "make approve/reject links tamper-proof."
+            )
+
+        def _action_url(action: str) -> str:
+            url = f"{base_url}/hitl/respond/{request_id}?action={action}"
+            if secret:
+                url += f"&token={sign_action(request_id, action, secret=secret)}"
+            return url
+
         return {
-            "approve_url": f"{base_url}/hitl/respond/{request_id}?action=approve",
-            "reject_url": f"{base_url}/hitl/respond/{request_id}?action=reject",
+            "approve_url": _action_url("approve"),
+            "reject_url": _action_url("reject"),
             "details_url": f"{base_url}/hitl/requests/{request_id}",
         }
 
@@ -676,6 +714,203 @@ class SlackTransport(BaseTransport):
         )
 
         return blocks
+
+
+# Microsoft Graph base for authenticated Teams delivery. Token acquisition lives
+# in victor.core.identity (a TokenCredential), injected into this transport.
+_GRAPH_API_BASE = "https://graph.microsoft.com/v1.0"
+
+
+class TeamsTransport(BaseTransport):
+    """Microsoft Teams HITL transport.
+
+    Authenticated delivery uses the Entra (Azure AD) **client-credentials**
+    flow: ``client_id`` + ``client_secret`` are exchanged at the tenant's token
+    endpoint for a Microsoft Graph access token, which is then used as a Bearer
+    token to post an Adaptive Card approval message to a channel. The
+    ``tenant_id`` is only the directory scope in the token URL — it is not a
+    credential and is never sent as one.
+
+    Token acquisition is delegated to an injected
+    :class:`~victor.core.identity.TokenCredential` (Dependency Inversion). When
+    none is supplied, one is built lazily from the config's Entra
+    client-credentials. If neither a credential nor a Graph target
+    (``team_id``/``channel_id``) is available, the transport falls back to a
+    legacy Teams *incoming webhook* — a secret URL (no Entra auth), logged as such.
+    """
+
+    def __init__(
+        self,
+        config: TeamsConfig,
+        credential: Optional["TokenCredential"] = None,
+    ):
+        super().__init__(config)
+        self.teams_config = config
+        self._message_ids: Dict[str, str] = {}  # request_id -> Graph message id
+        # Injected token source (DIP); built lazily from config when not provided.
+        self._credential = credential
+
+    @property
+    def mode(self) -> HITLMode:
+        return HITLMode.TEAMS
+
+    def _resolve_credential(self) -> Optional["TokenCredential"]:
+        """Return the injected credential, or build one from config (cached).
+
+        Returns None when neither an explicit credential nor Entra
+        client-credentials config is available, so the caller can fall back to
+        the webhook path.
+        """
+        if self._credential is not None:
+            return self._credential
+        cfg = self.teams_config
+        if cfg.tenant_id and cfg.client_id and cfg.client_secret:
+            from victor.core.identity import build_entra_credential
+
+            self._credential = build_entra_credential(
+                tenant_id=cfg.tenant_id,
+                client_id=cfg.client_id,
+                client_secret=cfg.client_secret,
+            )
+        return self._credential
+
+    def _can_use_graph(self) -> bool:
+        """True when a token credential AND a Graph target are available."""
+        cfg = self.teams_config
+        return bool(self._resolve_credential() and cfg.team_id and cfg.channel_id)
+
+    async def send(self, request: HITLRequest, workflow_id: str) -> str:
+        """Send a Teams approval card; returns the external message reference."""
+        import aiohttp
+
+        cfg = self.teams_config
+        urls = self._build_callback_urls(request.request_id)
+        card = self._build_adaptive_card(request, workflow_id, urls)
+
+        # Preferred path: authenticated Microsoft Graph. The token comes from the
+        # injected/derived TokenCredential — this transport never mints it itself.
+        credential = self._resolve_credential()
+        if credential is not None and cfg.team_id and cfg.channel_id:
+            from victor.core.identity import GRAPH_DEFAULT_SCOPE
+
+            token = (await credential.get_token(GRAPH_DEFAULT_SCOPE)).token
+            url = f"{_GRAPH_API_BASE}/teams/{cfg.team_id}/channels/{cfg.channel_id}/messages"
+            body = {
+                "body": {
+                    "contentType": "html",
+                    "content": '<attachment id="approval-card"></attachment>',
+                },
+                "attachments": [
+                    {
+                        "id": "approval-card",
+                        "contentType": "application/vnd.microsoft.card.adaptive",
+                        "content": json.dumps(card),
+                    }
+                ],
+            }
+            headers = {
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json",
+            }
+            async with aiohttp.ClientSession() as session:
+                async with session.post(url, json=body, headers=headers) as resp:
+                    data = await resp.json()
+                    if resp.status >= 300:
+                        logger.error(f"Teams Graph API error ({resp.status}): {data}")
+                        raise RuntimeError(f"Teams message send failed: {data.get('error', data)}")
+                    external_ref = str(data.get("id", request.request_id))
+            self._message_ids[request.request_id] = external_ref
+            logger.info(f"Sent Teams approval card via Graph for {request.request_id}")
+            return external_ref
+
+        # Fallback: legacy incoming webhook — a secret URL, NOT Entra-authenticated.
+        if cfg.webhook_url:
+            payload = {
+                "type": "message",
+                "attachments": [
+                    {
+                        "contentType": "application/vnd.microsoft.card.adaptive",
+                        "content": card,
+                    }
+                ],
+            }
+            async with aiohttp.ClientSession() as session:
+                async with session.post(cfg.webhook_url, json=payload) as resp:
+                    if resp.status >= 300:
+                        logger.error(f"Teams webhook error ({resp.status})")
+            logger.warning(
+                "Sent Teams approval via incoming webhook (no Entra auth). Configure "
+                "AZURE_TENANT_ID/AZURE_CLIENT_ID/AZURE_CLIENT_SECRET + "
+                "TEAMS_TEAM_ID/TEAMS_CHANNEL_ID for authenticated delivery."
+            )
+            return request.request_id
+
+        raise ValueError(
+            "Teams transport not configured. Provide Entra client-credentials "
+            "(AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET) plus a Graph "
+            "target (TEAMS_TEAM_ID, TEAMS_CHANNEL_ID), or a TEAMS_WEBHOOK_URL fallback."
+        )
+
+    async def poll(
+        self,
+        request_id: str,
+        external_ref: str,
+        timeout: Optional[float] = None,
+    ) -> Optional[HITLResponse]:
+        """Responses arrive via the approve/reject callback URLs — nothing to poll."""
+        return None
+
+    def _build_adaptive_card(
+        self,
+        request: HITLRequest,
+        workflow_id: str,
+        urls: Dict[str, str],
+    ) -> Dict[str, Any]:
+        """Build an Adaptive Card payload for the approval request."""
+        body: List[Dict[str, Any]] = [
+            {
+                "type": "TextBlock",
+                "size": "Large",
+                "weight": "Bolder",
+                "text": "🔔 Approval Required",
+            },
+            {
+                "type": "FactSet",
+                "facts": [
+                    {"title": "Workflow", "value": workflow_id},
+                    {"title": "Request ID", "value": f"{request.request_id[:12]}..."},
+                    {"title": "Timeout", "value": f"{request.timeout}s"},
+                ],
+            },
+            {"type": "TextBlock", "text": request.prompt, "wrap": True},
+        ]
+        if request.context:
+            body.append(
+                {
+                    "type": "FactSet",
+                    "facts": [
+                        {"title": str(k), "value": str(v)} for k, v in request.context.items()
+                    ],
+                }
+            )
+
+        actions: List[Dict[str, Any]] = []
+        if urls.get("approve_url"):
+            actions.append(
+                {"type": "Action.OpenUrl", "title": "✓ Approve", "url": urls["approve_url"]}
+            )
+        if urls.get("reject_url"):
+            actions.append(
+                {"type": "Action.OpenUrl", "title": "✗ Reject", "url": urls["reject_url"]}
+            )
+
+        return {
+            "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+            "type": "AdaptiveCard",
+            "version": "1.4",
+            "body": body,
+            "actions": actions,
+        }
 
 
 class SMSTransport(BaseTransport):
@@ -1023,6 +1258,7 @@ _TRANSPORT_REGISTRY: Dict[HITLMode, Type[BaseTransport]] = {
     HITLMode.EMAIL: EmailTransport,
     HITLMode.SMS: SMSTransport,
     HITLMode.SLACK: SlackTransport,
+    HITLMode.TEAMS: TeamsTransport,
     HITLMode.GITHUB_PR: GitHubPRTransport,
     HITLMode.GITHUB_CHECK: GitHubCheckTransport,
     HITLMode.CUSTOM_HOOK: CustomHookTransport,
@@ -1129,6 +1365,7 @@ __all__ = [
     "EmailTransport",
     "SMSTransport",
     "SlackTransport",
+    "TeamsTransport",
     "GitHubPRTransport",
     "GitHubCheckTransport",
     "CustomHookTransport",

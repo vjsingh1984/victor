@@ -16,7 +16,7 @@ category = "data"
 tags = ["data-analysis", "pandas", "visualization", "statistics", "ml"]
 
 [vertical.class]
-module = "victor.dataanalysis.data_assistant"
+module = "victor_dataanalysis.assistant"
 class_name = "DataAnalysisAssistant"
 provides_tools = [
     "read_csv",

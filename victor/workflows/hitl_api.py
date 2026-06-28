@@ -1071,6 +1071,33 @@ except ImportError:
     ResponseSubmit = None  # type: ignore
 
 
+def _render_decision_page(title: str, message: str, *, ok: bool) -> str:
+    """Render a minimal confirmation page shown after a signed approve/reject click."""
+    import html as _html
+
+    accent = "#16a34a" if ok else "#dc2626"
+    icon = "✓" if ok else "✕"
+    return f"""<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{_html.escape(title)}</title>
+<style>
+  body {{ font-family: system-ui, -apple-system, sans-serif; background: #0b0f17;
+         color: #e5e7eb; display: flex; min-height: 100vh; margin: 0;
+         align-items: center; justify-content: center; }}
+  .card {{ background: #111827; border: 1px solid #1f2937; border-radius: 14px;
+          padding: 40px 48px; max-width: 460px; text-align: center; }}
+  .icon {{ font-size: 44px; color: {accent}; }}
+  h1 {{ font-size: 20px; margin: 16px 0 8px; }}
+  p {{ color: #9ca3af; line-height: 1.5; }}
+</style></head>
+<body><div class="card">
+  <div class="icon">{icon}</div>
+  <h1>{_html.escape(title)}</h1>
+  <p>{_html.escape(message)}</p>
+</div></body></html>"""
+
+
 def create_hitl_router(
     store: Optional[HITLStore] = None,
     require_auth: bool = False,
@@ -1087,7 +1114,7 @@ def create_hitl_router(
         FastAPI APIRouter
     """
     try:
-        from fastapi import APIRouter, Body, HTTPException, Header
+        from fastapi import APIRouter, Body, HTTPException, Header, Query
         from fastapi.responses import HTMLResponse
     except ImportError:
         raise ImportError("FastAPI is required for HITL API. Install with: pip install fastapi")
@@ -1144,6 +1171,58 @@ def create_hitl_router(
         if not response:
             raise HTTPException(status_code=404, detail="Request not found or already processed")
         return {"success": True, "response": response.to_dict()}
+
+    @router.get("/respond/{request_id}", response_class=HTMLResponse)
+    async def submit_response_via_link(
+        request_id: str,
+        action: str = Query(..., pattern="^(approve|reject)$"),
+        token: Optional[str] = Query(None),
+        reason: Optional[str] = Query(None),
+    ):
+        """Browser-clickable approve/reject from a signed message link.
+
+        This is the receiving end of the approve/reject buttons embedded in
+        Slack/Teams/email approval messages. Authentication is the **signed
+        token** (not the bearer header used by the POST endpoint): it binds
+        (request_id, action, expiry) with an HMAC so a link cannot be forged or
+        flipped. Replay of an already-decided request is rejected by the store.
+        """
+        from victor.workflows.hitl_signing import get_signing_secret, verify_action
+
+        secret = get_signing_secret()
+        if secret and not verify_action(request_id, action, token, secret=secret):
+            return HTMLResponse(
+                status_code=403,
+                content=_render_decision_page(
+                    "Link invalid or expired",
+                    "This approval link is invalid, expired, or has been tampered with.",
+                    ok=False,
+                ),
+            )
+
+        response = await hitl_store.submit_response(
+            request_id=request_id,
+            approved=(action == "approve"),
+            reason=reason or f"Responded via signed link ({action})",
+        )
+        if not response:
+            return HTMLResponse(
+                status_code=409,
+                content=_render_decision_page(
+                    "Already decided",
+                    "This request was not found or has already been responded to.",
+                    ok=False,
+                ),
+            )
+
+        verb = "approved" if action == "approve" else "rejected"
+        return HTMLResponse(
+            content=_render_decision_page(
+                f"Request {verb}",
+                f"You have {verb} request {request_id[:12]}…. You may close this tab.",
+                ok=True,
+            )
+        )
 
     @router.get("/ui", response_class=HTMLResponse)
     async def hitl_ui():

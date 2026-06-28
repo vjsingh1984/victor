@@ -16,7 +16,7 @@ category = "research"
 tags = ["research", "web-search", "citations", "literature-review", "synthesis"]
 
 [vertical.class]
-module = "victor_research.research_assistant"
+module = "victor_research.assistant"
 class_name = "ResearchAssistant"
 provides_tools = [
     "web_search",

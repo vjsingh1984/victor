@@ -16,7 +16,7 @@ category = "development"
 tags = ["coding", "editing", "refactoring", "testing", "ast", "code-review"]
 
 [vertical.class]
-module = "victor_coding.coding_assistant"
+module = "victor_coding.assistant"
 class_name = "CodingAssistant"
 provides_tools = [
     "read",

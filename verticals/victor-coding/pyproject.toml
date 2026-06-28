@@ -7,7 +7,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "victor-coding"
-version = "0.7.0"
+version = "0.7.1"
 description = "Coding vertical for Victor AI - Software development, debugging, and code generation"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -38,6 +38,7 @@ dependencies = [
     "victor-contracts[yaml]>=0.6.0,<1.0",  # Definition-layer contract for external verticals
     "numpy>=1.24,<2.3",  # Required by victor.storage.embeddings; numba-compatible
     "victor-codegraph[treesitter]>=0.1.0",  # Shared code->CPG chunker (ADR-014); [treesitter] supplies the grammars the delegation parses JS/Go/TS/Rust with
+    "defusedxml>=0.7,<1.0",  # XXE-hardened XML parsing for coverage reports
 ]
 
 [project.optional-dependencies]
@@ -57,8 +58,8 @@ proximadb = [
     "proximadb>=0.2,<0.3",
 ]
 # Shared code->CPG chunker (ADR-014). Opt-in: when installed AND
-# VICTOR_CODING_USE_CODEGRAPH=1, CodeChunker delegates to it. Editable-only until
-# published: pip install -e ../../victor-codegraph
+# VICTOR_CODING_USE_CODEGRAPH=1, CodeChunker delegates to it. Published on PyPI
+# (`pip install victor-codegraph`); for local source work: pip install -e ../../victor-codegraph
 codegraph = [
     "victor-codegraph>=0.1.0,<1.0",
 ]

@@ -29,12 +29,34 @@ from victor.core.events import MessagingEvent
 
 @pytest.fixture(autouse=True)
 def reset_event_broadcaster_singleton():
-    """Avoid carrying the singleton broadcaster across function-scoped event loops."""
+    """Isolate the process-wide ``EventBroadcaster`` singleton per test.
+
+    ``EventBroadcaster`` is a ``__new__``-based singleton, so its loop-bound
+    state (``_loop``, ``_broadcast_task``, per-client sender tasks/queues)
+    survives across pytest's function-scoped event loops. If it leaks into a
+    later test it runs on a closed loop — delivery silently stalls (the burst
+    test then times out) or the next loop lookup raises. Reset BEFORE and AFTER
+    each test, cancelling any stale loop-bound task so every test starts with a
+    fresh broadcaster bound to its own loop.
+    """
+
+    def _reset():
+        from victor.integrations.api.event_bridge import EventBroadcaster
+
+        inst = EventBroadcaster._instance
+        if inst is not None:
+            inst._running = False
+            task = getattr(inst, "_broadcast_task", None)
+            if task is not None and not task.done():
+                task.cancel()  # safe cross-loop: requests cancellation only
+            inst._broadcast_task = None
+            inst._cancel_client_sender_tasks()
+            inst._clients.clear()
+        EventBroadcaster._instance = None
+
+    _reset()
     yield
-
-    from victor.integrations.api.event_bridge import EventBroadcaster
-
-    EventBroadcaster._instance = None
+    _reset()
 
 
 class TestEventBridgeEventTypes:
@@ -292,7 +314,11 @@ class TestEventBridgeReliability:
         async def send_func(message: str):
             received.append(json.loads(message))
 
-        async def wait_for(predicate, timeout: float = 2.0):
+        # Generous deadline: this poller returns the instant the predicate is
+        # true (10ms poll), so a wide timeout costs nothing on success and only
+        # tolerates a saturated CI runner (the full test matrix runs 72 jobs in
+        # parallel). 2.0s was too tight and flaked under load.
+        async def wait_for(predicate, timeout: float = 15.0):
             deadline = asyncio.get_running_loop().time() + timeout
             while asyncio.get_running_loop().time() < deadline:
                 if predicate():
