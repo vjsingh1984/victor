@@ -22,15 +22,26 @@ from typing import Any, List
 
 
 def get_table_names(db: Any) -> List[str]:
-    """Get table names with backward/forward LanceDB API compatibility."""
+    """Get table names with backward/forward LanceDB API compatibility.
+
+    Prefers ``list_tables()`` (canonical on current versions; avoids the
+    ``table_names()`` deprecation warning) but falls back to ``table_names()``
+    when ``list_tables()`` is absent OR returns empty — some versions report an
+    empty list from ``list_tables()`` while ``table_names()`` still lists the
+    tables.
+    """
     if hasattr(db, "list_tables"):
         response = db.list_tables()
         if hasattr(response, "tables"):
-            return list(response.tables)
-        return list(response) if response else []
+            names = list(response.tables)
+        else:
+            names = list(response) if response else []
+        if names:
+            return names
     if hasattr(db, "table_names"):
-        # Legacy LanceDB: list_tables() did not exist yet. table_names() is
-        # deprecated on current versions but is the only option here.
+        # Legacy LanceDB (no list_tables) OR list_tables() returned empty on a
+        # version where table_names() still lists the tables. table_names() is
+        # deprecated on current versions, so silence the warning here.
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", DeprecationWarning)
             result = db.table_names()
