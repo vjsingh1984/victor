@@ -498,6 +498,9 @@ class HITLResponse:
         value: Selected/input value (for CHOICE/INPUT/REVIEW)
         modifications: Modified data (for REVIEW)
         reason: Optional explanation for decision
+        responder: Identity of the human who responded (e.g. "Ada <ada@x.com>"),
+            populated by the delegated/SSO approval flow; None for anonymous or
+            programmatic responses
         responded_at: When response was provided
     """
 
@@ -507,6 +510,7 @@ class HITLResponse:
     value: Optional[Any] = None
     modifications: Optional[Dict[str, Any]] = None
     reason: Optional[str] = None
+    responder: Optional[str] = None
     responded_at: datetime = field(default_factory=_utc_now)
 
     def to_dict(self) -> Dict[str, Any]:
@@ -518,6 +522,7 @@ class HITLResponse:
             "value": self.value,
             "modifications": self.modifications,
             "reason": self.reason,
+            "responder": self.responder,
             "responded_at": self.responded_at.isoformat(),
         }
 
