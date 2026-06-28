@@ -528,8 +528,14 @@ class TestAdapterProtocolConformance:
         assert metadata["continuation_ledger"].startswith("Intent:")
 
 
+@pytest.mark.filterwarnings("ignore::DeprecationWarning")
 class TestChatServiceBootstrapLaziness:
-    """Chat service bootstrap should not force deprecated coordinator init."""
+    """Chat service bootstrap should not force deprecated coordinator init.
+
+    These tests exercise ``orchestrator.chat()``/``orchestrator.stream_chat()``
+    — deprecated delegation shims to ``ChatService``. The deprecation is
+    expected here; the tests assert delegation/laziness behavior, not the warning.
+    """
 
     def test_initialize_services_keeps_chat_and_tool_coordinators_lazy(self):
         from victor.agent.orchestrator import AgentOrchestrator

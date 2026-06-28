@@ -23,7 +23,13 @@ import pytest
 from unittest.mock import patch
 from docker.errors import DockerException
 
-from victor.tools.code_executor_tool import CodeSandbox
+# CodeSandbox migrated from victor.tools.code_executor_tool to the external
+# victor-coding package (resolution chain in
+# victor/core/utils/capability_loader.py). Skip the whole module when
+# victor-coding isn't installed rather than breaking collection for the rest
+# of the suite.
+pytest.importorskip("victor_coding")
+from victor_coding.tools.code_executor_tool import CodeSandbox  # noqa: E402
 
 
 class TestDockerAvailability:
