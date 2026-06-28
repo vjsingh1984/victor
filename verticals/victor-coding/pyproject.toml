@@ -158,6 +158,7 @@ packages = [
     "victor_coding.rl",
     "victor_coding.teams",
     "victor_coding.testgen",
+    "victor_coding.tools",
     "victor_coding.workflows",
 ]
 
