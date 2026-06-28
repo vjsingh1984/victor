@@ -292,7 +292,11 @@ class TestEventBridgeReliability:
         async def send_func(message: str):
             received.append(json.loads(message))
 
-        async def wait_for(predicate, timeout: float = 2.0):
+        # Generous deadline: this poller returns the instant the predicate is
+        # true (10ms poll), so a wide timeout costs nothing on success and only
+        # tolerates a saturated CI runner (the full test matrix runs 72 jobs in
+        # parallel). 2.0s was too tight and flaked under load.
+        async def wait_for(predicate, timeout: float = 15.0):
             deadline = asyncio.get_running_loop().time() + timeout
             while asyncio.get_running_loop().time() < deadline:
                 if predicate():
