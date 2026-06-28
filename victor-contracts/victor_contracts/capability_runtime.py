@@ -15,14 +15,18 @@ if TYPE_CHECKING:
 
 __all__ = [
     "TreeSitterParserProtocol",
+    "TreeSitterAnalysisProtocol",
     "EditorProtocol",
     "CodebaseIndexFactoryProtocol",
     "create_lazy_capability_proxy",
     "detect_enhanced_index_factory",
+    "get_capability_provider",
+    "is_capability_enhanced",
 ]
 
 _LAZY_IMPORTS = {
     "TreeSitterParserProtocol": "victor.framework.vertical_protocols",
+    "TreeSitterAnalysisProtocol": "victor.framework.vertical_protocols",
     "EditorProtocol": "victor.framework.vertical_protocols",
     "CodebaseIndexFactoryProtocol": "victor.framework.vertical_protocols",
     "detect_enhanced_index_factory": "victor.core.search.indexer",
@@ -49,6 +53,34 @@ def create_lazy_capability_proxy(provider: Callable[[], Any] | Any) -> Any:
         return proxy_type(provider)
     except ImportError:
         return _SdkLazyCapabilityProxy(provider)
+
+
+def get_capability_provider(protocol: Any) -> Any:
+    """Look up a registered capability provider by protocol.
+
+    Runtime bridge to the host's ``CapabilityRegistry`` — extracted verticals call
+    this instead of importing ``victor.core.capability_registry`` directly. Returns
+    ``None`` if the host runtime or the provider is unavailable.
+    """
+    try:
+        registry_mod = importlib.import_module("victor.core.capability_registry")
+        registry = registry_mod.CapabilityRegistry.get_instance()
+        return registry.get(protocol)
+    except Exception:
+        return None
+
+
+def is_capability_enhanced(protocol: Any) -> bool:
+    """Check if a capability provider is registered as ENHANCED.
+
+    Runtime bridge to ``CapabilityRegistry.is_enhanced()`` for extracted verticals.
+    """
+    try:
+        registry_mod = importlib.import_module("victor.core.capability_registry")
+        registry = registry_mod.CapabilityRegistry.get_instance()
+        return registry.is_enhanced(protocol)
+    except Exception:
+        return False
 
 
 class _SdkLazyCapabilityProxy:
