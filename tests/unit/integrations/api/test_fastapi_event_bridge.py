@@ -26,7 +26,6 @@ import pytest
 
 from victor.core.events import MessagingEvent
 
-
 # EventBroadcaster singleton isolation is handled by the shared autouse fixture
 # `_reset_event_broadcaster_singleton` in tests/unit/conftest.py (covers every
 # bridge test file, not just this one), via EventBroadcaster.reset_instance().
