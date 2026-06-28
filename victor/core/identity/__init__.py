@@ -34,6 +34,14 @@ from victor.core.identity.factory import (
     default_graph_credential,
     graph_credential_from_env,
 )
+from victor.core.identity.oidc import (
+    OidcConfig,
+    UserIdentity,
+    build_authorize_url,
+    exchange_code,
+    fetch_user_identity,
+    resolve_identity_from_code,
+)
 from victor.core.identity.protocols import (
     AccessToken,
     CredentialUnavailableError,
@@ -66,6 +74,13 @@ __all__ = [
     "build_entra_credential",
     "graph_credential_from_env",
     "default_graph_credential",
+    # Delegated / SSO (user identity)
+    "OidcConfig",
+    "UserIdentity",
+    "build_authorize_url",
+    "exchange_code",
+    "fetch_user_identity",
+    "resolve_identity_from_code",
     # Constants
     "ENTRA_AUTHORITY",
     "GRAPH_DEFAULT_SCOPE",

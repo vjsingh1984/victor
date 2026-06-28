@@ -235,6 +235,7 @@ class HITLStore:
         value: Optional[Any] = None,
         modifications: Optional[Dict[str, Any]] = None,
         reason: Optional[str] = None,
+        responder: Optional[str] = None,
     ) -> Optional[HITLResponse]:
         """Submit a response to a HITL request.
 
@@ -244,6 +245,7 @@ class HITLStore:
             value: Value for choice/input types
             modifications: Modifications for review type
             reason: Optional reason/comment
+            responder: Identity of the human who responded (delegated/SSO flow)
 
         Returns:
             HITLResponse or None if request not found
@@ -273,6 +275,7 @@ class HITLStore:
                 value=value,
                 modifications=modifications,
                 reason=reason,
+                responder=responder,
             )
 
             stored.response = response
@@ -685,6 +688,7 @@ class SQLiteHITLStore:
         value: Optional[Any] = None,
         modifications: Optional[Dict[str, Any]] = None,
         reason: Optional[str] = None,
+        responder: Optional[str] = None,
     ) -> Optional[HITLResponse]:
         """Submit a response to a HITL request.
 
@@ -694,6 +698,7 @@ class SQLiteHITLStore:
             value: Value for choice/input types
             modifications: Modifications for review type
             reason: Optional reason/comment
+            responder: Identity of the human who responded (delegated/SSO flow)
 
         Returns:
             HITLResponse or None if request not found
@@ -729,6 +734,7 @@ class SQLiteHITLStore:
                     value=value,
                     modifications=modifications,
                     reason=reason,
+                    responder=responder,
                     responded_at=now,
                 )
 
@@ -1115,13 +1121,60 @@ def create_hitl_router(
     """
     try:
         from fastapi import APIRouter, Body, HTTPException, Header, Query
-        from fastapi.responses import HTMLResponse
+        from fastapi.responses import HTMLResponse, RedirectResponse
     except ImportError:
         raise ImportError("FastAPI is required for HITL API. Install with: pip install fastapi")
 
     router = APIRouter(tags=["hitl"])
     hitl_store = store or get_global_store()
     expected_token = auth_token or os.environ.get("HITL_AUTH_TOKEN")
+
+    # Delegated/SSO identity capture is opt-in: configured -> approve/reject links
+    # route through an Entra sign-in so the decision records *who* approved.
+    from victor.core.identity import OidcConfig
+
+    oidc_config = OidcConfig.from_env()
+
+    def _encode_state(request_id: str, action: str, token: Optional[str]) -> str:
+        return f"{request_id}|{action}|{token or ''}"
+
+    def _decode_state(state: str) -> tuple:
+        parts = state.split("|", 2)
+        if len(parts) != 3:
+            return "", "", ""
+        return parts[0], parts[1], parts[2]
+
+    async def _record_decision(
+        request_id: str,
+        action: str,
+        reason: Optional[str],
+        responder: Optional[str],
+    ):
+        """Record an approve/reject and render the confirmation/error page."""
+        response = await hitl_store.submit_response(
+            request_id=request_id,
+            approved=(action == "approve"),
+            reason=reason or f"Responded via signed link ({action})",
+            responder=responder,
+        )
+        if not response:
+            return HTMLResponse(
+                status_code=409,
+                content=_render_decision_page(
+                    "Already decided",
+                    "This request was not found or has already been responded to.",
+                    ok=False,
+                ),
+            )
+        verb = "approved" if action == "approve" else "rejected"
+        by = f" by {responder}" if responder else ""
+        return HTMLResponse(
+            content=_render_decision_page(
+                f"Request {verb}",
+                f"Request {request_id[:12]}… {verb}{by}. You may close this tab.",
+                ok=True,
+            )
+        )
 
     async def verify_auth(authorization: Optional[str] = Header(None)):
         """Verify authentication if required."""
@@ -1200,29 +1253,86 @@ def create_hitl_router(
                 ),
             )
 
-        response = await hitl_store.submit_response(
-            request_id=request_id,
-            approved=(action == "approve"),
-            reason=reason or f"Responded via signed link ({action})",
-        )
-        if not response:
+        # Delegated/SSO: send the approver to Entra sign-in first so the decision
+        # records their identity. The signed token rides along as `state` and is
+        # re-verified on return.
+        if oidc_config is not None:
+            from victor.core.identity import build_authorize_url
+
+            authorize_url = build_authorize_url(
+                oidc_config, state=_encode_state(request_id, action, token)
+            )
+            return RedirectResponse(url=authorize_url, status_code=302)
+
+        # No SSO configured -> record the decision anonymously.
+        return await _record_decision(request_id, action, reason, responder=None)
+
+    @router.get("/auth/callback", response_class=HTMLResponse)
+    async def auth_callback(
+        code: Optional[str] = Query(None),
+        state: str = Query(...),
+        error: Optional[str] = Query(None),
+        error_description: Optional[str] = Query(None),
+    ):
+        """OIDC redirect target: resolve the signed-in approver, record the decision.
+
+        Entra redirects here after the approver authenticates. We re-verify the
+        signed token carried in ``state`` (so the decision is still bound to the
+        original request/action), exchange the auth ``code`` for the approver's
+        identity via Microsoft Graph ``/me``, and record the decision with that
+        identity attached.
+        """
+        from victor.workflows.hitl_signing import get_signing_secret, verify_action
+
+        if error or not code:
             return HTMLResponse(
-                status_code=409,
+                status_code=400,
                 content=_render_decision_page(
-                    "Already decided",
-                    "This request was not found or has already been responded to.",
+                    "Sign-in failed",
+                    error_description or error or "No authorization code was returned.",
                     ok=False,
                 ),
             )
 
-        verb = "approved" if action == "approve" else "rejected"
-        return HTMLResponse(
-            content=_render_decision_page(
-                f"Request {verb}",
-                f"You have {verb} request {request_id[:12]}…. You may close this tab.",
-                ok=True,
+        request_id, action, token = _decode_state(state)
+        if action not in ("approve", "reject"):
+            return HTMLResponse(
+                status_code=400,
+                content=_render_decision_page(
+                    "Invalid request", "The sign-in state was malformed.", ok=False
+                ),
             )
-        )
+
+        secret = get_signing_secret()
+        if secret and not verify_action(request_id, action, token, secret=secret):
+            return HTMLResponse(
+                status_code=403,
+                content=_render_decision_page(
+                    "Link invalid or expired",
+                    "This approval link is invalid, expired, or has been tampered with.",
+                    ok=False,
+                ),
+            )
+
+        responder = None
+        if oidc_config is not None:
+            from victor.core.identity import resolve_identity_from_code
+
+            try:
+                identity = await resolve_identity_from_code(oidc_config, code)
+                responder = identity.label()
+            except Exception as exc:  # pragma: no cover - network/identity failure
+                logger.error(f"HITL SSO identity resolution failed: {exc}")
+                return HTMLResponse(
+                    status_code=502,
+                    content=_render_decision_page(
+                        "Could not verify identity",
+                        "Sign-in succeeded but your identity could not be resolved.",
+                        ok=False,
+                    ),
+                )
+
+        return await _record_decision(request_id, action, reason=None, responder=responder)
 
     @router.get("/ui", response_class=HTMLResponse)
     async def hitl_ui():
