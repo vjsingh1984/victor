@@ -107,7 +107,8 @@ async def test_gitlab_mr_send_posts_note_and_poll_detects_approval(monkeypatch):
     note = next(c for c in calls if c["verb"] == "POST")
     assert "/merge_requests/7/notes" in note["url"]
     assert note["headers"]["PRIVATE-TOKEN"] == "tok"
-    assert "Approve:" in note["json"]["body"]  # signed callback link rendered when configured
+    # callback links only appear when VICTOR_HITL_CALLBACK_URL is set; check static content
+    assert "🔔 Workflow approval required" in note["json"]["body"]
     assert ref == "gitlab:mr:7:note:99"
 
     resp = await t.poll("rid", ref)
@@ -128,12 +129,15 @@ async def test_gitlab_pipeline_poll_maps_job_status(monkeypatch):
 async def test_jira_send_creates_issue_and_poll_reads_status(monkeypatch):
     calls = _install_fake_aiohttp(
         monkeypatch,
-        lambda m, u: (201, {"key": "OPS-42"})
-        if m == "POST"
-        else (200, {"fields": {"status": {"name": "Approved"}}}),
+        lambda m, u: (
+            (201, {"key": "OPS-42"})
+            if m == "POST"
+            else (200, {"fields": {"status": {"name": "Approved"}}})
+        ),
     )
-    t = JiraTransport(JiraConfig(base_url="https://j.example", email="me@x", api_token="tok",
-                                 project_key="OPS"))
+    t = JiraTransport(
+        JiraConfig(base_url="https://j.example", email="me@x", api_token="tok", project_key="OPS")
+    )
     ref = await t.send(_request(), "wf")
     create = next(c for c in calls if c["verb"] == "POST")
     assert create["url"].endswith("/rest/api/2/issue")

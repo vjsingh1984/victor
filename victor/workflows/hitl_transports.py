@@ -1314,9 +1314,7 @@ class GitHubDeploymentTransport(BaseTransport):
         env = cfg.environment or (request.context.get("environment") if request.context else None)
         if not run_id:
             raise ValueError("GitHub deployment approval requires context['run_id']")
-        logger.info(
-            f"GitHub deployment approval pending for run {run_id} (environment={env})"
-        )
+        logger.info(f"GitHub deployment approval pending for run {run_id} (environment={env})")
         return f"github:deployment:{run_id}:{env or ''}"
 
     async def poll(
@@ -1335,7 +1333,9 @@ class GitHubDeploymentTransport(BaseTransport):
         cfg = self.github_config
         base = cfg.base_url
         async with aiohttp.ClientSession() as session:
-            pend_url = f"{base}/repos/{cfg.owner}/{cfg.repo}/actions/runs/{run_id}/pending_deployments"
+            pend_url = (
+                f"{base}/repos/{cfg.owner}/{cfg.repo}/actions/runs/{run_id}/pending_deployments"
+            )
             async with session.get(pend_url, headers=self._headers()) as resp:
                 pending = await resp.json()
             if isinstance(pending, list):
