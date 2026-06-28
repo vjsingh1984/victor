@@ -138,9 +138,15 @@ async def test_code_exchange_error_raises(monkeypatch):
 
 
 def test_from_env_requires_redirect_uri(monkeypatch):
-    for v in ("AZURE_TENANT_ID", "AZURE_CLIENT_ID", "AZURE_CLIENT_SECRET",
-              "TEAMS_TENANT_ID", "TEAMS_CLIENT_ID", "TEAMS_CLIENT_SECRET",
-              "VICTOR_HITL_SSO_REDIRECT_URI"):
+    for v in (
+        "AZURE_TENANT_ID",
+        "AZURE_CLIENT_ID",
+        "AZURE_CLIENT_SECRET",
+        "TEAMS_TENANT_ID",
+        "TEAMS_CLIENT_ID",
+        "TEAMS_CLIENT_SECRET",
+        "VICTOR_HITL_SSO_REDIRECT_URI",
+    ):
         monkeypatch.delenv(v, raising=False)
     monkeypatch.setenv("AZURE_TENANT_ID", "t")
     monkeypatch.setenv("AZURE_CLIENT_ID", "c")
