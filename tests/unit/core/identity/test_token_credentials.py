@@ -268,7 +268,8 @@ def test_graph_credential_from_env_prefers_azure_then_teams_alias(monkeypatch):
         "TEAMS_TENANT_ID",
         "TEAMS_CLIENT_ID",
         "TEAMS_CLIENT_SECRET",
-    ):        monkeypatch.delenv(var, raising=False)
+    ):
+        monkeypatch.delenv(var, raising=False)
     assert graph_credential_from_env() is None  # nothing configured
 
     # TEAMS_* alias works when AZURE_* absent
