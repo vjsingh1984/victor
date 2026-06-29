@@ -65,6 +65,10 @@ mod tokenizer;
 mod trace_scanner;
 mod yaml_loader;
 
+// FEP-0010 Phase 4: PyO3 wrappers around the shared `victor_protocol` crate so
+// Python and the edge runtime agree on message/tool-call/stream shapes at FFI.
+mod protocol;
+
 /// Victor Native Extensions Module
 ///
 /// This module exposes high-performance Rust implementations to Python
@@ -75,6 +79,16 @@ fn victor_native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     // Version info
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
 
+    // FEP-0010 Phase 4: shared protocol types (Message/ToolCall/StreamChunk/…)
+    // mirror `victor_protocol` so Python and the edge runtime share one shape.
+    m.add_class::<protocol::PyRole>()?;
+    m.add_class::<protocol::PyToolCall>()?;
+    m.add_class::<protocol::PyUsage>()?;
+    m.add_class::<protocol::PyMessage>()?;
+    m.add_class::<protocol::PyStreamChunk>()?;
+    m.add_function(wrap_pyfunction!(protocol::echo_message, m)?)?;
+    m.add_function(wrap_pyfunction!(protocol::echo_stream_chunk, m)?)?;
+
     // Deduplication functions
     m.add_function(wrap_pyfunction!(dedup::rolling_hash_blocks, m)?)?;
     m.add_function(wrap_pyfunction!(dedup::normalize_block, m)?)?;
@@ -83,6 +97,7 @@ fn victor_native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     // Similarity functions
     m.add_function(wrap_pyfunction!(similarity::cosine_similarity, m)?)?;
     m.add_function(wrap_pyfunction!(similarity::batch_cosine_similarity, m)?)?;
+    m.add_function(wrap_pyfunction!(similarity::similarity_matrix, m)?)?;
     m.add_function(wrap_pyfunction!(similarity::top_k_similar, m)?)?;
     m.add_function(wrap_pyfunction!(similarity::batch_normalize_vectors, m)?)?;
     m.add_function(wrap_pyfunction!(
@@ -248,6 +263,7 @@ fn victor_native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     // BPE tokenizer (token counting and encoding)
     m.add_class::<tokenizer::BpeTokenizer>()?;
     m.add_function(wrap_pyfunction!(tokenizer::count_tokens_fast, m)?)?;
+    m.add_function(wrap_pyfunction!(tokenizer::count_tokens_fast_batch, m)?)?;
 
     // Context fitting and message truncation
     m.add_class::<context_fitter::MessageSlot>()?;

@@ -419,3 +419,85 @@ class TestSignatureSimilarity:
         """Test different lengths returns 0.0."""
         sim = signature_similarity("1234", "12345678")
         assert sim == 0.0
+
+
+# =============================================================================
+# TOKEN COUNTING BATCH (Gap 2: single-FFI-crossing batch)
+# =============================================================================
+
+
+class TestTokenCountBatch:
+    """Gap 2: count_tokens_batch must cross the FFI boundary once via the native
+    batch symbol, with results identical to per-element counting. Falls back to
+    the per-element loop on older native builds (version-skew safety)."""
+
+    def test_native_batch_symbol_registered(self):
+        """The Rust batch function must be exported by victor_native."""
+        pytest.importorskip("victor_native")
+        import victor_native
+
+        assert hasattr(victor_native, "count_tokens_fast_batch"), (
+            "native build is missing count_tokens_fast_batch — rebuild with "
+            "`cd rust && maturin develop --release`"
+        )
+
+    def test_batch_matches_single_elementwise(self):
+        """Batch result equals per-element counting (the wrapper's invariant)."""
+        pytest.importorskip("victor_native")
+        from victor.native.rust.tokenizer import RustTokenCounter
+
+        tc = RustTokenCounter()
+        texts = ["", "hello", "the quick brown fox", "   \n  ", "你好世界"]
+        batched = tc.count_tokens_batch(texts)
+        single = [tc.count_tokens_fast(t) for t in texts]
+        assert batched == single
+
+    def test_batch_empty(self):
+        pytest.importorskip("victor_native")
+        from victor.native.rust.tokenizer import RustTokenCounter
+
+        assert RustTokenCounter().count_tokens_batch([]) == []
+
+    def test_batch_preserves_order(self):
+        pytest.importorskip("victor_native")
+        from victor.native.rust.tokenizer import RustTokenCounter
+
+        tc = RustTokenCounter()
+        texts = ["a", "bb", "ccc", "dddd"]
+        batched = tc.count_tokens_batch(texts)
+        assert len(batched) == len(texts)
+
+
+class TestSimilarityMatrixBatch:
+    """FFI audit: similarity_matrix must cross once via the native batch fn,
+    matching per-query batch_cosine_similarity. (Note: similarity_matrix is a
+    python-preferred op per ACCELERATOR_BENCHMARKS — NumPy wins — so the Rust
+    path is only used when forced; this just makes that path non-looping.)"""
+
+    def test_native_matrix_symbol_registered(self):
+        pytest.importorskip("victor_native")
+        import victor_native
+
+        assert hasattr(victor_native, "similarity_matrix")
+
+    def test_matrix_matches_per_query(self):
+        pytest.importorskip("victor_native")
+        import victor_native
+
+        from victor.native.rust.similarity import RustSimilarityComputer
+
+        queries = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.7, 0.7, 0.0]]
+        corpus = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.9, 0.1, 0.0], [-1.0, 0.0, 0.0]]
+        sc = RustSimilarityComputer()
+        for normalize in (True, False):
+            matrix = sc.similarity_matrix(queries, corpus, normalize=normalize)
+            assert len(matrix) == len(queries)
+            for i, q in enumerate(queries):
+                row = victor_native.batch_cosine_similarity(q, corpus)
+                assert len(matrix[i]) == len(row)
+                for a, b in zip(matrix[i], row):
+                    assert abs(a - b) < 1e-5
+        # Sanity: identical -> 1.0, opposite -> -1.0
+        m = sc.similarity_matrix(queries, corpus, normalize=True)
+        assert abs(m[0][0] - 1.0) < 1e-5
+        assert abs(m[0][3] + 1.0) < 1e-5

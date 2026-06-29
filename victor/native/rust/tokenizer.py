@@ -20,7 +20,11 @@ the TokenCounterProtocol interface.
 
 Performance characteristics:
 - count_tokens: 2-5x faster (Rust BPE implementation)
-- count_tokens_batch: 3-8x faster (amortized FFI overhead)
+- count_tokens_batch: crosses the FFI boundary ONCE via the native
+  ``count_tokens_fast_batch`` (rayon-parallel), instead of looping the
+  single-text entry point from Python (which crossed once per text).
+  Falls back to the per-element loop when the batch symbol is absent
+  (older native builds), per the graceful-degradation mandate.
 """
 
 from __future__ import annotations
@@ -82,6 +86,11 @@ class RustTokenCounter(InstrumentedAccelerator):
     def count_tokens_batch(self, texts: List[str]) -> List[int]:
         """Count tokens for multiple texts in batch.
 
+        Uses the native ``count_tokens_fast_batch`` so the FFI boundary is
+        crossed once for the whole batch (rayon-parallel internally), rather
+        than once per text. Falls back to the per-element loop when the batch
+        symbol is unavailable (older native build / version skew).
+
         Args:
             texts: List of texts to count tokens for
 
@@ -89,4 +98,7 @@ class RustTokenCounter(InstrumentedAccelerator):
             List of token counts, one per input text
         """
         with self._timed_call("token_counting_batch"):
+            batch_fn = getattr(victor_native, "count_tokens_fast_batch", None)
+            if batch_fn is not None:
+                return list(batch_fn(list(texts)))
             return [victor_native.count_tokens_fast(text) for text in texts]
