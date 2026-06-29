@@ -107,6 +107,12 @@ demo_workspace/
 # Database consolidation moved conversation.db → project.db (project-specific) and victor.db (global)
 .victor/
 
+# Embedded-ProximaDB test runtime output. Committed fixtures under this dir
+# (embedded-config.toml, metadata/system-catalog.wal, seeded *.bcwal) stay tracked;
+# only untracked runtime artifacts (random UUID data dirs, WAL segments, metadata
+# subdirs) are hidden so they don't show as ?? noise after a storage test run.
+/victor/storage/test_dod_data/
+
 # Legacy context file location (now .victor/init.md)
 .victor.md
 .victor.md.backup
