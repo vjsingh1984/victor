@@ -14,14 +14,17 @@
 
 """Accelerator priority system, stdlib detection, YAML parsing, and protocol dispatch."""
 
+import logging
 import os
 import re
 import sys
 from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
 from victor.processing.native._base import _NATIVE_AVAILABLE, _native
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from victor.native.protocols import (
@@ -459,8 +462,12 @@ def get_preferred_backend(operation: str) -> str:
 
     Returns "rust" or "python" based on:
     1. User override (if set via set_accelerator_preference)
-    2. Benchmark data (if available)
-    3. Default to "rust" if native available, else "python"
+    2. Adaptive — observed per-backend EWMA latency, once enough samples exist
+       (closes the measurement→dispatch loop; self-corrects ops the static
+       benchmark mis-ranks for THIS machine). Gated by
+       ``observability.native_adaptive_dispatch_enabled``.
+    3. Benchmark data (static prior; hardware-aware cold start)
+    4. Default to "rust" if native available, else "python"
 
     Args:
         operation: Operation name
@@ -468,11 +475,18 @@ def get_preferred_backend(operation: str) -> str:
     Returns:
         "rust" or "python"
     """
-    # Check user override first
+    # 1. User override always wins.
     if operation in _accelerator_overrides:
         return _accelerator_overrides[operation]
 
-    # Check benchmark data
+    # 2. Adaptive: pick the empirically faster backend from observed latency.
+    if _NATIVE_AVAILABLE:
+        adaptive = _adaptive_preference(operation)
+        if adaptive is not None:
+            return adaptive
+
+    # 3. Static benchmark prior (cold start; encodes hardware-aware knowledge
+    #    like "Python wins batch_similarity via NumPy+BLAS").
     if operation in ACCELERATOR_BENCHMARKS:
         benchmark = ACCELERATOR_BENCHMARKS[operation]
         preferred = benchmark.preferred
@@ -481,8 +495,119 @@ def get_preferred_backend(operation: str) -> str:
             return "python"
         return preferred
 
-    # Default: use Rust if available
+    # 4. Default: use Rust if available
     return "rust" if _NATIVE_AVAILABLE else "python"
+
+
+# -----------------------------------------------------------------------------
+# Adaptive dispatch helpers (Gap 3).
+# -----------------------------------------------------------------------------
+
+_ADAPTIVE_SYNCED = False
+
+
+def _get_adaptive_settings() -> Dict[str, Any]:
+    """Read adaptive-dispatch settings, falling back to safe defaults."""
+    defaults = {"enabled": True, "min_samples": 20, "alpha": 0.3}
+    try:
+        from victor.config.settings import get_settings
+
+        s = get_settings().observability
+        return {
+            "enabled": bool(getattr(s, "native_adaptive_dispatch_enabled", True)),
+            "min_samples": int(getattr(s, "native_adaptive_min_samples", 20)),
+            "alpha": float(getattr(s, "native_adaptive_ewma_alpha", 0.3)),
+        }
+    except Exception:
+        return defaults
+
+
+def _sync_adaptive_tunables() -> None:
+    """Push adaptive settings into the metrics module once (EWMA alpha/min samples)."""
+    global _ADAPTIVE_SYNCED
+    if _ADAPTIVE_SYNCED:
+        return
+    _ADAPTIVE_SYNCED = True
+    try:
+        from victor.native.observability import (
+            set_adaptive_ewma_alpha,
+            set_adaptive_min_samples,
+        )
+
+        s = _get_adaptive_settings()
+        set_adaptive_ewma_alpha(s["alpha"])
+        set_adaptive_min_samples(s["min_samples"])
+    except Exception:
+        logger.debug("adaptive tunable sync failed", exc_info=True)
+
+
+def _adaptive_preference(operation: str) -> Optional[str]:
+    """Return an adaptive backend hint from observed EWMA, or None to defer."""
+    try:
+        s = _get_adaptive_settings()
+        if not s["enabled"]:
+            return None
+        _sync_adaptive_tunables()
+        from victor.native.observability import get_operation_stats
+
+        stats = get_operation_stats(operation)
+        if stats is None:
+            return None
+        return stats.preferred_backend(min_samples=s["min_samples"])
+    except Exception:
+        return None
+
+
+def calibrate_operation(
+    operation: str,
+    rust_fn: Optional[Callable[..., Any]] = None,
+    python_fn: Optional[Callable[..., Any]] = None,
+    inputs: Optional[List[Any]] = None,
+    rounds: int = 25,
+) -> Dict[str, float]:
+    """Seed the adaptive EWMA for ``operation`` by timing both backends.
+
+    Optional warmup: run each backend over ``inputs`` (repeated to ``rounds``
+    total calls) and record the per-call latencies as known-backend samples, so
+    adaptive dispatch has data immediately on cold start instead of waiting for
+    organic traffic. No-op (returns zeros) if a backend or inputs are missing.
+
+    Args:
+        operation: Operation name (must match the name used at dispatch time).
+        rust_fn: Callable running the Rust path. Takes one ``inputs`` element.
+        python_fn: Callable running the Python fallback path.
+        inputs: Sample inputs to time against.
+        rounds: Approximate total calls per backend.
+
+    Returns:
+        ``{"rust_ms_avg": float, "python_ms_avg": float}`` of measured averages.
+    """
+    import time as _time
+
+    from victor.native.observability import NativeMetrics
+
+    metrics = NativeMetrics.get_instance()
+    result: Dict[str, float] = {"rust_ms_avg": 0.0, "python_ms_avg": 0.0}
+    if not inputs:
+        return result
+
+    for backend_name, fn in (("rust", rust_fn), ("python", python_fn)):
+        if fn is None:
+            continue
+        times: List[float] = []
+        work = inputs * max(1, rounds // max(1, len(inputs)))
+        for inp in work:
+            t0 = _time.perf_counter()
+            try:
+                fn(inp)
+            except Exception:
+                continue
+            times.append((_time.perf_counter() - t0) * 1000.0)
+        for ms in times:
+            metrics.record_call(operation, ms, used_rust=(backend_name == "rust"))
+        if times:
+            result[f"{backend_name}_ms_avg"] = sum(times) / len(times)
+    return result
 
 
 def get_all_benchmarks() -> Dict[str, Dict[str, Any]]:

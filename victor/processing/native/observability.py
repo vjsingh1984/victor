@@ -42,6 +42,7 @@ import time
 from typing import Any, Callable, ParamSpec, TypeVar
 
 from victor.config.settings import get_settings
+from victor.processing.native._base import is_native_available as _native_is_available
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +52,9 @@ T = TypeVar("T")
 
 # Global observability state
 _observability_enabled: bool | None = None  # None = not initialized
+
+# Cap on retained per-operation latency samples (prevents unbounded list growth).
+_MAX_RETAINED_SAMPLES = 1000
 
 
 def is_observability_enabled() -> bool:
@@ -130,21 +134,25 @@ def dispatch_with_observability(
                 return func(*args, **kwargs)
 
             start = time.perf_counter()
-            backend = "unknown"
+            # Best-effort backend attribution for AGGREGATE stats only. The flat
+            # dispatch functions branch internally, so we cannot confirm which
+            # backend ran per call — hence we forward update_ewma=False so the
+            # per-backend EWMA (consumed by adaptive dispatch) stays honest and
+            # is populated only by InstrumentedAccelerator._timed_call, which
+            # knows its real backend.
+            backend = "rust" if _native_is_available() else "python"
 
             try:
-                result = func(*args, **kwargs)
-
-                # Detect backend from result or context
-                # This is a heuristic - for more accuracy, functions can
-                # set a context variable or return a metadata object
-                if hasattr(result, "__class__"):
-                    backend = "rust" if "Rust" in result.__class__.__name__ else "python"
-
-                return result
+                return func(*args, **kwargs)
             finally:
                 elapsed = time.perf_counter() - start
                 elapsed_us = elapsed * 1_000_000  # Convert to microseconds
+
+                # Feed the unified NativeMetrics sink (aggregate counts only).
+                try:
+                    DispatchMetrics.get_instance().record(operation_name, backend, elapsed_us)
+                except Exception:  # pragma: no cover - never let metrics break the call
+                    logger.debug("DispatchMetrics.record failed", exc_info=True)
 
                 # Only log slow operations (>1ms) to reduce noise
                 if elapsed_us > 1000:
@@ -191,6 +199,12 @@ class DispatchMetrics:
     ) -> None:
         """Record a dispatch operation.
 
+        Also forwards the observation to the unified ``NativeMetrics`` sink so
+        there is a single stats registry. The forward uses
+        ``update_ewma=False`` because the flat dispatch path cannot confirm
+        which backend actually ran; adaptive dispatch's per-backend EWMA is
+        populated only by ``InstrumentedAccelerator._timed_call``.
+
         Args:
             operation: Operation name
             backend: Backend used ("rust" or "python")
@@ -201,10 +215,26 @@ class DispatchMetrics:
         if operation not in self._times:
             self._times[operation] = []
         self._times[operation].append(elapsed_us)
+        # Bound the retained sample window to avoid unbounded growth.
+        if len(self._times[operation]) > _MAX_RETAINED_SAMPLES:
+            del self._times[operation][:-_MAX_RETAINED_SAMPLES]
 
         if operation not in self._backends:
             self._backends[operation] = {}
         self._backends[operation][backend] = self._backends[operation].get(backend, 0) + 1
+
+        # Forward to the canonical NativeMetrics sink (aggregate-only).
+        try:
+            from victor.native.observability import NativeMetrics
+
+            NativeMetrics.get_instance().record_call(
+                operation,
+                elapsed_us / 1000.0,
+                used_rust=(backend == "rust"),
+                update_ewma=False,
+            )
+        except Exception:  # pragma: no cover - metrics must never break dispatch
+            logger.debug("NativeMetrics forward failed", exc_info=True)
 
     def get_stats(self, operation: str) -> dict[str, Any] | None:
         """Get statistics for a specific operation.
