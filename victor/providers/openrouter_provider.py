@@ -39,6 +39,7 @@ from typing import Any, AsyncIterator, Dict, List, Optional
 import httpx
 
 from victor.providers.base import (
+    CacheCostModel,
     BaseProvider,
     CompletionResponse,
     Message,
@@ -210,6 +211,17 @@ class OpenRouterProvider(BaseProvider):
     def supports_kv_prefix_caching(self) -> bool:
         """OpenRouter routes to providers that support KV prefix caching."""
         return True
+
+    def cache_cost_model(self) -> CacheCostModel:
+        """Characterized API caching (FEP-0011): pass-through 25-90% off."""
+        return CacheCostModel(
+            supported=True,
+            read_discount=0.575,
+            write_overhead=1.0,
+            ttl_seconds=0.0,
+            min_prefix_tokens=0,
+            prefix_granularity="token",
+        )
 
     def context_window(self, model: Optional[str] = None) -> int:
         from victor.providers.context_windows import OPENROUTER_DEFAULT

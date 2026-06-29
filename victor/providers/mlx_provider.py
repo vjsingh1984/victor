@@ -40,6 +40,7 @@ import re
 from typing import Any, AsyncIterator, Dict, List, Optional, Tuple
 
 from victor.providers.base import (
+    CacheCostModel,
     BaseProvider,
     CompletionResponse,
     Message,
@@ -234,6 +235,15 @@ class MLXProvider(BaseProvider):
     def supports_kv_prefix_caching(self) -> bool:
         """MLX reuses KV cache for pure-attention models with matching prefixes."""
         return True
+
+    def kv_cache_cost_model(self) -> CacheCostModel:
+        """KV-prefix caching (FEP-0011): latency-only, no billing discount."""
+        return CacheCostModel(
+            supported=True,
+            read_discount=0.0,
+            ttl_seconds=0.0,
+            prefix_granularity="system_block",
+        )
 
     def context_window(self, model: Optional[str] = None) -> int:
         from victor.providers.context_windows import OLLAMA, MLX_DEFAULT, lookup
