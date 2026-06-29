@@ -6,7 +6,11 @@ from io import StringIO
 
 from victor.tools.base import AccessMode, DangerLevel, ExecutionCategory, Priority
 from victor.tools.decorators import tool
-from victor.tools.unified.parser import split_command
+from victor.tools.unified.parser import (
+    detect_shell_operators,
+    shell_operator_rejection,
+    split_command,
+)
 
 
 async def run_tests(runner: str, path: str):
@@ -137,6 +141,9 @@ async def code_tool(cmd: str) -> str:
         args_list = split_command(cmd)
         if args_list and args_list[0] == "code":
             args_list = args_list[1:]
+        operator = detect_shell_operators(args_list)
+        if operator is not None:
+            return shell_operator_rejection("code", operator)
         parsed_args = parser.parse_args(args_list)
     except ValueError as e:
         return f"### ❌ ERROR\n{e}"

@@ -90,11 +90,36 @@ def create_fs_parser() -> UnifiedFsParser:
     edit_parser = subparsers.add_parser("edit", help="Edit files atomically with undo")
     edit_parser.add_argument("path", help="Path to the file")
     edit_parser.add_argument("--old", default=None, help="Text to find (replace op)")
-    edit_parser.add_argument("--new", default=None, help="Replacement text (replace op)")
+    edit_parser.add_argument("--new", default=None, help="Replacement / inserted text")
+    edit_parser.add_argument(
+        "--new-file",
+        default=None,
+        help="Read the new/inserted text from this file (robust for multiline/code)",
+    )
+    edit_parser.add_argument(
+        "--insert",
+        default=None,
+        help="Anchor line — insert --new text immediately AFTER the unique matching line",
+    )
+    edit_parser.add_argument(
+        "--before",
+        default=None,
+        help="Anchor line — insert --new text immediately BEFORE the unique matching line",
+    )
+    edit_parser.add_argument(
+        "--append",
+        action="store_true",
+        help="Append --new text to the end of the file",
+    )
     edit_parser.add_argument(
         "--ops",
         default=None,
         help="Raw JSON ops list for advanced multi-op edits",
+    )
+    edit_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Preview the diff without writing",
     )
 
     # `search` subcommand — find files by name/metadata (delegates to find())
@@ -126,8 +151,15 @@ async def fs_tool(cmd: str) -> str:
       fs cat /path/to/file [--offset N --limit N] [--search PAT [--ctx N] [--regex]]
       fs write /path/to/file -c "Hello" [--validate] [--format] [--dry-run]
       fs patch /path/to/file --search "old" --replace "new"
-      fs edit /path --old "a" --new "b"
+      fs edit /path --old "a" --new "b"            # replace
+      fs edit /path --insert "anchor" --new "..."  # insert after a line
+      fs edit /path --append --new "..."           # append to end
+      fs edit /path --old "a" --new-file new.txt   # new text from a file
+      fs edit /path --old "a" --new "b" --dry-run  # preview diff only
       fs search "*.py" /path
+
+    Note: `fs` is NOT a shell — pipes (`|`), redirects (`>`), `||`, `&&`, `;`
+    are not interpreted. For shell pipelines use the `shell` tool.
 
     Paging: `fs cat big.py --offset 200 --limit 100` reads a slice of a large file.
     In-file search: `fs cat app.py --search "def login" --ctx 3`.
@@ -135,11 +167,19 @@ async def fs_tool(cmd: str) -> str:
     parser = create_fs_parser()
 
     try:
-        from victor.tools.unified.parser import split_command
+        from victor.tools.unified.parser import (
+            detect_shell_operators,
+            shell_operator_rejection,
+            split_command,
+        )
 
         args_list = split_command(cmd)
         if args_list and args_list[0] == "fs":
             args_list = args_list[1:]
+
+        operator = detect_shell_operators(args_list)
+        if operator is not None:
+            return shell_operator_rejection("fs", operator)
 
         parsed_args = parser.parse_args(args_list)
     except ValueError as e:
@@ -238,44 +278,172 @@ async def fs_tool(cmd: str) -> str:
 
 
 async def _fs_edit(parsed_args) -> str:
-    """``fs edit`` — delegate to the structured, atomic ``edit()`` tool."""
+    """``fs edit`` — delegate to the structured, atomic ``edit()`` tool.
+
+    Supports four modes (plus raw ``--ops`` JSON):
+
+    - **replace**: ``--old <text> --new <text>`` (default; the classic find/replace).
+    - **insert**:  ``--insert <anchor> --new <text>`` inserts after the unique line
+      containing ``<anchor>``. ``--before <anchor>`` inserts before it.
+    - **append**:  ``--append --new <text>`` appends to end of file.
+    - **ops**:     ``--ops '<json>'`` for advanced multi-op edits.
+
+    The new/inserted text may come from ``--new`` (inline) or ``--new-file``
+    (read from a file — robust for large, multiline, or quote/brace-heavy code).
+    Triple-quoted ``--new \"\"\"...\"\"\"`` is also supported by the parser.
+
+    insert/append are resolved locally into a full-file ``modify`` op so the
+    underlying ``edit()`` keeps its atomic-write + undo semantics; the
+    ``EditorProtocol`` surface is untouched.
+    """
     from victor.tools.file_editor_tool import edit
 
+    dry_run = bool(parsed_args.dry_run)
+
+    # --- raw JSON ops path -------------------------------------------------
     if parsed_args.ops:
         try:
             ops = json.loads(parsed_args.ops)
         except json.JSONDecodeError as e:
             return f"### ❌ ERROR\n--ops must be a valid JSON list: {e}"
-    else:
-        if parsed_args.old is None or parsed_args.new is None:
+        return await _dispatch_edit(ops, dry_run=dry_run)
+
+    # --- resolve the new/inserted text source ------------------------------
+    new_text = parsed_args.new
+    if parsed_args.new_file is not None:
+        try:
+            new_text = Path(parsed_args.new_file).expanduser().read_text(encoding="utf-8")
+        except OSError as e:
+            return f"### ❌ ERROR\n--new-file could not be read ({parsed_args.new_file}): {e}"
+
+    path = parsed_args.path
+
+    # --- replace mode ------------------------------------------------------
+    if parsed_args.old is not None:
+        if new_text is None:
             return (
-                "### ❌ ERROR\nfs edit requires --old/--new (replace) or --ops (JSON). "
-                "Example: fs edit path.py --old 'DEBUG = True' --new 'DEBUG = False'"
+                "### ❌ ERROR\nfs edit replace needs --new (or --new-file). Example:\n"
+                "  fs edit <path> --old '<exact old text>' --new '<new text>'"
             )
         ops = [
             {
                 "type": "replace",
-                "path": parsed_args.path,
+                "path": path,
                 "old_str": parsed_args.old,
-                "new_str": parsed_args.new,
+                "new_str": new_text,
             }
         ]
+        return await _dispatch_edit(ops, dry_run=dry_run)
+
+    # --- insert / append modes --------------------------------------------
+    if parsed_args.insert is not None or parsed_args.before is not None or parsed_args.append:
+        if new_text is None:
+            mode = "append" if parsed_args.append else "insert"
+            return (
+                f"### ❌ ERROR\nfs edit {mode} needs --new (or --new-file). Example:\n"
+                f"  fs edit <path> {'--append' if parsed_args.append else '--insert <anchor>'} "
+                "--new '<new code>'"
+            )
+        return await _fs_edit_splice(parsed_args, new_text, dry_run=dry_run)
+
+    # --- no usable mode ----------------------------------------------------
+    # The most common failure: --new given with no --old/--insert/--append.
+    if new_text is not None:
+        return _no_mode_error()
+    return (
+        "### ❌ ERROR\nfs edit needs a mode. Examples:\n"
+        "  fs edit <path> --old '<old>' --new '<new>'        # replace\n"
+        "  fs edit <path> --insert '<anchor>' --new '<new>'  # insert after line\n"
+        "  fs edit <path> --append --new '<new>'             # append\n"
+        "  fs edit <path> --ops '<json>'                     # advanced\n"
+        "Add --dry-run to preview, --new-file <path> for large/multiline content."
+    )
+
+
+def _no_mode_error() -> str:
+    """Short, actionable error for `--new` given without a target mode."""
+    return (
+        "### ❌ ERROR\nfs edit: `--new` given without a target mode. Pick one:\n"
+        "  • replace: fs edit <path> --old '<exact old text>' --new '<new text>'\n"
+        "  • insert:  fs edit <path> --insert '<anchor line>' --new '<new code>'\n"
+        "  • append:  fs edit <path> --append --new '<new code>'\n"
+        "  • create:  use `fs write <path> --content '<full content>'` for new files\n"
+        "Tip: for large/multiline content use `--new-file <path>` or triple quotes "
+        '("""...""").'
+    )
+
+
+async def _fs_edit_splice(parsed_args, new_text: str, *, dry_run: bool) -> str:
+    """Resolve an insert/append into a full-file ``modify`` op and dispatch.
+
+    Reads the target file, splices the new text at the anchor (or end), then
+    delegates to :func:`edit` as a single ``modify`` op so the write is atomic
+    and undoable. The anchor must match exactly one line (substring match).
+    """
+    file_path = Path(parsed_args.path).expanduser()
+    if not file_path.exists():
+        return f"### ❌ ERROR\nCannot insert/append into missing file: {parsed_args.path}"
+    try:
+        content = file_path.read_text(encoding="utf-8")
+    except OSError as e:
+        return f"### ❌ ERROR\nCould not read {parsed_args.path}: {e}"
+
+    lines = content.split("\n")
+    if parsed_args.append:
+        # Append is clean string concatenation (line-splice would add a stray
+        # blank line when the file ends with a newline). The caller controls
+        # leading newlines via --new.
+        full_content = content + new_text
+        ops = [{"type": "modify", "path": parsed_args.path, "content": full_content}]
+        return await _dispatch_edit(ops, dry_run=dry_run)
+
+    anchor = parsed_args.insert if parsed_args.insert is not None else parsed_args.before
+    matches = [i for i, line in enumerate(lines) if anchor in line]
+    if not matches:
+        return (
+            f"### ❌ ERROR\nInsert anchor not found: no line contains {anchor!r}.\n"
+            f"Refresh with `fs cat {parsed_args.path}` and copy the exact anchor text."
+        )
+    if len(matches) > 1:
+        return (
+            f"### ❌ ERROR\nInsert anchor ambiguous: {len(matches)} lines contain "
+            f"{anchor!r}. Add more characters so the anchor matches a single line."
+        )
+    anchor_idx = matches[0]
+    # --insert places text AFTER the anchor line; --before places it BEFORE.
+    insert_at = anchor_idx if parsed_args.before is not None else anchor_idx + 1
+
+    new_lines = lines[:insert_at] + new_text.split("\n") + lines[insert_at:]
+    full_content = "\n".join(new_lines)
+
+    ops = [{"type": "modify", "path": parsed_args.path, "content": full_content}]
+    return await _dispatch_edit(ops, dry_run=dry_run)
+
+
+async def _dispatch_edit(ops: list, *, dry_run: bool) -> str:
+    """Call the structured ``edit()`` tool and format its result for fs."""
+    from victor.tools.file_editor_tool import edit
 
     try:
-        result = await edit(ops=ops)
+        result = await edit(ops=ops, preview=dry_run, commit=not dry_run)
     except Exception as e:
         return f"### ❌ ERROR\nEdit failed: {e}"
 
-    if isinstance(result, dict):
-        if result.get("success") is False:
-            return f"### ❌ ERROR\n{result.get('error', 'edit failed')}"
-        # Surface a compact summary; the structured tool returns rich details.
-        summary = result.get("summary") or result.get("message") or "Edit applied."
-        changed = result.get("changed_files") or result.get("files") or []
-        if changed:
-            return f"{summary}\nChanged: {', '.join(map(str, changed))}"
-        return str(summary)
-    return str(result)
+    if not isinstance(result, dict):
+        return str(result)
+    if result.get("success") is False:
+        return f"### ❌ ERROR\n{result.get('error', 'edit failed')}"
+
+    if dry_run:
+        diff = result.get("diff") or result.get("preview_output") or ""
+        msg = result.get("message", "Dry-run preview (not written).")
+        return f"{msg}\n```diff\n{diff}\n```" if diff else msg
+
+    summary = result.get("message") or result.get("summary") or "Edit applied."
+    changed = result.get("changed_files") or result.get("files") or []
+    if changed:
+        return f"{summary}\nChanged: {', '.join(map(str, changed))}"
+    return str(summary)
 
 
 async def _fs_search(parsed_args) -> str:
