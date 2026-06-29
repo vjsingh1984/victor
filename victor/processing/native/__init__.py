@@ -200,6 +200,7 @@ from victor.processing.native.accelerator import (  # noqa: F401
     set_accelerator_preference,
     get_preferred_backend,
     get_all_benchmarks,
+    calibrate_operation,
 )
 
 __all__ = [
@@ -332,4 +333,5 @@ __all__ = [
     "set_accelerator_preference",
     "get_preferred_backend",
     "get_all_benchmarks",
+    "calibrate_operation",
 ]
