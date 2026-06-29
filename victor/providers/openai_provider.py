@@ -21,6 +21,7 @@ from openai.types.chat import ChatCompletion, ChatCompletionChunk
 
 from victor.providers.base import (
     BaseProvider,
+    CacheCostModel,
     CompletionResponse,
     Message,
     ProviderAuthError,
@@ -254,6 +255,21 @@ class OpenAIProvider(BaseProvider):
     def supports_kv_prefix_caching(self) -> bool:
         """OpenAI reuses KV cache server-side for matching prefixes."""
         return True
+
+    def cache_cost_model(self) -> CacheCostModel:
+        """OpenAI automatic prefix caching (FEP-0011).
+
+        90% read discount, ~1024-token minimum prefix, 5m–24h TTL, automatic
+        (no explicit cache_control), cached at token granularity.
+        """
+        return CacheCostModel(
+            supported=True,
+            read_discount=0.9,
+            write_overhead=1.0,  # no explicit write premium; automatic
+            ttl_seconds=300.0,  # 5-minute floor (up to 24h while active)
+            min_prefix_tokens=1024,
+            prefix_granularity="token",
+        )
 
     def context_window(self, model: Optional[str] = None) -> int:
         from victor.providers.context_windows import OPENAI, OPENAI_DEFAULT, lookup

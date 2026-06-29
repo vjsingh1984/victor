@@ -49,6 +49,7 @@ import httpx
 
 from victor.providers.base import (
     BaseProvider,
+    CacheCostModel,
     CompletionResponse,
     Message,
     ProviderAuthError,
@@ -239,6 +240,21 @@ class LlamaCppProvider(BaseProvider):
     def supports_kv_prefix_caching(self) -> bool:
         """llama.cpp natively reuses KV cache for matching prefixes."""
         return True
+
+    def kv_cache_cost_model(self) -> CacheCostModel:
+        """llama.cpp KV caching (FEP-0011).
+
+        Latency-only (no billing discount), local-engine TTL is effectively the
+        session lifetime, stable system prefix is the reuse unit.
+        NOTE: supports_prompt_caching() stays False, so cache_cost_model()
+        (API-level) correctly remains unsupported via the default.
+        """
+        return CacheCostModel(
+            supported=True,
+            read_discount=0.0,  # KV cache saves latency, not cost
+            ttl_seconds=0.0,  # 0 = indefinite while the session/engine lives
+            prefix_granularity="system_block",
+        )
 
     def context_window(self, model: Optional[str] = None) -> int:
         from victor.providers.context_windows import OLLAMA, LLAMACPP_DEFAULT, lookup
