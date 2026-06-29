@@ -57,17 +57,18 @@ def test_body_edit_bumps_content_version_not_oid():
     ), "body edit must bump content_version"
 
 
-def test_dual_emit_and_default_off_gate():
+def test_dual_emit_and_default_on_gate(monkeypatch):
+    monkeypatch.delenv("VICTOR_CODEGRAPH_STABLE_OID", raising=False)
     parsed = parse("def f(x):\n    return x\n", file_path="m.py")
-    # Default OFF: the record oid is the legacy line-coupled id (byte-identical behavior),
-    # but BOTH ids are always emitted for mixed-read.
-    off = _node(to_proxima_records(parsed, repo_graph_id="r"), "f")
-    assert off["oid"] == off["props"]["legacy_oid"]
-    assert off["props"]["stable_oid"] != off["props"]["legacy_oid"]
-    # Gate ON: the record oid is the canonical stable id.
-    on = _node(to_proxima_records(parsed, repo_graph_id="r", stable_oid=True), "f")
+    # P2 cutover — default ON: the record oid is the canonical stable id; BOTH ids are
+    # always emitted for mixed-read.
+    on = _node(to_proxima_records(parsed, repo_graph_id="r"), "f")
     assert on["oid"] == on["props"]["stable_oid"]
-    assert on["props"]["legacy_oid"] == off["props"]["legacy_oid"]
+    assert on["props"]["stable_oid"] != on["props"]["legacy_oid"]
+    # Explicit opt-out → legacy line-coupled id (existing collections stay byte-identical).
+    off = _node(to_proxima_records(parsed, repo_graph_id="r", stable_oid=False), "f")
+    assert off["oid"] == off["props"]["legacy_oid"]
+    assert off["props"]["stable_oid"] == on["props"]["stable_oid"]
 
 
 def test_stable_symbol_oid_is_pure_and_structural():

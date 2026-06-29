@@ -16,16 +16,21 @@ from .model import CodeRelation, CodeSymbol, ParsedCode, stable_symbol_oid
 
 Embedder = Callable[[str], list[float]]
 
-# ADR-044 mixed-read gate. Default OFF: the record `oid` stays the legacy line-coupled
-# form (byte-identical behavior) while BOTH ids are always emitted in props, so consumers
-# can dual-read and a later cutover flips this default behind a parity ratchet.
+# ADR-044 mixed-read gate. **P2 cutover (2026-06-28): default ON** — the record `oid` is
+# the line-independent canonical form, gated behind the parity ratchet
+# (tests/test_symbol_oid_parity.py: no collisions / completeness / line-shift stability).
+# BOTH ids are always emitted in props so readers dual-read and legacy collections still
+# resolve. Opt out per-call (`stable_oid=False`) or per-process (`VICTOR_CODEGRAPH_STABLE_OID=0`).
 _STABLE_OID_ENV = "VICTOR_CODEGRAPH_STABLE_OID"
 
 
 def _stable_oid_enabled(override: bool | None = None) -> bool:
     if override is not None:
         return override
-    return os.getenv(_STABLE_OID_ENV, "").strip().lower() in ("1", "true", "yes", "on")
+    val = os.getenv(_STABLE_OID_ENV)
+    if val is None or val.strip() == "":
+        return True  # ADR-044 P2: canonical is the default (parity-ratchet-gated)
+    return val.strip().lower() in ("1", "true", "yes", "on")
 
 
 def _legacy_symbol_oid(repo_graph_id: str, symbol: CodeSymbol) -> str:
