@@ -22,6 +22,13 @@ boundaries.
 import pytest
 from victor.ui.rendering import LiveDisplayRenderer, stream_response
 from rich.console import Console
+from victor.ui.theme import victor_theme
+
+
+def _themed_console() -> Console:
+    """Mirror production console setup: the renderer assumes the victor theme
+    (which defines ``thinking.text`` / ``thinking.indicator``) is loaded."""
+    return Console(theme=victor_theme)
 
 
 class TestConsoleRenderingE2E:
@@ -43,7 +50,7 @@ class TestConsoleRenderingE2E:
         from victor.providers.base import StreamChunk
 
         mock_agent = MagicMock()
-        mock_renderer = LiveDisplayRenderer(Console())
+        mock_renderer = LiveDisplayRenderer(_themed_console())
 
         async def mock_stream():
             # Simulate DeepSeek thinking pattern
@@ -83,7 +90,7 @@ class TestConsoleRenderingE2E:
         from victor.providers.base import StreamChunk
 
         mock_agent = MagicMock()
-        mock_renderer = LiveDisplayRenderer(Console())
+        mock_renderer = LiveDisplayRenderer(_themed_console())
 
         async def broken_stream():
             # Stream starts thinking but never calls on_thinking_end
@@ -119,7 +126,7 @@ class TestConsoleRenderingE2E:
         from victor.providers.base import StreamChunk
 
         mock_agent = MagicMock()
-        mock_renderer = LiveDisplayRenderer(Console())
+        mock_renderer = LiveDisplayRenderer(_themed_console())
 
         # Track content calls without interfering with the renderer
         original_on_content = mock_renderer.on_content
@@ -180,7 +187,7 @@ class TestConsoleRenderingE2E:
         from victor.providers.base import StreamChunk
 
         mock_agent = MagicMock()
-        mock_renderer = LiveDisplayRenderer(Console())
+        mock_renderer = LiveDisplayRenderer(_themed_console())
 
         async def stream_with_multiple_thinking():
             # First thinking block
@@ -224,7 +231,7 @@ class TestConsoleRenderingE2E:
         from victor.providers.base import StreamChunk
 
         mock_agent = MagicMock()
-        mock_renderer = LiveDisplayRenderer(Console())
+        mock_renderer = LiveDisplayRenderer(_themed_console())
 
         async def empty_stream():
             # Stream with no content at all
@@ -247,7 +254,7 @@ class TestThinkingModeTransitions:
 
     def test_thinking_mode_toggle(self):
         """Thinking mode should toggle correctly."""
-        console = Console()
+        console = _themed_console()
         renderer = LiveDisplayRenderer(console)
 
         renderer.start()
@@ -272,7 +279,7 @@ class TestThinkingModeTransitions:
         from victor.providers.base import StreamChunk
 
         mock_agent = MagicMock()
-        mock_renderer = LiveDisplayRenderer(Console())
+        mock_renderer = LiveDisplayRenderer(_themed_console())
 
         async def stream_ending_in_thinking():
             # Start thinking
@@ -292,7 +299,7 @@ class TestThinkingModeTransitions:
 
     def test_rapid_thinking_transitions(self):
         """Should handle rapid enter/exit thinking cycles."""
-        console = Console()
+        console = _themed_console()
         renderer = LiveDisplayRenderer(console)
 
         renderer.start()
@@ -318,7 +325,7 @@ class TestContentBufferSize:
         from victor.providers.base import StreamChunk
 
         mock_agent = MagicMock()
-        mock_renderer = LiveDisplayRenderer(Console())
+        mock_renderer = LiveDisplayRenderer(_themed_console())
 
         large_content = "X" * 15000  # 15KB of content
 

@@ -55,7 +55,11 @@ class TestPlanModeApprovalFlow:
         mock_renderer = MagicMock()
         mock_renderer.console = MagicMock()
 
-        coordinator = PlanningCoordinator(mock_orchestrator, renderer=mock_renderer)
+        # PlanningConfig.auto_approve defaults to True (intended production
+        # behavior). Opt into the interactive-approval path under test.
+        coordinator = PlanningCoordinator(
+            mock_orchestrator, config=PlanningConfig(auto_approve=False), renderer=mock_renderer
+        )
 
         # Create a test plan
         plan = ReadableTaskPlan(
@@ -168,7 +172,11 @@ class TestPlanPersistence:
         mock_renderer = MagicMock()
         mock_renderer.console = MagicMock()
 
-        coordinator = PlanningCoordinator(mock_orchestrator, renderer=mock_renderer)
+        # PlanningConfig.auto_approve defaults to True (intended production
+        # behavior). Opt into the interactive-approval path under test.
+        coordinator = PlanningCoordinator(
+            mock_orchestrator, config=PlanningConfig(auto_approve=False), renderer=mock_renderer
+        )
 
         plan = ReadableTaskPlan(
             name="Persistence Test Plan",
@@ -212,7 +220,11 @@ class TestPlanPersistence:
         mock_renderer = MagicMock()
         mock_renderer.console = MagicMock()
 
-        coordinator = PlanningCoordinator(mock_orchestrator, renderer=mock_renderer)
+        # PlanningConfig.auto_approve defaults to True (intended production
+        # behavior). Opt into the interactive-approval path under test.
+        coordinator = PlanningCoordinator(
+            mock_orchestrator, config=PlanningConfig(auto_approve=False), renderer=mock_renderer
+        )
 
         plan = ReadableTaskPlan(
             name="Metadata Test Plan",
@@ -255,7 +267,11 @@ class TestPlanPersistence:
         mock_renderer = MagicMock()
         mock_renderer.console = MagicMock()
 
-        coordinator = PlanningCoordinator(mock_orchestrator, renderer=mock_renderer)
+        # PlanningConfig.auto_approve defaults to True (intended production
+        # behavior). Opt into the interactive-approval path under test.
+        coordinator = PlanningCoordinator(
+            mock_orchestrator, config=PlanningConfig(auto_approve=False), renderer=mock_renderer
+        )
 
         plan1 = ReadableTaskPlan(
             name="Plan 1",
@@ -299,7 +315,11 @@ class TestPlanModeRenderingIntegration:
         mock_renderer = MagicMock()
         mock_renderer.console = MagicMock()
 
-        coordinator = PlanningCoordinator(mock_orchestrator, renderer=mock_renderer)
+        # PlanningConfig.auto_approve defaults to True (intended production
+        # behavior). Opt into the interactive-approval path under test.
+        coordinator = PlanningCoordinator(
+            mock_orchestrator, config=PlanningConfig(auto_approve=False), renderer=mock_renderer
+        )
 
         plan = ReadableTaskPlan(
             name="Renderer Test Plan",
@@ -354,7 +374,11 @@ class TestPlanModeRenderingIntegration:
         mock_renderer = MagicMock()
         mock_renderer.console = MagicMock()
 
-        coordinator = PlanningCoordinator(mock_orchestrator, renderer=mock_renderer)
+        # PlanningConfig.auto_approve defaults to True (intended production
+        # behavior). Opt into the interactive-approval path under test.
+        coordinator = PlanningCoordinator(
+            mock_orchestrator, config=PlanningConfig(auto_approve=False), renderer=mock_renderer
+        )
 
         plan = ReadableTaskPlan(
             name="Display Test Plan",
@@ -416,7 +440,11 @@ class TestPlanModeEndToEnd:
         mock_renderer = MagicMock()
         mock_renderer.console = MagicMock()
 
-        coordinator = PlanningCoordinator(mock_orchestrator, renderer=mock_renderer)
+        # PlanningConfig.auto_approve defaults to True (intended production
+        # behavior). Opt into the interactive-approval path under test.
+        coordinator = PlanningCoordinator(
+            mock_orchestrator, config=PlanningConfig(auto_approve=False), renderer=mock_renderer
+        )
 
         # Simulate user approving the plan
         with (
@@ -494,7 +522,11 @@ class TestPlanModeEndToEnd:
         mock_renderer = MagicMock()
         mock_renderer.console = MagicMock()
 
-        coordinator = PlanningCoordinator(mock_orchestrator, renderer=mock_renderer)
+        # PlanningConfig.auto_approve defaults to True (intended production
+        # behavior). Opt into the interactive-approval path under test.
+        coordinator = PlanningCoordinator(
+            mock_orchestrator, config=PlanningConfig(auto_approve=False), renderer=mock_renderer
+        )
 
         # Create a complex multi-step plan
         plan = ReadableTaskPlan(

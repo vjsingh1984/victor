@@ -262,10 +262,8 @@ class TestRecoveryCoordinatorDIIntegration:
 
     def test_recovery_coordinator_dependencies_resolution_chain(self, service_provider):
         """Test that RecoveryCoordinator dependency resolution chain works."""
-        from victor.agent.protocols import (
-            StreamingHandlerProtocol,
-            TaskTrackerProtocol,
-        )
+        from victor.agent.protocols import TaskTrackerProtocol
+        from victor.agent.services.protocols import StreamingHandlerProtocol
 
         container = service_provider.container
 

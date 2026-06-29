@@ -113,7 +113,10 @@ class TestAgentBuildOptions:
 
     def test_legacy_config_is_normalized(self):
         """Legacy AgentConfig inputs should be stored canonically."""
-        options = AgentBuildOptions(config=AgentConfig.high_budget())
+        # AgentConfig itself is deprecated; assert the deprecation fires so the
+        # legacy path stays properly marked while we verify normalization.
+        with pytest.warns(DeprecationWarning):
+            options = AgentBuildOptions(config=AgentConfig.high_budget())
 
         assert isinstance(options.config, UnifiedAgentConfig)
         assert options.config.tool_budget == 200
@@ -207,7 +210,7 @@ class TestAgentBuilder:
 
     def test_config_chain(self):
         """Test fluent config setting."""
-        config = AgentConfig.high_budget()
+        config = UnifiedAgentConfig.high_budget()
         builder = AgentBuilder().config(config)
         assert isinstance(builder._options.config, UnifiedAgentConfig)
         assert builder._options.config.tool_budget == config.tool_budget
@@ -291,7 +294,7 @@ class TestBuilderPresets:
         builder = AgentBuilder().preset(BuilderPreset.HIGH_BUDGET)
         assert isinstance(builder._options.config, UnifiedAgentConfig)
         # High budget config should have higher limits
-        assert builder._options.config.tool_budget > AgentConfig.default().tool_budget
+        assert builder._options.config.tool_budget > UnifiedAgentConfig.minimal().tool_budget
 
     def test_preset_airgapped(self):
         """Test AIRGAPPED preset."""

@@ -111,7 +111,15 @@ def temp_project_db_path(tmp_path: Path):
     reset_project_database(db_path)
 
 
+@pytest.mark.filterwarnings("ignore::DeprecationWarning")
 class TestSQLiteSessionPersistenceCompatibility:
+    """Guards the deprecated ``SQLiteSessionPersistence`` compat surface.
+
+    These tests intentionally use the deprecated persistence class to verify it
+    still behaves correctly (round-trip, schema compat, loader interop). The
+    deprecation warning is expected here and intentionally suppressed.
+    """
+
     def test_default_constructor_uses_canonical_project_db_path(self, tmp_path: Path):
         """Default constructor should honor the canonical ProjectPaths.project_db property."""
         db_path = tmp_path / "isolated-project.db"

@@ -283,7 +283,8 @@ class TestFileWatcherInitializer:
         await manager.wait_for_refresh(temp_project)
 
         refreshed_nodes = await graph_store.get_nodes_by_file(str(target_file))
-        assert {node.name for node in refreshed_nodes} == {"bar"}
+        # A synthetic module node (named after the file stem) is prepended per file.
+        assert {node.name for node in refreshed_nodes} == {"bar", "module"}
         assert str(temp_project.resolve()) not in manager._refresh_tasks
 
     @pytest.mark.asyncio
@@ -398,7 +399,7 @@ class TestFileWatcherInitializer:
         await manager.wait_for_refresh(temp_project)
 
         new_nodes = await graph_store.get_nodes_by_file(str(new_file))
-        assert {node.name for node in new_nodes} == {"created_later"}
+        assert {node.name for node in new_nodes} == {"created_later", "new_module"}
 
     @pytest.mark.asyncio
     async def test_graph_manager_background_refresh_deletes_removed_file(self, temp_project):
@@ -407,7 +408,8 @@ class TestFileWatcherInitializer:
 
         deleted_file = temp_project / "src" / "module.py"
         assert {node.name for node in await graph_store.get_nodes_by_file(str(deleted_file))} == {
-            "foo"
+            "foo",
+            "module",
         }
 
         time.sleep(0.5)
@@ -450,7 +452,8 @@ class TestFileWatcherInitializer:
 
         assert await graph_store.get_nodes_by_file(str(old_file)) == []
         assert {node.name for node in await graph_store.get_nodes_by_file(str(renamed_file))} == {
-            "foo"
+            "foo",
+            "renamed_module",
         }
 
 

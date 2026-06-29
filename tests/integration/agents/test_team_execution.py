@@ -837,7 +837,10 @@ class TestCrossFormation:
             result = await coord.execute_task("Test task", {})
 
             assert "member_results" in result
-            assert len(result["member_results"]) >= 2
+            # REFLECTION collapses the generator+critic loop into a single
+            # synthesized result; other formations return one result per member.
+            expected_min = 1 if formation == TeamFormation.REFLECTION else 2
+            assert len(result["member_results"]) >= expected_min
 
     @pytest.mark.asyncio
     async def test_formation_switching(
