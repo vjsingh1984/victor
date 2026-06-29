@@ -51,7 +51,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 # Re-export from protocols for stable API
-from victor.integrations.protocols.query_enhancement import (
+from victor.protocols.query_enhancement import (
     EnhancementTechnique,
     EnhancementContext,
     EnhancedQuery,

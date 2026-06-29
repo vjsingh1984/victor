@@ -37,7 +37,7 @@ import logging
 import re
 from typing import List, Optional
 
-from victor.integrations.protocols.query_enhancement import (
+from victor.protocols.query_enhancement import (
     EnhancedQuery,
     EnhancementContext,
     EnhancementTechnique,

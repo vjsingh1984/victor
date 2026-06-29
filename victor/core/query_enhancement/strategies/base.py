@@ -27,7 +27,7 @@ import logging
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Optional, TYPE_CHECKING
 
-from victor.integrations.protocols.query_enhancement import (
+from victor.protocols.query_enhancement import (
     EnhancedQuery,
     EnhancementContext,
     EnhancementTechnique,

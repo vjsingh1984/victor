@@ -18,8 +18,8 @@ These tests validate that Rust implementations provide the expected speedup
 over Python fallbacks. Run with pytest --benchmark to see detailed results.
 
 Usage:
-    pytest tests/benchmark/test_native_performance.py -v --benchmark-only
-    pytest tests/benchmark/test_native_performance.py -v --no-cov
+    pytest tests/benchmarks/test_native_performance.py -v --benchmark-only
+    pytest tests/benchmarks/test_native_performance.py -v --no-cov
 
 Expected Speedups:
 - Type coercion: 3-5x
