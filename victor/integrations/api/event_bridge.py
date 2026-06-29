@@ -387,6 +387,12 @@ class DeliveryEngine:
                     pass
             self._cancel_client_sender_tasks()
             self._drain_event_queue()
+            # Drop the queue reference too: it is bound to this loop. stop()
+            # nulls ``_loop``, which would otherwise defeat start()'s loop-swap
+            # guard (``self._loop is not None and ...``) on the next start() —
+            # leaving a stale queue that raises "is bound to a different event
+            # loop" the moment a fresh loop's broadcast task touches it.
+            self._event_queue = None
             self._loop = None
         else:
             # The engine's loop is foreign/closed — only drop references.

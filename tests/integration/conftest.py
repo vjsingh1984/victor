@@ -158,3 +158,21 @@ def reset_service_container():
             reset_container()
         except ImportError:
             pass
+
+
+@pytest.fixture(autouse=True)
+def _reset_event_broadcaster_singleton():
+    """Isolate the process-wide ``EventBroadcaster`` singleton per integration test.
+
+    ``EventBroadcaster`` owns a loop-bound ``DeliveryEngine`` (event queue +
+    broadcast/sender tasks). Across pytest's function-scoped loops a leaked
+    singleton is bound to a *closed* loop. ``reset_instance()`` disposes it
+    loop-safely (drops references when the bound loop is foreign/closed) so
+    every bridge test file starts on a clean, unbound singleton. Mirrors the
+    same fixture in ``tests/unit/conftest.py``.
+    """
+    from victor.integrations.api.event_bridge import EventBroadcaster
+
+    EventBroadcaster.reset_instance()
+    yield
+    EventBroadcaster.reset_instance()
