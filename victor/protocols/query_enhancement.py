@@ -23,7 +23,7 @@ Design Patterns:
 - Dependency Inversion: Core code depends on IQueryEnhancementStrategy interface
 
 Usage:
-    from victor.integrations.protocols.query_enhancement import (
+    from victor.protocols.query_enhancement import (
         QueryEnhancementPipeline,
         EnhancementContext,
         EnhancementTechnique,

@@ -34,7 +34,7 @@ import sys
 import time
 from typing import Dict, Optional, TYPE_CHECKING
 
-from victor.integrations.protocols.query_enhancement import (
+from victor.protocols.query_enhancement import (
     EnhancedQuery,
     EnhancementContext,
     EnhancementTechnique,
