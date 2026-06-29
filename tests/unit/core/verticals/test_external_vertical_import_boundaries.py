@@ -88,6 +88,23 @@ def _find_package_root(package_name: str) -> Path | None:
     return None
 
 
+def _is_inrepo_vertical(package_root: Path) -> bool:
+    """True iff the installed package is this monorepo's in-repo vertical copy.
+
+    An external install (e.g. the archived standalone ``victor-coding`` repo) can
+    shadow the in-repo ``verticals/<pkg>/`` editable install on a dev machine.
+    This guard validates the in-repo vertical that actually ships; when a
+    different install is shadowing it we skip rather than flag its out-of-scope
+    imports. CI installs the in-repo vertical, so the guard still runs there.
+    """
+    repo_root = Path(__file__).resolve().parents[4]
+    try:
+        package_root.resolve().relative_to(repo_root / "verticals")
+        return True
+    except ValueError:
+        return False
+
+
 def _extract_victor_imports(filepath: Path) -> List[str]:
     """Extract all victor.* imports from a Python file using AST parsing."""
     try:
@@ -164,6 +181,12 @@ def test_external_vertical_import_boundaries(package_name: str):
     package_root = _find_package_root(package_name)
     if package_root is None:
         pytest.skip(f"{package_name} is not installed")
+    if not _is_inrepo_vertical(package_root):
+        pytest.skip(
+            f"installed {package_name} is not the in-repo vertical "
+            f"(at {package_root}) — an external/standalone install is shadowing it; "
+            f"CI validates the in-repo vertical."
+        )
 
     violations = _scan_package_imports(package_root)
     known = KNOWN_VIOLATIONS.get(package_name, set())
@@ -195,6 +218,12 @@ def test_external_vertical_known_violations_not_stale(package_name: str):
     package_root = _find_package_root(package_name)
     if package_root is None:
         pytest.skip(f"{package_name} is not installed")
+    if not _is_inrepo_vertical(package_root):
+        pytest.skip(
+            f"installed {package_name} is not the in-repo vertical "
+            f"(at {package_root}) — an external/standalone install is shadowing it; "
+            f"CI validates the in-repo vertical."
+        )
 
     violations = _scan_package_imports(package_root)
     known = KNOWN_VIOLATIONS.get(package_name, set())
