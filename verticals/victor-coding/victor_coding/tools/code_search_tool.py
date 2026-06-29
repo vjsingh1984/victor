@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set, Tuple
 
 from victor.core.indexing.graph_enrichment import ensure_project_graph_enriched
-from victor.framework.enrichment.file_patterns import CODE_PATTERNS
+from victor_contracts.enrichment_runtime import CODE_PATTERNS
 from victor.framework.search import (
     CODEBASE_INDEX_MANIFEST_NAME,
     DEFAULT_CODEBASE_CHUNKING_STRATEGY,
@@ -2273,8 +2273,11 @@ async def _get_or_build_index(
     # Clean up nested .victor directories on first access
     _cleanup_nested_victor_dirs(root)
 
-    from victor.core.capability_registry import CapabilityRegistry
-    from victor.framework.vertical_protocols import CodebaseIndexFactoryProtocol
+    from victor_contracts.capability_runtime import (
+        CodebaseIndexFactoryProtocol,
+        get_capability_provider,
+        is_capability_enhanced,
+    )
     from victor.core.indexing.index_lock import IndexLockRegistry
 
     embedding_config = _build_codebase_embedding_config(settings, root)
@@ -2289,36 +2292,9 @@ async def _get_or_build_index(
         _raise_if_cached_index_build_failure(failure_cache, provider_failure_key)
         _raise_if_cached_index_build_failure(failure_cache, failure_key)
 
-    registry = CapabilityRegistry.get_instance()
-    # Ensure plugins are bootstrapped so victor-coding registers its factory
-    registry.ensure_bootstrapped()
+    _index_factory = get_capability_provider(CodebaseIndexFactoryProtocol)
 
-    _index_factory = registry.get(CodebaseIndexFactoryProtocol)
-    if _index_factory is None or not registry.is_enhanced(CodebaseIndexFactoryProtocol):
-        # Recovery 1: force plugin capability re-discovery (plugin chain may have
-        # been bootstrapped before victor-coding was installed, or an exception
-        # was silently swallowed during _auto_register_vertical_capabilities)
-        from victor.core.bootstrap import _discover_plugin_capabilities
-
-        _discover_plugin_capabilities(None)
-        _index_factory = registry.get(CodebaseIndexFactoryProtocol)
-
-    if _index_factory is None or not registry.is_enhanced(CodebaseIndexFactoryProtocol):
-        # Recovery 2: direct import — bypasses plugin→vertical→capability chain entirely.
-        # This handles cases where the plugin chain fails silently (DEBUG-level exception
-        # swallowing in _auto_register_vertical_capabilities) but the package IS installed.
-        from victor.core.capability_registry import CapabilityStatus
-
-        factory = _load_codebase_index_factory_via_importlib()
-        if factory is not None:
-            registry.register(CodebaseIndexFactoryProtocol, factory, CapabilityStatus.ENHANCED)
-            _index_factory = factory
-            logger.info(
-                "[code_search] Recovered CodebaseIndex factory via importlib fallback "
-                "(victor-coding is installed, plugin chain failed)"
-            )
-
-    if _index_factory is None or not registry.is_enhanced(CodebaseIndexFactoryProtocol):
+    if _index_factory is None or not is_capability_enhanced(CodebaseIndexFactoryProtocol):
         if importlib.util.find_spec("victor_coding") is not None:
             error_msg = (
                 "CodebaseIndex factory not registered. The victor-coding package "
@@ -3805,8 +3781,8 @@ async def code_search(
         # Record outcome for RL threshold learning if enabled
         if _get_search_setting(settings, "enable_semantic_threshold_rl_learning", False):
             try:
-                from victor.framework.rl.coordinator import get_rl_coordinator
-                from victor.framework.rl.base import RLOutcome
+                from victor_contracts.rl_runtime import get_rl_coordinator
+                from victor_contracts.rl_runtime import RLOutcome
 
                 coordinator = get_rl_coordinator()
 

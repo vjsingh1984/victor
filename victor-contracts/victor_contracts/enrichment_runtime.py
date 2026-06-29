@@ -30,9 +30,12 @@ __all__ = [
     "KeywordClassifier",
     "extract_dotted_paths",
     "extract_identifiers",
+,
+    "CODE_PATTERNS",
 ]
 
 _LAZY_IMPORTS = {
+    "CODE_PATTERNS": "victor.framework.enrichment.file_patterns",
     "ContextEnrichment": "victor.framework.enrichment",
     "DEVOPS_PATTERNS": "victor.framework.enrichment",
     "EnrichmentContext": "victor.framework.enrichment",

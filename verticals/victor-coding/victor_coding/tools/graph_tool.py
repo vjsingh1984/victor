@@ -1385,20 +1385,14 @@ def _should_reuse_project_graph_root(
 
 
 def _has_enhanced_codebase_index_provider() -> bool:
-    from victor.core.capability_registry import CapabilityRegistry
-    from victor.framework.vertical_protocols import CodebaseIndexFactoryProtocol
+    from victor_contracts.capability_runtime import (
+        CodebaseIndexFactoryProtocol,
+        get_capability_provider,
+        is_capability_enhanced,
+    )
 
-    registry = CapabilityRegistry.get_instance()
-    try:
-        registry.ensure_bootstrapped()
-    except Exception:
-        logger.debug(
-            "[graph] Capability bootstrap failed during availability check",
-            exc_info=True,
-        )
-
-    factory = registry.get(CodebaseIndexFactoryProtocol)
-    return factory is not None and registry.is_enhanced(CodebaseIndexFactoryProtocol)
+    factory = get_capability_provider(CodebaseIndexFactoryProtocol)
+    return factory is not None and is_capability_enhanced(CodebaseIndexFactoryProtocol)
 
 
 def _project_graph_has_data(root_path: Path) -> bool:
