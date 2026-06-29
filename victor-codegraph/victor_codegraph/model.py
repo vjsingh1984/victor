@@ -159,10 +159,40 @@ class CodeChunk:
 
 
 def deterministic_symbol_id(file_path: str, name: str, line: int, column: int = 0) -> str:
-    """Stable 16-hex id keyed on (file, name, line, col) — same input, same id."""
+    """Stable 16-hex id keyed on (file, name, line, col) — same input, same id.
+
+    LINE-COUPLED: editing code above a symbol moves its line and changes this id.
+    Retained as the *legacy* alias during the ADR-044 mixed-read bake; new identity
+    is :func:`stable_symbol_oid`.
+    """
 
     key = f"{file_path}:{name}:{line}:{column}"
     return hashlib.sha256(key.encode("utf-8")).hexdigest()[:16]
+
+
+def stable_symbol_oid(
+    repo_id: str,
+    language: str,
+    fully_qualified_name: str,
+    signature: str | None,
+) -> str:
+    """Line-independent stable symbol id (ADR-044) — the correlated-CPG join key.
+
+    Identity = the structural coordinates that survive edits which don't change *what
+    the symbol is*: ``repo ‖ language ‖ fully_qualified_name ‖ overload_discriminator``.
+    The FQN already encodes ``path::scope::name`` (no line), and ``signature`` (the
+    parameter list / arity) disambiguates same-name overloads. **Line, column, byte
+    offset and body text are NOT in identity** — they are metadata / a separate
+    ``content_version``. So a symbol that merely moves lines (or whose body is edited)
+    keeps this id; it changes only on rename / move / signature change.
+
+    Uses ``blake2b`` (stdlib, dependency-free) and the unit-separator ``\\x1f`` as the
+    field delimiter so a coordinate containing the delimiter can't forge a collision.
+    """
+
+    disc = signature or ""
+    key = "\x1f".join((repo_id, language, fully_qualified_name, disc))
+    return hashlib.blake2b(key.encode("utf-8"), digest_size=8).hexdigest()
 
 
 def content_hash(content: str) -> str:

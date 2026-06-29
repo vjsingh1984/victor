@@ -24,6 +24,8 @@ from .model import (
     CodeSymbolType,
     ParsedCode,
     SourceLocation,
+    deterministic_symbol_id,
+    stable_symbol_oid,
 )
 from .parser import chunk, parse
 from .repo import chunk_path, chunk_repo, iter_source_files, parse_path
@@ -51,4 +53,6 @@ __all__ = [
     "CodeRelationType",
     "ParsedCode",
     "SourceLocation",
+    "stable_symbol_oid",
+    "deterministic_symbol_id",
 ]
