@@ -11,9 +11,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set, Tuple
 
-from victor.core.indexing.graph_enrichment import ensure_project_graph_enriched
+from victor_contracts.indexing_runtime import ensure_project_graph_enriched
 from victor_contracts.enrichment_runtime import CODE_PATTERNS
-from victor.framework.search import (
+from victor_contracts.search_runtime import (
     CODEBASE_INDEX_MANIFEST_NAME,
     DEFAULT_CODEBASE_CHUNKING_STRATEGY,
     DEFAULT_CODEBASE_CHUNK_OVERLAP,
@@ -37,7 +37,7 @@ if TYPE_CHECKING:
     from victor.tools.cache_manager import CacheNamespace
 
     # File watching types
-    from victor.core.indexing.file_watcher import FileChangeEvent
+    from victor_contracts.indexing_runtime import FileChangeEvent
 
 logger = logging.getLogger(__name__)
 
@@ -1648,7 +1648,7 @@ async def _subscribe_to_file_watcher(
         root: Root path of codebase
         exec_ctx: Execution context
     """
-    from victor.core.indexing.file_watcher import FileWatcherRegistry
+    from victor_contracts.indexing_runtime import FileWatcherRegistry
 
     try:
         # Get or create file watcher for this path
@@ -1778,8 +1778,8 @@ async def _on_file_change(
         root: Root path of codebase
         exec_ctx: Execution context for cache access
     """
-    from victor.core.indexing.file_watcher import FileChangeType
-    from victor.core.indexing.index_lock import IndexLockRegistry
+    from victor_contracts.indexing_runtime import FileChangeType
+    from victor_contracts.indexing_runtime import IndexLockRegistry
 
     index_cache = _get_index_cache(exec_ctx)
     index_key = str(root)
@@ -1929,7 +1929,7 @@ async def _graph_search(
         Dictionary with results, metadata
     """
     import time
-    from victor.core.graph_rag import MultiHopRetriever, RetrievalConfig
+    from victor_contracts.graph_rag_runtime import MultiHopRetriever, RetrievalConfig
     from victor.storage.graph import create_graph_store
 
     start_time = time.time()
@@ -2278,7 +2278,7 @@ async def _get_or_build_index(
         get_capability_provider,
         is_capability_enhanced,
     )
-    from victor.core.indexing.index_lock import IndexLockRegistry
+    from victor_contracts.indexing_runtime import IndexLockRegistry
 
     embedding_config = _build_codebase_embedding_config(settings, root)
     index_manifest = build_codebase_index_manifest(embedding_config)
@@ -3605,7 +3605,7 @@ async def code_search(
                 }
         elif mode == "graph":
             # Graph-based multi-hop search using Graph RAG pipeline
-            from victor.core.feature_flags import get_feature_flag_manager, FeatureFlag
+            from victor_contracts.feature_flag_runtime import get_feature_flag_manager, FeatureFlag
 
             flag_manager = get_feature_flag_manager()
             graph_enabled = flag_manager.is_enabled(
@@ -3838,7 +3838,7 @@ async def code_search(
         # Optionally combine with keyword search using hybrid RRF
         if enable_hybrid:
             try:
-                from victor.framework.search import create_hybrid_search_engine
+                from victor_contracts.search_runtime import create_hybrid_search_engine
 
                 # Get keyword search results
                 keyword_fetch_limit = _literal_search_fetch_limit(k * 2, filters)

@@ -17,7 +17,7 @@ from types import SimpleNamespace
 from typing import Any, DefaultDict, Dict, Iterable, List, Literal, Optional, Set
 
 from victor.config.settings import get_project_paths, load_settings
-from victor.core.indexing.graph_enrichment import ensure_project_graph_enriched
+from victor_contracts.indexing_runtime import ensure_project_graph_enriched
 from victor.native.python.graph_algo import (
     connected_components,
     pagerank,
@@ -1396,7 +1396,7 @@ def _has_enhanced_codebase_index_provider() -> bool:
 
 
 def _project_graph_has_data(root_path: Path) -> bool:
-    from victor.core.database import get_project_database
+    from victor_contracts.database_runtime import get_project_database
 
     project_db = get_project_database(root_path)
     try:
@@ -1549,7 +1549,7 @@ async def _materialize_loaded_graph(
 
 
 async def _load_graph_from_project_store(root_path: Path) -> LoadedGraph:
-    from victor.core.database import get_project_database
+    from victor_contracts.database_runtime import get_project_database
     from victor.storage.graph.sqlite_store import SqliteGraphStore
 
     project_db = get_project_database(root_path)
@@ -1898,7 +1898,7 @@ async def _run_graph_sql_query_for_root(
     sql: str,
 ) -> Dict[str, Any]:
     """Execute a raw SQL query against the persisted project graph database."""
-    from victor.core.database import get_project_database
+    from victor_contracts.database_runtime import get_project_database
 
     # Security: strictly enforce read-only SELECT queries
     # Strip whitespace and check prefix
@@ -1982,7 +1982,7 @@ async def _run_graph_sql_query_for_root(
 def _graph_store_fingerprint(root_path: Path) -> float:
     """Return a cheap graph freshness fingerprint for analytics cache invalidation."""
     try:
-        from victor.core.database import get_project_database
+        from victor_contracts.database_runtime import get_project_database
 
         db_path = Path(get_project_database(root_path).db_path)
         return db_path.stat().st_mtime
@@ -2098,7 +2098,7 @@ async def _run_expensive_graph_analysis(
 
 def _build_stats_from_project_store(root_path: Path) -> Dict[str, Any]:
     """Build graph stats directly from persisted SQLite graph tables."""
-    from victor.core.database import get_project_database
+    from victor_contracts.database_runtime import get_project_database
 
     project_db = get_project_database(root_path)
     _ensure_project_graph_tables(project_db)
@@ -2154,7 +2154,7 @@ def _build_degree_centrality_from_project_store(
     Fast SQL-based approach that avoids materializing the entire graph in memory.
     Computes total degree (in_degree + out_degree) for nodes.
     """
-    from victor.core.database import get_project_database
+    from victor_contracts.database_runtime import get_project_database
 
     project_db = get_project_database(root_path)
     _ensure_project_graph_tables(project_db)
@@ -2266,7 +2266,7 @@ def _project_relative_scope(root_path: Path) -> Optional[str]:
     ``n.file LIKE scope || '/%'`` predicate. Returns ``None`` when the request is
     at (or above) the project root, i.e. genuinely repo-wide.
     """
-    from victor.core.database import resolve_project_db_root
+    from victor_contracts.database_runtime import resolve_project_db_root
 
     project_root = resolve_project_db_root(root_path)
     try:
@@ -2291,7 +2291,7 @@ def _build_cheap_overview_from_project_store(
     When ``root_path`` is a subdirectory of the project, results are scoped to
     that subtree via ``n.file`` prefix matching.
     """
-    from victor.core.database import get_project_database
+    from victor_contracts.database_runtime import get_project_database
 
     project_db = get_project_database(root_path)
     _ensure_project_graph_tables(project_db)
@@ -2884,8 +2884,8 @@ async def _graph_impl(
     # must run against the canonical project root — not a scoped subpath like
     # ``src/network``. Passing the subpath here indexes a stray subdirectory DB
     # (and litters a ``.victor/`` dir) instead of refreshing the repo's project.db.
-    from victor.core.database import resolve_project_db_root
-    from victor.core.indexing.graph_manager import GraphManager
+    from victor_contracts.database_runtime import resolve_project_db_root
+    from victor_contracts.indexing_runtime import GraphManager
 
     refresh_root = resolve_project_db_root(root_path)
 
