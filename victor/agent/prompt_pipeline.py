@@ -135,15 +135,27 @@ class CacheEconomics:
 
     @property
     def pruning_aggressiveness(self) -> str:
-        """How hard the assembler should prune, derived from the API read discount.
+        """How hard the assembler should prune the stable/cached prefix.
 
-        High discount → cached tokens are nearly free → keep more (conservative).
-        Low/no discount → every token costs → prune hard (aggressive).
+        Derived from tier + the characterized API read discount:
+
+        - ``API_AND_KV`` with a characterized LOW discount (``0 < d < 0.5``) →
+          ``balanced``: a weak cache shouldn't bloat the prefix — prune optional
+          content out of it.
+        - ``API_AND_KV`` otherwise (high discount, or uncharacterized) →
+          ``conservative``: keep content in the prefix; cached tokens are cheap
+          (or assumed cheap when the provider hasn't characterized its cache).
+        - ``KV_ONLY`` / ``NO_CACHE`` → ``aggressive``: every token costs.
+
+        The uncharacterized-API-cache case defaults to ``conservative`` so
+        providers (and test doubles) that report caching via the legacy bool but
+        don't override ``cache_cost_model()`` keep the current keep-everything
+        behavior.
         """
-        if self.api_discount >= 0.5:
+        if self.tier == ProviderTier.API_AND_KV:
+            if 0.0 < self.api_discount < 0.5:
+                return "balanced"
             return "conservative"
-        if self.api_discount >= 0.25:
-            return "balanced"
         return "aggressive"
 
 
@@ -250,9 +262,15 @@ def detect_cache_economics(provider: Any) -> CacheEconomics:
 class ContentRouter:
     """Routes content items to placements based on provider tier and category."""
 
-    def __init__(self, tier: ProviderTier, edge_sections: Optional[Set[str]] = None):
+    def __init__(
+        self,
+        tier: ProviderTier,
+        edge_sections: Optional[Set[str]] = None,
+        economics: Optional[CacheEconomics] = None,
+    ):
         self._tier = tier
         self._edge_sections = edge_sections
+        self._economics = economics
 
     @property
     def tier(self) -> ProviderTier:
@@ -269,6 +287,18 @@ class ContentRouter:
             return Placement.USER_PREFIX
 
         if self._tier == ProviderTier.API_AND_KV:
+            # Weak cache (characterized low discount): don't bloat the
+            # stable/cached prefix with optional content — keep only required
+            # and edge-relevant items in the system prompt, demote the rest to
+            # the per-turn user prefix. Conservative (default) keeps everything.
+            if self._economics is not None and self._economics.pruning_aggressiveness == "balanced":
+                if item.required:
+                    return Placement.SYSTEM_PROMPT
+                if self._edge_sections is not None and _matches_edge_sections(
+                    item, self._edge_sections
+                ):
+                    return Placement.SYSTEM_PROMPT
+                return Placement.USER_PREFIX
             return Placement.SYSTEM_PROMPT
 
         if self._tier == ProviderTier.KV_ONLY:
@@ -479,7 +509,8 @@ class UnifiedPromptPipeline:
         credit_tracking_service: Optional[Any] = None,
         tool_pipeline: Optional[Any] = None,
     ):
-        self._tier = detect_provider_tier(provider)
+        self._economics = detect_cache_economics(provider)
+        self._tier = self._economics.tier
         self._builder = builder
         self._registry = registry
         self._optimizer = optimizer
@@ -530,7 +561,7 @@ class UnifiedPromptPipeline:
                 enable_prompt_completeness_guard = False
         self.enable_prompt_completeness_guard = enable_prompt_completeness_guard
 
-        self._router = ContentRouter(self._tier, edge_sections)
+        self._router = ContentRouter(self._tier, edge_sections, economics=self._economics)
         self._frozen_prompt: Optional[str] = None
         self._last_prompt_completeness_assessment: Optional[PromptCompletenessAssessment] = None
 

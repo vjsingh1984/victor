@@ -11,9 +11,13 @@ import pytest
 
 from victor.agent.prompt_pipeline import (
     CacheEconomics,
+    ContentRouter,
+    Placement,
+    ProviderTier,
     detect_cache_economics,
     detect_provider_tier,
 )
+from victor.agent.content_registry import ContentCategory, ContentItem
 from victor.providers.base import BaseProvider, CacheCostModel
 from victor.providers.anthropic_provider import AnthropicProvider
 from victor.providers.openai_provider import OpenAIProvider
@@ -98,3 +102,58 @@ def test_economics_is_frozen():
     assert isinstance(eco, CacheEconomics)
     with pytest.raises(Exception):
         eco.api_discount = 1.0  # type: ignore[misc]
+
+
+def _item(required: bool = False) -> ContentItem:
+    return ContentItem(
+        name="x",
+        category=ContentCategory.STATIC,
+        default_text="content",
+        token_estimate=10,
+        evolvable=False,
+        required=required,
+        section_group="group",
+    )
+
+
+class TestContentRouterAggressiveness:
+    """FEP-0011 Phase 3+: pruning_aggressiveness now drives placement. A weak
+    (low-discount) API cache prunes optional content out of the stable prefix;
+    a strong/uncharacterized cache keeps everything (backward compatible)."""
+
+    def test_conservative_keeps_optional_in_prefix(self):
+        eco = CacheEconomics(tier=ProviderTier.API_AND_KV, api_discount=0.9)
+        router = ContentRouter(ProviderTier.API_AND_KV, economics=eco)
+        assert eco.pruning_aggressiveness == "conservative"
+        # Optional content still lands in the cached system prompt.
+        assert router.route(_item(required=False)) == Placement.SYSTEM_PROMPT
+
+    def test_balanced_prunes_optional_to_user_prefix(self):
+        eco = CacheEconomics(tier=ProviderTier.API_AND_KV, api_discount=0.25)
+        router = ContentRouter(ProviderTier.API_AND_KV, economics=eco)
+        assert eco.pruning_aggressiveness == "balanced"
+        # Optional content is demoted out of the cached prefix.
+        assert router.route(_item(required=False)) == Placement.USER_PREFIX
+        # Required content stays in the system prompt.
+        assert router.route(_item(required=True)) == Placement.SYSTEM_PROMPT
+
+    def test_balanced_keeps_edge_content_in_prefix(self):
+        eco = CacheEconomics(tier=ProviderTier.API_AND_KV, api_discount=0.3)
+        router = ContentRouter(
+            ProviderTier.API_AND_KV, edge_sections={"GROUNDING_RULES"}, economics=eco
+        )
+        edge_item = ContentItem(
+            name="gr",
+            category=ContentCategory.STATIC,
+            default_text="rules",
+            token_estimate=10,
+            evolvable=False,
+            required=False,
+            section_group="GROUNDING_RULES",
+        )
+        assert router.route(edge_item) == Placement.SYSTEM_PROMPT
+
+    def test_no_economics_keeps_default_behavior(self):
+        # Backward compat: ContentRouter built without economics keeps everything.
+        router = ContentRouter(ProviderTier.API_AND_KV)
+        assert router.route(_item(required=False)) == Placement.SYSTEM_PROMPT
