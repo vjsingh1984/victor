@@ -148,8 +148,10 @@ def new_name():
 
         changed_nodes = await graph_store.get_nodes_by_file(str(changed_file))
         unchanged_nodes = await graph_store.get_nodes_by_file(str(unchanged_file))
-        assert {node.name for node in changed_nodes} == {"new_name"}
-        assert {node.name for node in unchanged_nodes} == {"stable_name"}
+        # A synthetic module node (named after the file stem) is prepended per file
+        # so IMPORTS and top-level CONTAINS edges have an anchor (commit 35bdcc57a).
+        assert {node.name for node in changed_nodes} == {"changed", "new_name"}
+        assert {node.name for node in unchanged_nodes} == {"stable", "stable_name"}
 
         unchanged_file.unlink()
         deleted_stats = await pipeline.index_repository()

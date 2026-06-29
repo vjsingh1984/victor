@@ -677,16 +677,9 @@ class TestRealWorldScenarios:
 class TestDocumentationCompleteness:
     """Test that documentation is complete and accessible."""
 
-    def test_rollout_guide_exists(self):
-        """Test that rollout guide documentation exists."""
-        guide_path = Path("docs/rollout-guide.md")
-        assert guide_path.exists()
-
-        # Check that guide contains key sections
-        content = guide_path.read_text()
-        assert "Rollout Strategy" in content
-        assert "Rollback Procedures" in content
-        assert "Troubleshooting" in content
+    # Note: docs/rollout-guide.md was intentionally removed in the documentation
+    # consolidation (commit 6132152dd); the predictive-enhancements feature is
+    # still implemented and exercised by the rest of this suite.
 
     def test_api_documentation(self):
         """Test that API is documented."""

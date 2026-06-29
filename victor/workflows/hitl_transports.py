@@ -55,6 +55,7 @@ import html
 import json
 import logging
 import os
+import urllib.parse
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import (
@@ -1249,6 +1250,430 @@ class CustomHookTransport(BaseTransport):
 
 
 # =============================================================================
+# SCM / ticketing / incident transports
+#
+# These deliver the approval request to an external system and, where that
+# system exposes a queryable approval state, poll it. For systems without a
+# native approve/reject signal the response arrives via the signed callback
+# links embedded in the message (see BaseTransport._build_callback_urls) and
+# poll() returns None. The HTTP calls follow each provider's documented API;
+# they are unit-tested against mocked responses and warrant integration testing
+# against a real instance before production use.
+# =============================================================================
+
+
+def _approval_message(
+    request: HITLRequest,
+    workflow_id: str,
+    urls: Dict[str, str],
+) -> str:
+    """Build a plain-text approval body with context and signed action links."""
+    lines = [
+        "🔔 Workflow approval required",
+        f"Workflow: {workflow_id}",
+        f"Request: {request.prompt}",
+    ]
+    for key, value in (request.context or {}).items():
+        lines.append(f"- {key}: {value}")
+    if urls.get("approve_url"):
+        lines.append(f"Approve: {urls['approve_url']}")
+    if urls.get("reject_url"):
+        lines.append(f"Reject: {urls['reject_url']}")
+    lines.append(f"Request ID: {request.request_id[:12]} | Timeout: {request.timeout}s")
+    return "\n".join(lines)
+
+
+class GitHubDeploymentTransport(BaseTransport):
+    """GitHub deployment-protection HITL transport.
+
+    GitHub natively notifies the environment's required reviewers when a run
+    pauses for deployment, so ``send`` records the run reference and ``poll``
+    watches the run's *pending deployments*: once our environment is no longer
+    pending the gate has been resolved — a cancelled run means rejected, anything
+    else approved. Requires ``context['run_id']`` (the workflow run awaiting the
+    environment) and a configured ``environment``.
+    """
+
+    def __init__(self, config: GitHubConfig):
+        super().__init__(config)
+        self.github_config = config
+
+    @property
+    def mode(self) -> HITLMode:
+        return HITLMode.GITHUB_DEPLOYMENT
+
+    def _headers(self) -> Dict[str, str]:
+        return {
+            "Authorization": f"token {self.github_config.token}",
+            "Accept": "application/vnd.github+json",
+        }
+
+    async def send(self, request: HITLRequest, workflow_id: str) -> str:
+        cfg = self.github_config
+        run_id = request.context.get("run_id") if request.context else None
+        env = cfg.environment or (request.context.get("environment") if request.context else None)
+        if not run_id:
+            raise ValueError("GitHub deployment approval requires context['run_id']")
+        logger.info(f"GitHub deployment approval pending for run {run_id} (environment={env})")
+        return f"github:deployment:{run_id}:{env or ''}"
+
+    async def poll(
+        self,
+        request_id: str,
+        external_ref: str,
+        timeout: Optional[float] = None,
+    ) -> Optional[HITLResponse]:
+        import aiohttp
+
+        parts = external_ref.split(":")
+        run_id = parts[2] if len(parts) > 2 else None
+        env = parts[3] if len(parts) > 3 else None
+        if not run_id:
+            return None
+        cfg = self.github_config
+        base = cfg.base_url
+        async with aiohttp.ClientSession() as session:
+            pend_url = (
+                f"{base}/repos/{cfg.owner}/{cfg.repo}/actions/runs/{run_id}/pending_deployments"
+            )
+            async with session.get(pend_url, headers=self._headers()) as resp:
+                pending = await resp.json()
+            if isinstance(pending, list):
+                still_pending = (
+                    any((p.get("environment") or {}).get("name") == env for p in pending)
+                    if env
+                    else bool(pending)
+                )
+                if still_pending:
+                    return None
+            run_url = f"{base}/repos/{cfg.owner}/{cfg.repo}/actions/runs/{run_id}"
+            async with session.get(run_url, headers=self._headers()) as resp:
+                run = await resp.json()
+        if run.get("conclusion") == "cancelled":
+            return HITLResponse(
+                request_id=request_id,
+                status=HITLStatus.REJECTED,
+                approved=False,
+                reason="Deployment rejected (run cancelled)",
+            )
+        return HITLResponse(
+            request_id=request_id,
+            status=HITLStatus.APPROVED,
+            approved=True,
+            reason="Deployment approved",
+        )
+
+
+class GitLabMRTransport(BaseTransport):
+    """GitLab merge-request approval HITL transport.
+
+    Posts an approval note (with signed callback links) on the MR, then polls the
+    MR *approvals* endpoint for the native approve decision.
+    """
+
+    def __init__(self, config: GitLabConfig):
+        super().__init__(config)
+        self.gitlab_config = config
+
+    @property
+    def mode(self) -> HITLMode:
+        return HITLMode.GITLAB_MR
+
+    def _project(self) -> str:
+        return urllib.parse.quote(str(self.gitlab_config.project_id), safe="")
+
+    async def send(self, request: HITLRequest, workflow_id: str) -> str:
+        import aiohttp
+
+        cfg = self.gitlab_config
+        mr_iid = cfg.mr_iid or (request.context.get("mr_iid") if request.context else None)
+        if not (cfg.project_id and mr_iid):
+            raise ValueError("GitLab MR approval requires project_id and mr_iid")
+        urls = self._build_callback_urls(request.request_id)
+        body = _approval_message(request, workflow_id, urls)
+        url = f"{cfg.base_url}/api/v4/projects/{self._project()}/merge_requests/{mr_iid}/notes"
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                url, json={"body": body}, headers={"PRIVATE-TOKEN": cfg.token or ""}
+            ) as resp:
+                data = await resp.json()
+        return f"gitlab:mr:{mr_iid}:note:{data.get('id', '')}"
+
+    async def poll(
+        self,
+        request_id: str,
+        external_ref: str,
+        timeout: Optional[float] = None,
+    ) -> Optional[HITLResponse]:
+        import aiohttp
+
+        parts = external_ref.split(":")
+        mr_iid = parts[2] if len(parts) > 2 else self.gitlab_config.mr_iid
+        cfg = self.gitlab_config
+        url = f"{cfg.base_url}/api/v4/projects/{self._project()}/merge_requests/{mr_iid}/approvals"
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, headers={"PRIVATE-TOKEN": cfg.token or ""}) as resp:
+                data = await resp.json()
+        if data.get("approved") or data.get("approved_by"):
+            return HITLResponse(
+                request_id=request_id,
+                status=HITLStatus.APPROVED,
+                approved=True,
+                reason="Merge request approved",
+            )
+        return None
+
+
+class GitLabPipelineTransport(BaseTransport):
+    """GitLab pipeline manual-gate HITL transport.
+
+    Treats a manual job as the gate: ``send`` records the job reference and
+    ``poll`` reads the job status — ``success`` (played) is approval,
+    ``failed``/``canceled`` rejection. Requires ``context['job_id']``.
+    """
+
+    def __init__(self, config: GitLabConfig):
+        super().__init__(config)
+        self.gitlab_config = config
+
+    @property
+    def mode(self) -> HITLMode:
+        return HITLMode.GITLAB_PIPELINE
+
+    def _project(self) -> str:
+        return urllib.parse.quote(str(self.gitlab_config.project_id), safe="")
+
+    async def send(self, request: HITLRequest, workflow_id: str) -> str:
+        job_id = request.context.get("job_id") if request.context else None
+        if not (self.gitlab_config.project_id and job_id):
+            raise ValueError("GitLab pipeline approval requires project_id and context['job_id']")
+        logger.info(f"GitLab pipeline manual gate pending for job {job_id}")
+        return f"gitlab:pipeline:job:{job_id}"
+
+    async def poll(
+        self,
+        request_id: str,
+        external_ref: str,
+        timeout: Optional[float] = None,
+    ) -> Optional[HITLResponse]:
+        import aiohttp
+
+        job_id = external_ref.split(":")[-1]
+        cfg = self.gitlab_config
+        url = f"{cfg.base_url}/api/v4/projects/{self._project()}/jobs/{job_id}"
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, headers={"PRIVATE-TOKEN": cfg.token or ""}) as resp:
+                data = await resp.json()
+        status = data.get("status")
+        if status == "success":
+            return HITLResponse(
+                request_id=request_id,
+                status=HITLStatus.APPROVED,
+                approved=True,
+                reason="Manual job played",
+            )
+        if status in ("failed", "canceled"):
+            return HITLResponse(
+                request_id=request_id,
+                status=HITLStatus.REJECTED,
+                approved=False,
+                reason=f"Manual job {status}",
+            )
+        return None
+
+
+class JiraTransport(BaseTransport):
+    """Jira-issue approval HITL transport.
+
+    Creates an approval issue whose description carries the context and signed
+    callback links, then polls the issue status; a status name matching the
+    configured approval / rejection transition resolves the request.
+    """
+
+    def __init__(self, config: JiraConfig):
+        super().__init__(config)
+        self.jira_config = config
+
+    @property
+    def mode(self) -> HITLMode:
+        return HITLMode.JIRA
+
+    def _auth(self):
+        import aiohttp
+
+        return aiohttp.BasicAuth(self.jira_config.email or "", self.jira_config.api_token or "")
+
+    async def send(self, request: HITLRequest, workflow_id: str) -> str:
+        import aiohttp
+
+        cfg = self.jira_config
+        if not (cfg.base_url and cfg.project_key):
+            raise ValueError("Jira approval requires base_url and project_key")
+        urls = self._build_callback_urls(request.request_id)
+        fields = {
+            "project": {"key": cfg.project_key},
+            "summary": f"[Approval] {request.prompt[:120]}",
+            "description": _approval_message(request, workflow_id, urls),
+            "issuetype": {"name": cfg.issue_type},
+        }
+        url = f"{cfg.base_url}/rest/api/2/issue"
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, json={"fields": fields}, auth=self._auth()) as resp:
+                data = await resp.json()
+        return f"jira:issue:{data.get('key', '')}"
+
+    async def poll(
+        self,
+        request_id: str,
+        external_ref: str,
+        timeout: Optional[float] = None,
+    ) -> Optional[HITLResponse]:
+        import aiohttp
+
+        key = external_ref.split(":")[-1]
+        cfg = self.jira_config
+        url = f"{cfg.base_url}/rest/api/2/issue/{key}?fields=status"
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, auth=self._auth()) as resp:
+                data = await resp.json()
+        status_name = (data.get("fields", {}).get("status", {}) or {}).get("name", "")
+        lowered = status_name.lower()
+        if cfg.approval_transition.lower() in lowered or lowered in ("approved", "done"):
+            return HITLResponse(
+                request_id=request_id,
+                status=HITLStatus.APPROVED,
+                approved=True,
+                reason=f"Jira issue {status_name}",
+            )
+        if cfg.rejection_transition.lower() in lowered or lowered in ("rejected", "won't do"):
+            return HITLResponse(
+                request_id=request_id,
+                status=HITLStatus.REJECTED,
+                approved=False,
+                reason=f"Jira issue {status_name}",
+            )
+        return None
+
+
+class PagerDutyTransport(BaseTransport):
+    """PagerDuty HITL transport.
+
+    Triggers an incident via the Events API v2 with the approve/reject callback
+    links in the payload; PagerDuty has no native approve/reject, so the response
+    arrives through the signed callback endpoint and ``poll`` returns None.
+    """
+
+    def __init__(self, config: PagerDutyConfig):
+        super().__init__(config)
+        self.pagerduty_config = config
+
+    @property
+    def mode(self) -> HITLMode:
+        return HITLMode.PAGERDUTY
+
+    async def send(self, request: HITLRequest, workflow_id: str) -> str:
+        import aiohttp
+
+        cfg = self.pagerduty_config
+        if not cfg.routing_key:
+            raise ValueError("PagerDuty approval requires a routing_key (Events API v2)")
+        urls = self._build_callback_urls(request.request_id)
+        dedup_key = f"victor-hitl-{request.request_id}"
+        payload = {
+            "routing_key": cfg.routing_key,
+            "event_action": "trigger",
+            "dedup_key": dedup_key,
+            "payload": {
+                "summary": f"Approval required: {request.prompt[:200]}",
+                "source": f"victor:{workflow_id}",
+                "severity": "warning",
+                "custom_details": {
+                    "context": request.context or {},
+                    "approve_url": urls.get("approve_url"),
+                    "reject_url": urls.get("reject_url"),
+                    "request_id": request.request_id,
+                },
+            },
+        }
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                "https://events.pagerduty.com/v2/enqueue", json=payload
+            ) as resp:
+                if resp.status >= 300:
+                    logger.error(f"PagerDuty enqueue error ({resp.status})")
+        return f"pagerduty:incident:{dedup_key}"
+
+    async def poll(
+        self,
+        request_id: str,
+        external_ref: str,
+        timeout: Optional[float] = None,
+    ) -> Optional[HITLResponse]:
+        """Responses arrive via the signed callback links — nothing to poll."""
+        return None
+
+
+class TerraformCloudTransport(BaseTransport):
+    """Terraform Cloud run-approval HITL transport.
+
+    Polls a run awaiting confirmation: ``applied``/``planned_and_finished`` is
+    approval, ``discarded``/``canceled``/``errored`` rejection. To actually apply
+    or discard the run, use TFC or its run apply/discard API. Requires
+    ``context['run_id']``.
+    """
+
+    def __init__(self, config: TerraformCloudConfig):
+        super().__init__(config)
+        self.tfc_config = config
+
+    @property
+    def mode(self) -> HITLMode:
+        return HITLMode.TERRAFORM_CLOUD
+
+    async def send(self, request: HITLRequest, workflow_id: str) -> str:
+        run_id = request.context.get("run_id") if request.context else None
+        if not run_id:
+            raise ValueError("Terraform Cloud approval requires context['run_id']")
+        logger.info(f"Terraform Cloud run {run_id} awaiting confirmation")
+        return f"tfc:run:{run_id}"
+
+    async def poll(
+        self,
+        request_id: str,
+        external_ref: str,
+        timeout: Optional[float] = None,
+    ) -> Optional[HITLResponse]:
+        import aiohttp
+
+        run_id = external_ref.split(":")[-1]
+        cfg = self.tfc_config
+        headers = {
+            "Authorization": f"Bearer {cfg.token}",
+            "Content-Type": "application/vnd.api+json",
+        }
+        url = f"{cfg.base_url}/api/v2/runs/{run_id}"
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, headers=headers) as resp:
+                data = await resp.json()
+        status = (data.get("data", {}).get("attributes", {}) or {}).get("status", "")
+        if status in ("applied", "planned_and_finished"):
+            return HITLResponse(
+                request_id=request_id,
+                status=HITLStatus.APPROVED,
+                approved=True,
+                reason=f"Run {status}",
+            )
+        if status in ("discarded", "canceled", "errored"):
+            return HITLResponse(
+                request_id=request_id,
+                status=HITLStatus.REJECTED,
+                approved=False,
+                reason=f"Run {status}",
+            )
+        return None
+
+
+# =============================================================================
 # Transport Registry
 # =============================================================================
 
@@ -1261,6 +1686,12 @@ _TRANSPORT_REGISTRY: Dict[HITLMode, Type[BaseTransport]] = {
     HITLMode.TEAMS: TeamsTransport,
     HITLMode.GITHUB_PR: GitHubPRTransport,
     HITLMode.GITHUB_CHECK: GitHubCheckTransport,
+    HITLMode.GITHUB_DEPLOYMENT: GitHubDeploymentTransport,
+    HITLMode.GITLAB_MR: GitLabMRTransport,
+    HITLMode.GITLAB_PIPELINE: GitLabPipelineTransport,
+    HITLMode.JIRA: JiraTransport,
+    HITLMode.PAGERDUTY: PagerDutyTransport,
+    HITLMode.TERRAFORM_CLOUD: TerraformCloudTransport,
     HITLMode.CUSTOM_HOOK: CustomHookTransport,
 }
 
@@ -1368,6 +1799,12 @@ __all__ = [
     "TeamsTransport",
     "GitHubPRTransport",
     "GitHubCheckTransport",
+    "GitHubDeploymentTransport",
+    "GitLabMRTransport",
+    "GitLabPipelineTransport",
+    "JiraTransport",
+    "PagerDutyTransport",
+    "TerraformCloudTransport",
     "CustomHookTransport",
     # Registry functions
     "register_transport",

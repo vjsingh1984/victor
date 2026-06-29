@@ -335,13 +335,15 @@ class TestSchemaPromotion:
             },
         )
 
-        # Set a tiered config that puts "search" in semantic_pool (STUB)
+        # Set a tiered config that puts "search" in the semantic pool (STUB).
+        # Use advanced_tools (the canonical source); TieredToolConfig derives
+        # semantic_pool from it, avoiding the deprecated semantic_pool field.
         from victor.core.vertical_types import TieredToolConfig
 
         config = TieredToolConfig(
             mandatory=set(),
             vertical_core=set(),
-            semantic_pool={"search"},
+            advanced_tools={"search"},
             stage_tools={},
         )
         selector.set_tiered_config(config)

@@ -24,6 +24,16 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from rich.console import Console
 from victor.agent.services.chat_stream_runtime import ServiceStreamingRuntime
+
+from victor.ui.theme import victor_theme
+
+
+def _themed_console() -> Console:
+    """Mirror production console setup: the renderer assumes the victor theme
+    (which defines ``thinking.text`` / ``thinking.indicator``) is loaded."""
+    return Console(theme=victor_theme)
+
+
 from victor.agent.services.orchestrator_protocol_adapter import (
     OrchestratorProtocolAdapter,
 )
@@ -73,7 +83,7 @@ class TestStreamingCompletion:
         mock_orch.max_tokens = 4096
 
         # Mock renderer
-        console = Console()
+        console = _themed_console()
         renderer = LiveDisplayRenderer(console=console)
         renderer.on_content = MagicMock()
         renderer.finalize = MagicMock()
@@ -112,7 +122,7 @@ class TestStreamingCompletion:
 
         Expected: Content is preserved in content_buffer and displayed on finalize.
         """
-        console = Console()
+        console = _themed_console()
         renderer = LiveDisplayRenderer(console=console)
 
         # Simulate thinking mode start
@@ -306,7 +316,7 @@ class TestThinkingModeTransitions:
 
     def test_thinking_to_normal_transition(self):
         """Verify content preserved when transitioning from thinking to normal mode."""
-        console = Console()
+        console = _themed_console()
         renderer = LiveDisplayRenderer(console=console)
 
         # Start thinking mode
@@ -336,7 +346,7 @@ class TestThinkingModeTransitions:
         With the single-buffer design, content is preserved in _content_buffer
         even when stream ends in thinking mode.
         """
-        console = Console()
+        console = _themed_console()
         renderer = LiveDisplayRenderer(console=console)
 
         # Start thinking mode

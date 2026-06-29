@@ -26,37 +26,9 @@ import pytest
 
 from victor.core.events import MessagingEvent
 
-
-@pytest.fixture(autouse=True)
-def reset_event_broadcaster_singleton():
-    """Isolate the process-wide ``EventBroadcaster`` singleton per test.
-
-    ``EventBroadcaster`` is a ``__new__``-based singleton, so its loop-bound
-    state (``_loop``, ``_broadcast_task``, per-client sender tasks/queues)
-    survives across pytest's function-scoped event loops. If it leaks into a
-    later test it runs on a closed loop — delivery silently stalls (the burst
-    test then times out) or the next loop lookup raises. Reset BEFORE and AFTER
-    each test, cancelling any stale loop-bound task so every test starts with a
-    fresh broadcaster bound to its own loop.
-    """
-
-    def _reset():
-        from victor.integrations.api.event_bridge import EventBroadcaster
-
-        inst = EventBroadcaster._instance
-        if inst is not None:
-            inst._running = False
-            task = getattr(inst, "_broadcast_task", None)
-            if task is not None and not task.done():
-                task.cancel()  # safe cross-loop: requests cancellation only
-            inst._broadcast_task = None
-            inst._cancel_client_sender_tasks()
-            inst._clients.clear()
-        EventBroadcaster._instance = None
-
-    _reset()
-    yield
-    _reset()
+# EventBroadcaster singleton isolation is handled by the shared autouse fixture
+# `_reset_event_broadcaster_singleton` in tests/unit/conftest.py (covers every
+# bridge test file, not just this one), via EventBroadcaster.reset_instance().
 
 
 class TestEventBridgeEventTypes:
@@ -916,6 +888,57 @@ class TestEventBroadcasterLoopIsolation:
             if pending:
                 old_loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
             old_loop.close()
+
+    def test_delivery_survives_loop_swap_no_loss_or_reordering(self):
+        """Regression: a leaked singleton bound to a closed loop must not break
+        delivery on a later loop. Start on loop A (left bound), then run a
+        25-event burst on loop B; the engine must rebind and deliver all 25 in
+        order. Before the SRP/loop-correct redesign the stale DeliveryEngine
+        created tasks on the closed loop A -> 'Event loop is closed' / timeout.
+        """
+        import json as _json
+
+        from victor.core.events import InMemoryEventBackend, ObservabilityBus
+        from victor.integrations.api.event_bridge import EventBridge, EventBroadcaster
+
+        EventBroadcaster.reset_instance()
+
+        async def _leak_on_loop_a():
+            bridge = EventBridge(ObservabilityBus(backend=InMemoryEventBackend()))
+            await bridge.async_start()  # binds the singleton engine to loop A
+
+        async def _burst_on_loop_b():
+            bus = ObservabilityBus(backend=InMemoryEventBackend())
+            bridge = EventBridge(bus)
+            received = []
+
+            async def _send(message):
+                received.append(_json.loads(message))
+
+            async def _wait(predicate, timeout=5.0):
+                deadline = asyncio.get_running_loop().time() + timeout
+                while asyncio.get_running_loop().time() < deadline:
+                    if predicate():
+                        return True
+                    await asyncio.sleep(0.01)
+                return False
+
+            await bridge.async_start()  # same singleton -> must rebind A -> B
+            bridge._broadcaster.add_client("loss-check", _send)
+            await _wait(lambda: bridge._broadcaster._running)
+            total = 25
+            for idx in range(total):
+                await bus.emit("tool.start", {"idx": idx})
+            ok = await _wait(lambda: len(received) >= total)
+            ordered = [m["data"]["idx"] for m in received] == list(range(total))
+            await bridge.async_stop()
+            return len(received), (ok and ordered)
+
+        asyncio.run(_leak_on_loop_a())  # loop A closes; singleton left bound to it
+        count, ok = asyncio.run(_burst_on_loop_b())  # loop B
+        assert count == 25, f"expected 25 delivered after loop swap, got {count}"
+        assert ok, "events lost or reordered after loop swap"
+        EventBroadcaster.reset_instance()
 
 
 class TestEventBridgeSyncBridge:

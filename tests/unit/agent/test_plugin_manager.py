@@ -367,7 +367,7 @@ class TestRegisterTools(TestMockPlugin):
 
     def test_register_tools_empty(self, mock_plugin):
         """Test register_tools with no tools (covers lines 317-330)."""
-        from victor.tools.base import ToolRegistry
+        from victor.tools.registry import ToolRegistry
 
         manager = ToolPluginRegistry()
         manager.register_plugin(mock_plugin)
