@@ -22,6 +22,7 @@ from anthropic.types import Message as AnthropicMessage
 
 from victor.providers.base import (
     BaseProvider,
+    CacheCostModel,
     CompletionResponse,
     Message,
     ProviderAuthError,
@@ -202,6 +203,21 @@ class AnthropicProvider(BaseProvider):
     def supports_kv_prefix_caching(self) -> bool:
         """Anthropic reuses KV cache for matching prompt prefixes."""
         return True
+
+    def cache_cost_model(self) -> CacheCostModel:
+        """Anthropic explicit ``cache_control`` (FEP-0011).
+
+        90% read discount, 1.25x write premium, 5m–1h TTL, 1024-token minimum
+        prefix, cached at system-block granularity.
+        """
+        return CacheCostModel(
+            supported=True,
+            read_discount=0.9,
+            write_overhead=1.25,
+            ttl_seconds=300.0,  # 5-minute floor (1h with extended caching)
+            min_prefix_tokens=1024,
+            prefix_granularity="system_block",
+        )
 
     def context_window(self, model: Optional[str] = None) -> int:
         from victor.providers.context_windows import (

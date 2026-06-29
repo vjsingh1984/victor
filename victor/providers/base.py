@@ -17,6 +17,7 @@
 import contextlib
 import logging
 import math
+from dataclasses import dataclass
 import ssl
 import time
 import threading
@@ -316,6 +317,39 @@ from victor.core.errors import (
 )
 
 
+@dataclass(frozen=True)
+class CacheCostModel:
+    """Characterized caching economics for a provider capability (FEP-0011).
+
+    Replaces branching on a single boolean with a value object the prompt
+    assembler can optimize against (pruning aggressiveness, stable/dynamic
+    prefix split, prefix freeze size). See FEP-0011 for the full design.
+
+    Phase 1 (this): additive only. ``BaseProvider.cache_cost_model()`` defaults
+    to ``CacheCostModel(supported=self.supports_prompt_caching())`` so existing
+    providers behave identically; providers may override to advertise real
+    numbers. The assembler still reads the booleans today; consumption is a
+    later phase.
+
+    Attributes:
+        supported: Whether this caching capability is available at all.
+        read_discount: Fraction saved on a cached read (0.0–1.0).
+        write_overhead: Cost multiplier for a cache write (>=1.0; 1.0 = none).
+        ttl_seconds: Lifetime of a cache entry (0.0 = no TTL / indefinite).
+        min_prefix_tokens: Minimum stable prefix to be eligible for caching.
+        max_cache_tokens: Maximum cacheable tokens (0 = no published limit).
+        prefix_granularity: Smallest cacheable unit ("token"|"message"|"system_block").
+    """
+
+    supported: bool = False
+    read_discount: float = 0.0
+    write_overhead: float = 1.0
+    ttl_seconds: float = 0.0
+    min_prefix_tokens: int = 0
+    max_cache_tokens: int = 0
+    prefix_granularity: str = "token"
+
+
 class BaseProvider(ABC):
     """Abstract base class for all LLM providers."""
 
@@ -448,6 +482,33 @@ class BaseProvider(ABC):
             True if provider benefits from stable prompt prefixes
         """
         return False
+
+    def cache_cost_model(self) -> CacheCostModel:
+        """Characterized economics for API-level prompt caching (FEP-0011).
+
+        Default derives from :meth:`supports_prompt_caching` so this is purely
+        additive and existing providers are unaffected. Override to advertise
+        real numbers (discount %, TTL, prefix granularity, …) so the prompt
+        assembler can optimize against them instead of a single boolean.
+
+        Returns:
+            A frozen :class:`CacheCostModel` describing this provider's
+            API-level prompt-caching economics.
+        """
+        return CacheCostModel(supported=self.supports_prompt_caching())
+
+    def kv_cache_cost_model(self) -> CacheCostModel:
+        """Characterized economics for KV prefix caching (FEP-0011).
+
+        Default derives from :meth:`supports_kv_prefix_caching`. Override to
+        advertise real numbers (KV cache is latency-only; ``read_discount`` is
+        typically 0.0 since there is no billing discount).
+
+        Returns:
+            A frozen :class:`CacheCostModel` describing this provider's
+            KV-prefix-caching economics.
+        """
+        return CacheCostModel(supported=self.supports_kv_prefix_caching())
 
     def supports_reasoning_effort(self, model: Optional[str] = None) -> bool:
         """Check if a model accepts the ``reasoning_effort`` request parameter.

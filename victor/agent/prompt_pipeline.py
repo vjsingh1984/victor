@@ -107,20 +107,139 @@ class Placement(Enum):
 
 
 def detect_provider_tier(provider: Any) -> ProviderTier:
-    """Detect the caching tier from a provider instance."""
-    if provider is None:
-        return ProviderTier.NO_CACHE
+    """Detect the caching tier from a provider instance.
 
-    api_cache = hasattr(provider, "supports_prompt_caching") and provider.supports_prompt_caching()
-    kv_cache = (
-        hasattr(provider, "supports_kv_prefix_caching") and provider.supports_kv_prefix_caching()
+    FEP-0011 Phase 3: prefers the characterized ``cache_cost_model()`` over the
+    legacy booleans when available (the booleans are themselves derived from
+    the model, so behavior is unchanged for providers that override either).
+    """
+    economics = detect_cache_economics(provider)
+    return economics.tier
+
+
+@dataclass(frozen=True)
+class CacheEconomics:
+    """Characterized caching economics for a provider (FEP-0011 Phase 3).
+
+    The prompt assembler consumes this instead of branching on booleans, so
+    pruning aggressiveness and stable-prefix decisions can respond to real
+    numbers (discount, TTL, minimum prefix), not just a single bit.
+    """
+
+    tier: ProviderTier
+    api_discount: float = 0.0
+    kv_discount: float = 0.0
+    min_prefix_tokens: int = 0
+    api_ttl_seconds: float = 0.0
+    kv_ttl_seconds: float = 0.0
+
+    @property
+    def pruning_aggressiveness(self) -> str:
+        """How hard the assembler should prune, derived from the API read discount.
+
+        High discount → cached tokens are nearly free → keep more (conservative).
+        Low/no discount → every token costs → prune hard (aggressive).
+        """
+        if self.api_discount >= 0.5:
+            return "conservative"
+        if self.api_discount >= 0.25:
+            return "balanced"
+        return "aggressive"
+
+
+def _safe_cache_cost_model(provider: Any) -> Optional["object"]:
+    """Return the provider's ``cache_cost_model()`` ONLY if it yields a real
+    :class:`CacheCostModel`. MagicMock providers auto-create every attribute, so
+    a bare ``hasattr`` check would misfire — the ``isinstance`` guard keeps
+    detection correct for both real providers and test doubles.
+    """
+    from victor.providers.base import CacheCostModel
+
+    fn = getattr(provider, "cache_cost_model", None)
+    if not callable(fn):
+        return None
+    try:
+        model = fn()
+    except Exception:
+        return None
+    return model if isinstance(model, CacheCostModel) else None
+
+
+def _safe_kv_cache_cost_model(provider: Any) -> Optional["object"]:
+    from victor.providers.base import CacheCostModel
+
+    fn = getattr(provider, "kv_cache_cost_model", None)
+    if not callable(fn):
+        return None
+    try:
+        model = fn()
+    except Exception:
+        return None
+    return model if isinstance(model, CacheCostModel) else None
+
+
+def _provider_api_cache_supported(provider: Any) -> bool:
+    """API-level caching support, preferring the cost model over the legacy bool."""
+    model = _safe_cache_cost_model(provider)
+    if model is not None:
+        return bool(model.supported)  # type: ignore[attr-defined]
+    return bool(getattr(provider, "supports_prompt_caching", lambda: False)())
+
+
+def _provider_kv_cache_supported(provider: Any) -> bool:
+    model = _safe_kv_cache_cost_model(provider)
+    if model is not None:
+        return bool(model.supported)  # type: ignore[attr-defined]
+    return bool(getattr(provider, "supports_kv_prefix_caching", lambda: False)())
+
+
+def detect_cache_economics(provider: Any) -> CacheEconomics:
+    """Characterize a provider's caching economics (FEP-0011 Phase 3).
+
+    Reads ``cache_cost_model()`` / ``kv_cache_cost_model()`` when the provider
+    exposes them (and they return a real ``CacheCostModel``), falling back to
+    the legacy booleans. Returns a :class:`CacheEconomics` the prompt assembler
+    consumes to tune pruning and prefix stability to real numbers instead of a
+    single bit.
+    """
+    if provider is None:
+        return CacheEconomics(tier=ProviderTier.NO_CACHE)
+
+    api_model = _safe_cache_cost_model(provider)
+    kv_model = _safe_kv_cache_cost_model(provider)
+
+    api_supported = (
+        bool(api_model.supported)  # type: ignore[attr-defined]
+        if api_model is not None
+        else bool(getattr(provider, "supports_prompt_caching", lambda: False)())
+    )
+    kv_supported = (
+        bool(kv_model.supported)  # type: ignore[attr-defined]
+        if kv_model is not None
+        else bool(getattr(provider, "supports_kv_prefix_caching", lambda: False)())
     )
 
-    if api_cache:
-        return ProviderTier.API_AND_KV
-    if kv_cache:
-        return ProviderTier.KV_ONLY
-    return ProviderTier.NO_CACHE
+    api_discount = float(getattr(api_model, "read_discount", 0.0)) if api_model else 0.0
+    api_ttl = float(getattr(api_model, "ttl_seconds", 0.0)) if api_model else 0.0
+    min_prefix = int(getattr(api_model, "min_prefix_tokens", 0)) if api_model else 0
+    kv_discount = float(getattr(kv_model, "read_discount", 0.0)) if kv_model else 0.0
+    kv_ttl = float(getattr(kv_model, "ttl_seconds", 0.0)) if kv_model else 0.0
+
+    if api_supported:
+        tier = ProviderTier.API_AND_KV
+    elif kv_supported:
+        tier = ProviderTier.KV_ONLY
+    else:
+        tier = ProviderTier.NO_CACHE
+
+    return CacheEconomics(
+        tier=tier,
+        api_discount=api_discount,
+        kv_discount=kv_discount,
+        min_prefix_tokens=min_prefix,
+        api_ttl_seconds=api_ttl,
+        kv_ttl_seconds=kv_ttl,
+    )
 
 
 # ============================================================================
