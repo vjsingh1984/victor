@@ -120,6 +120,12 @@ class RustSimilarityComputer(InstrumentedAccelerator):
             queries_f32 = [[float(x) for x in q] for q in queries]
             corpus_f32 = [[float(x) for x in c] for c in corpus]
 
+            # Prefer the native similarity_matrix (one FFI crossing for the whole
+            # matrix); fall back to the per-query loop on older native builds.
+            matrix_fn = getattr(victor_native, "similarity_matrix", None)
+            if matrix_fn is not None:
+                return [list(row) for row in matrix_fn(queries_f32, corpus_f32, normalize)]
+
             if normalize:
                 # Use pre-normalized path for efficiency
                 corpus_normalized = victor_native.batch_normalize_vectors(corpus_f32)

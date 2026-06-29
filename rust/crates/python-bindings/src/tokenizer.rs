@@ -261,6 +261,23 @@ impl BpeTokenizer {
 /// BPE model is too expensive.
 #[pyfunction]
 pub fn count_tokens_fast(text: &str) -> usize {
+    count_tokens_fast_impl(text)
+}
+
+/// Count tokens for a batch of texts using the fast heuristic.
+///
+/// Processes all texts in a **single FFI crossing** with rayon parallelism,
+/// amortizing the per-call PyO3 boundary overhead — unlike looping
+/// `count_tokens_fast` from Python, which crosses the FFI once per text.
+/// Results are identical to calling `count_tokens_fast` on each element.
+#[pyfunction]
+pub fn count_tokens_fast_batch(texts: Vec<String>) -> Vec<usize> {
+    texts.par_iter().map(|t| count_tokens_fast_impl(t)).collect()
+}
+
+/// Shared heuristic body used by both the single and batch `#[pyfunction]`
+/// entry points, so they can never diverge.
+fn count_tokens_fast_impl(text: &str) -> usize {
     if text.is_empty() {
         return 0;
     }
@@ -503,6 +520,38 @@ mod tests {
             cjk_count >= ascii_count || cjk_count >= 2,
             "CJK text should produce a reasonable number of tokens",
         );
+    }
+
+    // -- count_tokens_fast_batch tests --
+
+    #[test]
+    fn test_batch_empty() {
+        assert_eq!(count_tokens_fast_batch(vec![]), Vec::<usize>::new());
+    }
+
+    #[test]
+    fn test_batch_matches_single_elementwise() {
+        // The batch result must equal per-element counting (the correctness
+        // invariant the Python wrapper relies on when it picks the batch path).
+        let texts = vec![
+            "".to_string(),
+            "hello".to_string(),
+            "the quick brown fox".to_string(),
+            "   \n\n  ".to_string(),
+            "\u{4f60}\u{597d}".to_string(),
+            "internationalization!".to_string(),
+        ];
+        let batched = count_tokens_fast_batch(texts.clone());
+        let elementwise: Vec<usize> = texts.iter().map(|t| count_tokens_fast(t)).collect();
+        assert_eq!(batched, elementwise);
+    }
+
+    #[test]
+    fn test_batch_preserves_order_and_length() {
+        let texts = vec!["a".to_string(), "bb".to_string(), "ccc".to_string()];
+        let batched = count_tokens_fast_batch(texts.clone());
+        assert_eq!(batched.len(), texts.len());
+        assert_eq!(batched[1], count_tokens_fast("bb"));
     }
 
     #[test]
