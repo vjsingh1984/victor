@@ -30,7 +30,7 @@ from .model import (
 from .parser import chunk, parse
 from .repo import chunk_path, chunk_repo, iter_source_files, parse_path
 
-__version__ = "0.1.1"
+__version__ = "0.1.2"
 
 __all__ = [
     "__version__",
