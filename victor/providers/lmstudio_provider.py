@@ -40,6 +40,7 @@ from victor.providers.openai_compat import (
     extract_thinking_content as _extract_thinking_content,
 )
 from victor.providers.base import (
+    CacheCostModel,
     BaseProvider,
     CompletionResponse,
     Message,
@@ -249,6 +250,15 @@ class LMStudioProvider(BaseProvider):
     def supports_kv_prefix_caching(self) -> bool:
         """LMStudio reuses KV cache for GGUF models with matching prefixes."""
         return True
+
+    def kv_cache_cost_model(self) -> CacheCostModel:
+        """KV-prefix caching (FEP-0011): latency-only, no billing discount."""
+        return CacheCostModel(
+            supported=True,
+            read_discount=0.0,
+            ttl_seconds=0.0,
+            prefix_granularity="system_block",
+        )
 
     def context_window(self, model: Optional[str] = None) -> int:
         # LMStudio loads various GGUF models; share Ollama's table since

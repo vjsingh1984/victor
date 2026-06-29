@@ -40,6 +40,7 @@ from typing import Any, AsyncIterator, Dict, List, Optional
 import httpx
 
 from victor.providers.base import (
+    CacheCostModel,
     BaseProvider,
     CompletionResponse,
     Message,
@@ -243,6 +244,17 @@ class AzureOpenAIProvider(BaseProvider):
     def supports_kv_prefix_caching(self) -> bool:
         """Azure OpenAI reuses KV cache for matching prompt prefixes."""
         return True
+
+    def cache_cost_model(self) -> CacheCostModel:
+        """Characterized API caching (FEP-0011): 50-75% discount, 1024 min, 10m TTL."""
+        return CacheCostModel(
+            supported=True,
+            read_discount=0.625,
+            write_overhead=1.0,
+            ttl_seconds=600.0,
+            min_prefix_tokens=1024,
+            prefix_granularity="token",
+        )
 
     def context_window(self, model: Optional[str] = None) -> int:
         from victor.providers.context_windows import (

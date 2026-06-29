@@ -47,6 +47,7 @@ from typing import Any, AsyncIterator, Dict, List, Optional, Tuple
 import httpx
 
 from victor.providers.base import (
+    CacheCostModel,
     BaseProvider,
     CompletionResponse,
     Message,
@@ -253,6 +254,15 @@ class VLLMProvider(BaseProvider):
     def supports_kv_prefix_caching(self) -> bool:
         """vLLM supports Automatic Prefix Caching (APC) for KV cache reuse."""
         return True
+
+    def kv_cache_cost_model(self) -> CacheCostModel:
+        """KV-prefix caching (FEP-0011): latency-only, no billing discount."""
+        return CacheCostModel(
+            supported=True,
+            read_discount=0.0,
+            ttl_seconds=0.0,
+            prefix_granularity="system_block",
+        )
 
     def context_window(self, model: Optional[str] = None) -> int:
         from victor.providers.context_windows import OLLAMA, VLLM_DEFAULT, lookup

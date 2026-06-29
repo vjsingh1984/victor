@@ -44,6 +44,7 @@ from typing import Any, AsyncIterator, Dict, List, Optional
 import httpx
 
 from victor.providers.base import (
+    CacheCostModel,
     BaseProvider,
     CompletionResponse,
     Message,
@@ -233,6 +234,17 @@ class GroqProvider(BaseProvider):
     def supports_kv_prefix_caching(self) -> bool:
         """Groq reuses KV cache for matching prompt prefixes."""
         return True
+
+    def cache_cost_model(self) -> CacheCostModel:
+        """Characterized API caching (FEP-0011): 50% discount on cached tokens."""
+        return CacheCostModel(
+            supported=True,
+            read_discount=0.5,
+            write_overhead=1.0,
+            ttl_seconds=0.0,
+            min_prefix_tokens=0,
+            prefix_granularity="token",
+        )
 
     def context_window(self, model: Optional[str] = None) -> int:
         from victor.providers.context_windows import GROQ, GROQ_DEFAULT, lookup
