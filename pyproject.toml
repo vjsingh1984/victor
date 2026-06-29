@@ -172,6 +172,7 @@ dev = [
     # test_ccg_construction calls build_ccg_for_file directly. CI's quick-tests
     # job installs only .[dev] (no victor-coding enhanced builder), so the
     # tree-sitter fallback must resolve a parser or the test gets 0 nodes.
+    # Mirrors the [dev] grammar install used by victor-codegraph's CI.
     "tree-sitter-python>=0.23",
 ]
 

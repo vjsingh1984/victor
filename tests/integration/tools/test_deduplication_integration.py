@@ -81,7 +81,10 @@ class TestToolRegistryDeduplication:
         registry.register(lc_adapter)
 
         # Native tool should be in registry, LangChain tool skipped
-        tools = registry.list_tools(only_enabled=True)
+        # include_folded=True so folded canonical names (e.g. "read"->"fs",
+        # "search"->"code") are observable — these tests assert dedup kept the
+        # native tool, which is folded but still the dedup winner.
+        tools = registry.list_tools(only_enabled=True, include_folded=True)
         tool_names = [t.name for t in tools]
 
         # Only native tool should be registered (LangChain skipped due to conflict)
@@ -111,7 +114,10 @@ class TestToolRegistryDeduplication:
         registry.register(mcp_adapter)
 
         # Native tool should be in registry, MCP tool skipped
-        tools = registry.list_tools(only_enabled=True)
+        # include_folded=True so folded canonical names (e.g. "read"->"fs",
+        # "search"->"code") are observable — these tests assert dedup kept the
+        # native tool, which is folded but still the dedup winner.
+        tools = registry.list_tools(only_enabled=True, include_folded=True)
         tool_names = [t.name for t in tools]
 
         # Only native tool should be registered (MCP skipped due to conflict)
@@ -144,7 +150,10 @@ class TestToolRegistryDeduplication:
         registry.register(mcp_adapter)
 
         # LangChain tool should be in registry, MCP tool skipped
-        tools = registry.list_tools(only_enabled=True)
+        # include_folded=True so folded canonical names (e.g. "read"->"fs",
+        # "search"->"code") are observable — these tests assert dedup kept the
+        # native tool, which is folded but still the dedup winner.
+        tools = registry.list_tools(only_enabled=True, include_folded=True)
         tool_names = [t.name for t in tools]
 
         # Only LangChain tool should be registered (MCP skipped due to conflict)
@@ -168,7 +177,10 @@ class TestToolRegistryDeduplication:
         registry.register(MCPAdapterTool(mcp_tool, MockMCPRegistry(), "test_server"))
         registry.register(native_tool)
 
-        tools = registry.list_tools(only_enabled=True)
+        # include_folded=True so folded canonical names (e.g. "read"->"fs",
+        # "search"->"code") are observable — these tests assert dedup kept the
+        # native tool, which is folded but still the dedup winner.
+        tools = registry.list_tools(only_enabled=True, include_folded=True)
         tool_names = [t.name for t in tools]
 
         assert "read" in tool_names
@@ -195,7 +207,10 @@ class TestToolRegistryDeduplication:
         registry.register(MCPAdapterTool(mcp_tool, MockMCPRegistry(), "test_server"))
 
         # All tools should be registered
-        tools = registry.list_tools(only_enabled=True)
+        # include_folded=True so folded canonical names (e.g. "read"->"fs",
+        # "search"->"code") are observable — these tests assert dedup kept the
+        # native tool, which is folded but still the dedup winner.
+        tools = registry.list_tools(only_enabled=True, include_folded=True)
         tool_names = [t.name for t in tools]
 
         assert "read" in tool_names

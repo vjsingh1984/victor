@@ -49,9 +49,39 @@ def is_ollama_available() -> bool:
         sock.close()
 
 
+def list_installed_ollama_models() -> list[str]:
+    """Return installed Ollama model names, or [] if unreachable / none installed.
+
+    Hits the ``/api/tags`` endpoint directly so the check is synchronous and
+    usable from a ``skipif`` marker evaluated at collection time.
+    """
+    import httpx
+
+    try:
+        resp = httpx.get("http://localhost:11434/api/tags", timeout=2.0)
+        resp.raise_for_status()
+        models = resp.json().get("models", [])
+        return [m["name"] for m in models if m.get("name")]
+    except Exception:
+        return []
+
+
 def requires_ollama():
-    """Pytest marker to skip tests when Ollama is not available."""
-    return pytest.mark.skipif(not is_ollama_available(), reason="Ollama server not available")
+    """Pytest marker to skip tests when Ollama or an installed model is unavailable.
+
+    Skips when the server is down OR when the server is up but no model is
+    installed, so a reachable-but-empty Ollama skips instead of failing.
+    """
+    if not is_ollama_available():
+        reason = "Ollama server not available"
+    elif not list_installed_ollama_models():
+        reason = (
+            "Ollama server available but no models installed "
+            "(run `ollama pull qwen2.5-coder:7b`)"
+        )
+    else:
+        reason = ""
+    return pytest.mark.skipif(bool(reason), reason=reason or "Ollama available")
 
 
 # =============================================================================

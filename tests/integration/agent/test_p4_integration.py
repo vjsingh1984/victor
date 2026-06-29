@@ -364,7 +364,6 @@ class TestToolPipelineDeduplicationIntegration:
         repo_root.mkdir()
         changed_file = repo_root / "module.py"
         changed_file.write_text("print('before')\n", encoding="utf-8")
-        fake_index_cache = {str(repo_root.resolve()): {"stale": False}}
 
         executor.execute = AsyncMock(
             side_effect=[
@@ -400,12 +399,15 @@ class TestToolPipelineDeduplicationIntegration:
             }
         ]
 
-        import victor.tools.code_search_tool as code_search_tool_module
+        # code_search_tool's index cache was replaced by the capability-loader
+        # path: ToolPipeline._invalidate_post_edit_freshness_state calls
+        # load_code_search_module().mark_index_cache_stale_for_path(...).
+        mock_code_search = MagicMock()
+        mock_code_search.mark_index_cache_stale_for_path = MagicMock(return_value=1)
 
-        with patch.object(
-            code_search_tool_module,
-            "_get_index_cache",
-            lambda exec_ctx=None: fake_index_cache,
+        with patch(
+            "victor.core.utils.capability_loader.load_code_search_module",
+            return_value=mock_code_search,
         ):
             first = await pipeline.execute_tool_calls(search_call, {})
             assert first.results[0].skipped is False
@@ -415,7 +417,9 @@ class TestToolPipelineDeduplicationIntegration:
 
             second = await pipeline.execute_tool_calls(search_call, {})
 
-        assert fake_index_cache[str(repo_root.resolve())]["stale"] is True
+        # The write must have marked the search index stale for the changed file,
+        # letting the follow-up search run fresh rather than deduplicated.
+        mock_code_search.mark_index_cache_stale_for_path.assert_called_once()
         assert second.results[0].skipped is False
         assert second.results[0].result == "after"
         assert executor.execute.await_count == 3

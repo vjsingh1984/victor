@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import time
 from collections import deque
 from typing import Any
@@ -670,8 +671,6 @@ class LiveDisplayRenderer:
         if tool_name in ("code_search", "grep", "search"):
             if "match" in output_lower or "result" in output_lower:
                 # Try to extract count from output
-                import re
-
                 count_match = re.search(r"(\d+)\s+(matches?|results?|files?)", output_lower)
                 if count_match:
                     return f"{count_match.group(1)} {count_match.group(2)}"
@@ -695,8 +694,6 @@ class LiveDisplayRenderer:
         # Shell tools - show exit code if available
         if tool_name == "shell":
             if "exit code" in output_lower or "exited with" in output_lower:
-                import re
-
                 exit_match = re.search(r"exit\s+code:\s*(\d+)", output_lower)
                 if exit_match:
                     code = exit_match.group(1)

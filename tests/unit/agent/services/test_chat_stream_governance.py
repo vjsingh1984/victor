@@ -114,7 +114,7 @@ async def test_run_request_block_short_circuits():
     )
 
     exe = StreamingChatExecutor(runtime_owner=runtime_owner)
-    chunks = await _drain(exe.run("please run rm -rf /"))
+    chunks = await _drain(exe.run_unified("please run rm -rf /"))
 
     assert chunks == [sentinel_chunk]
     # The refusal chunk carries the policy reason and is final.

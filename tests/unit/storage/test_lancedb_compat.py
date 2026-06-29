@@ -48,12 +48,18 @@ class TestLanceDBCompat:
         assert result == []
 
     def test_prefers_new_api_over_old(self):
-        """When both APIs exist, should prefer table_names()."""
+        """When both APIs exist, prefer list_tables() (current) over table_names() (deprecated).
+
+        list_tables() is the canonical method on current LanceDB versions and is
+        tried first so call-sites never trigger the ``table_names() is
+        deprecated`` warning emitted by recent releases. table_names() is the
+        legacy fallback used only when list_tables() is absent.
+        """
         mock_db = MagicMock()
-        mock_db.table_names.return_value = ["new_api"]
-        mock_response = MagicMock()
-        mock_response.tables = ["old_api"]
-        mock_db.list_tables.return_value = mock_response
+        # list_tables() is the current canonical API.
+        mock_db.list_tables.return_value = ["new_api"]
+        # table_names() is the deprecated legacy API and must NOT be called.
+        mock_db.table_names.return_value = ["old_api"]
         result = get_table_names(mock_db)
         assert result == ["new_api"]
-        mock_db.list_tables.assert_not_called()
+        mock_db.table_names.assert_not_called()

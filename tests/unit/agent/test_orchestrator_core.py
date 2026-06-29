@@ -750,8 +750,14 @@ class TestContextManager:
         orchestrator.shutdown.assert_called_once()
 
 
+@pytest.mark.filterwarnings("ignore::DeprecationWarning")
 class TestChatMethod:
-    """Tests for chat method."""
+    """Tests for chat method.
+
+    These tests exercise ``orchestrator.chat()`` — a deprecated delegation
+    shim to ``ChatService``. The deprecation is expected here; the tests assert
+    delegation behavior, not the warning.
+    """
 
     @pytest.mark.asyncio
     async def test_chat_basic(self, mock_provider, orchestrator_settings):

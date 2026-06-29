@@ -23,7 +23,15 @@ import pytest
 from unittest.mock import patch
 from docker.errors import DockerException
 
-from victor.tools.code_executor_tool import CodeSandbox
+# CodeSandbox migrated from victor.tools.code_executor_tool to the external
+# victor-coding package (resolution chain in
+# victor/core/utils/capability_loader.py). Skip the whole module when that
+# submodule isn't available rather than breaking collection for the rest of
+# the suite. NOTE: guard the actual submodule, not just the top-level package
+# -- importorskip("victor_coding") passes (the package imports fine) and then
+# the import below would raise ModuleNotFoundError during collection.
+pytest.importorskip("victor_coding.tools.code_executor_tool")
+from victor_coding.tools.code_executor_tool import CodeSandbox  # noqa: E402
 
 
 class TestDockerAvailability:
