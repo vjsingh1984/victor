@@ -14,6 +14,7 @@
 
 """Command-line interface for Victor - Open-source agentic AI framework."""
 
+import click
 import typer
 from rich.console import Console
 from typing import Optional
@@ -95,15 +96,60 @@ from victor.ui.commands.auth import auth_app
 
 # Import verification command
 from victor.ui.commands.verify import app as verify_app
+from victor.ui.cli_group import SuggestingGroup, suggest_command
 from victor.ui.theme import victor_theme
 
 app = typer.Typer(
     name="victor",
     help="Victor - Open-source agentic AI framework with multi-provider support.",
+    cls=SuggestingGroup,
     add_completion=False,
 )
 
 console = Console(theme=victor_theme)
+
+
+@app.command(
+    "help",
+    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
+)
+def help_command(ctx: typer.Context) -> None:
+    """Show help for Victor, or for one of its commands.
+
+    A ``help`` command is what most CLIs expose, but Typer does not register one
+    by default. This mirrors ``--help`` and additionally descends into a
+    subcommand so ``victor help db vacuum`` works.
+
+    \b
+    Examples:
+      victor help             # top-level help
+      victor help db          # help for the 'db' group
+      victor help db vacuum   # help for the 'db vacuum' command
+    """
+    root_ctx = ctx.parent
+    root_group = root_ctx.command
+    tokens = [t for t in ctx.args if not t.startswith("-")]
+
+    if not tokens:
+        typer.echo(root_ctx.get_help())
+        raise typer.Exit()
+
+    current_cmd = root_group
+    current_ctx = root_ctx
+    for name in tokens:
+        if not isinstance(current_cmd, typer.core.TyperGroup):
+            raise typer.BadParameter(
+                f"'{name}' is not valid: '{current_cmd.name}' has no subcommands."
+            )
+        nxt = current_cmd.get_command(current_ctx, name)
+        if nxt is None:
+            hint = suggest_command(current_ctx, name, current_cmd)
+            raise typer.BadParameter(hint or f"No such command '{name}'.")
+        current_cmd = nxt
+        current_ctx = click.Context(nxt, info_name=name, parent=current_ctx)
+
+    typer.echo(current_cmd.get_help(current_ctx))
+    raise typer.Exit()
 
 
 # Define doctor_command BEFORE registering it
