@@ -106,7 +106,10 @@ FOLDED_TOOLS: dict[str, ToolFold] = {
     "ls": ToolFold(target="fs", hint="Use fs ls <path> to list a directory."),
     "edit": ToolFold(
         target="fs",
-        hint="Use fs edit <path> --old/--new (or --ops JSON) for atomic edits with undo.",
+        hint=(
+            "Use fs edit <path> --old/--new (replace), --insert/--new (insert after a "
+            "line), --append/--new, or --ops JSON. Atomic with undo; --dry-run previews."
+        ),
     ),
     "find": ToolFold(target="fs", hint="Use fs search <pattern> <path> to find files by name."),
     "web_search": ToolFold(target="web", hint="Use web search <query> for web search."),

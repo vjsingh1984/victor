@@ -1,5 +1,9 @@
 import pytest
-from victor.tools.unified.parser import split_command
+from victor.tools.unified.parser import (
+    detect_shell_operators,
+    shell_operator_rejection,
+    split_command,
+)
 
 
 def test_split_simple_command():
@@ -57,3 +61,44 @@ def test_split_heredoc_preserves_docstring_body():
     cmd = 'code python <<EOF\n"""module docstring"""\nprint("ok")\nEOF'
     args = split_command(cmd)
     assert args == ["code", "python", '"""module docstring"""\nprint("ok")']
+
+
+# ---------------------------------------------------------------------------
+# Shell-operator detection
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "tokens,expected",
+    [
+        (["cat", "x", "||", "echo", "y"], "||"),
+        (["cat", "x", "&&", "echo", "y"], "&&"),
+        (["ls", ";", "pwd"], ";"),
+        (["grep", "foo", "|", "sort"], "|"),
+        (["cat", "x", "2>/dev/null"], "2>/dev/null"),  # redirect glued to path
+        (["cat", "x", ">", "out.txt"], ">"),
+        (["cat", "x", ">>", "log.txt"], ">>"),
+        (["cat", "x", "&", "bg"], "&"),
+    ],
+)
+def test_detect_shell_operators_flags_operators(tokens, expected):
+    assert detect_shell_operators(tokens) == expected
+
+
+def test_detect_shell_operators_clean_command_is_none():
+    assert detect_shell_operators(["cat", "main.py", "--offset", "10"]) is None
+
+
+def test_detect_shell_operators_ignores_operators_inside_quoted_token():
+    # A `|` or `>` that is content inside a single token is NOT flagged.
+    assert detect_shell_operators(["python", "a | b"]) is None
+    assert detect_shell_operators(["grep", "x>=1"]) is None
+    assert detect_shell_operators(["write", "-c", "print('a;b')"]) is None
+
+
+def test_shell_operator_rejection_message_is_actionable():
+    msg = shell_operator_rejection("fs", "||")
+    assert "SHELL OPERATOR NOT SUPPORTED" in msg
+    assert "`fs`" in msg
+    assert "`shell` tool" in msg
+    assert "`||`" in msg

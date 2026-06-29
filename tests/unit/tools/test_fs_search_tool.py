@@ -84,7 +84,7 @@ class TestFsEdit:
     async def test_edit_requires_old_and_new(self):
         result = await fs_tool("fs edit x.py --old only")
         assert "### ❌ ERROR" in result
-        assert "--old/--new" in result
+        assert "needs --new" in result
 
     @pytest.mark.asyncio
     async def test_edit_accepts_raw_ops_json(self):

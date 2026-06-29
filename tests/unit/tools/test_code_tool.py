@@ -30,6 +30,26 @@ async def test_code_tool_execute():
 
 
 @pytest.mark.asyncio
+async def test_code_tool_rejects_shell_operators():
+    """`code` is not a shell — a pipe returns the actionable rejection, not a
+    cryptic parse error."""
+    result = await code_tool("code grep foo src | grep bar")
+    assert "SHELL OPERATOR NOT SUPPORTED" in result
+    assert "`shell` tool" in result
+
+
+@pytest.mark.asyncio
+async def test_code_tool_pipe_inside_code_string_not_flagged():
+    """A `|` inside the code argument is content, not a shell operator."""
+    with patch(
+        "victor.tools.unified.code_tool.execute_python", new_callable=AsyncMock
+    ) as mock_exec:
+        mock_exec.return_value = "ok"
+        await code_tool('code python "x = a | b"')
+        mock_exec.assert_called_once()
+
+
+@pytest.mark.asyncio
 async def test_code_tool_python_alias():
     """`code python` should be the shell-style replacement for ad hoc Python execution."""
     with patch(
