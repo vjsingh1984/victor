@@ -20,6 +20,7 @@ if TYPE_CHECKING:
         get_rl_coordinator,
         get_rl_coordinator_async,
     )
+    from victor.framework.rl.base import RLOutcome
 
 __all__ = [
     "RLCoordinator",
@@ -34,9 +35,11 @@ __all__ = [
     "create_prompt_rollout_experiment_async",
     "get_rl_coordinator",
     "get_rl_coordinator_async",
+    "RLOutcome",
 ]
 
 _LAZY_IMPORTS = {
+    "RLOutcome": "victor.framework.rl.base",
     "RLCoordinator": "victor.framework.rl",
     "RLManager": "victor.framework.rl",
     "analyze_prompt_rollout_experiment": "victor.framework.rl",
