@@ -740,6 +740,14 @@ _EXECUTION_CATEGORY_ICONS = {
     "mixed": "🔀",
 }
 
+# Explicit display labels. "mixed" is relabeled to "read+write" because the raw
+# word "Mixed" was widely misread as a half-failed / mixed-success status (it is
+# only a capability hint: the tool does both reads and writes). The success/fail
+# signal is the green/red [DONE] color, not this badge.
+_EXECUTION_CATEGORY_LABELS = {
+    "mixed": "read+write",
+}
+
 
 def format_access_mode_badge(access_mode: str) -> str:
     """Format access mode as a colored badge.
@@ -777,7 +785,10 @@ def format_execution_category_hint(execution_category: str) -> str:
         Icon + category name
     """
     icon = _EXECUTION_CATEGORY_ICONS.get(str(execution_category).lower(), "•")
-    cat_label = str(execution_category).replace("_", " ").title()
+    cat_key = str(execution_category).lower()
+    cat_label = _EXECUTION_CATEGORY_LABELS.get(
+        cat_key, str(execution_category).replace("_", " ").title()
+    )
     return f"{icon} {cat_label}"
 
 
