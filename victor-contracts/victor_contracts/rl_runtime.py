@@ -20,6 +20,7 @@ if TYPE_CHECKING:
         get_rl_coordinator,
         get_rl_coordinator_async,
     )
+    from victor.framework.rl.base import RLOutcome
 
 __all__ = [
     "RLCoordinator",

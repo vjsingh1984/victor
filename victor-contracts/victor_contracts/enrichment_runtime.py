@@ -18,6 +18,7 @@ if TYPE_CHECKING:
         extract_dotted_paths,
         extract_identifiers,
     )
+    from victor.framework.enrichment.file_patterns import CODE_PATTERNS
 
 __all__ = [
     "ContextEnrichment",
