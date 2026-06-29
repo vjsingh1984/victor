@@ -116,7 +116,12 @@ def _name_of(node, src: bytes) -> str | None:
     if field is not None:
         return _text(field, src)
     for child in _children(node):
-        if child.type in ("identifier", "type_identifier", "field_identifier", "property_identifier"):
+        if child.type in (
+            "identifier",
+            "type_identifier",
+            "field_identifier",
+            "property_identifier",
+        ):
             return _text(child, src)
     return None
 
@@ -129,9 +134,7 @@ def _walk_collect(node, src, file_path, language, scope, symbols, relations):
             stype = (
                 CodeSymbolType.STRUCT
                 if t.startswith("struct")
-                else CodeSymbolType.INTERFACE
-                if "interface" in t
-                else CodeSymbolType.CLASS
+                else CodeSymbolType.INTERFACE if "interface" in t else CodeSymbolType.CLASS
             )
             sym = _mk(child, src, file_path, language, name, stype, scope)
             symbols.append(sym)
@@ -170,9 +173,33 @@ def _handle_const_arrow(node, src, file_path, language, symbols):
         value = decl.child_by_field_name("value")
         if name_node is not None and value is not None and value.type == "arrow_function":
             name = _text(name_node, src)
-            symbols.append(
-                _mk(decl, src, file_path, language, name, CodeSymbolType.FUNCTION, [])
-            )
+            symbols.append(_mk(decl, src, file_path, language, name, CodeSymbolType.FUNCTION, []))
+
+
+# Parameter-list node types across tree-sitter grammars (Python/JS-TS/Java/Go/Rust/C…).
+_PARAM_NODE_TYPES = frozenset(
+    {
+        "parameters",
+        "formal_parameters",
+        "parameter_list",
+        "argument_list",
+        "function_value_parameters",  # Kotlin/Rust-style
+    }
+)
+
+
+def _param_signature(node, src) -> str | None:
+    """The symbol's parameter-list text — the ADR-044 overload discriminator.
+
+    Stable under line moves (it's the params, not the position). ``None`` for symbols
+    with no parameter node (classes/structs), giving an empty discriminator there.
+    Python's AST parser supplies a richer ``signature``; this is the tree-sitter path.
+    """
+
+    for ch in _children(node):
+        if _attr(ch, "type") in _PARAM_NODE_TYPES:
+            return _text(ch, src)
+    return None
 
 
 def _mk(node, src, file_path, language, name, stype, scope) -> CodeSymbol:
@@ -184,6 +211,7 @@ def _mk(node, src, file_path, language, name, stype, scope) -> CodeSymbol:
         symbol_type=stype,
         fully_qualified_name=fqn,
         simple_name=name,
+        signature=_param_signature(node, src),
         location=SourceLocation(
             file_path=file_path,
             start_line=start_line,
