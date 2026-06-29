@@ -125,10 +125,11 @@ class TestExecutionCategoryHints:
         assert "Execute" in result
 
     def test_mixed_icon(self):
-        """MIXED category should show shuffle icon."""
+        """MIXED category shows the shuffle icon + an unambiguous 'read+write'
+        label (relabelled from 'Mixed' which read as a mixed-success status)."""
         result = format_execution_category_hint("mixed")
         assert "🔀" in result
-        assert "Mixed" in result
+        assert "read+write" in result
 
 
 class TestToolMetadataBadges:
