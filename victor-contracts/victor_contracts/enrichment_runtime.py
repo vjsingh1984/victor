@@ -30,7 +30,6 @@ __all__ = [
     "KeywordClassifier",
     "extract_dotted_paths",
     "extract_identifiers",
-,
     "CODE_PATTERNS",
 ]
 
