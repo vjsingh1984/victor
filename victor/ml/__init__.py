@@ -26,6 +26,14 @@ from victor.ml.mining import mine, mine_detailed, train_from_manifest
 # junction (the production path; mining is the offline manifest path).
 from victor.ml.outcome_training import load_outcome_samples, train_from_outcomes
 
+# FEP-0012 Phase 7: parity gate — validate a trained classifier on held-out
+# outcomes before shipping (ship only at parity vs a majority-class baseline).
+from victor.ml.parity_gate import (
+    evaluate_on_holdout,
+    ship_verdict,
+    validate_outcome_training,
+)
+
 __all__ = [
     "FEATURE_SPEC_VERSION",
     "HASH_SPACE",
@@ -37,4 +45,7 @@ __all__ = [
     "train_from_manifest",
     "load_outcome_samples",
     "train_from_outcomes",
+    "evaluate_on_holdout",
+    "ship_verdict",
+    "validate_outcome_training",
 ]
