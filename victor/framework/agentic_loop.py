@@ -3241,12 +3241,11 @@ class AgenticLoop:
 
             from victor.agent.decisions.schemas import DecisionType
             from victor.agent.services.protocols.decision_service import (
-                LLMDecisionServiceProtocol,
+                get_decision_service,
             )
             from victor.core import get_container
 
-            container = get_container()
-            decision_svc = container.get_optional(LLMDecisionServiceProtocol)
+            decision_svc = get_decision_service(get_container())
             if decision_svc is None:
                 return heuristic_result
 

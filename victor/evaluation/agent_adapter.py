@@ -603,12 +603,12 @@ class VictorAgentAdapter:
         if orch_detector:
             # Inject the edge decision service if available
             try:
-                from victor.core import get_container
                 from victor.agent.services.protocols.decision_service import (
-                    LLMDecisionServiceProtocol,
+                    get_decision_service,
                 )
+                from victor.core import get_container
 
-                edge_service = get_container().get(LLMDecisionServiceProtocol)
+                edge_service = get_decision_service(get_container())
                 if edge_service:
                     orch_detector._decision_service = edge_service
             except Exception:

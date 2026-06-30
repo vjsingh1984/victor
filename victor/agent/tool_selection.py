@@ -2534,11 +2534,10 @@ class ToolSelector(ModeAwareMixin):
             return self._runtime_intelligence
 
         from victor.agent.services.protocols.decision_service import (
-            LLMDecisionServiceProtocol,
+            get_decision_service,
         )
 
-        container = get_container()
-        service = container.get(LLMDecisionServiceProtocol)
+        service = get_decision_service(get_container())
         if service is None:
             return None
         return service

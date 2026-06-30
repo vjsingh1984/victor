@@ -1183,18 +1183,9 @@ class RuntimeIntelligenceService:
         container: Any,
     ) -> Optional["LLMDecisionServiceProtocol"]:
         """Resolve the decision service from a DI container when available."""
-        try:
-            from victor.agent.services.protocols.decision_service import (
-                LLMDecisionServiceProtocol,
-            )
+        from victor.agent.services.protocols.decision_service import get_decision_service
 
-            if hasattr(container, "get_optional"):
-                return container.get_optional(LLMDecisionServiceProtocol)
-            if hasattr(container, "get"):
-                return container.get(LLMDecisionServiceProtocol)
-        except Exception as exc:
-            logger.debug("Runtime intelligence could not resolve decision service: %s", exc)
-        return None
+        return get_decision_service(container)
 
     @staticmethod
     def _resolve_runtime_feedback(decision_service: Any) -> Optional[Any]:

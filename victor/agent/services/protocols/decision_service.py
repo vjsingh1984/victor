@@ -10,10 +10,13 @@ heuristic confidence falls below a configurable threshold.
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
-from typing import Any, Dict, Protocol, runtime_checkable
+from typing import Any, Dict, Optional, Protocol, runtime_checkable
 
 from victor.agent.decisions.schemas import DecisionType
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -157,3 +160,33 @@ class LLMDecisionServiceProtocol(Protocol):
     def get_metrics(self) -> DecisionMetrics:
         """Get aggregate metrics for monitoring."""
         ...
+
+
+def get_decision_service(
+    container: Any,
+) -> Optional["LLMDecisionServiceProtocol"]:
+    """Resolve the LLM decision service from a DI container, or ``None``.
+
+    The decision service is registered during bootstrap according to the
+    ``decision_backend`` enum (FEP-0012); it is left unregistered for the
+    ``HEURISTIC`` backend or when no healthy backend can be built. Absence
+    (``None``) therefore means "disabled", so callers branch on ``None`` rather
+    than re-checking feature flags or catching ``ServiceNotFoundError``.
+
+    Args:
+        container: A DI container exposing ``get_optional`` (or ``get``). May be
+            ``None`` (e.g. before the orchestrator is bootstrapped).
+
+    Returns:
+        The decision service instance, or ``None`` if not registered/unavailable.
+    """
+    if container is None:
+        return None
+    try:
+        get_optional = getattr(container, "get_optional", None)
+        if get_optional is not None:
+            return get_optional(LLMDecisionServiceProtocol)
+        return container.get(LLMDecisionServiceProtocol)
+    except Exception as exc:  # defensive: never let resolution crash a turn
+        logger.debug("Could not resolve LLM decision service: %s", exc)
+        return None

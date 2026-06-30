@@ -3676,15 +3676,11 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
                 return heuristic_conf >= 0.7  # Trust heuristic if no edge model
 
             from victor.agent.services.protocols.decision_service import (
-                LLMDecisionServiceProtocol,
+                get_decision_service,
             )
             from victor.agent.decisions.schemas import DecisionType
 
-            container = getattr(self, "_container", None)
-            if container is None:
-                return heuristic_conf >= 0.7
-
-            service = container.get(LLMDecisionServiceProtocol)
+            service = get_decision_service(getattr(self, "_container", None))
             if service is None:
                 return heuristic_conf >= 0.7
 
