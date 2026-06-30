@@ -241,11 +241,10 @@ class VictorAgentAdapter:
         "retry forever" loop.
         """
         lower = (content or "").lower()
-        # Explicit completion phrase from the benchmark prompt.
-        if "fix is complete and verified" in lower:
-            return True
-        # Common test-pass patterns from pytest/unittest output.
         test_pass_markers = [
+            # Explicit completion phrase from the benchmark prompt.
+            "fix is complete and verified",
+            # Pytest/unittest output patterns.
             "all tests passed",
             "tests passed",
             "test passed",
@@ -253,6 +252,19 @@ class VictorAgentAdapter:
             "no failures",
             "0 failed,",
             "passed, 0 failed",
+            # Broader phrasings models actually use.
+            "tests are passing",
+            "all tests succeeded",
+            "pytest passed",
+            "test suite passed",
+            "test passes",
+            "tests succeed",
+            "no test failures",
+            "all passing",
+            "verification successful",
+            "fix works",
+            "fix is working",
+            "issue is resolved",
         ]
         return any(marker in lower for marker in test_pass_markers)
 
