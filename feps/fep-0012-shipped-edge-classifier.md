@@ -33,6 +33,14 @@ native/numpy layer (no new heavy runtime dep). Ollama/LLM remains an
 classification), and turns 20K+ logged decisions + RL outcomes into a real
 asset.
 
+The design ships a **universal pretrained baseline** for all users (solves
+cold-start, works out of the box) plus an **optional per-project RL delta**
+learned on-device from each project's own outcomes (never uploaded). It also
+closes the **data-model gap** that today blocks reward-weighted training —
+micro-decisions are logged without correlation ids, so they cannot be joined to
+outcomes; this FEP stamps the correlation spine and adds the junction tables
+that make reward-supervised learning possible.
+
 ## Motivation
 
 ### Problem Statement
@@ -153,14 +161,54 @@ re-asserts). Pure-numpy/Rust; local only.
 - **Minimum Python:** 3.10 (unchanged). **New runtime deps:** none (numpy
   already core).
 
+## Benefits
+
+### For framework users (client/edge installs)
+
+- **No Ollama requirement for the edge layer:** micro-decisions resolve in
+  sub-milliseconds from a bundled artifact instead of a 4 s timeout against a
+  2.7 GB local model. Dramatically lowers the install/run footprint.
+- **Faster, more consistent decisions:** a calibrated linear classifier is
+  deterministic and sub-ms, eliminating the latency variance and timeout-driven
+  auto-disable that plagues the Ollama edge path today.
+- **Smooth degradation:** classifier → heuristic → (optional) LLM edge. Never
+  worse than the status quo.
+
+### For the ecosystem
+
+- **A real ML asset from existing data:** 20K+ logged decisions + RL outcomes
+  become supervised training data instead of a noisy log, continuously
+  improving the shipped baseline.
+- **Privacy-preserving personalization:** each project's RL delta stays local in
+  `project.db`; nothing is uploaded. The universal baseline is the only
+  universally-released artifact.
+- **No new runtime dependency:** numpy is already core; sklearn/torch stay
+  dev-only. The inference path also lands in the existing native Rust layer.
+
 ## Drawbacks and Alternatives
 
-- **Drawback:** a shipped baseline can be stale vs a fresh LLM. **Mitigation:**
-  versioned artifact + CDN updates + per-project RL delta that corrects locally.
-- **Alternative — keep Ollama:** rejected (the 2.7 GB client burden + low
-  utilization).
-- **Alternative — distilled transformer:** deferred to v2 if linear hashing
-  underperforms on some decision type.
+- **Drawback — a shipped baseline can be stale** relative to a fresh LLM, so it
+  may lag new task patterns until the next artifact release. **Mitigation:**
+  versioned artifacts with optional CDN updates between releases, plus the
+  per-project RL delta that corrects locally and immediately from observed
+  outcomes, and the retained LLM edge tier as an opt-in escalation for
+  low-confidence decisions.
+- **Drawback — linear hashing caps expressiveness** on decisions that depend on
+  long-range structure (e.g. multi-step intent). **Mitigation:** scope the
+  classifier to the narrow classification decisions where it wins; leave
+  structural/generative decisions on the heuristic/LLM path.
+- **Alternative — keep Ollama as the default:** rejected because the 2.7 GB
+  client/edge burden and a separate server are unjustified when only ~14 % of
+  decisions use the LLM today. Ollama stays as an optional upgrade, not the
+  default.
+- **Alternative — a distilled transformer (e.g. a few-MB fine-tuned model):**
+  deferred to v2. It adds an inference runtime (ONNX) and training complexity
+  for marginal gain on the narrow classification tasks; revisit only if the
+  linear classifier underperforms on a specific decision type.
+- **Alternative — retrain locally per project:** rejected because a single
+  project rarely has enough data and it would require sklearn/torch at runtime.
+  The reward-weighted delta overlay achieves personalization cheaply, in
+  pure-numpy/Rust, without a heavy runtime.
 
 ## Unresolved Questions
 
@@ -171,15 +219,51 @@ re-asserts). Pure-numpy/Rust; local only.
 
 ## Implementation Plan
 
-1. **FEP-0012 doc** (this).
-2. **Data model:** enrich decision records + `decision_log` /
-   `decision_outcome` (global) / `local_classifier_delta` (project) + migration;
-   wire per-decision credit assignment.
-3. **Training pipeline** (`scripts/train_edge_classifier.py` + `victor/ml/`).
-4. **Inference host** (`victor/processing/native/classifier.py` + Rust).
-5. **`LocalClassifierDecisionService`** + tier + bootstrap; flip default.
-6. **RL delta** (online, project-DB).
-7. **Validation:** A/B classifier vs LLM edge; ship only at parity.
+1. **FEP-0012 doc** — this design, status Draft, 14-day review.
+2. **Data model for RL (unblocks everything):** enrich decision records
+   (`chain.py` stamping + `decision_log`) with the correlation spine and
+   provenance; add `decision_outcome` (global) + `local_classifier_delta`
+   (project) tables with a versioned migration; wire per-decision credit
+   attribution by reusing `trace_to_credit` / `credit_assignment`.
+3. **Training pipeline** (`scripts/train_edge_classifier.py` + `victor/ml/`,
+   dev-only): clean → join on `decision_outcome` → featurize under a versioned
+   feature spec → reward-supervised train (logistic / GBM) → Platt-calibrate →
+   export the compressed artifact.
+4. **Inference host** (`victor/processing/native/classifier.py` + Rust):
+   `LocalEdgeClassifier` loads the artifact and scores the versioned hashed
+   features, with a pure-numpy fallback.
+5. **Service + default flip:** `LocalClassifierDecisionService` implementing
+   `LLMDecisionServiceProtocol`; new `local_classifier` tier in
+   `TieredDecisionService`; bootstrap factory; flip the default tier when the
+   artifact is present (LLM edge becomes opt-in escalation).
+6. **RL delta (online):** reward-weighted bandit overlay writing
+   `local_classifier_delta` (bounded, L2-decayed), pure-numpy/Rust.
+7. **Validation:** A/B the classifier vs the LLM edge model on held-out
+   decisions; ship only at parity on the universal decision types.
+
+## Migration Path
+
+This is a **non-breaking, additive** change with a staged default flip:
+
+1. **Data model lands first** (this PR): decision records gain correlation ids;
+   the three new tables + v8 migration ship. No behavior change — existing
+   decisions.jsonl continues to accumulate, now with joinable fields.
+2. **Artifact + inference land behind a flag:** `USE_LOCAL_CLASSIFIER` defaults
+   off until the A/B parity gate passes. The Ollama edge model remains the
+   active default during this window.
+3. **Default flip:** once the classifier meets parity on the universal decision
+   types, `USE_LOCAL_CLASSIFIER` defaults on (when the artifact is present) and
+   the `local_classifier` tier becomes the default; the LLM edge tier stays
+   available as opt-in escalation.
+4. **Rollback:** disabling `USE_LOCAL_CLASSIFIER` (or removing the artifact)
+   instantly restores the Ollama edge default; heuristic fallback is always
+   present beneath both.
+
+### Deprecation Timeline
+
+- `v0.9.x`: data model + classifier behind `USE_LOCAL_CLASSIFIER` (off).
+- `v1.0.x`: default flips to the shipped classifier; Ollama edge becomes opt-in
+  (not removed — retained for users who want the LLM boost).
 
 ## References
 
