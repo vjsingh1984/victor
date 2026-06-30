@@ -25,6 +25,9 @@ from victor.agent.decisions.schemas import (
     TaskTypeDecision,
 )
 
+# FEP-0012 Phase 6: stamp the decision → outcome reward junction.
+from victor.agent.decisions.outcome import record_session_outcome
+
 __all__ = [
     "ContinuationDecision",
     "DecisionType",
@@ -34,4 +37,5 @@ __all__ = [
     "QuestionTypeDecision",
     "TaskCompletionDecision",
     "TaskTypeDecision",
+    "record_session_outcome",
 ]
