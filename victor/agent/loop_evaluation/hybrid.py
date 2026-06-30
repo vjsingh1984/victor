@@ -78,9 +78,9 @@ class HybridLoopEvaluator(LoopEvaluator):
     def _resolve_flag(self) -> bool:
         if self._use_agentic is None:
             try:
-                from victor.core.feature_flags import FeatureFlag, is_feature_enabled
+                from victor.framework.agentic_loop_executor import use_stategraph_executor
 
-                self._use_agentic = is_feature_enabled(FeatureFlag.USE_STATEGRAPH_AGENTIC_LOOP)
+                self._use_agentic = use_stategraph_executor()
             except Exception:
                 self._use_agentic = False
         return self._use_agentic
