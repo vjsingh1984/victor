@@ -160,10 +160,8 @@ class TestVictorAgentAdapter:
         mock_orchestrator.tools = registry
 
         adapter = VictorAgentAdapter(mock_orchestrator)
-        # Force graph into the required set (deterministic — no env dependency).
-        readiness = adapter.get_benchmark_tool_readiness(
-            required_tools={"read", "edit", "write", "code", "shell", "graph"}
-        )
+        # graph is always in the desired allowlist; it's just not registered here.
+        readiness = adapter.get_benchmark_tool_readiness()
 
         assert readiness.ready is False
         assert readiness.missing_tools == ("graph",)

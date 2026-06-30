@@ -73,8 +73,15 @@ _BENCHMARK_BASE_TOOLS = frozenset(
     }
 )
 
+# Canonical benchmark toolset (the *desired* set): base tools plus ``graph``
+# (call-graph analysis: callers/callees/impact). ``graph`` is the optional
+# victor-coding tool; whether it's actually registered is a runtime concern
+# surfaced by get_benchmark_tool_readiness(), and prompt guidance only
+# describes it when it resolves (see _graph_tool_available).
+_BENCHMARK_TOOL_ALLOWLIST = _BENCHMARK_BASE_TOOLS | {"graph"}
+
 # Backward-compat alias (existing callers/tests reference the constant).
-BENCHMARK_TOOL_ALLOWLIST = _BENCHMARK_BASE_TOOLS
+BENCHMARK_TOOL_ALLOWLIST = _BENCHMARK_TOOL_ALLOWLIST
 
 
 def _graph_tool_available() -> bool:
@@ -467,22 +474,20 @@ class VictorAgentAdapter:
         )
 
     @classmethod
-    def benchmark_tool_allowlist(cls, *, include_graph: Optional[bool] = None) -> frozenset[str]:
-        """Return the canonical benchmark tool allowlist.
+    def benchmark_tool_allowlist(cls) -> frozenset[str]:
+        """Return the canonical benchmark tool allowlist (the *desired* toolset).
 
-        Base tools (``read``/``edit``/``write``/``code``/``shell``) plus
-        ``graph`` when the optional victor-coding graph tool resolves —
-        call-graph analysis helps the agent locate bugs in large codebases.
-        ``graph`` is added only when it resolves, so environments without
-        victor-coding degrade gracefully.
-
-        Args:
-            include_graph: Force graph on/off. ``None`` (default) auto-detects.
+        Always includes the base tools plus ``graph`` (call-graph analysis:
+        callers/callees/impact) — graph helps the agent locate bugs in large
+        codebases. This is the declarative desired set; whether ``graph`` is
+        actually registered in a given session is a runtime concern surfaced
+        by :meth:`get_benchmark_tool_readiness` (missing/disabled), and the
+        prompt guidance only describes graph when it resolves. Environments
+        without victor-coding enable a graph tool that simply isn't registered
+        (harmless no-op in ``set_enabled_tools``).
         """
-        tools = set(_BENCHMARK_BASE_TOOLS)
-        if include_graph or (include_graph is None and _graph_tool_available()):
-            tools.add("graph")
-        return frozenset(tools)
+        return _BENCHMARK_TOOL_ALLOWLIST
+        return _BENCHMARK_TOOL_ALLOWLIST
 
     def get_benchmark_tool_readiness(
         self,
