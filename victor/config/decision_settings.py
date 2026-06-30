@@ -20,6 +20,8 @@ from typing import Any, Dict, Optional
 
 from pydantic import BaseModel, Field
 
+from victor.agent.services.decision_backend import DecisionBackend
+
 
 class DecisionModelSpec(BaseModel):
     """Provider/model specification for one decision tier.
@@ -52,6 +54,15 @@ class DecisionServiceSettings(BaseModel):
     """
 
     enabled: bool = True
+
+    # FEP-0012: ONE config value selects the micro-decision backend (replaces the
+    # USE_EDGE_MODEL / USE_LLM_DECISION_SERVICE flag tangle). AUTO (default)
+    # auto-upgrades to the shipped local classifier once its artifact is bundled,
+    # else falls back to the legacy flag-based selection. See DecisionBackend.
+    decision_backend: DecisionBackend = Field(
+        default=DecisionBackend.AUTO,
+        description="Micro-decision backend: auto|local_classifier|edge|llm|heuristic",
+    )
 
     # Classification triage settings (confidence-based routing)
     enable_classification_triage: bool = True
