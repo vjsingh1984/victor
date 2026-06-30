@@ -22,6 +22,10 @@ from victor.ml.model import DecisionHead, EdgeClassifierModel
 # training rows for the classifier. See victor.evaluation.manifest.
 from victor.ml.mining import mine, mine_detailed, train_from_manifest
 
+# FEP-0012 Phase 6: reward-supervised training from the decision_outcome
+# junction (the production path; mining is the offline manifest path).
+from victor.ml.outcome_training import load_outcome_samples, train_from_outcomes
+
 __all__ = [
     "FEATURE_SPEC_VERSION",
     "HASH_SPACE",
@@ -31,4 +35,6 @@ __all__ = [
     "mine",
     "mine_detailed",
     "train_from_manifest",
+    "load_outcome_samples",
+    "train_from_outcomes",
 ]
