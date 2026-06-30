@@ -160,6 +160,10 @@ EMBEDDING_ARCHITECTURE.md
 test_semantic_fix.py
 test_victor_tools.sh
 
+# FEP scaffold scratch — `victor fep create` writes fep-XXXX-<title>.md to the repo
+# root by default (real FEPs live in feps/). This is a leftover `--title test` run.
+/fep-XXXX-test.md
+
 # Development documentation (session snapshots, implementation notes)
 *_PLAN.md
 *_IMPLEMENTATION.md
