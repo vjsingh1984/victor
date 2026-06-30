@@ -290,11 +290,12 @@ class VictorAgentAdapter:
     def _on_tool_start_hook(self, tool_name: str, arguments: Dict[str, Any]) -> None:
         """Hook called by ToolRegistry before tool execution.
 
-        For benchmark sessions, default shell to readonly=False so the agent can
-        run pip install + tests without explicitly passing it (the model's
-        default is readonly=True, which blocks mutating commands).
+        For benchmark sessions, FORCE shell readonly=False so the agent can run
+        pip install + tests. The model often passes readonly=True explicitly
+        (its default), so we override it unconditionally — the ShellSafetyPolicy
+        still blocks genuinely dangerous commands (rm -rf /, curl | sh).
         """
-        if tool_name == "shell" and "readonly" not in arguments:
+        if tool_name == "shell":
             arguments["readonly"] = False
         self._on_tool_start(tool_name, arguments)
 
