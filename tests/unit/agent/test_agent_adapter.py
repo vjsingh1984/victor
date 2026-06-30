@@ -155,16 +155,19 @@ class TestVictorAgentAdapter:
     def test_benchmark_tool_readiness_reports_missing_graph(self, mock_orchestrator):
         """Readiness should fail when graph is not registered in the live session."""
         registry = ToolRegistry()
-        for name in ("read", "edit", "write", "code_search", "ls", "shell"):
+        for name in ("read", "edit", "write", "code", "shell"):
             registry.register(_DummyTool(name))
         mock_orchestrator.tools = registry
 
         adapter = VictorAgentAdapter(mock_orchestrator)
-        readiness = adapter.get_benchmark_tool_readiness()
+        # Force graph into the required set (deterministic — no env dependency).
+        readiness = adapter.get_benchmark_tool_readiness(
+            required_tools={"read", "edit", "write", "code", "shell", "graph"}
+        )
 
         assert readiness.ready is False
         assert readiness.missing_tools == ("graph",)
-        assert "code_search" in readiness.enabled_tools
+        assert "code" in readiness.enabled_tools
 
     def test_benchmark_tool_readiness_reports_disabled_tools(self, mock_orchestrator):
         """Readiness should fail when required tools exist but are disabled."""
@@ -227,6 +230,7 @@ class TestVictorAgentAdapter:
             profile="benchmark-profile",
             session_config=config,
             enable_observability=False,
+            vertical=None,
         )
 
     def test_on_tool_start_records_call(self, adapter):
@@ -347,8 +351,14 @@ class TestVictorAgentAdapter:
             prompt="Fix a cross-module dependency bug",
         )
 
-        with tempfile.TemporaryDirectory() as tmpdir:
-            await adapter.execute_task(task, Path(tmpdir))
+        # graph is in the allowlist only when the optional graph tool resolves;
+        # force it on so the test is deterministic across environments.
+        with patch(
+            "victor.evaluation.agent_adapter._graph_tool_available",
+            return_value=True,
+        ):
+            with tempfile.TemporaryDirectory() as tmpdir:
+                await adapter.execute_task(task, Path(tmpdir))
 
         mock_orchestrator.set_enabled_tools.assert_called()
         enabled_tools = mock_orchestrator.set_enabled_tools.call_args.args[0]
