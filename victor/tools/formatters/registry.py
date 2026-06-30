@@ -318,7 +318,6 @@ def format_tool_output(tool_name: str, data: Dict[str, Any], **kwargs) -> Format
             "web",
             "http",
             "https",
-            "fs",
             "filesystem",
             "database",
             "db",

@@ -92,7 +92,6 @@ SCHEMA_HIDDEN_TOOL_NAMES: Set[str] = {
 
 
 BOOTSTRAP_TOOL_SPECS: Dict[str, tuple[str, str]] = {
-    "fs": ("victor.tools.unified.fs_tool", "fs_tool"),
     "git": ("victor.tools.unified.git_tool", "git_tool"),
     "search": ("victor.tools.unified.search_tool", "search_tool"),
     "code": ("victor.tools.unified.code_tool", "code_tool"),

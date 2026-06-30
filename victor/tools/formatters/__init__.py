@@ -76,7 +76,6 @@ def _register_default_formatters() -> None:
 
     # Phase 7 formatters
     registry.register("filesystem", FileSystemFormatter())
-    registry.register("fs", FileSystemFormatter())
     registry.register("ls", FileSystemFormatter())
     registry.register("find", FileSystemFormatter())
     registry.register("cat", FileSystemFormatter())

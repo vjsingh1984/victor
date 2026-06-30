@@ -14,10 +14,14 @@
 
 """Bash-style unified command tools (`domain action args`).
 
-This package hosts the command-shell tool dispatchers — ``fs``, ``shell``,
+This package hosts the command-shell tool dispatchers — ``shell``,
 ``git``, ``web``, ``code`` — each a ``@tool`` taking a single ``cmd: str``
 parsed via :mod:`victor.tools.unified.parser`, plus their shared helpers
 (``_search_helpers``, ``_vertical_resolver``).
+
+The ``fs`` domain has been REMOVED. File operations are now first-class tools
+with named parameters: ``read``, ``edit``, ``write`` (from
+``victor.tools.filesystem`` and ``victor.tools.file_editor_tool``).
 
 Tool discovery and execution do **not** live here. Discovery is owned by
 :class:`victor.agent.shared_tool_registry.SharedToolRegistry` (process-wide
@@ -27,7 +31,7 @@ selection by :mod:`victor.tools.unified`-independent
 adapters that lived here were dead code and have been removed.
 """
 
-# NOTE: The bash-style command tools (code_tool, fs_tool, git_tool, search_tool,
+# NOTE: The bash-style command tools (code_tool, git_tool, search_tool,
 # shell_tool, web_tool) are intentionally NOT re-exported here. Importing them as
 # ``from victor.tools.unified.<name>_tool import <name>_tool`` rebinds the
 # submodule name to the function and shadows the module object. That breaks
