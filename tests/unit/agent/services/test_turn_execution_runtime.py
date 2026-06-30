@@ -1515,3 +1515,23 @@ async def test_adapter_exposes_reasoning_effort_and_capability():
     assert adapter.reasoning_effort == "high"
     assert adapter.supports_reasoning_effort("o3-mini") is True
     assert adapter.supports_reasoning_effort("gpt-4o") is False
+
+
+def test_iteration_budget_override_does_not_mutate_settings():
+    """iteration_budget override must not mutate shared settings.chat_max_iterations.
+
+    Previously ``_apply_runtime_context_overrides`` mutated
+    ``settings.chat_max_iterations`` for one turn and ``_restore_*`` reverted it;
+    the override is now read directly in ``_execute_via_agentic_loop``, so the
+    shared settings are never touched (no mutate/restore, no leak risk).
+    """
+    executor = _make_executor()
+    executor._chat_context.settings.chat_max_iterations = 9
+    executor._resolve_orchestrator = lambda: None  # isolate settings behavior
+
+    snapshot = executor._apply_runtime_context_overrides({"iteration_budget": 3})
+
+    # settings is never mutated (the old code would leave it at 3 here).
+    assert executor._chat_context.settings.chat_max_iterations == 9
+    # and chat_max_iterations is no longer snapshotted for restore.
+    assert "chat_max_iterations" not in (snapshot or {})
