@@ -105,3 +105,39 @@ def _label_onehot(labels, idx):
     v = np.zeros(len(labels))
     v[idx] = 1.0
     return v
+
+
+# Regression: sklearn returns coef_ with shape [1, n_features] for BINARY
+# classification (coefs for the positive class). train_head must normalize this
+# to [n_labels, n_features] or the model degenerates to always predicting
+# labels[0] with confidence 1.0 (softmax over a length-1 score).
+_BINARY_PASS = [
+    "all parser tests pass and the fix is verified",
+    "the patch is complete and tests are green",
+    "verified the handler fix works correctly",
+    "pytest passes and the issue is resolved",
+]
+_BINARY_FAIL = [
+    "I think the bug is probably fixed now",
+    "maybe this addresses the issue hopefully",
+    "attempted a fix but not sure it works",
+    "the change might resolve it i believe",
+]
+
+
+def test_binary_head_uses_features_not_majority():
+    """A binary head must distinguish the two classes, not always pick labels[0]."""
+    samples = {
+        "task_completion": [(t, "pass") for t in _BINARY_PASS] * 8
+        + [(t, "fail") for t in _BINARY_FAIL] * 8
+    }
+    model = train_model(samples, model_version="binary-test", threshold=0.5)
+    head = model.heads["task_completion"]
+    # bias must have one entry per label (2), not the degenerate [1].
+    assert head.bias.shape == (2,), head.bias.shape
+
+    # A clearly-pass text predicts pass; a clearly-fail text predicts fail.
+    p_label, _ = model.predict("task_completion", "all tests pass and verified")
+    f_label, _ = model.predict("task_completion", "maybe probably not sure")
+    assert p_label == "pass", p_label
+    assert f_label == "fail", f_label
