@@ -437,12 +437,6 @@ class ProfileConfig(BaseSettings):
         None, description="Enable/disable tool call deduplication"
     )
 
-    # Tool broadcasting optimization
-    tool_strategy_v2_enabled: bool = Field(
-        default=False,
-        description="Enable context-window-aware, economy-first tool strategy (v2)",
-    )
-
     # Timeout and session limits
     session_idle_timeout: Optional[int] = Field(
         None,

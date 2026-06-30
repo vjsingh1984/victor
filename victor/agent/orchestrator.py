@@ -3805,24 +3805,18 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
             return False
 
     def _is_tool_strategy_v2_enabled(self) -> bool:
-        """Check if the new context-aware tool strategy is enabled.
+        """Check if the context-aware tool strategy (v2) is enabled.
 
-        Returns:
-            True if tool_strategy_v2 feature flag is enabled
+        Gated solely by the ``tool_strategy_v2`` feature flag. The former
+        ``tool_strategy_v2_enabled`` settings field was an unreachable,
+        exception-only fallback (defaulted False) and has been removed.
         """
         try:
-            # Check feature flag
             from victor.core.feature_flags import is_enabled
 
             return is_enabled("tool_strategy_v2")
         except Exception:
-            # If feature flag system unavailable, check settings
-            try:
-                settings = getattr(self, "settings", None)
-                if settings is not None:
-                    return getattr(settings, "tool_strategy_v2_enabled", False)
-            except Exception:
-                return False
+            return False
 
     def _apply_context_aware_strategy(self, tools):
         """Delegate context-aware selection to ToolService; emit strategy event here."""
