@@ -38,6 +38,15 @@ from victor.security.command_safety import (
     is_dangerous_command as _is_dangerous_consolidated,
 )
 
+# FEP-0013: damage-scoped shell safety policy. The default (legacy) policy is a
+# no-op here — the inline allowlist gate below runs unchanged. A non-legacy
+# policy installed per-session via SessionConfig.shell_safety replaces it.
+from victor.security.shell_safety_policy import (
+    ShellCommandContext as _ShellSafetyCtx,
+    SafetyVerdict as _SafetyVerdict,
+    get_shell_safety_policy as _get_shell_safety_policy,
+)
+
 # Platform-specific readonly commands - safe for exploration/analysis
 # These commands cannot modify state, only read
 READONLY_COMMANDS_UNIX: Set[str] = {
@@ -1493,8 +1502,51 @@ async def shell(
     if _eff is not None:
         readonly = _eff
 
-    # Check readonly mode restrictions
-    if readonly:
+    # --- FEP-0013: consult the session-scoped shell safety policy. The default
+    # ``legacy`` policy preserves the inline allowlist gate below unchanged; a
+    # non-legacy (damage-scoped) policy replaces it with invariant-based allow/
+    # deny/ask. ``readonly`` is honoured as a *hint* and overridden by the
+    # policy's effective_readonly on ALLOW.
+    _shell_policy = _get_shell_safety_policy()
+    _use_shell_policy = _shell_policy.name != "legacy-allowlist"
+    if _use_shell_policy:
+        _decision = _shell_policy.evaluate(
+            _ShellSafetyCtx(command=cmd, cwd=cwd, readonly_hint=readonly, action_hint=action)
+        )
+        if _decision.verdict is _SafetyVerdict.DENY:
+            _inv = f"/{_decision.invariant}" if _decision.invariant else ""
+            return {
+                "success": False,
+                "error": (
+                    f"Shell command denied ({_decision.category}{_inv}): "
+                    f"{_decision.reason}. Keep writes inside the working directory "
+                    f"({cwd}) and avoid protected paths."
+                ),
+                "stdout": "",
+                "stderr": "",
+                "return_code": -1,
+                "cwd": cwd,
+            }
+        if _decision.verdict is _SafetyVerdict.ASK:
+            # Phase 1 surfaces the approval need as an actionable error; routing
+            # ASK through the governance PolicyEngine (FEP-0005) is Phase 2.
+            return {
+                "success": False,
+                "error": (
+                    f"Shell command requires approval ({_decision.category}): "
+                    f"{_decision.reason}"
+                ),
+                "stdout": "",
+                "stderr": "",
+                "return_code": -1,
+                "cwd": cwd,
+            }
+        # ALLOW: adopt the policy's effective readonly and skip the legacy gate.
+        readonly = _decision.effective_readonly
+
+    # Check readonly mode restrictions (legacy inline allowlist gate; skipped
+    # when a non-legacy policy authorized the command above).
+    if readonly and not _use_shell_policy:
         is_valid, failing_cmd = _validate_readonly_command(cmd)
         if not is_valid:
             return {
