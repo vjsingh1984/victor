@@ -443,7 +443,6 @@ You have access to 45+ tools. Use them efficiently to accomplish tasks."""
                 EditorProtocol,
                 TreeSitterParserProtocol,
                 create_lazy_capability_proxy,
-                detect_enhanced_index_factory,
             )
 
             # Tree-sitter parser (lazy — imports tree_sitter_manager on first access)
@@ -464,13 +463,30 @@ You have access to 45+ tools. Use them efficiently to accomplish tasks."""
 
             registrations.append((EditorProtocol, create_lazy_capability_proxy(_load_editor)))
 
-            # Codebase index factory (lazy)
+            # Codebase index factory: register the REAL victor-coding CodebaseIndex
+            # factory. Do NOT use detect_enhanced_index_factory() — it returns the
+            # framework's delegating shell (EnhancedCodebaseIndexFactory), and
+            # registering that shell as the provider creates a self-reference loop
+            # (its create() finds only itself in the registry -> ImportError).
             def _load_index_factory():
-                return detect_enhanced_index_factory()
+                import inspect
 
-            factory = _load_index_factory()
-            if factory is not None:
-                registrations.append((CodebaseIndexFactoryProtocol, factory))
+                from victor_coding.codebase.indexer import CodebaseIndex
+
+                # Forward only kwargs the installed CodebaseIndex accepts, so
+                # callers targeting a newer/different signature (e.g. the
+                # deprecated graph_writer_mode compat flag) don't break against
+                # this version.
+                _accepted = set(inspect.signature(CodebaseIndex.__init__).parameters) - {"self"}
+
+                class _CodebaseIndexFactory:
+                    def create(self, root_path, **kwargs):
+                        filtered = {k: v for k, v in kwargs.items() if k in _accepted}
+                        return CodebaseIndex(root_path, **filtered)
+
+                return _CodebaseIndexFactory()
+
+            registrations.append((CodebaseIndexFactoryProtocol, _load_index_factory()))
 
         except ImportError:
             pass  # Framework protocols not available (contract-only mode)

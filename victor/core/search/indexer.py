@@ -101,6 +101,12 @@ class EnhancedCodebaseIndexFactory(CodebaseIndexFactoryProtocol):
     External vertical packages (e.g., victor-coding) register their
     CodebaseIndex factory as a capability via CapabilityRegistry at
     bootstrap time. This factory discovers and delegates to that provider.
+
+    NOTE: this is a CALLER-SIDE convenience — never register an
+    EnhancedCodebaseIndexFactory as the provider itself. It delegates to
+    ``registry.get(CodebaseIndexFactoryProtocol)`` and skips itself, so
+    registering it would self-reference and raise ImportError. The vertical
+    that owns a CodebaseIndex must register its real factory.
     """
 
     def create(self, root_path: str, **kwargs: Any) -> Any:
@@ -129,14 +135,15 @@ class EnhancedCodebaseIndexFactory(CodebaseIndexFactoryProtocol):
 
 
 def detect_enhanced_index_factory() -> Optional[CodebaseIndexFactoryProtocol]:
-    """Detect if a codebase indexing provider is registered.
+    """Detect whether a codebase indexing provider is registered.
 
-    Returns None if no provider is available via CapabilityRegistry.
+    Returns the registered factory directly, or None. This is a PURE DETECTOR —
+    it must NEVER return a delegating shell for re-registration as a provider
+    (doing so creates a self-reference loop: the shell's create() would find
+    only itself in the registry and raise ImportError). A vertical that owns a
+    CodebaseIndex should register its real factory directly.
     """
     from victor.core.capability_registry import CapabilityRegistry
 
     registry = CapabilityRegistry.get_instance()
-    factory = registry.get(CodebaseIndexFactoryProtocol)
-    if factory is not None:
-        return EnhancedCodebaseIndexFactory()
-    return None
+    return registry.get(CodebaseIndexFactoryProtocol)
