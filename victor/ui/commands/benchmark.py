@@ -846,6 +846,11 @@ def run_benchmark(
     timeout: int = typer.Option(420, "--timeout", "-t", help="Timeout per task in seconds"),
     max_turns: int = typer.Option(10, "--max-turns", help="Maximum conversation turns per task"),
     parallel: int = typer.Option(1, "--parallel", help="Number of parallel tasks"),
+    use_docker: bool = typer.Option(
+        False,
+        "--docker",
+        help="Run tests in Docker containers (requires per-repo images)",
+    ),
     resume: bool = typer.Option(
         False,
         "--resume",
@@ -925,6 +930,7 @@ def run_benchmark(
         timeout_per_task=timeout,
         max_turns=max_turns,
         parallel_tasks=parallel,
+        use_docker=use_docker,
     )
     _attach_manifest_metadata(config, runner)
     _print_benchmark_header(
@@ -1126,6 +1132,11 @@ def run_real_benchmark(
     timeout: int = typer.Option(420, "--timeout", "-t", help="Timeout per task in seconds"),
     max_turns: int = typer.Option(10, "--max-turns", help="Maximum conversation turns per task"),
     parallel: int = typer.Option(1, "--parallel", help="Number of parallel tasks"),
+    use_docker: bool = typer.Option(
+        False,
+        "--docker",
+        help="Run tests in Docker containers (requires per-repo images)",
+    ),
     resume: bool = typer.Option(
         False,
         "--resume",
@@ -1239,6 +1250,11 @@ def run_prompt_suite(
     timeout: int = typer.Option(420, "--timeout", "-t", help="Timeout per task in seconds"),
     max_turns: int = typer.Option(10, "--max-turns", help="Maximum conversation turns per task"),
     parallel: int = typer.Option(1, "--parallel", help="Number of parallel tasks"),
+    use_docker: bool = typer.Option(
+        False,
+        "--docker",
+        help="Run tests in Docker containers (requires per-repo images)",
+    ),
     resume: bool = typer.Option(
         False,
         "--resume",
