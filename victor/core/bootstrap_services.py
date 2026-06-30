@@ -577,9 +577,7 @@ def _decision_service_via_legacy_flags(
             if decision_service is not None:
                 logger.info("Bootstrapped LLMDecisionService with edge model")
 
-    if decision_service is None and feature_flags.is_enabled(
-        FeatureFlag.USE_LLM_DECISION_SERVICE
-    ):
+    if decision_service is None and feature_flags.is_enabled(FeatureFlag.USE_LLM_DECISION_SERVICE):
         decision_service = _create_llm_decision_service(container)
         if decision_service is not None:
             logger.info("Bootstrapped LLMDecisionService with cloud provider")
