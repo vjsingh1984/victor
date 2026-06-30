@@ -233,6 +233,36 @@ class VictorAgentAdapter:
             strict=True,
         )
 
+    def get_conversation_trace(self) -> Dict[str, Any]:
+        """Serialize the full execution trace for post-hoc analysis.
+
+        Returns the conversation messages, tool calls (with args + durations),
+        and file edits (with diffs) captured during the task. Written to the
+        results JSON so the trace survives process exit.
+        """
+        return {
+            "messages": [
+                {"role": m.get("role", ""), "content": str(m.get("content", ""))[:500]}
+                for m in self._messages[-50:]  # last 50 messages (bounded)
+            ],
+            "tool_calls": [
+                {
+                    "name": tc.name,
+                    "arguments": str(tc.arguments)[:500],
+                    "duration_s": round(getattr(tc, "duration", 0) or 0, 2),
+                }
+                for tc in self._tool_calls[-100:]  # last 100 calls (bounded)
+            ],
+            "file_edits": [
+                {
+                    "path": e.get("path", ""),
+                    "diff": str(e.get("diff", ""))[:2000],  # bounded
+                }
+                for e in self._file_edits[-20:]  # last 20 edits
+            ],
+            "turns": self._turns,
+        }
+
     def _on_tool_start_hook(self, tool_name: str, arguments: Dict[str, Any]) -> None:
         """Hook called by ToolRegistry before tool execution.
 
@@ -465,6 +495,7 @@ class VictorAgentAdapter:
             "file_edits": len(self._file_edits),
             "files_modified": [e.get("path", "") for e in self._file_edits[:10]],
             **_summarize_eval_tool_calls(self._tool_calls),
+            "conversation_trace": self.get_conversation_trace(),
         }
 
     def reset(self) -> None:
