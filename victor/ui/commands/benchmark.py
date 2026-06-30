@@ -1906,6 +1906,28 @@ async def _run_benchmark_async(
         except Exception as exc:  # never break the benchmark
             logger.debug("Execution manifest emission skipped: %s", exc)
 
+        # FEP-0012 Phase 6: stamp the durable decision_outcome reward junction
+        # per task (session_id → success/quality). This is the production
+        # training source (`victor.ml.train_from_outcomes`); the manifest above
+        # is the offline snapshot. Best-effort — never breaks the run.
+        try:
+            from victor.agent.decisions.outcome import record_session_outcome
+
+            for _tr in getattr(eval_result, "task_results", []) or []:
+                _sid = getattr(_tr, "session_id", "") or ""
+                if not _sid:
+                    continue
+                _total = int(getattr(_tr, "tests_total", 0) or 0)
+                _passed = int(getattr(_tr, "tests_passed", 0) or 0)
+                _rate = (_passed / _total) if _total else 0.0
+                record_session_outcome(
+                    _sid,
+                    success=(_passed == _total and _total > 0),
+                    quality_score=_rate,
+                )
+        except Exception as exc:  # never break the benchmark
+            logger.debug("decision_outcome recording skipped: %s", exc)
+
         return eval_result
 
 
