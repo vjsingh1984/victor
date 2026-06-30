@@ -59,14 +59,14 @@ from victor.providers.registry import ProviderRegistry
 
 logger = logging.getLogger(__name__)
 
+# Tools a benchmark session must have enabled. Updated for the unified tool
+# surface (fs/git/code/shell/web): the old separate read/write/ls/edit and
+# code_search/graph names were folded into `fs` and `code` (subcommands)
+# respectively by the unified-tool redesign. `code` covers code search + graph.
 BENCHMARK_TOOL_ALLOWLIST = frozenset(
     {
-        "read",
-        "edit",
-        "write",
-        "code_search",
-        "graph",
-        "ls",
+        "fs",
+        "code",
         "shell",
     }
 )
@@ -136,11 +136,16 @@ class BenchmarkToolReadiness:
 
 
 def _summarize_eval_tool_calls(tool_calls: List[EvalToolCall]) -> Dict[str, int]:
-    """Summarize tool usage counts for benchmark telemetry."""
+    """Summarize tool usage counts for benchmark telemetry.
+
+    Uses the unified tool names (fs/code/shell); `code` covers the code-search
+    and graph subcommands folded in by the unified-tool redesign.
+    """
     counts = Counter(call.name for call in tool_calls)
     return {
-        "code_search_calls": int(counts.get("code_search", 0)),
-        "graph_calls": int(counts.get("graph", 0)),
+        "fs_calls": int(counts.get("fs", 0)),
+        "code_calls": int(counts.get("code", 0)),
+        "shell_calls": int(counts.get("shell", 0)),
     }
 
 
@@ -641,15 +646,15 @@ class VictorAgentAdapter:
         prompt = (
             "Fix the following issue by editing the source code in this repository.\n\n"
             "WORKFLOW:\n"
-            "1. Use code_search to find relevant files\n"
-            "2. Use graph to inspect callers, callees, dependencies, and impact when "
+            "1. Use `code search` (or `code grep`) to find relevant files\n"
+            "2. Use `code` to inspect code structure, references, and impact when "
             "the fix crosses symbol or file boundaries\n"
-            "3. Use read to examine the code (use offset/limit for large files)\n"
-            "4. Use edit to apply your fix — COPY the old_str EXACTLY from the "
-            "read output, character-by-character. Do NOT type it from memory.\n"
+            "3. Use `fs cat` to examine the code (use --offset/--limit for large files)\n"
+            "4. Use `fs edit` to apply your fix — COPY the old_str EXACTLY from the "
+            "`fs cat` output, character-by-character. Do NOT type it from memory.\n"
             "5. If an edit fails (transaction rolled back), re-read the file at "
             "that location and try again with the exact text.\n\n"
-            "CRITICAL: The edit tool's old_str must match the file content exactly "
+            "CRITICAL: The `fs edit` tool's old_str must match the file content exactly "
             "including whitespace, quotes, and line breaks. Even one wrong character "
             "causes a rollback. Always copy from the most recent read output.\n\n"
             f"ISSUE:\n{task_description}"
@@ -1031,6 +1036,7 @@ class VictorAgentAdapter:
         session_config: "SessionConfig",
         *,
         profile: Optional[str] = None,
+        vertical: Optional[str] = None,
         config: Optional[AdapterConfig] = None,
         enable_observability: bool = True,
     ) -> "VictorAgentAdapter":
@@ -1038,12 +1044,18 @@ class VictorAgentAdapter:
 
         This is the preferred path for CLI/runtime callers that already have a
         normalized SessionConfig and want framework-owned provider/session setup.
+
+        Args:
+            vertical: Vertical name (e.g. "coding") so the vertical's
+                capabilities — code_search/graph for coding — register via
+                AgentFactory. Required for code-intelligence benchmarks.
         """
         from victor.framework.agent import Agent
 
         agent = await Agent.create(
             profile=profile or session_config.agent_profile,
             session_config=session_config,
+            vertical=vertical,
             enable_observability=enable_observability,
         )
         return cls(agent.get_orchestrator(), config)
