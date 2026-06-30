@@ -100,3 +100,36 @@ class TestRegisterVerticalCapabilities:
 
         registry = CapabilityRegistry.get_instance()
         assert registry.get(MockCapProtocol) is not None
+
+    def test_detect_enhanced_index_factory_is_pure_detector(self):
+        """detect_enhanced_index_factory returns the registered factory directly,
+        never wrapping it in the EnhancedCodebaseIndexFactory shell.
+
+        Regression: the coding vertical used to register detect()'s return value
+        (the shell) as the provider, which self-referenced (the shell's create()
+        found only itself in the registry -> ImportError). detect() must be a
+        pure detector so this misuse can't recur.
+        """
+        from victor.core.capability_registry import CapabilityRegistry
+        from victor.core.search.indexer import (
+            EnhancedCodebaseIndexFactory,
+            detect_enhanced_index_factory,
+        )
+        from victor.framework.vertical_protocols import CodebaseIndexFactoryProtocol
+
+        class _FakeRealFactory:
+            def create(self, root_path, **kwargs):
+                return "real-index"
+
+        registry = CapabilityRegistry.get_instance()
+        registry.register(CodebaseIndexFactoryProtocol, _FakeRealFactory())
+
+        detected = detect_enhanced_index_factory()
+        assert detected is not None
+        # Whatever real factory is registered (the fake here, or the coding
+        # vertical's real one if already registered at import), detect() must
+        # NEVER return the shell — a vertical re-registering the shell
+        # self-references and raises ImportError.
+        assert not isinstance(
+            detected, EnhancedCodebaseIndexFactory
+        ), "detect() returned the shell — would self-reference if re-registered"
