@@ -983,6 +983,65 @@ class RLCoordinator:
                                     if provider_cfg
                                     else None
                                 )
+
+                            # KV cache isolation: resolve a different model for
+                            # GEPA reflection so it doesn't thrash the main
+                            # agent's cache namespace. Same provider (keeps API
+                            # keys/auth), different model (separate cache).
+                            gepa_model_override = getattr(gepa_cfg, "model", None)
+                            if gepa_model_override and gepa_model_override != main_model:
+                                # Explicit override from settings/profile.
+                                main_model = gepa_model_override
+                                logger.info(
+                                    "[GEPA] cache_mode=ISOLATED model=%s "
+                                    "(explicit override, ≠ session %s)",
+                                    main_model,
+                                    self._session_model,
+                                )
+                            elif main_model:
+                                # Auto-resolve: try the provider's "edge" tier
+                                # model (cheaper + different cache namespace).
+                                try:
+                                    from victor.config.decision_settings import (
+                                        DecisionServiceSettings,
+                                    )
+
+                                    decision_cfg = DecisionServiceSettings()
+                                    provider_tiers = decision_cfg.provider_model_tiers.get(
+                                        str(main_provider), {}
+                                    )
+                                    edge_model = provider_tiers.get("edge")
+                                    if edge_model and edge_model != main_model:
+                                        main_model = edge_model
+                                        logger.info(
+                                            "[GEPA] cache_mode=ISOLATED model=%s "
+                                            "(auto-resolved edge tier for %s, "
+                                            "≠ session %s)",
+                                            main_model,
+                                            main_provider,
+                                            self._session_model,
+                                        )
+                                    else:
+                                        logger.warning(
+                                            "[GEPA] cache_mode=SHARED model=%s — "
+                                            "no different tier model found for "
+                                            "provider %s. Mid-session prompt "
+                                            "optimization can cause KV cache miss "
+                                            "and cost full token price. Set "
+                                            "settings.prompt_optimization.gepa.model "
+                                            "to isolate, or batch GEPA at "
+                                            "session-end.",
+                                            main_model,
+                                            main_provider,
+                                        )
+                                except Exception:
+                                    logger.warning(
+                                        "[GEPA] cache_mode=SHARED model=%s — "
+                                        "could not resolve tier models. Mid-session "
+                                        "prompt optimization can cause KV cache "
+                                        "miss and cost full token price.",
+                                        main_model,
+                                    )
                             if main_provider and main_model:
                                 _local = str(main_provider) in (
                                     "ollama",

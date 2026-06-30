@@ -169,6 +169,18 @@ class VictorAgentAdapter:
         self.orchestrator = orchestrator
         self.config = config or AdapterConfig()
 
+        # Disable prompt optimization (GEPA) for benchmark sessions — it
+        # thrashes the KV cache, wastes API calls on reflection, and
+        # invalidates the evaluation (evolving prompts while measuring them).
+        # Prompt optimization is user-driven (CLI: `victor benchmark evolve`),
+        # never automatic during evaluation.
+        try:
+            import os
+
+            os.environ["VICTOR_PROMPT_OPTIMIZATION_ENABLED"] = "false"
+        except Exception:
+            pass
+
         # Execution tracking
         self._tool_calls: List[EvalToolCall] = []
         self._file_edits: List[FileEdit] = []
