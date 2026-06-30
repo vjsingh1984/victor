@@ -50,7 +50,7 @@ Example:
     # Create health checker with multiple checks
     checker = HealthChecker()
     checker.add_check(ProviderHealthCheck("anthropic", provider))
-    checker.add_check(ToolHealthCheck("filesystem", fs_tool))
+    checker.add_check(ToolHealthCheck("filesystem", read))
     checker.add_check(CacheHealthCheck("redis", cache))
     checker.add_check(MemoryHealthCheck(threshold_mb=1024))
 

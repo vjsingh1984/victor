@@ -121,19 +121,21 @@ def create_code_parser() -> UnifiedCodeParser:
     priority=Priority.HIGH,
 )
 async def code_tool(cmd: str) -> str:
-    """Unified code tool.
+    """Standalone code-intelligence tool. Call it directly as code(cmd='...').
+    Do NOT pass code commands to the shell tool.
+
     Example commands:
+      code search "authentication logic"   # semantic code search
+      code grep "class RST"                # literal pattern search
       code test pytest tests/
       code python "print('hello')"
-      code python <<'PY'
-      print('hello')
-      PY
-      code execute "print('hello')"
       code metrics src/
 
     Args:
-        cmd: Bash-style grouped code command. Use `code python` for ad hoc
-            Python snippets and heredocs; use `code test` for test runners.
+        cmd: A code-intelligence subcommand string (e.g. 'grep "pattern"').
+            This is NOT a shell command — call the code tool directly,
+            do NOT pass it to shell(). Subcommands: search, grep, test,
+            python, execute, metrics.
     """
     parser = create_code_parser()
 

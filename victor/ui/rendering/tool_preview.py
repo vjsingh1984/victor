@@ -478,7 +478,6 @@ _STRATEGY_MAP: Dict[str, _ToolPreviewStrategy] = {
     "read": _ReadPreviewStrategy(),
     "view": _ReadPreviewStrategy(),
     "cat": _ReadPreviewStrategy(),
-    "fs": _GenericPreviewStrategy(),
     # Shell / execution
     "shell": _ShellPreviewStrategy(),
     "bash": _ShellPreviewStrategy(),

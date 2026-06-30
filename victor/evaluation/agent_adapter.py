@@ -59,13 +59,14 @@ from victor.providers.registry import ProviderRegistry
 
 logger = logging.getLogger(__name__)
 
-# Tools a benchmark session must have enabled. Updated for the unified tool
-# surface (fs/git/code/shell/web): the old separate read/write/ls/edit and
-# code_search/graph names were folded into `fs` and `code` (subcommands)
-# respectively by the unified-tool redesign. `code` covers code search + graph.
+# Tools a benchmark session must have enabled. The `fs` domain has been
+# removed — `read`/`edit`/`write` are now first-class tools with named
+# parameters. `ls`/`find` route to `shell`.
 BENCHMARK_TOOL_ALLOWLIST = frozenset(
     {
-        "fs",
+        "read",
+        "edit",
+        "write",
         "code",
         "shell",
     }
@@ -136,14 +137,12 @@ class BenchmarkToolReadiness:
 
 
 def _summarize_eval_tool_calls(tool_calls: List[EvalToolCall]) -> Dict[str, int]:
-    """Summarize tool usage counts for benchmark telemetry.
-
-    Uses the unified tool names (fs/code/shell); `code` covers the code-search
-    and graph subcommands folded in by the unified-tool redesign.
-    """
+    """Summarize tool usage counts for benchmark telemetry."""
     counts = Counter(call.name for call in tool_calls)
     return {
-        "fs_calls": int(counts.get("fs", 0)),
+        "read_calls": int(counts.get("read", 0)),
+        "edit_calls": int(counts.get("edit", 0)),
+        "write_calls": int(counts.get("write", 0)),
         "code_calls": int(counts.get("code", 0)),
         "shell_calls": int(counts.get("shell", 0)),
     }
@@ -700,19 +699,19 @@ class VictorAgentAdapter:
         # edit rollbacks by ensuring the agent copies text verbatim from read output.
         prompt = (
             "Fix the following issue by editing the source code in this repository.\n\n"
-            "IMPORTANT: You have THREE separate tools — `fs`, `code`, and `shell`. "
-            "Call each as its own tool. Do NOT pass tool names as shell commands "
-            "(e.g. `shell(cmd='fs cat ...')` will fail — call the `fs` tool instead).\n\n"
+            "IMPORTANT: You have separate tools — `read`, `edit`, `write`, `code`, "
+            "and `shell`. Call each as its own tool with named parameters.\n\n"
             "TOOL USAGE:\n"
-            "- To READ a file: call the `fs` tool with cmd='cat <path>'\n"
-            "- To EDIT a file: call the `fs` tool with cmd='edit <path> --old ... --new ...'\n"
-            "- To SEARCH code: call the `code` tool with cmd='search <query>' or 'grep <pattern>'\n"
-            "- To RUN commands (pip install, pytest, build): call the `shell` tool with cmd='<command>'\n\n"
+            "- To READ a file: call `read(path='path/to/file')`\n"
+            "- To EDIT a file: call `edit(ops=[{'type':'replace','path':'...','old_str':'...','new_str':'...'}])`\n"
+            "- To WRITE a new file: call `write(path='...', content='...')`\n"
+            "- To SEARCH code: call `code` with cmd='search <query>' or 'grep <pattern>'\n"
+            "- To RUN commands (pip install, pytest, build): call `shell` with cmd='<command>'\n\n"
             "WORKFLOW:\n"
             "1. Use `code` (search or grep) to find relevant files in this repository\n"
-            "2. Use `fs` (cat) to examine the code (use --offset/--limit for large files)\n"
-            "3. Use `fs` (edit) to apply your fix — COPY the old_str EXACTLY from the "
-            "cat output, character-by-character. Do NOT type it from memory.\n"
+            "2. Use `read` to examine the code (use offset/limit for large files)\n"
+            "3. Use `edit` to apply your fix — COPY old_str EXACTLY from the read "
+            "output, character-by-character. Do NOT type it from memory.\n"
             "4. If an edit fails, re-read the file and try again with the exact text.\n"
             "5. VERIFY: call `shell` with cmd='python -m pytest <test_file> -x'. "
             "Iterate until the test passes.\n"
@@ -720,7 +719,7 @@ class VictorAgentAdapter:
             "CONSTRAINTS:\n"
             "- Stay within the workspace directory. NEVER run 'find /' or search "
             "outside the project.\n"
-            "- The `fs edit` old_str must match file content EXACTLY (whitespace, "
+            "- The `edit` old_str must match file content EXACTLY (whitespace, "
             "quotes, line breaks). Always copy from the most recent read output.\n\n"
             f"ISSUE:\n{task_description}"
         )
