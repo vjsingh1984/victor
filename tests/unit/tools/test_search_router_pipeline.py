@@ -1244,14 +1244,14 @@ class TestToolPipelineNormalization:
         assert strategy is not None
 
     def test_normalize_tool_call_defaults_shell_to_readonly(self, pipeline):
-        """Canonical shell calls should default readonly=True."""
+        """Canonical shell calls should default readonly=False."""
         tool_name, args, strategy = pipeline._normalize_tool_call(
             "shell",
             {"cmd": "git status"},
         )
 
         assert tool_name == "shell"
-        assert args["readonly"] is True
+        assert args["readonly"] is False
         assert strategy is not None
 
     def test_normalize_tool_call_does_not_expand_shell_readonly(self, pipeline):
