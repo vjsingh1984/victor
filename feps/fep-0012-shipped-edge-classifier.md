@@ -1,5 +1,5 @@
 ---
-fep: 0012
+fep: "0012"
 title: "Shipped RL-trained edge classifier (replace the Ollama edge default)"
 type: Standards Track
 status: Draft
