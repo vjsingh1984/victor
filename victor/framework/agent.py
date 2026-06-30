@@ -246,6 +246,17 @@ class Agent:
                 model = provider_override.model or model
                 profile_overrides = provider_override.to_profile_overrides()
 
+            # Configure the session-scoped shell safety policy (FEP-0013). A
+            # ``legacy``/unset profile is a no-op (existing inline allowlist);
+            # a non-legacy profile installs a damage-scoped policy the shell
+            # tool consults via get_shell_safety_policy().
+            try:
+                from victor.security.shell_safety_policy import configure_from_session
+
+                configure_from_session(session_config, settings)
+            except Exception as exc:  # pragma: no cover - defensive
+                logger.debug("Shell safety policy configuration skipped: %s", exc)
+
         # Resolve a string vertical name into the actual VerticalBase class
         # before any attribute access. The public docstring/example accepts
         # vertical="coding"; without this step the get_config() call below
