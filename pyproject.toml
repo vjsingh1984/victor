@@ -132,6 +132,14 @@ chat-ui = [
     "chainlit>=2,<3",  # 2.x cl.Action uses payload= (the 1.x value= kwarg was removed)
 ]
 
+# Edge-classifier TRAINING (FEP-0012) — dev-only. Runtime inference is
+# numpy-only (victor.ml.features + victor.ml.model); this extra is needed only
+# to run scripts/train_edge_classifier.py / victor.ml.trainer.
+ml = [
+    "scikit-learn>=1.4",
+    "scipy>=1.10",
+]
+
 dev = [
     # Embeddings (required for full test coverage)
     "numpy>=1.24,<2.3",  # Required by victor.storage.embeddings.service; numba-compatible
@@ -195,6 +203,7 @@ ci = [
     "respx>=0.21",
     "pandas>=2.0",
     "scipy>=1.10",
+    "scikit-learn>=1.4",  # FEP-0012 edge-classifier trainer round-trip tests
 
     # Linting/Formatting/Typing
     "ruff>=0.5",
