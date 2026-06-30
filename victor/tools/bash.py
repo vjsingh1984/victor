@@ -1433,52 +1433,18 @@ async def shell(
     # Apply command optimizer pipeline (grep→rg, etc.)
     cmd = optimize_command(cmd)
 
-    # Redirect broad recursive search commands to the grouped search tool.
-    # Models bypass the semantic index by calling shell("rg ...") directly.
-    # Allow targeted single-file searches (grep -n "pattern" specific_file.py)
-    # since those are precise and don't benefit from semantic search.
-    import re as _re
-
-    _base_cmd = cmd.strip().split("|")[0].strip()
-    if _re.match(r"^\s*(rg|grep|ag|ack)\s+", _base_cmd, _re.IGNORECASE):
-        # Allow targeted searches: grep on a specific file path (not recursive)
-        _is_recursive = bool(_re.search(r"\s-[a-zA-Z]*r[a-zA-Z]*\s", _base_cmd))
-        _targets_file = bool(
-            _re.search(r"\s[\w./~\-]+\.\w{1,10}\s*$", _base_cmd)
-            or _re.search(r"\s[\w./~\-]+\.\w{1,10}\s*\|", cmd.strip())
-        )
-        # Always allow grep targeting library/venv files — code_search only covers project code
-        _targets_external = bool(
-            _re.search(
-                r"(\.venv|site-packages|/lib/python\d|/usr/lib|/usr/local/lib)",
-                _base_cmd,
-            )
-        )
-        # Detect command substitution in the file path (e.g. "$(python -c '...')/file.py")
-        _has_cmd_sub = bool(_re.search(r"\$\(", _base_cmd))
-
-        if not _targets_external and (not _targets_file or _is_recursive) and not readonly:
-            if _has_cmd_sub:
-                error_msg = (
-                    "Command substitution in file paths is not supported for grep. "
-                    "Resolve the path first, then use read() or grep with the literal path. "
-                    "Example: shell(cmd='python -c \"import arxiv; print(arxiv.__file__)\"') "
-                    "then read(path='<result>')."
-                )
-            else:
-                error_msg = (
-                    "Use search(cmd='search grep \"...\" .') instead of shell search commands "
-                    "for project code. The grouped search tool is indexed and more reliable. "
-                    "For library/venv files use read(path='...') directly. "
-                    "Example: search(cmd='search grep \"FilePathField\" .')"
-                )
-            return {
-                "success": False,
-                "error": error_msg,
-                "stdout": "",
-                "stderr": "",
-                "return_code": -1,
-            }
+    # Guard against filesystem-wide searches (find / ...) that timeout.
+    if re.match(r"^\s*find\s+/", cmd.strip()):
+        return {
+            "success": False,
+            "error": (
+                "Filesystem-wide searches are not allowed. "
+                "Use `code search` or `find . -name ...` within the workspace."
+            ),
+            "stdout": "",
+            "stderr": "",
+            "return_code": -1,
+        }
 
     # Check for dangerous commands
     if not dangerous and _is_dangerous(cmd):

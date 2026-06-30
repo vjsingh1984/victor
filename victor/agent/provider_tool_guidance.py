@@ -225,14 +225,13 @@ For git operations (status, diff, log, branch, commit, push):
 For executing shell commands:
 - shell() defaults to readonly=False — the dangerous-command check is the safety floor.
 - shell(cmd=..., readonly=True) validates against the readonly allowlist (opt-in for purely read-only commands).
-  • Use the unified ``fs`` tool (fs write / fs edit / fs patch) for direct file
-    modifications; prefer it over shell redirection.
+  • Use ``write`` for new files and ``edit`` for modifications; prefer over shell redirection.
 - Use dangerous=True only for genuinely destructive commands such as rm or kill
 
 Code & file search:
 - Use ``code grep "query" path`` for literal content search (add --regex / -C).
 - Use ``code search "query" --mode semantic`` for semantic code search.
-- Use ``fs search "pattern" path`` to find files by name.
+- Use ``shell`` with ``find . -name "pattern"`` to find files by name.
 """
 
         if task_type == "simple":

@@ -654,15 +654,9 @@ def _create_tool_class(
     if docstring.long_description:
         tool_description += "\n\n" + docstring.long_description
 
-    try:
-        from victor.tools.folding import folded_tool_hints_for_target
-
-        folded_hints = folded_tool_hints_for_target(resolved_name)
-    except Exception:
-        folded_hints = []
-    if folded_hints:
-        tool_description += "\n\nFolded tool guidance:\n"
-        tool_description += "\n".join(f"- {hint}" for hint in folded_hints)
+    # NOTE: folded-tool-guidance hints (dependency:, extract:, etc.) were
+    # removed from the LLM-facing description — they're internal routing hints
+    # that bloat the schema with no actionable value for the model.
 
     # Create the JSON schema for the parameters
     sig = inspect.signature(func)
