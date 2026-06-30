@@ -22,7 +22,7 @@ Usage:
 """
 
 import logging
-from typing import List
+from typing import List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -101,31 +101,57 @@ def log_decision(
     result: str,
     source: str,
     confidence: float = 0.0,
+    *,
+    model_version: Optional[str] = None,
+    feature_spec_version: Optional[str] = None,
+    feature_digest: Optional[str] = None,
 ) -> None:
-    """Append decision I/O to JSONL file for fine-tuning data collection.
+    """Append decision I/O to JSONL for fine-tuning / RL data collection.
 
-    Logs every decision (heuristic or LLM) with input context and output,
-    enabling future model fine-tuning on real decision patterns.
+    Logs every decision (heuristic, LLM, or local classifier) with input
+    context and output, enabling future model training on real decision patterns.
+
+    FEP-0012: stamps the correlation spine (``session_id``/``turn_id``/
+    ``trace_id``) and a unique ``decision_id`` so each record can be joined to
+    its eventual outcome (``rl_outcome`` / ``usage.jsonl``) for reward-weighted
+    training. Optional provenance fields (``model_version``,
+    ``feature_spec_version``, ``feature_digest``) are set by the local
+    classifier service for reproducibility.
 
     Path: ~/.victor/logs/decisions.jsonl
     """
     import json
+    import uuid
     from datetime import datetime
     from pathlib import Path
 
     try:
+        from victor.core.context import get_session_id, get_trace_id, get_turn_id
+
         log_dir = Path.home() / ".victor" / "logs"
         log_dir.mkdir(parents=True, exist_ok=True)
         log_path = log_dir / "decisions.jsonl"
 
         entry = {
             "ts": datetime.now().isoformat(),
+            "decision_id": uuid.uuid4().hex,
             "type": decision_type,
             "input": context,
             "output": result,
             "source": source,
             "confidence": confidence,
+            # Correlation spine (FEP-0012) — join key to outcomes.
+            "session_id": get_session_id(),
+            "turn_id": get_turn_id(),
+            "trace_id": get_trace_id(),
         }
+        # Optional provenance, set by the local classifier service.
+        if model_version is not None:
+            entry["model_version"] = model_version
+        if feature_spec_version is not None:
+            entry["feature_spec_version"] = feature_spec_version
+        if feature_digest is not None:
+            entry["feature_digest"] = feature_digest
 
         with open(log_path, "a") as f:
             f.write(json.dumps(entry, default=str) + "\n")
