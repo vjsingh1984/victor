@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# post-checkout guard: warn when feature-branch work is done in the MAIN working
+# tree instead of a git worktree.
+#
+# Why: a `git checkout` in the main tree switches the branch that EVERY session
+# and agent operating in that tree shares. A checkout mid-task can revert
+# another session's in-flight work, or land a commit on the wrong branch (this
+# has happened). Linked worktrees give each task its own working directory +
+# HEAD, so a checkout in one can never disturb another.
+#
+# See docs/development/PR_WORKFLOW.md -> "Git Worktrees" for the mandate.
+#
+# Install:  make hooks
+# Bypass:   VICTOR_SKIP_WORKTREE_GUARD=1
+
+set -u
+
+# post-checkout args: $1 prev-HEAD  $2 new-HEAD  $3 0=branch-checkout 1=file-checkout
+[ "${3:-1}" = "0" ] || exit 0
+[ "${VICTOR_SKIP_WORKTREE_GUARD:-0}" = "1" ] && exit 0
+
+# Inside a linked worktree? Its git-dir path contains "/worktrees/".
+gd="$(git rev-parse --git-dir 2>/dev/null)" || exit 0
+case "$gd" in
+    *worktrees*) exit 0 ;;   # already isolated in a worktree: nothing to warn
+    *) ;;
+esac
+
+branch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null)"
+# Integration branches legitimately live in the main tree; only nag on feature work.
+case "$branch" in
+    "" | main | master | develop) exit 0 ;;
+esac
+
+# Suggested worktree dir: branch slashes -> dashes (e.g. chore/x -> chore-x).
+dir="${branch//\//-}"
+
+{
+    printf '\n'
+    printf '⚠️  worktree guard: feature branch %s checked out in the MAIN working tree.\n' "'${branch}'"
+    printf '   A checkout here switches the branch shared by every session/agent and can\n'
+    printf '   revert their in-flight work or land commits on the wrong branch.\n'
+    printf '   Do feature work in a worktree instead:\n'
+    printf '       git worktree add ../victor-%s %s\n' "${dir}" "${branch}"
+    printf '       cd ../victor-%s\n' "${dir}"
+    printf '   (install guard: make hooks  |  bypass: VICTOR_SKIP_WORKTREE_GUARD=1)\n'
+    printf '\n'
+} >&2
+
+exit 0
