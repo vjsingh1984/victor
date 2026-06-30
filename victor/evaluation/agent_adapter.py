@@ -233,6 +233,30 @@ class VictorAgentAdapter:
             strict=True,
         )
 
+    @staticmethod
+    def _has_test_pass_signal(content: str) -> bool:
+        """Detect whether the agent's response indicates tests passed.
+
+        Checks for common test-pass language + the prompt's explicit completion
+        phrase. Used by the test-pass→force-complete path to break the
+        "retry forever" loop.
+        """
+        lower = (content or "").lower()
+        # Explicit completion phrase from the benchmark prompt.
+        if "fix is complete and verified" in lower:
+            return True
+        # Common test-pass patterns from pytest/unittest output.
+        test_pass_markers = [
+            "all tests passed",
+            "tests passed",
+            "test passed",
+            "0 failed",
+            "no failures",
+            "0 failed,",
+            "passed, 0 failed",
+        ]
+        return any(marker in lower for marker in test_pass_markers)
+
     def get_conversation_trace(self) -> Dict[str, Any]:
         """Serialize the full execution trace for post-hoc analysis.
 
@@ -811,15 +835,33 @@ class VictorAgentAdapter:
                     self._completion_detector._state.completion_signals.clear()
 
                 complete = self._completion_detector.should_stop()
+
+                # Test-pass → force-complete (Phase 2 item 7): if the agent has
+                # edited files AND its response indicates tests passed, the fix
+                # is verified — stop iterating. This breaks the "retry forever"
+                # loop (62/62 retry in the analysis) by giving the completion
+                # detector a concrete success signal it lacks on its own.
+                if (
+                    not complete
+                    and self._completion_detector._has_file_modifications()
+                    and self._has_test_pass_signal(assistant_content)
+                ):
+                    logger.info(
+                        "[AgentAdapter] Turn %d test-pass detected → force-complete",
+                        self._turns,
+                    )
+                    complete = True
+
                 logger.info(
                     "[AgentAdapter] Turn %d complete=%s (deliverables=%d, signals=%d, "
-                    "active_signal=%s, file_mods=%s)",
+                    "active_signal=%s, file_mods=%s, test_pass=%s)",
                     self._turns,
                     complete,
                     len(self._completion_detector._state.completed_deliverables),
                     len(self._completion_detector._state.completion_signals),
                     self._completion_detector._state.active_signal_detected,
                     self._completion_detector._has_file_modifications(),
+                    complete and self._turns > 1,
                 )
 
                 # Check tool budget
