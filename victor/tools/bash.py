@@ -1349,7 +1349,7 @@ async def shell(
     cwd: str = ".",
     timeout: Optional[int] = None,
     dangerous: bool = False,
-    readonly: bool = True,
+    readonly: bool = False,
     action: str = "read",
     stdout_limit: Optional[int] = None,
     stderr_limit: Optional[int] = None,
@@ -1367,9 +1367,14 @@ async def shell(
         cwd: Canonical working directory to run the command from.
             Defaults to `"."` (present working directory). Must exist.
         timeout: Max seconds before the command is killed.
-        dangerous: Allow mutating/network commands when `readonly` blocks them.
-        readonly: When True (default), block commands that mutate state.
-        action: "read" (default) or "write" — the caller's intent.
+        dangerous: Override the dangerous-command blocklist (use sparingly).
+        readonly: When True, validate the command against the readonly
+            allowlist. Defaults to False — the dangerous-command check and
+            ShellSafetyPolicy are the primary safety floor. Pass readonly=True
+            to opt INTO the allowlist for commands you know are read-only.
+        action: "read" (default) or "write"/"network"/"exec" — the caller's
+            intent. Non-"read" actions bypass the allowlist (same as
+            readonly=False).
         stdout_limit: Max stdout lines to return.
         stderr_limit: Max stderr lines to return.
 
@@ -1404,8 +1409,8 @@ async def shell(
         cwd: Working directory for the command
         timeout: Maximum seconds before timeout
         dangerous: Set true only for destructive commands (rm, kill, etc.)
-        readonly: Defaults to True. Set False only when the command must mutate state
-            or invoke non-readonly subcommands.
+        readonly: Defaults to False. Pass True to validate the command against
+            the readonly allowlist (opt-in for purely read-only commands).
         stdout_limit: Max lines for stdout (None=unlimited, default: 10000)
         stderr_limit: Max lines for stderr (None=unlimited, default: 2000)
 

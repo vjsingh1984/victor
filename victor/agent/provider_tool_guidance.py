@@ -223,9 +223,8 @@ For git operations (status, diff, log, branch, commit, push):
 - Reserve ``shell`` for ad-hoc git plumbing the ``git`` tool does not cover.
 
 For executing shell commands:
-- shell() defaults to readonly=True for safe inspection commands (ls, cat, etc.)
-- When the task involves file modifications, content creation, or consolidation:
-  • Use shell(cmd=..., readonly=False) for commands that write files (>, >>, tee, etc.)
+- shell() defaults to readonly=False — the dangerous-command check is the safety floor.
+- shell(cmd=..., readonly=True) validates against the readonly allowlist (opt-in for purely read-only commands).
   • Use the unified ``fs`` tool (fs write / fs edit / fs patch) for direct file
     modifications; prefer it over shell redirection.
 - Use dangerous=True only for genuinely destructive commands such as rm or kill

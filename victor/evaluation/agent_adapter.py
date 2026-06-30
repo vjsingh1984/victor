@@ -288,14 +288,7 @@ class VictorAgentAdapter:
         }
 
     def _on_tool_start_hook(self, tool_name: str, arguments: Dict[str, Any]) -> None:
-        """Hook called by ToolRegistry before tool execution.
-
-        For benchmark sessions, default shell to readonly=False so the agent can
-        run pip install + tests without explicitly passing it (the model's
-        default is readonly=True, which blocks mutating commands).
-        """
-        if tool_name == "shell" and "readonly" not in arguments:
-            arguments["readonly"] = False
+        """Hook called by ToolRegistry before tool execution."""
         self._on_tool_start(tool_name, arguments)
 
     def _on_tool_complete_hook(self, result: Any) -> None:
@@ -711,7 +704,7 @@ class VictorAgentAdapter:
             "- Read files:  `fs cat <path>` (NOT `shell cat`)\n"
             "- Edit files:  `fs edit <path> --old ... --new ...` (NOT shell python/sed)\n"
             "- Find code:   `code search <query>` or `code grep <pattern>` (NOT shell grep)\n"
-            "- Build/test:  `shell <cmd>` (readonly is already False in this session)\n\n"
+            "- Build/test:  `shell <cmd>`\n\n"
             "WORKFLOW:\n"
             "1. Use `code search` (or `code grep`) to find relevant files\n"
             "2. Use `code` to inspect code structure, references, and impact when "

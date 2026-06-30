@@ -1126,9 +1126,10 @@ class ToolPipeline:
     ) -> tuple[Dict[str, Any], bool]:
         """Apply the single-shell readonly policy.
 
-        The runtime now exposes a single ``shell`` tool and defaults it to
-        ``readonly=True`` unless the caller explicitly opts out. On read-only
-        or display-only turns, ``readonly`` is pinned back to True.
+        The shell tool defaults to ``readonly=False`` — the dangerous-command
+        check and ShellSafetyPolicy are the primary safety floor. On read-only
+        or display-only turns, ``readonly`` is pinned to True (opt into the
+        allowlist for purely exploratory turns).
         """
         if tool_name != "shell":
             return arguments, False
@@ -1140,7 +1141,7 @@ class ToolPipeline:
 
         readonly = adjusted.get("readonly")
         if readonly is None:
-            adjusted["readonly"] = True
+            adjusted["readonly"] = False
             changed = True
         else:
             coerced = self._coerce_bool_like(readonly)
