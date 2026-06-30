@@ -252,6 +252,19 @@ def _resolve_account_selection(
     return provider, model, resolved_account
 
 
+# Maps a benchmark to the vertical whose capabilities it needs registered via
+# AgentFactory (e.g. "coding" → code_search/graph). Benchmarks not listed use the
+# default (no vertical) and rely on whatever tools the profile/session provides.
+_BENCHMARK_VERTICAL: dict[str, str] = {
+    "swe-bench": "coding",
+    "swe-bench-lite": "coding",
+    "humaneval": "coding",
+    "mbpp": "coding",
+    "mbpp-test": "coding",
+    "dr3-eval": "research",
+}
+
+
 def _resolve_effective_model(profile: str, model: Optional[str]) -> str:
     """Resolve the effective benchmark model from CLI override or profile."""
     if model:
@@ -1642,6 +1655,14 @@ async def _run_benchmark_async(
             else:
                 console.print("[dim]Edge model disabled (--no-edge-model)[/]")
 
+            # Benchmarks need their vertical's capabilities registered
+            # (code_search/graph for coding) — Agent.create(vertical=...) via
+            # AgentFactory does this. Previously the profile-only path called
+            # from_profile (direct Orchestrator() construction), which bypassed
+            # capability discovery, so the tools never registered and the
+            # benchmark failed its readiness check. Both paths now go through
+            # create_from_session_config (Agent.create).
+            vertical = _BENCHMARK_VERTICAL.get(config.benchmark)
             if provider_override:
                 effective_model = (
                     model
@@ -1661,15 +1682,22 @@ async def _run_benchmark_async(
                 )
                 adapter = await VictorAgentAdapter.create_from_session_config(
                     session_config,
+                    profile=profile,
+                    vertical=vertical,
                     config=adapter_config,
                     enable_observability=False,
                 )
             else:
-                adapter = VictorAgentAdapter.from_profile(
+                session_config = SessionConfig.from_cli_flags(
+                    agent_profile=profile,
+                    provider_timeout=timeout,
+                )
+                adapter = await VictorAgentAdapter.create_from_session_config(
+                    session_config,
                     profile=profile,
-                    model_override=model,
-                    timeout=timeout,
+                    vertical=vertical,
                     config=adapter_config,
+                    enable_observability=False,
                 )
 
             actual_provider = getattr(adapter.orchestrator, "provider_name", None) or getattr(
