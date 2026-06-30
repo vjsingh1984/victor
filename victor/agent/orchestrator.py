@@ -1446,6 +1446,13 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
 
             coordinator = get_rl_coordinator()
             coordinator.set_repo_context(workspace_dir.name)
+            # Push the session's actual provider/model into GEPA so prompt
+            # optimization uses the right provider (e.g., zai/glm-5.2 from
+            # -p zai-coding), not the global settings default (ollama).
+            coordinator.set_session_provider(
+                getattr(self, "provider_name", None) or getattr(self.provider, "name", ""),
+                self.model,
+            )
         except Exception as exc:
             logger.debug("RL coordinator repo context unavailable: %s", exc)
 
