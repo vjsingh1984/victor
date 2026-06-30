@@ -3665,16 +3665,14 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         return self._tool_skip_mode(context_msg) != "tools"
 
     def _check_tool_necessity_via_edge(self, context_msg: str, heuristic_conf: float) -> bool:
-        """Consult edge model for tool necessity decision.
+        """Consult the decision service for tool necessity.
 
-        Falls back to heuristic if edge model is unavailable or times out.
+        Falls back to the heuristic when no decision service is registered or it
+        times out. The service is registered per the ``decision_backend`` enum
+        (FEP-0012); the legacy ``USE_LLM_DECISION_SERVICE`` gate was removed so a
+        registered local-classifier is honored here regardless of that flag.
         """
         try:
-            from victor.core.feature_flags import FeatureFlag, is_feature_enabled
-
-            if not is_feature_enabled(FeatureFlag.USE_LLM_DECISION_SERVICE):
-                return heuristic_conf >= 0.7  # Trust heuristic if no edge model
-
             from victor.agent.services.protocols.decision_service import (
                 get_decision_service,
             )
