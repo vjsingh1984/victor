@@ -18,10 +18,17 @@ from victor.ml.features import (
 )
 from victor.ml.model import DecisionHead, EdgeClassifierModel
 
+# Closed-loop mining: project an execution manifest into reward-labeled
+# training rows for the classifier. See victor.evaluation.manifest.
+from victor.ml.mining import mine, mine_detailed, train_from_manifest
+
 __all__ = [
     "FEATURE_SPEC_VERSION",
     "HASH_SPACE",
     "extract_features",
     "DecisionHead",
     "EdgeClassifierModel",
+    "mine",
+    "mine_detailed",
+    "train_from_manifest",
 ]

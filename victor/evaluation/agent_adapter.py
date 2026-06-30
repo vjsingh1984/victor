@@ -61,8 +61,9 @@ logger = logging.getLogger(__name__)
 
 # Tools a benchmark session must have enabled. The `fs` domain has been
 # removed — `read`/`edit`/`write` are now first-class tools with named
-# parameters. `ls`/`find` route to `shell`.
-BENCHMARK_TOOL_ALLOWLIST = frozenset(
+# parameters. `ls`/`find` route to `shell`. The ``code`` tool subsumes code
+# search/grep (the live code-intelligence surface).
+_BENCHMARK_BASE_TOOLS = frozenset(
     {
         "read",
         "edit",
@@ -71,6 +72,26 @@ BENCHMARK_TOOL_ALLOWLIST = frozenset(
         "shell",
     }
 )
+
+# Backward-compat alias (existing callers/tests reference the constant).
+BENCHMARK_TOOL_ALLOWLIST = _BENCHMARK_BASE_TOOLS
+
+
+def _graph_tool_available() -> bool:
+    """True if the optional victor-coding ``graph`` tool resolves.
+
+    ``graph`` (call-graph analysis: callers/callees/impact) helps the agent
+    locate bugs in large codebases like Django/astropy, so it is added to the
+    benchmark tool set when available. Environments without victor-coding (or
+    without a built graph store) degrade gracefully — graph is simply omitted.
+    """
+    try:
+        from victor.core.utils.capability_loader import load_graph_tool_module
+
+        load_graph_tool_module()
+        return True
+    except Exception:
+        return False
 
 
 @dataclass(frozen=True)
@@ -188,6 +209,11 @@ class VictorAgentAdapter:
         self._turns: int = 0
         self._file_snapshots: Dict[str, str] = {}  # path -> content before edit
 
+        # Correlation spine for this task. Set in execute_task and stamped on
+        # every decision (log_decision reads get_session_id()) so the per-task
+        # execution manifest can join decisions to the task outcome (reward).
+        self._task_session_id: str = ""
+
         # Correction metrics collector
         self._metrics_collector: Optional[CorrectionMetricsCollector] = None
         if self.config.track_corrections:
@@ -288,6 +314,8 @@ class VictorAgentAdapter:
         results JSON so the trace survives process exit.
         """
         return {
+            "session_id": self._task_session_id,
+            "task_id": self.config.working_dir.name if self.config.working_dir else "",
             "messages": [
                 {"role": m.get("role", ""), "content": str(m.get("content", ""))[:500]}
                 for m in self._messages[-50:]  # last 50 messages (bounded)
@@ -439,9 +467,22 @@ class VictorAgentAdapter:
         )
 
     @classmethod
-    def benchmark_tool_allowlist(cls) -> frozenset[str]:
-        """Return the canonical benchmark tool allowlist."""
-        return BENCHMARK_TOOL_ALLOWLIST
+    def benchmark_tool_allowlist(cls, *, include_graph: Optional[bool] = None) -> frozenset[str]:
+        """Return the canonical benchmark tool allowlist.
+
+        Base tools (``read``/``edit``/``write``/``code``/``shell``) plus
+        ``graph`` when the optional victor-coding graph tool resolves —
+        call-graph analysis helps the agent locate bugs in large codebases.
+        ``graph`` is added only when it resolves, so environments without
+        victor-coding degrade gracefully.
+
+        Args:
+            include_graph: Force graph on/off. ``None`` (default) auto-detects.
+        """
+        tools = set(_BENCHMARK_BASE_TOOLS)
+        if include_graph or (include_graph is None and _graph_tool_available()):
+            tools.add("graph")
+        return frozenset(tools)
 
     def get_benchmark_tool_readiness(
         self,
@@ -545,6 +586,7 @@ class VictorAgentAdapter:
         self._messages = []
         self._turns = 0
         self._file_snapshots = {}
+        self._task_session_id = ""
         self.orchestrator.reset_conversation()
 
         # Clear code_search index cache for task isolation
@@ -622,6 +664,18 @@ class VictorAgentAdapter:
         self.reset()
         self.config.working_dir = workspace_dir
 
+        # Stamp a per-task session_id on the correlation spine. log_decision()
+        # (called during the agent loop) reads get_session_id() and writes it on
+        # every decision record, so the per-task execution manifest can join
+        # decisions to this task's outcome (reward) for classifier training.
+        # 1:1 with task_id — one fresh UUID per task.
+        import uuid as _uuid
+
+        from victor.core.context import set_session_id
+
+        self._task_session_id = _uuid.uuid4().hex
+        set_session_id(self._task_session_id)
+
         # CRITICAL: Set workspace BEFORE any orchestrator operations
         # This ensures tools like file read/write, grep, etc. operate on the benchmark
         # repo rather than Victor's own codebase. Uses framework method for proper
@@ -656,9 +710,11 @@ class VictorAgentAdapter:
         # Restrict tools to a focused set for benchmark tasks.
         # The default semantic selector broadcasts 15+ tools which causes model
         # decision fatigue — models default to text responses instead of tool use.
-        # A minimal set forces decisive tool use at each stage.
+        # A minimal set forces decisive tool use at each stage. ``graph`` is
+        # added when the optional victor-coding graph tool resolves.
+        benchmark_tools = set(self.benchmark_tool_allowlist())
+        graph_enabled = "graph" in benchmark_tools
         try:
-            benchmark_tools = set(self.benchmark_tool_allowlist())
             self.orchestrator.set_enabled_tools(benchmark_tools)
             logger.info(
                 f"Benchmark tool restriction: {len(benchmark_tools)} tools enabled "
@@ -670,6 +726,7 @@ class VictorAgentAdapter:
         trace = AgenticExecutionTrace(
             task_id=task.task_id,
             start_time=time.time(),
+            session_id=self._task_session_id,
         )
 
         # Inject task context into vertical context for framework enrichment
@@ -721,6 +778,20 @@ class VictorAgentAdapter:
         # GEPA failure analysis (edit_mismatch category): the #1 failure mode is
         # old_str not matching file content exactly. Explicit guidance here reduces
         # edit rollbacks by ensuring the agent copies text verbatim from read output.
+        graph_guidance = (
+            "- To inspect CALL RELATIONSHIPS across modules: call `graph` with "
+            "mode='callers'|'callees'|'impact' (e.g. graph(mode='callers', "
+            "node='ClassName.method')). Use graph to inspect callers, callees, "
+            "dependencies, and impact before editing cross-module code.\n"
+            if graph_enabled
+            else ""
+        )
+        graph_workflow = (
+            "   - For cross-module bugs, use `graph` (callers/callees/impact) to "
+            "trace how the target symbol is reached before editing.\n"
+            if graph_enabled
+            else ""
+        )
         prompt = (
             "Fix the following issue by editing the source code in this repository.\n\n"
             "IMPORTANT: You have separate tools — `read`, `edit`, `write`, `code`, "
@@ -730,10 +801,12 @@ class VictorAgentAdapter:
             "- To EDIT a file: call `edit(ops=[{'type':'replace','path':'...','old_str':'...','new_str':'...'}])`\n"
             "- To WRITE a new file: call `write(path='...', content='...')`\n"
             "- To SEARCH code: call `code` with cmd='search <query>' or 'grep <pattern>'\n"
-            "- To RUN commands (pip install, pytest, build): call `shell` with cmd='<command>'\n\n"
-            "WORKFLOW:\n"
+            "- To RUN commands (pip install, pytest, build): call `shell` with cmd='<command>'\n"
+            + graph_guidance
+            + "\nWORKFLOW:\n"
             "1. Use `code` (search or grep) to find relevant files in this repository\n"
-            "2. Use `read` to examine the code (use offset/limit for large files)\n"
+            + graph_workflow
+            + "2. Use `read` to examine the code (use offset/limit for large files)\n"
             "3. Use `edit` to apply your fix — COPY old_str EXACTLY from the read "
             "output, character-by-character. Do NOT type it from memory.\n"
             "4. If an edit fails, re-read the file and try again with the exact text.\n"
