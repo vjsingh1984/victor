@@ -234,7 +234,14 @@ class VictorAgentAdapter:
         )
 
     def _on_tool_start_hook(self, tool_name: str, arguments: Dict[str, Any]) -> None:
-        """Hook called by ToolRegistry before tool execution."""
+        """Hook called by ToolRegistry before tool execution.
+
+        For benchmark sessions, default shell to readonly=False so the agent can
+        run pip install + tests without explicitly passing it (the model's
+        default is readonly=True, which blocks mutating commands).
+        """
+        if tool_name == "shell" and "readonly" not in arguments:
+            arguments["readonly"] = False
         self._on_tool_start(tool_name, arguments)
 
     def _on_tool_complete_hook(self, result: Any) -> None:
@@ -645,6 +652,11 @@ class VictorAgentAdapter:
         # edit rollbacks by ensuring the agent copies text verbatim from read output.
         prompt = (
             "Fix the following issue by editing the source code in this repository.\n\n"
+            "TOOL PREFERENCES (follow strictly):\n"
+            "- Read files:  `fs cat <path>` (NOT `shell cat`)\n"
+            "- Edit files:  `fs edit <path> --old ... --new ...` (NOT shell python/sed)\n"
+            "- Find code:   `code search <query>` or `code grep <pattern>` (NOT shell grep)\n"
+            "- Build/test:  `shell <cmd>` (readonly is already False in this session)\n\n"
             "WORKFLOW:\n"
             "1. Use `code search` (or `code grep`) to find relevant files\n"
             "2. Use `code` to inspect code structure, references, and impact when "
@@ -654,10 +666,9 @@ class VictorAgentAdapter:
             "`fs cat` output, character-by-character. Do NOT type it from memory.\n"
             "5. If an edit fails (transaction rolled back), re-read the file at "
             "that location and try again with the exact text.\n"
-            "6. VERIFY: run `pip install -e .` then the failing test(s) via the "
-            "`shell` tool with `readonly=False` (or `action='exec'`) — the shell "
-            "defaults to readonly, so you MUST pass readonly=False for install/test "
-            "commands. Iterate until the test passes.\n\n"
+            "6. VERIFY: run the failing test(s) via `shell` (e.g. "
+            "`shell --cmd='python -m pytest <test_file> -x'`). Iterate until it passes.\n"
+            "7. When the test passes, state 'The fix is complete and verified.'\n\n"
             "CRITICAL: The `fs edit` tool's old_str must match the file content exactly "
             "including whitespace, quotes, and line breaks. Even one wrong character "
             "causes a rollback. Always copy from the most recent read output.\n\n"

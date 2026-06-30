@@ -826,6 +826,9 @@ def run_benchmark(
         "--start-task",
         help="Skip first N tasks (0-indexed, for targeting specific tasks)",
     ),
+    shuffle: bool = typer.Option(
+        False, "--shuffle", help="Shuffle task order for diverse repo sampling",
+    ),
     model: Optional[str] = typer.Option(
         None, "--model", "-m", help="Model to use (default: from profile)"
     ),
@@ -1213,6 +1216,9 @@ def run_prompt_suite(
         0,
         "--start-task",
         help="Skip first N tasks (0-indexed, for targeting specific tasks)",
+    ),
+    shuffle: bool = typer.Option(
+        False, "--shuffle", help="Shuffle task order for diverse repo sampling",
     ),
     model: Optional[str] = typer.Option(
         None, "--model", "-m", help="Model to use (default: from profile)"
