@@ -233,10 +233,10 @@ class SemanticToolSelector:
         self._tiered_service: Optional[Any] = None
 
     def _get_tiered_service(self) -> Optional[Any]:
-        """Return TieredDecisionService if USE_TIERED_CLASSIFICATION is enabled."""
-        from victor.core.feature_flags import FeatureFlag, is_feature_enabled
+        """Return TieredDecisionService if tiered classification is enabled."""
+        from victor.agent.services.classification_backend import use_tiered_classification
 
-        if not is_feature_enabled(FeatureFlag.USE_TIERED_CLASSIFICATION):
+        if not use_tiered_classification():
             return None
         if self._tiered_service is None:
             try:
