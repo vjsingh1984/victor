@@ -397,6 +397,12 @@ class TaskResult:
     failure_diagnosis: Optional[FailureDiagnosis] = None
     confidence_assessment: Optional[ConfidenceAssessment] = None
 
+    # Correlation spine + bounded execution trace (messages, tool calls, edits).
+    # session_id joins this task's decisions (logged via log_decision) to its
+    # outcome for the execution manifest → classifier training data.
+    session_id: str = ""
+    trace: dict[str, Any] = field(default_factory=dict)
+
     # Detailed output
     stdout: str = ""
     stderr: str = ""

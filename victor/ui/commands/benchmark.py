@@ -1815,6 +1815,8 @@ async def _run_benchmark_async(
                         "tokens_used": partial.get("tokens_used", 0),
                         "tool_calls": partial.get("tool_calls", 0),
                         "turns": partial.get("turns", 0),
+                        "session_id": adapter._task_session_id,
+                        "conversation_trace": adapter.get_conversation_trace(),
                     }
                     raise
                 finally:
@@ -1857,6 +1859,14 @@ async def _run_benchmark_async(
                     "turns": trace.turns,
                     "code_search_calls": trace.code_search_calls,
                     "graph_calls": trace.graph_calls,
+                    # Per-task correlation spine — joins this task's decisions
+                    # (logged with get_session_id()) to its outcome for the
+                    # execution manifest / classifier training data.
+                    "session_id": trace.session_id,
+                    # Bounded execution trace (messages + tool calls + edits).
+                    # Persisted on TaskResult so the manifest + miner can
+                    # reconstruct what the agent actually did.
+                    "conversation_trace": adapter.get_conversation_trace(),
                 }
 
         except Exception as e:
@@ -1876,12 +1886,27 @@ async def _run_benchmark_async(
             task,
             description="Resuming evaluation..." if resume else "Running evaluation...",
         )
-        return await harness.run_evaluation(
+        eval_result = await harness.run_evaluation(
             config=config,
             agent_callback=agent_callback,
             progress_callback=on_progress,
             resume=resume,
         )
+
+        # Emit the per-task execution manifest (closed-loop artifact): joins
+        # each task's outcome (reward) + trace + logged decisions by session_id.
+        # Best-effort — failure here never breaks the run. Feeds the classifier
+        # miner (`victor benchmark mine` / python -m victor.ml.mining).
+        try:
+            from victor.evaluation.manifest import emit_execution_manifest
+
+            manifest_path = emit_execution_manifest(eval_result)
+            if manifest_path is not None:
+                console.print(f"[dim]Execution manifest: {manifest_path}[/]")
+        except Exception as exc:  # never break the benchmark
+            logger.debug("Execution manifest emission skipped: %s", exc)
+
+        return eval_result
 
 
 async def _run_prompt_candidate_suite_async(

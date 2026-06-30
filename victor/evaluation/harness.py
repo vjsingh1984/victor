@@ -1261,6 +1261,16 @@ class EvaluationHarness:
         task_result.graph_calls = int(payload.get("graph_calls", 0) or 0)
         task_result.metadata = dict(payload.get("metadata", {}) or {})
 
+        # Correlation spine + bounded execution trace. session_id joins this
+        # task's logged decisions to its outcome; trace carries the messages /
+        # tool calls / edits the manifest + miner need.
+        sid = payload.get("session_id")
+        if isinstance(sid, str) and sid:
+            task_result.session_id = sid
+        ct = payload.get("conversation_trace")
+        if isinstance(ct, dict) and ct:
+            task_result.trace = dict(ct)
+
         task_report = payload.get("task_report")
         if isinstance(task_report, dict):
             task_result.metadata["task_report"] = dict(task_report)

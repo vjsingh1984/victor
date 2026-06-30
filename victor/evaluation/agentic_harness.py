@@ -58,6 +58,42 @@ logger = logging.getLogger(__name__)
 
 from victor.core.utils import clamp as _clamp
 
+# Subcommands of the unified ``code`` tool that exercise the code index /
+# codebase graph — i.e. real "code intelligence". The standalone
+# ``code_search`` tool is a deprecated stub; these subcommands are the live
+# surface (see victor.tools.unified.code_tool).
+_CODE_INTELLIGENCE_SUBCOMMANDS = frozenset({"search", "grep"})
+
+# Legacy tool names that also count as code intelligence (kept for backward
+# compatibility with older traces/tests). The live surface is the ``code``
+# tool's search/grep subcommands above.
+_CODE_INTELLIGENCE_TOOL_NAMES = frozenset({"code_search"})
+
+
+def _code_subcommand(call: "EvalToolCall") -> str:
+    """Extract the subcommand (first token) of a ``code`` tool call.
+
+    ``code_tool(cmd: str)`` takes a single bash-style ``cmd`` string whose
+    first token is the subcommand (``search``/``grep``/``test``/…).
+    """
+    cmd = ""
+    if isinstance(call.arguments, dict):
+        cmd = str(call.arguments.get("cmd", "") or "")
+    else:
+        cmd = str(call.arguments or "")
+    return cmd.split()[0] if cmd.split() else ""
+
+
+def _is_code_search_call(call: "EvalToolCall") -> bool:
+    """True if ``call`` exercises code intelligence.
+
+    Counts the live ``code search``/``code grep`` subcommands plus the legacy
+    standalone ``code_search`` tool name (kept for older traces).
+    """
+    if call.name in _CODE_INTELLIGENCE_TOOL_NAMES:
+        return True
+    return call.name == "code" and _code_subcommand(call) in _CODE_INTELLIGENCE_SUBCOMMANDS
+
 
 class AgenticValidationType(Enum):
     """Types of validation for agentic tasks."""
@@ -105,6 +141,12 @@ class AgenticExecutionTrace:
     end_time: float = 0.0
     benchmark: str = ""
     benchmark_source: str = ""
+
+    # Correlation spine: every decision logged during this task
+    # (victor.agent.decisions.chain.log_decision) is stamped with this
+    # session_id, so the per-task execution manifest can join decisions to
+    # the task's outcome (reward) for classifier training. 1:1 with task_id.
+    session_id: str = ""
 
     # Multi-turn interaction tracking
     turns: int = 0
@@ -170,8 +212,14 @@ class AgenticExecutionTrace:
 
     @property
     def code_search_calls(self) -> int:
-        """Number of `code_search` tool calls."""
-        return self.count_tool_calls("code_search")
+        """Number of code-intelligence calls.
+
+        The standalone ``code_search`` tool is a deprecated stub; actual code
+        search happens via the ``code`` tool's ``search``/``grep`` subcommands
+        (``code_tool(cmd='search ...')`` / ``cmd='grep ...')``). Count those,
+        plus any ``graph`` calls (graph is tracked separately via ``graph_calls``).
+        """
+        return sum(1 for call in self.tool_calls if _is_code_search_call(call))
 
     @property
     def graph_calls(self) -> int:
@@ -180,8 +228,8 @@ class AgenticExecutionTrace:
 
     @property
     def code_intelligence_calls(self) -> int:
-        """Combined `code_search` and `graph` tool calls."""
-        return self.count_tool_calls("code_search", "graph")
+        """Combined code-search and graph calls."""
+        return self.code_search_calls + self.graph_calls
 
     def to_dict(self) -> dict[str, Any]:
         """Export trace as dictionary for serialization."""

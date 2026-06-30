@@ -274,6 +274,9 @@ class RealRunBenchmarkRunner:
         return {
             "task_id": getattr(task_result, "task_id", None),
             "status": getattr(status, "value", status),
+            # Correlation spine — joins this task's decisions to its outcome.
+            # The full execution trace lives in the per-run eval_manifest_*.jsonl.
+            "session_id": getattr(task_result, "session_id", ""),
             "tests_passed": getattr(task_result, "tests_passed", 0),
             "tests_total": getattr(task_result, "tests_total", 0),
             "duration": getattr(task_result, "duration_seconds", 0.0),
