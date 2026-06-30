@@ -74,11 +74,23 @@ def train_head(
     clf = LogisticRegression(C=C, max_iter=300, solver="lbfgs")
     clf.fit(X, y)
 
-    # coef_: [n_labels, HASH_SPACE]. Keep only non-zero columns (sparse shipping).
+    # coef_: [n_labels, HASH_SPACE] for multiclass, but sklearn returns
+    # [1, HASH_SPACE] for BINARY (coefs for the positive class = classes_[1]).
+    # Normalize to the [n_labels, n_features] form the model/predict path
+    # assumes — otherwise softmax over a length-1 score always yields labels[0]
+    # (a degenerate model that ignores features). For binary, class 0 is zeros
+    # and class 1 carries the learned coefs + intercept.
     coef = np.asarray(clf.coef_)
+    intercept = np.asarray(clf.intercept_).astype(float)
+    if coef.shape[0] == 1 and len(label_set) == 2:
+        pos = coef[0]
+        coef = np.vstack([np.zeros_like(pos), pos])
+        intercept = np.array([0.0, float(intercept[0])])
+
+    # Keep only non-zero columns (sparse shipping).
     nonzero_cols = np.flatnonzero(coef.any(axis=0))
     weights = {int(col): coef[:, col].astype(float) for col in nonzero_cols}
-    bias = np.asarray(clf.intercept_).astype(float)
+    bias = intercept
 
     return DecisionHead(
         decision_type=decision_type,
