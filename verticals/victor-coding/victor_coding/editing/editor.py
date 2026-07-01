@@ -23,6 +23,7 @@ Provides transaction-like editing with:
 """
 
 import difflib
+import logging
 import shutil
 from datetime import datetime
 from enum import Enum
@@ -33,6 +34,8 @@ from pydantic import BaseModel, Field
 from rich.console import Console
 from rich.syntax import Syntax
 from rich.panel import Panel
+
+logger = logging.getLogger(__name__)
 
 
 class OperationType(str, Enum):
@@ -101,6 +104,11 @@ class FileEditor:
 
         self.current_transaction: Optional[EditTransaction] = None
         self.transaction_history: List[EditTransaction] = []
+        # Last commit failure detail (set when commit() rolls back). Callers
+        # that suppress this editor's rich-console stdout (e.g. the victor edit
+        # tool wraps commit() in _capture_stdout) can read this to surface the
+        # real error instead of a generic "Failed to commit".
+        self.last_commit_error: Optional[str] = None
 
     def start_transaction(self, description: str = "") -> str:
         """Start a new edit transaction.
@@ -335,6 +343,7 @@ class FileEditor:
             return True
 
         # Apply operations
+        self.last_commit_error = None
         try:
             for i, op in enumerate(self.current_transaction.operations, 1):
                 self.console.print(f"\n[{i}/{len(self.current_transaction.operations)}] ", end="")
@@ -348,6 +357,19 @@ class FileEditor:
             return True
 
         except Exception as e:
+            # Capture the real failure detail. The victor edit tool suppresses
+            # this editor's rich-console stdout (it wraps commit() in
+            # _capture_stdout), so without this the actual error is lost and the
+            # agent only sees a generic "Failed to commit". Log + stash it.
+            import traceback
+
+            tb = traceback.format_exc()
+            self.last_commit_error = f"{type(e).__name__}: {e}"
+            logger.error(
+                "FileEditor.commit failed (rolling back): %s\n%s",
+                self.last_commit_error,
+                tb,
+            )
             self.console.print(f"\n[bold red]✗ Error applying changes:[/] {e}")
             self.console.print("[yellow]Rolling back...[/]")
             self.rollback()

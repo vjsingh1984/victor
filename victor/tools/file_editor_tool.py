@@ -999,9 +999,13 @@ async def edit(
                     "message": f"Applied {operations_queued} operations successfully",
                 }
             else:
+                _detail = getattr(editor, "last_commit_error", None) or ""
                 return {
                     "success": False,
-                    "error": "Failed to commit changes. Transaction rolled back.",
+                    "error": (
+                        "Failed to commit changes. Transaction rolled back."
+                        + (f" Reason: {_detail}" if _detail else "")
+                    ),
                 }
 
     # Handle commit (suppress FileEditor's transaction stdout — Victor formats its own output)
@@ -1068,9 +1072,13 @@ async def edit(
         else:
             # Clear change group on failure
             tracker._current_group = None
+            _detail = getattr(editor, "last_commit_error", None) or ""
             return {
                 "success": False,
-                "error": "Failed to commit changes. Transaction rolled back.",
+                "error": (
+                    "Failed to commit changes. Transaction rolled back."
+                    + (f" Reason: {_detail}" if _detail else "")
+                ),
             }
     else:
         # Queue only, don't commit
