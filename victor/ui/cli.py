@@ -55,6 +55,7 @@ from victor.ui.commands.fep import fep_app
 from victor.ui.commands.graph import graph_app
 from victor.ui.commands.index import index_app
 from victor.ui.commands.init import init_app
+from victor.ui.commands.ml import ml_app
 
 
 # Lazy imports for deprecated/hidden commands (startup performance)
@@ -431,6 +432,7 @@ app.add_typer(verify_app, name="verify", rich_help_panel="Development")
 app.add_typer(benchmark_app, rich_help_panel="Benchmarking & Experiments")
 app.add_typer(experiment_app, rich_help_panel="Benchmarking & Experiments")
 app.add_typer(ab_app, rich_help_panel="Benchmarking & Experiments")
+app.add_typer(ml_app, rich_help_panel="Benchmarking & Experiments")
 
 # --- Data & Sessions ---
 app.add_typer(sessions_app, rich_help_panel="Data & Sessions")
