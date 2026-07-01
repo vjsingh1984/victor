@@ -102,21 +102,27 @@ class LLMDecisionService:
         heuristic_result: Any = None,
         heuristic_confidence: float = 0.0,
     ) -> DecisionResult:
-        """Make a decision, consulting the LLM if heuristic confidence is low."""
+        """Make a decision, consulting the LLM if heuristic confidence is low.
+
+        Every path logs the decision (FEP-0012 closed loop) except cache hits,
+        which were logged when first computed.
+        """
         start = time.monotonic()
 
         # Fast path: heuristic is confident enough
         if heuristic_confidence >= self._config.confidence_threshold:
             self._metrics.total_calls += 1
-            return DecisionResult(
+            result = DecisionResult(
                 decision_type=decision_type,
                 result=heuristic_result,
                 source="heuristic",
                 confidence=heuristic_confidence,
                 latency_ms=_elapsed_ms(start),
             )
+            self._log_decision(decision_type, context, result)
+            return result
 
-        # Cache check
+        # Cache check — cached results were logged when computed.
         cache_key = self._cache_key(decision_type, context)
         cached = self._get_cached(cache_key)
         if cached is not None:
@@ -134,13 +140,15 @@ class LLMDecisionService:
                 self._budget_used,
                 self._config.micro_budget,
             )
-            return DecisionResult(
+            result = DecisionResult(
                 decision_type=decision_type,
                 result=heuristic_result,
                 source="budget_exhausted",
                 confidence=heuristic_confidence,
                 latency_ms=_elapsed_ms(start),
             )
+            self._log_decision(decision_type, context, result)
+            return result
 
         # LLM call with timeout
         try:
@@ -166,6 +174,7 @@ class LLMDecisionService:
                 result.confidence,
                 result.latency_ms,
             )
+            self._log_decision(decision_type, context, result)
             return result
 
         except asyncio.TimeoutError:
@@ -175,24 +184,54 @@ class LLMDecisionService:
                 "LLM decision timed out after %dms, using heuristic fallback",
                 self._config.timeout_ms,
             )
-            return DecisionResult(
+            result = DecisionResult(
                 decision_type=decision_type,
                 result=heuristic_result,
                 source="timeout_fallback",
                 confidence=heuristic_confidence,
                 latency_ms=_elapsed_ms(start),
             )
+            self._log_decision(decision_type, context, result)
+            return result
 
         except Exception:
             self._metrics.total_calls += 1
             logger.debug("LLM decision call failed, using heuristic fallback", exc_info=True)
-            return DecisionResult(
+            result = DecisionResult(
                 decision_type=decision_type,
                 result=heuristic_result,
                 source="heuristic",
                 confidence=heuristic_confidence,
                 latency_ms=_elapsed_ms(start),
             )
+            self._log_decision(decision_type, context, result)
+            return result
+
+    def _log_decision(
+        self,
+        decision_type: DecisionType,
+        context: Dict[str, Any],
+        result: DecisionResult,
+    ) -> None:
+        """Record a decision for RL/fine-tuning data collection (best-effort).
+
+        Called on EVERY decision path so heuristic/budget/auto-disabled/timeout
+        decisions are captured too — not just LLM-escalated ones. This is the
+        closed-loop data contract: log_decision is the source the classifier
+        trainer mines.
+        """
+        try:
+            from victor.agent.decisions.chain import log_decision
+
+            log_decision(
+                decision_type=decision_type.value,
+                context=context,
+                result=str(getattr(result.result, "__dict__", result.result)),
+                source=result.source,
+                confidence=result.confidence,
+            )
+        except Exception:
+            pass
 
     def decide_sync(
         self,
@@ -205,19 +244,22 @@ class LLMDecisionService:
         """Synchronous version of decide().
 
         If an event loop is already running, returns the heuristic fallback
-        rather than blocking.
+        rather than blocking. Every path logs the decision (FEP-0012 closed
+        loop) except cache hits, which were logged when first computed.
         """
         # Fast path: heuristic is confident enough
         if heuristic_confidence >= self._config.confidence_threshold:
             self._metrics.total_calls += 1
-            return DecisionResult(
+            result = DecisionResult(
                 decision_type=decision_type,
                 result=heuristic_result,
                 source="heuristic",
                 confidence=heuristic_confidence,
             )
+            self._log_decision(decision_type, context, result)
+            return result
 
-        # Cache check (works in sync)
+        # Cache check (works in sync) — cached results were logged when computed.
         cache_key = self._cache_key(decision_type, context)
         cached = self._get_cached(cache_key)
         if cached is not None:
@@ -229,12 +271,14 @@ class LLMDecisionService:
         if self._budget_used >= self._config.micro_budget:
             self._metrics.total_calls += 1
             self._metrics.budget_exhaustions += 1
-            return DecisionResult(
+            result = DecisionResult(
                 decision_type=decision_type,
                 result=heuristic_result,
                 source="budget_exhausted",
                 confidence=heuristic_confidence,
             )
+            self._log_decision(decision_type, context, result)
+            return result
 
         # Auto-disable if timeout rate is too high (>60% after 10+ calls)
         if (
@@ -250,12 +294,14 @@ class LLMDecisionService:
                 )
                 self._auto_disable_warned = True
             self._metrics.total_calls += 1
-            return DecisionResult(
+            result = DecisionResult(
                 decision_type=decision_type,
                 result=heuristic_result,
                 source="auto_disabled",
                 confidence=heuristic_confidence,
             )
+            self._log_decision(decision_type, context, result)
+            return result
 
         # Use run_sync_in_thread to handle both cases:
         # 1. No running loop — runs in a thread with its own loop
@@ -291,32 +337,21 @@ class LLMDecisionService:
                     timeout=self._config.timeout_ms / 1000.0,
                 )
 
-            # Log decision for fine-tuning data collection
-            try:
-                from victor.agent.decisions.chain import log_decision
-
-                log_decision(
-                    decision_type=decision_type.value,
-                    context=context,
-                    result=str(getattr(result.result, "__dict__", result.result)),
-                    source=result.source,
-                    confidence=result.confidence,
-                )
-            except Exception:
-                pass
-
+            self._log_decision(decision_type, context, result)
             return result
         except (TimeoutError, Exception) as e:
             logger.debug("decide_sync thread execution failed: %s", e)
             self._metrics.total_calls += 1
             if isinstance(e, TimeoutError):
                 self._metrics.timeouts += 1
-            return DecisionResult(
+            result = DecisionResult(
                 decision_type=decision_type,
                 result=heuristic_result,
                 source=("timeout_fallback" if isinstance(e, TimeoutError) else "heuristic"),
                 confidence=heuristic_confidence,
             )
+            self._log_decision(decision_type, context, result)
+            return result
 
     async def decide_async(
         self,
