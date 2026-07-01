@@ -461,7 +461,25 @@ class TestGraphDemandSpec:
     the victor-coding entry-point, making its registration fragile.
     """
 
+    def test_graph_spec_not_phantom_module(self):
+        """Guard: the graph spec must not point at the non-existent core path.
+
+        Runs in every CI environment (no victor-coding needed) — this is the
+        cheap regression guard against re-introducing the phantom
+        ``victor.tools.graph_tool`` spec.
+        """
+        from victor.agent.shared_tool_registry import DEMAND_TOOL_SPECS
+
+        module_name, _member = DEMAND_TOOL_SPECS["graph"]
+        assert (
+            module_name != "victor.tools.graph_tool"
+        ), "graph spec points at a phantom module (victor.tools.graph_tool doesn't exist)"
+        # graph lives in the optional victor-coding package.
+        assert module_name.startswith("victor_coding"), module_name
+
     def test_graph_spec_module_exists(self):
+        pytest.importorskip("victor_coding")  # spec resolves only where graph lives
+
         import importlib
 
         from victor.agent.shared_tool_registry import DEMAND_TOOL_SPECS
