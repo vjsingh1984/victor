@@ -2089,14 +2089,54 @@ class ToolSelector(ModeAwareMixin):
             List of relevant ToolDefinition objects
         """
         if use_semantic and self.semantic_selector:
-            return await self.select_semantic(
+            tools = await self.select_semantic(
                 user_message,
                 conversation_history=conversation_history,
                 conversation_depth=conversation_depth,
                 planned_tools=planned_tools,
             )
         else:
-            return self.select_keywords(user_message, planned_tools=planned_tools)
+            tools = self.select_keywords(user_message, planned_tools=planned_tools)
+        # Curated enabled-tools guarantee. set_enabled_tools() (tool_access_policy)
+        # updates the policy + this selector's filter but does NOT sync the
+        # registry's per-tool _tool_enabled map — so the semantic path (which
+        # gathers via list_tools(only_enabled=True), and its cache) can drop
+        # curated-but-registered-disabled tools like code/graph even though the
+        # caller explicitly enabled them and the prompt advertises them. select_keywords
+        # already respects this (#343); apply the same guarantee to the semantic path
+        # by unioning in any registered curated tool missing from the result.
+        return self._union_curated_enabled(tools)
+
+    def _union_curated_enabled(self, tools: List["ToolDefinition"]) -> List["ToolDefinition"]:
+        """Ensure every registered curated tool reaches the LLM.
+
+        When ``_enabled_tools`` is set (caller curated the toolset — e.g. the
+        benchmark enables exactly {code,edit,graph,read,shell,write}), every
+        registered member must be advertised. The semantic path and its cache
+        can drop curated-but-registered-disabled tools (code/graph) because
+        ``set_enabled_tools`` doesn't sync the registry's ``_tool_enabled`` map.
+        This unions any missing registered curated tool back in.
+
+        No-op when no curated set is active (the common auto-selected case).
+        """
+        if not self._enabled_tools:
+            return tools
+        have = {t.name for t in tools}
+        registered = {t.name: t for t in self.tools.list_tools(only_enabled=False)}
+        if not any(name in registered for name in self._enabled_tools):
+            return tools  # curated set doesn't match this registry — nothing to add
+        from victor.providers.base import ToolDefinition as _TD
+
+        result = list(tools)
+        for name in sorted(self._enabled_tools):
+            if name in have or name not in registered:
+                continue
+            src = registered[name]
+            result.append(
+                _TD(name=src.name, description=src.description, parameters=src.parameters)
+            )
+            have.add(name)
+        return result
 
     def _load_semantic_cached_selection(
         self,
