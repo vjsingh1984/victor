@@ -157,11 +157,24 @@ class BenchmarkToolReadiness:
     enabled_tools: tuple[str, ...]
     missing_tools: tuple[str, ...] = ()
     disabled_tools: tuple[str, ...] = ()
+    # Tools that are reported when missing/disabled but do NOT fail readiness.
+    # graph is demand-loaded (DEMAND_TOOL_SPECS, not bootstrap): it registers
+    # during the agent's first turn when the prompt mentions it, so it is
+    # legitimately absent at session-init readiness time. Treating it as
+    # optional avoids a false abort without skipping it.
+    optional_tools: tuple[str, ...] = ()
 
     @property
     def ready(self) -> bool:
-        """Whether all required tools are present and enabled."""
-        return not self.missing_tools and not self.disabled_tools
+        """Whether all REQUIRED tools are present and enabled.
+
+        Optional tools (e.g. graph) are surfaced in missing/disabled but do
+        not gate readiness — they are demand-loaded during the run.
+        """
+        optional = set(self.optional_tools)
+        hard_missing = any(t not in optional for t in self.missing_tools)
+        hard_disabled = any(t not in optional for t in self.disabled_tools)
+        return not hard_missing and not hard_disabled
 
 
 def _summarize_eval_tool_calls(tool_calls: List[EvalToolCall]) -> Dict[str, int]:
@@ -487,14 +500,23 @@ class VictorAgentAdapter:
         (harmless no-op in ``set_enabled_tools``).
         """
         return _BENCHMARK_TOOL_ALLOWLIST
-        return _BENCHMARK_TOOL_ALLOWLIST
 
     def get_benchmark_tool_readiness(
         self,
         required_tools: Optional[set[str]] = None,
     ) -> BenchmarkToolReadiness:
-        """Inspect the live session tool registry for benchmark-critical tools."""
-        required = set(required_tools or self.benchmark_tool_allowlist())
+        """Inspect the live session tool registry for benchmark-critical tools.
+
+        By default the hard requirement is the base tool set; ``graph`` is
+        optional (demand-loaded during the run, so legitimately absent at
+        session-init). Pass ``required_tools`` to override.
+        """
+        if required_tools is None:
+            required = set(_BENCHMARK_BASE_TOOLS)
+            optional = {"graph"}
+        else:
+            required = set(required_tools)
+            optional = set()
         registry = getattr(self.orchestrator, "tools", None)
         required_sorted = tuple(sorted(required))
 
@@ -503,6 +525,7 @@ class VictorAgentAdapter:
                 required_tools=required_sorted,
                 enabled_tools=(),
                 missing_tools=required_sorted,
+                optional_tools=tuple(sorted(optional)),
             )
 
         try:
@@ -518,11 +541,14 @@ class VictorAgentAdapter:
             for name in [getattr(tool, "name", None)]
             if isinstance(name, str) and name
         }
-        missing = sorted(required - registered)
+        # Check the full desired set (base ∪ optional) for visibility, but
+        # `ready` ignores optional tools (see BenchmarkToolReadiness.ready).
+        checked = required | optional
+        missing = sorted(checked - registered)
 
         enabled = []
         disabled = []
-        for tool_name in sorted(required & registered):
+        for tool_name in sorted(checked & registered):
             is_enabled = True
             if hasattr(registry, "is_tool_enabled"):
                 try:
@@ -539,6 +565,7 @@ class VictorAgentAdapter:
             enabled_tools=tuple(enabled),
             missing_tools=tuple(missing),
             disabled_tools=tuple(disabled),
+            optional_tools=tuple(sorted(optional)),
         )
 
     def get_partial_trace(self) -> Dict[str, Any]:
@@ -719,6 +746,24 @@ class VictorAgentAdapter:
         # added when the optional victor-coding graph tool resolves.
         benchmark_tools = set(self.benchmark_tool_allowlist())
         graph_enabled = "graph" in benchmark_tools
+        # Best-effort: hydrate demand-loaded tools (graph) into the registry
+        # before enabling. graph is demand-loaded (not bootstrap), so it isn't
+        # registered at session init; it normally registers on the first turn
+        # when the prompt mentions it. Hydrating here makes it available
+        # immediately. Never fatal — demand-loading covers it during the run.
+        tools_obj = getattr(self.orchestrator, "tools", None)
+        if tools_obj is not None:
+            for _hydrate in ("ensure_tool_registered", "ensure_tools_for_query"):
+                if hasattr(tools_obj, _hydrate):
+                    for _name in benchmark_tools:
+                        try:
+                            if _hydrate == "ensure_tools_for_query":
+                                tools_obj.ensure_tools_for_query("graph callers callees impact")
+                            else:
+                                tools_obj.ensure_tool_registered(_name)
+                        except Exception:
+                            pass
+                    break
         try:
             self.orchestrator.set_enabled_tools(benchmark_tools)
             logger.info(
