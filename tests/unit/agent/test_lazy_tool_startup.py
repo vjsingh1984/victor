@@ -133,10 +133,11 @@ def test_shared_registry_bootstrap_exposes_grouped_command_tools():
     finally:
         SharedToolRegistry.reset_instance()
 
-    # Core bash-style command domains available at bootstrap
-    assert {"fs", "git", "code", "web", "shell"}.issubset(names)
+    # Core bash-style command domains available at bootstrap. The `fs` domain
+    # was removed (#332) — read/edit/write are first-class tools now.
+    assert {"git", "code", "web", "shell"}.issubset(names)
     # The deprecated `search` shim remains in bootstrap for back-compat
-    # (forwards `search grep` -> `code grep`, `search files` -> `fs search`).
+    # (forwards `search grep` -> `code grep`).
     assert "search" in names
     # Demand-only tools NOT in bootstrap
     assert "pr" not in names
@@ -163,8 +164,9 @@ def test_grouped_command_tool_schemas_use_cmd_parameter():
     finally:
         SharedToolRegistry.reset_instance()
 
-    # Grouped command tools use "cmd" parameter (not "command")
-    for tool_name in ("fs", "search", "code", "web", "shell"):
+    # Grouped command tools use "cmd" parameter (not "command"). `fs` was
+    # removed (#332); read/edit/write are first-class with named parameters.
+    for tool_name in ("git", "search", "code", "web", "shell"):
         assert "cmd" in schemas[tool_name], f"{tool_name} should have 'cmd' parameter"
         assert (
             "command" not in schemas[tool_name]

@@ -451,3 +451,36 @@ class TestSharedToolRegistryGetToolNames:
         classes = registry.get_tool_classes()
 
         assert set(names) == set(classes.keys())
+
+
+class TestGraphDemandSpec:
+    """Regression: the graph demand spec must point at a real, loadable module.
+
+    It previously pointed at ``victor.tools.graph_tool`` (which doesn't exist),
+    so demand-loading graph silently failed — graph was only ever reachable via
+    the victor-coding entry-point, making its registration fragile.
+    """
+
+    def test_graph_spec_module_exists(self):
+        import importlib
+
+        from victor.agent.shared_tool_registry import DEMAND_TOOL_SPECS
+
+        module_name, _member = DEMAND_TOOL_SPECS["graph"]
+        # The spec's module must actually resolve (no phantom paths).
+        importlib.import_module(module_name)
+
+    def test_graph_demand_loadable(self):
+        pytest.importorskip("victor_coding")  # graph lives in the optional vertical
+
+        from victor.agent.shared_tool_registry import SharedToolRegistry
+
+        SharedToolRegistry.reset_instance()
+        registry = SharedToolRegistry.get_instance()
+
+        tool = registry._load_tool_spec("graph")
+        assert tool is not None
+        assert getattr(tool, "name", None) == "graph"
+
+        loaded = registry.get_tools_for_names(["graph"])
+        assert loaded and getattr(loaded[0], "name", None) == "graph"
