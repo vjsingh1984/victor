@@ -86,3 +86,62 @@ class TestEnsureProjectImportable:
 
             result = await ensure_project_importable("nonexistent_pkg_xyz", tmp_path)
             assert result is False
+
+
+class TestEnsureProjectImportableFastPath:
+    """The fast-path must require a real pip-installed distribution, not a bare
+    source-namespace import. A bare __import__ succeeds for a project's source
+    dir on sys.path even when its C-extensions aren't built (e.g. astropy),
+    which then yields "0 tests collected". Only a pip-installed distribution
+    means extensions were actually built.
+    """
+
+    @pytest.mark.asyncio
+    async def test_pip_installed_package_skips_install(self):
+        """A pip-installed package (django) returns True without installing."""
+        import importlib.metadata
+        from pathlib import Path
+        from unittest.mock import AsyncMock, patch
+
+        from victor.context.workspace_setup import ensure_project_importable
+
+        # Pick a name that IS pip-installed in the test env (pytest itself).
+        installed_name = "pytest"
+        with patch(
+            "victor.context.workspace_setup.asyncio.create_subprocess_exec",
+            AsyncMock(),
+        ) as mock_exec:
+            result = await ensure_project_importable(
+                installed_name, Path("/nonexistent"), install_deps=True
+            )
+        assert result is True
+        assert not mock_exec.called  # no install attempted — already installed
+
+    @pytest.mark.asyncio
+    async def test_uninstalled_package_triggers_install(self):
+        """A package NOT pip-installed must attempt pip install -e ."""
+        from pathlib import Path
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        from victor.context.workspace_setup import ensure_project_importable
+
+        nonexistent = "definitely_not_installed_xyz_12345"
+        fake_root = Path("/tmp/fake_project_xyz")
+        with (
+            patch.object(Path, "exists", return_value=True),
+            patch(
+                "victor.context.workspace_setup.asyncio.create_subprocess_exec",
+                AsyncMock(),
+            ) as mock_exec,
+            patch("victor.context.workspace_setup.asyncio.wait_for", AsyncMock()),
+        ):
+            mock_proc = MagicMock()
+            mock_proc.returncode = 1  # install fails
+            with patch(
+                "victor.context.workspace_setup.asyncio.wait_for",
+                AsyncMock(return_value=(b"", b"err")),
+            ):
+                mock_exec.return_value = mock_proc
+                result = await ensure_project_importable(nonexistent, fake_root, install_deps=True)
+        # Not installed (PackageNotFoundError) → must attempt install
+        assert mock_exec.called, "pip install should have been attempted"

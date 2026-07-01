@@ -46,10 +46,38 @@ async def ensure_project_importable(
     Returns:
         True if project is importable after this call, False otherwise
     """
-    # Check if already importable
+    # Check if already properly INSTALLED — not merely importable. A bare
+    # __import__ succeeds for a project whose source dir is on sys.path even
+    # when its compiled C-extensions aren't built (e.g. astropy), which then
+    # yields "0 tests collected". So:
+    #   - pip-installed distribution (extensions built) → done.
+    #   - importable but NOT pip-installed AND has a build system (setup.py/
+    #     pyproject/setup.cfg) → it's a source namespace that needs building;
+    #     fall through to `pip install -e .`.
+    #   - importable with no build system (stdlib, pure source) → nothing to
+    #     build, done.
     try:
+        import importlib.metadata
+
+        importlib.metadata.distribution(project_name)  # raises if not pip-installed
         __import__(project_name)
         return True
+    except (ImportError, importlib.metadata.PackageNotFoundError, ValueError):
+        pass
+
+    # Importable but not pip-installed: only force a build if the project HAS a
+    # build system (it may have unbuilt C-extensions). Stdlib / build-less
+    # packages are genuinely ready as-is.
+    try:
+        __import__(project_name)
+        has_build_system = (
+            (project_root / "setup.py").exists()
+            or (project_root / "pyproject.toml").exists()
+            or (project_root / "setup.cfg").exists()
+        )
+        if not has_build_system:
+            return True
+        # Has a build system + not pip-installed → needs building; fall through.
     except ImportError:
         pass
 

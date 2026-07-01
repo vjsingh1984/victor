@@ -294,7 +294,12 @@ class SWEBenchRunner(BaseBenchmarkRunner):
                     ensure_project_importable,
                 )
 
-                await ensure_project_importable(repo_name, cached_repo, install_deps=True)
+                # Build C-extensions for projects like astropy (default 120s is
+                # too short for a first C-ext compile; subsequent tasks are fast
+                # because pip sees the package already installed).
+                await ensure_project_importable(
+                    repo_name, cached_repo, install_deps=True, timeout=600
+                )
 
                 try:
                     spec = __import__(repo_name)
