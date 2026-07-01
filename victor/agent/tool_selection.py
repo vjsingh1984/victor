@@ -1492,6 +1492,15 @@ class ToolSelector(ModeAwareMixin):
         """
         from victor.config.orchestrator_constants import STAGE_TOOL_LIMITS
 
+        # An explicitly-curated enabled-tools set is not count-capped. The caller
+        # (e.g. the benchmark, which enables exactly {code,edit,graph,read,shell,
+        # write}) chose this toolset on purpose; capping it by stage would drop
+        # non-"core" tools like code/graph during READING — silently defeating
+        # the curation and leaving the model unable to call tools the prompt
+        # advertises. HITL annotation (from _filter_tools_for_stage) still applies.
+        if self._enabled_tools:
+            return tools
+
         # Get limit for current stage
         stage_limits = {
             ConversationStage.INITIAL: STAGE_TOOL_LIMITS.initial_max,
@@ -2364,6 +2373,39 @@ class ToolSelector(ModeAwareMixin):
         from victor.providers.base import ToolDefinition
 
         all_tools = list(self.tools.list_tools())
+        # [TOOLDIAG] trace why enabled tools (e.g. code/graph) may be missing
+        # from the advertised schema. Log the registry's view vs the enabled set.
+        _all_names = sorted(t.name for t in all_tools)
+        logger.info(
+            "[TOOLDIAG] select_keywords entry: all_tools=%d %s | _enabled_tools=%s",
+            len(all_names),
+            _all_names,
+            sorted(self._enabled_tools) if self._enabled_tools else None,
+        )
+        # [TOOLDIAG] for any curated tool missing from list_tools(), log WHY
+        # (which of the 3 filters excludes it: not-registered / not-enabled /
+        # not-available / not-advertised). One run pinpoints the root cause.
+        if self._enabled_tools:
+            from victor.tools.folding import should_advertise_tool
+
+            _present = {t.name for t in all_tools}
+            for _miss in sorted(set(self._enabled_tools) - _present):
+                _reg = _miss in getattr(self.tools, "_tools", {})
+                _en = getattr(self.tools, "_tool_enabled", {}).get(_miss, False)
+                _avail = bool(
+                    _reg
+                    and self.tools._tool_is_available(self.tools._tools[_miss])
+                )
+                _advert = should_advertise_tool(_miss, include_folded=False)
+                logger.warning(
+                    "[TOOLDIAG] curated tool '%s' MISSING from list_tools: "
+                    "registered=%s enabled=%s available=%s advertise=%s",
+                    _miss,
+                    _reg,
+                    _en,
+                    _avail,
+                    _advert,
+                )
 
         # Fallback to SharedToolRegistry if ToolRegistry is empty (registration delay)
         if not all_tools:
@@ -2404,7 +2446,14 @@ class ToolSelector(ModeAwareMixin):
 
             # Apply stage filtering and return
             stage = self.conversation_state.get_stage() if self.conversation_state else None
+            _pre_filter = sorted(t.name for t in selected_tools)
             selected_tools = self._filter_tools_for_stage(selected_tools, stage, user_message)
+            logger.info(
+                "[TOOLDIAG] enabled_tools branch: gathered=%s | stage=%s | after_filter=%s",
+                _pre_filter,
+                stage.value if stage else None,
+                sorted(t.name for t in selected_tools),
+            )
 
             tool_names = [t.name for t in selected_tools]
             logger.debug(
