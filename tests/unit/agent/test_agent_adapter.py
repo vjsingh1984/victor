@@ -152,35 +152,47 @@ class TestVictorAgentAdapter:
         """Benchmark sessions should always expose graph navigation."""
         assert "graph" in VictorAgentAdapter.benchmark_tool_allowlist()
 
-    def test_benchmark_tool_readiness_reports_missing_graph(self, mock_orchestrator):
-        """Readiness should fail when graph is not registered in the live session."""
+    def test_benchmark_tool_readiness_graph_optional_when_missing(self, mock_orchestrator):
+        """graph is demand-loaded/optional — missing it must NOT fail readiness."""
         registry = ToolRegistry()
         for name in ("read", "edit", "write", "code", "shell"):
             registry.register(_DummyTool(name))
         mock_orchestrator.tools = registry
 
         adapter = VictorAgentAdapter(mock_orchestrator)
-        # graph is always in the desired allowlist; it's just not registered here.
         readiness = adapter.get_benchmark_tool_readiness()
 
-        assert readiness.ready is False
-        assert readiness.missing_tools == ("graph",)
+        assert readiness.ready is True  # graph optional → still ready
+        assert "graph" in readiness.missing_tools  # but reported
+        assert "graph" in readiness.optional_tools
         assert "code" in readiness.enabled_tools
 
-    def test_benchmark_tool_readiness_reports_disabled_tools(self, mock_orchestrator):
-        """Readiness should fail when required tools exist but are disabled."""
+    def test_benchmark_tool_readiness_fails_on_missing_base_tool(self, mock_orchestrator):
+        """A missing BASE tool (not optional) must fail readiness."""
         registry = ToolRegistry()
-        for name in VictorAgentAdapter.benchmark_tool_allowlist():
+        for name in ("read", "edit", "write", "shell"):  # no 'code'
             registry.register(_DummyTool(name))
-        registry.disable_tool("graph")
         mock_orchestrator.tools = registry
 
         adapter = VictorAgentAdapter(mock_orchestrator)
         readiness = adapter.get_benchmark_tool_readiness()
 
         assert readiness.ready is False
-        assert readiness.disabled_tools == ("graph",)
-        assert "graph" not in readiness.enabled_tools
+        assert "code" in readiness.missing_tools
+
+    def test_benchmark_tool_readiness_reports_disabled_tools(self, mock_orchestrator):
+        """Readiness should fail when a required (base) tool is disabled."""
+        registry = ToolRegistry()
+        for name in VictorAgentAdapter.benchmark_tool_allowlist():
+            registry.register(_DummyTool(name))
+        registry.disable_tool("code")  # disable a BASE tool
+        mock_orchestrator.tools = registry
+
+        adapter = VictorAgentAdapter(mock_orchestrator)
+        readiness = adapter.get_benchmark_tool_readiness()
+
+        assert readiness.ready is False
+        assert "code" in readiness.disabled_tools
 
     def test_reset(self, adapter):
         """Test reset clears state."""
