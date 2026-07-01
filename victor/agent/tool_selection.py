@@ -2378,7 +2378,7 @@ class ToolSelector(ModeAwareMixin):
         _all_names = sorted(t.name for t in all_tools)
         logger.info(
             "[TOOLDIAG] select_keywords entry: all_tools=%d %s | _enabled_tools=%s",
-            len(all_names),
+            len(_all_names),
             _all_names,
             sorted(self._enabled_tools) if self._enabled_tools else None,
         )
@@ -2392,10 +2392,7 @@ class ToolSelector(ModeAwareMixin):
             for _miss in sorted(set(self._enabled_tools) - _present):
                 _reg = _miss in getattr(self.tools, "_tools", {})
                 _en = getattr(self.tools, "_tool_enabled", {}).get(_miss, False)
-                _avail = bool(
-                    _reg
-                    and self.tools._tool_is_available(self.tools._tools[_miss])
-                )
+                _avail = bool(_reg and self.tools._tool_is_available(self.tools._tools[_miss]))
                 _advert = should_advertise_tool(_miss, include_folded=False)
                 logger.warning(
                     "[TOOLDIAG] curated tool '%s' MISSING from list_tools: "
