@@ -66,3 +66,49 @@ def test_curated_set_respects_filter_when_all_enabled():
     selector.set_enabled_tools(set(_CURATED))
     result = selector.select_keywords("Fix the bug.")
     assert {t.name for t in result} <= _CURATED
+
+
+def test_union_curated_enabled_restores_semantic_drop():
+    """The semantic path can drop code/graph; _union_curated_enabled restores them.
+
+    Mirrors the real bug: semantic selection gathers via list_tools(only_enabled=True),
+    which excludes registered-but-disabled tools. The curated set (code/graph) must
+    still reach the LLM, so select_tools unions them back in.
+    """
+    from unittest.mock import MagicMock
+
+    from victor.agent.tool_selection import ToolSelector
+
+    enabled = [
+        ToolDefinition(name=n, description="d", parameters={})
+        for n in ("read", "shell", "edit", "write")
+    ]
+    disabled = [ToolDefinition(name=n, description="d", parameters={}) for n in ("code", "graph")]
+    reg = MagicMock()
+    reg.list_tools.side_effect = lambda only_enabled=True, include_folded=False: (
+        list(enabled) if only_enabled else list(enabled) + list(disabled)
+    )
+
+    sel = ToolSelector.__new__(ToolSelector)
+    sel.tools = reg
+    sel._enabled_tools = set(_CURATED)
+
+    # Semantic path returned only the 4 enabled (dropped code/graph)
+    dropped = list(enabled)
+    restored = sel._union_curated_enabled(dropped)
+    assert {t.name for t in restored} == _CURATED
+    assert {"code", "graph"} <= {t.name for t in restored}
+
+
+def test_union_curated_enabled_noop_without_curated_set():
+    """No curated set (common auto-selected case) → union is a no-op."""
+    from unittest.mock import MagicMock
+
+    from victor.agent.tool_selection import ToolSelector
+
+    reg = MagicMock()
+    sel = ToolSelector.__new__(ToolSelector)
+    sel.tools = reg
+    sel._enabled_tools = None
+    tools = [ToolDefinition(name="read", description="d", parameters={})]
+    assert sel._union_curated_enabled(tools) is tools
