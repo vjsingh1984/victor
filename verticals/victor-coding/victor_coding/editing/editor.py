@@ -431,6 +431,12 @@ class FileEditor:
         backup_path = self.backup_dir / backup_name
 
         if path_obj.is_file():
+            # Re-ensure the backup_dir exists: the FileEditor is often a long-lived
+            # singleton whose backup_dir was mkdir'd at __init__, but an external
+            # `git clean -fd` between tasks (e.g. the SWE-bench harness) can delete
+            # it. Without this, shutil.copy2 raises FileNotFoundError and the whole
+            # commit rolls back — every edit then fails until the process restarts.
+            self.backup_dir.mkdir(parents=True, exist_ok=True)
             shutil.copy2(path_obj, backup_path)
 
         return backup_path

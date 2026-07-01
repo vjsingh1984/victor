@@ -225,7 +225,13 @@ class SWEBenchRunner(BaseBenchmarkRunner):
                 for cmd in [
                     ["git", "fetch", "--depth", "1", "origin", task.base_commit],
                     ["git", "checkout", "--force", task.base_commit],
-                    ["git", "clean", "-fd"],
+                    # Preserve .victor (backups + embeddings). Without -e .victor,
+                    # git clean wipes the workspace's .victor/ between tasks: the
+                    # singleton FileEditor's backup_dir vanishes -> FileNotFoundError
+                    # on every later edit's commit (P0); the LanceDB embeddings
+                    # store vanishes -> the index rebuilds every task (P2). Matches
+                    # the agent_callback's own clean.
+                    ["git", "clean", "-fd", "-e", ".victor"],
                 ]:
                     proc = await asyncio.create_subprocess_exec(
                         *cmd,
