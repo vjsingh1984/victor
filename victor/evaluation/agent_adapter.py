@@ -746,24 +746,27 @@ class VictorAgentAdapter:
         # added when the optional victor-coding graph tool resolves.
         benchmark_tools = set(self.benchmark_tool_allowlist())
         graph_enabled = "graph" in benchmark_tools
-        # Best-effort: hydrate demand-loaded tools (graph) into the registry
-        # before enabling. graph is demand-loaded (not bootstrap), so it isn't
-        # registered at session init; it normally registers on the first turn
-        # when the prompt mentions it. Hydrating here makes it available
-        # immediately. Never fatal — demand-loading covers it during the run.
-        tools_obj = getattr(self.orchestrator, "tools", None)
-        if tools_obj is not None:
-            for _hydrate in ("ensure_tool_registered", "ensure_tools_for_query"):
-                if hasattr(tools_obj, _hydrate):
-                    for _name in benchmark_tools:
-                        try:
-                            if _hydrate == "ensure_tools_for_query":
-                                tools_obj.ensure_tools_for_query("graph callers callees impact")
-                            else:
-                                tools_obj.ensure_tool_registered(_name)
-                        except Exception:
-                            pass
-                    break
+        # Register demand-only curated tools (e.g. graph) into the live ToolRegistry
+        # before set_enabled_tools. graph is in DEMAND_TOOL_SPECS (not BOOTSTRAP),
+        # so it's never registered at init — _union_curated_enabled() can't find it
+        # in list_tools(only_enabled=False) → it never reaches the LLM schema. Load
+        # via SharedToolRegistry + BatchRegistrar (robust — doesn't depend on
+        # ensure_tool_registered, which lives on ToolRegistrar, not ToolRegistry).
+        try:
+            from victor.agent.shared_tool_registry import SharedToolRegistry
+
+            _shared = SharedToolRegistry.get_instance()
+            _registered = {t.name for t in self.orchestrator.tools.list_tools(only_enabled=False)}
+            _missing = benchmark_tools - _registered
+            if _missing:
+                _new = _shared.get_tools_for_names(_missing)
+                if _new:
+                    from victor.tools.batch_registration import BatchRegistrar
+
+                    BatchRegistrar(self.orchestrator.tools).register_batch(_new, fail_fast=False)
+                    logger.info("Demand-registered curated tools: %s", sorted(_missing))
+        except Exception as e:
+            logger.debug("Demand-registration of curated tools skipped: %s", e)
         try:
             self.orchestrator.set_enabled_tools(benchmark_tools)
             logger.info(
@@ -790,19 +793,30 @@ class VictorAgentAdapter:
         # Configure the orchestrator's detector to not prematurely stop.
         # The adapter's outer loop controls completion, not the orchestrator.
         orch_detector = getattr(self.orchestrator, "_task_completion_detector", None)
-        if orch_detector:
-            # Inject the edge decision service if available
-            try:
-                from victor.agent.services.protocols.decision_service import (
-                    get_decision_service,
-                )
-                from victor.core import get_container
+        # Resolve the decision service ONCE — inject into both the orchestrator's
+        # detector AND the adapter's own completion detector. The adapter's
+        # detector (_completion_detector) is what the per-turn loop actually
+        # uses (should_stop); without the service it uses pure regex and never
+        # logs the decision — so the FEP-0012 classifier gets 0 task_completion
+        # samples. Mirrors the working stage_detection path (state_machine.py).
+        edge_service = None
+        try:
+            from victor.agent.services.protocols.decision_service import (
+                get_decision_service,
+            )
+            from victor.core import get_container
 
-                edge_service = get_decision_service(get_container())
-                if edge_service:
-                    orch_detector._decision_service = edge_service
-            except Exception:
-                pass
+            edge_service = get_decision_service(get_container())
+        except Exception:
+            pass
+
+        # Inject into the adapter's detector (the one the loop actually uses).
+        if edge_service:
+            self._completion_detector._decision_service = edge_service
+
+        if orch_detector:
+            if edge_service:
+                orch_detector._decision_service = edge_service
 
             orch_detector.analyze_intent(task_description)
 
@@ -974,6 +988,34 @@ class VictorAgentAdapter:
                 ):
                     self._completion_detector._state.active_signal_detected = False
                     self._completion_detector._state.completion_signals.clear()
+
+                # Log the task_completion decision via the decision service (if
+                # injected). This routes through LoggingDecisionService →
+                # log_decision → decisions.jsonl, capturing the premature-
+                # completion signal for FEP-0012 classifier training. Without
+                # this, the adapter's regex-based completion check bypasses the
+                # logging pipeline → 0 task_completion samples. Mirrors the
+                # stage_detection pattern (state_machine.py:702-711).
+                if getattr(self._completion_detector, "_decision_service", None):
+                    try:
+                        from victor.agent.decisions.schemas import DecisionType
+
+                        self._completion_detector._decide_sync(
+                            DecisionType.TASK_COMPLETION,
+                            context={
+                                "response_tail": assistant_content[-500:],
+                                "deliverable_count": len(
+                                    self._completion_detector._state.completed_deliverables
+                                ),
+                                "signal_count": len(
+                                    self._completion_detector._state.completion_signals
+                                ),
+                            },
+                            heuristic_result="incomplete",
+                            heuristic_confidence=0.3,
+                        )
+                    except Exception:
+                        pass  # never break the benchmark on logging
 
                 complete = self._completion_detector.should_stop()
 
