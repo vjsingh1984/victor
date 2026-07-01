@@ -109,7 +109,13 @@ BOOTSTRAP_TOOL_SPECS: Dict[str, tuple[str, str]] = {
 
 DEMAND_TOOL_SPECS: Dict[str, tuple[str, str]] = {
     **BOOTSTRAP_TOOL_SPECS,
-    "graph": ("victor.tools.graph_tool", "graph"),
+    # graph lives in the optional victor-coding package (a vertical capability,
+    # not a core tool) — hence demand-loaded, not bootstrap. The spec must point
+    # at the real module; a stale "victor.tools.graph_tool" path (which doesn't
+    # exist) silently failed demand-loading, leaving graph registrable only via
+    # the victor-coding entry-point. Import fails gracefully when victor-coding
+    # is absent (caught in _load_tool_spec → returns None).
+    "graph": ("victor_coding.tools.graph_tool", "graph"),
 }
 
 
