@@ -189,7 +189,9 @@ def bootstrap_new_services(
     elif backend == DecisionBackend.LLM:
         decision_service = _create_llm_decision_service(container)
     elif backend == DecisionBackend.HEURISTIC:
-        decision_service = None
+        # Heuristic pass-through that still logs every decision (FEP-0012 closed
+        # loop) — was None, which meant no decisions were ever recorded.
+        decision_service = _create_logging_decision_service()
     else:  # AUTO — classifier-first, else legacy flag-based selection
         local = _create_local_classifier_decision_service()
         if local is not None and local.is_healthy():
@@ -197,6 +199,13 @@ def bootstrap_new_services(
             logger.info("Bootstrapped LocalClassifierDecisionService (auto)")
         else:
             decision_service = _decision_service_via_legacy_flags(feature_flags, container)
+            if decision_service is None:
+                # Always capture decisions for RL/training data, even when no
+                # classifier/edge/LLM backend is available (--no-edge-model +
+                # no artifact). log_decision is only reached via a registered
+                # service, so without this the closed loop gets no decisions.
+                decision_service = _create_logging_decision_service()
+                logger.info("Bootstrapped LoggingDecisionService (auto fallback)")
 
     if decision_service is not None:
         from victor.agent.services.protocols.decision_service import (
@@ -552,6 +561,26 @@ def _create_local_classifier_decision_service() -> Optional[Any]:
         return create_local_classifier_decision_service()
     except Exception as e:
         logger.debug("Local classifier decision service unavailable: %s", e)
+        return None
+
+
+def _create_logging_decision_service() -> Optional[Any]:
+    """Create the always-on, logging-only decision service (FEP-0012 closed loop).
+
+    A heuristic pass-through that records every decision via ``log_decision``.
+    Used as the ``heuristic`` backend and the ``auto`` fallback when no
+    classifier/edge/LLM backend is available, so decisions are always captured
+    for RL/training data (``log_decision`` is only reached via a registered
+    service). Decision outcomes are unchanged (heuristic); only telemetry added.
+    """
+    try:
+        from victor.agent.services.logging_decision_service import (
+            LoggingDecisionService,
+        )
+
+        return LoggingDecisionService()
+    except Exception as e:
+        logger.debug("Logging decision service unavailable: %s", e)
         return None
 
 

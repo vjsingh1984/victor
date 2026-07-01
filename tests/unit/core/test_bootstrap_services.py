@@ -61,12 +61,18 @@ class TestBootstrapServices:
             assert container.is_registered(SessionServiceProtocol)
             assert container.is_registered(ChatServiceProtocol)
 
-            # But LLMDecisionService should NOT be registered (no flags enabled)
+            # The decision service IS registered even with no edge/LLM flags:
+            # the LoggingDecisionService fallback (FEP-0012 closed loop) ensures
+            # decisions are always captured for RL/training data. log_decision is
+            # only reached via a registered service, so without this the loop
+            # gets no decisions when no backend is configured.
             from victor.agent.services.protocols.decision_service import (
                 LLMDecisionServiceProtocol,
             )
 
-            assert not container.is_registered(LLMDecisionServiceProtocol)
+            assert container.is_registered(LLMDecisionServiceProtocol)
+            svc = container.get(LLMDecisionServiceProtocol)
+            assert svc.__class__.__name__ == "LoggingDecisionService"
 
     @pytest.mark.parametrize(
         ("protocol_name", "health_attr"),
