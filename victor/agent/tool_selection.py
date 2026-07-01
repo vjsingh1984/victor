@@ -2391,7 +2391,16 @@ class ToolSelector(ModeAwareMixin):
                 f"Using vertical enabled tools ({len(self._enabled_tools)}): "
                 f"{sorted(self._enabled_tools)}"
             )
-            for tool in all_tools:
+            # Gather from ALL registered tools, not just registry-"enabled"
+            # ones. set_enabled_tools() updates the tool_access_policy + this
+            # selector's filter but does NOT flip the registry's per-tool
+            # _tool_enabled map — so list_tools(only_enabled=True) silently
+            # excludes curated tools that are registered-but-disabled (e.g.
+            # code/graph, which are bootstrap/demand-registered disabled). The
+            # curated _enabled_tools set is the source of truth here, so filter
+            # all-registered tools by it.
+            _registered_all = self.tools.list_tools(only_enabled=False)
+            for tool in _registered_all:
                 if tool.name in self._enabled_tools and tool.name not in existing_names:
                     selected_tools.append(
                         ToolDefinition(

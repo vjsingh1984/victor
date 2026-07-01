@@ -1,0 +1,68 @@
+# Copyright 2026 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License").
+
+"""Regression: a curated enabled-tools set must include registered-but-disabled tools.
+
+Root cause this guards: ``set_enabled_tools()`` (tool_access_policy) updates the
+policy + selector filter but NOT the registry's per-tool ``_tool_enabled`` map.
+``select_keywords`` gathered from ``list_tools(only_enabled=True)``, which checks
+that map — so curated tools that are registered-but-disabled (e.g. code/graph)
+were silently dropped from the advertised schema, even though the benchmark
+explicitly enabled them and the prompt advertised them. The fix gathers from
+``list_tools(only_enabled=False)`` filtered by the curated set.
+"""
+
+from __future__ import annotations
+
+from unittest.mock import MagicMock
+
+from victor.agent.tool_selection import ToolSelector
+from victor.providers.base import ToolDefinition
+
+_CURATED = {"code", "edit", "graph", "read", "shell", "write"}
+
+
+def _make_registry():
+    """Mock registry: only_enabled=True → 4 enabled; only_enabled=False → all 6.
+
+    Mirrors the real bug condition: code/graph are registered but disabled in
+    the registry's _tool_enabled map, while read/shell/edit/write are enabled.
+    """
+    enabled = [
+        ToolDefinition(name=n, description="d", parameters={})
+        for n in ("read", "shell", "edit", "write")
+    ]
+    disabled = [ToolDefinition(name=n, description="d", parameters={}) for n in ("code", "graph")]
+
+    reg = MagicMock()
+
+    def list_tools(only_enabled=True, include_folded=False):
+        return list(enabled) if only_enabled else list(enabled) + list(disabled)
+
+    reg.list_tools.side_effect = list_tools
+    return reg
+
+
+def test_curated_set_includes_registered_but_disabled():
+    """code/graph (registered, disabled) must be gathered when curated."""
+    selector = ToolSelector(tools=_make_registry(), tool_selection_config={})
+    selector.set_enabled_tools(set(_CURATED))
+
+    result = selector.select_keywords("Fix the bug by editing the source code.")
+    names = {t.name for t in result}
+
+    assert {"code", "graph"} <= names, f"curated code/graph dropped: {sorted(names)}"
+    assert names <= _CURATED, f"non-curated tools leaked: {sorted(names - _CURATED)}"
+
+
+def test_curated_set_respects_filter_when_all_enabled():
+    """When all curated tools are registry-enabled, behavior is unchanged."""
+    reg = MagicMock()
+    all_tools = [ToolDefinition(name=n, description="d", parameters={}) for n in _CURATED]
+    reg.list_tools.side_effect = lambda only_enabled=True, include_folded=False: list(all_tools)
+
+    selector = ToolSelector(tools=reg, tool_selection_config={})
+    selector.set_enabled_tools(set(_CURATED))
+    result = selector.select_keywords("Fix the bug.")
+    assert {t.name for t in result} <= _CURATED
