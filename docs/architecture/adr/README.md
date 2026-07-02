@@ -25,6 +25,7 @@ Architecture Decision Records (ADRs) document significant architectural decision
 | [ADR-008](008-registry-performance-optimization.md) | Tool Registry Performance Optimization | Accepted | 2025-04-19 |
 | [ADR-014](014-shared-codegraph-chunker-package.md) | Extract the code→CPG chunker into a shared `victor-codegraph` package | Proposed | 2026-06-26 |
 | [ADR-015](015-victor-core-adopts-codegraph.md) | Victor Core adopts victor-codegraph as the foundational code parser (phased) | Proposed | 2026-06-26 |
+| [ADR-016](016-distribution-packaging-strategy.md) | Distribution & Packaging: Docker image primary, pip dev; reject native single-binary | Proposed | 2026-07-02 |
 
 ## ADR Summaries
 
@@ -83,6 +84,16 @@ Architecture Decision Records (ADRs) document significant architectural decision
 - Query result caching with LRU eviction
 - Performance regression tests with CI gates
 - 3-5× faster for 100+ items, 6-11× overall improvement
+
+### ADR-016: Distribution & Packaging Strategy
+
+**Decision**: Ship victor as a Docker image (`full` with all extras, `slim` core-only) as the primary packaged artifact; retain the pip-installable package for dev/extensible use; reject native single-binary (PyInstaller/Nuitka/PyOxidizer) as primary.
+
+**Key Points**:
+- Hosts run full-capability victor with only Docker — no dep provisioning, no venv pollution, no version drift.
+- One consistent container story: `victor:full` agent + per-task eval images (correct runtime per task).
+- Native single-binary rejected because victor's architecture fights freezing: dynamic plugin/entry-point discovery, optional native Rust extensions, heavy ML deps (torch ~2 GB), and the pip-based extensibility model.
+- Dev experience unchanged (editable pip install remains first-class).
 
 ## Creating New ADRs
 
