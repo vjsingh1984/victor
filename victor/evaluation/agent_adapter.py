@@ -1065,33 +1065,36 @@ class VictorAgentAdapter:
                     self._completion_detector._state.active_signal_detected = False
                     self._completion_detector._state.completion_signals.clear()
 
-                # Log the task_completion decision via the decision service (if
-                # injected). This routes through LoggingDecisionService →
-                # log_decision → decisions.jsonl, capturing the premature-
-                # completion signal for FEP-0012 classifier training. Without
-                # this, the adapter's regex-based completion check bypasses the
-                # logging pipeline → 0 task_completion samples. Mirrors the
-                # stage_detection pattern (state_machine.py:702-711).
-                if getattr(self._completion_detector, "_decision_service", None):
-                    try:
-                        from victor.agent.decisions.schemas import DecisionType
+                # Log the task_completion decision DIRECTLY (not via
+                # _decide_sync) with an explicit session_id override. The
+                # contextvar may not propagate to the orchestrator's internal
+                # decision-logging paths during orchestrator.chat(), so all
+                # 1020 prior task_completion entries had session_id="" and
+                # couldn't join to outcomes. The explicit override guarantees
+                # the spine is stamped. This is the FEP-0012 classifier's key
+                # signal — without it, validate says "task_completion did not
+                # clear the bar" (0 samples).
+                try:
+                    from victor.agent.decisions.chain import log_decision
 
-                        self._completion_detector._decide_sync(
-                            DecisionType.TASK_COMPLETION,
-                            context={
-                                "response_tail": assistant_content[-500:],
-                                "deliverable_count": len(
-                                    self._completion_detector._state.completed_deliverables
-                                ),
-                                "signal_count": len(
-                                    self._completion_detector._state.completion_signals
-                                ),
-                            },
-                            heuristic_result="incomplete",
-                            heuristic_confidence=0.3,
-                        )
-                    except Exception:
-                        pass  # never break the benchmark on logging
+                    log_decision(
+                        decision_type="task_completion",
+                        context={
+                            "response_tail": assistant_content[-500:],
+                            "deliverable_count": len(
+                                self._completion_detector._state.completed_deliverables
+                            ),
+                            "signal_count": len(
+                                self._completion_detector._state.completion_signals
+                            ),
+                        },
+                        result="incomplete" if not complete else "complete",
+                        source="heuristic",
+                        confidence=0.3,
+                        session_id_override=self._task_session_id,
+                    )
+                except Exception:
+                    pass  # never break the benchmark on logging
 
                 complete = self._completion_detector.should_stop()
 

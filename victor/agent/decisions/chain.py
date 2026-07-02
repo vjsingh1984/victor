@@ -105,6 +105,7 @@ def log_decision(
     model_version: Optional[str] = None,
     feature_spec_version: Optional[str] = None,
     feature_digest: Optional[str] = None,
+    session_id_override: Optional[str] = None,
 ) -> None:
     """Append decision I/O to JSONL for fine-tuning / RL data collection.
 
@@ -117,6 +118,12 @@ def log_decision(
     training. Optional provenance fields (``model_version``,
     ``feature_spec_version``, ``feature_digest``) are set by the local
     classifier service for reproducibility.
+
+    ``session_id_override``: explicit session_id that takes precedence over
+    the contextvar. Callers that know their session_id (e.g. the benchmark
+    adapter, which sets it before orchestrator.chat() but the contextvar
+    may not propagate to all internal decision-logging paths) should pass it
+    to guarantee the spine is stamped correctly.
 
     Path: ~/.victor/logs/decisions.jsonl
     """
@@ -132,6 +139,11 @@ def log_decision(
         log_dir.mkdir(parents=True, exist_ok=True)
         log_path = log_dir / "decisions.jsonl"
 
+        # Use explicit override if provided; otherwise fall back to contextvar.
+        stamped_session_id = (
+            session_id_override if session_id_override is not None else get_session_id()
+        )
+
         entry = {
             "ts": datetime.now().isoformat(),
             "decision_id": uuid.uuid4().hex,
@@ -141,7 +153,7 @@ def log_decision(
             "source": source,
             "confidence": confidence,
             # Correlation spine (FEP-0012) — join key to outcomes.
-            "session_id": get_session_id(),
+            "session_id": stamped_session_id,
             "turn_id": get_turn_id(),
             "trace_id": get_trace_id(),
         }
