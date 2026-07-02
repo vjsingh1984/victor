@@ -495,3 +495,45 @@ jobs:
           fi
           echo "Running ${#TARGETS[@]} changed-file test target(s):"; printf '  %s\n' "${TARGETS[@]}"
           pytest "${TARGETS[@]}" -m "not slow" --tb=short -q
+
+  # Aggregate merge gate — mirrors ProximaDB's `CI Success` pattern (see
+  # ../proximaDB/.github/workflows/ci.yml `ci-success`). A single required
+  # status check that is green iff every core gate passed (or was path-skipped).
+  # Set as the SOLE required check on develop with strict=false so auto-merge
+  # fires cleanly instead of sitting BLOCKED (strict=true + zero required
+  # contexts left PRs unmergeable even when all of CI was green).
+  #
+  # `if: always()` makes this run even when a `needs` job failed, so we fail
+  # explicitly (red X) rather than reporting "skipped" (which also blocks, but
+  # less clearly). `skipped` needs pass; only `failure`/`cancelled` fail.
+  # Lesson from ProximaDB: an aggregate must hard-fail on any failed/cancelled
+  # need — an earlier grep-based version let red CI merge (PRs #226/#264).
+  ci-success:
+    name: CI Success
+    runs-on: ubuntu-latest
+    needs:
+      - format
+      - lint
+      - repo-hygiene
+      - docs-drift
+      - typecheck
+      - strict-typecheck
+      - imports
+      - imports-with-verticals
+      - strict-fallback-guards
+      - definition-import-boundaries
+      - version-sync
+      - guards
+      - security-quick
+      - quick-tests
+    if: always()
+    steps:
+      - name: Require all required jobs green
+        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
+        run: |
+          echo "::error::One or more required CI jobs failed or were cancelled — blocking merge. CI Success requires every required job green (or skipped by path filter)."
+          exit 1
+      - name: CI Success
+        run: |
+          echo "✅ All required CI jobs passed (or skipped by path filter)."
+          echo "## ✅ CI Success" >> "$GITHUB_STEP_SUMMARY"
