@@ -64,6 +64,66 @@ def test_resolve_swebench_image_custom_registry():
     assert img.startswith("ghcr.io/myorg/sweb.eval.x86_64.")
 
 
+# ---- exact resolver (Docker Hub lookup) ----
+
+
+class _FakeDockerHubResp:
+    def __init__(self, repos):
+        self._repos = repos
+
+    def raise_for_status(self):
+        pass
+
+    def json(self):
+        return {"results": [{"repo_name": r} for r in self._repos]}
+
+
+def _fake_dockerhub_client(repos, *, boom=False):
+    class _Client:
+        def __init__(self, *a, **k):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            pass
+
+        async def get(self, url, params=None, **k):
+            if boom:
+                raise RuntimeError("network down")
+            return _FakeDockerHubResp(repos)
+
+    return _Client
+
+
+async def test_resolve_swebench_image_exact_dockerhub_lookup(monkeypatch):
+    ce._INSTANCE_IMAGE_CACHE.clear()
+    repos = [
+        "swebench/sweb.eval.x86_64.astropy_1776_astropy-14182",
+        "swebench/sweb.eval.x86_64.astropy_1776_astropy-12907",
+        "swebench/sweb.eval.x86_64.astropy_1776_astropy-7166",
+    ]
+    monkeypatch.setattr(ce.httpx, "AsyncClient", _fake_dockerhub_client(repos))
+    img = await ce.resolve_swebench_image_exact(_Task(), _Config())
+    # Picks the repo ending with the instance's issue id, prefixed docker.io.
+    assert img == "docker.io/swebench/sweb.eval.x86_64.astropy_1776_astropy-12907"
+    assert "astropy__astropy-12907" in ce._INSTANCE_IMAGE_CACHE  # cached
+
+
+async def test_resolve_swebench_image_exact_falls_back_on_network_failure(monkeypatch):
+    ce._INSTANCE_IMAGE_CACHE.clear()
+    monkeypatch.setattr(ce.httpx, "AsyncClient", _fake_dockerhub_client([], boom=True))
+    img = await ce.resolve_swebench_image_exact(_Task(), _Config())
+    # Falls back to the heuristic resolver (graceful).
+    assert img == "docker.io/swebench/sweb.eval.x86_64.astropy_astropy-12907"
+
+
+async def test_resolve_swebench_image_exact_override_wins():
+    img = await ce.resolve_swebench_image_exact(_Task(docker_image="my/exact:1"), _Config())
+    assert img == "my/exact:1"
+
+
 def test_resolve_runtime_language_version_map():
     assert (
         resolve_runtime(_Task(language="python", language_version="3.9"), _Config()).base_image
