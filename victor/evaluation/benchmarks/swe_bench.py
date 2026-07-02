@@ -538,9 +538,7 @@ class SWEBenchRunner(BaseBenchmarkRunner):
             # upstream), so plain `git apply` is correct.
             patch_file = cached_repo / ".agent_patch.diff"
             patch_file.write_text(patch)
-            rc, _out, err = await container.exec(
-                ["git", "apply", ".agent_patch.diff"], cwd=ws
-            )
+            rc, _out, err = await container.exec(["git", "apply", ".agent_patch.diff"], cwd=ws)
             if rc != 0:
                 result.status = TaskStatus.FAILED
                 result.error_message = f"Failed to apply patch (container): {(err or '')[:200]}"
