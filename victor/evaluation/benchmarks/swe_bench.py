@@ -498,13 +498,15 @@ class SWEBenchRunner(BaseBenchmarkRunner):
             EVAL_WORKSPACE_MOUNT,
             EvalContainer,
             resolve_runtime,
-            resolve_swebench_image,
+            resolve_swebench_image_exact,
         )
 
         # Official per-instance image for SWE-bench tasks (carry repo); else the
-        # polyglot language+version map.
+        # polyglot language+version map. The exact name (with its per-repo
+        # version segment) is looked up on Docker Hub; falls back to the
+        # heuristic resolver if the lookup fails.
         image = (
-            resolve_swebench_image(task, config)
+            await resolve_swebench_image_exact(task, config)
             if getattr(task, "repo", None)
             else resolve_runtime(task, config).base_image
         )
