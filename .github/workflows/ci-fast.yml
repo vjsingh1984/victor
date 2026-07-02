@@ -19,20 +19,12 @@ on:
       - 'Makefile'
       - 'MANIFEST.in'
       - 'VERSION'
+  # NOTE: pull_request has NO paths filter. ci-fast produces the required
+  # `CI Success` merge gate (set on develop); a path-filtered trigger would skip
+  # docs/config-only PRs, leaving the required check unreported and the PR
+  # BLOCKED (unmergeable). The gates run on every PR so the aggregate reports.
   pull_request:
     branches: [main, develop]
-    paths:
-      - '.github/workflows/ci-fast.yml'
-      - 'victor/**'
-      - 'victor-contracts/**'
-      - 'rust/**'
-      - 'tests/**'
-      - 'scripts/**'
-      - 'pyproject.toml'
-      - 'requirements*.txt'
-      - 'Makefile'
-      - 'MANIFEST.in'
-      - 'VERSION'
   workflow_dispatch:
 
 env:
