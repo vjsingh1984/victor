@@ -266,6 +266,13 @@ class BenchmarkTask:
     benchmark: BenchmarkType
     description: str
     language: str = "python"
+    # Polyglot / multi-version runtime hints (consumed by the docker eval
+    # backend). For SWE-bench the official per-instance image pins the runtime,
+    # so language_version is informational there; for other benchmarks it is the
+    # authoritative version (e.g. "3.9", "20", "1.22").
+    language_version: Optional[str] = None
+    docker_image: Optional[str] = None
+    runtime_command: Optional[list[str]] = None
 
     # Input context
     prompt: str = ""
@@ -396,6 +403,13 @@ class TaskResult:
     metadata: dict[str, Any] = field(default_factory=dict)
     failure_diagnosis: Optional[FailureDiagnosis] = None
     confidence_assessment: Optional[ConfidenceAssessment] = None
+
+    # Polyglot / containerized-eval provenance (for per-language reporting,
+    # debugging, and orphan-container cleanup).
+    language: Optional[str] = None
+    eval_backend: Optional[str] = None  # "local" | "docker"
+    runtime_image: Optional[str] = None
+    container_id: Optional[str] = None
 
     # Correlation spine + bounded execution trace (messages, tool calls, edits).
     # session_id joins this task's decisions (logged via log_decision) to its
@@ -541,10 +555,25 @@ class EvaluationConfig:
     max_turns: int = 10
 
     # Environment
-    use_docker: bool = True
+    # use_docker is a back-compat alias: True ⇒ eval_backend "docker". Default
+    # is False so the default backend stays "local" (host) unless the caller
+    # opts into containers via use_docker=True or eval_backend="docker".
+    use_docker: bool = False
     docker_image: str = "python:3.11"
     workspace_dir: Optional[Path] = None
     dataset_metadata: dict[str, Any] = field(default_factory=dict)
+
+    # Containerized / polyglot eval backend. `eval_backend` is the modern
+    # switch ("local" = host subprocess [default for back-compat], "docker" =
+    # run each task in a container with the correct runtime). `use_docker=True`
+    # is treated as `eval_backend="docker"` for back-compat. `swebench_image_*`
+    # select the official per-instance SWE-bench images (the dataset carries no
+    # python_version, so the official image is the source of truth).
+    eval_backend: str = "local"
+    runtime_version: Optional[str] = None
+    docker_image_override: Optional[str] = None
+    swebench_image_source: str = "official"  # official | build | skip
+    swebench_image_registry: str = "ghcr.io/swe-bench"
 
     # Self-correction settings (generic iterative refinement)
     enable_self_correction: bool = False

@@ -895,6 +895,30 @@ def run_benchmark(
         "-a",
         help="Use a configured account (e.g., openai-oauth). Overrides --profile/--provider.",
     ),
+    eval_backend: str = typer.Option(
+        "local",
+        "--eval-backend",
+        help=(
+            "Eval backend: 'local' (host subprocess, default) or 'docker' "
+            "(each task runs in its correct runtime image — fixes Python "
+            "version / C-ext / polyglot tasks)."
+        ),
+    ),
+    runtime_version: Optional[str] = typer.Option(
+        None,
+        "--runtime-version",
+        help="Runtime version for the docker image (e.g. 3.9, 20, 1.22). Informational for SWE-bench (image pins it).",
+    ),
+    docker_image_override: Optional[str] = typer.Option(
+        None,
+        "--docker-image",
+        help="Override the docker image used for eval (skips per-task resolution).",
+    ),
+    swebench_image_source: str = typer.Option(
+        "official",
+        "--swebench-image-source",
+        help="SWE-bench per-instance image source: official | build | skip (skip → host fallback).",
+    ),
 ) -> None:
     """Run a benchmark evaluation."""
     _configure_log_level(log_level, debug_modules=debug_modules)
@@ -931,6 +955,12 @@ def run_benchmark(
         max_turns=max_turns,
         parallel_tasks=parallel,
         use_docker=use_docker,
+        # Containerized / polyglot eval. `--docker` (use_docker) is a back-compat
+        # alias for --eval-backend docker; honor whichever the user set.
+        eval_backend=("docker" if use_docker else eval_backend),
+        runtime_version=runtime_version,
+        docker_image_override=docker_image_override,
+        swebench_image_source=swebench_image_source,
     )
     _attach_manifest_metadata(config, runner)
     _print_benchmark_header(
