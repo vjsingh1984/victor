@@ -99,18 +99,26 @@ def resolve_swebench_image(task, config) -> str:
     """Resolve the official SWE-bench per-instance image for a task.
 
     The SWE-bench dataset has no ``python_version`` column; the official images
-    (``sweb.eval.<repo>__<instance>``) bake in the correct Python + compiled
-    C-extensions + pinned deps. Registry/tag scheme is configurable; default is
-    ``ghcr.io/swe-bench``.
+    bake in the correct Python + compiled C-extensions + pinned deps. The
+    published scheme (confirmed against Docker Hub) is::
+
+        docker.io/swebench/sweb.eval.<arch>.<repo>_<version>_<instance>
+
+    e.g. ``swebench/sweb.eval.x86_64.sympy_1776_sympy-20590``. The exact tag
+    includes a ``<version>`` segment that only the ``swebench`` package's
+    ``make_image_name`` computes from the dataset row, so this resolver is
+    **best-effort**: it produces the right structure but may miss the version
+    segment. Two reliable paths:
+      * pass the exact image via ``--docker-image`` / ``task.docker_image``
+        (highest precedence — use this for a known-correct name), or
+      * ``pip install swebench`` and the harness can name images authoritatively.
+
+    A wrong name is safe: ``docker pull`` fails → :class:`DockerUnavailable` →
+    the caller falls back to the host eval path.
     """
-    registry = getattr(config, "swebench_image_registry", None) or "ghcr.io/swe-bench"
-    repo = getattr(task, "repo", None) or ""
-    repo_slug = repo.rstrip("/").split("/")[-1].replace(".git", "").lower() or "unknown"
-    # task_id is the full SWE-bench instance_id (e.g. "astropy__astropy-12907"),
-    # which already encodes the repo — so it goes in the tag, the repo in the
-    # image name: ``sweb.eval.<repo>:<full_instance_id>`` (the standard form).
-    instance = (getattr(task, "task_id", "") or "").lower()
-    return f"{registry}/sweb.eval.{repo_slug}:{instance}"
+    registry = getattr(config, "swebench_image_registry", None) or "docker.io/swebench"
+    instance = (getattr(task, "task_id", "") or "").replace("__", "_").lower() or "unknown"
+    return f"{registry}/sweb.eval.x86_64.{instance}"
 
 
 async def _run_cmd(cmd: list[str], timeout: float) -> tuple[int, bytes, bytes]:
