@@ -486,8 +486,11 @@ class SWEBenchRunner(BaseBenchmarkRunner):
 
         Uses the official SWE-bench per-instance image (correct Python + compiled
         deps baked in) — the dataset carries no python_version, so the image is
-        the source of truth. The cached repo is mounted at /workspace; reset /
-        apply / install / test all run in-container. Raises
+        the source of truth. The image ships the repo EDITABLE-INSTALLED at
+        ``/testbed`` (its PWD) at the base_commit, so the canonical flow is:
+        apply the agent + test patches to ``/testbed`` and run tests there — no
+        reinstall. The host cached_repo is mounted at ``/workspace`` only so the
+        container can read the patch files. Raises
         :class:`victor.evaluation.container_eval.DockerUnavailable` (propagated
         to the caller for host fallback) if Docker or the image can't be used.
         """
@@ -515,68 +518,57 @@ class SWEBenchRunner(BaseBenchmarkRunner):
         result.language = getattr(task, "language", None) or "python"
 
         container = EvalContainer(image=image, workspace_host_path=str(cached_repo))
-        ws = EVAL_WORKSPACE_MOUNT  # "/workspace" — where cached_repo is mounted
+        ws = EVAL_WORKSPACE_MOUNT  # "/workspace" — cached_repo mount (patch files)
+        # The official image ships the repo EDITABLE-INSTALLED at /testbed (its
+        # PWD): `astropy.__path__ == /testbed/astropy`, git at the base_commit.
+        # So the canonical flow is: apply patches to /testbed, run tests there —
+        # NO mount-and-reinstall (that fought the image layout → pip install -e .
+        # failed → 0 tests). The cached_repo mount is read-only-for-eval: the
+        # container only reads the patch files from /workspace.
+        testbed = "/testbed"
         try:
             await container.start()  # raises DockerUnavailable if unusable
             result.container_id = container.name
 
-            # 1. Reset to base_commit (fetch may be outside shallow depth).
+            # Write the agent + test patches into the mounted cached_repo (host
+            # side) so the container can read them from /workspace.
+            patch_file = cached_repo / ".agent_patch.diff"
+            patch_file.write_text(patch)
+            if task.test_code:
+                (cached_repo / ".test_patch.diff").write_text(task.test_code)
+
+            # 1. Reset /testbed to base_commit. The image is already there on a
+            #    fresh container; this is for idempotency. No fetch — the commit
+            #    is local in the image.
             if task.base_commit:
                 for cmd in (
-                    ["git", "fetch", "--depth", "1", "origin", task.base_commit],
                     ["git", "checkout", "--force", task.base_commit],
-                    ["git", "clean", "-fd", "-e", ".victor"],
+                    ["git", "clean", "-fd"],
                 ):
-                    rc, _out, err = await container.exec(cmd, cwd=ws, timeout=180)
+                    rc, _out, err = await container.exec(cmd, cwd=testbed, timeout=180)
                     if rc != 0:
                         logger.debug("container git %s rc=%d: %s", cmd[1], rc, (err or "")[:200])
 
-            # 2. Apply the agent's patch (written into the mounted repo on host).
-            # NOTE: no `--allow-empty` — the SWE-bench images ship git 2.34.1
-            # which rejects that option ("unknown option `allow-empty'") → every
-            # patch apply failed → 0 tests. The patch is non-empty here (checked
-            # upstream), so plain `git apply` is correct.
-            patch_file = cached_repo / ".agent_patch.diff"
-            patch_file.write_text(patch)
-            rc, _out, err = await container.exec(["git", "apply", ".agent_patch.diff"], cwd=ws)
+            # 2. Apply the agent's patch to /testbed (read from /workspace).
+            #    No `--allow-empty` — SWE-bench images ship git 2.34.1 which
+            #    rejects it. Patching /testbed's editable source is sufficient
+            #    (the image's Python imports /testbed/<pkg>) — NO reinstall.
+            rc, _out, err = await container.exec(
+                ["git", "apply", f"{ws}/.agent_patch.diff"], cwd=testbed
+            )
             if rc != 0:
                 result.status = TaskStatus.FAILED
                 result.error_message = f"Failed to apply patch (container): {(err or '')[:200]}"
                 logger.warning("Patch apply failed in container: %s", (err or "")[:200])
                 return result
-            logger.info("Patch applied successfully in container")
+            logger.info("Patch applied successfully in container /testbed")
 
-            # 3. Apply the SWE-bench test patch if present.
+            # 3. Apply the SWE-bench test patch.
             if task.test_code:
-                (cached_repo / ".test_patch.diff").write_text(task.test_code)
-                await container.exec(["git", "apply", ".test_patch.diff"], cwd=ws)
+                await container.exec(["git", "apply", f"{ws}/.test_patch.diff"], cwd=testbed)
 
-            # 4. Reinstall the patched source so the image's Python imports it.
-            # The image has the build toolchain; pure-python is instant, C-ext
-            # compiles against the correct headers. Best-effort.
-            rc, _out, err = await container.exec(
-                [
-                    "python",
-                    "-m",
-                    "pip",
-                    "install",
-                    "-e",
-                    ".",
-                    "--no-build-isolation",
-                    "--no-deps",
-                    "-q",
-                ],
-                cwd=ws,
-                timeout=600,
-            )
-            if rc != 0:
-                logger.warning(
-                    "container pip install -e . failed (continuing): %s",
-                    (err or "")[:300],
-                )
-
-            # 5. Detect the test runner on the mounted repo (host-side read) and
-            #    run its command in-container.
+            # 4. Detect the test runner on the host cached_repo (same repo/files)
+            #    and run its command in /testbed.
             _test_files = None
             if getattr(task, "fail_to_pass", None):
                 _test_files = task.fail_to_pass
@@ -591,11 +583,11 @@ class SWEBenchRunner(BaseBenchmarkRunner):
             if runner_cfg.runner_type == "pytest" and "-m" in test_cmd:
                 idx = test_cmd.index("-m")
                 test_cmd.insert(idx + 2, "--noconftest")
-            logger.info("Running tests in container: %s", " ".join(test_cmd))
+            logger.info("Running tests in container /testbed: %s", " ".join(test_cmd))
 
             rc, stdout, stderr = await container.exec(
                 test_cmd,
-                cwd=ws,
+                cwd=testbed,
                 timeout=min(config.timeout_per_task, 300),
                 env=dict(runner_cfg.env),
             )
