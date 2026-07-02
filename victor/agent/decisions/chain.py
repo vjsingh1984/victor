@@ -140,7 +140,9 @@ def log_decision(
         log_path = log_dir / "decisions.jsonl"
 
         # Use explicit override if provided; otherwise fall back to contextvar.
-        stamped_session_id = session_id_override if session_id_override is not None else get_session_id()
+        stamped_session_id = (
+            session_id_override if session_id_override is not None else get_session_id()
+        )
 
         entry = {
             "ts": datetime.now().isoformat(),
