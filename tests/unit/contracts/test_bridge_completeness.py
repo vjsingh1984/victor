@@ -87,6 +87,7 @@ def test_all_victor_coding_imports_are_bridged():
 def test_graph_tool_module_loads():
     """The graph tool module must always be importable, even if a bridge
     entry is missing. Module-level imports must be hardened."""
+    pytest.importorskip("victor_coding")  # vertical not installed in CI's Quick-Unit env
     try:
         importlib.import_module("victor_coding.tools.graph_tool")
     except ImportError as exc:
