@@ -368,8 +368,8 @@ class VictorAgentAdapter:
             ],
             "file_edits": [
                 {
-                    "path": e.get("path", ""),
-                    "diff": str(e.get("diff", ""))[:2000],  # bounded
+                    "path": getattr(e, "path", ""),
+                    "diff": str(getattr(e, "diff", ""))[:2000],  # bounded
                 }
                 for e in self._file_edits[-20:]  # last 20 edits
             ],
@@ -682,7 +682,7 @@ class VictorAgentAdapter:
             "tool_calls": len(self._tool_calls),
             "turns": self._turns,
             "file_edits": len(self._file_edits),
-            "files_modified": [e.get("path", "") for e in self._file_edits[:10]],
+            "files_modified": [getattr(e, "path", "") for e in self._file_edits[:10]],
             **_summarize_eval_tool_calls(self._tool_calls),
             "conversation_trace": self.get_conversation_trace(),
         }
@@ -1181,7 +1181,7 @@ class VictorAgentAdapter:
                 self._turns,
                 len(self._tool_calls),
                 len(self._file_edits),
-                ", ".join(e.get("path", "") for e in self._file_edits[:5]),
+                ", ".join(getattr(e, "path", "") for e in self._file_edits[:5]),
                 dict(self._tool_failure_counts) or "none",
                 sorted(self._disabled_tools) or "none",
             )
