@@ -151,15 +151,23 @@ async def check_docker_available() -> None:
         )
 
 
-async def docker_pull(image: str, timeout: float = 1800.0) -> None:
+async def docker_pull(image: str, timeout: float = 1800.0, platform: Optional[str] = None) -> None:
     """Pull an image; raise :class:`DockerUnavailable` on failure.
 
     Large official SWE-bench images (3-8 GB) take minutes on first pull; the
     default timeout is generous. A missing image (pull fails) is treated as
     unavailable so callers fall back to the host path rather than failing hard.
+
+    ``platform`` (e.g. ``linux/amd64``) forces a specific arch — required when
+    the host arch differs from the image's (e.g. Apple Silicon running the
+    x86_64-only SWE-bench images via Rosetta/QEMU emulation).
     """
+    cmd = ["docker", "pull"]
+    if platform:
+        cmd += ["--platform", platform]
+    cmd.append(image)
     try:
-        rc, out, err = await _run_cmd(["docker", "pull", image], timeout=timeout)
+        rc, out, err = await _run_cmd(cmd, timeout=timeout)
     except asyncio.TimeoutError as exc:
         raise DockerUnavailable(f"docker pull timed out for {image}: {exc}") from exc
     except FileNotFoundError as exc:
@@ -189,6 +197,7 @@ class EvalContainer:
         resource_limits: Optional[ResourceLimits] = None,
         label_value: str = EVAL_CONTAINER_LABEL_VALUE,
         env: Optional[dict[str, str]] = None,
+        platform: str = "linux/amd64",
     ) -> None:
         self.image = image
         self.workspace = workspace_host_path
@@ -196,6 +205,10 @@ class EvalContainer:
         self.resource_limits = resource_limits or ResourceLimits()
         self.label_value = label_value
         self.env = env or {}
+        # SWE-bench official images are x86_64-only; on Apple Silicon (aarch64)
+        # they must run via Rosetta/QEMU emulation, so we pin linux/amd64. Pass
+        # platform="" or "linux/arm64" for arm64-native polyglot images.
+        self.platform = platform
         self.name = f"victor-eval-{uuid.uuid4().hex[:12]}"
         self.container_id: Optional[str] = None
         self._started = False
@@ -210,15 +223,19 @@ class EvalContainer:
         """
         await check_docker_available()
         # Best-effort pull — if the image is missing and source=official, treat
-        # as unavailable so the caller falls back to the host path.
-        await docker_pull(self.image, timeout=pull_timeout)
+        # as unavailable so the caller falls back to the host path. Pin the
+        # platform so x86_64-only SWE-bench images pull+run on Apple Silicon.
+        await docker_pull(self.image, timeout=pull_timeout, platform=self.platform or None)
 
         isolation = IsolationConfig(
             sandbox_type="docker",
             network_allowed=self.network_allowed,
             resource_limits=self.resource_limits,
         )
-        create_cmd = ["docker", "create", "--name", self.name]
+        create_cmd = ["docker", "create"]
+        if self.platform:
+            create_cmd += ["--platform", self.platform]
+        create_cmd += ["--name", self.name]
         create_cmd += build_docker_run_flags(
             working_dir=self.workspace,
             env=self.env,
