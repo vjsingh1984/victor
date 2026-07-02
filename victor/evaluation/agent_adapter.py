@@ -776,6 +776,23 @@ class VictorAgentAdapter:
         except Exception as e:
             logger.debug(f"Could not restrict tools for benchmark: {e}")
 
+        # Source fix: sync the registry's per-tool _tool_enabled map with the
+        # curated set. set_enabled_tools (tool_access_policy) sets the policy
+        # filter + selector filter but does NOT update the registry's own
+        # _tool_enabled map — so list_tools(only_enabled=True), used by
+        # MULTIPLE tool-gathering paths (agentic loop ACT phase, semantic
+        # selector, etc.), excludes curated-but-registered-disabled tools
+        # (code/graph). Enabling them in the registry map makes ALL paths
+        # see them, not just paths that check the policy filter. This is the
+        # definitive fix for "code/graph not in the LLM schema" — consumer
+        # fixes (#343/#345/#348 union) only cover select_tools; this covers
+        # every path.
+        try:
+            for _name in benchmark_tools:
+                self.orchestrator.tools.enable_tool(_name)
+        except Exception:
+            pass
+
         trace = AgenticExecutionTrace(
             task_id=task.task_id,
             start_time=time.time(),
