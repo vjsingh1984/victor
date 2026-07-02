@@ -155,9 +155,29 @@ class SWEBenchRunner(BaseBenchmarkRunner):
             cached_repo = workspace_manager.get_cached_repo_path(task)
 
             if cached_repo and cached_repo.exists():
-                result = await self._run_tests_in_cached_repo(
-                    task, result, patch, cached_repo, config
-                )
+                if self._select_backend(config) == "docker":
+                    # Containerized eval: each task runs in its correct runtime
+                    # image (official SWE-bench per-instance image for Python).
+                    # Falls back to the host path if Docker / the image is
+                    # unavailable so a missing Docker runtime never hard-fails.
+                    from victor.evaluation.container_eval import DockerUnavailable
+
+                    try:
+                        result = await self._run_tests_in_container(
+                            task, result, patch, cached_repo, config
+                        )
+                    except DockerUnavailable as exc:
+                        logger.warning(
+                            "Docker eval unavailable (%s) — falling back to host path",
+                            exc,
+                        )
+                        result = await self._run_tests_in_cached_repo(
+                            task, result, patch, cached_repo, config
+                        )
+                else:
+                    result = await self._run_tests_in_cached_repo(
+                        task, result, patch, cached_repo, config
+                    )
             else:
                 # Fallback to TaskEnvironment with remote clone
                 env = TaskEnvironment(
@@ -436,6 +456,175 @@ class SWEBenchRunner(BaseBenchmarkRunner):
                     stderr=asyncio.subprocess.PIPE,
                 )
                 await proc.communicate()
+
+        return result
+
+    @staticmethod
+    def _select_backend(config: EvaluationConfig) -> str:
+        """Pick the eval backend: ``"docker"`` or ``"local"`` (host).
+
+        ``eval_backend`` is the modern switch; the legacy ``use_docker=True`` is
+        treated as ``docker`` for back-compat. Default is ``local``.
+        """
+        backend = getattr(config, "eval_backend", "local")
+        if backend == "docker":
+            return "docker"
+        # Legacy flag: use_docker=True ⇒ docker (unless eval_backend explicitly local).
+        if backend == "local" and getattr(config, "use_docker", False):
+            return "docker"
+        return "local"
+
+    async def _run_tests_in_container(
+        self,
+        task: BenchmarkTask,
+        result: TaskResult,
+        patch: str,
+        cached_repo: Path,
+        config: EvaluationConfig,
+    ) -> TaskResult:
+        """Run a task's tests inside a Docker container with the correct runtime.
+
+        Uses the official SWE-bench per-instance image (correct Python + compiled
+        deps baked in) — the dataset carries no python_version, so the image is
+        the source of truth. The cached repo is mounted at /workspace; reset /
+        apply / install / test all run in-container. Raises
+        :class:`victor.evaluation.container_eval.DockerUnavailable` (propagated
+        to the caller for host fallback) if Docker or the image can't be used.
+        """
+        import re as _re
+
+        from victor.context.test_runner import detect_test_runner
+        from victor.evaluation.container_eval import (
+            EVAL_WORKSPACE_MOUNT,
+            EvalContainer,
+            resolve_runtime,
+            resolve_swebench_image,
+        )
+
+        # Official per-instance image for SWE-bench tasks (carry repo); else the
+        # polyglot language+version map.
+        image = (
+            resolve_swebench_image(task, config)
+            if getattr(task, "repo", None)
+            else resolve_runtime(task, config).base_image
+        )
+        result.runtime_image = image
+        result.eval_backend = "docker"
+        result.language = getattr(task, "language", None) or "python"
+
+        container = EvalContainer(image=image, workspace_host_path=str(cached_repo))
+        ws = EVAL_WORKSPACE_MOUNT  # "/workspace" — where cached_repo is mounted
+        try:
+            await container.start()  # raises DockerUnavailable if unusable
+            result.container_id = container.name
+
+            # 1. Reset to base_commit (fetch may be outside shallow depth).
+            if task.base_commit:
+                for cmd in (
+                    ["git", "fetch", "--depth", "1", "origin", task.base_commit],
+                    ["git", "checkout", "--force", task.base_commit],
+                    ["git", "clean", "-fd", "-e", ".victor"],
+                ):
+                    rc, _out, err = await container.exec(cmd, cwd=ws, timeout=180)
+                    if rc != 0:
+                        logger.debug("container git %s rc=%d: %s", cmd[1], rc, (err or "")[:200])
+
+            # 2. Apply the agent's patch (written into the mounted repo on host).
+            patch_file = cached_repo / ".agent_patch.diff"
+            patch_file.write_text(patch)
+            rc, _out, err = await container.exec(
+                ["git", "apply", "--allow-empty", ".agent_patch.diff"], cwd=ws
+            )
+            if rc != 0:
+                result.status = TaskStatus.FAILED
+                result.error_message = f"Failed to apply patch (container): {(err or '')[:200]}"
+                logger.warning("Patch apply failed in container: %s", (err or "")[:200])
+                return result
+            logger.info("Patch applied successfully in container")
+
+            # 3. Apply the SWE-bench test patch if present.
+            if task.test_code:
+                (cached_repo / ".test_patch.diff").write_text(task.test_code)
+                await container.exec(["git", "apply", "--allow-empty", ".test_patch.diff"], cwd=ws)
+
+            # 4. Reinstall the patched source so the image's Python imports it.
+            # The image has the build toolchain; pure-python is instant, C-ext
+            # compiles against the correct headers. Best-effort.
+            rc, _out, err = await container.exec(
+                [
+                    "python",
+                    "-m",
+                    "pip",
+                    "install",
+                    "-e",
+                    ".",
+                    "--no-build-isolation",
+                    "--no-deps",
+                    "-q",
+                ],
+                cwd=ws,
+                timeout=600,
+            )
+            if rc != 0:
+                logger.warning(
+                    "container pip install -e . failed (continuing): %s",
+                    (err or "")[:300],
+                )
+
+            # 5. Detect the test runner on the mounted repo (host-side read) and
+            #    run its command in-container.
+            _test_files = None
+            if getattr(task, "fail_to_pass", None):
+                _test_files = task.fail_to_pass
+            elif task.test_code:
+                _test_files = [
+                    f
+                    for f in _re.findall(r"diff --git a/(\S+)", task.test_code)
+                    if "test" in f.lower()
+                ]
+            runner_cfg = detect_test_runner(cached_repo, test_files=_test_files or None)
+            test_cmd = list(runner_cfg.command)
+            if runner_cfg.runner_type == "pytest" and "-m" in test_cmd:
+                idx = test_cmd.index("-m")
+                test_cmd.insert(idx + 2, "--noconftest")
+            logger.info("Running tests in container: %s", " ".join(test_cmd))
+
+            rc, stdout, stderr = await container.exec(
+                test_cmd,
+                cwd=ws,
+                timeout=min(config.timeout_per_task, 300),
+                env=dict(runner_cfg.env),
+            )
+            result.stdout = stdout[-2000:]
+            result.stderr = stderr[-2000:]
+
+            # 6. Parse + set outcome (mirrors the host path).
+            passed, total = self._parse_test_output(stdout + stderr)
+            result.tests_passed = passed
+            result.tests_total = total
+            result.tests_failed = total - passed
+            if total > 0 and passed == total:
+                result.status = TaskStatus.PASSED
+                logger.info("Tests PASSED (container): %d/%d", passed, total)
+            elif total > 0 and passed > 0:
+                result.status = TaskStatus.FAILED
+                result.error_message = f"Partial pass: {passed}/{total}"
+                logger.info("Tests partial (container): %d/%d", passed, total)
+            elif total > 0:
+                result.status = TaskStatus.FAILED
+                result.error_message = f"All tests failed ({total} total)"
+                logger.info("Tests FAILED (container): %d/%d", passed, total)
+            else:
+                result.status = TaskStatus.FAILED
+                result.error_message = (
+                    "Patch applied but tests could not run in container (0 collected)."
+                )
+                logger.warning("Tests not collected in container (0/0).")
+        finally:
+            # Clean up patch files on the host mount; tear down the container.
+            for f in (".agent_patch.diff", ".test_patch.diff"):
+                (cached_repo / f).unlink(missing_ok=True)
+            await container.stop()
 
         return result
 
