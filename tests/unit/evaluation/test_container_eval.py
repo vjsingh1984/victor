@@ -231,10 +231,13 @@ async def test_eval_container_start_exec_stop_issues_correct_docker_cmds(monkeyp
     # The pull also pins the platform (so the right arch variant is fetched).
     pull_cmd = next(cmd for cmd in issued if cmd[1] == "pull")
     assert "--platform" in pull_cmd and "linux/amd64" in pull_cmd
-    # The exec targets the container by name with cwd=/workspace.
+    # The exec targets the container by name with cwd=/workspace, and runs via
+    # bash -lc (login shell) so the image's conda env activates.
     exec_cmd = next(cmd for cmd in issued if cmd[1] == "exec")
     assert c.name in exec_cmd
     assert "-w" in exec_cmd and "/workspace" in exec_cmd
+    assert "bash" in exec_cmd and "-lc" in exec_cmd
+    assert "python" in exec_cmd[-1]  # the joined shell command
 
 
 async def test_eval_container_start_raises_docker_unavailable_when_daemon_down(monkeypatch):

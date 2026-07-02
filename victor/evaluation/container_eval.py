@@ -323,15 +323,24 @@ class EvalContainer:
         cwd: str = EVAL_WORKSPACE_MOUNT,
         env: Optional[dict[str, str]] = None,
     ) -> tuple[int, str, str]:
-        """Run a command inside the running container. Returns (rc, stdout, stderr)."""
+        """Run a command inside the running container. Returns (rc, stdout, stderr).
+
+        Commands run via ``bash -lc`` (a login shell). The SWE-bench images use
+        a conda ``testbed`` env that's only on PATH under a login shell — a bare
+        ``docker exec ... python`` resolves to the BASE conda env (no
+        pytest/astropy) → "No module named pytest" → 0 tests collected.
+        """
         if not self._started:
             raise RuntimeError("EvalContainer.exec before start()")
+        import shlex
+
+        shell_cmd = shlex.join(list(command))
         cmd = ["docker", "exec"]
         if cwd:
             cmd += ["-w", cwd]
         for key, value in (env or {}).items():
             cmd += ["-e", f"{key}={value}"]
-        cmd += [self.name] + list(command)
+        cmd += [self.name, "bash", "-lc", shell_cmd]
         rc, out, err = await self._run(cmd, timeout=timeout)
         return rc, out.decode("utf-8", errors="replace"), err.decode("utf-8", errors="replace")
 
