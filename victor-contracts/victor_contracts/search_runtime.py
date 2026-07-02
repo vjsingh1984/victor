@@ -20,6 +20,7 @@ __all__ = [  # noqa: F822
     "QueryExpansionConfig",
     "QueryExpanderProtocol",
     "create_query_expander",
+    "create_hybrid_search_engine",
 ]
 
 _LAZY_IMPORTS = {
@@ -42,6 +43,7 @@ _LAZY_IMPORTS = {
     "QueryExpansionConfig": "victor.framework.search.query_expansion",
     "QueryExpanderProtocol": "victor.framework.search.query_expansion",
     "create_query_expander": "victor.framework.search.query_expansion",
+    "create_hybrid_search_engine": "victor.framework.search.hybrid",
 }
 
 
