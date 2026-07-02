@@ -580,6 +580,13 @@ class SWEBenchRunner(BaseBenchmarkRunner):
                 ]
             runner_cfg = detect_test_runner(cached_repo, test_files=_test_files or None)
             test_cmd = list(runner_cfg.command)
+            # detect_test_runner embeds the HOST python (sys.executable) as the
+            # binary; that absolute path doesn't exist in the container → pytest
+            # never ran → 0 tests collected. Use the container's `python` (on
+            # the image's PATH). Only rewrites a python binary; leaves non-python
+            # commands (npm test, etc.) untouched.
+            if test_cmd and "python" in test_cmd[0]:
+                test_cmd[0] = "python"
             if runner_cfg.runner_type == "pytest" and "-m" in test_cmd:
                 idx = test_cmd.index("-m")
                 test_cmd.insert(idx + 2, "--noconftest")
