@@ -628,7 +628,12 @@ async def edit(
                 elif _new is None:
                     _reason = f"Replace operation for {_path} missing required field: new_str"
                 elif _old == _new:
-                    _reason = "no-op edit rejected: old_str and new_str are identical"
+                    _reason = (
+                        f"no-op edit rejected: old_str and new_str are identical "
+                        f"for {_path}. The file may already contain this change "
+                        f"from a previous edit. Re-read the file to see its "
+                        f"current state before retrying."
+                    )
                 elif not _fp.exists() and not _working:
                     _reason = f"file {_path} does not exist"
                 else:

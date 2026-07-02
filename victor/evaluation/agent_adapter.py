@@ -234,6 +234,15 @@ class VictorAgentAdapter:
         # execution manifest can join decisions to the task outcome (reward).
         self._task_session_id: str = ""
 
+        # Circuit breaker: tracks consecutive same-error failures per tool.
+        # After N failures (default 3), the tool is auto-disabled for the
+        # rest of the task — prevents the model from wasting 20+ turns
+        # retrying a persistently broken tool (e.g. graph import error).
+        self._tool_failure_threshold: int = 3
+        self._tool_failures: dict[str, str] = {}  # tool_name -> last error hash
+        self._tool_failure_counts: dict[str, int] = {}  # consecutive count
+        self._disabled_tools: set[str] = set()
+
         # Correction metrics collector
         self._metrics_collector: Optional[CorrectionMetricsCollector] = None
         if self.config.track_corrections:
@@ -429,6 +438,15 @@ class VictorAgentAdapter:
             }
             self._completion_detector.record_tool_result(last_call.name, result_dict)
 
+            # Circuit breaker: if a tool fails repeatedly with the same error,
+            # auto-disable it for the rest of this task to prevent turn waste
+            # (e.g. graph tool with an import error → 24 wasted retries).
+            if not success:
+                self._record_tool_failure(
+                    tool_name,
+                    last_call.result or "unknown error",
+                )
+
         # Track file edit after completion
         if self.config.track_file_edits and self._tool_calls:
             last_call = self._tool_calls[-1]
@@ -436,6 +454,43 @@ class VictorAgentAdapter:
                 path = last_call.arguments.get("path") or last_call.arguments.get("file_path", "")
                 if path and self.config.working_dir:
                     self._capture_file_edit(path, last_call.name)
+
+    def _record_tool_failure(self, tool_name: str, error: str) -> None:
+        """Circuit breaker: track consecutive failures and auto-disable.
+
+        After N consecutive failures with the SAME error, the tool is removed
+        from the orchestrator's enabled set for the rest of this task. This
+        prevents the model from wasting 20+ turns on a persistently broken
+        tool (e.g. graph import error on every call). Reset per task in
+        reset().
+        """
+        import hashlib
+
+        error_hash = hashlib.md5(error[:200].encode()).hexdigest()
+        if self._tool_failures.get(tool_name) == error_hash:
+            self._tool_failure_counts[tool_name] = self._tool_failure_counts.get(tool_name, 1) + 1
+        else:
+            self._tool_failures[tool_name] = error_hash
+            self._tool_failure_counts[tool_name] = 1
+
+        count = self._tool_failure_counts[tool_name]
+        if count >= self._tool_failure_threshold and tool_name not in self._disabled_tools:
+            self._disabled_tools.add(tool_name)
+            logger.warning(
+                "[AgentAdapter] Circuit breaker: disabling '%s' after %d "
+                "consecutive failures (error: %s). The tool will be unavailable "
+                "for the rest of this task.",
+                tool_name,
+                count,
+                error[:100],
+            )
+            try:
+                current = set(getattr(self.orchestrator, "_enabled_tools", None) or set())
+                current.discard(tool_name)
+                self.orchestrator.set_enabled_tools(current)
+                self.orchestrator.tools.disable_tool(tool_name)
+            except Exception:
+                pass
 
     def _capture_file_edit(self, path: str, action: str) -> None:
         """Capture file edit after tool completion."""
@@ -619,6 +674,10 @@ class VictorAgentAdapter:
         self._turns = 0
         self._file_snapshots = {}
         self._task_session_id = ""
+        # Reset circuit breaker for new task
+        self._tool_failures = {}
+        self._tool_failure_counts = {}
+        self._disabled_tools = set()
         self.orchestrator.reset_conversation()
 
         # Clear code_search index cache for task isolation
