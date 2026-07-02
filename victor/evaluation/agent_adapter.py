@@ -787,6 +787,12 @@ class VictorAgentAdapter:
 
         self._task_session_id = _uuid.uuid4().hex
         set_session_id(self._task_session_id)
+        # Also stamp the orchestrator's persistent session id. The contextvar
+        # above can be lost when decisions cross a thread/loop boundary
+        # (decide_sync runs on a fresh thread); orchestrator.chat re-stamps the
+        # contextvar from this attr at chat start so every decision the loop
+        # logs carries the task's session_id (FEP-0012 spine integrity).
+        self.orchestrator.active_session_id = self._task_session_id
 
         # CRITICAL: Set workspace BEFORE any orchestrator operations
         # This ensures tools like file read/write, grep, etc. operate on the benchmark
