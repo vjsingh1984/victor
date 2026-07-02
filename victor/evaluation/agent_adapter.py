@@ -84,13 +84,40 @@ _BENCHMARK_TOOL_ALLOWLIST = _BENCHMARK_BASE_TOOLS | {"graph"}
 BENCHMARK_TOOL_ALLOWLIST = _BENCHMARK_TOOL_ALLOWLIST
 
 # Tool names that modify files — drives the adapter's files_modified tracking
-# (and thus whether a task is credited with producing a patch). MUST include the
-# real tool names ("edit", "write"), not just legacy aliases ("file_write",
-# "file_edit", "edit_file", "patch") — otherwise files_modified stays False even
-# after a successful edit, hiding whether the agent patched anything.
-_FILE_MODIFYING_TOOLS = frozenset(
+# (and thus whether a task is credited with producing a patch). Derived from
+# CORE tool metadata (AccessMode.WRITE on each @tool) via _file_modifying_tools()
+# so it stays in sync with the tool declarations; falls back to a hardcoded set
+# if the metadata registry isn't populated yet (import-time / early boot).
+_FILE_MODIFYING_TOOLS_FALLBACK = frozenset(
     {"edit", "write", "file_write", "file_edit", "edit_file", "patch"}
 )
+_file_modifying_tools_cache: Optional[frozenset[str]] = None
+
+
+def _file_modifying_tools() -> frozenset[str]:
+    """File-modifying tool names, from core AccessMode.WRITE metadata.
+
+    Single source of truth: queries ``ToolMetadataRegistry.get_tools_by_access_mode
+    (WRITE)`` and UNIONS it with a static fallback so the known tools (edit/write)
+    are always present (the registry may be empty before tools register) and any
+    newly-declared WRITE tools are picked up automatically.
+    """
+    global _file_modifying_tools_cache
+    if _file_modifying_tools_cache is not None:
+        return _file_modifying_tools_cache
+    names = _FILE_MODIFYING_TOOLS_FALLBACK
+    try:
+        from victor.tools.enums import AccessMode
+        from victor.tools.metadata import ToolMetadataRegistry
+
+        reg_names = frozenset(
+            ToolMetadataRegistry.get_instance().get_tools_by_access_mode(AccessMode.WRITE)
+        )
+        names = names | reg_names  # superset: known tools + any new WRITE tools
+    except Exception:
+        pass
+    _file_modifying_tools_cache = names
+    return names
 
 
 def _graph_tool_available() -> bool:
@@ -459,7 +486,7 @@ class VictorAgentAdapter:
         # Track file edit after completion
         if self.config.track_file_edits and self._tool_calls:
             last_call = self._tool_calls[-1]
-            if last_call.name in _FILE_MODIFYING_TOOLS:
+            if last_call.name in _file_modifying_tools():
                 path = last_call.arguments.get("path") or last_call.arguments.get("file_path", "")
                 if path and self.config.working_dir:
                     self._capture_file_edit(path, last_call.name)

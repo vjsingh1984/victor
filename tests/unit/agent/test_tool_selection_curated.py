@@ -41,6 +41,15 @@ def _make_registry():
         return list(enabled) if only_enabled else list(enabled) + list(disabled)
 
     reg.list_tools.side_effect = list_tools
+
+    def _mock_tool(n):
+        t = MagicMock()
+        t.name = n
+        t.description = f"{n} tool"
+        t.parameters = {"type": "object", "properties": {}}
+        return t
+
+    reg.get.side_effect = lambda n: _mock_tool(n) if n in _CURATED else None
     return reg
 
 
@@ -112,3 +121,27 @@ def test_union_curated_enabled_noop_without_curated_set():
     sel._enabled_tools = None
     tools = [ToolDefinition(name="read", description="d", parameters={})]
     assert sel._union_curated_enabled(tools) is tools
+
+
+async def test_select_tools_short_circuits_to_stable_curated_set():
+    """select_tools (the path the benchmark actually calls) returns the stable
+    6-tool curated set immediately, bypassing semantic/keyword selection that
+    drops code/graph (#353 fix — the short-circuit previously lived only in
+    select_tools_for_turn, which the benchmark never calls)."""
+    selector = ToolSelector(tools=_make_registry(), tool_selection_config={})
+    selector.set_enabled_tools(set(_CURATED))
+
+    result = await selector.select_tools("Fix the bug by editing the source code.")
+    names = {t.name for t in result}
+
+    assert names == _CURATED, f"expected stable 6-tool curated set, got {sorted(names)}"
+
+
+async def test_select_tools_no_curated_set_uses_normal_selection():
+    """Without a curated set, select_tools falls through to normal selection
+    (the short-circuit is a no-op — doesn't change auto-selected behavior)."""
+    selector = ToolSelector(tools=_make_registry(), tool_selection_config={})
+    # No set_enabled_tools → _enabled_tools is None → no short-circuit.
+    result = await selector.select_tools("Fix the bug by editing the source code.")
+    # Falls to select_keywords (no semantic_selector) → returns some tools.
+    assert isinstance(result, list)
