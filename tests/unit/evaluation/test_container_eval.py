@@ -41,7 +41,7 @@ class _Task:
 class _Config:
     def __init__(self, **kw):
         defaults = {
-            "swebench_image_registry": "ghcr.io/swe-bench",
+            "swebench_image_registry": "docker.io/swebench",
             "runtime_version": None,
             "docker_image_override": None,
         }
@@ -54,13 +54,14 @@ class _Config:
 
 def test_resolve_swebench_image_standard_form():
     img = resolve_swebench_image(_Task(), _Config())
-    # repo in the image name, full instance_id in the tag — no doubled repo.
-    assert img == "ghcr.io/swe-bench/sweb.eval.astropy:astropy__astropy-12907"
+    # Official Docker Hub scheme: swebench/sweb.eval.<arch>.<instance>; the
+    # resolver is best-effort (exact <version> segment needs the swebench pkg).
+    assert img == "docker.io/swebench/sweb.eval.x86_64.astropy_astropy-12907"
 
 
 def test_resolve_swebench_image_custom_registry():
     img = resolve_swebench_image(_Task(), _Config(swebench_image_registry="ghcr.io/myorg"))
-    assert img.startswith("ghcr.io/myorg/sweb.eval.astropy:")
+    assert img.startswith("ghcr.io/myorg/sweb.eval.x86_64.")
 
 
 def test_resolve_runtime_language_version_map():

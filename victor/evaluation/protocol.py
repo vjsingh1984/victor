@@ -573,7 +573,7 @@ class EvaluationConfig:
     runtime_version: Optional[str] = None
     docker_image_override: Optional[str] = None
     swebench_image_source: str = "official"  # official | build | skip
-    swebench_image_registry: str = "ghcr.io/swe-bench"
+    swebench_image_registry: str = "docker.io/swebench"
 
     # Self-correction settings (generic iterative refinement)
     enable_self_correction: bool = False
