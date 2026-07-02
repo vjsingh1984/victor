@@ -2137,6 +2137,25 @@ async def run_interactive(
                 )
                 console.print(f"[green]✓[/] {resumed_message}\n")
 
+            # FEP-0012 Phase 0: ensure a non-empty session_id so every decision
+            # logged this session can join to its outcome. Fresh chat starts with
+            # active_session_id=None (→ get_session_id() returns ""), which would
+            # make record_session_outcome a no-op. Mirror the benchmark adapter
+            # (agent_adapter.py). Resumed sessions keep their id from above.
+            try:
+                import uuid as _uuid
+
+                from victor.core.context import set_session_id
+
+                _chat_sid = getattr(agent, "active_session_id", None) or _uuid.uuid4().hex
+                agent.active_session_id = _chat_sid
+                _orch = agent.get_orchestrator() if hasattr(agent, "get_orchestrator") else None
+                if _orch is not None:
+                    _orch.active_session_id = _chat_sid
+                set_session_id(_chat_sid)
+            except Exception:
+                pass
+
             # Note: Observability (shim) is handled by AgentFactory internally
             # The factory creates the agent with framework features already wired
 
@@ -3064,6 +3083,77 @@ def _create_cli_prompt_session(
     return prompt_session, renderer_holder
 
 
+def _maybe_prompt_outcome(agent: Any, settings: Any, console: "Console") -> None:
+    """FEP-0012: after the agent declares task completion, ask for a reward.
+
+    On a fresh completion (the orchestrator's task-completion detector flips
+    False→True across this turn, tracked per-session on the orchestrator) we:
+      1. log a ``task_completion`` decision — this is the chat-side spine that
+         was missing (only the benchmark adapter logged it before), so the
+         session's decisions can now join to an outcome;
+      2. prompt "Did this resolve your task? [y/n/skip]";
+      3. stamp the reward via ``record_session_outcome`` → ``decision_outcome``.
+
+    Non-invasive: uses a transition signal (not a detector reset), so it never
+    alters completion-detection behavior and never re-prompts on stale-True.
+    Interactive REPL only; gated by ``enable_rl_feedback_prompt``. Best-effort —
+    never raises into the REPL.
+    """
+    try:
+        if not getattr(settings, "enable_rl_feedback_prompt", True):
+            return
+        orch = agent.get_orchestrator() if hasattr(agent, "get_orchestrator") else None
+        if orch is None:
+            return
+        detector = getattr(orch, "_task_completion_detector", None)
+        if detector is None or not hasattr(detector, "should_stop"):
+            return
+
+        now_complete = bool(detector.should_stop())
+        prev_complete = getattr(orch, "_rl_prev_completed", False)
+        orch._rl_prev_completed = now_complete
+        if not (now_complete and not prev_complete):
+            return  # not a fresh completion this turn
+
+        sid = getattr(orch, "active_session_id", "") or ""
+        if not sid:
+            return
+
+        from victor.agent.decisions.chain import log_decision
+
+        state = getattr(detector, "_state", None)
+        log_decision(
+            "task_completion",
+            {
+                "source": "task_completion_detector",
+                "detector_verdict": "fulfilled",
+                "completion_percentage": getattr(state, "completion_percentage", None),
+            },
+            result="fulfilled",
+            source="task_completion_detector",
+            session_id_override=sid,
+        )
+
+        from rich.prompt import Prompt
+
+        answer = Prompt.ask(
+            "[dim]Did this resolve your task?[/]",
+            choices=["y", "n", "skip"],
+            default="skip",
+        )
+        if answer == "skip":
+            return
+        success = answer == "y"
+        from victor.agent.decisions.outcome import record_session_outcome
+
+        count = record_session_outcome(sid, success=success, quality_score=1.0 if success else 0.0)
+        console.print(
+            f"[dim]✓ Recorded {'success' if success else 'failure'} " f"for {count} decision(s).[/]"
+        )
+    except Exception:
+        pass  # never break the REPL
+
+
 async def _run_cli_repl(
     agent: Any,
     settings: Any,
@@ -3248,6 +3338,10 @@ async def _run_cli_repl(
                 ):
                     response = await agent.chat(user_input, use_planning=enable_planning)
                 console.print(Markdown(response.content))
+
+            # FEP-0012: capture the RL reward label after the agent's turn. Both
+            # the streaming and non-streaming paths converge here.
+            _maybe_prompt_outcome(agent, settings, console)
 
         except KeyboardInterrupt:
             console.print("\n[dim]Use /exit or Ctrl+D to quit[/]")
