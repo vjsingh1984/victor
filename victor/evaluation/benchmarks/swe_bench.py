@@ -532,10 +532,14 @@ class SWEBenchRunner(BaseBenchmarkRunner):
                         logger.debug("container git %s rc=%d: %s", cmd[1], rc, (err or "")[:200])
 
             # 2. Apply the agent's patch (written into the mounted repo on host).
+            # NOTE: no `--allow-empty` — the SWE-bench images ship git 2.34.1
+            # which rejects that option ("unknown option `allow-empty'") → every
+            # patch apply failed → 0 tests. The patch is non-empty here (checked
+            # upstream), so plain `git apply` is correct.
             patch_file = cached_repo / ".agent_patch.diff"
             patch_file.write_text(patch)
             rc, _out, err = await container.exec(
-                ["git", "apply", "--allow-empty", ".agent_patch.diff"], cwd=ws
+                ["git", "apply", ".agent_patch.diff"], cwd=ws
             )
             if rc != 0:
                 result.status = TaskStatus.FAILED
@@ -547,7 +551,7 @@ class SWEBenchRunner(BaseBenchmarkRunner):
             # 3. Apply the SWE-bench test patch if present.
             if task.test_code:
                 (cached_repo / ".test_patch.diff").write_text(task.test_code)
-                await container.exec(["git", "apply", "--allow-empty", ".test_patch.diff"], cwd=ws)
+                await container.exec(["git", "apply", ".test_patch.diff"], cwd=ws)
 
             # 4. Reinstall the patched source so the image's Python imports it.
             # The image has the build toolchain; pure-python is instant, C-ext
