@@ -83,6 +83,15 @@ _BENCHMARK_TOOL_ALLOWLIST = _BENCHMARK_BASE_TOOLS | {"graph"}
 # Backward-compat alias (existing callers/tests reference the constant).
 BENCHMARK_TOOL_ALLOWLIST = _BENCHMARK_TOOL_ALLOWLIST
 
+# Tool names that modify files — drives the adapter's files_modified tracking
+# (and thus whether a task is credited with producing a patch). MUST include the
+# real tool names ("edit", "write"), not just legacy aliases ("file_write",
+# "file_edit", "edit_file", "patch") — otherwise files_modified stays False even
+# after a successful edit, hiding whether the agent patched anything.
+_FILE_MODIFYING_TOOLS = frozenset(
+    {"edit", "write", "file_write", "file_edit", "edit_file", "patch"}
+)
+
 
 def _graph_tool_available() -> bool:
     """True if the optional victor-coding ``graph`` tool resolves.
@@ -450,7 +459,7 @@ class VictorAgentAdapter:
         # Track file edit after completion
         if self.config.track_file_edits and self._tool_calls:
             last_call = self._tool_calls[-1]
-            if last_call.name in ("file_write", "file_edit", "edit_file", "patch"):
+            if last_call.name in _FILE_MODIFYING_TOOLS:
                 path = last_call.arguments.get("path") or last_call.arguments.get("file_path", "")
                 if path and self.config.working_dir:
                     self._capture_file_edit(path, last_call.name)
@@ -464,6 +473,18 @@ class VictorAgentAdapter:
         tool (e.g. graph import error on every call). Reset per task in
         reset().
         """
+        # Log the full error text (truncated) on EVERY failure. The circuit
+        # breaker below only hashes the error, so without this the failure
+        # cause is invisible in logs — e.g. an edit returning an 8110-char
+        # error payload would leave no trace of WHY it failed.
+        logger.warning(
+            "[AgentAdapter] Tool '%s' failed (turn %d, call #%d): %.500s",
+            tool_name,
+            self._turns,
+            len(self._tool_calls),
+            error or "(no error text)",
+        )
+
         import hashlib
 
         error_hash = hashlib.md5(error[:200].encode()).hexdigest()
@@ -1144,6 +1165,20 @@ class VictorAgentAdapter:
                 await _heartbeat_task
             except asyncio.CancelledError:
                 pass
+            # Structured per-task outcome summary for failure diagnosis. Surfaces
+            # whether the agent produced a patch (files_modified), which tools
+            # failed and how often, and what got circuit-broken — the signals
+            # previously missing when a task came back "failed".
+            logger.warning(
+                "[AgentAdapter] Task summary: turns=%d tool_calls=%d "
+                "files_modified=%d (%s) tool_failures=%s disabled_tools=%s",
+                self._turns,
+                len(self._tool_calls),
+                len(self._file_edits),
+                ", ".join(e.get("path", "") for e in self._file_edits[:5]),
+                dict(self._tool_failure_counts) or "none",
+                sorted(self._disabled_tools) or "none",
+            )
 
         # Populate trace
         trace.end_time = time.time()

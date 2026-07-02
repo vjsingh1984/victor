@@ -1128,8 +1128,23 @@ class EvaluationHarness:
                 results.append(task_result)
                 all_results.append(task_result)
 
-                status_str = "PASS" if task_result.is_success else "FAIL"
-                logger.info(f"  Result: {status_str}")
+                if task_result.is_success:
+                    logger.info(
+                        "  Result: PASS (tests %d/%d)",
+                        task_result.tests_passed,
+                        task_result.tests_total,
+                    )
+                else:
+                    # Surface WHY the task failed — the harness sets
+                    # error_message to a categorized reason (partial pass,
+                    # all tests failed, 0 collected / install issue, timeout,
+                    # exception). Without this, "Result: FAIL" gave no clue.
+                    logger.warning(
+                        "  Result: FAIL (tests %d/%d) — reason: %s",
+                        task_result.tests_passed,
+                        task_result.tests_total,
+                        task_result.error_message or "no reason recorded",
+                    )
 
                 # Save checkpoint after each task
                 if checkpoint_path:
