@@ -7,10 +7,11 @@ from __future__ import annotations
 import importlib
 from typing import Any
 
-__all__ = ["get_project_database"]
+__all__ = ["get_project_database", "resolve_project_db_root"]
 
 _LAZY_IMPORTS = {
     "get_project_database": "victor.core.database",
+    "resolve_project_db_root": "victor.core.database",
 }
 
 

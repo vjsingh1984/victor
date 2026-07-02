@@ -2268,7 +2268,7 @@ def _project_relative_scope(root_path: Path) -> Optional[str]:
     """
     from victor_contracts.database_runtime import resolve_project_db_root
 
-    project_root = resolve_project_db_root(root_path)
+    project_root = resolve_project_db_root(root_path)  # noqa: guaranteed by bridge
     try:
         rel = Path(root_path).resolve().relative_to(project_root)
     except ValueError:
