@@ -1577,6 +1577,33 @@ async def _setup_benchmark_async(
     console.print(f"\nNow run: victor benchmark run {benchmark}")
 
 
+def _record_benchmark_task_outcome(_tr: Any) -> None:
+    """Stamp one benchmark task's outcome into the decision_outcome junction.
+
+    FEP-0012 Gap A fix: called from the per-task ``on_progress`` callback (so a
+    ctrl+c / crash loses only the in-flight task, never completed ones) AND from
+    the post-run safety-net loop (idempotent backstop). ``record_session_outcome``
+    is DELETE-then-INSERT per session_id, so calling it twice is a no-op.
+
+    Args:
+        _tr: A TaskResult-like object exposing ``session_id``, ``tests_total``,
+            and ``tests_passed``. Tasks without a session_id are skipped.
+    """
+    _sid = getattr(_tr, "session_id", "") or ""
+    if not _sid:
+        return
+    _total = int(getattr(_tr, "tests_total", 0) or 0)
+    _passed = int(getattr(_tr, "tests_passed", 0) or 0)
+    _rate = (_passed / _total) if _total else 0.0
+    from victor.agent.decisions.outcome import record_session_outcome
+
+    record_session_outcome(
+        _sid,
+        success=(_passed == _total and _total > 0),
+        quality_score=_rate,
+    )
+
+
 async def _run_benchmark_async(
     *,
     runner,
@@ -1881,6 +1908,14 @@ async def _run_benchmark_async(
                 task,
                 description=f"Task {task_idx + 1}/{total}: {result.status.value}",
             )
+            # FEP-0012 Gap A fix: record this task's outcome the INSTANT it
+            # completes — not deferred to after run_evaluation() returns. A
+            # ctrl+c / crash / timeout during the benchmark then loses only the
+            # in-flight task, never the completed ones. Best-effort.
+            try:
+                _record_benchmark_task_outcome(result)
+            except Exception as exc:  # never break the benchmark
+                logger.debug("per-task decision_outcome recording skipped: %s", exc)
 
         progress.update(
             task,
@@ -1906,27 +1941,16 @@ async def _run_benchmark_async(
         except Exception as exc:  # never break the benchmark
             logger.debug("Execution manifest emission skipped: %s", exc)
 
-        # FEP-0012 Phase 6: stamp the durable decision_outcome reward junction
-        # per task (session_id → success/quality). This is the production
-        # training source (`victor.ml.train_from_outcomes`); the manifest above
-        # is the offline snapshot. Best-effort — never breaks the run.
+        # FEP-0012 safety net: re-stamp outcomes for every task now that the full
+        # run completed. on_progress already recorded each as it finished (so an
+        # interrupt loses nothing); this loop is idempotent and only backfills
+        # any task whose on_progress callback did not fire (e.g. an edge on the
+        # final task). Best-effort — never breaks the run.
         try:
-            from victor.agent.decisions.outcome import record_session_outcome
-
             for _tr in getattr(eval_result, "task_results", []) or []:
-                _sid = getattr(_tr, "session_id", "") or ""
-                if not _sid:
-                    continue
-                _total = int(getattr(_tr, "tests_total", 0) or 0)
-                _passed = int(getattr(_tr, "tests_passed", 0) or 0)
-                _rate = (_passed / _total) if _total else 0.0
-                record_session_outcome(
-                    _sid,
-                    success=(_passed == _total and _total > 0),
-                    quality_score=_rate,
-                )
+                _record_benchmark_task_outcome(_tr)
         except Exception as exc:  # never break the benchmark
-            logger.debug("decision_outcome recording skipped: %s", exc)
+            logger.debug("decision_outcome safety-net recording skipped: %s", exc)
 
         return eval_result
 
