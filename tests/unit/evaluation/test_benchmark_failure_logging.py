@@ -6,14 +6,20 @@
 
 Covers the gaps that made benchmark failures undiagnosable:
 - `_record_tool_failure` now logs the full error text (was only hashed).
-- `_FILE_MODIFYING_TOOLS` recognizes the real tool names ``edit``/``write``
+- `_file_modifying_tools()` recognizes the real tool names ``edit``/``write``
   (was only legacy aliases → files_modified always False after an edit).
+  (#368 replaced the `_FILE_MODIFYING_TOOLS` constant with this derivation:
+  CORE AccessMode.WRITE metadata unioned with a curated fallback.)
 """
 
 import logging
 from unittest.mock import MagicMock
 
-from victor.evaluation.agent_adapter import VictorAgentAdapter, _FILE_MODIFYING_TOOLS
+from victor.evaluation.agent_adapter import (
+    VictorAgentAdapter,
+    _FILE_MODIFYING_TOOLS_FALLBACK,
+    _file_modifying_tools,
+)
 
 
 def _make_adapter() -> VictorAgentAdapter:
@@ -31,14 +37,20 @@ def test_file_modifying_tools_recognize_edit_and_write():
     'edit_file', 'patch') were recognized, so an `edit`/`write` tool call left
     files_modified=False even after a successful edit.
     """
-    assert "edit" in _FILE_MODIFYING_TOOLS
-    assert "write" in _FILE_MODIFYING_TOOLS
+    tools = _file_modifying_tools()
+    assert "edit" in tools
+    assert "write" in tools
     # legacy aliases still recognized
-    assert "file_write" in _FILE_MODIFYING_TOOLS
-    assert "patch" in _FILE_MODIFYING_TOOLS
-    # read-only tools are NOT file-modifying
-    assert "read" not in _FILE_MODIFYING_TOOLS
-    assert "shell" not in _FILE_MODIFYING_TOOLS
+    assert "file_write" in tools
+    assert "patch" in tools
+    # Read-only tools must NOT be in the curated fallback. (The derived set
+    # unions registry AccessMode.WRITE tools, so assert the curated contract —
+    # a registry-populated environment could legitimately add new WRITE tools.)
+    assert "read" not in _FILE_MODIFYING_TOOLS_FALLBACK
+    assert "shell" not in _FILE_MODIFYING_TOOLS_FALLBACK
+    # And in this test environment the derived set stays read-only-free too.
+    assert "read" not in tools
+    assert "shell" not in tools
 
 
 def test_record_tool_failure_logs_the_error_text(caplog):
