@@ -23,7 +23,11 @@ from typing import List
 
 import pytest
 
-pytest.importorskip("proximadb_sdk", reason="proximadb_sdk not installed")
+try:  # importorskip only catches ImportError; a broken install (e.g. grpc codegen
+    # mismatch) raises RuntimeError and would fail collection for the whole suite.
+    import proximadb_sdk  # noqa: F401
+except Exception as _exc:  # pragma: no cover - environment-dependent
+    pytest.skip(f"proximadb_sdk unavailable: {_exc}", allow_module_level=True)
 
 from victor.storage.graph import GraphEdge, GraphNode, SqliteGraphStore  # noqa: E402
 from victor.storage.graph.proxima_store import ProximaGraphStore  # noqa: E402

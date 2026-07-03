@@ -488,6 +488,33 @@ jobs:
           echo "Running ${#TARGETS[@]} changed-file test target(s):"; printf '  %s\n' "${TARGETS[@]}"
           pytest "${TARGETS[@]}" -m "not slow" --tb=short -q
 
+  collect-check:
+    name: Full-Suite Collection Check
+    runs-on: ubuntu-latest
+    # Collects (imports) every test module without running any test. Catches the
+    # stale-import class of failure — a refactor that moves/renames a symbol and
+    # misses an importer — which otherwise surfaces only at develop -> main, where
+    # a single collection error turns ALL 24 shards red (see PR #376). Required
+    # via the ci-success aggregate below.
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          # victor-contracts first (provides constants), then victor-ai with dev extras
+          pip install -e ./victor-contracts
+          pip install -e ".[dev]"
+
+      - name: Collect full test suite (no execution)
+        run: pytest tests/ --collect-only -q
+
   # Aggregate merge gate — mirrors ProximaDB's `CI Success` pattern (see
   # ../proximaDB/.github/workflows/ci.yml `ci-success`). A single required
   # status check that is green iff every core gate passed (or was path-skipped).
@@ -518,6 +545,7 @@ jobs:
       - guards
       - security-quick
       - quick-tests
+      - collect-check
     if: always()
     steps:
       - name: Require all required jobs green
