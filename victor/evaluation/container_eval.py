@@ -31,13 +31,51 @@ from typing import Optional
 import httpx
 
 from victor.workflows.isolation import IsolationConfig, ResourceLimits
-from victor.workflows.sandbox_executor import build_docker_run_flags
+from victor.workflows.sandbox_executor import SANDBOX_CONTAINER_LABEL, build_docker_run_flags
 
 logger = logging.getLogger(__name__)
 
 # Container label value for eval containers (the label key is
 # ``victor.sandbox``; value distinguishes eval from workflow sandboxes).
 EVAL_CONTAINER_LABEL_VALUE = "eval"
+
+
+async def cleanup_stale_eval_containers() -> int:
+    """Remove orphaned victor-eval containers from prior crashed runs.
+
+    If a benchmark process dies (SIGHUP, crash, OOM) mid-task, the
+    ``EvalContainer.stop()`` in the ``finally`` block doesn't run → that
+    task's container stays. Over multiple runs these accumulate and can
+    exhaust Docker resources (disk, memory, container-limit). Call this at
+    benchmark START to sweep orphans labelled ``victor.sandbox=eval``.
+
+    Returns the number of containers removed.
+    """
+    try:
+        rc, out, _ = await _run_cmd(
+            [
+                "docker",
+                "ps",
+                "-aq",
+                "--filter",
+                f"label={SANDBOX_CONTAINER_LABEL}={EVAL_CONTAINER_LABEL_VALUE}",
+            ],
+            timeout=30,
+        )
+        if rc != 0:
+            return 0
+        ids = [line.strip() for line in out.decode().splitlines() if line.strip()]
+        if not ids:
+            return 0
+        rc, _, _ = await _run_cmd(["docker", "rm", "-f", *ids], timeout=60)
+        if rc == 0:
+            logger.info("Cleaned up %d stale eval container(s) at startup", len(ids))
+            return len(ids)
+    except Exception as exc:
+        logger.debug("Stale container cleanup failed (non-fatal): %s", exc)
+    return 0
+
+
 # Where the task's cached repo is mounted inside the container.
 EVAL_WORKSPACE_MOUNT = "/workspace"
 

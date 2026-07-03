@@ -500,9 +500,16 @@ class SWEBenchRunner(BaseBenchmarkRunner):
         from victor.evaluation.container_eval import (
             EVAL_WORKSPACE_MOUNT,
             EvalContainer,
+            cleanup_stale_eval_containers,
             resolve_runtime,
             resolve_swebench_image_exact,
         )
+
+        # One-shot: sweep orphaned eval containers from prior crashed runs
+        # (process death before stop() → containers accumulate → Docker strain).
+        if not getattr(SWEBenchRunner, "_stale_containers_cleaned", False):
+            SWEBenchRunner._stale_containers_cleaned = True
+            await cleanup_stale_eval_containers()
 
         # Official per-instance image for SWE-bench tasks (carry repo); else the
         # polyglot language+version map. The exact name (with its per-repo
