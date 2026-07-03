@@ -38,11 +38,11 @@ def test_replace_lines_multi_line_replacement():
 
 
 def test_replace_lines_delete_range():
-    """Replace a range with empty string (deletion)."""
+    """Replace a range with empty string (deletion — no leftover empty line)."""
     content = "a\nb\nc\nd"
     result = _resolve_replace_lines(content, 2, 3, "", "f.py")
     assert result["ok"] is True
-    assert result["new_content"] == "a\n\nd"
+    assert result["new_content"] == "a\nd"
 
 
 def test_replace_lines_invalid_range_start_zero():
