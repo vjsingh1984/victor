@@ -21,6 +21,13 @@ To generate trajectories with a *real* agent instead of the scripted executor, u
 
 Usage:
     python benchmarks/judge_calibration/run_offline_calibration.py [--variants 8] [--out DIR]
+
+    # Calibrate the LLM rubric judge via a Victor profile (provider/model/key from
+    # profiles.yaml). If the key lives in the system keyring, bridge it into env first —
+    # keyring is skipped without a TTY, but env always resolves:
+    eval "$(victor auth env -p zai)"
+    python benchmarks/judge_calibration/run_offline_calibration.py \
+        --variants 8 --judge-profile zai-coding   # e.g. zai / glm-5.2 (1M context)
 """
 
 from __future__ import annotations
