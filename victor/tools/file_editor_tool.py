@@ -240,12 +240,64 @@ def _replace_not_found_detail(current_content: str, old_str: str, path: str) -> 
     )
 
 
+def _normalize_backslashes(s: str) -> str:
+    """Collapse doubled backslashes (``\\\\d`` → ``\\d``).
+
+    Handles the common JSON/LLM escaping artifact where the model outputs
+    ``"\\\\d"`` in its tool call (JSON-escaped ``\\d``) but the file contains the
+    single-backslash ``\\d``. Applied as a FALLBACK only (after exact + whitespace
+    fuzzy fail) so legitimate double-backslashes (Windows paths etc.) are
+    unaffected unless the normalized version matches uniquely.
+    """
+    return s.replace("\\\\", "\\")
+
+
+def _try_backslash_normalized_replace(
+    content: str, old_str: str, new_str: str, path: str
+) -> Optional[Dict[str, Any]]:
+    """Fallback: try matching with backslash-normalized old_str + new_str.
+
+    Returns a result dict (like ``_resolve_replace``) if the normalized match
+    succeeds uniquely; ``None`` if it doesn't help (caller falls through to the
+    error).  Only fires when normalizing actually CHANGES old_str (no point
+    retrying the same string).
+    """
+    norm_old = _normalize_backslashes(old_str)
+    if norm_old == old_str:
+        return None  # normalization didn't change anything
+    norm_new = _normalize_backslashes(new_str)
+
+    occurrences = content.count(norm_old)
+    if occurrences == 1:
+        return {
+            "ok": True,
+            "new_content": content.replace(norm_old, norm_new, 1),
+            "fuzzy": True,
+            "normalized": "backslash",
+        }
+    if occurrences > 1:
+        return None  # ambiguous → don't guess
+
+    # Also try the whitespace-tolerant span with the normalized old_str.
+    span = _find_unique_fuzzy_span(content, norm_old)
+    if span is not None and span != norm_new:
+        return {
+            "ok": True,
+            "new_content": content.replace(span, norm_new, 1),
+            "fuzzy": True,
+            "normalized": "backslash",
+        }
+    return None
+
+
 def _resolve_replace(current_content: str, old_str: str, new_str: str, path: str) -> Dict[str, Any]:
     """Resolve a ``replace`` op to concrete new content.
 
-    Tries an exact unique match first, then a single unambiguous whitespace-
-    tolerant span. Returns a dict with ``ok`` plus either ``new_content`` (and
-    whether a ``fuzzy`` match was used) or a human-readable ``reason``.
+    Tries (in order): exact unique match → whitespace-tolerant fuzzy span →
+    backslash-normalized match (handles JSON/LLM escaping artifacts like
+    ``\\\\d`` vs ``\\d``). Returns a dict with ``ok`` plus either ``new_content``
+    (and whether a ``fuzzy``/``normalized`` match was used) or a human-readable
+    ``reason``.
     """
     occurrences = current_content.count(old_str)
     if occurrences == 1:
@@ -270,6 +322,10 @@ def _resolve_replace(current_content: str, old_str: str, new_str: str, path: str
             "new_content": current_content.replace(span, new_str, 1),
             "fuzzy": True,
         }
+    # Backslash-normalized fallback (JSON/LLM escaping: \\d → \d).
+    norm_result = _try_backslash_normalized_replace(current_content, old_str, new_str, path)
+    if norm_result is not None:
+        return norm_result
     return {"ok": False, "reason": _replace_not_found_detail(current_content, old_str, path)}
 
 
