@@ -587,13 +587,21 @@ class SWEBenchRunner(BaseBenchmarkRunner):
                 ]
             runner_cfg = detect_test_runner(cached_repo, test_files=_test_files or None)
             test_cmd = list(runner_cfg.command)
-            # detect_test_runner embeds the HOST python (sys.executable) as the
-            # binary; that absolute path doesn't exist in the container → pytest
-            # never ran → 0 tests collected. Use the container's `python` (on
-            # the image's PATH). Only rewrites a python binary; leaves non-python
-            # commands (npm test, etc.) untouched.
+            # detect_test_runner embeds HOST ABSOLUTE PATHS (e.g. the
+            # ``runtests.py`` path, ``sys.executable``) which don't exist in
+            # the container (repo is at ``/testbed``). Rewrite both:
+            # 1. Python binary → bare ``python`` (container's PATH).
+            # 2. Any path starting with the cached_repo prefix → relative path
+            #    (so ``/Users/.../tests/runtests.py`` → ``tests/runtests.py``,
+            #    valid from ``/testbed``). Without this, django's runtests.py
+            #    was a host-only path → file not found → 0 tests collected.
             if test_cmd and "python" in test_cmd[0]:
                 test_cmd[0] = "python"
+            _repo_prefix = str(cached_repo.resolve()) + "/"
+            test_cmd = [
+                arg.replace(_repo_prefix, "") if arg.startswith(_repo_prefix) else arg
+                for arg in test_cmd
+            ]
             if runner_cfg.runner_type == "pytest" and "-m" in test_cmd:
                 idx = test_cmd.index("-m")
                 test_cmd.insert(idx + 2, "--noconftest")
