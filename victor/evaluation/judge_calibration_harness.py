@@ -1,0 +1,301 @@
+# Copyright 2026 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Offline judge-calibration harness (EVR-2, ADR-011).
+
+The :class:`~victor.evaluation.judge_calibration.JudgeReliabilityGate` needs a *gold* label
+sequence to measure a judge against — but nothing requires those labels to come from human
+annotators. This harness produces them from **programmatic verifiers**: each
+:class:`VerifiableTask` materializes a fixture workspace, an executor (a real agent, a scripted
+stand-in, or a replayed transcript) attempts the task, and the task's verifier computes the gold
+completion label from the *actual workspace state* — the effect-grounded ground truth of ADR-010.
+
+The judge is **blinded by construction**: it receives only the task prompt, the execution
+transcript, and a read-only view of the workspace. Verifier verdicts are never part of its input,
+so measured agreement is agreement, not leakage.
+
+The whole loop runs offline — no LLM, no network — which makes it cheap enough to run in CI and
+to smoke-test judge changes before spending tokens on SWE-bench-scale calibration.
+
+Usage::
+
+    from victor.evaluation.judge_calibration_harness import JudgeCalibrationHarness
+    from victor.evaluation.calibration_corpus import default_corpus
+
+    harness = JudgeCalibrationHarness(default_corpus(variants=8))
+    report = harness.run(executor=my_executor, judge=my_judge)
+    print(report.gate_decision)          # trusted / not trusted, with reason
+    report.save(Path("calibration_report.json"))
+
+Interpretation caveats (record them wherever a report is consumed):
+
+- Gold labels are binary completion verdicts, so a passing gate trusts the judge **for
+  completion decisions only** — it says nothing about the calibration of interval rubric scores.
+- Agreement is reported per task family as well as overall; a judge may clear the gate on one
+  distribution and fail on another. Graduate flags on the family you actually route through it.
+"""
+
+from __future__ import annotations
+
+import json
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any, Callable, Hashable, Optional, Protocol, Sequence
+
+from victor.evaluation.judge_calibration import (
+    GateDecision,
+    JudgeReliability,
+    JudgeReliabilityGate,
+    evaluate_judge_agreement,
+)
+
+# ----------------------------------------------------------------------------------------------------
+# Transcript + task model
+# ----------------------------------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class TranscriptStep:
+    """One observable step of an execution: a tool action or an assistant message."""
+
+    kind: str  # "tool" | "message"
+    content: str
+
+
+@dataclass(frozen=True)
+class Transcript:
+    """What the judge is allowed to see about an execution (besides the workspace)."""
+
+    steps: tuple[TranscriptStep, ...] = ()
+    final_message: str = ""
+
+    def tool_steps(self) -> tuple[TranscriptStep, ...]:
+        return tuple(step for step in self.steps if step.kind == "tool")
+
+
+@dataclass(frozen=True)
+class VerifiableTask:
+    """A task whose completion is decidable by a programmatic verifier.
+
+    Attributes:
+        task_id: Unique, stable identifier (also used for report grouping/debugging).
+        family: Task-distribution family (e.g. ``file-create``, ``code-fix``, ``qa``).
+            Agreement is reported per family so gate decisions can be scoped.
+        prompt: The instruction given to the executor and, verbatim, to the judge.
+        setup: Materializes fixture files into an empty workspace directory.
+        verify: Computes the gold label (1.0 complete / 0.0 not) from the workspace
+            state and transcript AFTER execution. Never exposed to the judge.
+        solve: Reference solution used by scripted executors and corpus self-tests;
+            applies the correct change to the workspace.
+        reference_answer: For tasks verified from the transcript (e.g. QA), the final
+            message a correct execution would produce; scripted executors emit it when
+            they solve the task.
+    """
+
+    task_id: str
+    family: str
+    prompt: str
+    setup: Callable[[Path], None]
+    verify: Callable[[Path, Transcript], float]
+    solve: Optional[Callable[[Path], None]] = None
+    reference_answer: Optional[str] = None
+
+
+class CalibrationExecutor(Protocol):
+    """Attempts a task in the given workspace and returns what happened."""
+
+    def __call__(self, task: VerifiableTask, workspace: Path) -> Transcript: ...
+
+
+class CalibrationJudge(Protocol):
+    """Scores completion in [0, 1] from prompt + transcript + read-only workspace.
+
+    Gold labels and verifier internals are structurally absent from this signature —
+    that is the blinding contract.
+    """
+
+    def __call__(self, prompt: str, transcript: Transcript, workspace: Path) -> float: ...
+
+
+# ----------------------------------------------------------------------------------------------------
+# Harness + report
+# ----------------------------------------------------------------------------------------------------
+
+
+def binary_categorize(score: float) -> Hashable:
+    """Default categorizer for Cohen's κ: complete at ≥ 0.5."""
+    return score >= 0.5
+
+
+@dataclass(frozen=True)
+class CalibrationSample:
+    """One (task, gold, judged) observation."""
+
+    task_id: str
+    family: str
+    gold: float
+    judged: float
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "task_id": self.task_id,
+            "family": self.family,
+            "gold": self.gold,
+            "judged": self.judged,
+        }
+
+
+@dataclass(frozen=True)
+class CalibrationReport:
+    """Agreement measurements plus the resulting gate decision.
+
+    ``overall`` and ``per_family`` are :class:`JudgeReliability` measurements; the gate decision
+    is computed from ``overall``. Per-family α on small corpora is noisy — treat families with
+    n < 30 as directional, not gating evidence.
+    """
+
+    samples: tuple[CalibrationSample, ...]
+    overall: JudgeReliability
+    per_family: dict[str, JudgeReliability]
+    gate_decision: GateDecision
+    alpha_threshold: float
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "n": len(self.samples),
+            "alpha_threshold": self.alpha_threshold,
+            "gate": {
+                "trusted": self.gate_decision.trusted,
+                "reason": self.gate_decision.reason,
+                "scope": "binary completion verdicts only (gold labels are programmatic "
+                "verifier outcomes, not interval rubric scores)",
+            },
+            "overall": self.overall.to_dict(),
+            "per_family": {family: rel.to_dict() for family, rel in self.per_family.items()},
+            "samples": [sample.to_dict() for sample in self.samples],
+        }
+
+    def save(self, path: Path) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(self.to_dict(), indent=2, sort_keys=True) + "\n")
+
+
+@dataclass
+class JudgeCalibrationHarness:
+    """Runs a corpus through (executor, judge) and measures agreement against verifier gold.
+
+    Per task: a fresh workspace directory is created under ``workspace_root``, ``task.setup``
+    materializes fixtures, the executor attempts the task, the judge scores the blinded view,
+    and the verifier computes gold. Judge scoring happens BEFORE verification so no verifier
+    side effects can leak into the judged view.
+    """
+
+    tasks: Sequence[VerifiableTask]
+    gate: JudgeReliabilityGate = field(default_factory=JudgeReliabilityGate)
+    categorize: Callable[[float], Hashable] = binary_categorize
+
+    def run(
+        self,
+        executor: CalibrationExecutor,
+        judge: CalibrationJudge,
+        *,
+        workspace_root: Optional[Path] = None,
+    ) -> CalibrationReport:
+        import tempfile
+
+        root = workspace_root or Path(tempfile.mkdtemp(prefix="judge_calibration_"))
+        samples: list[CalibrationSample] = []
+        for index, task in enumerate(self.tasks):
+            workspace = root / f"{index:04d}_{task.task_id}"
+            workspace.mkdir(parents=True, exist_ok=False)
+            task.setup(workspace)
+            transcript = executor(task, workspace)
+            judged = float(judge(task.prompt, transcript, workspace))
+            gold = float(task.verify(workspace, transcript))
+            samples.append(
+                CalibrationSample(
+                    task_id=task.task_id, family=task.family, gold=gold, judged=judged
+                )
+            )
+
+        overall = self._agreement(samples)
+        per_family: dict[str, JudgeReliability] = {}
+        for family in sorted({s.family for s in samples}):
+            per_family[family] = self._agreement([s for s in samples if s.family == family])
+        return CalibrationReport(
+            samples=tuple(samples),
+            overall=overall,
+            per_family=per_family,
+            gate_decision=self.gate.decide(overall),
+            alpha_threshold=self.gate.alpha_threshold,
+        )
+
+    def _agreement(self, samples: Sequence[CalibrationSample]) -> JudgeReliability:
+        return evaluate_judge_agreement(
+            [s.gold for s in samples],
+            [s.judged for s in samples],
+            level="nominal",
+            categorize=self.categorize,
+        )
+
+
+# ----------------------------------------------------------------------------------------------------
+# Scripted executors (offline stand-ins for a real agent)
+# ----------------------------------------------------------------------------------------------------
+
+
+def make_scripted_executor(
+    should_solve: Callable[[VerifiableTask], bool],
+) -> CalibrationExecutor:
+    """An executor that solves tasks selected by ``should_solve`` and fakes the rest.
+
+    Solved tasks apply ``task.solve`` and emit a tool step; unsolved tasks emit NO tool steps
+    but still *claim* success in the final message — the "completion-without-effect" failure
+    mode (ADR-010) that a trustworthy completion judge must catch. Mixing the two produces the
+    label variance κ/α need.
+    """
+
+    def executor(task: VerifiableTask, workspace: Path) -> Transcript:
+        if should_solve(task):
+            if task.solve is None:
+                raise ValueError(f"task {task.task_id} has no reference solution")
+            task.solve(workspace)
+            final = task.reference_answer or f"Done — completed the task: {task.prompt[:60]}"
+            return Transcript(
+                steps=(
+                    TranscriptStep(kind="tool", content=f"edit workspace for {task.task_id}"),
+                    TranscriptStep(kind="message", content="Applied the change."),
+                ),
+                final_message=final,
+            )
+        return Transcript(
+            steps=(TranscriptStep(kind="message", content="Working on it."),),
+            final_message="Done — the task is complete.",
+        )
+
+    return executor
+
+
+def alternating_scripted_executor(period: int = 2) -> CalibrationExecutor:
+    """Deterministically solves all but every ``period``-th task (by corpus order).
+
+    Stateful across calls; create a fresh instance per harness run.
+    """
+    counter = {"i": -1}
+
+    def should_solve(_task: VerifiableTask) -> bool:
+        counter["i"] += 1
+        return counter["i"] % period != period - 1
+
+    return make_scripted_executor(should_solve)
