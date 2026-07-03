@@ -293,6 +293,7 @@ class TestProtocolRegistration:
                 (),
                 {
                     "name": "mock-tools",
+                    "group": "victor.sdk.protocols",
                     "load": mock_load,
                     "dist": type("MockDist", (), {"version": "1.0.0"}),
                 },
@@ -301,12 +302,9 @@ class TestProtocolRegistration:
 
         import importlib.metadata
 
-        original_entry_points = importlib.metadata.entry_points
-
         def mock_entry_points(*args, **kwargs):
-            if "group" in kwargs and kwargs["group"] == "victor.sdk.protocols":
-                return mock_eps
-            return original_entry_points(*args, **kwargs)
+            # Discovery uses a single no-group scan and partitions by ep.group.
+            return mock_eps
 
         monkeypatch.setattr(importlib.metadata, "entry_points", mock_entry_points)
 

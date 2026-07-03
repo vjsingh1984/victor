@@ -46,6 +46,7 @@ yaml = [
     "PyYAML>=6.0",
 ]
 dev = [
+    "PyYAML>=6.0",  # the tool-dependency loader tests exercise the yaml extra
     "pytest>=8.0",
     "pytest-asyncio>=0.23",
     "pytest-cov>=4.1",

@@ -1,5 +1,9 @@
 """Tests for SDK workflow runtime host adapters."""
 
+import pytest
+
+pytest.importorskip("victor", reason="host runtime adapters require the victor-ai package")
+
 from victor_contracts.workflow_runtime import (
     BaseYAMLWorkflowProvider,
     WorkflowBuilder,

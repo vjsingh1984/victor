@@ -1,5 +1,9 @@
 """Tests for SDK enrichment and middleware host adapters."""
 
+import pytest
+
+pytest.importorskip("victor", reason="host runtime adapters require the victor-ai package")
+
 from victor_contracts.enrichment_runtime import (
     ContextEnrichment,
     EnrichmentContext,
