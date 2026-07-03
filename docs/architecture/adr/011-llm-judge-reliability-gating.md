@@ -2,7 +2,7 @@
 
 ## Metadata
 
-- **Status**: Proposed
+- **Status**: Accepted (2026-07-02 — machinery shipped in `victor/evaluation/judge_calibration.py` + `trajectory_eval.py` (#202); the κ/α validation against human labels has not yet been run, so ADR-009/010 stay opt-in; was Proposed)
 - **Date**: 2026-06-21
 - **Decision Makers**: Vijaykumar Singh
 - **Related ADRs**: 009 (rubric completion), 010 (effect-grounded), 012 (regression-gated harness)

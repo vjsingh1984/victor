@@ -266,6 +266,31 @@ from victor.evaluation.judge_calibration import (
     evaluate_judge_agreement,
 )
 
+# Offline judge-calibration harness + verifiable corpus (EVR-2, ADR-011)
+from victor.evaluation.judge_calibration_harness import (
+    CalibrationReport,
+    CalibrationSample,
+    JudgeCalibrationHarness,
+    Transcript,
+    TranscriptStep,
+    VerifiableTask,
+    alternating_scripted_executor,
+    make_scripted_executor,
+)
+from victor.evaluation.calibration_corpus import default_corpus as default_calibration_corpus
+from victor.evaluation.calibration_agent_executor import (
+    execute_verifiable_task,
+    make_agent_executor,
+    trace_to_transcript,
+    verifiable_to_benchmark_task,
+)
+from victor.evaluation.calibration_rubric_judge import (
+    make_llm_rubric_judge,
+    make_provider_complete_fn,
+    make_rubric_judge,
+    render_judged_content,
+)
+
 __all__ = [
     # Protocol types
     "BenchmarkFailureCategory",
@@ -426,4 +451,22 @@ __all__ = [
     "cohens_kappa",
     "krippendorff_alpha",
     "evaluate_judge_agreement",
+    # Offline judge-calibration harness + corpus (EVR-2)
+    "CalibrationReport",
+    "CalibrationSample",
+    "JudgeCalibrationHarness",
+    "Transcript",
+    "TranscriptStep",
+    "VerifiableTask",
+    "alternating_scripted_executor",
+    "make_scripted_executor",
+    "default_calibration_corpus",
+    "execute_verifiable_task",
+    "make_agent_executor",
+    "trace_to_transcript",
+    "verifiable_to_benchmark_task",
+    "make_llm_rubric_judge",
+    "make_provider_complete_fn",
+    "make_rubric_judge",
+    "render_judged_content",
 ]

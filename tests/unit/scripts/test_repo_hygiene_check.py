@@ -1073,6 +1073,61 @@ warnings.warn(
     assert findings == []
 
 
+def _write_canonical_pointer_docs(root: Path) -> None:
+    write_file(root, "roadmap.md", "See [roadmap](docs/roadmap.md).\n")
+    write_file(root, "ARCHITECTURE.md", "See [arch](docs/architecture.md).\n")
+    write_file(root, "docs/roadmap.md", "See [debt](tech-stack.md#technical-debt-register).\n")
+    write_file(root, "docs/architecture/adr/README.md", "See [template](000-template.md).\n")
+    write_file(root, "docs/architecture.md", "arch\n")
+    write_file(root, "docs/tech-stack.md", "debt\n")
+    write_file(root, "docs/architecture/adr/000-template.md", "template\n")
+
+
+def test_canonical_doc_pointers_pass_when_targets_resolve(tmp_path: Path) -> None:
+    _write_canonical_pointer_docs(tmp_path)
+
+    findings = repo_hygiene_check.check_canonical_doc_pointers(tmp_path)
+
+    assert findings == []
+
+
+def test_canonical_doc_pointers_flag_missing_doc_and_broken_link(tmp_path: Path) -> None:
+    _write_canonical_pointer_docs(tmp_path)
+    (tmp_path / "docs" / "roadmap.md").unlink()
+    write_file(
+        tmp_path,
+        "ARCHITECTURE.md",
+        "See [arch](docs/architecture.md) and [gone](docs/does-not-exist.md).\n",
+    )
+
+    findings = repo_hygiene_check.check_canonical_doc_pointers(tmp_path)
+
+    messages = {(str(f.path), f.message) for f in findings}
+    assert ("docs/roadmap.md", "canonical doc is missing") in messages
+    assert (
+        "ARCHITECTURE.md",
+        "broken canonical link target: docs/does-not-exist.md",
+    ) in messages
+    # roadmap.md's link to docs/roadmap.md is now dangling too.
+    assert (
+        "roadmap.md",
+        "broken canonical link target: docs/roadmap.md",
+    ) in messages
+
+
+def test_canonical_doc_pointers_ignore_external_links(tmp_path: Path) -> None:
+    _write_canonical_pointer_docs(tmp_path)
+    write_file(
+        tmp_path,
+        "docs/architecture/adr/README.md",
+        "See [adr](https://adr.github.io/x.md) and [template](000-template.md).\n",
+    )
+
+    findings = repo_hygiene_check.check_canonical_doc_pointers(tmp_path)
+
+    assert findings == []
+
+
 def test_current_repo_passes_hygiene_checks() -> None:
     findings = repo_hygiene_check.run_checks(Path.cwd())
 
