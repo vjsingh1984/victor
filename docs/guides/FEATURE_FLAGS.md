@@ -374,7 +374,7 @@ else:
 
 ## References
 
-- [Feature Flag Implementation](../architecture/adr/008-feature-flags.md)
+- Feature flag implementation: `victor/core/feature_flags.py` (no dedicated ADR exists; graduation policy is tracked as TD-17 in the [tech-debt register](../tech-stack.md#technical-debt-register))
 - [Edge Model Guide](./EDGE_MODEL.md)
 - [Configuration Guide](../users/reference/config.md)
 - [Architecture Decision Records](../architecture/adr/)
