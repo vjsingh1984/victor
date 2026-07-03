@@ -85,8 +85,7 @@ coding = []
 research = ["victor-research>=0.6.0"]
 devops = ["victor-devops>=0.6.0"]
 verticals = ["victor-coding>=0.6.0", "victor-research>=0.6.0", "victor-devops>=0.6.0"]
-        """.strip()
-        + "\n",
+        """.strip() + "\n",
     )
 
     findings = repo_hygiene_check.run_checks(tmp_path)
@@ -115,8 +114,7 @@ research = ["victor-research>=0.6.0"]
 devops = ["victor-devops>=0.6.0"]
 verticals = ["victor-coding>=0.6.0", "victor-research>=0.6.0", "victor-devops>=0.6.0"]
 rag = []
-        """.strip()
-        + "\n",
+        """.strip() + "\n",
     )
 
     findings = repo_hygiene_check.run_checks(tmp_path)
@@ -145,8 +143,7 @@ research = ["victor-research>=0.6.0"]
 devops = ["victor-devops>=0.6.0"]
 verticals = ["victor-coding>=0.6.0", "victor-research>=0.6.0", "victor-devops>=0.6.0"]
 ci = ["victor-ai[dev]", "pytest-split>=0.8"]
-        """.strip()
-        + "\n",
+        """.strip() + "\n",
     )
 
     findings = repo_hygiene_check.run_checks(tmp_path)
@@ -182,8 +179,7 @@ benchmark = "victor.benchmark:plugin"
 
 # Requirements for external verticals:
 #   1. Must inherit from victor.core.verticals.VerticalBase
-        """.strip()
-        + "\n",
+        """.strip() + "\n",
     )
 
     findings = repo_hygiene_check.run_checks(tmp_path)
@@ -216,8 +212,7 @@ coding = ["victor-coding>=0.6.0"]
 research = ["victor-research>=0.6.0"]
 devops = ["victor-devops>=0.6.0"]
 verticals = ["victor-coding>=0.6.0", "victor-research>=0.6.0", "victor-devops>=0.6.0"]
-        """.strip()
-        + "\n",
+        """.strip() + "\n",
     )
     write_file(
         tmp_path,
@@ -225,8 +220,7 @@ verticals = ["victor-coding>=0.6.0", "victor-research>=0.6.0", "victor-devops>=0
         """
 [project.entry-points."victor.verticals"]
 security = "victor_security:SecurityVertical"
-        """.strip()
-        + "\n",
+        """.strip() + "\n",
     )
 
     findings = repo_hygiene_check.run_checks(tmp_path)
@@ -250,8 +244,7 @@ def test_primary_vertical_contract_docs_reject_nested_victor_plugins_groups(
         """
 [project.entry-points."victor.plugins.my_company"]
 tool = "my_package.plugin:plugin"
-        """.strip()
-        + "\n",
+        """.strip() + "\n",
     )
 
     findings = repo_hygiene_check.run_checks(tmp_path)
@@ -281,8 +274,7 @@ search = "my_vertical.capabilities:SearchCapability"
 
 [project.entry-points."victor.sdk.validators"]
 path = "my_vertical.validators:validate_path"
-        """.strip()
-        + "\n",
+        """.strip() + "\n",
     )
 
     findings = repo_hygiene_check.run_checks(tmp_path)
@@ -334,8 +326,7 @@ def test_primary_vertical_contract_docs_reject_compat_sdk_import_namespace(
 {legacy_import}
 
 Must inherit from victor.core.verticals.VerticalBase in every external vertical.
-        """.strip()
-        + "\n",
+        """.strip() + "\n",
     )
 
     findings = repo_hygiene_check.run_checks(tmp_path)
@@ -408,16 +399,14 @@ coding = ["victor-coding>=0.6.0"]
 research = ["victor-research>=0.6.0"]
 devops = ["victor-devops>=0.6.0"]
 verticals = ["victor-coding>=0.6.0", "victor-research>=0.6.0", "victor-devops>=0.6.0"]
-        """.strip()
-        + "\n",
+        """.strip() + "\n",
     )
     write_file(
         tmp_path,
         "victor-contracts/VERTICAL_DEVELOPMENT.md",
         """
 from victor.framework.vertical_base import VerticalBase
-        """.strip()
-        + "\n",
+        """.strip() + "\n",
     )
 
     findings = repo_hygiene_check.run_checks(tmp_path)
@@ -443,8 +432,7 @@ from victor.core.verticals.registration import register_vertical
 
 # Public API reference
 victor.core.verticals.registration.register_vertical
-        """.strip()
-        + "\n",
+        """.strip() + "\n",
     )
 
     findings = repo_hygiene_check.run_checks(tmp_path)
@@ -472,8 +460,7 @@ def test_primary_vertical_contract_docs_reject_framework_extensions_definition_i
 from victor.framework.extensions import VerticalBase
 from victor.framework.extensions import StageDefinition
 from victor.framework.extensions import VerticalConfig
-        """.strip()
-        + "\n",
+        """.strip() + "\n",
     )
 
     findings = repo_hygiene_check.run_checks(tmp_path)
@@ -500,8 +487,7 @@ def test_primary_vertical_contract_docs_reject_legacy_entry_point_lookup_example
 from victor.framework.entry_point_registry import get_entry_point
 
 coding = get_entry_point("victor.verticals", "coding")
-        """.strip()
-        + "\n",
+        """.strip() + "\n",
     )
 
     findings = repo_hygiene_check.run_checks(tmp_path)
@@ -529,8 +515,7 @@ from victor.verticals.base import VerticalConfig
 from victor.verticals import VerticalRegistry
 
 VerticalRegistry.register(MyVertical)
-        """.strip()
-        + "\n",
+        """.strip() + "\n",
     )
 
     findings = repo_hygiene_check.run_checks(tmp_path)
@@ -838,8 +823,7 @@ def __getattr__(name):
         "It will be removed in a future release.",
         DeprecationWarning,
     )
-        """.strip()
-        + "\n",
+        """.strip() + "\n",
     )
     write_file(tmp_path, "CHANGELOG.md", "## [Unreleased] (develop)\n")
     write_file(tmp_path, "docs/development/deprecation-inventory-2026-03-03.md", "")
@@ -877,8 +861,7 @@ def test_deprecation_contract_accepts_complete_teamnode_contract(
         "docs/development/deprecation-inventory-2026-03-03.md",
         """
 | `TeamNode*` workflow compatibility aliases | source | `TeamStep*` workflow names | Architecture Lead | `v0.9.0` | `2027-03-31` |
-        """.strip()
-        + "\n",
+        """.strip() + "\n",
     )
     write_file(
         tmp_path,
@@ -892,8 +875,7 @@ def test_deprecation_contract_accepts_complete_teamnode_contract(
   - Target removal date: `2027-03-31`
   - Replacement: `TeamStep*` workflow names
   - Compatibility shim status: warning-backed aliases remain supported through `v0.9.0`
-        """.strip()
-        + "\n",
+        """.strip() + "\n",
     )
     write_file(
         tmp_path,
@@ -902,8 +884,7 @@ def test_deprecation_contract_accepts_complete_teamnode_contract(
 Legacy `TeamNode*` workflow names are deprecated.
 Use `TeamStep*` names during the migration window.
 Removal target: `v0.9.0` (`2027-03-31`).
-        """.strip()
-        + "\n",
+        """.strip() + "\n",
     )
 
     findings = repo_hygiene_check.check_deprecation_contract(tmp_path, contract)
@@ -941,8 +922,7 @@ def test_deprecation_contract_accepts_complete_workflowgraph_contract(
         "docs/development/deprecation-inventory-2026-03-03.md",
         """
 | `WorkflowGraph` alias from `victor.workflows.graph` | source | `BasicWorkflowGraph` or `victor.workflows.graph_dsl.WorkflowGraph` | Architecture Lead | `v0.8.0` | `2026-12-31` |
-        """.strip()
-        + "\n",
+        """.strip() + "\n",
     )
     write_file(
         tmp_path,
@@ -956,8 +936,7 @@ def test_deprecation_contract_accepts_complete_workflowgraph_contract(
   - Target removal date: `2026-12-31`
   - Replacement: `BasicWorkflowGraph` for the simple container or `victor.workflows.graph_dsl.WorkflowGraph` for the typed DSL
   - Compatibility shim status: warning-backed alias remains supported through `v0.8.0`
-        """.strip()
-        + "\n",
+        """.strip() + "\n",
     )
     write_file(
         tmp_path,
@@ -966,8 +945,7 @@ def test_deprecation_contract_accepts_complete_workflowgraph_contract(
 Legacy `WorkflowGraph` import from `victor.workflows.graph` is deprecated.
 Use `BasicWorkflowGraph` for the simple container or `victor.workflows.graph_dsl.WorkflowGraph` for the typed DSL.
 Removal target: `v0.8.0` (`2026-12-31`).
-        """.strip()
-        + "\n",
+        """.strip() + "\n",
     )
 
     findings = repo_hygiene_check.check_deprecation_contract(tmp_path, contract)
@@ -999,8 +977,7 @@ def test_deprecation_contract_accepts_complete_frameworkshim_contract(
         "docs/development/deprecation-inventory-2026-03-03.md",
         """
 | `FrameworkShim` compatibility surface | `victor/framework/shim.py`, `victor/framework/__init__.py` | `Agent.create()` for public callers or `AgentFactory` / `AgentCreationFactory` for internal composition | Architecture Lead | `v1.0.0` | `2027-06-30` |
-        """.strip()
-        + "\n",
+        """.strip() + "\n",
     )
     write_file(
         tmp_path,
@@ -1014,8 +991,7 @@ def test_deprecation_contract_accepts_complete_frameworkshim_contract(
   - Target removal date: `2027-06-30`
   - Replacement: `Agent.create()` for public callers or `AgentFactory` / `AgentCreationFactory` for internal composition
   - Compatibility shim status: warning-backed shim remains supported through `v1.0.0`
-        """.strip()
-        + "\n",
+        """.strip() + "\n",
     )
     write_file(
         tmp_path,
@@ -1024,8 +1000,7 @@ def test_deprecation_contract_accepts_complete_frameworkshim_contract(
 Legacy `FrameworkShim` usage is deprecated.
 Use `Agent.create()` for public callers or `AgentFactory` / `AgentCreationFactory` for internal composition.
 Removal target: `v1.0.0` (`2027-06-30`).
-        """.strip()
-        + "\n",
+        """.strip() + "\n",
     )
 
     findings = repo_hygiene_check.check_deprecation_contract(tmp_path, contract)
@@ -1087,8 +1062,7 @@ warnings.warn(
     "See docs/migration/foo.md for migration guidance.",
     DeprecationWarning,
 )
-        """.strip()
-        + "\n",
+        """.strip() + "\n",
     )
     write_file(tmp_path, "docs/development/foo-inventory.md", "LegacyFoo\n")
     write_file(tmp_path, "CHANGELOG.md", "## [Unreleased] (develop)\nLegacyFoo\n")
