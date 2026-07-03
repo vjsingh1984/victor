@@ -1629,6 +1629,15 @@ class TurnExecutor:
             conversation_depth=conversation_depth,
         )
 
+        # When the caller curated the toolset (_enabled_tools is a real non-empty
+        # collection), the schema must reach the LLM UNCHANGED — no stage
+        # prioritization or intent filtering that drops curated tools (code/graph).
+        # select_tools() already short-circuits to the stable curated set (#368);
+        # skip the downstream gates too so the full 6-tool set survives.
+        _curated = getattr(self._tool_context.tool_selector, "_enabled_tools", None)
+        if isinstance(_curated, (set, frozenset, list)) and _curated:
+            return tools
+
         # Prioritize by stage
         tools = self._tool_context.tool_selector.prioritize_by_stage(user_message, tools)
 
