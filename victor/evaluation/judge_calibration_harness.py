@@ -271,7 +271,10 @@ def make_scripted_executor(
             if task.solve is None:
                 raise ValueError(f"task {task.task_id} has no reference solution")
             task.solve(workspace)
-            final = task.reference_answer or f"Done — completed the task: {task.prompt[:60]}"
+            # Keep the claim clean: an earlier version echoed a mid-word-truncated
+            # prompt here, which a perceptive judge (correctly) penalized as a
+            # defect — poisoning every solved-task calibration label.
+            final = task.reference_answer or "Done — I completed the requested task."
             return Transcript(
                 steps=(
                     TranscriptStep(kind="tool", content=f"edit workspace for {task.task_id}"),
