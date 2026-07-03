@@ -12,6 +12,9 @@ on:
       - 'victor/**'
       - 'victor-contracts/**'
       - 'tests/**'
+      # benchmarks/ holds executable code importing victor.* — without this filter,
+      # benchmarks-only PRs never run the required checks and are unmergeable.
+      - 'benchmarks/**'
       - 'pyproject.toml'
       - 'requirements*.txt'
       - 'Makefile'
@@ -23,6 +26,9 @@ on:
       - 'victor/**'
       - 'victor-contracts/**'
       - 'tests/**'
+      # benchmarks/ holds executable code importing victor.* — without this filter,
+      # benchmarks-only PRs never run the required checks and are unmergeable.
+      - 'benchmarks/**'
       - 'pyproject.toml'
       - 'requirements*.txt'
       - 'Makefile'
