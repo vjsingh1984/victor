@@ -110,6 +110,24 @@ class FileEditor:
         # real error instead of a generic "Failed to commit".
         self.last_commit_error: Optional[str] = None
 
+    def reset_state(self) -> None:
+        """Reset per-task mutable state (benchmark isolation hygiene).
+
+        The FileEditor is a singleton; without this, transaction_history grows
+        unbounded across tasks and a stale last_commit_error from task N can
+        leak into task N+1's diagnostics. Called per-task by the edit tool's
+        ``_create_file_editor`` (victor/tools/file_editor_tool.py). Also
+        re-ensures backup_dir (defense-in-depth alongside the git-clean -e
+        .victor fix).
+        """
+        self.current_transaction = None
+        self.transaction_history = []
+        self.last_commit_error = None
+        try:
+            self.backup_dir.mkdir(parents=True, exist_ok=True)
+        except Exception:
+            pass
+
     def start_transaction(self, description: str = "") -> str:
         """Start a new edit transaction.
 

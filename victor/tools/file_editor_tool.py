@@ -308,9 +308,13 @@ def _create_file_editor(backup_dir: str):
         # If it's a class, instantiate it
         if isinstance(provider, type):
             return provider(backup_dir=backup_dir)
-        # Already an instance — reset any stale transaction state
-        # FileEditor uses current_transaction (Optional[EditTransaction]), not _in_transaction
-        if hasattr(provider, "current_transaction"):
+        # Already an instance — reset per-task mutable state (benchmark
+        # isolation hygiene). Prefers the vertical's reset_state() (clears
+        # transaction_history + last_commit_error + re-ensures backup_dir);
+        # falls back to clearing current_transaction for editors without it.
+        if hasattr(provider, "reset_state"):
+            provider.reset_state()
+        elif hasattr(provider, "current_transaction"):
             provider.current_transaction = None
         return provider
     return None
