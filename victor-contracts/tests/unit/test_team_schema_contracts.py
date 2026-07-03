@@ -1,5 +1,7 @@
 """Tests for SDK-owned declarative team schema contracts."""
 
+import pytest
+
 from victor_contracts.team_schema import (
     RoleConfig,
     TeamFormation,
@@ -46,6 +48,7 @@ def test_team_spec_round_trips_from_dict() -> None:
 
 
 def test_team_member_spec_bridges_to_runtime_member() -> None:
+    pytest.importorskip("victor", reason="to_team_member() requires the victor-ai package")
     member = TeamMemberSpec(
         role="researcher",
         goal="Find the relevant code",

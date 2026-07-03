@@ -78,7 +78,7 @@ def is_capability_enhanced(protocol: Any) -> bool:
     try:
         registry_mod = importlib.import_module("victor.core.capability_registry")
         registry = registry_mod.CapabilityRegistry.get_instance()
-        return registry.is_enhanced(protocol)
+        return bool(registry.is_enhanced(protocol))
     except Exception:
         return False
 

@@ -10,6 +10,15 @@ Version: Synchronized with victor-ai
 # ruff: noqa: E402
 
 import sys
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from victor_contracts.workflow_runtime import (
+        BaseYAMLWorkflowProvider,
+        WorkflowBuilder,
+        WorkflowDefinition,
+        workflow,
+    )
 
 _MIN_SUPPORTED_PYTHON = (3, 10)
 
@@ -156,12 +165,6 @@ from victor_contracts.workflows import (
     NodeResult,
     WorkflowContextProtocol,
     register_compute_handlers,
-)
-from victor_contracts.workflow_runtime import (
-    BaseYAMLWorkflowProvider,
-    WorkflowBuilder,
-    WorkflowDefinition,
-    workflow,
 )
 from victor_contracts.core.plugins import PluginContext, VictorPlugin
 from victor_contracts.registries import (
@@ -345,7 +348,6 @@ __all__ = [
     "FileOperationType",
     "BaseCapabilityProvider",
     "BaseRLConfig",
-    "BaseYAMLWorkflowProvider",
     "ComputeHandlerProtocol",
     "ComputeHandlerRegistrar",
     "ComputeNodeProtocol",
@@ -383,9 +385,6 @@ __all__ = [
     "get_default_team_registry",
     "set_default_persona_registry",
     "set_default_team_registry",
-    "WorkflowBuilder",
-    "WorkflowDefinition",
-    "workflow",
     "PluginContext",
     "VictorPlugin",
     # Exceptions
@@ -473,3 +472,26 @@ __all__ = [
     "RLOutcome",
     "RLRecommendation",
 ]
+
+# Runtime-backed workflow helpers resolved from the Victor host runtime.
+# Deferred via PEP 562 so `import victor_contracts` works without victor-ai
+# installed; accessing these names without the host runtime raises ImportError.
+# Intentionally excluded from __all__ so `from victor_contracts import *`
+# (and the victor_sdk shim's re-export) stays standalone-safe.
+_HOST_RUNTIME_EXPORTS = frozenset(
+    {
+        "BaseYAMLWorkflowProvider",
+        "WorkflowBuilder",
+        "WorkflowDefinition",
+        "workflow",
+    }
+)
+
+
+def __getattr__(name: str) -> Any:
+    """Resolve host-runtime-backed exports lazily (PEP 562)."""
+    if name in _HOST_RUNTIME_EXPORTS:
+        from victor_contracts import workflow_runtime
+
+        return getattr(workflow_runtime, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
