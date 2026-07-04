@@ -119,12 +119,25 @@ async def test_shell_general_exception():
 
 
 @pytest.mark.asyncio
-async def test_shell_defaults_to_readonly_mode():
-    """Shell should default to readonly mode when the caller omits the flag."""
+async def test_shell_defaults_to_non_readonly_mode():
+    """Shell defaults to readonly=False; the allowlist is opt-in.
+
+    Commit 989dd14e flipped the default (the LLM echoed readonly=True back
+    from the schema, blocking legitimate commands). The dangerous-command
+    check and ShellSafetyPolicy remain the always-on safety floor (covered
+    by test_shell_dangerous_command); a benign non-allowlisted command must
+    run when the caller omits the flag, and readonly=True must still opt
+    into the allowlist.
+    """
     result = await shell(cmd="sleep 1")
 
-    assert result["success"] is False
-    assert "readonly mode" in result["error"]
+    assert result["success"] is True
+    assert result["return_code"] == 0
+
+    opted_in = await shell(cmd="sleep 1", readonly=True)
+
+    assert opted_in["success"] is False
+    assert "readonly mode" in opted_in["error"]
 
 
 @pytest.mark.asyncio
@@ -149,13 +162,33 @@ async def test_shell_heredoc_command():
 
 
 @pytest.mark.asyncio
-async def test_shell_broad_search_guidance_uses_grouped_search_tool():
-    """Blocked broad searches should point at the advertised grouped search tool."""
-    result = await shell(cmd="rg FilePathField .", readonly=False)
+async def test_shell_broad_search_commands_are_not_redirected():
+    """Broad rg/grep searches execute in shell; the redirect guard is gone.
+
+    Commit 92935ec9 removed the search-redirect guard that blocked rg/grep
+    and pointed at the deprecated grouped search tool. The command must now
+    reach subprocess execution instead of returning a guard error.
+    """
+    with patch(
+        "victor.tools.shell_command_cache.execute_with_cache",
+        return_value=(0, "match\n", ""),
+    ) as mock_exec:
+        result = await shell(cmd="rg FilePathField .", readonly=False)
+
+    mock_exec.assert_called_once()
+    assert mock_exec.call_args.args[0].startswith("rg ")
+    assert result["success"] is True
+    assert "match" in result["stdout"]
+
+
+@pytest.mark.asyncio
+async def test_shell_blocks_filesystem_wide_find():
+    """`find / ...` is guarded (commit 92935ec9) — immediate error, no execution."""
+    result = await shell(cmd="find / -name '*.py'")
 
     assert result["success"] is False
-    assert "search(cmd=" in result["error"]
-    assert "code_search(" not in result["error"]
+    assert "Filesystem-wide searches are not allowed" in result["error"]
+    assert result["return_code"] == -1
 
 
 class TestReadonlyControlFlow:

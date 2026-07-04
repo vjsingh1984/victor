@@ -1439,6 +1439,9 @@ class TestChatServiceBootstrapLaziness:
         from victor.agent.orchestrator import AgentOrchestrator
 
         obj = object.__new__(AgentOrchestrator)
+        # chat()/stream_chat() re-stamp the session_id contextvar from
+        # active_session_id (commit 89df2774, #360); __new__ skips __init__.
+        obj.active_session_id = None
         chunk = StreamChunk(content="service", is_final=True)
         constraints = object()
 
@@ -1458,6 +1461,7 @@ class TestChatServiceBootstrapLaziness:
         from victor.agent.orchestrator import AgentOrchestrator
 
         obj = object.__new__(AgentOrchestrator)
+        obj.active_session_id = None
         calls = []
 
         async def _stream_chat(user_message: str, **kwargs):
@@ -1476,6 +1480,7 @@ class TestChatServiceBootstrapLaziness:
         from victor.agent.orchestrator import AgentOrchestrator
 
         obj = object.__new__(AgentOrchestrator)
+        obj.active_session_id = None
 
         async def _stream_chat(_user_message: str, **_kwargs):
             raise RuntimeError("stream failed")
@@ -1748,6 +1753,7 @@ class TestChatServiceBootstrapLaziness:
         from victor.agent.orchestrator import AgentOrchestrator
 
         obj = object.__new__(AgentOrchestrator)
+        obj.active_session_id = None
         response = CompletionResponse(content="done", role="assistant")
         obj._chat_service = SimpleNamespace(chat=AsyncMock(return_value=response))
 
@@ -1761,6 +1767,7 @@ class TestChatServiceBootstrapLaziness:
         from victor.agent.orchestrator import AgentOrchestrator
 
         obj = object.__new__(AgentOrchestrator)
+        obj.active_session_id = None
         response = CompletionResponse(content="planned", role="assistant")
         obj._chat_service = SimpleNamespace(chat=AsyncMock(return_value=response))
 
@@ -1774,6 +1781,7 @@ class TestChatServiceBootstrapLaziness:
         from victor.agent.orchestrator import AgentOrchestrator
 
         obj = object.__new__(AgentOrchestrator)
+        obj.active_session_id = None
         response = CompletionResponse(content="done", role="assistant")
         obj._chat_service = SimpleNamespace(chat=AsyncMock(return_value=response))
 
@@ -1800,6 +1808,7 @@ class TestChatServiceBootstrapLaziness:
         from victor.agent.orchestrator import AgentOrchestrator
 
         obj = object.__new__(AgentOrchestrator)
+        obj.active_session_id = None
         obj._chat_service = SimpleNamespace(chat=AsyncMock(side_effect=RuntimeError("chat failed")))
 
         with pytest.raises(RuntimeError, match="chat failed"):
