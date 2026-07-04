@@ -32,13 +32,9 @@ from unittest.mock import MagicMock
 
 from victor.workflows.graph_dsl import WorkflowGraph, State
 from victor.workflows.definition import WorkflowBuilder, TransformNode
-from victor.workflows.executor import (
-    WorkflowExecutor,
-    WorkflowContext,
-    WorkflowResult,
-    NodeResult,
-    ExecutorNodeStatus,
-)
+from victor.workflows.context import WorkflowContext, WorkflowResult
+from victor.workflows.unified_executor import WorkflowExecutor
+from victor_contracts.workflows import ExecutorNodeStatus, NodeResult
 
 # ============ Test State Classes ============
 

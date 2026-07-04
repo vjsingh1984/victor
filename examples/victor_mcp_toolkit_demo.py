@@ -54,7 +54,8 @@ import sys
 from typing import List, Optional, Set
 
 from victor.integrations.mcp import MCPResource, MCPServer
-from victor.tools.base import BaseTool, ToolRegistry
+from victor.tools.base import BaseTool
+from victor.tools.registry import ToolRegistry
 
 # Tool categories by vertical
 VERTICAL_TOOLS = {

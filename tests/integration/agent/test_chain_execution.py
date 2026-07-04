@@ -377,7 +377,7 @@ class TestYAMLWorkflowChainReferences:
     @pytest.mark.asyncio
     async def test_chain_handler_prefix_parsing(self):
         """Chain handler prefix is correctly recognized and parsed."""
-        from victor.workflows.executor import CHAIN_HANDLER_PREFIX
+        from victor.workflows.compute_registry import CHAIN_HANDLER_PREFIX
 
         # Register a chain
         @chain("coding:analyze_imports")

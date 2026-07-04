@@ -224,7 +224,7 @@ class ComputeNodeExecutor:
             Handler instance or None if not found
         """
         from victor.workflows.compute_registry import get_compute_handler
-        from victor.workflows.executor import CHAIN_HANDLER_PREFIX
+        from victor.workflows.compute_registry import CHAIN_HANDLER_PREFIX
 
         # Check if this is a chain reference (e.g., "chain:coding:static_analysis")
         if handler_name.startswith(CHAIN_HANDLER_PREFIX):
@@ -246,7 +246,7 @@ class ComputeNodeExecutor:
         Returns:
             ComputeHandler wrapper or None if chain not found
         """
-        from victor.workflows.executor import CHAIN_HANDLER_PREFIX
+        from victor.workflows.compute_registry import CHAIN_HANDLER_PREFIX
         from victor.framework.chain_registry import create_chain
 
         # Parse "chain:vertical:name" or "chain:name"

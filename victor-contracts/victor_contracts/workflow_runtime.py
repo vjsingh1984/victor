@@ -46,14 +46,14 @@ __all__ = [
 _LAZY_IMPORTS = {
     "BaseYAMLWorkflowProvider": "victor.framework.workflows",
     "ComputeNode": "victor.workflows.definition",
-    "ExecutorNodeStatus": "victor.workflows.executor",
-    "NodeResult": "victor.workflows.executor",
+    "ExecutorNodeStatus": "victor_contracts.workflows",
+    "NodeResult": "victor_contracts.workflows",
     "WorkflowBuilder": "victor.workflows.definition",
-    "WorkflowContext": "victor.workflows.executor",
+    "WorkflowContext": "victor.workflows.context",
     "WorkflowDefinition": "victor.workflows.definition",
-    "WorkflowExecutor": "victor.workflows.executor",
-    "WorkflowResult": "victor.workflows.executor",
-    "register_compute_handler": "victor.workflows.executor",
+    "WorkflowExecutor": "victor.workflows.unified_executor",
+    "WorkflowResult": "victor.workflows.context",
+    "register_compute_handler": "victor.workflows.compute_registry",
     "workflow": "victor.workflows.definition",
 }
 
