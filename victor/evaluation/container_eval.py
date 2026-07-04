@@ -161,8 +161,45 @@ def resolve_swebench_image(task, config) -> str:
     return f"{registry}/sweb.eval.x86_64.{instance}"
 
 
-# Per-instance exact-image cache (one Docker Hub lookup per instance per run).
+# Per-instance exact-image cache (short-circuits the cheap match scan).
 _INSTANCE_IMAGE_CACHE: dict[str, str] = {}
+
+# Per-REPO index of Docker Hub candidate image names. The search
+# ``sweb.eval.x86_64.<repo>`` is the expensive part (one API call) and its
+# result is shared across ALL instances of that repo, so we cache the
+# candidate list per repo and match each instance against it. This matters
+# for django: the query returns 100+ results and SWE-bench images fall off
+# page 1, so the match fails — without this index that failing lookup
+# repeated once per django task (≈44 redundant API calls). A repo whose
+# lookup fails (or yields no candidates) is cached as an empty list so every
+# subsequent instance skips straight to the heuristic/host fallback.
+_REPO_IMAGE_INDEX: dict[str, list[str]] = {}
+
+
+async def _resolve_repo_image_candidates(repo: str) -> list[str]:
+    """Return (cached) Docker Hub repo-name candidates for a SWE-bench repo.
+
+    The first caller for a given repo performs the search; all later callers
+    reuse the cached list. Network failure / empty results are cached as ``[]``
+    so the lookup is never retried within a process.
+    """
+    if repo in _REPO_IMAGE_INDEX:
+        return _REPO_IMAGE_INDEX[repo]
+    try:
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            resp = await client.get(
+                "https://hub.docker.com/v2/search/repositories/",
+                params={"query": f"sweb.eval.x86_64.{repo}", "page_size": 100},
+            )
+            resp.raise_for_status()
+            candidates = [
+                r.get("repo_name", "") for r in resp.json().get("results", []) if r.get("repo_name")
+            ]
+    except Exception as exc:  # noqa: BLE001 — network failure → empty → heuristic
+        logger.debug("Docker Hub lookup failed for repo %s: %s", repo, exc)
+        candidates = []
+    _REPO_IMAGE_INDEX[repo] = candidates
+    return candidates
 
 
 async def resolve_swebench_image_exact(task, config) -> str:
@@ -172,9 +209,10 @@ async def resolve_swebench_image_exact(task, config) -> str:
     ``sweb.eval.x86_64.astropy_1776_astropy-12907``) that only the swebench
     package's versioning map computes — not derivable from the dataset fields
     victor has. Rather than take a hard dep on swebench, look the exact repo up
-    on Docker Hub (one search per repo, cached per instance). Falls back to the
-    heuristic :func:`resolve_swebench_image` on any failure (which then degrades
-    gracefully via host fallback on a pull failure).
+    on Docker Hub (one search per REPO — see :data:`_REPO_IMAGE_INDEX` — then a
+    cheap per-instance match against the cached candidate list). Falls back to
+    the heuristic :func:`resolve_swebench_image` on any failure (which then
+    degrades gracefully via host fallback on a pull failure).
 
     Precedence: ``task.docker_image`` → ``config.docker_image_override`` → Docker
     Hub lookup → heuristic.
@@ -191,23 +229,19 @@ async def resolve_swebench_image_exact(task, config) -> str:
         return _INSTANCE_IMAGE_CACHE[instance_id]
 
     repo, _, issue = instance_id.partition("__")
-    try:
-        async with httpx.AsyncClient(timeout=20.0) as client:
-            resp = await client.get(
-                "https://hub.docker.com/v2/search/repositories/",
-                params={"query": f"sweb.eval.x86_64.{repo}", "page_size": 100},
-            )
-            resp.raise_for_status()
-            repos = [r.get("repo_name", "") for r in resp.json().get("results", [])]
-    except Exception as exc:  # noqa: BLE001 — network failure → graceful fallback
-        logger.debug("Docker Hub lookup failed for %s: %s", instance_id, exc)
-        return resolve_swebench_image(task, config)
+    candidates = await _resolve_repo_image_candidates(repo)
 
     # The exact repo ends with the instance's issue id, e.g.
     # swebench/sweb.eval.x86_64.astropy_1776_astropy-12907  (issue = astropy-12907).
-    match = next((rn for rn in repos if rn and rn.endswith(issue)), None)
+    match = next((rn for rn in candidates if rn.endswith(issue)), None)
     if not match:
-        logger.warning("No Docker Hub image match for %s; using heuristic name", instance_id)
+        logger.warning(
+            "No Docker Hub image match for %s among %d candidate(s) for repo "
+            "%s; using heuristic name",
+            instance_id,
+            len(candidates),
+            repo,
+        )
         return resolve_swebench_image(task, config)
     image = f"docker.io/{match}"
     _INSTANCE_IMAGE_CACHE[instance_id] = image

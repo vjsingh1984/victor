@@ -160,7 +160,13 @@ class AdapterConfig:
     tool_budget: int = 50  # Maximum tool calls (ACTION complexity)
     max_tool_calls: int = 50  # Alias for tool_budget (backwards compat)
     total_timeout: int = 1200  # Total task timeout: 20 minutes for slow models
-    min_turn_timeout: int = 240  # 4 minutes per turn (slow model inference)
+    # Per-turn floor. Benchmark data showed agents over-explore and die
+    # mid-turn-1 because a high floor (240s) left too few turns within the
+    # task budget — at 1200s total, 240s/turn → 5 turns; 120s/turn → 10
+    # turns. More turns = more chances to reach the edit phase. Cloud
+    # providers (grok/zai) complete one orchestrator.chat() (incl. its
+    # internal agentic loop) well under 120s.
+    min_turn_timeout: int = 120  # 2 minutes per turn
     track_file_edits: bool = True
     track_diffs: bool = True
     working_dir: Optional[Path] = None
@@ -264,6 +270,14 @@ class VictorAgentAdapter:
         self._messages: List[Dict[str, str]] = []
         self._turns: int = 0
         self._file_snapshots: Dict[str, str] = {}  # path -> content before edit
+
+        # Action-bias: exploration budget. Counts consecutive tool calls that
+        # do NOT modify a file (read/search/grep/shell) since the last
+        # successful edit/write. Drives escalating continuation nudges so the
+        # agent doesn't over-explore (the #1 failure mode: 22/32 failures
+        # were "no valid patch" — the agent read 10-18 files and never
+        # edited). Reset to 0 on any successful file-modifying tool.
+        self._exploration_calls: int = 0
 
         # Correlation spine for this task. Set in execute_task and stamped on
         # every decision (log_decision reads get_session_id()) so the per-task
@@ -482,6 +496,16 @@ class VictorAgentAdapter:
                     tool_name,
                     last_call.result or "unknown error",
                 )
+
+            # Action-bias: track exploration budget. A SUCCESSFUL file-modifying
+            # call resets the counter (the agent took action); anything else
+            # (read/search/grep/shell, or a FAILED edit) increments it. The
+            # continuation-message logic escalates nudges as the counter grows
+            # so the agent converges on editing instead of over-exploring.
+            if success and tool_name in _file_modifying_tools():
+                self._exploration_calls = 0
+            else:
+                self._exploration_calls += 1
 
         # Track file edit after completion
         if self.config.track_file_edits and self._tool_calls:
@@ -722,6 +746,7 @@ class VictorAgentAdapter:
         self._turns = 0
         self._file_snapshots = {}
         self._task_session_id = ""
+        self._exploration_calls = 0
         # Reset circuit breaker for new task
         self._tool_failures = {}
         self._tool_failure_counts = {}
@@ -990,6 +1015,15 @@ class VictorAgentAdapter:
             "Fix the following issue by editing the source code in this repository.\n\n"
             "IMPORTANT: You have separate tools — `read`, `edit`, `write`, `code`, "
             "and `shell`. Call each as its own tool with named parameters.\n\n"
+            "BE EFFICIENT — you have a limited budget of tool calls and turns.\n"
+            "Most fixes need only 2-3 reads/searches before you can edit. The most "
+            "common failure mode is reading too many files and running out of time "
+            "before editing. Act with conviction:\n"
+            "- SEARCH once or twice (grep/code) to locate the right file.\n"
+            "- READ only the relevant function/method (use offset/limit).\n"
+            "- EDIT as soon as you understand the fix — do NOT read the whole file.\n"
+            "- Make a best-effort fix rather than over-researching; you can iterate "
+            "after seeing the test result.\n\n"
             "TOOL USAGE:\n"
             "- To READ a file: call `read(path='path/to/file')`\n"
             "- To EDIT a file: call `edit(ops=[{'type':'replace','path':'...','old_str':'...','new_str':'...'}])`\n"
@@ -1026,10 +1060,11 @@ class VictorAgentAdapter:
                     await asyncio.sleep(30)
                     logger.info(
                         "[AgentAdapter] Heartbeat: turn=%d, tool_calls=%d, "
-                        "files_modified=%s, elapsed=%.0fs",
+                        "files_modified=%s, exploration_calls=%d, elapsed=%.0fs",
                         self._turns,
                         len(self._tool_calls),
                         bool(self._file_edits),
+                        self._exploration_calls,
                         _time.time() - _heartbeat_start,
                     )
 
@@ -1040,26 +1075,53 @@ class VictorAgentAdapter:
             while not complete and self._turns < self.config.max_turns:
                 self._turns += 1
 
-                # Add user message — on continuation turns, direct the model
-                # toward file edits since benchmark tasks require code changes.
+                # Add user message. Turn 1 gets the full task prompt; later
+                # turns get a continuation. If the agent has already edited a
+                # file, let it continue freely; if it has NOT edited yet, the
+                # message escalates with exploration depth (_exploration_calls
+                # counts non-modifying calls since the last edit) to push the
+                # agent toward editing before it runs out of turns. This is the
+                # primary lever against the over-exploration failure mode.
                 if self._turns == 1:
                     current_message = prompt
-                elif not self._completion_detector._has_file_modifications():
-                    current_message = (
-                        "You have not edited any files yet. "
-                        "When you have enough context, use the edit tool "
-                        "to fix the issue in the source code."
-                    )
-                else:
+                elif self._completion_detector._has_file_modifications():
                     current_message = "Continue."
+                else:
+                    n = self._exploration_calls
+                    if n >= 8:
+                        current_message = (
+                            "CRITICAL: You must edit NOW or this task fails. "
+                            f"You have made {n} tool calls (reads/searches) "
+                            "without editing anything. Your current "
+                            "understanding of the bug is sufficient — do not "
+                            "read more. Call `edit` right now with your best "
+                            "fix, copying old_str from text you already read."
+                        )
+                    elif n >= 5:
+                        current_message = (
+                            "STOP reading. You have made "
+                            f"{n} tool calls without editing. Apply your best "
+                            "fix NOW using `edit(ops=[...])`. Use text you "
+                            "already read as old_str — do not search or read "
+                            "again first."
+                        )
+                    else:
+                        current_message = (
+                            "You have enough context to apply a fix. Use `edit` "
+                            "now — pick the most likely location based on what "
+                            "you have read so far and apply your best fix. You "
+                            "can iterate after seeing the test result."
+                        )
                 self._messages.append({"role": "user", "content": current_message})
 
                 # Get agent response
                 logger.info(
-                    "[AgentAdapter] Turn %d started (tool_calls=%d, files_modified=%s)",
+                    "[AgentAdapter] Turn %d started (tool_calls=%d, "
+                    "files_modified=%s, exploration_calls=%d)",
                     self._turns,
                     len(self._tool_calls),
                     self._completion_detector._has_file_modifications(),
+                    self._exploration_calls,
                 )
                 try:
                     response = await asyncio.wait_for(
