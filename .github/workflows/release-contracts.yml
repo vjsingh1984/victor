@@ -123,6 +123,12 @@ jobs:
     needs: build
     if: "!contains(github.ref, 'alpha') && !contains(github.ref, 'beta') && !contains(github.ref, 'rc')"
     runs-on: ubuntu-latest
+    # The PyPI trusted publisher for victor-contracts is registered with the
+    # `pypi` environment; the OIDC token must carry a matching environment
+    # claim or the exchange fails with `invalid-publisher` (sdk-v0.7.2 run).
+    environment:
+      name: pypi
+      url: https://pypi.org/project/victor-contracts/
     permissions:
       id-token: write
     steps:
