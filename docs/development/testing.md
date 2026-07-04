@@ -551,7 +551,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - run: pip install -e ".[dev]"
+      - run: pip install -e ./victor-contracts -e ".[dev]"
       - run: pytest --cov=victor --cov-report=xml
 ```
 

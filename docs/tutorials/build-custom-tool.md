@@ -14,7 +14,7 @@ A `weather` tool that fetches current weather conditions for any location. This 
 ## Prerequisites
 
 - Python 3.10+
-- Victor installed (`pip install -e ".[dev]"`)
+- Victor installed (`pip install -e ./victor-contracts -e ".[dev]"`)
 - Basic understanding of async/await in Python
 - Familiarity with JSON Schema
 

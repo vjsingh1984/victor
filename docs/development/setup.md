@@ -31,8 +31,8 @@ cd victor
 python -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
 
-# Install in development mode
-pip install -e ".[dev]"
+# Install in development mode (contracts first — victor-ai depends on the in-repo SDK)
+pip install -e ./victor-contracts -e ".[dev]"
 
 # Verify installation
 victor --version
@@ -64,10 +64,12 @@ source .venv/bin/activate          # macOS/Linux
 
 ### 3. Install Development Dependencies
 
-The `[dev]` extra includes testing, linting, and formatting tools:
+The `[dev]` extra includes testing, linting, and formatting tools. Install the
+in-repo `victor-contracts` in the same command so victor-ai resolves the local
+SDK instead of the PyPI release (equivalently, run `make install-dev`):
 
 ```bash
-pip install -e ".[dev]"
+pip install -e ./victor-contracts -e ".[dev]"
 ```
 
 This installs:
@@ -258,9 +260,9 @@ For testing, the `isolate_environment_variables` fixture automatically clears AP
 
 ### ModuleNotFoundError: No module named 'victor'
 
-Ensure you installed in editable mode:
+Ensure you installed in editable mode (with the in-repo contracts):
 ```bash
-pip install -e ".[dev]"
+pip install -e ./victor-contracts -e ".[dev]"
 ```
 
 ### Permission denied on `.venv`

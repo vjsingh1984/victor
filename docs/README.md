@@ -3,7 +3,7 @@
 Build and serve the documentation site:
 
 ```bash
-pip install -e ".[docs]"
+pip install -e ./victor-contracts -e ".[docs]"
 mkdocs serve     # Dev server with live reload at http://localhost:8000
 mkdocs build     # Static site → ./site/
 mkdocs build --strict  # Fail on broken links
