@@ -486,7 +486,17 @@ jobs:
             exit 0
           fi
           echo "Running ${#TARGETS[@]} changed-file test target(s):"; printf '  %s\n' "${TARGETS[@]}"
+          # pytest exits 5 when every collected test was skipped/deselected (e.g. all
+          # mapped tests skip on missing optional deps in CI) — that's a pass, not a fail.
+          set +e
           pytest "${TARGETS[@]}" -m "not slow" --tb=short -q
+          rc=$?
+          set -e
+          if [ "$rc" -eq 5 ]; then
+            echo "All mapped tests were skipped or deselected (pytest exit 5) — treating as pass."
+            exit 0
+          fi
+          exit "$rc"
 
   collect-check:
     name: Full-Suite Collection Check
