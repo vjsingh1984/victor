@@ -225,3 +225,76 @@ def test_provider_complete_fn_grades_at_temperature_zero(tmp_path: Path) -> None
     assert call["temperature"] == 0.0  # a non-deterministic grader cannot be calibrated
     assert call["messages"][0].role == "user"
     assert "TASK:" in call["messages"][0].content
+
+
+class _RateLimitedProvider(_StubProvider):
+    """Raises rate-limit errors for the first ``fail_n`` calls, then succeeds."""
+
+    def __init__(self, reply: str, fail_n: int) -> None:
+        super().__init__(reply)
+        self.fail_n = fail_n
+
+    async def chat(self, messages, **kwargs):
+        if len(self.calls) < self.fail_n:
+            self.calls.append({"failed": True})
+            raise ConnectionError("Rate limit exceeded: 429 Too Many Requests")
+        return await super().chat(messages, **kwargs)
+
+
+def test_provider_complete_fn_retries_rate_limits_and_tracks_stats(tmp_path: Path) -> None:
+    from victor.evaluation.calibration_rubric_judge import (
+        JudgeCallStats,
+        make_provider_complete_fn,
+    )
+
+    stats = JudgeCallStats()
+    provider = _RateLimitedProvider(_grade_lines(0.9), fail_n=2)
+    judge = make_llm_rubric_judge(
+        make_provider_complete_fn(provider, "test-model", retry_backoff_seconds=0.0, stats=stats)
+    )
+    assert judge("Task", _transcript(), tmp_path) == 1.0
+    assert stats.calls == 1
+    assert stats.retries == 2
+    assert stats.failures == 0
+    assert stats.clean
+
+
+def test_provider_complete_fn_exhausted_retries_count_as_failure(tmp_path: Path) -> None:
+    from victor.evaluation.calibration_rubric_judge import (
+        JudgeCallStats,
+        make_provider_complete_fn,
+    )
+
+    stats = JudgeCallStats()
+    provider = _RateLimitedProvider(_grade_lines(0.9), fail_n=99)
+    judge = make_llm_rubric_judge(
+        make_provider_complete_fn(
+            provider, "test-model", max_attempts=3, retry_backoff_seconds=0.0, stats=stats
+        )
+    )
+    # LLMRubricJudge degrades the propagated error to the neutral fallback (verdict 1.0) —
+    # which is exactly why stats.failures must void the measurement.
+    assert judge("Task", _transcript(), tmp_path) == 1.0
+    assert stats.failures == 1
+    assert not stats.clean
+
+
+def test_provider_complete_fn_does_not_retry_non_rate_limit_errors(tmp_path: Path) -> None:
+    from victor.evaluation.calibration_rubric_judge import (
+        JudgeCallStats,
+        make_provider_complete_fn,
+    )
+
+    class _AuthFailProvider(_StubProvider):
+        async def chat(self, messages, **kwargs):
+            self.calls.append({"failed": True})
+            raise PermissionError("invalid api key")
+
+    stats = JudgeCallStats()
+    provider = _AuthFailProvider("")
+    judge = make_llm_rubric_judge(
+        make_provider_complete_fn(provider, "test-model", retry_backoff_seconds=0.0, stats=stats)
+    )
+    judge("Task", _transcript(), tmp_path)
+    assert len(provider.calls) == 1  # no retries on non-retryable errors
+    assert stats.failures == 1 and stats.retries == 0

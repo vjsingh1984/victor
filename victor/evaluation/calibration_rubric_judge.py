@@ -50,6 +50,7 @@ A judge whose provider is failing therefore looks systematically credulous — w
 from __future__ import annotations
 
 import asyncio
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Awaitable, Callable, Literal, Optional
 
@@ -166,17 +167,57 @@ def make_rubric_judge(
     return judge
 
 
+@dataclass
+class JudgeCallStats:
+    """Integrity accounting for judge grading calls.
+
+    A calibration whose grading calls errored is not a measurement of the judge — the
+    ``LLMRubricJudge`` error fallback produces neutral, filter-inert scores, so failed calls
+    silently masquerade as credulous grades (observed live: a fully rate-limited GLM-5.2 run
+    reproduced the heuristic judge's α to three decimals). Check ``failures == 0`` before
+    trusting a report built from this ``complete_fn``.
+    """
+
+    calls: int = 0
+    retries: int = 0
+    failures: int = 0
+
+    @property
+    def clean(self) -> bool:
+        return self.failures == 0
+
+    def summary(self) -> str:
+        return f"calls={self.calls} retries={self.retries} failures={self.failures}"
+
+
+def _looks_rate_limited(exc: Exception) -> bool:
+    if getattr(exc, "retryable", False):
+        return True
+    text = str(exc).lower()
+    return "429" in text or "rate limit" in text
+
+
 def make_provider_complete_fn(
     provider: "BaseProvider",
     model: str,
     *,
     temperature: float = 0.0,
     max_tokens: int = 512,
+    max_attempts: int = 5,
+    retry_backoff_seconds: float = 20.0,
+    pre_call_delay_seconds: float = 0.0,
+    stats: Optional[JudgeCallStats] = None,
 ) -> Callable[[str], Awaitable[str]]:
     """Adapt any Victor provider into the ``complete_fn`` seam of the LLM rubric judge.
 
     Grading defaults to temperature 0.0 for reproducibility (the ADR-013 concern applies
     doubly to a judge: a non-deterministic grader cannot be meaningfully calibrated).
+
+    Unlike the production completion path (which correctly degrades to neutral rather than
+    stall the agentic loop), calibration should WAIT: rate-limited calls retry up to
+    ``max_attempts`` with linear backoff (``retry_backoff_seconds`` × attempt), and
+    ``pre_call_delay_seconds`` paces successive tasks under strict provider RPM caps.
+    Pass a :class:`JudgeCallStats` to detect runs whose α is voided by residual failures.
 
     Example (fully offline)::
 
@@ -191,13 +232,31 @@ def make_provider_complete_fn(
     async def complete_fn(prompt: str) -> str:
         from victor.providers.base import Message
 
-        response = await provider.chat(
-            [Message(role="user", content=prompt)],
-            model=model,
-            temperature=temperature,
-            max_tokens=max_tokens,
-        )
-        return response.content or ""
+        if stats:
+            stats.calls += 1
+        if pre_call_delay_seconds > 0:
+            await asyncio.sleep(pre_call_delay_seconds)
+        last_exc: Optional[Exception] = None
+        for attempt in range(1, max_attempts + 1):
+            try:
+                response = await provider.chat(
+                    [Message(role="user", content=prompt)],
+                    model=model,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                )
+                return response.content or ""
+            except Exception as exc:
+                last_exc = exc
+                if attempt >= max_attempts or not _looks_rate_limited(exc):
+                    break
+                if stats:
+                    stats.retries += 1
+                await asyncio.sleep(retry_backoff_seconds * attempt)
+        if stats:
+            stats.failures += 1
+        assert last_exc is not None
+        raise last_exc
 
     return complete_fn
 
