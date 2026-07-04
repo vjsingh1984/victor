@@ -64,10 +64,14 @@ def test_core_tools_always_selected():
         if len(names) == 0:
             pytest.skip("Tool registry not initialized - test isolation issue")
 
-        # Core/critical tools should be included (read, ls, shell, edit, search)
-        # Note: 'write' is NOT a critical tool - 'edit' is for file modifications
+        # Core read-only tools should be included even when the message
+        # matches no keywords. The first-class registry is now
+        # read/edit/write/code/shell/git/web (fs domain removed in
+        # eb4f6a6a — 'ls' folded into shell and is no longer a tool), so
+        # in the initial/exploration stage the guaranteed core is 'read'.
         assert "read" in names
-        assert "ls" in names
+        # 'ls' must stay retired — it should never reappear in selection.
+        assert "ls" not in names
     finally:
         import asyncio
 

@@ -1570,10 +1570,13 @@ class TestBenchmarkPromptEvolution:
                 "victor.evaluation.harness.EvaluationHarness",
                 return_value=FakeHarness(),
             ),
+            # All adapter creation now routes through
+            # create_from_session_config (Agent.create) — commits 8487d43a +
+            # 77cb6406; from_profile is no longer called by the CLI.
             patch(
-                "victor.evaluation.agent_adapter.VictorAgentAdapter.from_profile",
-                return_value=fake_adapter,
-            ) as from_profile,
+                "victor.evaluation.agent_adapter.VictorAgentAdapter.create_from_session_config",
+                new=AsyncMock(return_value=fake_adapter),
+            ) as create_from_session_config,
             patch(
                 "victor.core.feature_flags.get_feature_flag_manager",
                 return_value=SimpleNamespace(is_enabled=lambda *_args, **_kwargs: False),
@@ -1598,7 +1601,8 @@ class TestBenchmarkPromptEvolution:
             )
 
         assert result == {"status": "ok"}
-        binding = from_profile.call_args.kwargs["config"].prompt_binding
+        create_from_session_config.assert_awaited_once()
+        binding = create_from_session_config.await_args.kwargs["config"].prompt_binding
         assert binding is not None
         assert binding.prompt_candidate_hash == "cand-123"
         assert binding.section_name == "GROUNDING_RULES"

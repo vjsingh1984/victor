@@ -22,18 +22,22 @@ async def test_search_grep_forwards_to_code_grep():
 
 
 @pytest.mark.asyncio
-async def test_search_files_forwards_to_fs_search():
-    """``search files`` is a shim that forwards to ``fs search``."""
-    mock_fs = AsyncMock(return_value="fs-search-output")
-    with patch("victor.tools.unified.fs_tool.fs_tool", mock_fs):
+async def test_search_files_forwards_to_shell_find():
+    """``search files`` is a shim that forwards to ``shell`` find.
+
+    The fs domain was removed (commit eb4f6a6a); file-name search now
+    routes to a readonly ``find`` via the shell tool.
+    """
+    mock_shell = AsyncMock(return_value="shell-find-output")
+    with patch("victor.tools.bash.shell", mock_shell):
         result = await search_tool('search files "*.py" src')
 
-    mock_fs.assert_awaited_once()
-    forwarded = mock_fs.call_args.args[0]
-    assert forwarded.startswith("fs search")
+    mock_shell.assert_awaited_once()
+    forwarded = mock_shell.call_args.kwargs["cmd"]
+    assert forwarded.startswith("find")
     assert "*.py" in forwarded
     assert "src" in forwarded
-    assert result == "fs-search-output"
+    assert result == "shell-find-output"
 
 
 @pytest.mark.asyncio

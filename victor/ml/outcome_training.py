@@ -55,7 +55,12 @@ def _load_outcome_rewards() -> dict[str, float]:
         from victor.core.schema import Tables
 
         db = get_database()
-        cursor = db.execute(f"SELECT decision_id, attributed_reward FROM {Tables.DECISION_OUTCOME}")
+        # Table name is the hardcoded Tables.DECISION_OUTCOME constant, not
+        # user input (identifiers cannot be bound as SQL parameters).
+        # nosemgrep: python.sqlalchemy.security.sqlalchemy-execute-raw-query.sqlalchemy-execute-raw-query, python.lang.security.audit.formatted-sql-query.formatted-sql-query
+        cursor = db.execute(  # nosemgrep
+            f"SELECT decision_id, attributed_reward FROM {Tables.DECISION_OUTCOME}"
+        )
         for decision_id, reward in cursor.fetchall():
             if decision_id:
                 rewards[decision_id] = float(reward) if reward is not None else 0.0

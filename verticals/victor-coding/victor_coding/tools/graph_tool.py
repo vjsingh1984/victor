@@ -74,7 +74,10 @@ def _check_graph_dependencies() -> bool:
 
     for mod_name, attr_name in _GRAPH_DEPENDENCY_CHECKS:
         try:
-            mod = _importlib.import_module(mod_name)
+            # Module names come from the hardcoded _GRAPH_DEPENDENCY_CHECKS
+            # list above, not from user input.
+            # nosemgrep: python.lang.security.audit.non-literal-import.non-literal-import
+            mod = _importlib.import_module(mod_name)  # nosemgrep
             getattr(mod, attr_name)
         except Exception:
             _GRAPH_DEPENDENCIES_CHECKED = False

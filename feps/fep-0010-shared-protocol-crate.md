@@ -1,5 +1,5 @@
 ---
-fep: 0010
+fep: "0010"
 title: "Shared protocol crate for edge + cloud (one contract surface)"
 type: Standards Track
 status: Draft
