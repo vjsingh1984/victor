@@ -184,12 +184,13 @@ class TestModelSelectorLearner:
             learner, provider="provider_B", quality_score=0.1, task_type="analysis"
         )
 
-        # Mock random.random to ensure exploration is chosen for EPSILON_GREEDY
-        import random
-
+        # Force the exploration draw. The learner draws from its per-instance
+        # ``self._rng`` (base.py), NOT module-level random — patching the module
+        # was a no-op, leaving this a ~1-in-100 flake (ε decays to 0.99 after the
+        # two recorded outcomes, so the unpatched draw failed whenever rng >= ε).
         with patch.object(
-            random, "random", return_value=0.1
-        ):  # Ensure random.random() < learner.epsilon (which is 0.99)
+            learner._rng, "random", return_value=0.1
+        ):  # 0.1 < ε for EPSILON_GREEDY; EXPLOIT_ONLY ignores the draw
             # Get recommendation for providers A and B
             rec = learner.get_recommendation(
                 provider='["provider_A", "provider_B"]',
