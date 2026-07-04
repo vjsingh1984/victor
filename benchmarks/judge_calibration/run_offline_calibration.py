@@ -21,6 +21,13 @@ To generate trajectories with a *real* agent instead of the scripted executor, u
 
 Usage:
     python benchmarks/judge_calibration/run_offline_calibration.py [--variants 8] [--out DIR]
+
+    # Calibrate the LLM rubric judge via a Victor profile (provider/model/key from
+    # profiles.yaml). If the key lives in the system keyring, bridge it into env first —
+    # keyring is skipped without a TTY, but env always resolves:
+    eval "$(victor auth env -p zai)"
+    python benchmarks/judge_calibration/run_offline_calibration.py \
+        --variants 8 --judge-profile zai-coding   # e.g. zai / glm-5.2 (1M context)
 """
 
 from __future__ import annotations
@@ -70,6 +77,13 @@ def main() -> int:
         default=None,
         help="Provider base URL override (e.g. http://<windows-host>:11434 from WSL)",
     )
+    parser.add_argument(
+        "--judge-profile",
+        default=None,
+        help="Resolve the LLM judge's provider/model/api-key from a Victor profile "
+        "(profiles.yaml), e.g. --judge-profile cerebras-glm. Overrides the "
+        "--llm-judge-provider/--llm-judge-model pair.",
+    )
     args = parser.parse_args()
 
     judges = {
@@ -79,20 +93,42 @@ def main() -> int:
         # DimensionAwareFilter) — calibrated as shipped, binary completion verdicts.
         "rubric-heuristic": make_rubric_judge(),
     }
-    if args.llm_judge_provider:
+    if args.judge_profile or args.llm_judge_provider:
         from victor.evaluation.calibration_rubric_judge import (
             make_llm_rubric_judge,
             make_provider_complete_fn,
         )
         from victor.providers.registry import ProviderRegistry
 
+        provider_name = args.llm_judge_provider
+        model = args.llm_judge_model
         provider_kwargs = {}
         if args.llm_judge_base_url:
             provider_kwargs["base_url"] = args.llm_judge_base_url
-        provider = ProviderRegistry.create(args.llm_judge_provider, **provider_kwargs)
-        judges["rubric-llm"] = make_llm_rubric_judge(
-            make_provider_complete_fn(provider, args.llm_judge_model)
-        )
+        if args.judge_profile:
+            import os
+
+            from victor.config.settings import load_settings
+
+            profiles = load_settings().load_profiles()
+            if args.judge_profile not in profiles:
+                parser.error(
+                    f"profile '{args.judge_profile}' not found. "
+                    f"Available: {', '.join(sorted(profiles))}"
+                )
+            profile = profiles[args.judge_profile]
+            provider_name, model = profile.provider, profile.model
+            # Pass through profile extras; ${ENV} references resolve like from_profile.
+            api_key = getattr(profile, "api_key", None)
+            if api_key and api_key.startswith("${") and api_key.endswith("}"):
+                api_key = os.environ.get(api_key[2:-1])
+            if api_key:
+                provider_kwargs["api_key"] = api_key
+            profile_base_url = getattr(profile, "base_url", None)
+            if profile_base_url and not args.llm_judge_base_url:
+                provider_kwargs["base_url"] = profile_base_url
+        provider = ProviderRegistry.create(provider_name, **provider_kwargs)
+        judges["rubric-llm"] = make_llm_rubric_judge(make_provider_complete_fn(provider, model))
     exit_code = 0
     for name, judge in judges.items():
         harness = JudgeCalibrationHarness(default_corpus(variants=args.variants))
