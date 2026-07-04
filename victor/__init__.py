@@ -43,12 +43,18 @@ Full API (advanced):
 For coding-specific features, install the victor-coding package:
     pip install victor-coding
 Verticals are discovered automatically via the victor.plugins entry point.
+
+Import cost:
+    ``import victor`` is intentionally cheap. All public names are resolved
+    lazily via PEP 562 module ``__getattr__`` on first attribute access, so
+    the orchestrator/provider/framework stacks only load when actually used.
+    (This supersedes the old VICTOR_LIGHT_IMPORT top-level branch; the env
+    var is still honored by subpackages such as ``victor.agent``.)
 """
 
 import importlib
-import os
 import sys
-from typing import Any, Callable
+from typing import Any
 
 _MIN_SUPPORTED_PYTHON = (3, 10)
 
@@ -69,7 +75,7 @@ def _ensure_supported_python() -> None:
 
 _ensure_supported_python()
 
-from victor._contracts_bootstrap import prefer_repo_local_victor_contracts
+from victor._contracts_bootstrap import prefer_repo_local_victor_contracts  # noqa: E402
 
 prefer_repo_local_victor_contracts(__file__)
 
@@ -83,118 +89,95 @@ __author__ = "Vijaykumar Singh"
 __email__ = "singhvjd@gmail.com"
 __license__ = "Apache-2.0"
 
-_LIGHT_IMPORT = str(os.getenv("VICTOR_LIGHT_IMPORT", "")).strip().lower() in {
-    "1",
-    "true",
-    "yes",
-    "on",
+__all__ = [
+    # Decorator API
+    "agent",
+    "task",
+    "AgentCallable",
+    "TaskDefinition",
+    # Framework API (5 core concepts + supporting classes)
+    "Agent",
+    "Task",
+    "Tools",
+    "State",
+    "AgentExecutionEvent",
+    # Supporting classes
+    "ChatSession",
+    "TaskResult",
+    "FrameworkTaskType",
+    "ToolSet",
+    "ToolCategory",
+    "Stage",
+    "StateHooks",
+    "EventType",
+    "AgentConfig",
+    "UnifiedAgentConfig",
+    # Errors
+    "AgentError",
+    "ProviderError",
+    "ToolError",
+    "ConfigurationError",
+    "BudgetExhaustedError",
+    "CancellationError",
+    # Core classes (existing API)
+    "AgentOrchestrator",
+    "Settings",
+]
+
+# name -> (module, attribute). Resolved on first access via __getattr__ (PEP 562)
+# and cached in the module globals, so `import victor` stays cheap and partial
+# installs (missing optional extras) only fail when the relevant name is used.
+_LAZY_EXPORTS: dict[str, tuple[str, str]] = {
+    # Core classes (existing API - for backward compatibility)
+    "AgentOrchestrator": ("victor.agent.orchestrator", "AgentOrchestrator"),
+    "Settings": ("victor.config.settings", "Settings"),
+    # Framework API (simplified - new golden path)
+    "Agent": ("victor.framework", "Agent"),
+    "AgentConfig": ("victor.framework", "AgentConfig"),
+    "UnifiedAgentConfig": ("victor.framework", "UnifiedAgentConfig"),
+    "AgentError": ("victor.framework", "AgentError"),
+    "AgentExecutionEvent": ("victor.framework", "AgentExecutionEvent"),
+    "BudgetExhaustedError": ("victor.framework", "BudgetExhaustedError"),
+    "CancellationError": ("victor.framework", "CancellationError"),
+    "ChatSession": ("victor.framework", "ChatSession"),
+    "ConfigurationError": ("victor.framework", "ConfigurationError"),
+    "EventType": ("victor.framework", "EventType"),
+    "FrameworkTaskType": ("victor.framework", "FrameworkTaskType"),
+    "ProviderError": ("victor.framework", "ProviderError"),
+    "Stage": ("victor.framework", "Stage"),
+    "State": ("victor.framework", "State"),
+    "StateHooks": ("victor.framework", "StateHooks"),
+    "Task": ("victor.framework", "Task"),
+    "TaskResult": ("victor.framework", "TaskResult"),
+    "ToolCategory": ("victor.framework", "ToolCategory"),
+    "ToolError": ("victor.framework", "ToolError"),
+    "Tools": ("victor.framework", "Tools"),
+    "ToolSet": ("victor.framework", "ToolSet"),
+    # Decorator API — @victor.task (@victor.agent is handled below)
+    "task": ("victor.framework.decorators", "task"),
+    "AgentCallable": ("victor.framework.decorators", "AgentCallable"),
+    "TaskDefinition": ("victor.framework.decorators", "TaskDefinition"),
 }
 
 
-class _CallableModuleProxy:
-    """Expose a callable decorator API without shadowing a real submodule.
+def __getattr__(name: str) -> Any:
+    """Resolve public API names lazily (PEP 562).
 
-    `unittest.mock.patch("victor.agent...")` relies on `victor.agent` resolving
-    to the package module. At the same time, the public API expects `victor.agent`
-    to be callable as a decorator. This proxy forwards attribute access to the
-    real submodule while preserving the callable interface.
+    ``victor.agent`` is special: it is both a real subpackage and the
+    ``@victor.agent`` decorator. The subpackage module is made callable
+    (see victor/agent/__init__.py), so resolving it here to the module
+    keeps both `mock.patch("victor.agent...")` and the decorator working.
     """
-
-    def __init__(self, module_name: str, func: Callable[..., Any]) -> None:
-        self._module_name = module_name
-        self._func = func
-
-    def __call__(self, *args: Any, **kwargs: Any) -> Any:
-        return self._func(*args, **kwargs)
-
-    def __getattr__(self, name: str) -> Any:
-        module = importlib.import_module(self._module_name)
-        return getattr(module, name)
-
-    def __dir__(self) -> list[str]:
-        module = importlib.import_module(self._module_name)
-        return sorted(set(dir(module)) | set(self.__dict__) | set(dir(type(self))))
-
-    def __repr__(self) -> str:
-        return f"<callable module proxy for {self._module_name}>"
+    if name == "agent":
+        return importlib.import_module("victor.agent")
+    spec = _LAZY_EXPORTS.get(name)
+    if spec is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    module = importlib.import_module(spec[0])
+    value = getattr(module, spec[1])
+    globals()[name] = value
+    return value
 
 
-if not _LIGHT_IMPORT:
-    # Core classes (existing API - for backward compatibility)
-    from victor.agent.orchestrator import AgentOrchestrator
-    from victor.config.settings import Settings
-
-    # Framework API (simplified - new golden path)
-    from victor.framework import (
-        Agent,
-        AgentConfig,
-        UnifiedAgentConfig,
-        AgentError,
-        AgentExecutionEvent,
-        BudgetExhaustedError,
-        CancellationError,
-        ChatSession,
-        ConfigurationError,
-        EventType,
-        FrameworkTaskType,
-        ProviderError,
-        Stage,
-        State,
-        StateHooks,
-        Task,
-        TaskResult,
-        ToolCategory,
-        ToolError,
-        Tools,
-        ToolSet,
-    )
-
-    # Decorator API — @victor.agent / @victor.task
-    from victor.framework.decorators import (
-        agent as _agent_decorator,
-        task,
-        AgentCallable,
-        TaskDefinition,
-    )
-
-    agent = _CallableModuleProxy("victor.agent", _agent_decorator)
-
-    __all__ = [
-        # Decorator API
-        "agent",
-        "task",
-        "AgentCallable",
-        "TaskDefinition",
-        # Framework API (5 core concepts + supporting classes)
-        "Agent",
-        "Task",
-        "Tools",
-        "State",
-        "AgentExecutionEvent",
-        # Supporting classes
-        "ChatSession",
-        "TaskResult",
-        "FrameworkTaskType",
-        "ToolSet",
-        "ToolCategory",
-        "Stage",
-        "StateHooks",
-        "EventType",
-        "AgentConfig",
-        "UnifiedAgentConfig",
-        # Errors
-        "AgentError",
-        "ProviderError",
-        "ToolError",
-        "ConfigurationError",
-        "BudgetExhaustedError",
-        "CancellationError",
-        # Core classes (existing API)
-        "AgentOrchestrator",
-        "Settings",
-    ]
-else:
-    # Light mode intentionally avoids importing orchestrator/provider stacks.
-    from victor.config.settings import Settings
-
-    __all__ = ["Settings"]
+def __dir__() -> list[str]:
+    return sorted(set(globals()) | set(__all__))
