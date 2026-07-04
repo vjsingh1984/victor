@@ -285,6 +285,7 @@ from victor.evaluation.calibration_agent_executor import (
     verifiable_to_benchmark_task,
 )
 from victor.evaluation.calibration_rubric_judge import (
+    JudgeCallStats,
     make_llm_rubric_judge,
     make_provider_complete_fn,
     make_rubric_judge,
@@ -465,6 +466,7 @@ __all__ = [
     "make_agent_executor",
     "trace_to_transcript",
     "verifiable_to_benchmark_task",
+    "JudgeCallStats",
     "make_llm_rubric_judge",
     "make_provider_complete_fn",
     "make_rubric_judge",
