@@ -317,8 +317,12 @@ def _build_rubric_prompt(rubric: Rubric, content: str) -> str:
     lines = [
         "Grade whether the RESPONSE satisfies the task on each dimension below.",
         "For EACH dimension output exactly one line: <name>: score=<0.0-1.0> confidence=<0.0-1.0>",
-        "score = how well the response satisfies the dimension; confidence = how sure you are "
-        "(use a LOW confidence when the response does not engage that dimension at all).",
+        "score = how well the response satisfies the dimension; confidence = how sure you are.",
+        # The numeric convention matters: DimensionAwareFilter treats confidence >= 0.25 as an
+        # engaged dimension. A vague "use LOW confidence" led judges to emit 0.3 for
+        # not-applicable axes (e.g. recovery with no failures), wrongly blocking completion.
+        "If a dimension does not apply to this task (e.g. recovery when nothing failed), "
+        "output exactly: score=0.0 confidence=0.0 for it.",
         "",
         "Dimensions:",
     ]
@@ -338,8 +342,11 @@ def _parse_rubric_scores(rubric: Rubric, text: str) -> tuple[RubricDimensionScor
         if not row:
             out.append(RubricDimensionScore(d.name, 0.5, 0.2, "llm: dimension not in output"))
             continue
+        # Unparseable rows must default BELOW the DimensionAwareFilter engagement floor
+        # (0.25): a row like "correctness: looks good" carries no gradable verdict and
+        # must not gate completion as an engaged 0.5-score failure.
         score = clamp(float(s_match.group(1)), 0.0, 1.0) if s_match else 0.5
-        confidence = clamp(float(c_match.group(1)), 0.0, 1.0) if c_match else 0.3
+        confidence = clamp(float(c_match.group(1)), 0.0, 1.0) if c_match else 0.2
         out.append(RubricDimensionScore(d.name, score, confidence, "llm"))
     return tuple(out)
 

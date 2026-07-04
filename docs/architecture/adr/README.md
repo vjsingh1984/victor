@@ -11,79 +11,54 @@ Architecture Decision Records (ADRs) document significant architectural decision
 - **Rationale**: Why the decision was made
 - **Consequences**: Positive, negative, and neutral impacts
 
+ADRs record *decisions*; the [Technical Debt Register](../../tech-stack.md#technical-debt-register)
+records *work*. When an ADR's rollout is incomplete, the remaining work must have a TD-* or EVR-*
+entry — the ADR itself never tracks tasks.
+
 ## ADR Index
 
-| ADR | Title | Status | Date |
-|-----|-------|--------|------|
-| [ADR-001](001-agent-orchestration.md) | Agent Orchestrator Architecture | Accepted | 2025-02-26 |
-| [ADR-002](002-state-management.md) | State Management System | Accepted | 2025-02-26 |
-| [ADR-003](003-workflow-engine.md) | Workflow Engine Architecture | Accepted | 2025-02-26 |
-| [ADR-004](004-tool-system.md) | Tool System Architecture | Accepted | 2025-02-26 |
-| [ADR-005](005-event-system.md) | Event System Architecture | Accepted | 2025-02-26 |
-| [ADR-006](006-provider-integration-improvements.md) | Provider Integration Improvements for Non-Interactive Environments | Proposed | 2026-02-28 |
-| [ADR-007](007-vertical-distribution-and-sdk-boundary.md) | Vertical Distribution Model and Contracts Boundary | Proposed | 2026-03-10 |
-| [ADR-008](008-registry-performance-optimization.md) | Tool Registry Performance Optimization | Accepted | 2025-04-19 |
-| [ADR-014](014-shared-codegraph-chunker-package.md) | Extract the code→CPG chunker into a shared `victor-codegraph` package | Proposed | 2026-06-26 |
-| [ADR-015](015-victor-core-adopts-codegraph.md) | Victor Core adopts victor-codegraph as the foundational code parser (phased) | Proposed | 2026-06-26 |
-| [ADR-016](016-distribution-packaging-strategy.md) | Distribution & Packaging: Docker image primary, pip dev; reject native single-binary | Proposed | 2026-07-02 |
+Status is the governance state of the *decision*. Implementation is the observed state of the
+*code* (verified 2026-07-02).
 
-## ADR Summaries
+| ADR | Title | Status | Implementation | Date |
+|-----|-------|--------|----------------|------|
+| [ADR-001](001-agent-orchestration.md) | Agent Orchestrator Architecture | Superseded (by service-first runtime, see update in file) | Superseded | 2025-02-26 |
+| [ADR-002](002-state-management.md) | State Management System | Accepted | Shipped | 2025-02-26 |
+| [ADR-003](003-workflow-engine.md) | Workflow Engine Architecture | Accepted | Shipped | 2025-02-26 |
+| [ADR-004](004-tool-system.md) | Tool System Architecture | Accepted | Shipped | 2025-02-26 |
+| [ADR-005](005-event-system.md) | Event System Architecture | Accepted | Shipped | 2025-02-26 |
+| [ADR-006](006-provider-integration-improvements.md) | Provider Integration Improvements for Non-Interactive Environments | Proposed | Partial | 2026-02-28 |
+| [ADR-007](007-vertical-distribution-and-sdk-boundary.md) | Vertical Distribution Model and Contracts Boundary | Accepted | Shipped (CI-guarded boundary; verticals folded into monorepo) | 2026-03-10 |
+| [ADR-008](008-registry-performance-optimization.md) | Tool Registry Performance Optimization | Accepted | Shipped | 2025-04-19 |
+| [ADR-009](009-rubric-based-completion-evaluation.md) | Rubric-Based Completion Evaluation | Accepted | Shipped, opt-in (`completion_strategy=rubric`; default remains `enhanced` pending ADR-011 gate) | 2026-06-21 |
+| [ADR-010](010-effect-grounded-completion.md) | Effect-Grounded Completion | Proposed | Not implemented (backlog EVR-4, P0) | 2026-06-21 |
+| [ADR-011](011-llm-judge-reliability-gating.md) | LLM-Judge Reliability Gating | Accepted | Shipped (`victor/evaluation/judge_calibration.py`, `trajectory_eval.py`); κ/α gate not yet run against human labels | 2026-06-21 |
+| [ADR-012](012-regression-gated-harness-acceptance.md) | Regression-Gated Harness Acceptance | Proposed | Partial (parity/characterization batteries exist; formal acceptance oracle is EVR-5, P0) | 2026-06-21 |
+| [ADR-013](013-unified-temperature-policy.md) | Unified, Intent-Based Temperature Policy with Spin Ratchet | Accepted | Shipped (`victor/framework/temperature/`, default flip 0.7→0.6, scatter-guard test) | 2026-06-22 |
+| [ADR-014](014-shared-codegraph-chunker-package.md) | Extract the code→CPG chunker into a shared `victor-codegraph` package | Accepted | Shipped (`victor-codegraph` 0.1.x released; `victor-coding` delegates) | 2026-06-26 |
+| [ADR-015](015-victor-core-adopts-codegraph.md) | Victor Core adopts victor-codegraph as the foundational code parser (phased) | Accepted | Partial (Phase 1: guarded import in `victor/core/graph_rag/indexing.py`; later phases pending) | 2026-06-26 |
+| [ADR-016](016-distribution-packaging-strategy.md) | Distribution & Packaging: Docker image primary, pip dev; reject native single-binary | Proposed | Not started | 2026-07-02 |
 
-### ADR-001: Agent Orchestrator Architecture
+## External ADR series (cross-repo)
 
-**Decision**: Use Coordinator Pattern with specialized coordinators for conversation, safety, tools, and metrics.
+Victor's code-memory direction is co-designed with two sibling repositories that keep their own ADR
+series. References like "ADR-029" or "ADR-044" in commits, code comments, and `victor-codegraph/`
+belong to those series — they are **not** missing Victor ADRs.
 
-**Key Points**:
-- Central AgentOrchestrator with delegated responsibilities
-- Single Responsibility Principle compliance
-- Easy to extend with new coordinators
+| Series | Repo / path | Numbering style | Referenced decisions |
+|--------|-------------|-----------------|----------------------|
+| ProximaDB | `proximaDB/docs/12-design/adr/` | `ADR-0NN` (2-digit, high numbers) | **ADR-029** shared codegraph chunker package (authoritative for the cross-repo chunker decision; pairs with Victor ADR-014/015) · **ADR-044** stable, line-independent symbol oid — the correlated-CPG join key (implemented in `victor-codegraph` 0.1.2) · ADR-028 index policy routing (unrelated to the chunker) |
+| AnvaiOps | `anvaiops/docs/adr/` | `NNNN` (4-digit) | **0017** code-graph-as-a-service · **0018** consume shared codegraph chunker (SaaS consumer of `victor-codegraph`) |
 
-### ADR-002: State Management System
+Rules for cross-repo decisions:
 
-**Decision**: Four-scope state management (CONVERSATION, WORKFLOW, TEAM, GLOBAL) with copy-on-write optimization.
-
-**Key Points**:
-- Clear state boundaries
-- Efficient memory usage
-- Checkpointing support
-
-### ADR-003: Workflow Engine Architecture
-
-**Decision**: Two-level architecture with WorkflowEngine facade and specialized coordinators.
-
-**Key Points**:
-- YAML and Python workflow support
-- Two-level caching
-- Human-in-the-loop integration
-
-### ADR-004: Tool System Architecture
-
-**Decision**: Three-phase tool system with metadata-driven discovery and progressive disclosure.
-
-**Key Points**:
-- Rich tool metadata
-- Cost-based tiers
-- 33+ built-in tools
-
-### ADR-005: Event System Architecture
-
-**Decision**: Structured event model with middleware pipeline and event bus.
-
-**Key Points**:
-- Type-safe events
-- Middleware processing
-- Pub/Sub event distribution
-
-### ADR-008: Tool Registry Performance Optimization
-
-**Decision**: Multi-layered caching and batch operations for 6-11× performance improvement.
-
-**Key Points**:
-- Batch registration API with single cache invalidation
-- Feature flag caching with TTL expiration
-- Query result caching with LRU eviction
-- Performance regression tests with CI gates
-- 3-5× faster for 100+ items, 6-11× overall improvement
+1. One repo is named **authoritative** for each shared decision; the others hold thin consumer ADRs
+   that link to it (chunker: ProximaDB ADR-029 authoritative, Victor ADR-014 owner-of-record for the
+   package, AnvaiOps 0018 consumer).
+2. Victor code and docs must cite external ADRs with their series name (e.g. "ProximaDB ADR-044"),
+   never a bare number.
+3. When an external ADR materially changes Victor behavior (as ADR-044 did for symbol identity),
+   add or amend a Victor ADR that records the local consequence.
 
 ### ADR-016: Distribution & Packaging Strategy
 
@@ -101,9 +76,12 @@ When making a significant architectural decision:
 
 1. Copy the [template](000-template.md)
 2. Fill in all sections
-3. Use next sequential number (e.g., ADR-006)
-4. Update this index
+3. Use the next sequential number (next free: **ADR-016**)
+4. Update this index (both tables if cross-repo)
 5. Submit for review
+
+Heading convention: `# ADR-0NN: Title` (hyphenated) with a `## Metadata` list — ADRs 006/007/008/014/015
+predate this and drift cosmetically; new ADRs must follow it.
 
 ## ADR Lifecycle
 
@@ -112,16 +90,24 @@ Proposed → Accepted → Superseded/Deprecated
 ```
 
 - **Proposed**: Initial draft for discussion
-- **Accepted**: Decision made and implemented
-- **Superseded**: Replaced by newer decision (link to new ADR)
+- **Accepted**: Decision made (implementation may still be phased/opt-in — record that in the
+  Implementation column above, and file remaining rollout work as TD-*/EVR-* items)
+- **Superseded**: Replaced by a newer decision (link to the new ADR from the old one)
 - **Deprecated**: No longer applicable
+
+Advance the status when reality changes: an ADR that shipped weeks ago must not still read
+"Proposed" (this index and the file metadata must agree — the file is authoritative on conflict).
 
 ## Related Documentation
 
-- [Victor Architecture](../architecture-analysis-phase3.md)
-- [Implementation Plan](../roadmap/improvement-plan-v1.md)
-- [Vertical Platform Convergence Plan](../roadmap/vertical-platform-convergence-plan.md)
-- [API Reference](../api/README.md)
+- [Victor Architecture](../../architecture.md) — canonical system architecture
+- [Evaluation-Centric Runtime Vision](../vision-evaluation-centric-runtime.md) and
+  [Backlog](../evaluation-centric-runtime-backlog.md) (EVR-* items)
+- [ProximaDB as the CCG Backend](../proximadb-codegraph-backend.md) — live design behind ADR-014/015
+  and ProximaDB ADR-044 (TD-11/12/13)
+- [Technical Debt Register](../../tech-stack.md#technical-debt-register)
+- [FEP Process](../../FEP_PROCESS.md) — FEPs govern framework API *changes*; ADRs record
+  architectural *decisions* (a FEP usually yields one or more ADRs)
 
 ## References
 

@@ -2,7 +2,7 @@
 
 ## Metadata
 
-- **Status**: Proposed
+- **Status**: Accepted (2026-07-02 — shipped opt-in via `completion_strategy=rubric` (#203/#216/#217/#223); default remains `enhanced` until the ADR-011 reliability gate passes; was Proposed)
 - **Date**: 2026-06-21
 - **Decision Makers**: Vijaykumar Singh
 - **Related ADRs**: 010 (effect-grounded completion), 011 (judge reliability), 012 (regression-gated harness)

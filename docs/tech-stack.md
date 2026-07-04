@@ -217,44 +217,71 @@ erDiagram
 ## Technical Debt Register
 
 > Consolidated from `docs/tech-debt/`, `docs/architecture/` analysis, and codebase audits.
+> Last verified against the codebase: 2026-07-02.
+
+**Namespaces.** Three ID families appear in Victor docs — keep them distinct:
+
+- `TD-*` (this register) — Victor framework debt. Canonical here.
+- `EVR-*` — evaluation-centric runtime backlog items in
+  [`architecture/evaluation-centric-runtime-backlog.md`](architecture/evaluation-centric-runtime-backlog.md).
+  Items tagged `techdebt` there (EVR-5, EVR-7) are debt; they stay in the EVR sequence but are
+  cross-referenced below so this register remains the single lookup point.
+- `TD-1xx` (e.g. TD-127, TD-128, TD-130, TD-131, TD-134 in
+  [`architecture/proximadb-codegraph-backend.md`](architecture/proximadb-codegraph-backend.md)) —
+  **ProximaDB engine** tickets, an external register that happens to share the `TD-` prefix. Never
+  allocate Victor debt IDs in the 100+ range.
 
 ### Active Items
 
 | ID | Area | Description | Priority | Status | Module |
 |----|------|-------------|----------|--------|--------|
-| TD-1 | API Server | `victor/integrations/api/server.py` hotspot decomposition | High | Planned | `victor/integrations/` |
+| TD-1 | API Server | API server hotspot decomposition (`victor/integrations/api/fastapi_server.py` — note: the old `server.py` path no longer exists; verify remaining scope, may be largely done at 1,046 lines) | High | Planned | `victor/integrations/` |
 | TD-2 | Vertical Integration | `victor/framework/vertical_integration.py` cleanup | Medium | Planned | `victor/framework/` |
-| TD-3 | Conversation Memory | `victor/agent/conversation/store.py` refactoring | Medium | Complete | `victor/agent/` |
 | TD-4 | Secret Handling | Normalize across provider, server, session settings | High | In Progress | `victor/providers/` |
 | TD-5 | Observability | Decide: prototype or supported surface | Medium | Pending | `victor/core/` |
 | TD-6 | Benchmark Publication | Publish SWE-bench results publicly | High | Planned | `benchmarks/` |
 | TD-7 | Onboarding Clarity | Happy-path documentation for new users | High | In Progress | `docs/` |
-| TD-8 | Legacy Verticals | Built-in contrib verticals emit DeprecationWarning | Low | Complete | `victor/verticals/` |
 | TD-9 | Streaming + AgenticLoop | StreamingChatPipeline not yet integrated with AgenticLoop | Medium | Planned | `victor/agent/` |
 | TD-10 | Workspace Isolation | Rename internals from worktree-only to workspace-first | Medium | In Progress | `victor/teams/` |
 | TD-11 | ProximaDB CCG Backend | Make `proximadb_provider.py` real and add a `ProximaGraphStore` implementing `GraphStoreProtocol`, so the SQLite + LanceDB pair can be replaced by one correlated ProximaDB collection (graph + vector + relational on one `oid`). See `docs/architecture/proximadb-codegraph-backend.md`. | Medium | Planned | `victor/storage/` |
 | TD-12 | Embedding↔Node Correlation | Retire the unpopulated `graph_node.embedding_ref`: correlate embedding to node by shared `oid` (= `graph/{repo}/node/{symbol_oid}`) so a code change rewrites text + re-embedding in one atomic upsert. Removes SQLite↔Lance dual-write skew. | Medium | Planned | `victor/storage/graph/` |
 | TD-13 | Tier-A/Tier-B CCG split | Index symbols (~80K) + cross-fn edges (~96K) into the traversable graph; offload intra-procedural CPG (statements + DDG/CFG/CDG, ~96% of edges, 100% intra-file) to columnar fragments fetched on dataflow drill-down. Keeps the live graph ~120 MB f32 / ~35 MB SQ8 in-RAM. | Medium | Planned | `victor/core/graph_rag/` |
+| TD-14 | Orchestrator Regrowth | `victor/agent/orchestrator.py` is 4,690 lines — it regrew ~34% after TD-R1 declared it resolved at 3,510. The facade pattern is intact (delegation to services is real), but the file is a god-object again. Decompose; ratchet guard landed 2026-07-02 (`tests/unit/runtime/test_hotspot_size_guard.py`) so it cannot silently regrow a third time — lower the caps as decomposition proceeds. | High | In Progress | `victor/agent/` |
+| TD-15 | Services Sprawl | `victor/agent/services/` holds ~55 files, several 100k+ chars (`planning_runtime.py`, `runtime_intelligence.py`, `turn_execution_runtime.py`, `tool_service.py`) — far beyond the documented "six canonical services." Either promote the runtime modules into the documented architecture or fold them under the six services; today the story and the tree disagree. | Medium | Planned | `victor/agent/services/` |
+| TD-16 | Architecture Doc Drift | `docs/architecture.md` claims "34 tool modules across 9 categories" (actual: ~79 top-level modules, 8 category dirs), calls the orchestrator a "thin facade" (see TD-14), and omits live subsystems: `victor/coordination/`, `victor/experiments/`, `victor/optimization/`, `victor/classification/` (plus `analytics/`, `benchmark/`, `iac/`, `native/`). Recount, document or deprecate each, and add a drift check to `check-repo-hygiene`. Remove dead `victor/tools/smart_cicd_tool.py.broken`. | Medium | Planned | `docs/` |
+| TD-17 | Flag Graduation Policy | The quality/safety loop is almost entirely opt-in: `USE_POLICY_ENGINE`, `sandbox_enabled`, `USE_SMART_ROUTING`, rubric completion (`completion_strategy`), L1 reference-aware pruning all default OFF. No written criteria exist for when a flag graduates to default-on or is deleted. Define per-flag graduation criteria (the ADR-011 κ/α gate is the model) and review each flag against them; kill flags that will never graduate. | High | Planned | `victor/core/feature_flags.py` |
+| TD-18 | Roadmap/Docs Governance | Canonical `docs/roadmap.md` was referenced by six documents but never committed to git (existed only as an untracked local file — now restored 2026-07-02). Hygiene check landed 2026-07-02 (`check_canonical_doc_pointers` in `scripts/ci/repo_hygiene_check.py`) — canonical pointer docs must exist and their relative links must resolve. Remaining: commit the restored roadmap and extend coverage to `docs/index.md`. | High | In Progress | `docs/`, `scripts/ci/` |
+
+Cross-referenced debt tracked in the EVR backlog (do not duplicate IDs here):
+
+| EVR ID | Description | Priority | Status |
+|--------|-------------|----------|--------|
+| EVR-5 | Regression-gated harness acceptance oracle (implements ADR-012) | P0 | Planned |
+| EVR-7 | Close the credit→learner loop (segment-level process reward) | P1 | Planned |
 
 ### Tech Debt Timeline
 
 ```mermaid
 gantt
-    title Tech Debt Resolution Timeline
+    title Tech Debt Resolution Timeline (completed items live in Resolved Debt, not here)
     dateFormat YYYY-MM-DD
     section High Priority
-        TD-4 Secret Handling     :active, a1, 2026-05-01, 2026-06-15
-        TD-1 API Decomposition   : a2, 2026-06-01, 2026-07-15
-        TD-6 Benchmark Publish   : a3, 2026-06-01, 2026-06-30
-        TD-7 Onboarding          :active, a4, 2026-05-01, 2026-06-15
+        TD-4 Secret Handling     :active, a1, 2026-05-01, 2026-07-15
+        TD-7 Onboarding          :active, a2, 2026-05-01, 2026-07-15
+        TD-1 API Decomposition   : a3, 2026-07-01, 2026-08-15
+        TD-6 Benchmark Publish   : a4, 2026-07-01, 2026-07-31
+        TD-14 Orchestrator Ratchet : a5, 2026-07-01, 2026-08-15
+        TD-17 Flag Graduation    : a6, 2026-07-15, 2026-08-15
+        TD-18 Docs Governance    :active, a7, 2026-07-01, 2026-07-15
     section Medium Priority
-        TD-5 Observability       : b1, 2026-07-01, 2026-08-01
-        TD-3 Conv Memory         :done, b2, 2026-07-01, 2026-08-01
-        TD-9 Streaming Loop      : b3, 2026-08-01, 2026-09-01
-        TD-10 Workspace Rename   :active, b4, 2026-05-15, 2026-06-30
+        TD-5 Observability       : b1, 2026-07-15, 2026-08-15
+        TD-9 Streaming Loop      : b2, 2026-08-01, 2026-09-01
+        TD-10 Workspace Rename   :active, b3, 2026-05-15, 2026-07-15
+        TD-15 Services Sprawl    : b4, 2026-08-01, 2026-09-15
+        TD-16 Arch Doc Drift     : b5, 2026-07-15, 2026-08-01
+        TD-11/12/13 ProximaDB CCG : b6, 2026-08-01, 2026-10-01
     section Low Priority
         TD-2 Vertical Cleanup    : c1, 2026-09-01, 2026-10-01
-        TD-8 Legacy (complete)   :done, c2, 2026-04-01, 2026-05-01
 ```
 
 ---
@@ -263,7 +290,9 @@ gantt
 
 | ID | Area | Resolution | Date |
 |----|------|-----------|------|
-| TD-R1 | Orchestrator | Decomposed to 3,510 LOC (42% reduction) | 2026-05 |
+| TD-3 | Conversation Memory | `victor/agent/conversation/store.py` refactored | 2026-06 |
+| TD-8 | Legacy Verticals | Built-in contrib verticals emit DeprecationWarning | 2026-05 |
+| TD-R1 | Orchestrator | Decomposed to 3,510 LOC (42% reduction) — **regrew to 4,690 by 2026-07; reopened as TD-14 with a ratchet guard** | 2026-05 |
 | TD-R2 | Service Layer | 6 canonical services mandatory, feature flags removed | 2026-04 |
 | TD-R3 | Legacy Coordinators | 13/13 deprecated coordinators removed | 2026-04 |
 | TD-R4 | Protocols | Extracted to `victor/agent/protocols/` | 2026-03 |

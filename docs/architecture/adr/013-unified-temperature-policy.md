@@ -2,7 +2,7 @@
 
 ## Metadata
 
-- **Status**: Proposed
+- **Status**: Accepted (2026-07-02 — implemented in `victor/framework/temperature/` with the 0.7→0.6 default flip and the `test_no_temperature_scatter.py` boundary guard; was Proposed)
 - **Date**: 2026-06-22
 - **Decision Makers**: Vijaykumar Singh
 - **Related ADRs**: 009 (rubric completion) — shares the reproducibility concern
