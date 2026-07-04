@@ -64,9 +64,11 @@ class TestAdapterConfig:
         Defaults optimized for SWE-bench with slow models (DeepSeek, Qwen, Mixtral).
         """
         config = AdapterConfig()
-        assert config.max_turns == 20  # Fewer, longer turns for slow models
+        assert config.max_turns == 20  # More turns within the task budget
         assert config.tool_budget == 50  # ACTION complexity budget
-        assert config.min_turn_timeout == 240  # 4 min per turn for slow inference
+        # 2 min per turn: a lower floor maximizes turns within the task budget
+        # (1200s / 120s = 10 turns) so the agent reaches the edit phase.
+        assert config.min_turn_timeout == 120
         assert config.track_file_edits is True
         assert config.track_diffs is True
         assert config.working_dir is None

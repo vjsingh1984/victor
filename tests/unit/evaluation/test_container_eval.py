@@ -99,6 +99,7 @@ def _fake_dockerhub_client(repos, *, boom=False):
 
 async def test_resolve_swebench_image_exact_dockerhub_lookup(monkeypatch):
     ce._INSTANCE_IMAGE_CACHE.clear()
+    ce._REPO_IMAGE_INDEX.clear()
     repos = [
         "swebench/sweb.eval.x86_64.astropy_1776_astropy-14182",
         "swebench/sweb.eval.x86_64.astropy_1776_astropy-12907",
@@ -113,10 +114,45 @@ async def test_resolve_swebench_image_exact_dockerhub_lookup(monkeypatch):
 
 async def test_resolve_swebench_image_exact_falls_back_on_network_failure(monkeypatch):
     ce._INSTANCE_IMAGE_CACHE.clear()
+    ce._REPO_IMAGE_INDEX.clear()
     monkeypatch.setattr(ce.httpx, "AsyncClient", _fake_dockerhub_client([], boom=True))
     img = await ce.resolve_swebench_image_exact(_Task(), _Config())
     # Falls back to the heuristic resolver (graceful).
     assert img == "docker.io/swebench/sweb.eval.x86_64.astropy_astropy-12907"
+
+
+async def test_repo_image_index_dedupes_lookups_per_repo(monkeypatch):
+    """The Docker Hub search fires ONCE per repo, not once per instance.
+
+    A repo whose lookup fails is cached empty so every subsequent instance of
+    that repo skips straight to the heuristic — this is the django fix (≈44
+    redundant failing calls reduced to 1).
+    """
+    ce._INSTANCE_IMAGE_CACHE.clear()
+    ce._REPO_IMAGE_INDEX.clear()
+    calls = {"n": 0}
+
+    class _CountingClient:
+        def __init__(self, *a, **k):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            pass
+
+        async def get(self, url, params=None, **k):
+            calls["n"] += 1
+            return _FakeDockerHubResp([])  # no matching images → heuristic
+
+    monkeypatch.setattr(ce.httpx, "AsyncClient", _CountingClient)
+    # Three instances of the same repo → the lookup should fire only once.
+    for tid in ("astropy__astropy-12907", "astropy__astropy-14182", "astropy__astropy-7166"):
+        await ce.resolve_swebench_image_exact(_Task(task_id=tid), _Config())
+    assert calls["n"] == 1
+    # The empty result is cached, so a network failure isn't retried per task.
+    assert ce._REPO_IMAGE_INDEX["astropy"] == []
 
 
 async def test_resolve_swebench_image_exact_override_wins():
