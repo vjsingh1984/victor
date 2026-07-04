@@ -53,7 +53,7 @@ victor "summarize this repo"
 ## Troubleshooting
 - Connection refused: start Ollama with `ollama serve`
 - Model not found: `ollama pull <model>`
-- Import errors: reinstall with `pip install -e ".[dev]"` for local dev
+- Import errors: reinstall with `pip install -e ./victor-contracts -e ".[dev]"` for local dev
 
 ## Next Steps
 - User Guide: `../USER_GUIDE.md`

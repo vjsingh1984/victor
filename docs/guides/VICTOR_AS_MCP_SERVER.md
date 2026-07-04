@@ -47,7 +47,7 @@ pip install victor-ai
 # Or install from source
 git clone https://github.com/victor-ai/victor.git
 cd victor
-pip install -e ".[dev]"
+pip install -e ./victor-contracts -e ".[dev]"
 ```
 
 ### Step 2: Configure Claude Desktop

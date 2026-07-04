@@ -130,8 +130,8 @@ cd victor
 python -m venv .venv
 source .venv/bin/activate
 
-# Install in editable mode
-pip install -e ".[dev]"
+# Install in editable mode (contracts first — victor-ai depends on the in-repo SDK)
+pip install -e ./victor-contracts -e ".[dev]"
 
 # Install pre-commit hooks
 pre-commit install
@@ -471,7 +471,7 @@ docker pull ghcr.io/vjsingh1984/victor:latest
 ### Development
 ```bash
 git pull origin main
-pip install -e ".[dev]"
+pip install -e ./victor-contracts -e ".[dev]"
 ```
 
 ---

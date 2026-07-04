@@ -161,7 +161,8 @@ Project code intelligence is derived, rebuildable state. Graph indexes, vector i
 ```bash
 python -m venv .venv
 source .venv/bin/activate
-pip install -e ".[dev]"
+# victor-contracts first so victor-ai resolves the in-repo SDK, not PyPI
+pip install -e ./victor-contracts -e ".[dev]"
 
 make test-quick
 make test

@@ -50,7 +50,8 @@ cd victor
 # 2. Set up environment
 python -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
-pip install -e ".[dev]"
+make install-dev   # installs victor-contracts (in-repo SDK) before victor-ai[dev]
+# without make: pip install -e ./victor-contracts -e ".[dev]"
 
 # 3. Create branch
 git checkout -b feature/your-feature-name

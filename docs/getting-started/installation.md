@@ -26,7 +26,7 @@ Choose the installation method that best fits your use case:
 | **pipx** (Recommended) | `pipx install victor-ai` | CLI users, isolated environment |
 | **pip** | `pip install victor-ai` | Virtual environments, Python projects |
 | **Docker** | `docker pull ghcr.io/vjsingh1984/victor` | Containers, isolated deployments |
-| **Development** | `pip install -e ".[dev]"` | Contributors, local development |
+| **Development** | `pip install -e ./victor-contracts -e ".[dev]"` | Contributors, local development |
 
 ### Method 1: pipx (Recommended for CLI Users)
 
@@ -121,7 +121,8 @@ python -m venv .venv
 source .venv/bin/activate
 
 # Install in development mode with all dependencies
-pip install -e ".[dev]"
+# (contracts first — victor-ai depends on the in-repo SDK)
+pip install -e ./victor-contracts -e ".[dev]"
 
 # Verify installation
 victor --version
@@ -416,7 +417,7 @@ docker pull ghcr.io/vjsingh1984/victor:latest
 ### Development
 ```bash
 git pull origin main
-pip install -e ".[dev]"
+pip install -e ./victor-contracts -e ".[dev]"
 ```
 
 ---
