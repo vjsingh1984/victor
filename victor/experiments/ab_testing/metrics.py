@@ -24,10 +24,18 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import numpy as np
-from scipy import stats
+
+try:  # scipy ships in the [ml] extra — keep the CLI import chain scipy-free.
+    from scipy import stats
+
+    SCIPY_AVAILABLE = True
+except ImportError:  # pragma: no cover - environment-dependent
+    stats = None  # type: ignore[assignment]
+    SCIPY_AVAILABLE = False
 
 from victor.core.events import MessagingEvent, get_observability_bus
 from victor.experiments.ab_testing.paths import get_default_ab_test_db_path
+from victor.experiments.ab_testing.statistics import _require_scipy
 from victor.experiments.ab_testing.models import (
     AggregatedMetrics,
     ExecutionMetrics,
@@ -289,6 +297,7 @@ class MetricsCollector:
         Returns:
             Aggregated metrics
         """
+        _require_scipy()
         execution_times = np.array(cache["execution_times"])
         token_counts = np.array(cache["token_counts"])
         tool_call_counts = np.array(cache["tool_call_counts"])
@@ -373,6 +382,7 @@ class MetricsCollector:
         Returns:
             Tuple of (lower_bound, upper_bound)
         """
+        _require_scipy()
         if total == 0:
             return (0.0, 0.0)
 

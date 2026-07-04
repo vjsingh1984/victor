@@ -22,7 +22,24 @@ from enum import Enum
 from typing import Any, Dict, List, Literal, Optional, Tuple
 
 import numpy as np
-from scipy import stats
+
+try:  # scipy ships in the [ml] extra — keep the CLI import chain scipy-free.
+    from scipy import stats
+
+    SCIPY_AVAILABLE = True
+except ImportError:  # pragma: no cover - environment-dependent
+    stats = None  # type: ignore[assignment]
+    SCIPY_AVAILABLE = False
+
+
+def _require_scipy() -> None:
+    """Fail with an actionable message when statistical tests need scipy."""
+    if not SCIPY_AVAILABLE:
+        raise ImportError(
+            "scipy is required for A/B statistical analysis. "
+            'Install it with: pip install "victor-ai[ml]"'
+        )
+
 
 # =============================================================================
 # Enums for A/B Testing Optimization
@@ -64,6 +81,9 @@ class StatisticalAnalyzer:
             treatment_total=100,
         )
     """
+
+    def __init__(self) -> None:
+        _require_scipy()
 
     def compare_means(
         self,
