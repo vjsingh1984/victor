@@ -40,10 +40,8 @@ from victor.workflows.streaming_executor import (
     WorkflowEventType,
     WorkflowStreamChunk,
 )
-from victor.workflows.executor import (
-    WorkflowResult,
-    ExecutorNodeStatus,
-)
+from victor.workflows.context import WorkflowResult
+from victor_contracts.workflows import ExecutorNodeStatus
 
 # ============ Test Fixtures ============
 

@@ -15,6 +15,11 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Protocol
 
 from victor_contracts.workflows import ExecutorNodeStatus, NodeResult
 
+# Prefix identifying chain handlers in YAML workflow references
+# ("chain:<vertical>:<name>"). Canonical home; victor.workflows.executor
+# re-exports it for backward compatibility until 0.10.0.
+CHAIN_HANDLER_PREFIX = "chain:"
+
 if TYPE_CHECKING:
     from victor.workflows.definition import ComputeNode
     from victor.tools.registry import ToolRegistry
