@@ -157,6 +157,17 @@ LEGACY_PATHS_THAT_MUST_STAY_REMOVED = {
 }
 
 ROADMAP_LINK_RE = re.compile(r"\[[^\]]+\]\(([^)]*ROADMAP\.md(?:#[^)]+)?)\)")
+
+# Canonical pointer docs: files whose whole job is to route readers to other
+# docs. Every relative markdown/asset link inside them must resolve (TD-18).
+CANONICAL_POINTER_DOCS = (
+    Path("roadmap.md"),
+    Path("ARCHITECTURE.md"),
+    Path("docs/roadmap.md"),
+    Path("docs/architecture/adr/README.md"),
+)
+
+RELATIVE_DOC_LINK_RE = re.compile(r"\[[^\]]*\]\(([^)#\s]+\.(?:md|mmd|svg|png))(?:#[^)]*)?\)")
 TARGET_HEADER_RE = re.compile(r"^[A-Za-z0-9_.-]+:\s*(?:#.*)?$")
 
 
@@ -675,6 +686,33 @@ def check_archived_doc_banners(root: Path) -> list[HygieneFinding]:
     return findings
 
 
+def check_canonical_doc_pointers(root: Path) -> list[HygieneFinding]:
+    """Ensure canonical pointer docs exist and their relative links resolve (TD-18).
+
+    docs/roadmap.md was referenced by six documents while existing only as an
+    untracked local file; this check makes that class of drift fail CI.
+    """
+    findings: list[HygieneFinding] = []
+    for rel_path in CANONICAL_POINTER_DOCS:
+        path = root / rel_path
+        if not path.is_file():
+            findings.append(HygieneFinding(rel_path, "canonical doc is missing"))
+            continue
+        text = path.read_text()
+        for match in RELATIVE_DOC_LINK_RE.finditer(text):
+            target = match.group(1)
+            if target.startswith(("http://", "https://", "mailto:", "/")):
+                continue
+            if not (path.parent / target).resolve().exists():
+                findings.append(
+                    HygieneFinding(
+                        rel_path,
+                        f"broken canonical link target: {target}",
+                    )
+                )
+    return findings
+
+
 def check_removed_legacy_paths(root: Path) -> list[HygieneFinding]:
     """Prevent removed duplicate-source files from quietly returning."""
     findings: list[HygieneFinding] = []
@@ -1112,6 +1150,7 @@ def run_checks(root: Path) -> list[HygieneFinding]:
     findings.extend(check_banned_repo_urls(root))
     findings.extend(check_uppercase_roadmap_links(root))
     findings.extend(check_archived_doc_banners(root))
+    findings.extend(check_canonical_doc_pointers(root))
     findings.extend(check_removed_legacy_paths(root))
     findings.extend(check_makefile_lint_gate(root))
     findings.extend(check_vertical_extra_metadata(root))

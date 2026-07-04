@@ -2,11 +2,11 @@
 
 ## Metadata
 
-- **Status**: Proposed
+- **Status**: Accepted (2026-07-02 — Phase 0 done, Phase 1 live as a guarded soft-import in `victor/core/graph_rag/indexing.py`; later phases pending; was Proposed)
 - **Date**: 2026-06-26
 - **Decision Makers**: Vijaykumar Singh
 - **Related ADRs**: ADR 014 (shared victor-codegraph package), ADR 007 (vertical/contracts boundary)
-- **Cross-repo**: ProximaDB `ADR-029` (shared chunker), AnvaiOps `ADR-0018` (consumer)
+- **Cross-repo**: ProximaDB `ADR-029` (shared chunker), ProximaDB `ADR-044` (stable symbol oid — shipped in victor-codegraph 0.1.2), AnvaiOps `ADR-0018` (consumer)
 
 ## Context
 

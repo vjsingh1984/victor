@@ -55,9 +55,10 @@ def test_parse_missing_dimension_falls_back_low_confidence():
 
 def test_parse_missing_numbers_use_defaults_and_clamp():
     rubric = Rubric("t", (RubricDimension("alpha"),))
-    # line present but no parseable score/confidence -> score 0.5, confidence 0.3
+    # Line present but no parseable score/confidence -> neutral score, confidence BELOW
+    # the DimensionAwareFilter engagement floor (0.25) so it cannot gate completion.
     s = _parse_rubric_scores(rubric, "alpha: looks good")[0]
-    assert s.score == 0.5 and s.confidence == 0.3
+    assert s.score == 0.5 and s.confidence == 0.2
 
 
 def test_build_prompt_includes_dimensions_and_content():

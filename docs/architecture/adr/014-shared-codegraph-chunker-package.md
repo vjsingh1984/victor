@@ -2,11 +2,11 @@
 
 ## Metadata
 
-- **Status**: Proposed
+- **Status**: Accepted (2026-07-02 — `victor-codegraph` 0.1.x released, `victor-coding` delegates; was Proposed)
 - **Date**: 2026-06-26
 - **Decision Makers**: Vijaykumar Singh
-- **Related ADRs**: ADR 007 (Vertical Distribution Model and Contracts Boundary)
-- **Cross-repo**: ProximaDB `docs/12-design/adr/ADR-028-shared-codegraph-chunker-package.adoc` (authoritative cross-repo decision); AnvaiOps `docs/adr/0018-consume-shared-codegraph-chunker.md` (SaaS consumer)
+- **Related ADRs**: ADR 007 (Vertical Distribution Model and Contracts Boundary), ADR 015 (core adoption)
+- **Cross-repo**: ProximaDB `docs/12-design/adr/ADR-029-shared-codegraph-chunker-package.adoc` (authoritative cross-repo decision); ProximaDB `ADR-044` (stable symbol oid — extends this package's identity contract); AnvaiOps `docs/adr/0018-consume-shared-codegraph-chunker.md` (SaaS consumer)
 
 ## Context
 

@@ -2,7 +2,7 @@
 
 ## Metadata
 
-- **Status**: Proposed
+- **Status**: Accepted (2026-07-02 — contract boundary CI-guarded, first-party verticals folded into monorepo under `verticals/`; was Proposed)
 - **Date**: 2026-03-10
 - **Decision Makers**: Vijaykumar Singh
 - **Related ADRs**: ADR 001, ADR 004
