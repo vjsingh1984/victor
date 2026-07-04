@@ -22,24 +22,12 @@ on:
       - 'Dockerfile'
       - 'docker/**'
       - 'docker-compose*.yml'
+  # No path filter on pull_request: "Build Python Package" is a REQUIRED status check,
+  # so it must run on EVERY PR — a PR whose paths trigger no build run is permanently
+  # unmergeable (workflow_dispatch runs on the head SHA do not satisfy the PR's
+  # expected-context tracking; verified twice on PR #379). The job costs ~30s.
   pull_request:
     branches: [main]
-    paths:
-      - '.github/workflows/build.yml'
-      - 'victor/**'
-      - 'victor-contracts/**'
-      - 'rust/**'
-      # benchmarks/ ships no package artifact, but "Build Python Package" is a REQUIRED
-      # status check — a PR whose paths trigger no build run is unmergeable (workflow_dispatch
-      # runs do not satisfy the PR's expected-context tracking; verified on PR #379).
-      - 'benchmarks/**'
-      - 'pyproject.toml'
-      - 'requirements*.txt'
-      - 'MANIFEST.in'
-      - 'VERSION'
-      - 'Dockerfile'
-      - 'docker/**'
-      - 'docker-compose*.yml'
   workflow_dispatch:
 
 env:
