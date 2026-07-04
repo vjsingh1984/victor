@@ -633,6 +633,7 @@ victor = [
     "config/*.yaml",
     "config/*.yml",
     "config/*.json",
+    "models/*.npz",
     "verticals/contrib/*/*.yaml",
     "verticals/contrib/*/*.toml",
     "verticals/contrib/*/*.svg",
