@@ -11,6 +11,10 @@ on:
       - 'victor/**'
       - 'victor-contracts/**'
       - 'rust/**'
+      # benchmarks/ ships no package artifact, but "Build Python Package" is a REQUIRED
+      # status check — a PR whose paths trigger no build run is unmergeable (workflow_dispatch
+      # runs do not satisfy the PR's expected-context tracking; verified on PR #379).
+      - 'benchmarks/**'
       - 'pyproject.toml'
       - 'requirements*.txt'
       - 'MANIFEST.in'
@@ -25,6 +29,10 @@ on:
       - 'victor/**'
       - 'victor-contracts/**'
       - 'rust/**'
+      # benchmarks/ ships no package artifact, but "Build Python Package" is a REQUIRED
+      # status check — a PR whose paths trigger no build run is unmergeable (workflow_dispatch
+      # runs do not satisfy the PR's expected-context tracking; verified on PR #379).
+      - 'benchmarks/**'
       - 'pyproject.toml'
       - 'requirements*.txt'
       - 'MANIFEST.in'
