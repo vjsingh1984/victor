@@ -91,6 +91,14 @@ def main() -> int:
         help="Seconds to pace between LLM grading calls (strict provider RPM caps, "
         "e.g. Z.AI, need 15+; local Ollama can use 0)",
     )
+    parser.add_argument(
+        "--judge-max-tokens",
+        type=int,
+        default=1024,
+        help="Token budget per grading call. Thinking-family judge models spend tokens "
+        "on reasoning before the grade lines — if the integrity line reports "
+        "ungradable>0, raise this (2048+).",
+    )
     args = parser.parse_args()
 
     judges = {
@@ -142,9 +150,11 @@ def main() -> int:
             make_provider_complete_fn(
                 provider,
                 model,
+                max_tokens=args.judge_max_tokens,
                 pre_call_delay_seconds=args.judge_delay,
                 stats=llm_stats,
-            )
+            ),
+            stats=llm_stats,
         )
     exit_code = 0
     for name, judge in judges.items():
@@ -160,12 +170,21 @@ def main() -> int:
             if not llm_stats.clean:
                 verdict = "VOID"
                 exit_code = 1
-                print(
-                    f"[rubric-llm] ⚠ {llm_stats.failures} grading call(s) failed after retries — "
-                    "failed calls degrade to neutral fallback scores, so this α measures the "
-                    "error path, NOT the judge. Re-run with a higher --judge-delay or a "
-                    "less rate-limited provider."
-                )
+                if llm_stats.failures:
+                    print(
+                        f"[rubric-llm] ⚠ {llm_stats.failures} grading call(s) failed after "
+                        "retries — failed calls degrade to neutral fallback scores, so this α "
+                        "measures the error path, NOT the judge. Re-run with a higher "
+                        "--judge-delay or a less rate-limited provider."
+                    )
+                if llm_stats.ungradable:
+                    print(
+                        f"[rubric-llm] ⚠ {llm_stats.ungradable} grading call(s) returned "
+                        "output with NO parseable dimension scores — wrong output format, or a "
+                        "thinking-family model exhausting its token budget on reasoning before "
+                        "the grade lines. This α measures the parse-fallback path, NOT the "
+                        "judge. Try --judge-max-tokens 2048+ or a non-thinking judge model."
+                    )
         print(f"[{name}] n={len(report.samples)}  {verdict}  ({decision.reason})")
         for family, rel in report.per_family.items():
             alpha = rel.krippendorff_alpha

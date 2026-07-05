@@ -207,6 +207,36 @@ def test_llm_rubric_judge_reuses_one_event_loop(tmp_path: Path) -> None:
     assert len(set(loops)) == 1, "each call ran on a different event loop"
 
 
+def test_ungradable_output_is_detected_and_voids_cleanliness(tmp_path: Path) -> None:
+    """Regression for the qwen3.5 signature: transport succeeds, no grade lines parse,
+    every dimension falls back below the engagement floor, verdict defaults to COMPLETE.
+    Constant credulity with clean call stats — must be counted as ungradable."""
+    from victor.evaluation.calibration_rubric_judge import JudgeCallStats
+
+    async def thinking_preamble_fn(_prompt: str) -> str:
+        return "Let me carefully consider whether this task was completed properly..."
+
+    stats = JudgeCallStats()
+    judge = make_llm_rubric_judge(thinking_preamble_fn, stats=stats)
+    verdict = judge("Task", _transcript(), tmp_path)
+    assert verdict == 1.0  # the filter's default — a grade-shaped non-grade
+    assert stats.ungradable == 1
+    assert not stats.clean
+
+
+def test_parseable_output_does_not_count_as_ungradable(tmp_path: Path) -> None:
+    from victor.evaluation.calibration_rubric_judge import JudgeCallStats
+
+    async def good_fn(_prompt: str) -> str:
+        return _grade_lines(0.9)
+
+    stats = JudgeCallStats()
+    judge = make_llm_rubric_judge(good_fn, stats=stats)
+    judge("Task", _transcript(), tmp_path)
+    assert stats.ungradable == 0
+    assert stats.clean
+
+
 # --- Provider complete_fn adapter ------------------------------------------------------------------
 
 
