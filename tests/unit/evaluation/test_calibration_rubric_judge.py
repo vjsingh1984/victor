@@ -187,6 +187,26 @@ def test_llm_rubric_judge_provider_error_is_credulous_by_design(tmp_path: Path) 
     assert make_llm_rubric_judge(failing_fn)("Task", _transcript(), tmp_path) == 1.0
 
 
+def test_llm_rubric_judge_reuses_one_event_loop(tmp_path: Path) -> None:
+    """Regression: per-call asyncio.run broke pooled-HTTP providers on the second call
+    ('Event loop is closed' — hit live with DeepSeek). All grading calls must run on the
+    same persistent loop so provider connection pools stay bound to a live loop."""
+    import asyncio
+
+    loops: list[int] = []
+
+    async def loop_spy_fn(_prompt: str) -> str:
+        loops.append(id(asyncio.get_running_loop()))
+        return _grade_lines(0.9)
+
+    judge = make_llm_rubric_judge(loop_spy_fn)
+    judge("Task one", _transcript(), tmp_path)
+    judge("Task two", _transcript(), tmp_path)
+    judge("Task three", _transcript(), tmp_path)
+    assert len(loops) == 3
+    assert len(set(loops)) == 1, "each call ran on a different event loop"
+
+
 # --- Provider complete_fn adapter ------------------------------------------------------------------
 
 
