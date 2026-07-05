@@ -99,6 +99,12 @@ def main() -> int:
         "on reasoning before the grade lines — if the integrity line reports "
         "ungradable>0, raise this (2048+).",
     )
+    parser.add_argument(
+        "--keep-workspaces",
+        action="store_true",
+        help="Keep the per-task workspace dirs for inspection (default: cleaned up). "
+        "Useful for diagnosing what a judge actually saw on a bad run.",
+    )
     args = parser.parse_args()
 
     judges = {
@@ -161,7 +167,11 @@ def main() -> int:
         harness = JudgeCalibrationHarness(default_corpus(variants=args.variants))
         # period=5 is coprime with the 6 task families, so scripted failures rotate
         # across every family instead of always hitting the same ones.
-        report = harness.run(alternating_scripted_executor(period=5), judge)
+        report = harness.run(
+            alternating_scripted_executor(period=5),
+            judge,
+            keep_workspaces=args.keep_workspaces,
+        )
         report.save(args.out / f"{name}.json")
         decision = report.gate_decision
         verdict = "TRUSTED" if decision.trusted else "NOT TRUSTED"

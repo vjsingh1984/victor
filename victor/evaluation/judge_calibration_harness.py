@@ -242,35 +242,51 @@ class JudgeCalibrationHarness:
         judge: CalibrationJudge,
         *,
         workspace_root: Optional[Path] = None,
+        keep_workspaces: bool = False,
     ) -> CalibrationReport:
+        """Run the corpus and return a :class:`CalibrationReport`.
+
+        When ``workspace_root`` is given, the caller owns that directory and its lifetime.
+        When it is not, a fresh temp dir is created and **removed on exit** (this harness
+        previously orphaned one ``judge_calibration_*`` dir per run in the system temp
+        directory). Set ``keep_workspaces=True`` to retain the auto-created dir for post-hoc
+        inspection of what a judge actually saw.
+        """
+        import shutil
         import tempfile
 
+        caller_owned = workspace_root is not None
         root = workspace_root or Path(tempfile.mkdtemp(prefix="judge_calibration_"))
-        samples: list[CalibrationSample] = []
-        for index, task in enumerate(self.tasks):
-            workspace = root / f"{index:04d}_{task.task_id}"
-            workspace.mkdir(parents=True, exist_ok=False)
-            task.setup(workspace)
-            transcript = executor(task, workspace)
-            judged = float(judge(task.prompt, transcript, workspace))
-            gold = float(task.verify(workspace, transcript))
-            samples.append(
-                CalibrationSample(
-                    task_id=task.task_id, family=task.family, gold=gold, judged=judged
+        try:
+            samples: list[CalibrationSample] = []
+            for index, task in enumerate(self.tasks):
+                workspace = root / f"{index:04d}_{task.task_id}"
+                workspace.mkdir(parents=True, exist_ok=False)
+                task.setup(workspace)
+                transcript = executor(task, workspace)
+                judged = float(judge(task.prompt, transcript, workspace))
+                gold = float(task.verify(workspace, transcript))
+                samples.append(
+                    CalibrationSample(
+                        task_id=task.task_id, family=task.family, gold=gold, judged=judged
+                    )
                 )
-            )
 
-        overall = self._agreement(samples)
-        per_family: dict[str, JudgeReliability] = {}
-        for family in sorted({s.family for s in samples}):
-            per_family[family] = self._agreement([s for s in samples if s.family == family])
-        return CalibrationReport(
-            samples=tuple(samples),
-            overall=overall,
-            per_family=per_family,
-            gate_decision=self.gate.decide(overall),
-            alpha_threshold=self.gate.alpha_threshold,
-        )
+            overall = self._agreement(samples)
+            per_family: dict[str, JudgeReliability] = {}
+            for family in sorted({s.family for s in samples}):
+                per_family[family] = self._agreement([s for s in samples if s.family == family])
+            return CalibrationReport(
+                samples=tuple(samples),
+                overall=overall,
+                per_family=per_family,
+                gate_decision=self.gate.decide(overall),
+                alpha_threshold=self.gate.alpha_threshold,
+            )
+        finally:
+            # Only remove what we created; a caller-provided root is theirs to keep.
+            if not caller_owned and not keep_workspaces:
+                shutil.rmtree(root, ignore_errors=True)
 
     def _agreement(self, samples: Sequence[CalibrationSample]) -> JudgeReliability:
         return evaluate_judge_agreement(
