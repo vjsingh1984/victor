@@ -175,23 +175,49 @@ def make_rubric_judge(
 class JudgeCallStats:
     """Integrity accounting for judge grading calls.
 
-    A calibration whose grading calls errored is not a measurement of the judge — the
-    ``LLMRubricJudge`` error fallback produces neutral, filter-inert scores, so failed calls
-    silently masquerade as credulous grades (observed live: a fully rate-limited GLM-5.2 run
-    reproduced the heuristic judge's α to three decimals). Check ``failures == 0`` before
-    trusting a report built from this ``complete_fn``.
+    Two ways a calibration silently stops measuring the judge, both producing neutral,
+    filter-inert scores that masquerade as credulous grades:
+
+    - **Transport failure** (``failures``): the provider call errored after retries; the
+      ``LLMRubricJudge`` error fallback kicks in. Observed live: a fully rate-limited
+      GLM-5.2 run reproduced the heuristic judge's α to three decimals.
+    - **Ungradable output** (``ungradable``): the call SUCCEEDED but no dimension parsed
+      from the reply — wrong format, or a thinking-family model exhausting max_tokens on
+      reasoning before emitting any ``score=`` line. Observed live: qwen3.5:27b returned
+      48/48 clean calls and judged everything complete, again matching the heuristic's α
+      exactly.
+
+    Check ``clean`` before trusting a report built from this judge.
     """
 
     calls: int = 0
     retries: int = 0
     failures: int = 0
+    ungradable: int = 0
 
     @property
     def clean(self) -> bool:
-        return self.failures == 0
+        return self.failures == 0 and self.ungradable == 0
 
     def summary(self) -> str:
-        return f"calls={self.calls} retries={self.retries} failures={self.failures}"
+        return (
+            f"calls={self.calls} retries={self.retries} "
+            f"failures={self.failures} ungradable={self.ungradable}"
+        )
+
+
+def _no_dimension_graded(result: RubricCompletionResult) -> bool:
+    """True when every dimension carries the parse/error fallback signature.
+
+    All three ungraded paths in :mod:`victor.framework.rubric_completion` — missing row,
+    present-but-unparseable row, provider-error fallback — emit ``score=0.5`` with
+    ``confidence<=0.2`` (below the engagement floor). A result made entirely of such
+    scores contains zero judge signal; the filter's COMPLETE verdict is a default, not a
+    grade.
+    """
+    return bool(result.scores) and all(
+        s.score == 0.5 and s.confidence <= 0.2 for s in result.scores
+    )
 
 
 def _looks_rate_limited(exc: Exception) -> bool:
@@ -270,6 +296,7 @@ def make_llm_rubric_judge(
     *,
     evaluator: Optional[AsyncRubricCompletionEvaluator] = None,
     score_mode: ScoreMode = "complete",
+    stats: Optional[JudgeCallStats] = None,
 ) -> CalibrationJudge:
     """Wrap the LLM-backed rubric evaluator (single grading call per task) as a CalibrationJudge.
 
@@ -290,6 +317,8 @@ def make_llm_rubric_judge(
                 content=render_judged_content(prompt, transcript, workspace),
             )
         )
+        if stats is not None and _no_dimension_graded(result):
+            stats.ungradable += 1
         return _project(result, score_mode)
 
     return judge
