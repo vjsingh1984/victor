@@ -151,3 +151,41 @@ def test_scripted_executor_requires_reference_solution(tmp_path: Path) -> None:
 def test_binary_categorize_threshold() -> None:
     assert binary_categorize(0.5) is True
     assert binary_categorize(0.49) is False
+
+
+def _isolated_tempdir(tmp_path: Path, monkeypatch) -> Path:
+    """Redirect tempfile.mkdtemp() into an isolated dir so these assertions never race
+    another process's judge_calibration_* dirs in the shared system temp."""
+    import tempfile
+
+    root = tmp_path / "tmproot"
+    root.mkdir()
+    monkeypatch.setattr(tempfile, "tempdir", str(root))
+    return root
+
+
+def test_auto_created_workspace_is_cleaned_up(tmp_path: Path, monkeypatch) -> None:
+    """Regression: the harness orphaned one judge_calibration_* dir per run when no
+    workspace_root was passed (47 leaked into /tmp before this fix)."""
+    root = _isolated_tempdir(tmp_path, monkeypatch)
+    harness = JudgeCalibrationHarness(default_corpus(variants=1))
+    harness.run(make_scripted_executor(lambda _t: True), lambda p, t, w: 1.0)
+    assert list(root.glob("judge_calibration_*")) == [], "temp workspace was not removed"
+
+
+def test_caller_provided_workspace_is_not_deleted(tmp_path: Path) -> None:
+    root = tmp_path / "mine"
+    root.mkdir()
+    harness = JudgeCalibrationHarness(default_corpus(variants=1))
+    harness.run(make_scripted_executor(lambda _t: True), lambda p, t, w: 1.0, workspace_root=root)
+    assert root.is_dir(), "caller-owned workspace_root must survive the run"
+    assert any(root.iterdir()), "caller-owned root should retain the per-task workspaces"
+
+
+def test_keep_workspaces_retains_auto_created_dir(tmp_path: Path, monkeypatch) -> None:
+    root = _isolated_tempdir(tmp_path, monkeypatch)
+    harness = JudgeCalibrationHarness(default_corpus(variants=1))
+    harness.run(make_scripted_executor(lambda _t: True), lambda p, t, w: 1.0, keep_workspaces=True)
+    kept = list(root.glob("judge_calibration_*"))
+    assert len(kept) == 1, "keep_workspaces should retain the temp dir"
+    assert any(kept[0].iterdir()), "kept workspace should contain the per-task dirs"
