@@ -103,8 +103,10 @@ class ProviderCapabilities:
     requires_thinking_time: bool = False
 
 
-# Import canonical ToolCall for runtime construction (kept private to avoid re-export).
-from victor.agent.tool_calling.base import ToolCall as _ToolCall
+# The canonical ToolCall is imported inside the normalize_tool_calls bodies:
+# a module-scope import of victor.agent closes the cycle victor.protocols ->
+# victor.agent -> runtime_intelligence_pipeline -> victor.protocols.provider_adapter
+# and breaks any direct `import victor.protocols` entry.
 
 
 @dataclass
@@ -257,6 +259,8 @@ class BaseProviderAdapter:
         Returns:
             Normalized ToolCall list
         """
+        from victor.agent.tool_calling.base import ToolCall as _ToolCall
+
         normalized = []
         for i, call in enumerate(raw_calls):
             if isinstance(call, dict):
@@ -453,6 +457,8 @@ class AnthropicAdapter(BaseProviderAdapter):
 
     def normalize_tool_calls(self, raw_calls: List[Any]) -> List[ToolCall]:
         """Normalize Anthropic's content block format."""
+        from victor.agent.tool_calling.base import ToolCall as _ToolCall
+
         normalized = []
         for i, call in enumerate(raw_calls):
             if isinstance(call, dict) and call.get("type") == "tool_use":
@@ -522,6 +528,8 @@ class GoogleAdapter(BaseProviderAdapter):
 
     def normalize_tool_calls(self, raw_calls: List[Any]) -> List[ToolCall]:
         """Normalize Google's FunctionCall format."""
+        from victor.agent.tool_calling.base import ToolCall as _ToolCall
+
         normalized = []
         for i, call in enumerate(raw_calls):
             if isinstance(call, dict):
@@ -1005,6 +1013,8 @@ class BedrockAdapter(BaseProviderAdapter):
 
     def normalize_tool_calls(self, raw_calls: List[Any]) -> List[ToolCall]:
         """Normalize Bedrock's tool calls (varies by underlying model)."""
+        from victor.agent.tool_calling.base import ToolCall as _ToolCall
+
         normalized = []
         for i, call in enumerate(raw_calls):
             if isinstance(call, dict):
