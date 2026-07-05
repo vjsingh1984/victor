@@ -200,6 +200,73 @@ class TestVerifyPatchInContainer:
         assert vr.status == "partial"
         assert (vr.passed, vr.total) == (3, 5)
 
+    @pytest.mark.asyncio
+    async def test_whole_file_scoring_not_node_ids(self, tmp_path, monkeypatch):
+        """A task with BOTH fail_to_pass node-IDs and a test_code patch must
+        drive the test command from the test_code WHOLE FILE, not the node-IDs
+        (node-ID scoring mis-scores — see the 64%→20% validation regression).
+        """
+        from types import SimpleNamespace
+
+        from victor.evaluation import container_eval
+
+        captured = {}
+
+        class _FakeContainer:
+            name = "fake"
+
+            def __init__(self, **kw):
+                self.started = False
+
+            async def start(self):
+                self.started = True
+
+            async def exec(self, command, *, cwd=None, timeout=600, env=None):
+                cmd = " ".join(command)
+                if "checkout" in cmd or "clean" in cmd:
+                    return 0, "", ""
+                if ".agent_patch.diff" in cmd or ".test_patch.diff" in cmd:
+                    return 0, "", ""
+                return 0, "1 passed", ""
+
+            async def stop(self):
+                self.started = False
+
+        monkeypatch.setattr(container_eval, "EvalContainer", _FakeContainer)
+
+        async def _img(task, config):
+            return "img"
+
+        async def _noop():
+            return 0
+
+        monkeypatch.setattr(container_eval, "resolve_swebench_image_exact", _img)
+        monkeypatch.setattr(container_eval, "cleanup_stale_eval_containers", _noop)
+        import victor.context.test_runner as trm
+
+        def _rec(project_root, test_files=None):
+            captured["test_files"] = test_files
+            return SimpleNamespace(
+                command=["python", "-m", "pytest", "x"], env={}, runner_type="pytest"
+            )
+
+        monkeypatch.setattr(trm, "detect_test_runner", _rec)
+
+        task = BenchmarkTask(
+            task_id="org__repo-1",
+            benchmark=BenchmarkType.SWE_BENCH,
+            description="t",
+            repo="org/repo",
+            base_commit="abc",
+            test_code="diff --git a/tests/test_x.py b/tests/test_x.py\n--- a/tests/test_x.py\n",
+            fail_to_pass=["tests/test_x.py::test_node_id"],  # must be IGNORED
+        )
+        runner = SWEBenchRunner()
+        config = EvaluationConfig(benchmark=BenchmarkType.SWE_BENCH, model="t", max_tasks=1)
+        await runner._verify_patch_in_container(task, "PATCH", tmp_path, config)
+        # Whole test file from the test patch — NOT the fail_to_pass node-ID.
+        assert captured["test_files"] == ["tests/test_x.py"]
+
 
 class TestFailToPassNormalization:
     """Regression: FAIL_TO_PASS is a JSON-stringified list in the dataset.
