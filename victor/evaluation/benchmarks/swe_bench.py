@@ -24,7 +24,7 @@ to avoid code duplication. This module focuses on task execution.
 import asyncio
 import logging
 from pathlib import Path
-from typing import Optional
+from typing import NamedTuple, Optional
 
 from victor.evaluation.harness import BaseBenchmarkRunner, TaskEnvironment
 from victor.evaluation.protocol import (
@@ -37,6 +37,23 @@ from victor.evaluation.protocol import (
 from victor.evaluation.swe_bench_loader import SWEBenchConfig, SWEBenchLoader
 
 logger = logging.getLogger(__name__)
+
+
+class _ContainerVerifyResult(NamedTuple):
+    """Outcome of running a patch's tests in an official SWE-bench container.
+
+    Returned by :meth:`SWEBenchRunner._verify_patch_in_container` and consumed
+    by both the post-loop eval (maps ``status`` → ``TaskResult``) and the
+    closed-loop verify-and-retry gate (checks ``status == "passed"``).
+    """
+
+    passed: int
+    total: int
+    raw_output: str
+    # "passed" | "partial" | "all_failed" | "zero_collected" | "apply_failed" | "error"
+    status: str
+    image: str = ""
+    container_name: str = ""
 
 
 class SWEBenchRunner(BaseBenchmarkRunner):
@@ -482,23 +499,20 @@ class SWEBenchRunner(BaseBenchmarkRunner):
             return "docker"
         return "local"
 
-    async def _run_tests_in_container(
+    async def _verify_patch_in_container(
         self,
         task: BenchmarkTask,
-        result: TaskResult,
         patch: str,
         cached_repo: Path,
         config: EvaluationConfig,
-    ) -> TaskResult:
-        """Run a task's tests inside a Docker container with the correct runtime.
+    ) -> "_ContainerVerifyResult":
+        """Apply ``patch`` to ``/testbed`` in a fresh official SWE-bench
+        container and run the FAIL_TO_PASS tests.
 
-        Uses the official SWE-bench per-instance image (correct Python + compiled
-        deps baked in) — the dataset carries no python_version, so the image is
-        the source of truth. The image ships the repo EDITABLE-INSTALLED at
-        ``/testbed`` (its PWD) at the base_commit, so the canonical flow is:
-        apply the agent + test patches to ``/testbed`` and run tests there — no
-        reinstall. The host cached_repo is mounted at ``/workspace`` only so the
-        container can read the patch files. Raises
+        Full container lifecycle per call (start → exec×N → stop) so it is
+        stateless and reusable — by the post-loop eval (via
+        :meth:`_run_tests_in_container`) AND by the closed-loop verify-and-retry
+        gate mid-loop. Raises
         :class:`victor.evaluation.container_eval.DockerUnavailable` (propagated
         to the caller for host fallback) if Docker or the image can't be used.
         """
@@ -519,31 +533,21 @@ class SWEBenchRunner(BaseBenchmarkRunner):
             SWEBenchRunner._stale_containers_cleaned = True
             await cleanup_stale_eval_containers()
 
-        # Official per-instance image for SWE-bench tasks (carry repo); else the
-        # polyglot language+version map. The exact name (with its per-repo
-        # version segment) is looked up on Docker Hub; falls back to the
-        # heuristic resolver if the lookup fails.
         image = (
             await resolve_swebench_image_exact(task, config)
             if getattr(task, "repo", None)
             else resolve_runtime(task, config).base_image
         )
-        result.runtime_image = image
-        result.eval_backend = "docker"
-        result.language = getattr(task, "language", None) or "python"
-
         container = EvalContainer(image=image, workspace_host_path=str(cached_repo))
         ws = EVAL_WORKSPACE_MOUNT  # "/workspace" — cached_repo mount (patch files)
         # The official image ships the repo EDITABLE-INSTALLED at /testbed (its
-        # PWD): `astropy.__path__ == /testbed/astropy`, git at the base_commit.
-        # So the canonical flow is: apply patches to /testbed, run tests there —
-        # NO mount-and-reinstall (that fought the image layout → pip install -e .
-        # failed → 0 tests). The cached_repo mount is read-only-for-eval: the
-        # container only reads the patch files from /workspace.
+        # PWD): apply patches there and run tests — NO mount-and-reinstall.
         testbed = "/testbed"
+        passed = total = 0
+        raw = ""
+        status = "error"
         try:
             await container.start()  # raises DockerUnavailable if unusable
-            result.container_id = container.name
 
             # Write the agent + test patches into the mounted cached_repo (host
             # side) so the container can read them from /workspace.
@@ -552,9 +556,7 @@ class SWEBenchRunner(BaseBenchmarkRunner):
             if task.test_code:
                 (cached_repo / ".test_patch.diff").write_text(task.test_code)
 
-            # 1. Reset /testbed to base_commit. The image is already there on a
-            #    fresh container; this is for idempotency. No fetch — the commit
-            #    is local in the image.
+            # 1. Reset /testbed to base_commit (idempotency; commit is local).
             if task.base_commit:
                 for cmd in (
                     ["git", "checkout", "--force", task.base_commit],
@@ -565,101 +567,130 @@ class SWEBenchRunner(BaseBenchmarkRunner):
                         logger.debug("container git %s rc=%d: %s", cmd[1], rc, (err or "")[:200])
 
             # 2. Apply the agent's patch to /testbed (read from /workspace).
-            #    No `--allow-empty` — SWE-bench images ship git 2.34.1 which
-            #    rejects it. Patching /testbed's editable source is sufficient
-            #    (the image's Python imports /testbed/<pkg>) — NO reinstall.
             rc, _out, err = await container.exec(
                 ["git", "apply", f"{ws}/.agent_patch.diff"], cwd=testbed
             )
             if rc != 0:
-                result.status = TaskStatus.FAILED
-                result.error_message = f"Failed to apply patch (container): {(err or '')[:200]}"
-                logger.warning("Patch apply failed in container: %s", (err or "")[:200])
-                return result
-            logger.info("Patch applied successfully in container /testbed")
-
-            # 3. Apply the SWE-bench test patch.
-            if task.test_code:
-                await container.exec(["git", "apply", f"{ws}/.test_patch.diff"], cwd=testbed)
-
-            # 4. Detect the test runner on the host cached_repo (same repo/files)
-            #    and run its command in /testbed.
-            _test_files = None
-            if getattr(task, "fail_to_pass", None):
-                _test_files = task.fail_to_pass
-            elif task.test_code:
-                _test_files = [
-                    f
-                    for f in _re.findall(r"diff --git a/(\S+)", task.test_code)
-                    if "test" in f.lower()
-                ]
-            runner_cfg = detect_test_runner(cached_repo, test_files=_test_files or None)
-            test_cmd = list(runner_cfg.command)
-            # detect_test_runner embeds HOST ABSOLUTE PATHS (e.g. the
-            # ``runtests.py`` path, ``sys.executable``) which don't exist in
-            # the container (repo is at ``/testbed``). Rewrite both:
-            # 1. Python binary → bare ``python`` (container's PATH).
-            # 2. Any path starting with the cached_repo prefix → relative path
-            #    (so ``/Users/.../tests/runtests.py`` → ``tests/runtests.py``,
-            #    valid from ``/testbed``). Without this, django's runtests.py
-            #    was a host-only path → file not found → 0 tests collected.
-            if test_cmd and "python" in test_cmd[0]:
-                test_cmd[0] = "python"
-            _repo_prefix = str(cached_repo.resolve()) + "/"
-            test_cmd = [
-                arg.replace(_repo_prefix, "") if arg.startswith(_repo_prefix) else arg
-                for arg in test_cmd
-            ]
-            if runner_cfg.runner_type == "pytest" and "-m" in test_cmd:
-                idx = test_cmd.index("-m")
-                test_cmd.insert(idx + 2, "--noconftest")
-            logger.info("Running tests in container /testbed: %s", " ".join(test_cmd))
-
-            rc, stdout, stderr = await container.exec(
-                test_cmd,
-                cwd=testbed,
-                timeout=min(config.timeout_per_task, 300),
-                env=dict(runner_cfg.env),
-            )
-            result.stdout = stdout[-2000:]
-            result.stderr = stderr[-2000:]
-
-            # 6. Parse + set outcome (mirrors the host path).
-            passed, total = self._parse_test_output(stdout + stderr)
-            result.tests_passed = passed
-            result.tests_total = total
-            result.tests_failed = total - passed
-            if total > 0 and passed == total:
-                result.status = TaskStatus.PASSED
-                logger.info("Tests PASSED (container): %d/%d", passed, total)
-            elif total > 0 and passed > 0:
-                result.status = TaskStatus.FAILED
-                result.error_message = f"Partial pass: {passed}/{total}"
-                logger.info("Tests partial (container): %d/%d", passed, total)
-            elif total > 0:
-                result.status = TaskStatus.FAILED
-                result.error_message = f"All tests failed ({total} total)"
-                logger.info("Tests FAILED (container): %d/%d", passed, total)
+                status = "apply_failed"
+                raw = (err or "")[:500]
+                logger.warning("Patch apply failed in container: %s", raw)
             else:
-                result.status = TaskStatus.FAILED
-                result.error_message = (
-                    "Patch applied but tests could not run in container (0 collected)."
+                logger.info("Patch applied successfully in container /testbed")
+                # 3. Apply the SWE-bench test patch.
+                if task.test_code:
+                    await container.exec(["git", "apply", f"{ws}/.test_patch.diff"], cwd=testbed)
+
+                # 4. Detect the test runner on the host cached_repo (same
+                #    repo/files) and run its command in /testbed.
+                _test_files = None
+                if getattr(task, "fail_to_pass", None):
+                    _test_files = task.fail_to_pass
+                elif task.test_code:
+                    _test_files = [
+                        f
+                        for f in _re.findall(r"diff --git a/(\S+)", task.test_code)
+                        if "test" in f.lower()
+                    ]
+                runner_cfg = detect_test_runner(cached_repo, test_files=_test_files or None)
+                test_cmd = list(runner_cfg.command)
+                # detect_test_runner embeds HOST ABSOLUTE PATHS which don't
+                # exist in the container (repo is at /testbed). Rewrite: python
+                # binary → bare ``python``; cached_repo prefix → relative path.
+                if test_cmd and "python" in test_cmd[0]:
+                    test_cmd[0] = "python"
+                _repo_prefix = str(cached_repo.resolve()) + "/"
+                test_cmd = [
+                    arg.replace(_repo_prefix, "") if arg.startswith(_repo_prefix) else arg
+                    for arg in test_cmd
+                ]
+                if runner_cfg.runner_type == "pytest" and "-m" in test_cmd:
+                    idx = test_cmd.index("-m")
+                    test_cmd.insert(idx + 2, "--noconftest")
+                logger.info("Running tests in container /testbed: %s", " ".join(test_cmd))
+
+                _rc, stdout, stderr = await container.exec(
+                    test_cmd,
+                    cwd=testbed,
+                    timeout=min(config.timeout_per_task, 300),
+                    env=dict(runner_cfg.env),
                 )
-                logger.warning("Tests not collected in container (0/0).")
-                # Surface raw container test output so a parser gap (e.g.
-                # django runtests.py format) vs a genuine collection failure
-                # (wrong test path / runner) is diagnosable.
-                logger.warning(
-                    "Raw container test output (last 1500 chars) for " "0-collected task %s:\n%s",
-                    getattr(task, "task_id", "?"),
-                    (stdout + stderr)[-1500:],
-                )
+                raw = stdout + stderr
+                passed, total = self._parse_test_output(raw)
+                if total > 0 and passed == total:
+                    status = "passed"
+                    logger.info("Tests PASSED (container): %d/%d", passed, total)
+                elif total > 0 and passed > 0:
+                    status = "partial"
+                    logger.info("Tests partial (container): %d/%d", passed, total)
+                elif total > 0:
+                    status = "all_failed"
+                    logger.info("Tests FAILED (container): %d/%d", passed, total)
+                else:
+                    status = "zero_collected"
+                    logger.warning("Tests not collected in container (0/0).")
+                    logger.warning(
+                        "Raw container test output (last 1500 chars) for "
+                        "0-collected task %s:\n%s",
+                        getattr(task, "task_id", "?"),
+                        raw[-1500:],
+                    )
         finally:
             # Clean up patch files on the host mount; tear down the container.
             for f in (".agent_patch.diff", ".test_patch.diff"):
                 (cached_repo / f).unlink(missing_ok=True)
             await container.stop()
 
+        return _ContainerVerifyResult(
+            passed=passed,
+            total=total,
+            raw_output=raw[-4000:],
+            status=status,
+            image=image,
+            container_name=container.name,
+        )
+
+    async def _run_tests_in_container(
+        self,
+        task: BenchmarkTask,
+        result: TaskResult,
+        patch: str,
+        cached_repo: Path,
+        config: EvaluationConfig,
+    ) -> TaskResult:
+        """Run a task's tests in the official SWE-bench container (post-loop eval).
+
+        Thin wrapper over :meth:`_verify_patch_in_container` that maps the
+        parsed counts + status onto the ``TaskResult``. Raises
+        :class:`victor.evaluation.container_eval.DockerUnavailable` (propagated
+        to the caller for host fallback) if Docker or the image can't be used.
+        """
+        vr = await self._verify_patch_in_container(task, patch, cached_repo, config)
+        result.runtime_image = vr.image
+        result.container_id = vr.container_name
+        result.eval_backend = "docker"
+        result.language = getattr(task, "language", None) or "python"
+        result.tests_passed = vr.passed
+        result.tests_total = vr.total
+        result.tests_failed = vr.total - vr.passed
+        result.stdout = vr.raw_output[-2000:]
+        if vr.status == "passed":
+            result.status = TaskStatus.PASSED
+        elif vr.status == "partial":
+            result.status = TaskStatus.FAILED
+            result.error_message = f"Partial pass: {vr.passed}/{vr.total}"
+        elif vr.status == "all_failed":
+            result.status = TaskStatus.FAILED
+            result.error_message = f"All tests failed ({vr.total} total)"
+        elif vr.status == "apply_failed":
+            result.status = TaskStatus.FAILED
+            result.error_message = f"Failed to apply patch (container): {vr.raw_output[:200]}"
+        else:  # zero_collected or error
+            result.status = TaskStatus.FAILED
+            result.error_message = (
+                "Patch applied but tests could not run in container (0 collected)."
+                if vr.status == "zero_collected"
+                else f"Container verify error ({vr.status})"
+            )
         return result
 
     def _build_test_command(self, task: BenchmarkTask, repo_dir: Path) -> list:
