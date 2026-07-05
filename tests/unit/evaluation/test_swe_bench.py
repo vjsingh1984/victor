@@ -28,6 +28,7 @@ from victor.evaluation.benchmarks.swe_bench import (
     MBPPRunner,
 )
 from victor.evaluation.protocol import (
+    BenchmarkTask,
     BenchmarkType,
     EvaluationConfig,
     TaskResult,
@@ -109,6 +110,94 @@ class TestParseTestOutput:
         # Garbled / unparseable output → (0, 0) → caller logs raw + "0 collected".
         passed, total = self.runner._parse_test_output("some random error trace\nno tests here")
         assert passed == 0 and total == 0
+
+
+class TestVerifyPatchInContainer:
+    """Tests for the refactored _verify_patch_in_container (PR2 split).
+
+    Mocks EvalContainer + the image/test-runner resolvers so the full
+    start→apply→run→stop flow is exercised without Docker, validating the
+    status mapping consumed by both the post-loop eval and the verify-and-retry
+    gate.
+    """
+
+    def _make_task(self):
+        return BenchmarkTask(
+            task_id="org__repo-1",
+            benchmark=BenchmarkType.SWE_BENCH,
+            description="t",
+            repo="org/repo",
+            base_commit="abc123",
+            test_code="",  # no test patch
+            fail_to_pass=["tests/test_x.py::test_a"],
+        )
+
+    def _install_fakes(self, monkeypatch, test_stdout: str):
+        from types import SimpleNamespace
+
+        from victor.evaluation import container_eval
+
+        class _FakeContainer:
+            name = "fake-eval"
+
+            def __init__(self, **kwargs):
+                self.started = False
+
+            async def start(self):
+                self.started = True
+
+            async def exec(self, command, *, cwd=None, timeout=600, env=None):
+                cmd = " ".join(command)
+                if "checkout" in cmd or "clean" in cmd:
+                    return 0, "", ""
+                if ".agent_patch.diff" in cmd or ".test_patch.diff" in cmd:
+                    return 0, "", ""
+                # the test run (EvalContainer.exec returns decoded str, not bytes)
+                return 0, test_stdout, ""
+
+            async def stop(self):
+                self.started = False
+
+        monkeypatch.setattr(container_eval, "EvalContainer", _FakeContainer)
+
+        async def _fake_image(task, config):
+            return "fake/img:1"
+
+        monkeypatch.setattr(container_eval, "resolve_swebench_image_exact", _fake_image)
+
+        async def _noop_cleanup():
+            return 0
+
+        monkeypatch.setattr(container_eval, "cleanup_stale_eval_containers", _noop_cleanup)
+
+        import victor.context.test_runner as trm
+
+        monkeypatch.setattr(
+            trm,
+            "detect_test_runner",
+            lambda project_root, test_files=None: SimpleNamespace(
+                command=["python", "-m", "pytest", "tests/"], env={}, runner_type="pytest"
+            ),
+        )
+
+    @pytest.mark.asyncio
+    async def test_verify_returns_passed(self, tmp_path, monkeypatch):
+        self._install_fakes(monkeypatch, "=== 5 passed in 1.0s ===")
+        runner = SWEBenchRunner()
+        config = EvaluationConfig(benchmark=BenchmarkType.SWE_BENCH, model="test", max_tasks=1)
+        vr = await runner._verify_patch_in_container(self._make_task(), "PATCH", tmp_path, config)
+        assert vr.status == "passed"
+        assert (vr.passed, vr.total) == (5, 5)
+        assert vr.image == "fake/img:1"
+
+    @pytest.mark.asyncio
+    async def test_verify_returns_partial(self, tmp_path, monkeypatch):
+        self._install_fakes(monkeypatch, "=== 3 passed, 2 failed in 1.0s ===")
+        runner = SWEBenchRunner()
+        config = EvaluationConfig(benchmark=BenchmarkType.SWE_BENCH, model="test", max_tasks=1)
+        vr = await runner._verify_patch_in_container(self._make_task(), "PATCH", tmp_path, config)
+        assert vr.status == "partial"
+        assert (vr.passed, vr.total) == (3, 5)
 
 
 class TestExtractPatch:

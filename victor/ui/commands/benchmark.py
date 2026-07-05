@@ -1856,7 +1856,52 @@ async def _run_benchmark_async(
                 original_cwd = os.getcwd()
                 os.chdir(work_dir)
                 try:
-                    trace = await adapter.execute_task(benchmark_task, work_dir)
+                    # Closed-loop verify_fn (PR2): for docker SWE-bench tasks,
+                    # let the agent loop verify its in-progress edits against the
+                    # real FAIL_TO_PASS tests and re-enter on failure. The
+                    # closure captures this task's repo + config; the adapter
+                    # calls it only after the agent claims done (≤max_verify_retries
+                    # times). Each call runs a full container lifecycle.
+                    verify_fn = None
+                    if getattr(config, "eval_backend", None) == "docker" and getattr(
+                        benchmark_task, "repo", None
+                    ):
+                        from victor.evaluation.benchmarks.swe_bench import SWEBenchRunner
+
+                        _verify_runner = SWEBenchRunner()
+
+                        async def verify_fn(_task=benchmark_task, _work=work_dir, _cfg=config):
+                            # Snapshot the agent's current edits as a patch.
+                            proc = await asyncio.create_subprocess_exec(
+                                "git",
+                                "-C",
+                                str(_work),
+                                "diff",
+                                "HEAD",
+                                stdout=asyncio.subprocess.PIPE,
+                                stderr=asyncio.subprocess.PIPE,
+                            )
+                            try:
+                                out, _err = await asyncio.wait_for(proc.communicate(), timeout=30)
+                            except asyncio.TimeoutError:
+                                proc.kill()
+                                await proc.wait()
+                                return (0, 0, "verify: git diff timed out")
+                            patch = out.decode("utf-8", "replace")
+                            if not patch.strip():
+                                return (
+                                    0,
+                                    0,
+                                    "verify: no edits to verify (git diff HEAD is empty)",
+                                )
+                            vr = await _verify_runner._verify_patch_in_container(
+                                _task, patch, _work, _cfg
+                            )
+                            return (vr.passed, vr.total, vr.raw_output)
+
+                    trace = await adapter.execute_task(
+                        benchmark_task, work_dir, verify_fn=verify_fn
+                    )
                 except asyncio.CancelledError:
                     partial = adapter.get_partial_trace()
                     logger.info(
