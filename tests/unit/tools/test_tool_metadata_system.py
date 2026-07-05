@@ -475,6 +475,7 @@ class TestToolMetadataRegistry:
         from victor.tools.metadata_registry import (
             ToolMetadataRegistry as CanonicalToolMetadataRegistry,
         )
+        import victor.tools.metadata as _legacy_metadata_mod
 
         # The wrapper warns once per process; any earlier test that touched the
         # legacy registry sets the flag and this test then sees no warning
@@ -482,6 +483,12 @@ class TestToolMetadataRegistry:
         monkeypatch.setattr(tools_metadata, "_LEGACY_METADATA_REGISTRY_WARNING_EMITTED", False)
 
         CanonicalToolMetadataRegistry.reset_instance()
+
+        # The legacy-usage deprecation is emitted ONCE per process (guarded by a
+        # module global). Under sharded test runs another test may trip it first,
+        # so reset the flag here to guarantee this contract test observes the
+        # warning regardless of execution order (isolation, not a product change).
+        _legacy_metadata_mod._LEGACY_METADATA_REGISTRY_WARNING_EMITTED = False
 
         with pytest.deprecated_call(
             match="Importing ToolMetadataRegistry from victor.tools.metadata is deprecated"
