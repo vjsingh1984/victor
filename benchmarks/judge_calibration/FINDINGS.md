@@ -1,6 +1,6 @@
 # Judge-Calibration Findings — EVR-2 / ADR-011 first live measurements
 
-**Date**: 2026-07-02/05 (8 runs) · **Corpus**: `default_calibration_corpus(variants=8)` — 48 tasks,
+**Date**: 2026-07-02/05 (9 runs) · **Corpus**: `default_calibration_corpus(variants=8)` — 48 tasks,
 6 families · **Executor**: scripted (`alternating_scripted_executor(period=5)`, ~38 solved /
 ~10 completion-without-effect fakes) · **Gate**: Krippendorff α ≥ 0.7 (binary completion
 verdicts vs programmatic verifier gold) · **Judges measured**: local Ollama (offline,
@@ -21,6 +21,7 @@ runs 1–5, 7) and cloud DeepSeek (run 6); all cloud/paced runs integrity-verifi
 | 6 | rubric-llm, **deepseek-chat (cloud)** | run-5 code state; `--judge-delay 5`; first clean cloud run (integrity: calls=48 retries=0 failures=0) | **0.279** | NOT TRUSTED | **New best**, and the first cross-provider data point. Per-family fingerprint nearly identical to run 5: file-create 1.000, qa 1.000, refactor 0.372, code-fix −0.190, docs −0.500 — and again **zero false completions**; all 15 errors are missed completions on solved docs-link (6/7), code-fix (5/7), and dead-code (4/7) tasks. Two unrelated judges (local qwen-32b, cloud DeepSeek) producing the same family-level failure signature confirms the bottleneck is the **narration-free scripted transcripts**, not judge capability — the judges refuse to certify work nobody described, which is defensible behavior against a corpus artifact. Preceding runs on this machine also validated the new guardrails live: a fully rate-limited GLM-5.2 attempt was correctly VOIDed (α would have equaled the heuristic's to 3 decimals), and a DeepSeek attempt exposed the per-call-event-loop bug (PR #394). |
 | 7 | rubric-llm, **gemma4:31b (LOCAL, Ollama on Apple Silicon)** | run-5 code state; default 2 s pacing (~84 s/call inference); integrity: calls=48 retries=0 failures=0 | **0.929** | **TRUSTED — first gate pass** | 47/48 verdicts correct. Per-family: code-fix **1.000** (the family that broke every prior judge), docs 1.000, file-create 1.000, qa 1.000, refactor 0.823 — clears the gate overall AND per-family. The single error is the series' **first false completion** (refactor-rename-02: unsolved rename judged complete) — a changed error polarity worth watching at larger n. This result **overturns run 5/6's corpus-ceiling diagnosis**: gemma4 passed on the same narration-free scripted claims that capped qwen-32b and DeepSeek, proving the workspace-state evidence in the view was sufficient all along and the earlier judges' refusals were model disposition, not a corpus artifact. The gate-passing judge is fully local — no API cost, no rate limits, no data egress. |
 | 8 | rubric-llm, qwen3.5:27b-q4 (local) | run-7 code state; integrity: calls=48 retries=0 failures=0 — but see diagnosis | **−0.092** | NOT TRUSTED (should be VOID) | **Third integrity blindspot found**: every verdict was 1.0 — 10 false completions, 0 misses — matching rubric-heuristic's α sample-for-sample, the signature of a judge contributing zero signal. Transport succeeded, but no `score=` line ever parsed: every dimension fell back to 0.5@≤0.2 (below the engagement floor), so the DimensionAwareFilter defaulted every task to COMPLETE. Suspected cause: qwen3.5 is a thinking-family model that exhausted the 512-token grading budget on reasoning preamble (~72 s/call supports this). Fixed: `JudgeCallStats.ungradable` now counts all-fallback results and VOIDs the run; `--judge-max-tokens` (default raised to 1024) gives thinking judges headroom. Retest qwen3.5 with `--judge-max-tokens 2048` to distinguish format-mismatch from truncation. |
+| 9 | rubric-llm, **llama3.3:70b (local, Ollama on the Windows-host GPU)** | run-8 code state (`--judge-max-tokens 1024`, ungradable guard active); integrity: calls=48 retries=0 failures=0 ungradable=0 | **1.000** | **TRUSTED — perfect score** | 48/48 verdicts correct, zero errors of either polarity, every family at α=1.000. Second gate-passer (of six judge models measured), confirming gate-passing judges are not rare among strong models — and the first ceiling hit: a perfect score at n=48 means this corpus can no longer discriminate among top judges. Ranking so far: llama3.3:70b 1.000 > gemma4:31b 0.929 > deepseek-chat 0.279 > qwen2.5-coder:32b 0.173 ≫ qwen3.5:27b (ungraded). Run also validated the run-8 ungradable guard end-to-end in a live measurement (`ungradable=0` reported). |
 
 ## What the series established
 
@@ -60,13 +61,21 @@ Reports (per-family α, gate decision, every sample) land in
 
 ## Verdict and open items
 
-**First gate pass: gemma4:31b (local Ollama) at α=0.929, TRUSTED overall and per-family**
-(run 7). `completion_strategy=rubric` stays opt-in pending the confirmation steps below,
-but graduation now has a concrete candidate configuration rather than a research direction.
-Trust is **judge-specific**: this evidence graduates gemma4:31b as the rubric judge, not
-LLM-judging in the abstract (same code scored 0.173–0.279 with other models — see point 4).
+**Two gate-passers: llama3.3:70b at α=1.000 (run 9, perfect) and gemma4:31b at α=0.929
+(run 7)** — both local Ollama. `completion_strategy=rubric` stays opt-in pending the
+confirmation steps below, but graduation now has two candidate judge configurations:
+llama3.3:70b (most accurate, ~42 GB) and gemma4:31b (efficient, ~19 GB, one false
+completion at n=48). Trust is **judge-specific**: this evidence graduates these models as
+rubric judges, not LLM-judging in the abstract (identical code scored 0.173–0.279 with
+other models, and one thinking model produced zero usable grades — see points 4 and the
+run-8 guard).
 
-Graduation checklist for `completion_strategy=rubric` + gemma4:31b (TD-17 evidence):
+Run 9's perfect score also marks the corpus's **ceiling**: at `variants=8` it can no
+longer discriminate among top judges, which makes the confirmation steps below the only
+way to separate the two candidates.
+
+Graduation checklist for `completion_strategy=rubric` + a pinned candidate judge (TD-17
+evidence):
 
 1. **Confirmation at gating-grade n** — re-run `--variants 16`+ (n ≥ 16/family; ~2–4 h at
    local inference speed) so per-family α and the new false-completion polarity (run 7's
