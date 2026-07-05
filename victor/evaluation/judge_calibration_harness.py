@@ -48,10 +48,11 @@ Interpretation caveats (record them wherever a report is consumed):
 
 from __future__ import annotations
 
+import asyncio
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Hashable, Optional, Protocol, Sequence
+from typing import Any, Callable, Coroutine, Hashable, Optional, Protocol, Sequence, TypeVar
 
 from victor.evaluation.judge_calibration import (
     GateDecision,
@@ -59,6 +60,36 @@ from victor.evaluation.judge_calibration import (
     JudgeReliabilityGate,
     evaluate_judge_agreement,
 )
+
+_T = TypeVar("_T")
+
+
+class PersistentLoopRunner:
+    """Runs coroutines on ONE long-lived event loop across many sync calls.
+
+    ``asyncio.run()`` per call creates and closes a fresh loop each time — but providers
+    hold httpx ``AsyncClient`` connection pools whose keep-alive connections bind to the
+    loop that created them, so the second call dies with ``RuntimeError: Event loop is
+    closed`` (observed live: DeepSeek calibration failed on every call after the first).
+    One loop for the runner's lifetime keeps pooled connections valid.
+
+    Must be driven from sync code only — ``run`` raises if a loop is already running in
+    this thread. The loop is closed on ``close()`` or interpreter exit.
+    """
+
+    def __init__(self) -> None:
+        self._loop: Optional[asyncio.AbstractEventLoop] = None
+
+    def run(self, coro: Coroutine[Any, Any, _T]) -> _T:
+        if self._loop is None or self._loop.is_closed():
+            self._loop = asyncio.new_event_loop()
+        return self._loop.run_until_complete(coro)
+
+    def close(self) -> None:
+        if self._loop is not None and not self._loop.is_closed():
+            self._loop.close()
+        self._loop = None
+
 
 # ----------------------------------------------------------------------------------------------------
 # Transcript + task model

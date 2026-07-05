@@ -109,6 +109,28 @@ def test_agent_executor_runs_task_and_restores_cwd(tmp_path: Path) -> None:
     assert task.verify(workspace, transcript) == 1.0
 
 
+def test_agent_executor_reuses_one_event_loop(tmp_path: Path) -> None:
+    """Regression: per-task asyncio.run breaks adapters whose providers hold pooled HTTP
+    connections ('Event loop is closed' after the first task)."""
+    import asyncio
+
+    loops: list[int] = []
+
+    class _LoopSpyAdapter(_StubAdapter):
+        async def execute_task(self, benchmark_task, workspace_dir: Path):
+            loops.append(id(asyncio.get_running_loop()))
+            return await super().execute_task(benchmark_task, workspace_dir)
+
+    executor = make_agent_executor(_LoopSpyAdapter())
+    for i, task in enumerate(default_corpus(variants=1)[:3]):
+        workspace = tmp_path / f"loop_ws_{i}"
+        workspace.mkdir()
+        task.setup(workspace)
+        executor(task, workspace)
+    assert len(loops) == 3
+    assert len(set(loops)) == 1, "each task ran on a different event loop"
+
+
 def test_agent_executor_composes_with_harness(tmp_path: Path) -> None:
     tasks = [t for t in default_corpus(variants=2) if t.family in {"file-create", "docs"}]
     harness = JudgeCalibrationHarness(tasks)
