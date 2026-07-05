@@ -52,11 +52,6 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Tuple, Type
 
 from victor.core.context import bind_active_vertical
 from victor.core.events.emit_helper import emit_event_sync
-from victor.framework.entry_point_registry import (
-    get_entry_point_registry,
-    get_entry_point_values,
-)
-from victor.framework.module_loader import get_entry_point_cache
 from victor.core.verticals.adapters import ensure_runtime_vertical
 from victor.core.verticals.base import VerticalBase, VerticalRegistry
 from victor.core.verticals.compatibility_gate import VerticalCompatibilityGate
@@ -80,6 +75,37 @@ logger = logging.getLogger(__name__)
 
 # Per-name set so each contrib vertical warns exactly once per process (Pattern C).
 _CONTRIB_VERTICAL_WARNED: Set[str] = set()
+
+
+# --- Lazy victor.framework delegates -----------------------------------------
+# victor.core must not import victor.framework at module import time:
+# framework/__init__ eagerly pulls framework._api, which imports
+# victor.core.verticals back — a cycle that was masked by the eager
+# victor/__init__ and unmasked when it went lazy (PEP 562, #390). These thin
+# module-level delegates keep the import deferred to call time while
+# preserving the `victor.core.verticals.vertical_loader.<name>` seam that
+# tests patch.
+
+
+def get_entry_point_registry() -> Any:
+    """Lazy delegate for :func:`victor.framework.entry_point_registry.get_entry_point_registry`."""
+    from victor.framework.entry_point_registry import get_entry_point_registry as _impl
+
+    return _impl()
+
+
+def get_entry_point_values(group_name: str, *, force: bool = False) -> Dict[str, str]:
+    """Lazy delegate for :func:`victor.framework.entry_point_registry.get_entry_point_values`."""
+    from victor.framework.entry_point_registry import get_entry_point_values as _impl
+
+    return _impl(group_name, force=force)
+
+
+def get_entry_point_cache() -> Any:
+    """Lazy delegate for :func:`victor.framework.module_loader.get_entry_point_cache`."""
+    from victor.framework.module_loader import get_entry_point_cache as _impl
+
+    return _impl()
 
 
 @dataclass(frozen=True)
