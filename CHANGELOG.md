@@ -5,6 +5,40 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased] (develop)
 
+## [0.7.3] - 2026-07-05
+
+Patch release: makes the public PyPI install actually work end-to-end.
+
+### Fixed
+- **Public install**: `victor-contracts` 0.7.2 is now published to PyPI (Trusted
+  Publishing via `release-contracts.yml` + `pypi` environment), so
+  `pip install victor-ai` resolves again (#380, #393)
+- **Clean-env startup**: declared `packaging` and `numpy` as runtime deps —
+  both are imported on the `import victor` / CLI path but were previously only
+  satisfied transitively by dev tooling; a bare install crashed at startup (#384)
+- **scipy off the CLI path**: `experiments/ab_testing` imports are guarded;
+  A/B statistical analysis raises an actionable `pip install "victor-ai[ml]"`
+  error instead of breaking CLI startup (#384)
+- Stale test-collection class: full-suite `--collect-only` gate on every
+  develop PR; quick-tests treats pytest exit 5 (all skipped) as pass (#382)
+- `victor-codegraph-v*` tags no longer trigger the victor-ai Release workflow
+
+### Changed
+- **`import victor` is lazy (PEP 562)** — drops from importing the whole
+  runtime to ~20ms/2 modules; `victor.agent` is a callable module so
+  `@victor.agent` and `mock.patch("victor.agent...")` keep working (#390)
+- `docker` moved from default dependencies to the `[docker]` extra; all import
+  sites already degrade via `DOCKER_AVAILABLE` (#384)
+- Deprecation migrations completed internally: no in-repo importers of
+  `victor.tools.base` registry re-exports or `victor.workflows.executor`
+  remain (shims stay until 0.10.0); `CHAIN_HANDLER_PREFIX` re-homed to
+  `victor.workflows.compute_registry` (#387)
+- One documented dev-install path: `make install-dev` /
+  `pip install -e ./victor-contracts -e ".[dev]"` across README + docs (#383)
+- victor-contracts is importable standalone (host-runtime workflow helpers
+  resolve lazily; excluded from `__all__` for star-import safety) (#380)
+
+
 ## [0.7.2] - TBD
 
 ### ⚠️ Breaking Changes
