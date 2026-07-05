@@ -279,6 +279,13 @@ class VictorAgentAdapter:
         # edited). Reset to 0 on any successful file-modifying tool.
         self._exploration_calls: int = 0
 
+        # Docker-agnostic "agent has acted" signal: True once any edit/write/
+        # patch tool call succeeds this task. Used in place of the host-side
+        # _has_file_modifications() (which is always False in docker eval —
+        # edits land in-container, not on the host snapshots) for the action-
+        # bias escalation branch and the test-pass force-complete.
+        self._made_edit_tool_call: bool = False
+
         # Correlation spine for this task. Set in execute_task and stamped on
         # every decision (log_decision reads get_session_id()) so the per-task
         # execution manifest can join decisions to the task outcome (reward).
@@ -504,6 +511,12 @@ class VictorAgentAdapter:
             # so the agent converges on editing instead of over-exploring.
             if success and tool_name in _file_modifying_tools():
                 self._exploration_calls = 0
+                # Docker-agnostic "agent acted" signal: latches True the first
+                # time any edit/write/patch tool succeeds. Host-side
+                # _has_file_modifications() is blind to in-container edits
+                # (always False in docker eval), so escalation/force-complete
+                # gate on THIS instead.
+                self._made_edit_tool_call = True
             else:
                 self._exploration_calls += 1
 
@@ -747,6 +760,7 @@ class VictorAgentAdapter:
         self._file_snapshots = {}
         self._task_session_id = ""
         self._exploration_calls = 0
+        self._made_edit_tool_call = False
         # Reset circuit breaker for new task
         self._tool_failures = {}
         self._tool_failure_counts = {}
@@ -1013,6 +1027,12 @@ class VictorAgentAdapter:
         )
         prompt = (
             "Fix the following issue by editing the source code in this repository.\n\n"
+            "WORKSPACE: the repository source is at your current working directory "
+            "(the workspace root). All source, tests, and files you need are UNDER "
+            "it. NEVER search outside the workspace — do NOT look in host paths "
+            "like `.venv`, `~/.victor`, `site-packages`, or `/Users/...`; those are "
+            "blocked and won't help. Use the `code` tool (search/grep) to locate "
+            "files within the workspace.\n\n"
             "IMPORTANT: You have separate tools — `read`, `edit`, `write`, `code`, "
             "and `shell`. Call each as its own tool with named parameters.\n\n"
             "BE EFFICIENT — you have a limited budget of tool calls and turns.\n"
@@ -1060,10 +1080,10 @@ class VictorAgentAdapter:
                     await asyncio.sleep(30)
                     logger.info(
                         "[AgentAdapter] Heartbeat: turn=%d, tool_calls=%d, "
-                        "files_modified=%s, exploration_calls=%d, elapsed=%.0fs",
+                        "edited=%s, exploration_calls=%d, elapsed=%.0fs",
                         self._turns,
                         len(self._tool_calls),
-                        bool(self._file_edits),
+                        self._made_edit_tool_call,
                         self._exploration_calls,
                         _time.time() - _heartbeat_start,
                     )
@@ -1084,7 +1104,7 @@ class VictorAgentAdapter:
                 # primary lever against the over-exploration failure mode.
                 if self._turns == 1:
                     current_message = prompt
-                elif self._completion_detector._has_file_modifications():
+                elif self._made_edit_tool_call:
                     current_message = "Continue."
                 else:
                     n = self._exploration_calls
@@ -1117,10 +1137,10 @@ class VictorAgentAdapter:
                 # Get agent response
                 logger.info(
                     "[AgentAdapter] Turn %d started (tool_calls=%d, "
-                    "files_modified=%s, exploration_calls=%d)",
+                    "edited=%s, exploration_calls=%d)",
                     self._turns,
                     len(self._tool_calls),
-                    self._completion_detector._has_file_modifications(),
+                    self._made_edit_tool_call,
                     self._exploration_calls,
                 )
                 try:
@@ -1176,7 +1196,7 @@ class VictorAgentAdapter:
                 # trigger immediate termination before any work is done.
                 if (
                     self._completion_detector._state.active_signal_detected
-                    and not self._completion_detector._has_file_modifications()
+                    and not self._made_edit_tool_call
                 ):
                     self._completion_detector._state.active_signal_detected = False
                     self._completion_detector._state.completion_signals.clear()
@@ -1221,7 +1241,7 @@ class VictorAgentAdapter:
                 # detector a concrete success signal it lacks on its own.
                 if (
                     not complete
-                    and self._completion_detector._has_file_modifications()
+                    and self._made_edit_tool_call
                     and self._has_test_pass_signal(assistant_content)
                 ):
                     logger.info(
@@ -1232,13 +1252,13 @@ class VictorAgentAdapter:
 
                 logger.info(
                     "[AgentAdapter] Turn %d complete=%s (deliverables=%d, signals=%d, "
-                    "active_signal=%s, file_mods=%s, test_pass=%s)",
+                    "active_signal=%s, edited=%s, test_pass=%s)",
                     self._turns,
                     complete,
                     len(self._completion_detector._state.completed_deliverables),
                     len(self._completion_detector._state.completion_signals),
                     self._completion_detector._state.active_signal_detected,
-                    self._completion_detector._has_file_modifications(),
+                    self._made_edit_tool_call,
                     complete and self._turns > 1,
                 )
 
@@ -1266,9 +1286,10 @@ class VictorAgentAdapter:
             # previously missing when a task came back "failed".
             logger.warning(
                 "[AgentAdapter] Task summary: turns=%d tool_calls=%d "
-                "files_modified=%d (%s) tool_failures=%s disabled_tools=%s",
+                "edited=%s files_modified=%d (%s) tool_failures=%s disabled_tools=%s",
                 self._turns,
                 len(self._tool_calls),
+                self._made_edit_tool_call,
                 len(self._file_edits),
                 ", ".join(getattr(e, "path", "") for e in self._file_edits[:5]),
                 dict(self._tool_failure_counts) or "none",
