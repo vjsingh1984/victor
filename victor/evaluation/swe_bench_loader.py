@@ -86,6 +86,26 @@ class SWEBenchConfig:
     use_cache: bool = True  # Whether to use cached repos
 
 
+def _normalize_test_list(value: Any) -> list[str]:
+    """Normalize a SWE-bench FAIL_TO_PASS / PASS_TO_PASS field to a list.
+
+    The dataset (HuggingFace + JSONL) stores these as a **JSON-stringified**
+    list (e.g. ``'["tests/test_a.py::test_a", "tests/test_b.py"]'``), not a
+    native list. Storing the raw string broke the test command: ``list(str)``
+    explodes it into single characters, and ``cmd.extend(chars)`` produced a
+    malformed pytest invocation (one-char args) → 0 tests collected on every
+    task. This always returns a proper ``list[str]`` of test node IDs.
+    """
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except (json.JSONDecodeError, TypeError):
+            return []
+    if isinstance(value, list):
+        return [str(v) for v in value]
+    return []
+
+
 @dataclass
 class SWEBenchInstance:
     """A single SWE-bench task instance with raw data."""
@@ -117,8 +137,8 @@ class SWEBenchInstance:
             hints_text=data.get("hints_text", ""),
             patch=data.get("patch", ""),
             test_patch=data.get("test_patch", ""),
-            fail_to_pass=data.get("FAIL_TO_PASS", []),
-            pass_to_pass=data.get("PASS_TO_PASS", []),
+            fail_to_pass=_normalize_test_list(data.get("FAIL_TO_PASS", [])),
+            pass_to_pass=_normalize_test_list(data.get("PASS_TO_PASS", [])),
             created_at=data.get("created_at", ""),
             version=data.get("version", ""),
             environment_setup_commit=data.get("environment_setup_commit", ""),
