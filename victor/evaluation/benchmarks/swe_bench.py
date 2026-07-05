@@ -435,6 +435,14 @@ class SWEBenchRunner(BaseBenchmarkRunner):
                     "Tests not collected (0/0). Project may need "
                     "`pip install -e .` or Docker for test execution."
                 )
+                # Surface the raw test output so a parser gap vs a genuine
+                # collection failure is diagnosable (e.g. django runtests.py
+                # output that doesn't match the pytest/unittest patterns).
+                logger.warning(
+                    "Raw test output (last 1500 chars) for 0-collected task " "%s:\n%s",
+                    getattr(task, "task_id", "?"),
+                    (stdout_str + stderr_str)[-1500:],
+                )
 
         except Exception as e:
             result.status = TaskStatus.ERROR
@@ -638,6 +646,14 @@ class SWEBenchRunner(BaseBenchmarkRunner):
                     "Patch applied but tests could not run in container (0 collected)."
                 )
                 logger.warning("Tests not collected in container (0/0).")
+                # Surface raw container test output so a parser gap (e.g.
+                # django runtests.py format) vs a genuine collection failure
+                # (wrong test path / runner) is diagnosable.
+                logger.warning(
+                    "Raw container test output (last 1500 chars) for " "0-collected task %s:\n%s",
+                    getattr(task, "task_id", "?"),
+                    (stdout + stderr)[-1500:],
+                )
         finally:
             # Clean up patch files on the host mount; tear down the container.
             for f in (".agent_patch.diff", ".test_patch.diff"):
@@ -674,25 +690,37 @@ class SWEBenchRunner(BaseBenchmarkRunner):
         return config.command
 
     def _parse_test_output(self, output: str) -> tuple:
-        """Parse pytest output to extract pass/fail counts."""
+        """Parse test-runner output to extract (passed, total).
+
+        Handles the common SWE-bench runner output formats:
+          * pytest: "12 passed, 3 failed, 1 error"
+          * unittest / django ``runtests.py``: "Ran 17 tests in 1.2s" + "OK"
+            or "FAILED (failures=N, errors=M)"
+
+        Returns ``(0, 0)`` only when no recognizable result line is found —
+        callers treat that as "0 collected" and log the raw output so the
+        cause (wrong runner, missing test file, unparseable format) is
+        diagnosable instead of silent.
+        """
         import re
 
-        # Try pytest format: "5 passed, 2 failed"
-        match = re.search(r"(\d+) passed", output)
-        passed = int(match.group(1)) if match else 0
+        def _grab(pattern: str) -> int:
+            m = re.search(pattern, output)
+            return int(m.group(1)) if m else 0
 
-        match = re.search(r"(\d+) failed", output)
-        failed = int(match.group(1)) if match else 0
+        # pytest-style counts.
+        passed = _grab(r"(\d+)\s+passed")
+        failed = _grab(r"(\d+)\s+failed")
+        errors = _grab(r"(\d+)\s+errors?\b")
+        total = passed + failed + errors
 
-        total = passed + failed
-
-        # Try "Ran N tests" (unittest format)
+        # unittest / django runtests.py fallback: "Ran N tests" + OK/FAILED.
         if total == 0:
-            match = re.search(r"Ran (\d+) test", output)
-            if match:
-                total = int(match.group(1))
-                if "OK" in output:
-                    passed = total
+            m = re.search(r"Ran\s+(\d+)\s+tests?", output)
+            if m:
+                total = int(m.group(1))
+                # "OK" on its own line ⇒ all passed; otherwise none passed.
+                passed = total if re.search(r"(?:^|\n)\s*OK\b", output) else 0
 
         return passed, total
 

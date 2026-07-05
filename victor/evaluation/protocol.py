@@ -278,6 +278,13 @@ class BenchmarkTask:
     prompt: str = ""
     context_code: str = ""
     test_code: str = ""
+    # SWE-bench FAIL_TO_PASS: the specific test node IDs that must pass after
+    # the fix. The test runner uses these to build a targeted test command
+    # (rather than scanning test_code), and the closed-loop verify gate (P1)
+    # checks exactly these. Carried from SWEBenchInstance — previously dropped
+    # in to_benchmark_task, so the runner's getattr(task, "fail_to_pass")
+    # always returned None.
+    fail_to_pass: list[str] = field(default_factory=list)
     seed_files: dict[str, str] = field(default_factory=dict)
 
     # Repository info (for SWE-bench)

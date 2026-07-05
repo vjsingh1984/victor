@@ -161,6 +161,7 @@ class SWEBenchInstance:
             prompt=self.problem_statement,
             context_code="",  # Loaded from cloned repo
             test_code=self.test_patch,
+            fail_to_pass=list(self.fail_to_pass),  # FAIL_TO_PASS test node IDs
             repo=f"https://github.com/{self.repo}.git",
             base_commit=self.base_commit,
             issue_text=self.problem_statement,

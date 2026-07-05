@@ -61,6 +61,56 @@ class TestSWEBenchRunnerInit:
         assert runner.benchmark_type == BenchmarkType.SWE_BENCH
 
 
+class TestParseTestOutput:
+    """Tests for SWEBenchRunner._parse_test_output across runner formats.
+
+    Covers pytest, unittest, and django runtests.py outputs — the F3
+    "0 collected" failures were caused by django/unittest output not matching
+    the old pytest-only patterns.
+    """
+
+    def setup_method(self):
+        self.runner = SWEBenchRunner()
+
+    def test_pytest_all_passed(self):
+        passed, total = self.runner._parse_test_output("=== 5 passed in 1.0s ===")
+        assert passed == 5 and total == 5
+
+    def test_pytest_passed_and_failed(self):
+        passed, total = self.runner._parse_test_output("=== 3 passed, 2 failed in 1.0s ===")
+        assert passed == 3 and total == 5
+
+    def test_pytest_with_errors(self):
+        passed, total = self.runner._parse_test_output("1 passed, 2 errors in 1.0s")
+        assert passed == 1 and total == 3
+
+    def test_unittest_ok(self):
+        out = "....\nRan 4 tests in 0.5s\n\nOK"
+        passed, total = self.runner._parse_test_output(out)
+        assert passed == 4 and total == 4
+
+    def test_unittest_failed(self):
+        out = ".F..\nRan 4 tests in 0.5s\n\nFAILED (failures=1)"
+        passed, total = self.runner._parse_test_output(out)
+        assert passed == 0 and total == 4
+
+    def test_django_runtests_ok(self):
+        # django runtests.py delegates to unittest — "Ran N tests" + "OK".
+        out = "Ran 9 tests in 1.2s\n\nOK\nDestroying test database..."
+        passed, total = self.runner._parse_test_output(out)
+        assert passed == 9 and total == 9
+
+    def test_django_runtests_failed(self):
+        out = "Ran 9 tests in 1.2s\n\nFAILED (failures=2, errors=1)\n"
+        passed, total = self.runner._parse_test_output(out)
+        assert passed == 0 and total == 9
+
+    def test_no_recognizable_output(self):
+        # Garbled / unparseable output → (0, 0) → caller logs raw + "0 collected".
+        passed, total = self.runner._parse_test_output("some random error trace\nno tests here")
+        assert passed == 0 and total == 0
+
+
 class TestExtractPatch:
     """Tests for _extract_patch method."""
 
