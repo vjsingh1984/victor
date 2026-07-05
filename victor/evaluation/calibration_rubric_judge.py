@@ -54,7 +54,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Awaitable, Callable, Literal, Optional
 
-from victor.evaluation.judge_calibration_harness import CalibrationJudge, Transcript
+from victor.evaluation.judge_calibration_harness import (
+    CalibrationJudge,
+    PersistentLoopRunner,
+    Transcript,
+)
 from victor.framework.rubric_completion import (
     AsyncRubricCompletionEvaluator,
     LLMRubricJudge,
@@ -271,13 +275,16 @@ def make_llm_rubric_judge(
 
     ``complete_fn(prompt) -> text`` is the provider seam — pass a local-model completion for a
     fully offline run. ``evaluator`` overrides the default AsyncRubricCompletionEvaluator (e.g.
-    to supply a task-adaptive generator). Owns its event loop per call (``asyncio.run``);
-    raises RuntimeError if invoked from a running loop.
+    to supply a task-adaptive generator). All grading calls share ONE persistent event loop
+    (provider connection pools bind to their creating loop; per-call ``asyncio.run`` broke
+    every call after the first against pooled-HTTP providers). Raises RuntimeError if invoked
+    from a running loop — use the async evaluator directly there.
     """
     rubric_evaluator = evaluator or AsyncRubricCompletionEvaluator(LLMRubricJudge(complete_fn))
+    runner = PersistentLoopRunner()
 
     def judge(prompt: str, transcript: Transcript, workspace: Path) -> float:
-        result = asyncio.run(
+        result = runner.run(
             rubric_evaluator.aevaluate(
                 task_family=CALIBRATION_TASK_FAMILY,
                 content=render_judged_content(prompt, transcript, workspace),

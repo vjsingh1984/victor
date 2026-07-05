@@ -40,13 +40,13 @@ The executor returned by :func:`make_agent_executor` is synchronous (it owns its
 
 from __future__ import annotations
 
-import asyncio
 import os
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from victor.evaluation.judge_calibration_harness import (
     CalibrationExecutor,
+    PersistentLoopRunner,
     Transcript,
     TranscriptStep,
     VerifiableTask,
@@ -120,12 +120,15 @@ def make_agent_executor(
 ) -> CalibrationExecutor:
     """Wrap a VictorAgentAdapter as a synchronous CalibrationExecutor.
 
-    Owns its event loop per task (``asyncio.run``); raises RuntimeError if invoked from a
-    running loop — use :func:`execute_verifiable_task` there instead.
+    All tasks share ONE persistent event loop: the adapter's provider holds pooled HTTP
+    connections bound to their creating loop, so per-task ``asyncio.run`` breaks every task
+    after the first (``Event loop is closed``). Raises RuntimeError if invoked from a running
+    loop — use :func:`execute_verifiable_task` there instead.
     """
+    runner = PersistentLoopRunner()
 
     def executor(task: VerifiableTask, workspace: Path) -> Transcript:
-        return asyncio.run(
+        return runner.run(
             execute_verifiable_task(adapter, task, workspace, timeout_seconds=timeout_seconds)
         )
 
