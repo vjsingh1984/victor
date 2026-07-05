@@ -84,6 +84,13 @@ def main() -> int:
         "(profiles.yaml), e.g. --judge-profile cerebras-glm. Overrides the "
         "--llm-judge-provider/--llm-judge-model pair.",
     )
+    parser.add_argument(
+        "--judge-delay",
+        type=float,
+        default=2.0,
+        help="Seconds to pace between LLM grading calls (strict provider RPM caps, "
+        "e.g. Z.AI, need 15+; local Ollama can use 0)",
+    )
     args = parser.parse_args()
 
     judges = {
@@ -93,8 +100,10 @@ def main() -> int:
         # DimensionAwareFilter) — calibrated as shipped, binary completion verdicts.
         "rubric-heuristic": make_rubric_judge(),
     }
+    llm_stats = None
     if args.judge_profile or args.llm_judge_provider:
         from victor.evaluation.calibration_rubric_judge import (
+            JudgeCallStats,
             make_llm_rubric_judge,
             make_provider_complete_fn,
         )
@@ -128,7 +137,15 @@ def main() -> int:
             if profile_base_url and not args.llm_judge_base_url:
                 provider_kwargs["base_url"] = profile_base_url
         provider = ProviderRegistry.create(provider_name, **provider_kwargs)
-        judges["rubric-llm"] = make_llm_rubric_judge(make_provider_complete_fn(provider, model))
+        llm_stats = JudgeCallStats()
+        judges["rubric-llm"] = make_llm_rubric_judge(
+            make_provider_complete_fn(
+                provider,
+                model,
+                pre_call_delay_seconds=args.judge_delay,
+                stats=llm_stats,
+            )
+        )
     exit_code = 0
     for name, judge in judges.items():
         harness = JudgeCalibrationHarness(default_corpus(variants=args.variants))
@@ -138,6 +155,17 @@ def main() -> int:
         report.save(args.out / f"{name}.json")
         decision = report.gate_decision
         verdict = "TRUSTED" if decision.trusted else "NOT TRUSTED"
+        if name == "rubric-llm" and llm_stats is not None:
+            print(f"[rubric-llm] grading-call integrity: {llm_stats.summary()}")
+            if not llm_stats.clean:
+                verdict = "VOID"
+                exit_code = 1
+                print(
+                    f"[rubric-llm] ⚠ {llm_stats.failures} grading call(s) failed after retries — "
+                    "failed calls degrade to neutral fallback scores, so this α measures the "
+                    "error path, NOT the judge. Re-run with a higher --judge-delay or a "
+                    "less rate-limited provider."
+                )
         print(f"[{name}] n={len(report.samples)}  {verdict}  ({decision.reason})")
         for family, rel in report.per_family.items():
             alpha = rel.krippendorff_alpha
