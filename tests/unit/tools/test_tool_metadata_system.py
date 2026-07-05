@@ -466,14 +466,20 @@ class TestToolMetadataRegistry:
 
         assert PackageToolMetadataRegistry is CanonicalToolMetadataRegistry
 
-    def test_metadata_module_wrapper_warns_and_adapts_legacy_shape(self):
+    def test_metadata_module_wrapper_warns_and_adapts_legacy_shape(self, monkeypatch):
         """victor.tools.metadata should remain a deprecated compatibility wrapper."""
+        import victor.tools.metadata as tools_metadata
         from victor.tools.metadata import (
             ToolMetadataRegistry as LegacyToolMetadataRegistry,
         )
         from victor.tools.metadata_registry import (
             ToolMetadataRegistry as CanonicalToolMetadataRegistry,
         )
+
+        # The wrapper warns once per process; any earlier test that touched the
+        # legacy registry sets the flag and this test then sees no warning
+        # (shard-order dependent — broke Test Shard 2 on the develop->main gate).
+        monkeypatch.setattr(tools_metadata, "_LEGACY_METADATA_REGISTRY_WARNING_EMITTED", False)
 
         CanonicalToolMetadataRegistry.reset_instance()
 
