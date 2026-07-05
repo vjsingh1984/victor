@@ -1,9 +1,10 @@
 # Judge-Calibration Findings — EVR-2 / ADR-011 first live measurements
 
-**Date**: 2026-07-02/03 · **Corpus**: `default_calibration_corpus(variants=8)` — 48 tasks,
+**Date**: 2026-07-02/05 · **Corpus**: `default_calibration_corpus(variants=8)` — 48 tasks,
 6 families · **Executor**: scripted (`alternating_scripted_executor(period=5)`, ~38 solved /
 ~10 completion-without-effect fakes) · **Gate**: Krippendorff α ≥ 0.7 (binary completion
-verdicts vs programmatic verifier gold) · **Hardware**: local Ollama (offline)
+verdicts vs programmatic verifier gold) · **Judges measured**: local Ollama (offline,
+runs 1–5) and cloud DeepSeek (run 6, `--judge-delay` paced, integrity-verified)
 
 ## Run series
 
@@ -17,6 +18,7 @@ verdicts vs programmatic verifier gold) · **Hardware**: local Ollama (offline)
 | 3 | rubric-llm, qwen2.5-coder:32b | same view as run 2 | **−0.237** | NOT TRUSTED | Zero false completions, 30 missed: mass refusal. Probing the raw output exposed the scripted executor's claim echoing a mid-word-truncated prompt — the stronger model *correctly* penalized the garbled message the weaker model glossed over. Label poisoning, not judge failure. |
 | 4 | rubric-llm, qwen2.5-coder:32b | clean claim message | **−0.412** | NOT TRUSTED | Still mass refusal (34 missed, 0 false). Raw output on a perfect task: three dimensions 1.0@1.0, then `recovery: score=0.0 confidence=0.3` — the un-engaged axis scored just above the DimensionAwareFilter engagement floor (0.25), gating completion. **Framework bug (ADR-009), fixed in `82e20be9`.** |
 | 5 | rubric-llm, qwen2.5-coder:32b | + engagement-convention fix | **0.173** | NOT TRUSTED | Large improvement (−0.412 → 0.173): file-create and qa now α=1.000, zero false completions. Remaining 19 misses concentrate on code-fix/docs-link/dead-code. Probing shows the convention fix took (recovery now 0.0@0.0) and the judge *sees* the correct workspace (`tool_grounding: 0.8 — "workspace state shows the correct implementation"`) — but penalizes correctness/completeness because the terse scripted claim ("Done — I completed the requested task.") **doesn't narrate the fix**. Near-identical variants flip between perfect and penalized grades at temperature 0 (variant 0 graded 1.0/1.0/1.0; variant 1 graded 0.5/0.8/0.6), so the residual is part scripted-transcript artifact, part judge instability on narration-free claims. |
+| 6 | rubric-llm, **deepseek-chat (cloud)** | run-5 code state; `--judge-delay 5`; first clean cloud run (integrity: calls=48 retries=0 failures=0) | **0.279** | NOT TRUSTED | **New best**, and the first cross-provider data point. Per-family fingerprint nearly identical to run 5: file-create 1.000, qa 1.000, refactor 0.372, code-fix −0.190, docs −0.500 — and again **zero false completions**; all 15 errors are missed completions on solved docs-link (6/7), code-fix (5/7), and dead-code (4/7) tasks. Two unrelated judges (local qwen-32b, cloud DeepSeek) producing the same family-level failure signature confirms the bottleneck is the **narration-free scripted transcripts**, not judge capability — the judges refuse to certify work nobody described, which is defensible behavior against a corpus artifact. Preceding runs on this machine also validated the new guardrails live: a fully rate-limited GLM-5.2 attempt was correctly VOIDed (α would have equaled the heuristic's to 3 decimals), and a DeepSeek attempt exposed the per-call-event-loop bug (PR #394). |
 
 ## What the series established
 
@@ -52,14 +54,17 @@ Reports (per-family α, gate decision, every sample) land in
 ## Verdict and open items
 
 **`completion_strategy=rubric` stays opt-in.** Best measured configuration
-(qwen2.5-coder:32b, contents view, aligned convention): α=0.173 overall, far below the 0.7
-gate — though with a safe error profile (zero false completions; all errors burn retries
-rather than shipping unverified completions).
+(deepseek-chat, contents view, aligned convention, run 6): **α=0.279** overall, well below
+the 0.7 gate — but with a consistently safe error profile across both measured judges (zero
+false completions in runs 5 and 6; every error burns retries rather than shipping unverified
+completions).
 
 Next measurements, in order of expected leverage:
 
 1. **Real agent trajectories** (`make_agent_executor` + `VictorAgentAdapter.from_profile`) —
-   run 5's residual misses are dominated by narration-free scripted claims that real agents
+   now decisively the top lever: runs 5 and 6 show two unrelated judges failing on the SAME
+   families with zero false completions, i.e. the corpus's narration-free scripted claims —
+   not judge capability — cap α. Both judges' residual misses are on claims that real agents
    don't produce; this is now the biggest known artifact. (Scripted transcripts also make
    the evidence baseline artificially perfect.)
 2. **Prompt guidance that workspace state is authoritative** — the judge already extracts
