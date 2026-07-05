@@ -1,10 +1,10 @@
 # Judge-Calibration Findings — EVR-2 / ADR-011 first live measurements
 
-**Date**: 2026-07-02/05 · **Corpus**: `default_calibration_corpus(variants=8)` — 48 tasks,
+**Date**: 2026-07-02/05 (7 runs) · **Corpus**: `default_calibration_corpus(variants=8)` — 48 tasks,
 6 families · **Executor**: scripted (`alternating_scripted_executor(period=5)`, ~38 solved /
 ~10 completion-without-effect fakes) · **Gate**: Krippendorff α ≥ 0.7 (binary completion
 verdicts vs programmatic verifier gold) · **Judges measured**: local Ollama (offline,
-runs 1–5) and cloud DeepSeek (run 6, `--judge-delay` paced, integrity-verified)
+runs 1–5, 7) and cloud DeepSeek (run 6); all cloud/paced runs integrity-verified
 
 ## Run series
 
@@ -19,11 +19,13 @@ runs 1–5) and cloud DeepSeek (run 6, `--judge-delay` paced, integrity-verified
 | 4 | rubric-llm, qwen2.5-coder:32b | clean claim message | **−0.412** | NOT TRUSTED | Still mass refusal (34 missed, 0 false). Raw output on a perfect task: three dimensions 1.0@1.0, then `recovery: score=0.0 confidence=0.3` — the un-engaged axis scored just above the DimensionAwareFilter engagement floor (0.25), gating completion. **Framework bug (ADR-009), fixed in `82e20be9`.** |
 | 5 | rubric-llm, qwen2.5-coder:32b | + engagement-convention fix | **0.173** | NOT TRUSTED | Large improvement (−0.412 → 0.173): file-create and qa now α=1.000, zero false completions. Remaining 19 misses concentrate on code-fix/docs-link/dead-code. Probing shows the convention fix took (recovery now 0.0@0.0) and the judge *sees* the correct workspace (`tool_grounding: 0.8 — "workspace state shows the correct implementation"`) — but penalizes correctness/completeness because the terse scripted claim ("Done — I completed the requested task.") **doesn't narrate the fix**. Near-identical variants flip between perfect and penalized grades at temperature 0 (variant 0 graded 1.0/1.0/1.0; variant 1 graded 0.5/0.8/0.6), so the residual is part scripted-transcript artifact, part judge instability on narration-free claims. |
 | 6 | rubric-llm, **deepseek-chat (cloud)** | run-5 code state; `--judge-delay 5`; first clean cloud run (integrity: calls=48 retries=0 failures=0) | **0.279** | NOT TRUSTED | **New best**, and the first cross-provider data point. Per-family fingerprint nearly identical to run 5: file-create 1.000, qa 1.000, refactor 0.372, code-fix −0.190, docs −0.500 — and again **zero false completions**; all 15 errors are missed completions on solved docs-link (6/7), code-fix (5/7), and dead-code (4/7) tasks. Two unrelated judges (local qwen-32b, cloud DeepSeek) producing the same family-level failure signature confirms the bottleneck is the **narration-free scripted transcripts**, not judge capability — the judges refuse to certify work nobody described, which is defensible behavior against a corpus artifact. Preceding runs on this machine also validated the new guardrails live: a fully rate-limited GLM-5.2 attempt was correctly VOIDed (α would have equaled the heuristic's to 3 decimals), and a DeepSeek attempt exposed the per-call-event-loop bug (PR #394). |
+| 7 | rubric-llm, **gemma4:31b (LOCAL, Ollama on Apple Silicon)** | run-5 code state; default 2 s pacing (~84 s/call inference); integrity: calls=48 retries=0 failures=0 | **0.929** | **TRUSTED — first gate pass** | 47/48 verdicts correct. Per-family: code-fix **1.000** (the family that broke every prior judge), docs 1.000, file-create 1.000, qa 1.000, refactor 0.823 — clears the gate overall AND per-family. The single error is the series' **first false completion** (refactor-rename-02: unsolved rename judged complete) — a changed error polarity worth watching at larger n. This result **overturns run 5/6's corpus-ceiling diagnosis**: gemma4 passed on the same narration-free scripted claims that capped qwen-32b and DeepSeek, proving the workspace-state evidence in the view was sufficient all along and the earlier judges' refusals were model disposition, not a corpus artifact. The gate-passing judge is fully local — no API cost, no rate limits, no data egress. |
 
 ## What the series established
 
 1. **The gate works.** Every NOT TRUSTED verdict above was correct — each traced to a real,
    specific defect (in the judge, the view, or the harness itself), not measurement noise.
+   And it passes when a judge deserves it (run 7).
 2. **Per-family α is mandatory.** Run 0c passes the overall gate while blind on code-fix;
    runs 1–2 show failures migrating between families as the view changes. Gate per family,
    with n ≥ 30 per family (`--variants 16`+) before treating per-family α as evidence.
@@ -31,7 +33,11 @@ runs 1–5) and cloud DeepSeek (run 6, `--judge-delay` paced, integrity-verified
    worse." Both times the model was right and the harness was wrong (truncated claim echo;
    engagement-floor mismatch). Diagnose mass-refusal patterns (0 false completions, many
    missed) by probing raw judge output before blaming the model.
-4. **Fixes found in framework code, not just calibration code** (commit `82e20be9`):
+4. **Judge choice dominates.** Runs 5–7 ran identical code, views, and corpus; α spanned
+   0.173 → 0.279 → 0.929 purely by model. A shared failure pattern across two judges
+   (runs 5–6) looked like a corpus ceiling until a third judge broke through it — beware
+   concluding "artifact" from N=2 judges.
+5. **Fixes found in framework code, not just calibration code** (commit `82e20be9`):
    - Grading prompt now states the numeric not-applicable convention
      (`score=0.0 confidence=0.0`) instead of "use a LOW confidence" — judges' idea of low
      (0.3) sat above the filter's engagement floor (0.25).
@@ -53,23 +59,25 @@ Reports (per-family α, gate decision, every sample) land in
 
 ## Verdict and open items
 
-**`completion_strategy=rubric` stays opt-in.** Best measured configuration
-(deepseek-chat, contents view, aligned convention, run 6): **α=0.279** overall, well below
-the 0.7 gate — but with a consistently safe error profile across both measured judges (zero
-false completions in runs 5 and 6; every error burns retries rather than shipping unverified
-completions).
+**First gate pass: gemma4:31b (local Ollama) at α=0.929, TRUSTED overall and per-family**
+(run 7). `completion_strategy=rubric` stays opt-in pending the confirmation steps below,
+but graduation now has a concrete candidate configuration rather than a research direction.
+Trust is **judge-specific**: this evidence graduates gemma4:31b as the rubric judge, not
+LLM-judging in the abstract (same code scored 0.173–0.279 with other models — see point 4).
 
-Next measurements, in order of expected leverage:
+Graduation checklist for `completion_strategy=rubric` + gemma4:31b (TD-17 evidence):
 
-1. **Real agent trajectories** (`make_agent_executor` + `VictorAgentAdapter.from_profile`) —
-   now decisively the top lever: runs 5 and 6 show two unrelated judges failing on the SAME
-   families with zero false completions, i.e. the corpus's narration-free scripted claims —
-   not judge capability — cap α. Both judges' residual misses are on claims that real agents
-   don't produce; this is now the biggest known artifact. (Scripted transcripts also make
-   the evidence baseline artificially perfect.)
-2. **Prompt guidance that workspace state is authoritative** — the judge already extracts
-   the correct evidence into `tool_grounding` but doesn't let it carry `correctness`;
-   one sentence in the grading prompt may transfer it. Any change re-measures here first.
-3. **Order-swap / repeated-sample ensemble (ADR-011)** — the variant 0-vs-1 grade flips at
-   temperature 0 are exactly the instability ensembling averages out.
-4. Raise `--variants` to 16+ so per-family α is gating-grade (n ≥ 30/family).
+1. **Confirmation at gating-grade n** — re-run `--variants 16`+ (n ≥ 16/family; ~2–4 h at
+   local inference speed) so per-family α and the new false-completion polarity (run 7's
+   single error blessed unsolved work — the series' first) are measured, not anecdotal.
+2. **Real agent trajectories** (`make_agent_executor` + `VictorAgentAdapter.from_profile`) —
+   the production distribution: real agents narrate, fail partially, and recover;
+   scripted transcripts do none of that (and make the evidence baseline artificially
+   perfect). Gate must hold there too.
+3. **Pin the judge identity in the flag criteria** — default-on only with a calibrated
+   judge model; falling back to the heuristic (α=−0.092) or an uncalibrated model must
+   revert to `enhanced`, per the ADR-011 fallback contract.
+
+Deprioritized after run 7 (were top levers when the corpus looked like the ceiling):
+prompt evidence-transfer guidance and the order-swap ensemble — both remain available if
+the confirmation runs regress, and the ensemble may still help judges below the gate.
