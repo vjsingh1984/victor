@@ -22,11 +22,13 @@ from __future__ import annotations
 
 import threading
 import time
-from typing import Any, ClassVar, Dict, List, Optional, Type, cast
+from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional, Type, cast
 
 from victor.core.vertical_types import StageDefinition
 from victor.core.verticals.base import VerticalBase, VerticalConfig
-from victor.framework.tools import ToolSet
+
+if TYPE_CHECKING:
+    from victor.framework.tools import ToolSet
 from victor_contracts.core.types import (
     StageDefinition as SdkStageDefinition,
     ToolSet as SdkToolSet,
@@ -52,6 +54,11 @@ def _to_runtime_stages(stages: Dict[str, Any]) -> Dict[str, StageDefinition]:
 
 def _to_runtime_toolset(tools: Any) -> ToolSet:
     """Convert SDK/declarative tools into the runtime ToolSet."""
+
+    # Deferred: victor.core must not import victor.framework at module import
+    # time (core -> framework layering; circular via framework._api, which
+    # imports victor.core.verticals). Unmasked by the lazy victor/__init__.
+    from victor.framework.tools import ToolSet
 
     if isinstance(tools, ToolSet):
         return tools
