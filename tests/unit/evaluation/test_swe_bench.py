@@ -27,6 +27,7 @@ from victor.evaluation.benchmarks.swe_bench import (
     HumanEvalRunner,
     MBPPRunner,
 )
+from victor.evaluation.swe_bench_loader import SWEBenchInstance, _normalize_test_list
 from victor.evaluation.protocol import (
     BenchmarkTask,
     BenchmarkType,
@@ -198,6 +199,47 @@ class TestVerifyPatchInContainer:
         vr = await runner._verify_patch_in_container(self._make_task(), "PATCH", tmp_path, config)
         assert vr.status == "partial"
         assert (vr.passed, vr.total) == (3, 5)
+
+
+class TestFailToPassNormalization:
+    """Regression: FAIL_TO_PASS is a JSON-stringified list in the dataset.
+
+    Storing it raw broke the test command — list(str) exploded it into single
+    chars → cmd.extend(chars) → pytest got one-char args → 0 collected on every
+    task (0/20 pass on the PR1 validation run).
+    """
+
+    def test_normalize_json_string(self):
+        assert _normalize_test_list('["tests/test_a.py::test_a", "tests/test_b.py"]') == [
+            "tests/test_a.py::test_a",
+            "tests/test_b.py",
+        ]
+
+    def test_normalize_already_list(self):
+        assert _normalize_test_list(["a", "b"]) == ["a", "b"]
+
+    def test_normalize_empty_or_garbage(self):
+        assert _normalize_test_list("") == []
+        assert _normalize_test_list("not json") == []
+        assert _normalize_test_list(None) == []
+
+    def test_from_jsonl_line_parses_fail_to_pass_string(self):
+        raw = {
+            "instance_id": "org__repo-1",
+            "repo": "org/repo",
+            "base_commit": "abc",
+            "problem_statement": "ps",
+            "hints_text": "",
+            "patch": "",
+            "test_patch": "",
+            "FAIL_TO_PASS": '["tests/test_a.py::test_a"]',
+            "PASS_TO_PASS": "[]",
+            "created_at": "",
+        }
+        inst = SWEBenchInstance.from_jsonl_line(raw)
+        assert inst.fail_to_pass == ["tests/test_a.py::test_a"]  # list, not chars
+        task = inst.to_benchmark_task()
+        assert task.fail_to_pass == ["tests/test_a.py::test_a"]
 
 
 class TestExtractPatch:
