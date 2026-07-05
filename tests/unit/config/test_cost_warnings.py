@@ -17,7 +17,8 @@
 import pytest
 from unittest.mock import MagicMock
 
-from victor.tools.base import CostTier, ToolRegistry
+from victor.tools.base import CostTier
+from victor.tools.registry import ToolRegistry
 from victor.tools.semantic_selector import (
     SemanticToolSelector,
     COST_TIER_WARNINGS,

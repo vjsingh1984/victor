@@ -15,6 +15,9 @@
 """Agent module - orchestrator and supporting components."""
 
 import os
+import sys as _sys
+import types as _types
+from typing import Any
 
 _LIGHT_IMPORT = str(os.getenv("VICTOR_LIGHT_IMPORT", "")).strip().lower() in {
     "1",
@@ -151,3 +154,23 @@ if not _LIGHT_IMPORT:
     ]
 else:
     __all__ = []
+
+
+class _CallableAgentModule(_types.ModuleType):
+    """Make ``victor.agent`` callable so ``@victor.agent`` keeps working.
+
+    ``victor.agent`` is both a real subpackage (mock.patch targets like
+    ``victor.agent.orchestrator`` must resolve through it) and the public
+    ``@victor.agent`` decorator. With the top-level lazy ``victor/__init__``
+    (PEP 562), the import machinery binds this module object onto the
+    ``victor`` package on first import — so the decorator has to live on the
+    module itself rather than on a shadowing proxy object.
+    """
+
+    def __call__(self, *args: Any, **kwargs: Any) -> Any:
+        from victor.framework.decorators import agent as _agent_decorator
+
+        return _agent_decorator(*args, **kwargs)
+
+
+_sys.modules[__name__].__class__ = _CallableAgentModule

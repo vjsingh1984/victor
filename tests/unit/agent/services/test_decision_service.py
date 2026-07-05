@@ -510,3 +510,49 @@ class TestSyncDecide:
         )
         # decide_sync uses run_sync_in_thread to bridge async-in-sync
         assert result.source == "llm"
+
+
+class TestDecisionLogging:
+    """Every decision path must log (FEP-0012 closed loop) — not just LLM ones.
+
+    log_decision is the source the classifier trainer mines, so heuristic /
+    budget / timeout decisions must be captured too.
+    """
+
+    def _service(self):
+        return LLMDecisionService(provider=_make_provider({}), model="test")
+
+    def test_fast_path_logs(self):
+        service = self._service()
+        with patch("victor.agent.decisions.chain.log_decision") as m:
+            result = service.decide_sync(
+                DecisionType.TASK_COMPLETION,
+                context={"response_tail": "", "deliverable_count": 0, "signal_count": 0},
+                heuristic_confidence=0.9,  # above threshold → heuristic fast path
+            )
+        assert result.source == "heuristic"
+        m.assert_called_once()
+        assert m.call_args.kwargs["source"] == "heuristic"
+
+    def test_budget_exhausted_logs(self):
+        config = LLMDecisionServiceConfig(micro_budget=0)  # immediately exhausted
+        service = LLMDecisionService(provider=_make_provider({}), model="test", config=config)
+        with patch("victor.agent.decisions.chain.log_decision") as m:
+            result = service.decide_sync(
+                DecisionType.TASK_COMPLETION,
+                context={"response_tail": "", "deliverable_count": 0, "signal_count": 0},
+                heuristic_confidence=0.0,  # low → not fast-path; budget=0 → exhausted
+            )
+        assert result.source == "budget_exhausted"
+        m.assert_called_once()
+
+    async def test_decide_async_fast_path_logs(self):
+        service = self._service()
+        with patch("victor.agent.decisions.chain.log_decision") as m:
+            result = await service.decide(
+                DecisionType.TASK_COMPLETION,
+                context={"response_tail": "", "deliverable_count": 0, "signal_count": 0},
+                heuristic_confidence=0.9,
+            )
+        assert result.source == "heuristic"
+        m.assert_called_once()

@@ -6,7 +6,11 @@ from io import StringIO
 
 from victor.tools.base import AccessMode, DangerLevel, ExecutionCategory, Priority
 from victor.tools.decorators import tool
-from victor.tools.unified.parser import split_command
+from victor.tools.unified.parser import (
+    detect_shell_operators,
+    shell_operator_rejection,
+    split_command,
+)
 
 
 async def run_tests(runner: str, path: str):
@@ -117,19 +121,21 @@ def create_code_parser() -> UnifiedCodeParser:
     priority=Priority.HIGH,
 )
 async def code_tool(cmd: str) -> str:
-    """Unified code tool.
+    """Standalone code-intelligence tool. Call it directly as code(cmd='...').
+    Do NOT pass code commands to the shell tool.
+
     Example commands:
+      code search "authentication logic"   # semantic code search
+      code grep "class RST"                # literal pattern search
       code test pytest tests/
       code python "print('hello')"
-      code python <<'PY'
-      print('hello')
-      PY
-      code execute "print('hello')"
       code metrics src/
 
     Args:
-        cmd: Bash-style grouped code command. Use `code python` for ad hoc
-            Python snippets and heredocs; use `code test` for test runners.
+        cmd: A code-intelligence subcommand string (e.g. 'grep "pattern"').
+            This is NOT a shell command — call the code tool directly,
+            do NOT pass it to shell(). Subcommands: search, grep, test,
+            python, execute, metrics.
     """
     parser = create_code_parser()
 
@@ -137,6 +143,9 @@ async def code_tool(cmd: str) -> str:
         args_list = split_command(cmd)
         if args_list and args_list[0] == "code":
             args_list = args_list[1:]
+        operator = detect_shell_operators(args_list)
+        if operator is not None:
+            return shell_operator_rejection("code", operator)
         parsed_args = parser.parse_args(args_list)
     except ValueError as e:
         return f"### ❌ ERROR\n{e}"

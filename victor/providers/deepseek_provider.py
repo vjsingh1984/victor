@@ -34,7 +34,7 @@ from typing import Any, AsyncIterator, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
-from victor.providers.base import CompletionResponse, StreamChunk, ToolDefinition
+from victor.providers.base import CacheCostModel, CompletionResponse, StreamChunk, ToolDefinition
 from victor.providers.httpx_openai_compat import build_openai_messages
 from victor.providers.httpx_openai_compat import HttpxOpenAICompatProvider
 from victor.providers.resolution import (
@@ -225,6 +225,17 @@ class DeepSeekProvider(HttpxOpenAICompatProvider):
 
     def supports_kv_prefix_caching(self) -> bool:
         return True
+
+    def cache_cost_model(self) -> CacheCostModel:
+        """Characterized API caching (FEP-0011): 90% discount, $0 write, 1h+ TTL."""
+        return CacheCostModel(
+            supported=True,
+            read_discount=0.9,
+            write_overhead=1.0,
+            ttl_seconds=3600.0,
+            min_prefix_tokens=0,
+            prefix_granularity="token",
+        )
 
     def context_window(self, model: Optional[str] = None) -> int:
         from victor.providers.context_windows import DEEPSEEK, DEEPSEEK_DEFAULT, lookup

@@ -29,7 +29,7 @@ References:
 import json
 from typing import Any, Dict, List, Optional
 
-from victor.providers.base import CompletionResponse, ProviderError
+from victor.providers.base import CacheCostModel, CompletionResponse, ProviderError
 from victor.providers.httpx_openai_compat import HttpxOpenAICompatProvider
 from victor.providers.resolution import (
     UnifiedApiKeyResolver,
@@ -440,6 +440,16 @@ class ZAIProvider(HttpxOpenAICompatProvider):
         )
 
     # ── ZAI-specific helpers ──────────────────────────────────────────────────
+
+    def cache_cost_model(self) -> CacheCostModel:
+        """Characterized API caching (FEP-0011): ~50% discount on cached tokens."""
+        return CacheCostModel(
+            supported=True,
+            read_discount=0.5,
+            write_overhead=1.0,
+            min_prefix_tokens=0,
+            prefix_granularity="token",
+        )
 
     def context_window(self, model: str) -> int:
         """Context window in tokens — the method the runtime actually calls.

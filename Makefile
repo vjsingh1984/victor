@@ -171,6 +171,12 @@ pre-commit:
 pre-commit-install:
 	pre-commit install
 
+hooks:  ## Install shared git hooks (.githooks/* -> .git/hooks/). Preserves pre-commit's hooks.
+	@mkdir -p .git/hooks
+	@cp -p .githooks/* .git/hooks/ 2>/dev/null || true
+	@chmod +x .git/hooks/* 2>/dev/null || true
+	@echo "shared hooks installed (.githooks -> .git/hooks); pre-commit hooks preserved"
+
 clean:
 	rm -rf build/ dist/ *.egg-info/ .pytest_cache/ .mypy_cache/ .ruff_cache/
 	rm -rf htmlcov/ .coverage coverage.xml

@@ -174,6 +174,23 @@ class ToolSelectionRuntime:
     ) -> Any:
         """Select, prioritize, and filter tools for the current turn."""
         runtime = self._runtime
+
+        # STABLE CURATED TOOLS: when the caller has curated the toolset
+        # (_enabled_tools is set), bypass ALL per-turn selection and return
+        # a stable, sorted, cached ToolDefinition list. This:
+        #   1. Eliminates KV cache misses from tool-schema churn (5-15K
+        #      tokens per miss on cloud providers — tool defs are part of
+        #      the cached prefix).
+        #   2. Gives the agent a predictable action space within the task
+        #      (agentic AI best practice — the model plans with stable tools).
+        #   3. Skips redundant selection work (Q&A gate, semantic, stage,
+        #      ACT pipeline) that the caller already decided.
+        selector = getattr(runtime, "tool_selector", None)
+        if selector and getattr(selector, "_enabled_tools", None):
+            stable = self._stable_curated_tools(runtime, selector)
+            if stable:
+                return stable
+
         provider_supports_tools = runtime.provider.supports_tools()
         tooling_allowed = provider_supports_tools and runtime._model_supports_tool_calls()
         # Intent and mutation authorization are turn-scoped user-prompt state.
@@ -323,6 +340,48 @@ class ToolSelectionRuntime:
         except Exception:
             logger.debug("registered-tools snapshot failed", exc_info=True)
         return None
+
+    def _stable_curated_tools(self, runtime: Any, selector: Any) -> Any:
+        """Return a cached, stable ToolDefinition list for the curated tool set.
+
+        When the caller has curated the toolset (``_enabled_tools`` is set),
+        build a sorted, full-schema ToolDefinition list from the live registry
+        and cache it. Reused every turn → byte-identical tool schema → stable
+        prefix-cache fingerprint → no KV cache misses from tool-schema churn.
+
+        The cache key is ``frozenset(_enabled_tools)``: when the adapter calls
+        ``set_enabled_tools(new_set)`` for a new task, the key changes → the
+        cache rebuilds. No explicit reset needed.
+        """
+        cache_key = frozenset(selector._enabled_tools)
+        cached = getattr(self, "_stable_tools_cache", None)
+        if cached and cached[0] == cache_key:
+            return cached[1]
+
+        try:
+            from victor.agent.tool_selection import tool_to_definition
+            from victor.tools.enums import SchemaLevel
+        except ImportError:
+            return None
+
+        registry = getattr(selector, "tools", None)
+        if not registry:
+            return None
+
+        stable: list[Any] = []
+        for name in sorted(selector._enabled_tools):
+            tool = registry.get(name)
+            if tool is not None:
+                stable.append(tool_to_definition(tool, SchemaLevel.FULL))
+
+        if stable:
+            self._stable_tools_cache = (cache_key, stable)
+            logger.info(
+                "[ToolSchema] Stable curated: %d tools (%s) — prefix-cache stable",
+                len(stable),
+                ", ".join(sorted(selector._enabled_tools)),
+            )
+        return stable or None
 
     @staticmethod
     def _read_core_tools(runtime: Any) -> Any:

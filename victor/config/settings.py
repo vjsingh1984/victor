@@ -437,12 +437,6 @@ class ProfileConfig(BaseSettings):
         None, description="Enable/disable tool call deduplication"
     )
 
-    # Tool broadcasting optimization
-    tool_strategy_v2_enabled: bool = Field(
-        default=False,
-        description="Enable context-window-aware, economy-first tool strategy (v2)",
-    )
-
     # Timeout and session limits
     session_idle_timeout: Optional[int] = Field(
         None,
@@ -1467,6 +1461,14 @@ class Settings(BaseSettings):
     # Enable RL-based learning of optimal continuation prompts per provider/model
     # Tracks success rates and adjusts limits automatically
     enable_continuation_rl_learning: bool = True
+
+    # FEP-0012 RL feedback: after the agent declares task completion in an
+    # interactive `victor chat` session, prompt "Did this resolve your task?"
+    # The yes/no answer is the reward label that flows (via
+    # record_session_outcome → decision_outcome) into classifier training.
+    # Skippable (enter=skip); /rate works regardless of this flag. Interactive
+    # REPL only — never fires for oneshot/API/headless.
+    enable_rl_feedback_prompt: bool = True
 
     # Session idle timeout: Maximum seconds of inactivity before forcing completion
     # Timer resets on each provider response or tool execution

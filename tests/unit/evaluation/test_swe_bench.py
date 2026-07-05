@@ -27,7 +27,9 @@ from victor.evaluation.benchmarks.swe_bench import (
     HumanEvalRunner,
     MBPPRunner,
 )
+from victor.evaluation.swe_bench_loader import SWEBenchInstance, _normalize_test_list
 from victor.evaluation.protocol import (
+    BenchmarkTask,
     BenchmarkType,
     EvaluationConfig,
     TaskResult,
@@ -59,6 +61,185 @@ class TestSWEBenchRunnerInit:
         """Return correct benchmark type."""
         runner = SWEBenchRunner()
         assert runner.benchmark_type == BenchmarkType.SWE_BENCH
+
+
+class TestParseTestOutput:
+    """Tests for SWEBenchRunner._parse_test_output across runner formats.
+
+    Covers pytest, unittest, and django runtests.py outputs — the F3
+    "0 collected" failures were caused by django/unittest output not matching
+    the old pytest-only patterns.
+    """
+
+    def setup_method(self):
+        self.runner = SWEBenchRunner()
+
+    def test_pytest_all_passed(self):
+        passed, total = self.runner._parse_test_output("=== 5 passed in 1.0s ===")
+        assert passed == 5 and total == 5
+
+    def test_pytest_passed_and_failed(self):
+        passed, total = self.runner._parse_test_output("=== 3 passed, 2 failed in 1.0s ===")
+        assert passed == 3 and total == 5
+
+    def test_pytest_with_errors(self):
+        passed, total = self.runner._parse_test_output("1 passed, 2 errors in 1.0s")
+        assert passed == 1 and total == 3
+
+    def test_unittest_ok(self):
+        out = "....\nRan 4 tests in 0.5s\n\nOK"
+        passed, total = self.runner._parse_test_output(out)
+        assert passed == 4 and total == 4
+
+    def test_unittest_failed(self):
+        out = ".F..\nRan 4 tests in 0.5s\n\nFAILED (failures=1)"
+        passed, total = self.runner._parse_test_output(out)
+        assert passed == 0 and total == 4
+
+    def test_django_runtests_ok(self):
+        # django runtests.py delegates to unittest — "Ran N tests" + "OK".
+        out = "Ran 9 tests in 1.2s\n\nOK\nDestroying test database..."
+        passed, total = self.runner._parse_test_output(out)
+        assert passed == 9 and total == 9
+
+    def test_django_runtests_failed(self):
+        out = "Ran 9 tests in 1.2s\n\nFAILED (failures=2, errors=1)\n"
+        passed, total = self.runner._parse_test_output(out)
+        assert passed == 0 and total == 9
+
+    def test_no_recognizable_output(self):
+        # Garbled / unparseable output → (0, 0) → caller logs raw + "0 collected".
+        passed, total = self.runner._parse_test_output("some random error trace\nno tests here")
+        assert passed == 0 and total == 0
+
+
+class TestVerifyPatchInContainer:
+    """Tests for the refactored _verify_patch_in_container (PR2 split).
+
+    Mocks EvalContainer + the image/test-runner resolvers so the full
+    start→apply→run→stop flow is exercised without Docker, validating the
+    status mapping consumed by both the post-loop eval and the verify-and-retry
+    gate.
+    """
+
+    def _make_task(self):
+        return BenchmarkTask(
+            task_id="org__repo-1",
+            benchmark=BenchmarkType.SWE_BENCH,
+            description="t",
+            repo="org/repo",
+            base_commit="abc123",
+            test_code="",  # no test patch
+            fail_to_pass=["tests/test_x.py::test_a"],
+        )
+
+    def _install_fakes(self, monkeypatch, test_stdout: str):
+        from types import SimpleNamespace
+
+        from victor.evaluation import container_eval
+
+        class _FakeContainer:
+            name = "fake-eval"
+
+            def __init__(self, **kwargs):
+                self.started = False
+
+            async def start(self):
+                self.started = True
+
+            async def exec(self, command, *, cwd=None, timeout=600, env=None):
+                cmd = " ".join(command)
+                if "checkout" in cmd or "clean" in cmd:
+                    return 0, "", ""
+                if ".agent_patch.diff" in cmd or ".test_patch.diff" in cmd:
+                    return 0, "", ""
+                # the test run (EvalContainer.exec returns decoded str, not bytes)
+                return 0, test_stdout, ""
+
+            async def stop(self):
+                self.started = False
+
+        monkeypatch.setattr(container_eval, "EvalContainer", _FakeContainer)
+
+        async def _fake_image(task, config):
+            return "fake/img:1"
+
+        monkeypatch.setattr(container_eval, "resolve_swebench_image_exact", _fake_image)
+
+        async def _noop_cleanup():
+            return 0
+
+        monkeypatch.setattr(container_eval, "cleanup_stale_eval_containers", _noop_cleanup)
+
+        import victor.context.test_runner as trm
+
+        monkeypatch.setattr(
+            trm,
+            "detect_test_runner",
+            lambda project_root, test_files=None: SimpleNamespace(
+                command=["python", "-m", "pytest", "tests/"], env={}, runner_type="pytest"
+            ),
+        )
+
+    @pytest.mark.asyncio
+    async def test_verify_returns_passed(self, tmp_path, monkeypatch):
+        self._install_fakes(monkeypatch, "=== 5 passed in 1.0s ===")
+        runner = SWEBenchRunner()
+        config = EvaluationConfig(benchmark=BenchmarkType.SWE_BENCH, model="test", max_tasks=1)
+        vr = await runner._verify_patch_in_container(self._make_task(), "PATCH", tmp_path, config)
+        assert vr.status == "passed"
+        assert (vr.passed, vr.total) == (5, 5)
+        assert vr.image == "fake/img:1"
+
+    @pytest.mark.asyncio
+    async def test_verify_returns_partial(self, tmp_path, monkeypatch):
+        self._install_fakes(monkeypatch, "=== 3 passed, 2 failed in 1.0s ===")
+        runner = SWEBenchRunner()
+        config = EvaluationConfig(benchmark=BenchmarkType.SWE_BENCH, model="test", max_tasks=1)
+        vr = await runner._verify_patch_in_container(self._make_task(), "PATCH", tmp_path, config)
+        assert vr.status == "partial"
+        assert (vr.passed, vr.total) == (3, 5)
+
+
+class TestFailToPassNormalization:
+    """Regression: FAIL_TO_PASS is a JSON-stringified list in the dataset.
+
+    Storing it raw broke the test command — list(str) exploded it into single
+    chars → cmd.extend(chars) → pytest got one-char args → 0 collected on every
+    task (0/20 pass on the PR1 validation run).
+    """
+
+    def test_normalize_json_string(self):
+        assert _normalize_test_list('["tests/test_a.py::test_a", "tests/test_b.py"]') == [
+            "tests/test_a.py::test_a",
+            "tests/test_b.py",
+        ]
+
+    def test_normalize_already_list(self):
+        assert _normalize_test_list(["a", "b"]) == ["a", "b"]
+
+    def test_normalize_empty_or_garbage(self):
+        assert _normalize_test_list("") == []
+        assert _normalize_test_list("not json") == []
+        assert _normalize_test_list(None) == []
+
+    def test_from_jsonl_line_parses_fail_to_pass_string(self):
+        raw = {
+            "instance_id": "org__repo-1",
+            "repo": "org/repo",
+            "base_commit": "abc",
+            "problem_statement": "ps",
+            "hints_text": "",
+            "patch": "",
+            "test_patch": "",
+            "FAIL_TO_PASS": '["tests/test_a.py::test_a"]',
+            "PASS_TO_PASS": "[]",
+            "created_at": "",
+        }
+        inst = SWEBenchInstance.from_jsonl_line(raw)
+        assert inst.fail_to_pass == ["tests/test_a.py::test_a"]  # list, not chars
+        task = inst.to_benchmark_task()
+        assert task.fail_to_pass == ["tests/test_a.py::test_a"]
 
 
 class TestExtractPatch:

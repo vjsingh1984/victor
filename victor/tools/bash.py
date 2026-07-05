@@ -38,6 +38,15 @@ from victor.security.command_safety import (
     is_dangerous_command as _is_dangerous_consolidated,
 )
 
+# FEP-0013: damage-scoped shell safety policy. The default (legacy) policy is a
+# no-op here — the inline allowlist gate below runs unchanged. A non-legacy
+# policy installed per-session via SessionConfig.shell_safety replaces it.
+from victor.security.shell_safety_policy import (
+    ShellCommandContext as _ShellSafetyCtx,
+    SafetyVerdict as _SafetyVerdict,
+    get_shell_safety_policy as _get_shell_safety_policy,
+)
+
 # Platform-specific readonly commands - safe for exploration/analysis
 # These commands cannot modify state, only read
 READONLY_COMMANDS_UNIX: Set[str] = {
@@ -1340,7 +1349,7 @@ async def shell(
     cwd: str = ".",
     timeout: Optional[int] = None,
     dangerous: bool = False,
-    readonly: bool = True,
+    readonly: bool = False,
     action: str = "read",
     stdout_limit: Optional[int] = None,
     stderr_limit: Optional[int] = None,
@@ -1358,9 +1367,14 @@ async def shell(
         cwd: Canonical working directory to run the command from.
             Defaults to `"."` (present working directory). Must exist.
         timeout: Max seconds before the command is killed.
-        dangerous: Allow mutating/network commands when `readonly` blocks them.
-        readonly: When True (default), block commands that mutate state.
-        action: "read" (default) or "write" — the caller's intent.
+        dangerous: Override the dangerous-command blocklist (use sparingly).
+        readonly: When True, validate the command against the readonly
+            allowlist. Defaults to False — the dangerous-command check and
+            ShellSafetyPolicy are the primary safety floor. Pass readonly=True
+            to opt INTO the allowlist for commands you know are read-only.
+        action: "read" (default) or "write"/"network"/"exec" — the caller's
+            intent. Non-"read" actions bypass the allowlist (same as
+            readonly=False).
         stdout_limit: Max stdout lines to return.
         stderr_limit: Max stderr lines to return.
 
@@ -1395,8 +1409,8 @@ async def shell(
         cwd: Working directory for the command
         timeout: Maximum seconds before timeout
         dangerous: Set true only for destructive commands (rm, kill, etc.)
-        readonly: Defaults to True. Set False only when the command must mutate state
-            or invoke non-readonly subcommands.
+        readonly: Defaults to False. Pass True to validate the command against
+            the readonly allowlist (opt-in for purely read-only commands).
         stdout_limit: Max lines for stdout (None=unlimited, default: 10000)
         stderr_limit: Max lines for stderr (None=unlimited, default: 2000)
 
@@ -1419,52 +1433,18 @@ async def shell(
     # Apply command optimizer pipeline (grep→rg, etc.)
     cmd = optimize_command(cmd)
 
-    # Redirect broad recursive search commands to the grouped search tool.
-    # Models bypass the semantic index by calling shell("rg ...") directly.
-    # Allow targeted single-file searches (grep -n "pattern" specific_file.py)
-    # since those are precise and don't benefit from semantic search.
-    import re as _re
-
-    _base_cmd = cmd.strip().split("|")[0].strip()
-    if _re.match(r"^\s*(rg|grep|ag|ack)\s+", _base_cmd, _re.IGNORECASE):
-        # Allow targeted searches: grep on a specific file path (not recursive)
-        _is_recursive = bool(_re.search(r"\s-[a-zA-Z]*r[a-zA-Z]*\s", _base_cmd))
-        _targets_file = bool(
-            _re.search(r"\s[\w./~\-]+\.\w{1,10}\s*$", _base_cmd)
-            or _re.search(r"\s[\w./~\-]+\.\w{1,10}\s*\|", cmd.strip())
-        )
-        # Always allow grep targeting library/venv files — code_search only covers project code
-        _targets_external = bool(
-            _re.search(
-                r"(\.venv|site-packages|/lib/python\d|/usr/lib|/usr/local/lib)",
-                _base_cmd,
-            )
-        )
-        # Detect command substitution in the file path (e.g. "$(python -c '...')/file.py")
-        _has_cmd_sub = bool(_re.search(r"\$\(", _base_cmd))
-
-        if not _targets_external and (not _targets_file or _is_recursive) and not readonly:
-            if _has_cmd_sub:
-                error_msg = (
-                    "Command substitution in file paths is not supported for grep. "
-                    "Resolve the path first, then use read() or grep with the literal path. "
-                    "Example: shell(cmd='python -c \"import arxiv; print(arxiv.__file__)\"') "
-                    "then read(path='<result>')."
-                )
-            else:
-                error_msg = (
-                    "Use search(cmd='search grep \"...\" .') instead of shell search commands "
-                    "for project code. The grouped search tool is indexed and more reliable. "
-                    "For library/venv files use read(path='...') directly. "
-                    "Example: search(cmd='search grep \"FilePathField\" .')"
-                )
-            return {
-                "success": False,
-                "error": error_msg,
-                "stdout": "",
-                "stderr": "",
-                "return_code": -1,
-            }
+    # Guard against filesystem-wide searches (find / ...) that timeout.
+    if re.match(r"^\s*find\s+/", cmd.strip()):
+        return {
+            "success": False,
+            "error": (
+                "Filesystem-wide searches are not allowed. "
+                "Use `code search` or `find . -name ...` within the workspace."
+            ),
+            "stdout": "",
+            "stderr": "",
+            "return_code": -1,
+        }
 
     # Check for dangerous commands
     if not dangerous and _is_dangerous(cmd):
@@ -1493,8 +1473,51 @@ async def shell(
     if _eff is not None:
         readonly = _eff
 
-    # Check readonly mode restrictions
-    if readonly:
+    # --- FEP-0013: consult the session-scoped shell safety policy. The default
+    # ``legacy`` policy preserves the inline allowlist gate below unchanged; a
+    # non-legacy (damage-scoped) policy replaces it with invariant-based allow/
+    # deny/ask. ``readonly`` is honoured as a *hint* and overridden by the
+    # policy's effective_readonly on ALLOW.
+    _shell_policy = _get_shell_safety_policy()
+    _use_shell_policy = _shell_policy.name != "legacy-allowlist"
+    if _use_shell_policy:
+        _decision = _shell_policy.evaluate(
+            _ShellSafetyCtx(command=cmd, cwd=cwd, readonly_hint=readonly, action_hint=action)
+        )
+        if _decision.verdict is _SafetyVerdict.DENY:
+            _inv = f"/{_decision.invariant}" if _decision.invariant else ""
+            return {
+                "success": False,
+                "error": (
+                    f"Shell command denied ({_decision.category}{_inv}): "
+                    f"{_decision.reason}. Keep writes inside the working directory "
+                    f"({cwd}) and avoid protected paths."
+                ),
+                "stdout": "",
+                "stderr": "",
+                "return_code": -1,
+                "cwd": cwd,
+            }
+        if _decision.verdict is _SafetyVerdict.ASK:
+            # Phase 1 surfaces the approval need as an actionable error; routing
+            # ASK through the governance PolicyEngine (FEP-0005) is Phase 2.
+            return {
+                "success": False,
+                "error": (
+                    f"Shell command requires approval ({_decision.category}): "
+                    f"{_decision.reason}"
+                ),
+                "stdout": "",
+                "stderr": "",
+                "return_code": -1,
+                "cwd": cwd,
+            }
+        # ALLOW: adopt the policy's effective readonly and skip the legacy gate.
+        readonly = _decision.effective_readonly
+
+    # Check readonly mode restrictions (legacy inline allowlist gate; skipped
+    # when a non-legacy policy authorized the command above).
+    if readonly and not _use_shell_policy:
         is_valid, failing_cmd = _validate_readonly_command(cmd)
         if not is_valid:
             return {

@@ -7,7 +7,7 @@ Contributing to Victor: setup, patterns, and processes.
 ```bash
 git clone https://github.com/vijayksingh/victor.git
 cd victor
-pip install -e ".[dev]"
+pip install -e ./victor-contracts -e ".[dev]"
 pytest tests/unit -v
 ```
 

@@ -42,7 +42,7 @@ from victor.agent.debug_logger import TRACE
 # Note: Similarity operations use NumPy+BLAS directly (not Rust).
 # Benchmarks show NumPy is 10x faster due to BLAS optimization and
 # avoiding Python→list→Rust→list→Python FFI overhead.
-# See tests/benchmark/test_native_performance.py for details.
+# See tests/benchmarks/test_native_performance.py for details.
 
 # Disable tokenizers parallelism BEFORE importing sentence_transformers
 # This prevents "bad value(s) in fds_to_keep" errors in async contexts

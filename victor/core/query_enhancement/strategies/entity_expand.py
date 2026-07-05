@@ -31,7 +31,7 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
-from victor.integrations.protocols.query_enhancement import (
+from victor.protocols.query_enhancement import (
     EnhancedQuery,
     EnhancementContext,
     EnhancementTechnique,

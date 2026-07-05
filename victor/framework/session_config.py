@@ -223,6 +223,60 @@ class ToolApprovalConfig:
 
 
 @dataclass(frozen=True)
+class ShellSafetyConfig:
+    """Shell safety policy overrides for a session (FEP-0013).
+
+    Configures the damage-scoped :class:`ShellSafetyPolicy` wired to the shell
+    tool. The default profile ``"legacy"`` preserves the shell tool's existing
+    inline readonly allowlist (no behaviour change). Selecting a non-legacy
+    profile (``"strict"``, ``"benchmark"``, ``"autonomous"``) installs a
+    damage-scoped policy that allows in-workspace work (``pip install``,
+    ``xargs``, ``sed -i``, redirects) while denying workspace escapes and
+    protected-asset writes.
+
+    Attributes:
+        profile: Safety profile — ``"legacy"`` | ``"strict"`` | ``"benchmark"``
+            | ``"autonomous"`` | ``"custom"``.
+        workspace_root: Workspace boundary the agent may write within. ``None``
+            resolves to the session working directory.
+        protected_paths: Extra protected paths (``~/.victor`` and system dirs
+            are always implicit).
+        allow_network: ``True``/``False`` to force-allow/force-deny network
+            egress; ``None`` defers to the profile default.
+        extra_allow_patterns: Regex patterns that short-circuit to ALLOW.
+        deny_patterns: Regex patterns that force DENY.
+    """
+
+    profile: str = "legacy"
+    workspace_root: Optional[str] = None
+    protected_paths: tuple = ()
+    allow_network: Optional[bool] = None
+    extra_allow_patterns: tuple = ()
+    deny_patterns: tuple = ()
+
+    @classmethod
+    def from_cli(
+        cls,
+        *,
+        profile: Optional[str] = None,
+        workspace_root: Optional[str] = None,
+        allow_network: Optional[bool] = None,
+    ) -> "ShellSafetyConfig":
+        """Normalize shell-safety flags from CLI-friendly inputs."""
+        valid = {"legacy", "strict", "benchmark", "autonomous", "custom"}
+        resolved = (profile or "legacy").lower()
+        if resolved not in valid:
+            raise ValueError(
+                f"shell_safety_profile must be one of {sorted(valid)}, got '{profile}'."
+            )
+        return cls(
+            profile=resolved,
+            workspace_root=workspace_root,
+            allow_network=allow_network,
+        )
+
+
+@dataclass(frozen=True)
 class SessionConfig:
     """Immutable capture of all CLI/runtime session overrides.
 
@@ -276,6 +330,7 @@ class SessionConfig:
     provider_override: ProviderOverrideConfig = field(default_factory=ProviderOverrideConfig)
     bayesian: BayesianConfig = field(default_factory=BayesianConfig)
     tool_approval: ToolApprovalConfig = field(default_factory=ToolApprovalConfig)
+    shell_safety: ShellSafetyConfig = field(default_factory=ShellSafetyConfig)
 
     # --- Convenience shorthands (populate sub-configs) ---
 
@@ -349,6 +404,10 @@ class SessionConfig:
         tool_approval_enabled: bool = False,
         ask_on_tools: Optional[List[str]] = None,
         ask_fallback: str = "deny",
+        # Shell safety policy (FEP-0013)
+        shell_safety_profile: Optional[str] = None,
+        shell_workspace_root: Optional[str] = None,
+        shell_allow_network: Optional[bool] = None,
     ) -> "SessionConfig":
         """Create a ``SessionConfig`` from flat CLI flags.
 
@@ -443,6 +502,11 @@ class SessionConfig:
                 enabled=tool_approval_enabled,
                 ask_on_tools=tuple(ask_on_tools or ()),
                 ask_fallback=ask_fallback,
+            ),
+            shell_safety=ShellSafetyConfig.from_cli(
+                profile=shell_safety_profile,
+                workspace_root=shell_workspace_root,
+                allow_network=shell_allow_network,
             ),
         )
 

@@ -41,6 +41,7 @@ import os
 from typing import Any, AsyncIterator, Dict, List, Optional
 
 from victor.providers.base import (
+    CacheCostModel,
     BaseProvider,
     CompletionResponse,
     Message,
@@ -287,6 +288,17 @@ class BedrockProvider(BaseProvider):
     def supports_kv_prefix_caching(self) -> bool:
         """Bedrock reuses KV cache for matching prompt prefixes."""
         return True
+
+    def cache_cost_model(self) -> CacheCostModel:
+        """Characterized API caching (FEP-0011): 90% read, 1.25x write, 5m TTL (Claude/Nova)."""
+        return CacheCostModel(
+            supported=True,
+            read_discount=0.9,
+            write_overhead=1.25,
+            ttl_seconds=300.0,
+            min_prefix_tokens=1024,
+            prefix_granularity="system_block",
+        )
 
     def context_window(self, model: Optional[str] = None) -> int:
         from victor.providers.context_windows import (

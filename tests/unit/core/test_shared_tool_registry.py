@@ -451,3 +451,54 @@ class TestSharedToolRegistryGetToolNames:
         classes = registry.get_tool_classes()
 
         assert set(names) == set(classes.keys())
+
+
+class TestGraphDemandSpec:
+    """Regression: the graph demand spec must point at a real, loadable module.
+
+    It previously pointed at ``victor.tools.graph_tool`` (which doesn't exist),
+    so demand-loading graph silently failed — graph was only ever reachable via
+    the victor-coding entry-point, making its registration fragile.
+    """
+
+    def test_graph_spec_not_phantom_module(self):
+        """Guard: the graph spec must not point at the non-existent core path.
+
+        Runs in every CI environment (no victor-coding needed) — this is the
+        cheap regression guard against re-introducing the phantom
+        ``victor.tools.graph_tool`` spec.
+        """
+        from victor.agent.shared_tool_registry import DEMAND_TOOL_SPECS
+
+        module_name, _member = DEMAND_TOOL_SPECS["graph"]
+        assert (
+            module_name != "victor.tools.graph_tool"
+        ), "graph spec points at a phantom module (victor.tools.graph_tool doesn't exist)"
+        # graph lives in the optional victor-coding package.
+        assert module_name.startswith("victor_coding"), module_name
+
+    def test_graph_spec_module_exists(self):
+        pytest.importorskip("victor_coding")  # spec resolves only where graph lives
+
+        import importlib
+
+        from victor.agent.shared_tool_registry import DEMAND_TOOL_SPECS
+
+        module_name, _member = DEMAND_TOOL_SPECS["graph"]
+        # The spec's module must actually resolve (no phantom paths).
+        importlib.import_module(module_name)
+
+    def test_graph_demand_loadable(self):
+        pytest.importorskip("victor_coding")  # graph lives in the optional vertical
+
+        from victor.agent.shared_tool_registry import SharedToolRegistry
+
+        SharedToolRegistry.reset_instance()
+        registry = SharedToolRegistry.get_instance()
+
+        tool = registry._load_tool_spec("graph")
+        assert tool is not None
+        assert getattr(tool, "name", None) == "graph"
+
+        loaded = registry.get_tools_for_names(["graph"])
+        assert loaded and getattr(loaded[0], "name", None) == "graph"

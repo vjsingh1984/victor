@@ -6,13 +6,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from victor.workflows.executor import (
-    ExecutorNodeStatus,
-    NodeResult,
-    WorkflowContext,
-    WorkflowExecutor,
-    WorkflowResult,
-)
+from victor.workflows.context import WorkflowContext, WorkflowResult
+from victor.workflows.unified_executor import WorkflowExecutor
+from victor_contracts.workflows import ExecutorNodeStatus, NodeResult
 
 
 @pytest.fixture
@@ -255,7 +251,7 @@ class TestComputeRegistryBoundary:
 
     def test_register_via_registry_visible_in_executor(self):
         from victor.workflows.compute_registry import register_compute_handler
-        from victor.workflows.executor import get_compute_handler, list_compute_handlers
+        from victor.workflows.compute_registry import get_compute_handler, list_compute_handlers
 
         async def stub_handler(node, context, tool_registry):
             pass

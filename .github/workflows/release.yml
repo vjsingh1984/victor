@@ -25,6 +25,10 @@ on:
     tags:
       - 'v*'
       - '!sdk-v*'
+      # victor-codegraph releases have their own workflow (release-codegraph.yml)
+      # but 'victor-codegraph-v*' matches 'v*', spuriously triggering this one
+      # (every such run failed after ~30 wasted minutes).
+      - '!victor-codegraph-v*'
   workflow_dispatch:
     inputs:
       publish_testpypi:

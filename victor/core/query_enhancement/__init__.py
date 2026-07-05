@@ -55,7 +55,7 @@ Types:
 """
 
 # Re-export from protocols for convenience
-from victor.integrations.protocols.query_enhancement import (
+from victor.protocols.query_enhancement import (
     IQueryEnhancementStrategy,
     IQueryEnhancementPipeline,
     EnhancementTechnique,

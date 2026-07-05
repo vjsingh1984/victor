@@ -23,6 +23,7 @@ Provides transaction-like editing with:
 """
 
 import difflib
+import logging
 import shutil
 from datetime import datetime
 from enum import Enum
@@ -33,6 +34,8 @@ from pydantic import BaseModel, Field
 from rich.console import Console
 from rich.syntax import Syntax
 from rich.panel import Panel
+
+logger = logging.getLogger(__name__)
 
 
 class OperationType(str, Enum):
@@ -101,6 +104,29 @@ class FileEditor:
 
         self.current_transaction: Optional[EditTransaction] = None
         self.transaction_history: List[EditTransaction] = []
+        # Last commit failure detail (set when commit() rolls back). Callers
+        # that suppress this editor's rich-console stdout (e.g. the victor edit
+        # tool wraps commit() in _capture_stdout) can read this to surface the
+        # real error instead of a generic "Failed to commit".
+        self.last_commit_error: Optional[str] = None
+
+    def reset_state(self) -> None:
+        """Reset per-task mutable state (benchmark isolation hygiene).
+
+        The FileEditor is a singleton; without this, transaction_history grows
+        unbounded across tasks and a stale last_commit_error from task N can
+        leak into task N+1's diagnostics. Called per-task by the edit tool's
+        ``_create_file_editor`` (victor/tools/file_editor_tool.py). Also
+        re-ensures backup_dir (defense-in-depth alongside the git-clean -e
+        .victor fix).
+        """
+        self.current_transaction = None
+        self.transaction_history = []
+        self.last_commit_error = None
+        try:
+            self.backup_dir.mkdir(parents=True, exist_ok=True)
+        except Exception:
+            pass
 
     def start_transaction(self, description: str = "") -> str:
         """Start a new edit transaction.
@@ -335,6 +361,7 @@ class FileEditor:
             return True
 
         # Apply operations
+        self.last_commit_error = None
         try:
             for i, op in enumerate(self.current_transaction.operations, 1):
                 self.console.print(f"\n[{i}/{len(self.current_transaction.operations)}] ", end="")
@@ -348,6 +375,19 @@ class FileEditor:
             return True
 
         except Exception as e:
+            # Capture the real failure detail. The victor edit tool suppresses
+            # this editor's rich-console stdout (it wraps commit() in
+            # _capture_stdout), so without this the actual error is lost and the
+            # agent only sees a generic "Failed to commit". Log + stash it.
+            import traceback
+
+            tb = traceback.format_exc()
+            self.last_commit_error = f"{type(e).__name__}: {e}"
+            logger.error(
+                "FileEditor.commit failed (rolling back): %s\n%s",
+                self.last_commit_error,
+                tb,
+            )
             self.console.print(f"\n[bold red]✗ Error applying changes:[/] {e}")
             self.console.print("[yellow]Rolling back...[/]")
             self.rollback()
@@ -409,6 +449,12 @@ class FileEditor:
         backup_path = self.backup_dir / backup_name
 
         if path_obj.is_file():
+            # Re-ensure the backup_dir exists: the FileEditor is often a long-lived
+            # singleton whose backup_dir was mkdir'd at __init__, but an external
+            # `git clean -fd` between tasks (e.g. the SWE-bench harness) can delete
+            # it. Without this, shutil.copy2 raises FileNotFoundError and the whole
+            # commit rolls back — every edit then fails until the process restarts.
+            self.backup_dir.mkdir(parents=True, exist_ok=True)
             shutil.copy2(path_obj, backup_path)
 
         return backup_path

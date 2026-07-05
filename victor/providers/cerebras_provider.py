@@ -44,6 +44,7 @@ from typing import Any, AsyncIterator, Dict, List, Optional, Tuple
 import httpx
 
 from victor.providers.base import (
+    CacheCostModel,
     BaseProvider,
     CompletionResponse,
     Message,
@@ -502,6 +503,17 @@ class CerebrasProvider(BaseProvider):
     def supports_kv_prefix_caching(self) -> bool:
         """Cerebras reuses KV cache with 5min TTL for matching prefixes."""
         return True
+
+    def cache_cost_model(self) -> CacheCostModel:
+        """Characterized API caching (FEP-0011): latency-only, 5m TTL (no billing discount)."""
+        return CacheCostModel(
+            supported=True,
+            read_discount=0.0,
+            write_overhead=1.0,
+            ttl_seconds=300.0,
+            min_prefix_tokens=0,
+            prefix_granularity="token",
+        )
 
     def context_window(self, model: Optional[str] = None) -> int:
         from victor.providers.context_windows import CEREBRAS, CEREBRAS_DEFAULT, lookup

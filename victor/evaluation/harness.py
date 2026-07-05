@@ -570,6 +570,38 @@ class TaskEnvironment:
         else:
             return await self._run_tests_local(test_dir, timeout)
 
+    async def _install_task_repo(self, test_dir: Path, install_timeout: int) -> None:
+        """Best-effort ``pip install -e .`` of the task repo.
+
+        SWE-bench repos must be installed for their package to be importable
+        during test collection; otherwise pytest collects 0 tests. Best-effort:
+        if install fails or times out, the test run still proceeds (it may
+        collect partially or 0).
+        """
+        if not any((test_dir / f).exists() for f in ("setup.py", "pyproject.toml", "setup.cfg")):
+            return
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                "python",
+                "-m",
+                "pip",
+                "install",
+                "-e",
+                ".",
+                "--no-input",
+                "--disable-pip-version-check",
+                cwd=test_dir,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                env={**os.environ, "PIP_NO_BUILD_ISOLATION": "1"},
+            )
+            try:
+                await asyncio.wait_for(proc.communicate(), timeout=install_timeout)
+            except asyncio.TimeoutError:
+                proc.kill()
+        except Exception:
+            pass  # best-effort
+
     async def _run_tests_local(
         self,
         test_dir: Path,
@@ -577,6 +609,12 @@ class TaskEnvironment:
     ) -> tuple[int, int, str, str]:
         """Run tests locally."""
         try:
+            # SWE-bench repos must be installed (pip install -e .) for their
+            # package to be importable during test collection — otherwise pytest
+            # collects 0 tests ("Tests not collected"). Best-effort: if install
+            # fails, still attempt the test run.
+            await self._install_task_repo(test_dir, install_timeout=max(60, timeout // 2))
+
             # Detect test framework
             if (test_dir / "pytest.ini").exists() or (test_dir / "setup.py").exists():
                 cmd = ["python", "-m", "pytest", "-v", "--tb=short"]
@@ -1090,8 +1128,23 @@ class EvaluationHarness:
                 results.append(task_result)
                 all_results.append(task_result)
 
-                status_str = "PASS" if task_result.is_success else "FAIL"
-                logger.info(f"  Result: {status_str}")
+                if task_result.is_success:
+                    logger.info(
+                        "  Result: PASS (tests %d/%d)",
+                        task_result.tests_passed,
+                        task_result.tests_total,
+                    )
+                else:
+                    # Surface WHY the task failed — the harness sets
+                    # error_message to a categorized reason (partial pass,
+                    # all tests failed, 0 collected / install issue, timeout,
+                    # exception). Without this, "Result: FAIL" gave no clue.
+                    logger.warning(
+                        "  Result: FAIL (tests %d/%d) — reason: %s",
+                        task_result.tests_passed,
+                        task_result.tests_total,
+                        task_result.error_message or "no reason recorded",
+                    )
 
                 # Save checkpoint after each task
                 if checkpoint_path:
@@ -1222,6 +1275,16 @@ class EvaluationHarness:
         task_result.code_search_calls = int(payload.get("code_search_calls", 0) or 0)
         task_result.graph_calls = int(payload.get("graph_calls", 0) or 0)
         task_result.metadata = dict(payload.get("metadata", {}) or {})
+
+        # Correlation spine + bounded execution trace. session_id joins this
+        # task's logged decisions to its outcome; trace carries the messages /
+        # tool calls / edits the manifest + miner need.
+        sid = payload.get("session_id")
+        if isinstance(sid, str) and sid:
+            task_result.session_id = sid
+        ct = payload.get("conversation_trace")
+        if isinstance(ct, dict) and ct:
+            task_result.trace = dict(ct)
 
         task_report = payload.get("task_report")
         if isinstance(task_report, dict):

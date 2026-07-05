@@ -50,10 +50,10 @@ async def search_tool(cmd: str) -> str:
         return await code_tool(_join(["code", "grep", *rest]))
 
     if subcommand == "files":
-        from victor.tools.unified.fs_tool import fs_tool
+        from victor.tools.bash import shell
 
-        # `search files <pattern> [path]` maps to `fs search <pattern> [path]`.
-        return await fs_tool(_join(["fs", "search", *rest]))
+        # `search files <pattern> [path]` — use shell find since fs is removed.
+        return await shell(cmd=_join(["find", *rest, "-type", "f"]))
 
     return f"### ❌ ERROR\nUnknown search subcommand '{subcommand}'. {_SEARCH_DEPRECATED_MSG}"
 

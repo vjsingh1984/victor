@@ -23,20 +23,18 @@ gaps:
 
 ## Install
 
-Not yet published to PyPI — use an **editable install** from the monorepo for now. Consumers
-(Victor, the ProximaDB SDK, AnvaiOps) reference it editable until the first `victor-codegraph-v*`
-release is cut.
+Published on PyPI as [`victor-codegraph`](https://pypi.org/project/victor-codegraph/)
+(current release **0.1.2**). Consumers pin the PyPI release — the ProximaDB SDK's
+`proximadb[codegraph]` extra and AnvaiOps both require `victor-codegraph>=0.1.2`.
 
 ```bash
-# dev: editable, with tree-sitter grammars + test tooling
+# from PyPI
+pip install victor-codegraph                 # Python-only (stdlib ast) path, zero native deps
+pip install "victor-codegraph[treesitter]"   # + multi-language tree-sitter grammars
+
+# dev (monorepo): editable, with tree-sitter grammars + test tooling
 make -C victor-codegraph dev          # = pip install -e ../victor-contracts && pip install -e ".[dev]"
-
-# minimal: Python-only (stdlib ast) path, zero native deps
-pip install -e ./victor-codegraph
-
-# once published:
-#   pip install victor-codegraph                 # Python path
-#   pip install "victor-codegraph[treesitter]"   # + multi-language grammars
+pip install -e ./victor-codegraph     # minimal editable install
 ```
 
 ### Releasing
@@ -74,6 +72,6 @@ records = to_proxima_records(parsed, repo_graph_id="myrepo", branch_id="main",
 
 ## Status
 
-`0.1.0` — TD-CG1 scaffold. Python (stdlib `ast`) is the primary, fully-offline path.
+`0.1.2` (PyPI). Python (stdlib `ast`) is the primary, fully-offline path.
 Multi-language extraction is best-effort via tree-sitter; deeper per-language relation
 extraction (the donor parsers' Rust/Go/Java specifics) lands incrementally.

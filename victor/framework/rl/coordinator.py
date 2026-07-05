@@ -537,6 +537,12 @@ class RLCoordinator:
         # Active learners allowlist (None = no restriction)
         self._active_learners: Optional[Set[str]] = None
 
+        # Session-scoped provider/model override (set by the orchestrator from
+        # the session profile, so GEPA uses the ACTUAL provider — not the
+        # global settings default).
+        self._session_provider: Optional[str] = None
+        self._session_model: Optional[str] = None
+
         # Async writer queue for non-blocking outcome recording
         self._writer_queue: Optional[AsyncWriterQueue] = None
         self._writer_queue_enabled = False
@@ -683,6 +689,16 @@ class RLCoordinator:
                 logger.info("RL: Migrated rl_outcome — added columns: %s", added)
         except Exception as e:
             logger.debug("RL: Phase 1 migration skipped: %s", e)
+
+    def set_session_provider(self, provider: str, model: str) -> None:
+        """Set the session-scoped provider/model for GEPA reflection.
+
+        Called by the orchestrator on init so GEPA uses the ACTUAL session
+        provider (e.g., zai/glm-5.2 from -p zai-coding), not the global
+        settings default (which may be ollama on a dev machine).
+        """
+        self._session_provider = provider
+        self._session_model = model
 
     def set_repo_context(self, repo_id: Optional[str]) -> None:
         """Set current repo context for outcome isolation.
@@ -949,17 +965,83 @@ class RLCoordinator:
 
                         main_model_spec = None
                         if getattr(gepa_cfg, "use_main_model", True):
-                            provider_cfg = getattr(settings, "provider", None)
-                            main_provider = (
-                                getattr(provider_cfg, "default_provider", None)
-                                if provider_cfg
-                                else None
-                            )
-                            main_model = (
-                                getattr(provider_cfg, "default_model", None)
-                                if provider_cfg
-                                else None
-                            )
+                            # Prefer session-scoped provider/model (set by the
+                            # orchestrator from the session profile) over global
+                            # settings — fixes GEPA calling the wrong provider
+                            # (e.g., ollama instead of zai when -p zai-coding).
+                            main_provider = self._session_provider
+                            main_model = self._session_model
+                            if not main_provider or not main_model:
+                                provider_cfg = getattr(settings, "provider", None)
+                                main_provider = (
+                                    getattr(provider_cfg, "default_provider", None)
+                                    if provider_cfg
+                                    else None
+                                )
+                                main_model = (
+                                    getattr(provider_cfg, "default_model", None)
+                                    if provider_cfg
+                                    else None
+                                )
+
+                            # KV cache isolation: resolve a different model for
+                            # GEPA reflection so it doesn't thrash the main
+                            # agent's cache namespace. Same provider (keeps API
+                            # keys/auth), different model (separate cache).
+                            gepa_model_override = getattr(gepa_cfg, "model", None)
+                            if gepa_model_override and gepa_model_override != main_model:
+                                # Explicit override from settings/profile.
+                                main_model = gepa_model_override
+                                logger.info(
+                                    "[GEPA] cache_mode=ISOLATED model=%s "
+                                    "(explicit override, ≠ session %s)",
+                                    main_model,
+                                    self._session_model,
+                                )
+                            elif main_model:
+                                # Auto-resolve: try the provider's "edge" tier
+                                # model (cheaper + different cache namespace).
+                                try:
+                                    from victor.config.decision_settings import (
+                                        DecisionServiceSettings,
+                                    )
+
+                                    decision_cfg = DecisionServiceSettings()
+                                    provider_tiers = decision_cfg.provider_model_tiers.get(
+                                        str(main_provider), {}
+                                    )
+                                    edge_model = provider_tiers.get("edge")
+                                    if edge_model and edge_model != main_model:
+                                        main_model = edge_model
+                                        logger.info(
+                                            "[GEPA] cache_mode=ISOLATED model=%s "
+                                            "(auto-resolved edge tier for %s, "
+                                            "≠ session %s)",
+                                            main_model,
+                                            main_provider,
+                                            self._session_model,
+                                        )
+                                    else:
+                                        logger.warning(
+                                            "[GEPA] cache_mode=SHARED model=%s — "
+                                            "no different tier model found for "
+                                            "provider %s. Mid-session prompt "
+                                            "optimization can cause KV cache miss "
+                                            "and cost full token price. Set "
+                                            "settings.prompt_optimization.gepa.model "
+                                            "to isolate, or batch GEPA at "
+                                            "session-end.",
+                                            main_model,
+                                            main_provider,
+                                        )
+                                except Exception:
+                                    logger.warning(
+                                        "[GEPA] cache_mode=SHARED model=%s — "
+                                        "could not resolve tier models. Mid-session "
+                                        "prompt optimization can cause KV cache "
+                                        "miss and cost full token price.",
+                                        main_model,
+                                    )
                             if main_provider and main_model:
                                 _local = str(main_provider) in (
                                     "ollama",

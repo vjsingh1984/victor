@@ -14,6 +14,7 @@ __all__ = [
     "IndexLockRegistry",
     "ensure_project_graph_enriched",
     "GraphBuildCoordinator",
+    "GraphManager",
 ]
 
 _LAZY_IMPORTS = {
@@ -23,6 +24,7 @@ _LAZY_IMPORTS = {
     "IndexLockRegistry": "victor.core.indexing.index_lock",
     "ensure_project_graph_enriched": "victor.core.indexing.graph_enrichment",
     "GraphBuildCoordinator": "victor.core.indexing.graph_manager",
+    "GraphManager": "victor.core.indexing.graph_manager",
 }
 
 

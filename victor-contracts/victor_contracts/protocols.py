@@ -58,7 +58,7 @@ class OrchestratorProtocol(Protocol):
 @runtime_checkable
 class SandboxProtocol(Protocol):
     """Protocol for stateful code execution sandboxes.
-    
+
     Allows core executors (e.g. sandbox_executor) to manage sandboxes
     without knowing the concrete container implementation.
     """

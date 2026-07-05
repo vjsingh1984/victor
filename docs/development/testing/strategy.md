@@ -275,7 +275,7 @@ jobs:
       
       - name: Install dependencies
         run: |
-          pip install -e ".[dev]"
+          pip install -e ./victor-contracts -e ".[dev]"
       
       - name: Run tests
         run: |
@@ -334,7 +334,7 @@ Add to README.md:
 
 ### Dependencies
 ```bash
-pip install -e ".[dev]"  # Includes pytest, pytest-asyncio, pytest-cov
+pip install -e ./victor-contracts -e ".[dev]"  # Includes pytest, pytest-asyncio, pytest-cov
 ```
 
 ### Running Tests

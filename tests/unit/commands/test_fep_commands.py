@@ -546,6 +546,53 @@ Template summary.
                     assert "test@example.com" in content
                     assert "testauthor" in content
 
+    def test_create_fep_default_output_lands_in_feps_dir(self, tmp_path, monkeypatch):
+        """Default output (no --output) must land in feps/, not the cwd.
+
+        Guards against the regression where the scaffold wrote
+        fep-XXXX-<slug>.md to the current working directory, leaving scratch
+        (e.g. fep-XXXX-test.md) at the repo root.
+        """
+        feps_dir = tmp_path / "feps"
+        feps_dir.mkdir()
+        template_path = feps_dir / "fep-0000-template.md"
+        template_path.write_text("# FEP-{number}: {Title}\n\n## Summary\nTemplate.\n")
+
+        # cwd is tmp_path, deliberately NOT feps/ — a cwd-relative default would
+        # drop the file here.
+        monkeypatch.chdir(tmp_path)
+
+        with patch("victor.ui.commands.fep._get_feps_dir", return_value=feps_dir):
+            with patch(
+                "victor.ui.commands.fep._get_template_path",
+                return_value=template_path,
+            ):
+                result = runner.invoke(
+                    fep_app,
+                    [
+                        "create",
+                        "--title",
+                        "My Feature",
+                        "--type",
+                        "standards",
+                        "--author",
+                        "Test Author",
+                        "--email",
+                        "test@example.com",
+                        "--github",
+                        "testauthor",
+                    ],
+                )
+
+        assert result.exit_code == 0, result.output
+        expected = feps_dir / "fep-XXXX-my-feature.md"
+        assert expected.exists(), "default output must land in feps/"
+        # And it must NOT pollute the cwd.
+        assert not (tmp_path / "fep-XXXX-my-feature.md").exists(), "must not write to cwd"
+
+        content = expected.read_text()
+        assert "My Feature" in content
+
     def test_create_fep_without_git(self):
         """Test creating a FEP when git is not available."""
         with tempfile.TemporaryDirectory() as tmpdir:

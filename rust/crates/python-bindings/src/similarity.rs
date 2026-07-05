@@ -51,6 +51,17 @@ fn simd_norm(vec: &[f32]) -> f32 {
     total.sqrt().max(EPSILON)
 }
 
+/// L2-normalize a vector in place-free form (returns a new Vec).
+/// Falls back to the original vector if the norm is ~0.
+#[inline]
+fn normalize_vec(vec: &[f32]) -> Vec<f32> {
+    let norm = simd_norm(vec);
+    if norm <= EPSILON {
+        return vec.to_vec();
+    }
+    vec.iter().map(|x| x / norm).collect()
+}
+
 /// Compute dot product using SIMD.
 #[inline]
 fn simd_dot(a: &[f32], b: &[f32]) -> f32 {
@@ -168,6 +179,83 @@ pub fn batch_cosine_similarity(query: Vec<f32>, corpus: Vec<Vec<f32>>) -> PyResu
     };
 
     Ok(results)
+}
+
+/// Compute a full similarity matrix of `queries` x `corpus` in a SINGLE FFI
+/// crossing (rayon-parallel over queries), instead of looping
+/// `batch_cosine_similarity` from Python (which crossed once per query).
+///
+/// Results are identical to per-query `batch_cosine_similarity`.
+///
+/// # Arguments
+/// * `queries` - Query embedding vectors (matrix rows)
+/// * `corpus` - Corpus embedding vectors (matrix columns)
+/// * `normalize` - If true, pre-normalize the corpus once and reuse it for
+///   every query (avoids recomputing corpus norms per row)
+#[pyfunction]
+#[pyo3(signature = (queries, corpus, normalize = true))]
+pub fn similarity_matrix(
+    queries: Vec<Vec<f32>>,
+    corpus: Vec<Vec<f32>>,
+    normalize: bool,
+) -> PyResult<Vec<Vec<f32>>> {
+    if queries.is_empty() || corpus.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    // Validate dimensions: every corpus vector must match the query dim.
+    let qdim = queries[0].len();
+    for (i, q) in queries.iter().enumerate() {
+        if q.len() != qdim {
+            return Err(pyo3::exceptions::PyValueError::new_err(format!(
+                "Query dimension mismatch: queries[0] has {} dims, queries[{}] has {}",
+                qdim,
+                i,
+                q.len()
+            )));
+        }
+    }
+    for (i, c) in corpus.iter().enumerate() {
+        if c.len() != qdim {
+            return Err(pyo3::exceptions::PyValueError::new_err(format!(
+                "Dimension mismatch: query has {} dims, corpus[{}] has {}",
+                qdim,
+                i,
+                c.len()
+            )));
+        }
+    }
+
+    if normalize {
+        // Pre-normalize corpus once; reuse for every query row.
+        let corpus_normed: Vec<Vec<f32>> = corpus.par_iter().map(|c| normalize_vec(c)).collect();
+        Ok(queries
+            .par_iter()
+            .map(|q| {
+                let qn = normalize_vec(q);
+                corpus_normed
+                    .iter()
+                    .map(|c| simd_dot(&qn, c))
+                    .collect::<Vec<f32>>()
+            })
+            .collect())
+    } else {
+        // Cosine similarity normalizes per dot product; same result, slightly
+        // more work (recomputes corpus norms per row) but avoids the helper.
+        Ok(queries
+            .par_iter()
+            .map(|q| {
+                let qn = simd_norm(q);
+                corpus
+                    .iter()
+                    .map(|c| {
+                        let cn = simd_norm(c);
+                        simd_dot(q, c) / (qn * cn)
+                    })
+                    .collect::<Vec<f32>>()
+            })
+            .collect())
+    }
 }
 
 /// Find top-k most similar vectors from a corpus.
@@ -398,6 +486,48 @@ mod tests {
         assert!((sims[0] - 1.0).abs() < 1e-6);
         assert!(sims[1].abs() < 1e-6);
         assert!((sims[2] + 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_similarity_matrix_matches_per_query() {
+        // The matrix result must equal per-query batch_cosine_similarity for both
+        // normalize branches (the correctness invariant the Python wrapper relies on).
+        let queries = vec![
+            vec![1.0, 0.0, 0.0],
+            vec![0.0, 1.0, 0.0],
+            vec![0.7, 0.7, 0.0],
+        ];
+        let corpus = vec![
+            vec![1.0, 0.0, 0.0],
+            vec![0.0, 1.0, 0.0],
+            vec![0.9, 0.1, 0.0],
+            vec![-1.0, 0.0, 0.0],
+        ];
+
+        for normalize in [true, false] {
+            let matrix = similarity_matrix(queries.clone(), corpus.clone(), normalize).unwrap();
+            assert_eq!(matrix.len(), queries.len());
+            for (i, q) in queries.iter().enumerate() {
+                let row =
+                    batch_cosine_similarity(q.clone(), corpus.clone()).unwrap();
+                assert_eq!(matrix[i].len(), row.len());
+                for (a, b) in matrix[i].iter().zip(row.iter()) {
+                    assert!((a - b).abs() < 1e-5, "matrix mismatch at row {i} (normalize={normalize})");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_similarity_matrix_empty() {
+        assert_eq!(
+            similarity_matrix(vec![], vec![vec![1.0, 0.0]], true).unwrap(),
+            Vec::<Vec<f32>>::new()
+        );
+        assert_eq!(
+            similarity_matrix(vec![vec![1.0, 0.0]], vec![], true).unwrap(),
+            Vec::<Vec<f32>>::new()
+        );
     }
 
     #[test]

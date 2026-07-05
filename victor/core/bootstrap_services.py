@@ -167,31 +167,45 @@ def bootstrap_new_services(
     )
     logger.info("Bootstrapped SessionService")
 
-    # Bootstrap decision service — prefer tiered (edge+balanced+performance),
-    # fall back to single edge, then cloud
+    # Bootstrap decision service — selected by the `decision_backend` enum
+    # (FEP-0012). ONE config value replaces the USE_EDGE_MODEL /
+    # USE_LLM_DECISION_SERVICE flag precedence. AUTO (default) prefers the
+    # shipped local classifier when a healthy artifact is present, else falls
+    # back to the legacy flag-based selection (preserving prior behavior).
     decision_service = None
-
     feature_flags = _get_feature_flag_manager_optional()
-    if feature_flags is not None:
-        from victor.core.feature_flags import FeatureFlag
+    try:
+        from victor.agent.services.decision_backend import DecisionBackend
+        from victor.config.decision_settings import DecisionServiceSettings
 
-        if feature_flags.is_enabled(FeatureFlag.USE_EDGE_MODEL):
-            # Try tiered service first (routes different DecisionTypes to different tiers)
-            decision_service = _create_tiered_decision_service()
-            if decision_service is not None:
-                logger.info("Bootstrapped TieredDecisionService (edge/balanced/performance)")
-            else:
-                # Fall back to single edge model
-                decision_service = _create_edge_decision_service()
-                if decision_service is not None:
-                    logger.info("Bootstrapped LLMDecisionService with edge model")
+        backend = DecisionServiceSettings().decision_backend
+    except Exception:
+        backend = DecisionBackend.AUTO  # type: ignore[name-defined]
 
-        if decision_service is None and feature_flags.is_enabled(
-            FeatureFlag.USE_LLM_DECISION_SERVICE
-        ):
-            decision_service = _create_llm_decision_service(container)
-            if decision_service is not None:
-                logger.info("Bootstrapped LLMDecisionService with cloud provider")
+    if backend == DecisionBackend.LOCAL_CLASSIFIER:
+        decision_service = _create_local_classifier_decision_service()
+    elif backend == DecisionBackend.EDGE:
+        decision_service = _create_tiered_decision_service() or _create_edge_decision_service()
+    elif backend == DecisionBackend.LLM:
+        decision_service = _create_llm_decision_service(container)
+    elif backend == DecisionBackend.HEURISTIC:
+        # Heuristic pass-through that still logs every decision (FEP-0012 closed
+        # loop) — was None, which meant no decisions were ever recorded.
+        decision_service = _create_logging_decision_service()
+    else:  # AUTO — classifier-first, else legacy flag-based selection
+        local = _create_local_classifier_decision_service()
+        if local is not None and local.is_healthy():
+            decision_service = local
+            logger.info("Bootstrapped LocalClassifierDecisionService (auto)")
+        else:
+            decision_service = _decision_service_via_legacy_flags(feature_flags, container)
+            if decision_service is None:
+                # Always capture decisions for RL/training data, even when no
+                # classifier/edge/LLM backend is available (--no-edge-model +
+                # no artifact). log_decision is only reached via a registered
+                # service, so without this the closed loop gets no decisions.
+                decision_service = _create_logging_decision_service()
+                logger.info("Bootstrapped LoggingDecisionService (auto fallback)")
 
     if decision_service is not None:
         from victor.agent.services.protocols.decision_service import (
@@ -530,6 +544,73 @@ def _create_llm_decision_service(container: ServiceContainer) -> Optional[Any]:
     except Exception as e:
         logger.warning("Failed to create LLMDecisionService: %s", e)
         return None
+
+
+def _create_local_classifier_decision_service() -> Optional[Any]:
+    """Create the shipped local-classifier decision service (FEP-0012).
+
+    Returns a service (always); ``is_healthy()`` reflects whether a bundled
+    artifact was found and loaded. Under ``decision_backend=auto`` the bootstrap
+    only adopts it when healthy.
+    """
+    try:
+        from victor.agent.services.local_classifier_service import (
+            create_local_classifier_decision_service,
+        )
+
+        return create_local_classifier_decision_service()
+    except Exception as e:
+        logger.debug("Local classifier decision service unavailable: %s", e)
+        return None
+
+
+def _create_logging_decision_service() -> Optional[Any]:
+    """Create the always-on, logging-only decision service (FEP-0012 closed loop).
+
+    A heuristic pass-through that records every decision via ``log_decision``.
+    Used as the ``heuristic`` backend and the ``auto`` fallback when no
+    classifier/edge/LLM backend is available, so decisions are always captured
+    for RL/training data (``log_decision`` is only reached via a registered
+    service). Decision outcomes are unchanged (heuristic); only telemetry added.
+    """
+    try:
+        from victor.agent.services.logging_decision_service import (
+            LoggingDecisionService,
+        )
+
+        return LoggingDecisionService()
+    except Exception as e:
+        logger.debug("Logging decision service unavailable: %s", e)
+        return None
+
+
+def _decision_service_via_legacy_flags(
+    feature_flags: Any, container: ServiceContainer
+) -> Optional[Any]:
+    """Legacy USE_EDGE_MODEL / USE_LLM_DECISION_SERVICE selection (FEP-0012).
+
+    Preserved as the ``auto`` fallback so existing flag-based configs keep
+    working unchanged when no local-classifier artifact is present.
+    """
+    if feature_flags is None:
+        return None
+    from victor.core.feature_flags import FeatureFlag
+
+    decision_service: Optional[Any] = None
+    if feature_flags.is_enabled(FeatureFlag.USE_EDGE_MODEL):
+        decision_service = _create_tiered_decision_service()
+        if decision_service is not None:
+            logger.info("Bootstrapped TieredDecisionService (edge/balanced/performance)")
+        else:
+            decision_service = _create_edge_decision_service()
+            if decision_service is not None:
+                logger.info("Bootstrapped LLMDecisionService with edge model")
+
+    if decision_service is None and feature_flags.is_enabled(FeatureFlag.USE_LLM_DECISION_SERVICE):
+        decision_service = _create_llm_decision_service(container)
+        if decision_service is not None:
+            logger.info("Bootstrapped LLMDecisionService with cloud provider")
+    return decision_service
 
 
 def _create_default_tool_selector(container: ServiceContainer) -> Any:

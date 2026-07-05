@@ -60,6 +60,15 @@ class GEPASettings(BaseModel):
     # --- Prompt bloat control ---
     max_prompt_chars: int = 1500
 
+    # --- KV cache isolation ---
+    # When set AND different from the session model, GEPA reflection uses this
+    # model on the SAME provider → different cache namespace → no thrashing.
+    # When None or same as session model → GEPA shares the main agent's cache
+    # (mid-session reflection can cause KV cache miss + full-token-price cost).
+    # The coordinator auto-resolves this to the provider's "edge" tier model
+    # when available (e.g., glm-4.7-flash for zai). Set explicitly to override.
+    model: str | None = None
+
     # --- Evolution thresholds ---
     min_traces_for_evolution: int = 5
     max_training_traces: int = 50

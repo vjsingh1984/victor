@@ -1446,6 +1446,13 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
 
             coordinator = get_rl_coordinator()
             coordinator.set_repo_context(workspace_dir.name)
+            # Push the session's actual provider/model into GEPA so prompt
+            # optimization uses the right provider (e.g., zai/glm-5.2 from
+            # -p zai-coding), not the global settings default (ollama).
+            coordinator.set_session_provider(
+                getattr(self, "provider_name", None) or getattr(self.provider, "name", ""),
+                self.model,
+            )
         except Exception as exc:
             logger.debug("RL coordinator repo context unavailable: %s", exc)
 
@@ -3269,6 +3276,18 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
             stacklevel=2,
         )
 
+        # Re-stamp the session_id contextvar from the persistent attr. The
+        # contextvar can be lost when the caller (e.g. the benchmark adapter)
+        # set it in a different async context, or when decisions cross a
+        # thread/loop boundary (decide_sync). Setting it here, in the chat
+        # call's context, ensures every decision the agentic loop logs carries
+        # the task's session_id (FEP-0012 decision_outcome spine integrity).
+        if self.active_session_id:
+            try:
+                set_session_id(self.active_session_id)
+            except Exception:
+                pass
+
         return await self._chat_service.chat(
             user_message,
             use_planning=use_planning,
@@ -3665,26 +3684,20 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         return self._tool_skip_mode(context_msg) != "tools"
 
     def _check_tool_necessity_via_edge(self, context_msg: str, heuristic_conf: float) -> bool:
-        """Consult edge model for tool necessity decision.
+        """Consult the decision service for tool necessity.
 
-        Falls back to heuristic if edge model is unavailable or times out.
+        Falls back to the heuristic when no decision service is registered or it
+        times out. The service is registered per the ``decision_backend`` enum
+        (FEP-0012); the legacy ``USE_LLM_DECISION_SERVICE`` gate was removed so a
+        registered local-classifier is honored here regardless of that flag.
         """
         try:
-            from victor.core.feature_flags import FeatureFlag, is_feature_enabled
-
-            if not is_feature_enabled(FeatureFlag.USE_LLM_DECISION_SERVICE):
-                return heuristic_conf >= 0.7  # Trust heuristic if no edge model
-
             from victor.agent.services.protocols.decision_service import (
-                LLMDecisionServiceProtocol,
+                get_decision_service,
             )
             from victor.agent.decisions.schemas import DecisionType
 
-            container = getattr(self, "_container", None)
-            if container is None:
-                return heuristic_conf >= 0.7
-
-            service = container.get(LLMDecisionServiceProtocol)
+            service = get_decision_service(getattr(self, "_container", None))
             if service is None:
                 return heuristic_conf >= 0.7
 
@@ -3811,24 +3824,18 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
             return False
 
     def _is_tool_strategy_v2_enabled(self) -> bool:
-        """Check if the new context-aware tool strategy is enabled.
+        """Check if the context-aware tool strategy (v2) is enabled.
 
-        Returns:
-            True if tool_strategy_v2 feature flag is enabled
+        Gated solely by the ``tool_strategy_v2`` feature flag. The former
+        ``tool_strategy_v2_enabled`` settings field was an unreachable,
+        exception-only fallback (defaulted False) and has been removed.
         """
         try:
-            # Check feature flag
             from victor.core.feature_flags import is_enabled
 
             return is_enabled("tool_strategy_v2")
         except Exception:
-            # If feature flag system unavailable, check settings
-            try:
-                settings = getattr(self, "settings", None)
-                if settings is not None:
-                    return getattr(settings, "tool_strategy_v2_enabled", False)
-            except Exception:
-                return False
+            return False
 
     def _apply_context_aware_strategy(self, tools):
         """Delegate context-aware selection to ToolService; emit strategy event here."""
@@ -4163,6 +4170,13 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
             DeprecationWarning,
             stacklevel=2,
         )
+
+        # Re-stamp the session_id contextvar (see chat() for rationale).
+        if self.active_session_id:
+            try:
+                set_session_id(self.active_session_id)
+            except Exception:
+                pass
 
         async for chunk in self._chat_service.stream_chat(user_message, **kwargs):
             yield chunk

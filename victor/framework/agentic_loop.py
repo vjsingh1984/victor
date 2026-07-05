@@ -780,9 +780,9 @@ class AgenticLoop:
         import time
 
         # Phase 1 Consolidation: Use StateGraph-based executor when enabled
-        from victor.core.feature_flags import FeatureFlag, is_feature_enabled
+        from victor.framework.agentic_loop_executor import use_stategraph_executor
 
-        if is_feature_enabled(FeatureFlag.USE_STATEGRAPH_AGENTIC_LOOP):
+        if use_stategraph_executor():
             return await self._run_with_stategraph(
                 query=query,
                 context=context,
@@ -1530,9 +1530,9 @@ class AgenticLoop:
         Yields:
             LoopIteration for each iteration
         """
-        from victor.core.feature_flags import FeatureFlag, is_feature_enabled
+        from victor.framework.agentic_loop_executor import use_stategraph_executor
 
-        if is_feature_enabled(FeatureFlag.USE_STATEGRAPH_AGENTIC_LOOP):
+        if use_stategraph_executor():
             async for iteration in self._stream_with_stategraph(
                 query=query,
                 context=context,
@@ -3241,12 +3241,11 @@ class AgenticLoop:
 
             from victor.agent.decisions.schemas import DecisionType
             from victor.agent.services.protocols.decision_service import (
-                LLMDecisionServiceProtocol,
+                get_decision_service,
             )
             from victor.core import get_container
 
-            container = get_container()
-            decision_svc = container.get_optional(LLMDecisionServiceProtocol)
+            decision_svc = get_decision_service(get_container())
             if decision_svc is None:
                 return heuristic_result
 

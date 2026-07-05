@@ -50,7 +50,8 @@ cd victor
 # 2. Set up environment
 python -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
-pip install -e ".[dev]"
+make install-dev   # installs victor-contracts (in-repo SDK) before victor-ai[dev]
+# without make: pip install -e ./victor-contracts -e ".[dev]"
 
 # 3. Create branch
 git checkout -b feature/your-feature-name
@@ -829,6 +830,14 @@ def complex_function(arg1: str, arg2: int) -> bool:
    ```bash
    make test
    make test-cov  # Check coverage
+   ```
+
+   **Moving or renaming any symbol?** Sweep every importer of the old name
+   repo-wide before pushing — a missed importer breaks test *collection*, which
+   turns the entire shard matrix red at develop → main promotion:
+   ```bash
+   grep -rn "OldName" victor/ victor-contracts/ tests/ verticals/ examples/ scripts/
+   pytest tests/ --collect-only -q   # the same gate CI runs on every develop PR
    ```
 
 2. **Format and lint**

@@ -252,6 +252,19 @@ def _resolve_account_selection(
     return provider, model, resolved_account
 
 
+# Maps a benchmark to the vertical whose capabilities it needs registered via
+# AgentFactory (e.g. "coding" → code_search/graph). Benchmarks not listed use the
+# default (no vertical) and rely on whatever tools the profile/session provides.
+_BENCHMARK_VERTICAL: dict[str, str] = {
+    "swe-bench": "coding",
+    "swe-bench-lite": "coding",
+    "humaneval": "coding",
+    "mbpp": "coding",
+    "mbpp-test": "coding",
+    "dr3-eval": "research",
+}
+
+
 def _resolve_effective_model(profile: str, model: Optional[str]) -> str:
     """Resolve the effective benchmark model from CLI override or profile."""
     if model:
@@ -813,6 +826,11 @@ def run_benchmark(
         "--start-task",
         help="Skip first N tasks (0-indexed, for targeting specific tasks)",
     ),
+    shuffle: bool = typer.Option(
+        False,
+        "--shuffle",
+        help="Shuffle task order for diverse repo sampling",
+    ),
     model: Optional[str] = typer.Option(
         None, "--model", "-m", help="Model to use (default: from profile)"
     ),
@@ -828,6 +846,11 @@ def run_benchmark(
     timeout: int = typer.Option(420, "--timeout", "-t", help="Timeout per task in seconds"),
     max_turns: int = typer.Option(10, "--max-turns", help="Maximum conversation turns per task"),
     parallel: int = typer.Option(1, "--parallel", help="Number of parallel tasks"),
+    use_docker: bool = typer.Option(
+        False,
+        "--docker",
+        help="Run tests in Docker containers (requires per-repo images)",
+    ),
     resume: bool = typer.Option(
         False,
         "--resume",
@@ -872,6 +895,30 @@ def run_benchmark(
         "-a",
         help="Use a configured account (e.g., openai-oauth). Overrides --profile/--provider.",
     ),
+    eval_backend: str = typer.Option(
+        "local",
+        "--eval-backend",
+        help=(
+            "Eval backend: 'local' (host subprocess, default) or 'docker' "
+            "(each task runs in its correct runtime image — fixes Python "
+            "version / C-ext / polyglot tasks)."
+        ),
+    ),
+    runtime_version: Optional[str] = typer.Option(
+        None,
+        "--runtime-version",
+        help="Runtime version for the docker image (e.g. 3.9, 20, 1.22). Informational for SWE-bench (image pins it).",
+    ),
+    docker_image_override: Optional[str] = typer.Option(
+        None,
+        "--docker-image",
+        help="Override the docker image used for eval (skips per-task resolution).",
+    ),
+    swebench_image_source: str = typer.Option(
+        "official",
+        "--swebench-image-source",
+        help="SWE-bench per-instance image source: official | build | skip (skip → host fallback).",
+    ),
 ) -> None:
     """Run a benchmark evaluation."""
     _configure_log_level(log_level, debug_modules=debug_modules)
@@ -907,6 +954,13 @@ def run_benchmark(
         timeout_per_task=timeout,
         max_turns=max_turns,
         parallel_tasks=parallel,
+        use_docker=use_docker,
+        # Containerized / polyglot eval. `--docker` (use_docker) is a back-compat
+        # alias for --eval-backend docker; honor whichever the user set.
+        eval_backend=("docker" if use_docker else eval_backend),
+        runtime_version=runtime_version,
+        docker_image_override=docker_image_override,
+        swebench_image_source=swebench_image_source,
     )
     _attach_manifest_metadata(config, runner)
     _print_benchmark_header(
@@ -1108,6 +1162,11 @@ def run_real_benchmark(
     timeout: int = typer.Option(420, "--timeout", "-t", help="Timeout per task in seconds"),
     max_turns: int = typer.Option(10, "--max-turns", help="Maximum conversation turns per task"),
     parallel: int = typer.Option(1, "--parallel", help="Number of parallel tasks"),
+    use_docker: bool = typer.Option(
+        False,
+        "--docker",
+        help="Run tests in Docker containers (requires per-repo images)",
+    ),
     resume: bool = typer.Option(
         False,
         "--resume",
@@ -1201,6 +1260,11 @@ def run_prompt_suite(
         "--start-task",
         help="Skip first N tasks (0-indexed, for targeting specific tasks)",
     ),
+    shuffle: bool = typer.Option(
+        False,
+        "--shuffle",
+        help="Shuffle task order for diverse repo sampling",
+    ),
     model: Optional[str] = typer.Option(
         None, "--model", "-m", help="Model to use (default: from profile)"
     ),
@@ -1216,6 +1280,11 @@ def run_prompt_suite(
     timeout: int = typer.Option(420, "--timeout", "-t", help="Timeout per task in seconds"),
     max_turns: int = typer.Option(10, "--max-turns", help="Maximum conversation turns per task"),
     parallel: int = typer.Option(1, "--parallel", help="Number of parallel tasks"),
+    use_docker: bool = typer.Option(
+        False,
+        "--docker",
+        help="Run tests in Docker containers (requires per-repo images)",
+    ),
     resume: bool = typer.Option(
         False,
         "--resume",
@@ -1538,6 +1607,33 @@ async def _setup_benchmark_async(
     console.print(f"\nNow run: victor benchmark run {benchmark}")
 
 
+def _record_benchmark_task_outcome(_tr: Any) -> None:
+    """Stamp one benchmark task's outcome into the decision_outcome junction.
+
+    FEP-0012 Gap A fix: called from the per-task ``on_progress`` callback (so a
+    ctrl+c / crash loses only the in-flight task, never completed ones) AND from
+    the post-run safety-net loop (idempotent backstop). ``record_session_outcome``
+    is DELETE-then-INSERT per session_id, so calling it twice is a no-op.
+
+    Args:
+        _tr: A TaskResult-like object exposing ``session_id``, ``tests_total``,
+            and ``tests_passed``. Tasks without a session_id are skipped.
+    """
+    _sid = getattr(_tr, "session_id", "") or ""
+    if not _sid:
+        return
+    _total = int(getattr(_tr, "tests_total", 0) or 0)
+    _passed = int(getattr(_tr, "tests_passed", 0) or 0)
+    _rate = (_passed / _total) if _total else 0.0
+    from victor.agent.decisions.outcome import record_session_outcome
+
+    record_session_outcome(
+        _sid,
+        success=(_passed == _total and _total > 0),
+        quality_score=_rate,
+    )
+
+
 async def _run_benchmark_async(
     *,
     runner,
@@ -1642,6 +1738,14 @@ async def _run_benchmark_async(
             else:
                 console.print("[dim]Edge model disabled (--no-edge-model)[/]")
 
+            # Benchmarks need their vertical's capabilities registered
+            # (code_search/graph for coding) — Agent.create(vertical=...) via
+            # AgentFactory does this. Previously the profile-only path called
+            # from_profile (direct Orchestrator() construction), which bypassed
+            # capability discovery, so the tools never registered and the
+            # benchmark failed its readiness check. Both paths now go through
+            # create_from_session_config (Agent.create).
+            vertical = _BENCHMARK_VERTICAL.get(config.benchmark)
             if provider_override:
                 effective_model = (
                     model
@@ -1661,15 +1765,22 @@ async def _run_benchmark_async(
                 )
                 adapter = await VictorAgentAdapter.create_from_session_config(
                     session_config,
+                    profile=profile,
+                    vertical=vertical,
                     config=adapter_config,
                     enable_observability=False,
                 )
             else:
-                adapter = VictorAgentAdapter.from_profile(
+                session_config = SessionConfig.from_cli_flags(
+                    agent_profile=profile,
+                    provider_timeout=timeout,
+                )
+                adapter = await VictorAgentAdapter.create_from_session_config(
+                    session_config,
                     profile=profile,
-                    model_override=model,
-                    timeout=timeout,
+                    vertical=vertical,
                     config=adapter_config,
+                    enable_observability=False,
                 )
 
             actual_provider = getattr(adapter.orchestrator, "provider_name", None) or getattr(
@@ -1745,7 +1856,52 @@ async def _run_benchmark_async(
                 original_cwd = os.getcwd()
                 os.chdir(work_dir)
                 try:
-                    trace = await adapter.execute_task(benchmark_task, work_dir)
+                    # Closed-loop verify_fn (PR2): for docker SWE-bench tasks,
+                    # let the agent loop verify its in-progress edits against the
+                    # real FAIL_TO_PASS tests and re-enter on failure. The
+                    # closure captures this task's repo + config; the adapter
+                    # calls it only after the agent claims done (≤max_verify_retries
+                    # times). Each call runs a full container lifecycle.
+                    verify_fn = None
+                    if getattr(config, "eval_backend", None) == "docker" and getattr(
+                        benchmark_task, "repo", None
+                    ):
+                        from victor.evaluation.benchmarks.swe_bench import SWEBenchRunner
+
+                        _verify_runner = SWEBenchRunner()
+
+                        async def verify_fn(_task=benchmark_task, _work=work_dir, _cfg=config):
+                            # Snapshot the agent's current edits as a patch.
+                            proc = await asyncio.create_subprocess_exec(
+                                "git",
+                                "-C",
+                                str(_work),
+                                "diff",
+                                "HEAD",
+                                stdout=asyncio.subprocess.PIPE,
+                                stderr=asyncio.subprocess.PIPE,
+                            )
+                            try:
+                                out, _err = await asyncio.wait_for(proc.communicate(), timeout=30)
+                            except asyncio.TimeoutError:
+                                proc.kill()
+                                await proc.wait()
+                                return (0, 0, "verify: git diff timed out")
+                            patch = out.decode("utf-8", "replace")
+                            if not patch.strip():
+                                return (
+                                    0,
+                                    0,
+                                    "verify: no edits to verify (git diff HEAD is empty)",
+                                )
+                            vr = await _verify_runner._verify_patch_in_container(
+                                _task, patch, _work, _cfg
+                            )
+                            return (vr.passed, vr.total, vr.raw_output)
+
+                    trace = await adapter.execute_task(
+                        benchmark_task, work_dir, verify_fn=verify_fn
+                    )
                 except asyncio.CancelledError:
                     partial = adapter.get_partial_trace()
                     logger.info(
@@ -1761,6 +1917,8 @@ async def _run_benchmark_async(
                         "tokens_used": partial.get("tokens_used", 0),
                         "tool_calls": partial.get("tool_calls", 0),
                         "turns": partial.get("turns", 0),
+                        "session_id": adapter._task_session_id,
+                        "conversation_trace": adapter.get_conversation_trace(),
                     }
                     raise
                 finally:
@@ -1803,6 +1961,14 @@ async def _run_benchmark_async(
                     "turns": trace.turns,
                     "code_search_calls": trace.code_search_calls,
                     "graph_calls": trace.graph_calls,
+                    # Per-task correlation spine — joins this task's decisions
+                    # (logged with get_session_id()) to its outcome for the
+                    # execution manifest / classifier training data.
+                    "session_id": trace.session_id,
+                    # Bounded execution trace (messages + tool calls + edits).
+                    # Persisted on TaskResult so the manifest + miner can
+                    # reconstruct what the agent actually did.
+                    "conversation_trace": adapter.get_conversation_trace(),
                 }
 
         except Exception as e:
@@ -1817,17 +1983,51 @@ async def _run_benchmark_async(
                 task,
                 description=f"Task {task_idx + 1}/{total}: {result.status.value}",
             )
+            # FEP-0012 Gap A fix: record this task's outcome the INSTANT it
+            # completes — not deferred to after run_evaluation() returns. A
+            # ctrl+c / crash / timeout during the benchmark then loses only the
+            # in-flight task, never the completed ones. Best-effort.
+            try:
+                _record_benchmark_task_outcome(result)
+            except Exception as exc:  # never break the benchmark
+                logger.debug("per-task decision_outcome recording skipped: %s", exc)
 
         progress.update(
             task,
             description="Resuming evaluation..." if resume else "Running evaluation...",
         )
-        return await harness.run_evaluation(
+        eval_result = await harness.run_evaluation(
             config=config,
             agent_callback=agent_callback,
             progress_callback=on_progress,
             resume=resume,
         )
+
+        # Emit the per-task execution manifest (closed-loop artifact): joins
+        # each task's outcome (reward) + trace + logged decisions by session_id.
+        # Best-effort — failure here never breaks the run. Feeds the classifier
+        # miner (`victor benchmark mine` / python -m victor.ml.mining).
+        try:
+            from victor.evaluation.manifest import emit_execution_manifest
+
+            manifest_path = emit_execution_manifest(eval_result)
+            if manifest_path is not None:
+                console.print(f"[dim]Execution manifest: {manifest_path}[/]")
+        except Exception as exc:  # never break the benchmark
+            logger.debug("Execution manifest emission skipped: %s", exc)
+
+        # FEP-0012 safety net: re-stamp outcomes for every task now that the full
+        # run completed. on_progress already recorded each as it finished (so an
+        # interrupt loses nothing); this loop is idempotent and only backfills
+        # any task whose on_progress callback did not fire (e.g. an edge on the
+        # final task). Best-effort — never breaks the run.
+        try:
+            for _tr in getattr(eval_result, "task_results", []) or []:
+                _record_benchmark_task_outcome(_tr)
+        except Exception as exc:  # never break the benchmark
+            logger.debug("decision_outcome safety-net recording skipped: %s", exc)
+
+        return eval_result
 
 
 async def _run_prompt_candidate_suite_async(

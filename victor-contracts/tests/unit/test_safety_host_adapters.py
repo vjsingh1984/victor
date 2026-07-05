@@ -1,5 +1,9 @@
 """Tests for SDK safety host adapter modules."""
 
+import pytest
+
+pytest.importorskip("victor", reason="host runtime adapters require the victor-ai package")
+
 from victor_contracts.safety_patterns import (
     CodePatternScanner,
     InfrastructureScanner,

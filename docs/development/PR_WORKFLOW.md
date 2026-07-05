@@ -38,16 +38,71 @@ feature/* (optional)
   └── PR into develop for early integration
 ```
 
+## Git Worktrees (Required for Feature Work)
+
+**Mandate: all `feature/*`, `fix/*`, `refactor/*`, `docs/*`, and `chore/*` work
+happens in a linked git worktree — NOT by checking the branch out in the main
+working tree.** Only the integration branches (`main`, `develop`) live in the
+main tree.
+
+**Why.** The main working tree has a single `HEAD` shared by every session,
+terminal, and agent operating in that directory. A `git checkout <feature>`
+mid-task switches that shared `HEAD` and can silently revert another session's
+in-flight work, or land a commit on the wrong branch. (This has happened: a
+checkout moved the active branch while another session had uncommitted/committed
+work, reverting files and misrouting a commit onto `develop`.) Linked worktrees
+give each task its own working directory **and** its own `HEAD`, so a checkout in
+one can never disturb another.
+
+**Recommended layout** (one sibling worktree per task):
+
+```bash
+# from the main tree, on develop, up to date:
+git checkout develop && git pull origin develop
+
+# create a worktree + branch for the task (branch slashes -> dashes in the dir)
+git worktree add ../victor-feature-my-feature -b feature/my-feature
+cd ../victor-feature-my-feature
+
+# ... work, commit, push, open PR ...
+git push -u origin feature/my-feature
+
+# when the PR merges, clean up:
+cd /Users/vijaysingh/code/codingagent
+git worktree remove ../victor-feature-my-feature
+git branch -d feature/my-feature   # safe after merge
+```
+
+**Guard.** A `post-checkout` hook (`.githooks/post-checkout`) warns whenever a
+feature branch is checked out in the main tree, reminding you to use a worktree.
+Install it once per clone:
+
+```bash
+make hooks        # copies .githooks/* into .git/hooks/ (pre-commit hooks preserved)
+```
+
+The guard is advisory (it never blocks a checkout) and can be bypassed with
+`VICTOR_SKIP_WORKTREE_GUARD=1`. Integration branches (`main`/`develop`) and
+file-checkouts do not trigger it.
+
 ## Workflow
 
 ### 1. Start New Work
 
-```bash
-# Ensure develop is up to date
-git checkout develop
-git pull origin develop
+**Prefer a worktree** (see [Git Worktrees](#git-worktrees-required-for-feature-work) above):
 
-# Create feature branch (optional but recommended)
+```bash
+# from the main tree, on develop:
+git checkout develop && git pull origin develop
+git worktree add ../victor-feature-your-feature -b feature/your-feature-name
+cd ../victor-feature-your-feature
+```
+
+For a tiny change directly in the main tree (the guard will warn — bypass with
+`VICTOR_SKIP_WORKTREE_GUARD=1`):
+
+```bash
+git checkout develop && git pull origin develop
 git checkout -b feature/your-feature-name
 ```
 

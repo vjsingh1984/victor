@@ -86,6 +86,76 @@ class SandboxExecutionResult:
         }
 
 
+# Label applied to every victor-spawned container for identification + cleanup
+# (e.g. `docker rm -f $(docker ps -aq --filter label=victor.sandbox=...)`).
+SANDBOX_CONTAINER_LABEL = "victor.sandbox"
+
+
+def build_docker_run_flags(
+    *,
+    working_dir: Optional[str],
+    env: Optional[Dict[str, str]],
+    isolation: IsolationConfig,
+    limits: Optional[ResourceLimits] = None,
+    label_value: str = "code-executor",
+    workspace_mount: str = "/workspace",
+) -> List[str]:
+    """Build the common docker flags shared by ``docker run`` and ``docker create``.
+
+    Returns the flag list that sits between ``["docker", "<run|create>", "--name", N]``
+    and ``[image] + command``: the sandbox label, resource limits, network policy,
+    filesystem read-only flag, working-dir + extra-volume mounts, and env vars.
+
+    Factored out of ``SandboxedExecutor._execute_docker`` so the evaluation
+    container path (`victor.evaluation.container_eval.EvalContainer`) reuses the
+    exact same flag assembly instead of duplicating it.
+
+    Args:
+        working_dir: Host path to bind-mount at ``workspace_mount`` (the cwd).
+        env: Per-call env vars (merged on top of ``isolation.environment``).
+        isolation: Isolation config (network/fs/volumes/base env).
+        limits: Resource limits; defaults to ``isolation.resource_limits``.
+        label_value: Value for the ``victor.sandbox`` label (e.g. ``code-executor``
+            for workflow sandboxes, ``eval`` for eval containers).
+        workspace_mount: Container path to mount ``working_dir`` at.
+    """
+    resolved_limits = limits or isolation.resource_limits or ResourceLimits()
+    flags: List[str] = []
+    # Label for identification + cleanup.
+    flags.extend(["--label", f"{SANDBOX_CONTAINER_LABEL}={label_value}"])
+    # Resource limits.
+    flags.extend(
+        [
+            "--memory",
+            f"{resolved_limits.max_memory_mb}m",
+            "--cpus",
+            "1.0",
+            "--pids-limit",
+            str(resolved_limits.max_processes),
+        ]
+    )
+    # Network policy.
+    if not isolation.network_allowed:
+        flags.extend(["--network", "none"])
+    # Filesystem policy.
+    if isolation.filesystem_readonly:
+        flags.append("--read-only")
+    # Working-directory mount.
+    if working_dir:
+        mount_mode = "ro" if isolation.filesystem_readonly else "rw"
+        flags.extend(["-v", f"{working_dir}:{workspace_mount}:{mount_mode}"])
+        flags.extend(["-w", workspace_mount])
+    # Additional volume mounts.
+    for host_path, container_path in isolation.docker_volumes.items():
+        flags.extend(["-v", f"{host_path}:{container_path}"])
+    # Environment variables (per-call then isolation base).
+    for key, value in (env or {}).items():
+        flags.extend(["-e", f"{key}={value}"])
+    for key, value in isolation.environment.items():
+        flags.extend(["-e", f"{key}={value}"])
+    return flags
+
+
 class SandboxedExecutor:
     """Execute commands with configurable isolation.
 
@@ -338,10 +408,6 @@ class SandboxedExecutor:
         Returns:
             SandboxExecutionResult
         """
-        # Using inline constants to avoid dependency on victor_coding
-        SANDBOX_CONTAINER_LABEL = "victor.sandbox"
-        SANDBOX_CONTAINER_VALUE = "code-executor"
-
         limits = isolation.resource_limits or ResourceLimits()
         image = isolation.docker_image or self._default_image
 
@@ -350,51 +416,19 @@ class SandboxedExecutor:
 
         container_name = f"victor-sandbox-{uuid.uuid4().hex[:12]}"
 
-        # Build docker run command
-        # Note: Using --rm flag ensures container is removed after exit
+        # Build docker run command. Flags (label/limits/network/mounts/env) are
+        # assembled by the shared build_docker_run_flags helper — reused by the
+        # eval container path so the two never drift.
         docker_cmd = ["docker", "run", "--rm", "--name", container_name]
-
-        # Add label for identification during cleanup
-        docker_cmd.extend(["--label", f"{SANDBOX_CONTAINER_LABEL}={SANDBOX_CONTAINER_VALUE}"])
-
-        # Resource limits
         docker_cmd.extend(
-            [
-                "--memory",
-                f"{limits.max_memory_mb}m",
-                "--cpus",
-                "1.0",
-                "--pids-limit",
-                str(limits.max_processes),
-            ]
+            build_docker_run_flags(
+                working_dir=working_dir,
+                env=env,
+                isolation=isolation,
+                limits=limits,
+                label_value="code-executor",
+            )
         )
-
-        # Network settings
-        if not isolation.network_allowed:
-            docker_cmd.extend(["--network", "none"])
-
-        # Filesystem settings
-        if isolation.filesystem_readonly:
-            docker_cmd.append("--read-only")
-
-        # Mount working directory
-        if working_dir:
-            mount_mode = "ro" if isolation.filesystem_readonly else "rw"
-            docker_cmd.extend(["-v", f"{working_dir}:/workspace:{mount_mode}"])
-            docker_cmd.extend(["-w", "/workspace"])
-
-        # Mount additional volumes
-        for host_path, container_path in isolation.docker_volumes.items():
-            docker_cmd.extend(["-v", f"{host_path}:{container_path}"])
-
-        # Environment variables
-        for key, value in (env or {}).items():
-            docker_cmd.extend(["-e", f"{key}={value}"])
-
-        for key, value in isolation.environment.items():
-            docker_cmd.extend(["-e", f"{key}={value}"])
-
-        # Add image and command
         docker_cmd.append(image)
         docker_cmd.extend(command)
 

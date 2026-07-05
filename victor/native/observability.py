@@ -57,11 +57,47 @@ logger = logging.getLogger(__name__)
 T = TypeVar("T")
 
 
+# -----------------------------------------------------------------------------
+# Adaptive-dispatch tunables (Gap 3: close the measurement→dispatch loop).
+#
+# Per-backend EWMA latency is maintained on OperationStats and consumed by
+# accelerator.get_preferred_backend() to pick the empirically faster backend
+# once enough samples exist. These defaults can be overridden via
+# set_adaptive_ewma_alpha() / set_adaptive_min_samples() (wired from settings
+# in victor.processing.native.accelerator).
+# -----------------------------------------------------------------------------
+_EWMA_ALPHA: float = 0.3
+_DEFAULT_MIN_SAMPLES: int = 20
+
+
+def set_adaptive_ewma_alpha(alpha: float) -> None:
+    """Set the EWMA smoothing factor used for adaptive dispatch (clamped 0.01–1.0)."""
+    global _EWMA_ALPHA
+    _EWMA_ALPHA = max(0.01, min(1.0, float(alpha)))
+
+
+def set_adaptive_min_samples(min_samples: int) -> None:
+    """Set the minimum per-backend samples before adaptive dispatch kicks in."""
+    global _DEFAULT_MIN_SAMPLES
+    _DEFAULT_MIN_SAMPLES = max(1, int(min_samples))
+
+
+def _ewma_update(current: float, observed: float, alpha: float, sample_count: int) -> float:
+    """Blend a new observation into the EWMA. The first observation seeds it."""
+    if sample_count <= 1:
+        return observed
+    return alpha * observed + (1.0 - alpha) * current
+
+
 @dataclass
 class OperationStats:
     """Statistics for a single operation type.
 
-    Thread-safe accumulator for operation metrics.
+    Thread-safe accumulator for operation metrics. In addition to aggregate
+    counters, it tracks per-backend EWMA latency so adaptive dispatch can pick
+    the empirically faster backend (Gap 3). EWMA is only updated by observers
+    that KNOW which backend ran (InstrumentedAccelerator._timed_call);
+    best-effort observers pass ``update_ewma=False`` to avoid corrupting it.
     """
 
     calls: int = 0
@@ -69,10 +105,34 @@ class OperationStats:
     errors: int = 0
     rust_calls: int = 0
     python_calls: int = 0
+    # Per-backend EWMA latency (ms) + sample counts for adaptive dispatch.
+    rust_ewma_ms: float = 0.0
+    python_ewma_ms: float = 0.0
+    rust_ewma_samples: int = 0
+    python_ewma_samples: int = 0
     _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
 
-    def record(self, duration_ms: float, used_rust: bool, error: bool = False) -> None:
-        """Record an operation execution."""
+    def record(
+        self,
+        duration_ms: float,
+        used_rust: bool,
+        error: bool = False,
+        *,
+        update_ewma: bool = True,
+        ewma_alpha: Optional[float] = None,
+    ) -> None:
+        """Record an operation execution.
+
+        Args:
+            duration_ms: Duration of the call in milliseconds.
+            used_rust: Whether the Rust backend was used.
+            error: Whether the call resulted in an error.
+            update_ewma: Only observers that know the real backend should update
+                the per-backend EWMA (default True for the class-based timed
+                path). Best-effort observers pass False to keep EWMA honest.
+            ewma_alpha: Override the module EWMA alpha for this sample.
+        """
+        alpha = _EWMA_ALPHA if ewma_alpha is None else ewma_alpha
         with self._lock:
             self.calls += 1
             self.duration_ms_total += duration_ms
@@ -80,8 +140,35 @@ class OperationStats:
                 self.errors += 1
             if used_rust:
                 self.rust_calls += 1
+                if update_ewma:
+                    self.rust_ewma_samples += 1
+                    self.rust_ewma_ms = _ewma_update(
+                        self.rust_ewma_ms, duration_ms, alpha, self.rust_ewma_samples
+                    )
             else:
                 self.python_calls += 1
+                if update_ewma:
+                    self.python_ewma_samples += 1
+                    self.python_ewma_ms = _ewma_update(
+                        self.python_ewma_ms, duration_ms, alpha, self.python_ewma_samples
+                    )
+
+    def preferred_backend(self, min_samples: Optional[int] = None) -> Optional[str]:
+        """Adaptive backend hint from observed per-backend EWMA latency.
+
+        Returns ``"rust"`` or ``"python"`` once BOTH backends have at least
+        ``min_samples`` EWMA observations (picks the lower-latency one); else
+        ``None`` so the caller falls back to the static benchmark prior.
+
+        Args:
+            min_samples: Minimum per-backend samples required (default: module
+                ``_DEFAULT_MIN_SAMPLES``).
+        """
+        threshold = _DEFAULT_MIN_SAMPLES if min_samples is None else min_samples
+        with self._lock:
+            if self.rust_ewma_samples >= threshold and self.python_ewma_samples >= threshold:
+                return "rust" if self.rust_ewma_ms <= self.python_ewma_ms else "python"
+        return None
 
     @property
     def duration_ms_avg(self) -> float:
@@ -103,6 +190,10 @@ class OperationStats:
             "rust_calls": float(self.rust_calls),
             "python_calls": float(self.python_calls),
             "rust_ratio": self.rust_ratio,
+            "rust_ewma_ms": self.rust_ewma_ms,
+            "python_ewma_ms": self.python_ewma_ms,
+            "rust_ewma_samples": float(self.rust_ewma_samples),
+            "python_ewma_samples": float(self.python_ewma_samples),
         }
 
 
@@ -207,6 +298,7 @@ class NativeMetrics:
         used_rust: bool,
         error: bool = False,
         tags: Optional[Dict[str, str]] = None,
+        update_ewma: bool = True,
     ) -> None:
         """Record a native operation call.
 
@@ -216,12 +308,14 @@ class NativeMetrics:
             used_rust: Whether Rust implementation was used
             error: Whether the call resulted in an error
             tags: Optional additional tags for metrics
+            update_ewma: Forwarded to :meth:`OperationStats.record`. Pass False
+                from best-effort observers that cannot confirm which backend ran.
         """
         # Update internal stats
         with self._stats_lock:
             if operation not in self._stats:
                 self._stats[operation] = OperationStats()
-            self._stats[operation].record(duration_ms, used_rust, error)
+            self._stats[operation].record(duration_ms, used_rust, error, update_ewma=update_ewma)
 
         # Emit to MetricsRegistry if available
         registry = self._get_registry()
@@ -275,6 +369,16 @@ class NativeMetrics:
                 stats = self._stats.get(operation)
                 return stats.to_dict() if stats else {}
             return {op: stats.to_dict() for op, stats in self._stats.items()}
+
+    def get_operation_stats(self, operation: str) -> Optional[OperationStats]:
+        """Return the live ``OperationStats`` for ``operation``, or ``None``.
+
+        Used by adaptive dispatch (:func:`accelerator.get_preferred_backend`) to
+        read the per-backend EWMA. The returned object is thread-safe (mutated
+        under its own lock), so callers may read ``preferred_backend()`` directly.
+        """
+        with self._stats_lock:
+            return self._stats.get(operation)
 
     def get_summary(self) -> Dict[str, float]:
         """Get summary statistics across all operations."""
@@ -490,3 +594,29 @@ class InstrumentedAccelerator:
                 error=error,
                 tags=tags if tags else None,
             )
+
+
+# -----------------------------------------------------------------------------
+# Canonical metrics sink (Gap 1 unification).
+#
+# This module is the single source of truth for native-acceleration metrics:
+# ``InstrumentedAccelerator._timed_call`` feeds accurate per-backend EWMA here,
+# and ``victor.processing.native.observability.DispatchMetrics`` delegates here
+# too, so there is ONE stats registry (not two parallel ones). Physical
+# relocation of the ``victor/native/`` impl packages is tracked separately
+# (118 import sites — FEP-grade); do not move ``InstrumentedAccelerator``.
+# -----------------------------------------------------------------------------
+
+
+def get_operation_stats(operation: str) -> Optional[OperationStats]:
+    """Return the live ``OperationStats`` for ``operation`` from the shared sink.
+
+    Convenience accessor over :meth:`NativeMetrics.get_operation_stats`. Returns
+    ``None`` when the operation has never been recorded.
+    """
+    return NativeMetrics.get_instance().get_operation_stats(operation)
+
+
+def reset_native_metrics() -> None:
+    """Drop the singleton metrics instance (test helper)."""
+    NativeMetrics.reset_instance()

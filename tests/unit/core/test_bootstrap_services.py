@@ -61,12 +61,23 @@ class TestBootstrapServices:
             assert container.is_registered(SessionServiceProtocol)
             assert container.is_registered(ChatServiceProtocol)
 
-            # But LLMDecisionService should NOT be registered (no flags enabled)
+            # The decision service IS registered even with no edge/LLM flags
+            # (FEP-0012): decision_backend=auto is classifier-first, and the
+            # bundled edge_classifier_v1.npz baseline (#381) makes the shipped
+            # LocalClassifierDecisionService the flag-independent default.
+            # (LoggingDecisionService remains the auto fallback only when no
+            # healthy classifier artifact exists, so decisions are still always
+            # captured for RL/training data.)
             from victor.agent.services.protocols.decision_service import (
                 LLMDecisionServiceProtocol,
             )
 
-            assert not container.is_registered(LLMDecisionServiceProtocol)
+            assert container.is_registered(LLMDecisionServiceProtocol)
+            svc = container.get(LLMDecisionServiceProtocol)
+            assert svc.__class__.__name__ == "LocalClassifierDecisionService"
+            # Flag-independence: every rollout flag is disabled above, yet the
+            # bundled-classifier backend is adopted and healthy.
+            assert svc.is_healthy()
 
     @pytest.mark.parametrize(
         ("protocol_name", "health_attr"),

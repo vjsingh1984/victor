@@ -22,7 +22,7 @@ Usage:
 """
 
 import logging
-from typing import List
+from typing import List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -101,31 +101,69 @@ def log_decision(
     result: str,
     source: str,
     confidence: float = 0.0,
+    *,
+    model_version: Optional[str] = None,
+    feature_spec_version: Optional[str] = None,
+    feature_digest: Optional[str] = None,
+    session_id_override: Optional[str] = None,
 ) -> None:
-    """Append decision I/O to JSONL file for fine-tuning data collection.
+    """Append decision I/O to JSONL for fine-tuning / RL data collection.
 
-    Logs every decision (heuristic or LLM) with input context and output,
-    enabling future model fine-tuning on real decision patterns.
+    Logs every decision (heuristic, LLM, or local classifier) with input
+    context and output, enabling future model training on real decision patterns.
+
+    FEP-0012: stamps the correlation spine (``session_id``/``turn_id``/
+    ``trace_id``) and a unique ``decision_id`` so each record can be joined to
+    its eventual outcome (``rl_outcome`` / ``usage.jsonl``) for reward-weighted
+    training. Optional provenance fields (``model_version``,
+    ``feature_spec_version``, ``feature_digest``) are set by the local
+    classifier service for reproducibility.
+
+    ``session_id_override``: explicit session_id that takes precedence over
+    the contextvar. Callers that know their session_id (e.g. the benchmark
+    adapter, which sets it before orchestrator.chat() but the contextvar
+    may not propagate to all internal decision-logging paths) should pass it
+    to guarantee the spine is stamped correctly.
 
     Path: ~/.victor/logs/decisions.jsonl
     """
     import json
+    import uuid
     from datetime import datetime
     from pathlib import Path
 
     try:
+        from victor.core.context import get_session_id, get_trace_id, get_turn_id
+
         log_dir = Path.home() / ".victor" / "logs"
         log_dir.mkdir(parents=True, exist_ok=True)
         log_path = log_dir / "decisions.jsonl"
 
+        # Use explicit override if provided; otherwise fall back to contextvar.
+        stamped_session_id = (
+            session_id_override if session_id_override is not None else get_session_id()
+        )
+
         entry = {
             "ts": datetime.now().isoformat(),
+            "decision_id": uuid.uuid4().hex,
             "type": decision_type,
             "input": context,
             "output": result,
             "source": source,
             "confidence": confidence,
+            # Correlation spine (FEP-0012) — join key to outcomes.
+            "session_id": stamped_session_id,
+            "turn_id": get_turn_id(),
+            "trace_id": get_trace_id(),
         }
+        # Optional provenance, set by the local classifier service.
+        if model_version is not None:
+            entry["model_version"] = model_version
+        if feature_spec_version is not None:
+            entry["feature_spec_version"] = feature_spec_version
+        if feature_digest is not None:
+            entry["feature_digest"] = feature_digest
 
         with open(log_path, "a") as f:
             f.write(json.dumps(entry, default=str) + "\n")

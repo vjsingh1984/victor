@@ -593,6 +593,21 @@ class ToolMetadataRegistry:
     def get_tools_by_category(self, category: str) -> List[str]:
         return sorted(self._delegate.get_tools_by_category(category))
 
+    def get_tools_by_access_mode(self, access_mode: "AccessMode") -> List[str]:
+        """Return tool names whose metadata declares the given access mode.
+
+        Single source of truth for "which tools modify files/state" — replaces
+        hardcoded constants (e.g. the benchmark adapter's _FILE_MODIFYING_TOOLS)
+        so UI approval prompts, security policies, and eval file-tracking all
+        read the same core metadata. Falls back to AccessMode.READONLY when an
+        entry has no access_mode set (the ToolMetadata default).
+        """
+        return sorted(
+            name
+            for name, meta in self.get_all_metadata().items()
+            if (meta.access_mode or AccessMode.READONLY) == access_mode
+        )
+
     def get_tools_by_keyword(self, keyword: str) -> List[str]:
         return sorted(entry.name for entry in self._delegate.get_by_keyword(keyword))
 

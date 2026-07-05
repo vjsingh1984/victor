@@ -65,13 +65,13 @@ FOLDED_TOOLS: dict[str, ToolFold] = {
     "rag_stats": ToolFold(target="rag", hint="Use rag stats for knowledge-base statistics."),
     "rename": ToolFold(
         target="shell",
-        hint="Use shell with standard tools (sed, fastmod) or fs edit/patch for renaming symbols.",
+        hint="Use shell with standard tools (sed, fastmod) or edit for renaming symbols.",
     ),
     "inline": ToolFold(
-        target="shell", hint="Use shell with standard tools (sed) or fs edit/patch for inlining."
+        target="shell", hint="Use shell with standard tools (sed) or edit for inlining."
     ),
     "extract": ToolFold(
-        target="shell", hint="Use shell with standard tools or fs edit/patch for extraction."
+        target="shell", hint="Use shell with standard tools or edit for extraction."
     ),
     "organize_imports": ToolFold(
         target="shell", hint="Use shell with standard tools (isort, ruff) for organizing imports."
@@ -97,18 +97,12 @@ FOLDED_TOOLS: dict[str, ToolFold] = {
     "mcp": ToolFold(
         target="mcp_bridge", hint="Use mcp_bridge to access Model Context Protocol specific tools."
     ),
-    # Unified command-domain folds: granular primitives represented by the
-    # fs/web/code bash-style surfaces. Folded tools stay REGISTERED and
-    # EXECUTABLE (callable) — they are only removed from the default advertised
-    # schema so the LLM is offered the cleaner `fs`/`web`/`code` domains.
-    "read": ToolFold(target="fs", hint="Use fs cat <path> to read file contents."),
-    "write": ToolFold(target="fs", hint="Use fs write <path> -c <content> to write files."),
-    "ls": ToolFold(target="fs", hint="Use fs ls <path> to list a directory."),
-    "edit": ToolFold(
-        target="fs",
-        hint="Use fs edit <path> --old/--new (or --ops JSON) for atomic edits with undo.",
-    ),
-    "find": ToolFold(target="fs", hint="Use fs search <pattern> <path> to find files by name."),
+    # Unified command-domain folds: granular primitives previously represented
+    # by the fs/web/code bash-style surfaces. The fs domain has been REMOVED —
+    # read/write/edit/ls/find are now first-class tools with named parameters,
+    # exposed directly to the LLM (no subcommand parsing).
+    "ls": ToolFold(target="shell", hint="Use shell with ls to list directories."),
+    "find": ToolFold(target="shell", hint="Use shell with find to locate files."),
     "web_search": ToolFold(target="web", hint="Use web search <query> for web search."),
     "web_fetch": ToolFold(target="web", hint="Use web fetch <url> to fetch a URL as markdown."),
     # `search` is a deprecated back-compat shim. It stays folded (hidden from the

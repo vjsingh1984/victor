@@ -79,6 +79,7 @@ TYPE_INFERENCE_KEYS: Dict[str, str] = {
     "old": "replace",
     "find": "replace",
     "search": "replace",
+    "line_start": "replace_lines",
     "new_path": "rename",
     "new_name": "rename",
     "destination": "rename",
@@ -240,12 +241,88 @@ def _replace_not_found_detail(current_content: str, old_str: str, path: str) -> 
     )
 
 
+def _normalize_backslashes(s: str) -> str:
+    """Collapse doubled backslashes (``\\\\d`` → ``\\d``).
+
+    Handles the common JSON/LLM escaping artifact where the model outputs
+    ``"\\\\d"`` in its tool call (JSON-escaped ``\\d``) but the file contains the
+    single-backslash ``\\d``. Applied as a FALLBACK only (after exact + whitespace
+    fuzzy fail) so legitimate double-backslashes (Windows paths etc.) are
+    unaffected unless the normalized version matches uniquely.
+    """
+    return s.replace("\\\\", "\\")
+
+
+def _try_backslash_normalized_replace(
+    content: str, old_str: str, new_str: str, path: str
+) -> Optional[Dict[str, Any]]:
+    """Fallback: try matching with backslash-normalized old_str + new_str.
+
+    Returns a result dict (like ``_resolve_replace``) if the normalized match
+    succeeds uniquely; ``None`` if it doesn't help (caller falls through to the
+    error).  Only fires when normalizing actually CHANGES old_str (no point
+    retrying the same string).
+    """
+    norm_old = _normalize_backslashes(old_str)
+    if norm_old == old_str:
+        return None  # normalization didn't change anything
+    norm_new = _normalize_backslashes(new_str)
+
+    occurrences = content.count(norm_old)
+    if occurrences == 1:
+        return {
+            "ok": True,
+            "new_content": content.replace(norm_old, norm_new, 1),
+            "fuzzy": True,
+            "normalized": "backslash",
+        }
+    if occurrences > 1:
+        return None  # ambiguous → don't guess
+
+    # Also try the whitespace-tolerant span with the normalized old_str.
+    span = _find_unique_fuzzy_span(content, norm_old)
+    if span is not None and span != norm_new:
+        return {
+            "ok": True,
+            "new_content": content.replace(span, norm_new, 1),
+            "fuzzy": True,
+            "normalized": "backslash",
+        }
+    return None
+
+
+def _resolve_replace_lines(
+    content: str, line_start: int, line_end: int, new_str: str, path: str
+) -> Dict[str, Any]:
+    """Resolve a ``replace_lines`` op: replace lines [line_start, line_end] (1-indexed, inclusive).
+
+    Bypasses old_str matching entirely — the agent specifies WHERE (from its last
+    ``read``) + WHAT (new content). Eliminates the entire class of old_str-drift
+    failures (LLMs generating old_str from memory).
+    """
+    lines = content.split("\n")
+    if line_start < 1 or line_end < line_start or line_end > len(lines):
+        return {
+            "ok": False,
+            "reason": (
+                f"replace_lines failed: invalid range [{line_start}, {line_end}] "
+                f"for {path} ({len(lines)} lines). Use 1-indexed inclusive line "
+                f"numbers from your last read."
+            ),
+        }
+    new_lines = new_str.split("\n") if new_str else []
+    result_lines = lines[: line_start - 1] + new_lines + lines[line_end:]
+    return {"ok": True, "new_content": "\n".join(result_lines), "fuzzy": False}
+
+
 def _resolve_replace(current_content: str, old_str: str, new_str: str, path: str) -> Dict[str, Any]:
     """Resolve a ``replace`` op to concrete new content.
 
-    Tries an exact unique match first, then a single unambiguous whitespace-
-    tolerant span. Returns a dict with ``ok`` plus either ``new_content`` (and
-    whether a ``fuzzy`` match was used) or a human-readable ``reason``.
+    Tries (in order): exact unique match → whitespace-tolerant fuzzy span →
+    backslash-normalized match (handles JSON/LLM escaping artifacts like
+    ``\\\\d`` vs ``\\d``). Returns a dict with ``ok`` plus either ``new_content``
+    (and whether a ``fuzzy``/``normalized`` match was used) or a human-readable
+    ``reason``.
     """
     occurrences = current_content.count(old_str)
     if occurrences == 1:
@@ -270,6 +347,10 @@ def _resolve_replace(current_content: str, old_str: str, new_str: str, path: str
             "new_content": current_content.replace(span, new_str, 1),
             "fuzzy": True,
         }
+    # Backslash-normalized fallback (JSON/LLM escaping: \\d → \d).
+    norm_result = _try_backslash_normalized_replace(current_content, old_str, new_str, path)
+    if norm_result is not None:
+        return norm_result
     return {"ok": False, "reason": _replace_not_found_detail(current_content, old_str, path)}
 
 
@@ -308,9 +389,13 @@ def _create_file_editor(backup_dir: str):
         # If it's a class, instantiate it
         if isinstance(provider, type):
             return provider(backup_dir=backup_dir)
-        # Already an instance — reset any stale transaction state
-        # FileEditor uses current_transaction (Optional[EditTransaction]), not _in_transaction
-        if hasattr(provider, "current_transaction"):
+        # Already an instance — reset per-task mutable state (benchmark
+        # isolation hygiene). Prefers the vertical's reset_state() (clears
+        # transaction_history + last_commit_error + re-ensures backup_dir);
+        # falls back to clearing current_transaction for editors without it.
+        if hasattr(provider, "reset_state"):
+            provider.reset_state()
+        elif hasattr(provider, "current_transaction"):
             provider.current_transaction = None
         return provider
     return None
@@ -555,7 +640,7 @@ async def edit(
                 "error": f"Operation {i} missing required field: type",
             }
 
-        if op_type not in ["create", "modify", "delete", "rename", "replace"]:
+        if op_type not in ["create", "modify", "delete", "rename", "replace", "replace_lines"]:
             return {
                 "success": False,
                 "error": f"Operation {i} has invalid type: {op_type}. Must be create, modify, delete, rename, or replace",
@@ -596,10 +681,10 @@ async def edit(
         _groups.setdefault(_op_file_key(_op), []).append((_idx, _op))
 
     failed_files: List[Dict[str, Any]] = []
+    _all_failed_indices: Set[int] = set()
     _applicable_keys: Set[str] = set()
     for _key, _group in _groups.items():
         _working: Optional[str] = None  # lazy per-file working copy
-        _group_ok = True
         for _idx, _op in _group:
             _otype = _op.get("type")
             _path = _op.get("path")
@@ -619,8 +704,8 @@ async def edit(
                             ),
                         }
                     )
-                    _group_ok = False
-                    break
+                    _all_failed_indices.add(_idx)
+                    continue
                 _old = _op.get("old_str")
                 _new = _op.get("new_str")
                 if _old is None:
@@ -628,7 +713,12 @@ async def edit(
                 elif _new is None:
                     _reason = f"Replace operation for {_path} missing required field: new_str"
                 elif _old == _new:
-                    _reason = "no-op edit rejected: old_str and new_str are identical"
+                    _reason = (
+                        f"no-op edit rejected: old_str and new_str are identical "
+                        f"for {_path}. The file may already contain this change "
+                        f"from a previous edit. Re-read the file to see its "
+                        f"current state before retrying."
+                    )
                 elif not _fp.exists() and not _working:
                     _reason = f"file {_path} does not exist"
                 else:
@@ -643,8 +733,30 @@ async def edit(
                         _reason = _res["reason"]
                 if _reason is not None:
                     failed_files.append({"path": _path, "op_index": _idx, "error": _reason})
-                    _group_ok = False
-                    break
+                    _all_failed_indices.add(_idx)
+                    continue
+            elif _otype == "replace_lines":
+                _ls = _op.get("line_start")
+                _le = _op.get("line_end")
+                _new = _op.get("new_str", "")
+                if _ls is None or _le is None:
+                    failed_files.append(
+                        {
+                            "path": _path,
+                            "op_index": _idx,
+                            "error": "replace_lines requires line_start and line_end (1-indexed, inclusive).",
+                        }
+                    )
+                    _all_failed_indices.add(_idx)
+                    continue
+                _res = _resolve_replace_lines(_working, int(_ls), int(_le), _new, _path)
+                if _res["ok"]:
+                    _working = _res["new_content"]
+                    _op["__resolved_new_content__"] = _res["new_content"]
+                else:
+                    failed_files.append({"path": _path, "op_index": _idx, "error": _res["reason"]})
+                    _all_failed_indices.add(_idx)
+                    continue
             elif _otype == "modify":
                 _content = _op.get("new_content")
                 if _content is None:
@@ -657,8 +769,8 @@ async def edit(
                             "error": "modify op missing content / new_content",
                         }
                     )
-                    _group_ok = False
-                    break
+                    _all_failed_indices.add(_idx)
+                    continue
                 _working = _content
             elif _otype == "create":
                 _op_mode = _op.get("mode", mode)
@@ -674,16 +786,17 @@ async def edit(
                             ),
                         }
                     )
-                    _group_ok = False
-                    break
+                    _all_failed_indices.add(_idx)
+                    continue
                 _working = _op.get("content", "")
             # delete / rename: no text content to validate at this stage
-        if _group_ok:
-            _applicable_keys.add(_key)
+        _applicable_keys.add(_key)
 
     if failed_files:
-        # Drop ops belonging to any failed file group; keep the rest.
-        ops = [op for op in ops if _op_file_key(op) in _applicable_keys]
+        # Per-op filtering: exclude only the SPECIFIC failed ops (not the whole
+        # file group). Correct ops in the same file still apply — the difference
+        # between 9/10 and 10/10 on a benchmark task.
+        ops = [op for i, op in enumerate(ops) if i not in _all_failed_indices]
 
     if not ops:
         # Nothing applicable — surface the first failure as the primary error
@@ -999,9 +1112,13 @@ async def edit(
                     "message": f"Applied {operations_queued} operations successfully",
                 }
             else:
+                _detail = getattr(editor, "last_commit_error", None) or ""
                 return {
                     "success": False,
-                    "error": "Failed to commit changes. Transaction rolled back.",
+                    "error": (
+                        "Failed to commit changes. Transaction rolled back."
+                        + (f" Reason: {_detail}" if _detail else "")
+                    ),
                 }
 
     # Handle commit (suppress FileEditor's transaction stdout — Victor formats its own output)
@@ -1068,9 +1185,13 @@ async def edit(
         else:
             # Clear change group on failure
             tracker._current_group = None
+            _detail = getattr(editor, "last_commit_error", None) or ""
             return {
                 "success": False,
-                "error": "Failed to commit changes. Transaction rolled back.",
+                "error": (
+                    "Failed to commit changes. Transaction rolled back."
+                    + (f" Reason: {_detail}" if _detail else "")
+                ),
             }
     else:
         # Queue only, don't commit

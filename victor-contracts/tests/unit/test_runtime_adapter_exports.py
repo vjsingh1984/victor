@@ -1,5 +1,9 @@
 """Tests for processing, LSP, search, and RL runtime adapters."""
 
+import pytest
+
+pytest.importorskip("victor", reason="host runtime adapters require the victor-ai package")
+
 from victor_contracts.agent_spec_runtime import (
     AgentCapabilities,
     AgentConstraints,

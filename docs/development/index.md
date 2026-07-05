@@ -10,7 +10,8 @@ git clone https://github.com/vjsingh1984/victor.git
 cd victor
 python -m venv .venv
 source .venv/bin/activate
-pip install -e ".[dev]"
+# victor-contracts first so victor-ai resolves the in-repo SDK, not PyPI
+pip install -e ./victor-contracts -e ".[dev]"
 
 # Run tests
 make test

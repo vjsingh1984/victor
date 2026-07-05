@@ -26,7 +26,7 @@ References:
 
 from typing import Any, Dict, List, Optional
 
-from victor.providers.base import ProviderError
+from victor.providers.base import CacheCostModel, ProviderError
 from victor.providers.httpx_openai_compat import HttpxOpenAICompatProvider
 from victor.providers.resolution import (
     UnifiedApiKeyResolver,
@@ -185,6 +185,16 @@ class XAIProvider(HttpxOpenAICompatProvider):
             "grok-4.1-fast-non-reasoning": "grok-4-1-fast-non-reasoning",
         }
         return aliases.get(model, model)
+
+    def cache_cost_model(self) -> CacheCostModel:
+        """Characterized API caching (FEP-0011): 50-75% discount on cached tokens."""
+        return CacheCostModel(
+            supported=True,
+            read_discount=0.625,
+            write_overhead=1.0,
+            min_prefix_tokens=0,
+            prefix_granularity="token",
+        )
 
     def context_window(self, model: Optional[str] = None) -> int:
         from victor.providers.context_windows import XAI, XAI_DEFAULT, lookup

@@ -88,22 +88,16 @@ def _extract_required_outputs_from_prompt(user_message: str) -> List[str]:
 
 
 def _get_decision_service(orchestrator: object) -> object | None:
-    """Get the LLM decision service from the container if available."""
-    try:
-        from victor.core.feature_flags import FeatureFlag, is_feature_enabled
+    """Get the LLM decision service from the container if available.
 
-        if not is_feature_enabled(FeatureFlag.USE_LLM_DECISION_SERVICE):
-            return None
-        from victor.agent.services.protocols.decision_service import (
-            LLMDecisionServiceProtocol,
-        )
+    Resolution is centralized in :func:`get_decision_service`; the service is
+    registered per the ``decision_backend`` enum (FEP-0012), so absence (None)
+    means "disabled". The legacy ``USE_LLM_DECISION_SERVICE`` gate was removed
+    so a registered local-classifier is honored here regardless of that flag.
+    """
+    from victor.agent.services.protocols.decision_service import get_decision_service
 
-        container = getattr(orchestrator, "_container", None)
-        if container is not None:
-            return container.get(LLMDecisionServiceProtocol)
-    except Exception as exc:
-        logger.debug("Failed to resolve LLM decision service: %s", exc)
-    return None
+    return get_decision_service(getattr(orchestrator, "_container", None))
 
 
 @dataclass

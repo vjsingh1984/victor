@@ -37,6 +37,7 @@ Status is the governance state of the *decision*. Implementation is the observed
 | [ADR-013](013-unified-temperature-policy.md) | Unified, Intent-Based Temperature Policy with Spin Ratchet | Accepted | Shipped (`victor/framework/temperature/`, default flip 0.7→0.6, scatter-guard test) | 2026-06-22 |
 | [ADR-014](014-shared-codegraph-chunker-package.md) | Extract the code→CPG chunker into a shared `victor-codegraph` package | Accepted | Shipped (`victor-codegraph` 0.1.x released; `victor-coding` delegates) | 2026-06-26 |
 | [ADR-015](015-victor-core-adopts-codegraph.md) | Victor Core adopts victor-codegraph as the foundational code parser (phased) | Accepted | Partial (Phase 1: guarded import in `victor/core/graph_rag/indexing.py`; later phases pending) | 2026-06-26 |
+| [ADR-016](016-distribution-packaging-strategy.md) | Distribution & Packaging: Docker image primary, pip dev; reject native single-binary | Proposed | Not started | 2026-07-02 |
 
 ## External ADR series (cross-repo)
 
@@ -58,6 +59,16 @@ Rules for cross-repo decisions:
    never a bare number.
 3. When an external ADR materially changes Victor behavior (as ADR-044 did for symbol identity),
    add or amend a Victor ADR that records the local consequence.
+
+### ADR-016: Distribution & Packaging Strategy
+
+**Decision**: Ship victor as a Docker image (`full` with all extras, `slim` core-only) as the primary packaged artifact; retain the pip-installable package for dev/extensible use; reject native single-binary (PyInstaller/Nuitka/PyOxidizer) as primary.
+
+**Key Points**:
+- Hosts run full-capability victor with only Docker — no dep provisioning, no venv pollution, no version drift.
+- One consistent container story: `victor:full` agent + per-task eval images (correct runtime per task).
+- Native single-binary rejected because victor's architecture fights freezing: dynamic plugin/entry-point discovery, optional native Rust extensions, heavy ML deps (torch ~2 GB), and the pip-based extensibility model.
+- Dev experience unchanged (editable pip install remains first-class).
 
 ## Creating New ADRs
 

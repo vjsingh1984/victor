@@ -39,6 +39,20 @@ It is designed for teams that need agent systems to be testable, extensible, obs
 | Python API | `pip install victor-ai` | Embedding Victor in applications |
 | Docker | `docker pull ghcr.io/vjsingh1984/victor:latest` | Isolated CLI/API runtime |
 
+## Give Your Agent Durable Memory
+
+Victor pairs with [ProximaDB](https://github.com/vjsingh1984/proximaDB) — a multi-model
+(vector + graph + document) context database by the same author — as its durable memory
+layer. Index any repository with the shared [`victor-codegraph`](victor-codegraph/)
+chunker and get semantic recall ("where do we validate JWTs?") plus call-graph queries
+("who calls `parse_jwt`?") that persist across sessions:
+
+**[Quickstart: Durable Code Memory with ProximaDB](docs/quickstart-proximadb-memory.md)** — Docker + two `pip install`s, ~10 minutes.
+
+Victor's embedded ProximaDB backends for project code intelligence are in-tree and
+flag-gated (SQLite/LanceDB remain the defaults); the conversational-memory backend is in
+progress — see [ProximaDB as the CCG Backend](docs/architecture/proximadb-codegraph-backend.md).
+
 ## Python API
 
 ```python
@@ -147,7 +161,8 @@ Project code intelligence is derived, rebuildable state. Graph indexes, vector i
 ```bash
 python -m venv .venv
 source .venv/bin/activate
-pip install -e ".[dev]"
+# victor-contracts first so victor-ai resolves the in-repo SDK, not PyPI
+pip install -e ./victor-contracts -e ".[dev]"
 
 make test-quick
 make test
@@ -165,6 +180,7 @@ cd rust && cargo test
 ## Documentation
 
 - [Getting Started](docs/getting-started/)
+- [Durable Code Memory with ProximaDB](docs/quickstart-proximadb-memory.md)
 - [Guides](docs/guides/)
 - [Reference](docs/reference/)
 - [Operations](docs/operations/)

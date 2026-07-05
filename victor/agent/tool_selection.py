@@ -2088,15 +2088,102 @@ class ToolSelector(ModeAwareMixin):
         Returns:
             List of relevant ToolDefinition objects
         """
+        # Stable curated short-circuit (TOP of select_tools): when the caller
+        # curated the toolset (_enabled_tools set), return the full curated set
+        # UNCHANGED every turn — bypassing semantic/keyword/Q&A selection that
+        # drops demand-loaded tools (code/graph) and churns the schema
+        # (KV-cache misses). The benchmark (and any curating caller) hits
+        # select_tools directly, so the short-circuit MUST live here, not in
+        # select_tools_for_turn (which the benchmark never calls — the #353 bug).
+        stable = self._stable_curated_tools()
+        if stable:
+            return stable
+
         if use_semantic and self.semantic_selector:
-            return await self.select_semantic(
+            tools = await self.select_semantic(
                 user_message,
                 conversation_history=conversation_history,
                 conversation_depth=conversation_depth,
                 planned_tools=planned_tools,
             )
         else:
-            return self.select_keywords(user_message, planned_tools=planned_tools)
+            tools = self.select_keywords(user_message, planned_tools=planned_tools)
+        # Curated enabled-tools guarantee. set_enabled_tools() (tool_access_policy)
+        # updates the policy + this selector's filter but does NOT sync the
+        # registry's per-tool _tool_enabled map — so the semantic path (which
+        # gathers via list_tools(only_enabled=True), and its cache) can drop
+        # curated-but-registered-disabled tools like code/graph even though the
+        # caller explicitly enabled them and the prompt advertises them. select_keywords
+        # already respects this (#343); apply the same guarantee to the semantic path
+        # by unioning in any registered curated tool missing from the result.
+        return self._union_curated_enabled(tools)
+
+    def _stable_curated_tools(self) -> Optional[List["ToolDefinition"]]:
+        """Return a cached, stable ToolDefinition list for the curated tool set.
+
+        When ``_enabled_tools`` is set (caller curated the toolset — e.g. the
+        benchmark enables exactly {code,edit,graph,read,shell,write}), build a
+        sorted, full-schema list from the registry + cache it. Returned at the
+        TOP of ``select_tools()`` so the curated set reaches the LLM UNCHANGED
+        every turn — no semantic/keyword/Q&A gating that drops demand-loaded
+        tools (code/graph) and no schema churn (KV-cache misses). The cache key
+        is ``frozenset(_enabled_tools)``: a new task's curated set rebuilds it.
+        No-op when no curated set is active (the common auto-selected case).
+        """
+        if not self._enabled_tools:
+            return None
+        cache_key = frozenset(self._enabled_tools)
+        cached = getattr(self, "_stable_tools_cache", None)
+        if cached and cached[0] == cache_key:
+            return cached[1]
+        try:
+            from victor.tools.enums import SchemaLevel
+        except ImportError:
+            return None
+        stable: List["ToolDefinition"] = []
+        for name in sorted(self._enabled_tools):
+            tool = self.tools.get(name)
+            if tool is not None:
+                stable.append(tool_to_definition(tool, SchemaLevel.FULL))
+        if stable:
+            self._stable_tools_cache = (cache_key, stable)
+            logger.info(
+                "[ToolSchema] Stable curated: %d tools (%s) — prefix-cache stable",
+                len(stable),
+                ", ".join(sorted(self._enabled_tools)),
+            )
+        return stable or None
+
+    def _union_curated_enabled(self, tools: List["ToolDefinition"]) -> List["ToolDefinition"]:
+        """Ensure every registered curated tool reaches the LLM.
+
+        When ``_enabled_tools`` is set (caller curated the toolset — e.g. the
+        benchmark enables exactly {code,edit,graph,read,shell,write}), every
+        registered member must be advertised. The semantic path and its cache
+        can drop curated-but-registered-disabled tools (code/graph) because
+        ``set_enabled_tools`` doesn't sync the registry's ``_tool_enabled`` map.
+        This unions any missing registered curated tool back in.
+
+        No-op when no curated set is active (the common auto-selected case).
+        """
+        if not self._enabled_tools:
+            return tools
+        have = {t.name for t in tools}
+        registered = {t.name: t for t in self.tools.list_tools(only_enabled=False)}
+        if not any(name in registered for name in self._enabled_tools):
+            return tools  # curated set doesn't match this registry — nothing to add
+        from victor.providers.base import ToolDefinition as _TD
+
+        result = list(tools)
+        for name in sorted(self._enabled_tools):
+            if name in have or name not in registered:
+                continue
+            src = registered[name]
+            result.append(
+                _TD(name=src.name, description=src.description, parameters=src.parameters)
+            )
+            have.add(name)
+        return result
 
     def _load_semantic_cached_selection(
         self,
@@ -2391,7 +2478,16 @@ class ToolSelector(ModeAwareMixin):
                 f"Using vertical enabled tools ({len(self._enabled_tools)}): "
                 f"{sorted(self._enabled_tools)}"
             )
-            for tool in all_tools:
+            # Gather from ALL registered tools, not just registry-"enabled"
+            # ones. set_enabled_tools() updates the tool_access_policy + this
+            # selector's filter but does NOT flip the registry's per-tool
+            # _tool_enabled map — so list_tools(only_enabled=True) silently
+            # excludes curated tools that are registered-but-disabled (e.g.
+            # code/graph, which are bootstrap/demand-registered disabled). The
+            # curated _enabled_tools set is the source of truth here, so filter
+            # all-registered tools by it.
+            _registered_all = self.tools.list_tools(only_enabled=False)
+            for tool in _registered_all:
                 if tool.name in self._enabled_tools and tool.name not in existing_names:
                     selected_tools.append(
                         ToolDefinition(
@@ -2534,11 +2630,10 @@ class ToolSelector(ModeAwareMixin):
             return self._runtime_intelligence
 
         from victor.agent.services.protocols.decision_service import (
-            LLMDecisionServiceProtocol,
+            get_decision_service,
         )
 
-        container = get_container()
-        service = container.get(LLMDecisionServiceProtocol)
+        service = get_decision_service(get_container())
         if service is None:
             return None
         return service

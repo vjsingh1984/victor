@@ -20,7 +20,19 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 from victor.core.verticals.vertical_loader import VerticalLoader, get_vertical_loader
-from victor.framework.entry_point_loader import get_entry_point_loader_stats
+
+
+def get_entry_point_loader_stats() -> Dict[str, Any]:
+    """Lazy delegate for :func:`victor.framework.entry_point_loader.get_entry_point_loader_stats`.
+
+    victor.core must not import victor.framework at module import time
+    (framework._api imports victor.core.verticals back; the cycle was unmasked
+    by the lazy PEP 562 victor/__init__). A module-level delegate keeps the
+    import deferred while preserving the patch seam tests rely on.
+    """
+    from victor.framework.entry_point_loader import get_entry_point_loader_stats as _impl
+
+    return _impl()
 
 
 def get_vertical_runtime_diagnostics(

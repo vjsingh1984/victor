@@ -35,18 +35,16 @@ Example usage:
     from victor.protocols import IProviderAdapter, IGroundingStrategy
 
     # Query enhancement protocols
-    from victor.integrations.protocols.query_enhancement import EnhancementContext
+    from victor.protocols.query_enhancement import EnhancementContext
 """
 
 # Expose submodules for easier access
 from victor.integrations import api
 from victor.integrations import mcp
 from victor.integrations import protocol
-from victor.integrations import protocols
 
 __all__ = [
     "api",
     "mcp",
     "protocol",
-    "protocols",
 ]

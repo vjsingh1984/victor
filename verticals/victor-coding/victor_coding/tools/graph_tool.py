@@ -17,7 +17,15 @@ from types import SimpleNamespace
 from typing import Any, DefaultDict, Dict, Iterable, List, Literal, Optional, Set
 
 from victor.config.settings import get_project_paths, load_settings
-from victor_contracts.indexing_runtime import ensure_project_graph_enriched
+
+# Harden the module-level contracts import: if the bridge is incomplete (a
+# function was added to victor.core but not proxied in victor_contracts),
+# the module must still load. ensure_project_graph_enriched is set to None
+# and the pre-flight check (_check_graph_dependencies) catches it at runtime.
+try:
+    from victor_contracts.indexing_runtime import ensure_project_graph_enriched
+except (ImportError, AttributeError):
+    ensure_project_graph_enriched = None
 from victor.native.python.graph_algo import (
     connected_components,
     pagerank,
@@ -32,6 +40,57 @@ from victor.tools.context import ToolExecutionContext
 from victor.tools.decorators import tool
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Pre-flight dependency check (Layer 3 robustness)
+# ---------------------------------------------------------------------------
+# Validates ALL victor_contracts imports resolve before the tool attempts any
+# operation. If any dependency is missing (bridge gap), the tool returns a
+# clean error on the FIRST call (1 turn wasted, not 3+). Combined with the
+# circuit breaker (3 calls → auto-disable), worst case is 3 turns total
+# instead of 24-64+. Cached after first call.
+_GRAPH_DEPENDENCIES_CHECKED: Optional[bool] = None
+
+_GRAPH_DEPENDENCY_CHECKS = [
+    ("victor_contracts.database_runtime", "get_project_database"),
+    ("victor_contracts.database_runtime", "resolve_project_db_root"),
+    ("victor_contracts.indexing_runtime", "ensure_project_graph_enriched"),
+    ("victor_contracts.indexing_runtime", "GraphManager"),
+    ("victor_contracts.capability_runtime", "get_capability_provider"),
+]
+
+
+def _check_graph_dependencies() -> bool:
+    """Validate ALL victor_contracts imports resolve. Cached after first call.
+
+    Returns False if any dependency is missing (bridge gap). The caller should
+    return _graph_error_response immediately — no point attempting operations
+    that will crash on import.
+    """
+    global _GRAPH_DEPENDENCIES_CHECKED
+    if _GRAPH_DEPENDENCIES_CHECKED is not None:
+        return _GRAPH_DEPENDENCIES_CHECKED
+    import importlib as _importlib
+
+    for mod_name, attr_name in _GRAPH_DEPENDENCY_CHECKS:
+        try:
+            # Module names come from the hardcoded _GRAPH_DEPENDENCY_CHECKS
+            # list above, not from user input.
+            # nosemgrep: python.lang.security.audit.non-literal-import.non-literal-import
+            mod = _importlib.import_module(mod_name)  # nosemgrep
+            getattr(mod, attr_name)
+        except Exception:
+            _GRAPH_DEPENDENCIES_CHECKED = False
+            logger.warning(
+                "Graph tool dependency check failed: %s.%s not available. "
+                "The tool will return errors until the bridge is fixed.",
+                mod_name,
+                attr_name,
+            )
+            return False
+    _GRAPH_DEPENDENCIES_CHECKED = True
+    return True
+
 
 _GRAPH_ANALYTICS_TIMEOUT_SECONDS = 90.0
 _GRAPH_TOOL_TIMEOUT_SECONDS = _GRAPH_ANALYTICS_TIMEOUT_SECONDS
@@ -2268,7 +2327,7 @@ def _project_relative_scope(root_path: Path) -> Optional[str]:
     """
     from victor_contracts.database_runtime import resolve_project_db_root
 
-    project_root = resolve_project_db_root(root_path)
+    project_root = resolve_project_db_root(root_path)  # noqa: guaranteed by bridge
     try:
         rel = Path(root_path).resolve().relative_to(project_root)
     except ValueError:
@@ -2878,6 +2937,26 @@ async def _graph_impl(
                 path,
             )
             root_path = project_root
+
+    # Pre-flight check: if any contracts-bridge dependency is missing, return
+    # immediately with an actionable error. This prevents ImportError crashes
+    # deep in helper functions (resolve_project_db_root, GraphManager, etc.)
+    # and saves the 2-3 wasted turns the circuit breaker would otherwise need.
+    if not _check_graph_dependencies():
+        return _graph_error_response(
+            requested_mode=requested_mode,
+            mode=normalized_mode,
+            error="Graph tool dependencies not available (contracts bridge gap). "
+            "Use `code search` or `read` instead.",
+            suggestions=[],
+            extra={
+                "suggestion": (
+                    "A required function is missing from the victor-contracts "
+                    "bridge. Use code_search, read, or ls for code exploration."
+                ),
+                "unavailable": True,
+            },
+        )
 
     # Subscribe to file watcher for automatic cache invalidation (only once per root).
     # The watcher + incremental refresh operate on the *project* graph DB, so they

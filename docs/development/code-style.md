@@ -417,6 +417,47 @@ class MyToolExecutor:
         pass
 ```
 
+### Package & Directory Naming (Singular vs Plural)
+
+Package and directory names follow one rule so that the same concept never
+appears as both `foo/` and `foos/` siblings:
+
+1. **Top-level packages and their `tests/` mirrors are plural** when they hold
+   a collection of modules: `victor/tools`, `victor/providers`, `victor/protocols`,
+   `victor/verticals`, mirrored by `tests/unit/tools`, `tests/unit/providers`, …
+   A test directory mirrors its source package name **exactly**.
+2. **Singular** is for a sub-package describing one concrete subsystem or a
+   proper/mass noun: the `victor/benchmark` vertical, `mode_config`, `profiler`.
+3. A **category** test directory that is *not* a package mirror uses a descriptive
+   name, never the bare noun — `tests/performance`, not `tests/benchmark`.
+4. **No parent holds both forms of one concept.** If a stem names two distinct
+   things, disambiguate by renaming one (e.g. `agents/` meaning multi-agent
+   coordination → `multi_agent/`).
+
+```text
+# Good — plural collection, test mirror matches source
+victor/tools/              tests/unit/tools/
+
+# Good — singular concrete subsystem (proper noun)
+victor/benchmark/          tests/unit/benchmark/
+
+# Bad — same concept as both singular and plural siblings (now folded)
+tests/benchmark/  +  tests/benchmarks/        →  tests/benchmarks/
+victor/integrations/protocol/  +  .../protocols/  →  query_enhancement moved to victor/protocols/
+```
+
+Cross-layer splits where singular and plural describe genuinely different things
+at **different** layers are fine and documented, not folded — e.g.
+`victor/agent/conversation` (the conversation runtime/store) vs
+`victor/framework/conversations` (the coordination framework), and the
+`benchmark` vertical vs `victor/evaluation/benchmarks` (eval-dataset suites).
+
+This convention is **enforced in CI** by
+`tests/unit/runtime/test_naming_singular_plural_guard.py`, which fails on any
+new same-parent singular/plural directory collision. That guard test is the
+authoritative statement of the rule; update it (and its allowlist) if the
+convention changes.
+
 ## Async/Await Conventions
 
 All I/O operations should be async:

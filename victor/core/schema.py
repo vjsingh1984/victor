@@ -128,6 +128,13 @@ class Tables:
     RL_PATTERN = "rl_pattern"  # Cross-vertical patterns
     RL_PATTERN_USE = "rl_pattern_use"  # Pattern application tracking
 
+    # Edge-classifier / decision learning (FEP-0012)
+    # decision_log + decision_outcome are GLOBAL (join rl_outcome for training);
+    # local_classifier_delta is a PROJECT table (per-project RL personalization).
+    DECISION_LOG = "decision_log"  # Correlated decision records (training input)
+    DECISION_OUTCOME = "decision_outcome"  # decision -> outcome/reward junction
+    LOCAL_CLASSIFIER_DELTA = "local_classifier_delta"  # per-project RL weight overlay
+
     # ===========================================
     # AGENT DOMAIN (agent_)
     # ===========================================
@@ -324,6 +331,80 @@ class Schema:
             ON {Tables.RL_OUTCOME}(learner_id, created_at);
         CREATE INDEX IF NOT EXISTS idx_rl_outcome_context
             ON {Tables.RL_OUTCOME}(provider, model, task_type);
+    """
+
+    # FEP-0012: correlated decision records — the structured mirror of
+    # decisions.jsonl, carrying the correlation spine so each decision joins to
+    # its outcome (rl_outcome / usage.jsonl) for reward-weighted training.
+    DECISION_LOG = f"""
+        CREATE TABLE IF NOT EXISTS {Tables.DECISION_LOG} (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            decision_id TEXT NOT NULL,
+            decision_type TEXT NOT NULL,
+            session_id TEXT DEFAULT '',
+            turn_id TEXT DEFAULT '',
+            trace_id TEXT DEFAULT '',
+            source TEXT DEFAULT '',
+            confidence REAL DEFAULT 0.0,
+            model_version TEXT DEFAULT '',
+            feature_spec_version TEXT DEFAULT '',
+            feature_digest TEXT DEFAULT '',
+            context TEXT DEFAULT '',
+            result TEXT DEFAULT '',
+            ts TEXT DEFAULT (datetime('now'))
+        )
+    """
+
+    DECISION_LOG_INDEXES = f"""
+        CREATE INDEX IF NOT EXISTS idx_decision_log_correlation
+            ON {Tables.DECISION_LOG}(session_id, turn_id);
+        CREATE INDEX IF NOT EXISTS idx_decision_log_type_ts
+            ON {Tables.DECISION_LOG}(decision_type, ts);
+        CREATE INDEX IF NOT EXISTS idx_decision_log_id
+            ON {Tables.DECISION_LOG}(decision_id);
+    """
+
+    # FEP-0012: decision -> outcome junction. attributed_reward is the
+    # per-decision credit (GAE) derived from the session outcome.
+    DECISION_OUTCOME = f"""
+        CREATE TABLE IF NOT EXISTS {Tables.DECISION_OUTCOME} (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            decision_id TEXT NOT NULL,
+            session_id TEXT DEFAULT '',
+            turn_id TEXT DEFAULT '',
+            success INTEGER,
+            quality_score REAL,
+            attributed_reward REAL,
+            credit_method TEXT DEFAULT '',
+            segment_rewards TEXT DEFAULT '',
+            ts TEXT DEFAULT (datetime('now'))
+        )
+    """
+
+    DECISION_OUTCOME_INDEXES = f"""
+        CREATE INDEX IF NOT EXISTS idx_decision_outcome_id
+            ON {Tables.DECISION_OUTCOME}(decision_id);
+        CREATE INDEX IF NOT EXISTS idx_decision_outcome_session
+            ON {Tables.DECISION_OUTCOME}(session_id);
+    """
+
+    # FEP-0012: per-project RL weight overlay (personalization delta). Sparse,
+    # top-K bounded per decision_type, L2-decayed. Lives in the PROJECT db.
+    LOCAL_CLASSIFIER_DELTA = f"""
+        CREATE TABLE IF NOT EXISTS {Tables.LOCAL_CLASSIFIER_DELTA} (
+            decision_type TEXT NOT NULL,
+            feature_hash INTEGER NOT NULL,
+            weight REAL DEFAULT 0.0,
+            samples INTEGER DEFAULT 0,
+            sum_reward REAL DEFAULT 0.0,
+            updated_at TEXT DEFAULT (datetime('now')),
+            PRIMARY KEY (decision_type, feature_hash)
+        )
+    """
+
+    LOCAL_CLASSIFIER_DELTA_INDEXES = f"""
+        CREATE INDEX IF NOT EXISTS idx_local_classifier_delta_type
+            ON {Tables.LOCAL_CLASSIFIER_DELTA}(decision_type);
     """
 
     RL_Q_VALUE = f"""
@@ -1104,6 +1185,9 @@ class Schema:
             cls.RL_PATTERN,
             cls.RL_PATTERN_USE,
             cls.RL_METRIC,
+            # Edge-classifier decision learning (FEP-0012) — global
+            cls.DECISION_LOG,
+            cls.DECISION_OUTCOME,
             # Agent
             cls.AGENT_TEAM_CONFIG,
             cls.AGENT_TEAM_RUN,
@@ -1129,6 +1213,9 @@ class Schema:
             cls.RL_TRANSITION_INDEXES,
             cls.UI_SESSION_INDEXES,
             cls.UI_FAILED_CALL_INDEXES,
+            # FEP-0012 decision-learning indexes
+            cls.DECISION_LOG_INDEXES,
+            cls.DECISION_OUTCOME_INDEXES,
         ]
 
     @classmethod
@@ -1155,6 +1242,8 @@ class Schema:
             # Changes
             cls.CHANGES_GROUP,
             cls.CHANGES_FILE,
+            # Edge-classifier per-project RL delta (FEP-0012)
+            cls.LOCAL_CLASSIFIER_DELTA,
         ]
 
     @classmethod
@@ -1169,6 +1258,7 @@ class Schema:
             cls.MODE_INDEXES,
             cls.PROFILE_INDEXES,
             cls.CHANGES_INDEXES,
+            cls.LOCAL_CLASSIFIER_DELTA_INDEXES,
         ]
 
 
@@ -1179,7 +1269,11 @@ class Schema:
 # Edges now include optional file lineage in graph_edge for direct file-aware deletes.
 # Version 7: RL unified tables - add value_text column to rl_param for JSON blob storage
 #   All per-learner private tables consolidated into rl_q_value/rl_transition/rl_param/rl_task_stat.
-CURRENT_SCHEMA_VERSION = 7
+# Version 8: FEP-0012 edge-classifier decision learning
+#   - decision_log + decision_outcome (global): correlated decision records + the
+#     decision->outcome/reward junction, enabling reward-weighted training.
+#   - local_classifier_delta (project): per-project RL weight overlay.
+CURRENT_SCHEMA_VERSION = 8
 
 
 def get_migration_sql(from_version: int, to_version: int) -> List[str]:
@@ -1277,6 +1371,15 @@ def get_migration_sql(from_version: int, to_version: int) -> List[str]:
         7: [
             f"ALTER TABLE {Tables.RL_PARAM} ADD COLUMN value_text TEXT",
             f"INSERT OR REPLACE INTO {Tables.SYS_METADATA} (key, value, updated_at) VALUES ('rl_unified_schema_version', '7', datetime('now'))",
+        ],
+        # Version 8 (FEP-0012): edge-classifier decision learning. Idempotent
+        # CREATE TABLE — decision_log/decision_outcome are global (join
+        # rl_outcome for training); local_classifier_delta is per-project.
+        # Indexes are created via Schema.get_all_indexes()/get_project_indexes().
+        8: [
+            Schema.DECISION_LOG,
+            Schema.DECISION_OUTCOME,
+            Schema.LOCAL_CLASSIFIER_DELTA,
         ],
     }
 

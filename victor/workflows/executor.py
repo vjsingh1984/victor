@@ -66,9 +66,9 @@ warnings.warn(
 # Backward compatibility alias
 WorkflowExecutor = CompiledWorkflowExecutor
 
-# Chain handler prefix for YAML workflow references
-# Used to identify chain handlers in workflow definitions: "chain:vertical:name"
-CHAIN_HANDLER_PREFIX = "chain:"
+# Chain handler prefix moved to victor.workflows.compute_registry (canonical);
+# re-exported here for backward compatibility until 0.10.0.
+from victor.workflows.compute_registry import CHAIN_HANDLER_PREFIX  # noqa: E402
 
 
 # Dummy function for test patching (deprecated)

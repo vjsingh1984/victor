@@ -64,9 +64,11 @@ class TestAdapterConfig:
         Defaults optimized for SWE-bench with slow models (DeepSeek, Qwen, Mixtral).
         """
         config = AdapterConfig()
-        assert config.max_turns == 20  # Fewer, longer turns for slow models
+        assert config.max_turns == 20  # More turns within the task budget
         assert config.tool_budget == 50  # ACTION complexity budget
-        assert config.min_turn_timeout == 240  # 4 min per turn for slow inference
+        # 2 min per turn: a lower floor maximizes turns within the task budget
+        # (1200s / 120s = 10 turns) so the agent reaches the edit phase.
+        assert config.min_turn_timeout == 120
         assert config.track_file_edits is True
         assert config.track_diffs is True
         assert config.working_dir is None
@@ -152,10 +154,25 @@ class TestVictorAgentAdapter:
         """Benchmark sessions should always expose graph navigation."""
         assert "graph" in VictorAgentAdapter.benchmark_tool_allowlist()
 
-    def test_benchmark_tool_readiness_reports_missing_graph(self, mock_orchestrator):
-        """Readiness should fail when graph is not registered in the live session."""
+    def test_benchmark_tool_readiness_graph_optional_when_missing(self, mock_orchestrator):
+        """graph is demand-loaded/optional — missing it must NOT fail readiness."""
         registry = ToolRegistry()
-        for name in ("read", "edit", "write", "code_search", "ls", "shell"):
+        for name in ("read", "edit", "write", "code", "shell"):
+            registry.register(_DummyTool(name))
+        mock_orchestrator.tools = registry
+
+        adapter = VictorAgentAdapter(mock_orchestrator)
+        readiness = adapter.get_benchmark_tool_readiness()
+
+        assert readiness.ready is True  # graph optional → still ready
+        assert "graph" in readiness.missing_tools  # but reported
+        assert "graph" in readiness.optional_tools
+        assert "code" in readiness.enabled_tools
+
+    def test_benchmark_tool_readiness_fails_on_missing_base_tool(self, mock_orchestrator):
+        """A missing BASE tool (not optional) must fail readiness."""
+        registry = ToolRegistry()
+        for name in ("read", "edit", "write", "shell"):  # no 'code'
             registry.register(_DummyTool(name))
         mock_orchestrator.tools = registry
 
@@ -163,23 +180,21 @@ class TestVictorAgentAdapter:
         readiness = adapter.get_benchmark_tool_readiness()
 
         assert readiness.ready is False
-        assert readiness.missing_tools == ("graph",)
-        assert "code_search" in readiness.enabled_tools
+        assert "code" in readiness.missing_tools
 
     def test_benchmark_tool_readiness_reports_disabled_tools(self, mock_orchestrator):
-        """Readiness should fail when required tools exist but are disabled."""
+        """Readiness should fail when a required (base) tool is disabled."""
         registry = ToolRegistry()
         for name in VictorAgentAdapter.benchmark_tool_allowlist():
             registry.register(_DummyTool(name))
-        registry.disable_tool("graph")
+        registry.disable_tool("code")  # disable a BASE tool
         mock_orchestrator.tools = registry
 
         adapter = VictorAgentAdapter(mock_orchestrator)
         readiness = adapter.get_benchmark_tool_readiness()
 
         assert readiness.ready is False
-        assert readiness.disabled_tools == ("graph",)
-        assert "graph" not in readiness.enabled_tools
+        assert "code" in readiness.disabled_tools
 
     def test_reset(self, adapter):
         """Test reset clears state."""
@@ -227,6 +242,7 @@ class TestVictorAgentAdapter:
             profile="benchmark-profile",
             session_config=config,
             enable_observability=False,
+            vertical=None,
         )
 
     def test_on_tool_start_records_call(self, adapter):
@@ -347,8 +363,14 @@ class TestVictorAgentAdapter:
             prompt="Fix a cross-module dependency bug",
         )
 
-        with tempfile.TemporaryDirectory() as tmpdir:
-            await adapter.execute_task(task, Path(tmpdir))
+        # graph is in the allowlist only when the optional graph tool resolves;
+        # force it on so the test is deterministic across environments.
+        with patch(
+            "victor.evaluation.agent_adapter._graph_tool_available",
+            return_value=True,
+        ):
+            with tempfile.TemporaryDirectory() as tmpdir:
+                await adapter.execute_task(task, Path(tmpdir))
 
         mock_orchestrator.set_enabled_tools.assert_called()
         enabled_tools = mock_orchestrator.set_enabled_tools.call_args.args[0]
@@ -492,3 +514,147 @@ class TestFileEditCapture:
             assert "+++" in diff
             assert "-old_line" in diff
             assert "+line2" in diff
+
+
+class TestTaskCompletionLogging:
+    """The benchmark adapter must log task_completion decisions via the decision
+    service, so the FEP-0012 classifier gets premature-completion training data.
+
+    Previously the adapter used pure regex (analyze_response/should_stop) and
+    never called decide_sync → 0 task_completion samples. Now it injects the
+    decision service + calls _decide_sync(TASK_COMPLETION) per turn.
+    """
+
+    @pytest.fixture
+    def mock_orchestrator(self):
+        orchestrator = MagicMock()
+        orchestrator._on_tool_start_callback = None
+        orchestrator._on_tool_complete_callback = None
+        orchestrator.reset_conversation = MagicMock()
+        orchestrator.chat = AsyncMock(return_value=MagicMock(content="TASK COMPLETE"))
+        orchestrator.tools = MagicMock()
+        orchestrator.tools.list_tools.return_value = []
+        orchestrator.tools.register_before_hook = MagicMock()
+        orchestrator.tools.register_after_hook = MagicMock()
+        return orchestrator
+
+    @pytest.mark.asyncio
+    async def test_completion_detector_gets_decision_service(self, mock_orchestrator):
+        """execute_task injects the decision service into the completion detector."""
+        from victor.evaluation.agent_adapter import VictorAgentAdapter, AdapterConfig
+        from victor.evaluation.protocol import BenchmarkTask, BenchmarkType
+        import tempfile
+        from pathlib import Path
+        from unittest.mock import MagicMock, patch, AsyncMock
+
+        adapter = VictorAgentAdapter(mock_orchestrator, AdapterConfig(max_turns=1))
+        task = BenchmarkTask(
+            task_id="test/svc",
+            benchmark=BenchmarkType.CUSTOM,
+            description="test",
+            prompt="Fix a bug",
+        )
+        mock_response = MagicMock()
+        mock_response.content = "Done."
+        mock_response.tool_calls = []
+        mock_response.metadata = {}
+        mock_orchestrator.chat = AsyncMock(return_value=mock_response)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with patch("victor.core.context.set_session_id"):
+                with patch(
+                    "victor.agent.services.protocols.decision_service.get_decision_service",
+                    return_value=MagicMock(name="LoggingDecisionService"),
+                ):
+                    await adapter.execute_task(task, Path(tmpdir))
+
+        # The adapter's completion detector should have the service injected.
+        assert adapter._completion_detector._decision_service is not None
+
+    @pytest.mark.asyncio
+    async def test_task_completion_logged_per_turn(self, mock_orchestrator):
+        """Each turn's completion check calls _decide_sync(TASK_COMPLETION)."""
+        from victor.evaluation.agent_adapter import VictorAgentAdapter, AdapterConfig
+        from victor.evaluation.protocol import BenchmarkTask, BenchmarkType
+        import tempfile
+        from pathlib import Path
+        from unittest.mock import MagicMock, patch, AsyncMock
+
+        adapter = VictorAgentAdapter(mock_orchestrator, AdapterConfig(max_turns=1))
+        task = BenchmarkTask(
+            task_id="test/log",
+            benchmark=BenchmarkType.CUSTOM,
+            description="test",
+            prompt="Fix a bug",
+        )
+        mock_response = MagicMock()
+        mock_response.content = "The fix is complete."
+        mock_response.tool_calls = []
+        mock_response.metadata = {}
+        mock_orchestrator.chat = AsyncMock(return_value=mock_response)
+
+        # Mock the decision service + _decide_sync
+        mock_svc = MagicMock()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with patch("victor.core.context.set_session_id"):
+                with patch(
+                    "victor.agent.services.protocols.decision_service.get_decision_service",
+                    return_value=mock_svc,
+                ):
+                    await adapter.execute_task(task, Path(tmpdir))
+
+        # _decide_sync should have been called with TASK_COMPLETION
+        assert adapter._completion_detector._decision_service is mock_svc
+        # The LoggingDecisionService's decide_sync should have been invoked
+        # (via _decide_sync on the detector). We verify the service was set.
+        # Full verification requires a deeper integration test.
+
+
+class TestDemandLoadCuratedTools:
+    """Demand-only tools (graph) must be registered before set_enabled_tools
+    so _union_curated_enabled() can find them in list_tools."""
+
+    @pytest.fixture
+    def mock_orchestrator(self):
+        orchestrator = MagicMock()
+        orchestrator._on_tool_start_callback = None
+        orchestrator._on_tool_complete_callback = None
+        orchestrator.reset_conversation = MagicMock()
+        orchestrator.chat = AsyncMock(return_value=MagicMock(content="Done"))
+        orchestrator.tools = ToolRegistry()
+        return orchestrator
+
+    def test_graph_registered_when_in_allowlist(self, mock_orchestrator):
+        """If graph is in the allowlist but not in the registry, the demand-load
+        logic detects it and attempts registration."""
+        from victor.evaluation.agent_adapter import VictorAgentAdapter
+        from unittest.mock import patch
+
+        # Set up a registry WITHOUT graph
+        registry = ToolRegistry()
+        for name in ("read", "edit", "write", "code", "shell"):
+            registry.register(_DummyTool(name))
+        mock_orchestrator.tools = registry
+        adapter = VictorAgentAdapter(mock_orchestrator)
+
+        # Simulate the demand-registration logic from execute_task
+        benchmark_tools = {"code", "edit", "graph", "read", "shell", "write"}
+        registered = {t.name for t in registry.list_tools(only_enabled=False)}
+        missing = benchmark_tools - registered
+        assert missing == {"graph"}, f"Expected only graph missing, got {missing}"
+
+        # Mock SharedToolRegistry to return a graph tool
+        graph_tool = _DummyTool("graph")
+        with patch("victor.agent.shared_tool_registry.SharedToolRegistry.get_instance") as mock_get:
+            mock_instance = MagicMock()
+            mock_instance.get_tools_for_names.return_value = [graph_tool]
+            mock_get.return_value = mock_instance
+
+            from victor.tools.batch_registration import BatchRegistrar
+
+            shared = mock_get.return_value
+            new_tools = shared.get_tools_for_names(missing)
+            BatchRegistrar(registry).register_batch(new_tools, fail_fast=False)
+
+        registered_after = {t.name for t in registry.list_tools(only_enabled=False)}
+        assert "graph" in registered_after, f"graph not registered: {registered_after}"

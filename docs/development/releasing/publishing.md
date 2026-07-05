@@ -196,7 +196,7 @@ twine upload dist/*
 
 ```bash
 # Install build dependencies
-pip install -e ".[build]"
+pip install -e ./victor-contracts -e ".[build]"
 
 # Build for current platform
 python scripts/build_binary.py --onefile
@@ -340,7 +340,7 @@ docker login ghcr.io
 
 **Missing dependencies:**
 ```bash
-pip install -e ".[build]"
+pip install -e ./victor-contracts -e ".[build]"
 ```
 
 **PyInstaller errors:**

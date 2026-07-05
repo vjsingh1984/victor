@@ -53,6 +53,7 @@ except ImportError:
     types = None
 
 from victor.providers.base import (
+    CacheCostModel,
     BaseProvider,
     CompletionResponse,
     Message,
@@ -236,6 +237,17 @@ class GoogleProvider(BaseProvider):
     def supports_kv_prefix_caching(self) -> bool:
         """Gemini reuses KV cache for matching prompt prefixes."""
         return True
+
+    def cache_cost_model(self) -> CacheCostModel:
+        """Characterized API caching (FEP-0011): 75-90% read, 32K min, custom TTL."""
+        return CacheCostModel(
+            supported=True,
+            read_discount=0.825,
+            write_overhead=1.0,
+            ttl_seconds=0.0,
+            min_prefix_tokens=32768,
+            prefix_granularity="token",
+        )
 
     def context_window(self, model: Optional[str] = None) -> int:
         from victor.providers.context_windows import GOOGLE, GOOGLE_DEFAULT, lookup

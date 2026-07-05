@@ -128,7 +128,10 @@ def create_fep(
         None, "--github", "-g", help="GitHub username (default: git config github.user)"
     ),
     output: Optional[Path] = typer.Option(
-        None, "--output", "-o", help="Output file path (default: fep-XXXX-title.md)"
+        None,
+        "--output",
+        "-o",
+        help="Output file path (default: feps/fep-XXXX-title.md)",
     ),
 ) -> None:
     """Create a new FEP from template.
@@ -184,10 +187,12 @@ def create_fep(
     template_path = _get_template_path()
     template_content = template_path.read_text(encoding="utf-8")
 
-    # Generate filename
+    # Generate filename. Default into feps/ (where the validator and repo
+    # convention expect drafts) rather than the cwd, which previously left
+    # scaffold scratch like fep-XXXX-test.md at the repo root.
     title_slug = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
     if output is None:
-        output = Path(f"fep-XXXX-{title_slug}.md")
+        output = _get_feps_dir() / f"fep-XXXX-{title_slug}.md"
 
     # Get current date
     from datetime import datetime

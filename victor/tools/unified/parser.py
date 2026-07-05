@@ -68,3 +68,70 @@ def split_command(command: str) -> list[str]:
             restored_args.append(arg)
 
     return restored_args
+
+
+# -----------------------------------------------------------------------------
+# Shell-operator detection
+# -----------------------------------------------------------------------------
+# `fs`/`code`/etc. are NOT shells: they pass the command through `shlex` and
+# `argparse`, so shell control/redirect operators are never interpreted — they
+# just produce a cryptic argparse parse error. These helpers detect such
+# operators on the *post-split token list* so the tool can return a crisp,
+# actionable "use the `shell` tool" message instead.
+#
+# Scanning tokens (not the raw string) is what makes this accurate: an operator
+# inside a quoted argument (e.g. `code python "a | b"`) survives `shlex` as a
+# single token whose *content* contains the character, so it is only flagged
+# when the whole token — or a leading redirect run — IS the operator.
+# -----------------------------------------------------------------------------
+
+# Control operators that are only meaningful as standalone (space-separated) tokens.
+_CONTROL_OPERATORS = frozenset({"|", "||", "&&", ";", "&"})
+
+# Redirect operators. These appear either as a bare token (`>`, `2>`) or glued
+# to a target path (`>/dev/null`, `2>/dev/null`, `>>log.txt`). A legitimate
+# filesystem/code argument never starts with one of these, so a prefix match is
+# safe. Longer prefixes are listed first so the reported operator is specific.
+_REDIRECT_PREFIXES = (">>", "2>>", "1>>", "&>>", "&>", "2>", "1>", ">", "<")
+
+
+def detect_shell_operators(tokens: list[str]) -> str | None:
+    """Return a shell operator if ``tokens`` contain one, else ``None``.
+
+    Args:
+        tokens: The post-:func:`split_command` token list (i.e. what argparse
+            would see). Pass the list *after* stripping the tool-name prefix.
+
+    Returns:
+        The offending operator string (e.g. ``"||"``, ``"2>"``) for messaging,
+        or ``None`` when the command is clean.
+
+    Notes:
+        - Operators embedded inside a quoted argument are NOT flagged, because
+          ``shlex`` keeps them as a single token's content (e.g. the ``|`` in
+          ``code python "a | b"`` is part of the token ``a | b``).
+        - Deeply embedded, unspaced operators inside an unquoted code fragment
+          (e.g. a bare ``a||b`` token) are intentionally NOT flagged to avoid
+          false positives on legitimate code; the common space-separated and
+          redirect forms — the ones that actually break argparse — are caught.
+    """
+    for tok in tokens:
+        if tok in _CONTROL_OPERATORS:
+            return tok
+        for prefix in _REDIRECT_PREFIXES:
+            if tok == prefix or tok.startswith(prefix):
+                return tok
+    return None
+
+
+def shell_operator_rejection(tool_name: str, operator: str) -> str:
+    """Build the actionable "use the ``shell`` tool" rejection message."""
+    return (
+        "### ⚠️ SHELL OPERATOR NOT SUPPORTED\n"
+        f"`{tool_name}` is not a shell — `{operator}` is not interpreted here, "
+        "so this command would silently mis-parse.\n"
+        "  • For pipelines / redirects / `a || b` / `a && b`, use the `shell` "
+        f"tool:  `shell --cmd '<your full command>'`\n"
+        f"  • Or drop the operator and run each step as its own `{tool_name}` "
+        "call."
+    )

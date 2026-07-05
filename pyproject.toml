@@ -18,7 +18,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "victor-ai"
-version = "0.7.2"
+version = "0.7.3"
 description = "Open-source agentic AI framework with multi-provider support, workflow orchestration, and extensible tool system"
 readme = "README.md"
 license = {text = "Apache-2.0"}
@@ -58,6 +58,15 @@ dependencies = [
     "python-dotenv>=1.0",
     "typing-extensions>=4.9",  # For typing.Self on Python 3.10
     "orjson>=3.9.0",  # Fast JSON serialization (Rust-backed, 5-10x faster than stdlib)
+    # Imported on the `import victor` path (core.verticals.version_matrix) and for
+    # vertical version gating. Previously satisfied only transitively via dev tools —
+    # a bare `pip install victor-ai` could land in an env without it.
+    "packaging>=23.0",
+    # Module-level import on the CLI path (processing.native similarity fallbacks,
+    # semantic caches, FEP-0012 numpy-only ML inference). Previously only reachable
+    # via the embeddings/dev extras, so a bare `pip install victor-ai` shipped a CLI
+    # that crashed at startup. Keep the pin aligned with the embeddings extra.
+    "numpy>=1.24,<2.3",
 
     # Async
     "httpx>=0.27",
@@ -95,13 +104,18 @@ dependencies = [
     # Caching
     "cachetools>=5.3",
     "diskcache>=5.6",
-    "docker>=7.0",
     "docstring-parser>=0.15",
     "psutil>=5.9",  # System metrics for observability and health monitoring
 
 ]
 
 [project.optional-dependencies]
+# Docker-backed surfaces: sandboxed code execution, the docker workflow service
+# provider, and container deployment. Every import site is lazy/guarded
+# (DOCKER_AVAILABLE pattern), so the base install degrades gracefully without it.
+docker = [
+    "docker>=7.0",
+]
 # Semantic embeddings: tool selection, conversation embeddings, codebase search
 embeddings = [
     "numpy>=1.24,<2.3",  # Required by victor.storage.embeddings.service; numba-compatible
@@ -132,6 +146,14 @@ chat-ui = [
     "chainlit>=2,<3",  # 2.x cl.Action uses payload= (the 1.x value= kwarg was removed)
 ]
 
+# Edge-classifier TRAINING (FEP-0012) — dev-only. Runtime inference is
+# numpy-only (victor.ml.features + victor.ml.model); this extra is needed only
+# to run scripts/train_edge_classifier.py / victor.ml.trainer.
+ml = [
+    "scikit-learn>=1.4",
+    "scipy>=1.10",
+]
+
 dev = [
     # Embeddings (required for full test coverage)
     "numpy>=1.24,<2.3",  # Required by victor.storage.embeddings.service; numba-compatible
@@ -149,6 +171,7 @@ dev = [
     "pytest-benchmark>=5.0",  # For performance tests
     "pytest-timeout>=2.3",  # ci-fast quick-tests run with --timeout=120
     "aiosqlite>=0.19",  # For SQLite async operations in tests
+    "docker>=7.0",  # docker moved out of default deps; tests + collection need it
 
     "respx>=0.21",
     "pandas>=2.0",  # For data analysis handler tests
@@ -194,7 +217,9 @@ ci = [
     "pytest-timeout>=2.3",  # ci-fast quick-tests run with --timeout=120
     "respx>=0.21",
     "pandas>=2.0",
+    "docker>=7.0",  # docker moved out of default deps; tests + collection need it
     "scipy>=1.10",
+    "scikit-learn>=1.4",  # FEP-0012 edge-classifier trainer round-trip tests
 
     # Linting/Formatting/Typing
     "ruff>=0.5",
@@ -624,6 +649,7 @@ victor = [
     "config/*.yaml",
     "config/*.yml",
     "config/*.json",
+    "models/*.npz",
     "verticals/contrib/*/*.yaml",
     "verticals/contrib/*/*.toml",
     "verticals/contrib/*/*.svg",

@@ -1086,8 +1086,17 @@ class TurnExecutor:
         task_classification = self._provider_context.task_classifier.classify(user_message)
         is_qa = self._is_question_only(user_message)
 
-        # Calculate iteration budget same as legacy path
-        max_iterations_setting = getattr(self._chat_context.settings, "chat_max_iterations", 10)
+        # Calculate iteration budget. A per-call ``iteration_budget`` override
+        # (from runtime_context_overrides) is read directly here rather than via
+        # a mutate-then-restore of the shared settings.chat_max_iterations.
+        iter_override = self._coerce_int_override(
+            (runtime_context_overrides or {}).get("iteration_budget")
+        )
+        max_iterations_setting = (
+            iter_override
+            if iter_override is not None
+            else getattr(self._chat_context.settings, "chat_max_iterations", 10)
+        )
         task_budget = max(task_classification.tool_budget * 2, 1)
         iteration_budget = min(task_budget, max_iterations_setting, max_iterations)
 
@@ -1620,6 +1629,15 @@ class TurnExecutor:
             conversation_depth=conversation_depth,
         )
 
+        # When the caller curated the toolset (_enabled_tools is a real non-empty
+        # collection), the schema must reach the LLM UNCHANGED — no stage
+        # prioritization or intent filtering that drops curated tools (code/graph).
+        # select_tools() already short-circuits to the stable curated set (#368);
+        # skip the downstream gates too so the full 6-tool set survives.
+        _curated = getattr(self._tool_context.tool_selector, "_enabled_tools", None)
+        if isinstance(_curated, (set, frozenset, list)) and _curated:
+            return tools
+
         # Prioritize by stage
         tools = self._tool_context.tool_selector.prioritize_by_stage(user_message, tools)
 
@@ -1813,14 +1831,9 @@ class TurnExecutor:
         if tool_budget is not None:
             self._apply_tool_budget_override(tool_budget, snapshot, orchestrator)
 
-        iteration_budget = self._coerce_int_override(overrides.get("iteration_budget"))
-        settings = getattr(self._chat_context, "settings", None)
-        if iteration_budget is not None and settings is not None:
-            snapshot["chat_max_iterations"] = getattr(settings, "chat_max_iterations", _MISSING)
-            try:
-                settings.chat_max_iterations = max(1, iteration_budget)
-            except Exception:
-                pass
+        # NOTE: ``iteration_budget`` is no longer applied here by mutating the
+        # shared ``settings.chat_max_iterations``; it is read directly in
+        # ``_execute_via_agentic_loop`` from ``runtime_context_overrides``.
 
         return snapshot
 
@@ -1846,14 +1859,6 @@ class TurnExecutor:
             self._chat_context._runtime_context_overrides = previous_chat_context
 
         self._restore_tool_budget_override(snapshot, orchestrator)
-
-        settings = getattr(self._chat_context, "settings", None)
-        previous_iterations = snapshot.get("chat_max_iterations", _MISSING)
-        if settings is not None and previous_iterations is not _MISSING:
-            try:
-                settings.chat_max_iterations = previous_iterations
-            except Exception:
-                pass
 
     def _apply_tool_budget_override(
         self,

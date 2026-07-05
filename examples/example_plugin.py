@@ -315,7 +315,7 @@ class WeatherPlugin(ToolPlugin):
 
 async def demo_plugin_usage():
     """Demonstrate plugin usage with ToolPluginRegistry."""
-    from victor.tools.base import ToolRegistry
+    from victor.tools.registry import ToolRegistry
     from victor.tools.plugin_registry import ToolPluginRegistry
 
     print("=" * 60)
