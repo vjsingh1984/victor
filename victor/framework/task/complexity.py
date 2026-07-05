@@ -44,12 +44,10 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple
 
 from .protocols import TaskClassification, TaskClassifierProtocol, TaskComplexity
 
-# Import TASK_TYPE_TO_COMPLEXITY from classification module (Single Source of Truth)
-from victor.classification import (
-    TASK_TYPE_TO_COMPLEXITY as CLASSIFICATION_TASK_TYPE_TO_COMPLEXITY,
-    TaskType,
-    get_pattern_matcher,
-)
+# TASK_TYPE_TO_COMPLEXITY / get_pattern_matcher come from victor.classification
+# (Single Source of Truth) but are imported at call sites: a module-scope import
+# closes the cycle victor.classification -> victor.framework -> ... -> here and
+# breaks any direct `import victor.classification` entry.
 
 # Per-turn tool budgets are sourced from the framework-wide budget policy so the
 # complexity-derived budgets cannot drift away from BUDGET_LIMITS again.
@@ -440,6 +438,11 @@ class TaskComplexityService:
         Falls back to None if no high-confidence match is found.
         """
         try:
+            from victor.classification import (
+                TASK_TYPE_TO_COMPLEXITY as CLASSIFICATION_TASK_TYPE_TO_COMPLEXITY,
+                get_pattern_matcher,
+            )
+
             matcher = get_pattern_matcher()
             pattern = matcher.match(message)
             if pattern and pattern.confidence >= 0.9:
@@ -622,6 +625,10 @@ class TaskComplexityService:
             return None
 
         try:
+            from victor.classification import (
+                TASK_TYPE_TO_COMPLEXITY as CLASSIFICATION_TASK_TYPE_TO_COMPLEXITY,
+            )
+
             result = classifier.classify_sync(message)
             # Use CLASSIFICATION_TASK_TYPE_TO_COMPLEXITY from classification module
             # This uses TaskType enum keys directly (Single Source of Truth)

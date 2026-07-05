@@ -114,3 +114,28 @@ assert victor.agent is agent_pkg  # mock.patch("victor.agent...") depends on thi
 """
         result = _run(script)
         assert result.returncode == 0, result.stdout.strip() or result.stderr.strip()
+
+
+# Direct-entry imports that historically deadlocked on import cycles once the
+# top-level victor/__init__ went lazy (the eager init always entered via
+# framework first, masking them). Each runs in a fresh interpreter because the
+# pytest worker has already imported most of victor.
+# - victor.core.verticals.package_schema: vertical-validation CI entry
+# - victor.classification: cycle via framework.task.complexity
+# - victor.protocols: cycle via agent.runtime_intelligence_pipeline
+_DIRECT_ENTRY_MODULES = [
+    "victor.core.verticals.package_schema",
+    "victor.core.verticals",
+    "victor.classification",
+    "victor.protocols",
+]
+
+
+@pytest.mark.parametrize("module", _DIRECT_ENTRY_MODULES)
+def test_direct_submodule_entry_has_no_import_cycle(module: str) -> None:
+    """Importing a subpackage FIRST (no prior `import victor`) must work."""
+    result = _run(f"import {module}")
+    assert result.returncode == 0, (
+        f"direct `import {module}` failed — an import cycle regressed:\n"
+        f"{result.stdout.strip() or result.stderr.strip()}"
+    )
