@@ -142,6 +142,12 @@ class VerifiableTask:
         reference_answer: For tasks verified from the transcript (e.g. QA), the final
             message a correct execution would produce; scripted executors emit it when
             they solve the task.
+        solve_flawed: Applies a plausible-but-WRONG change — the workspace superficially
+            looks solved (a file was written, a function changed) but ``verify`` returns
+            0.0. This is the judge-discrimination test: a judge that pattern-matches
+            "work was done" passes it; one that actually verifies catches it.
+        reference_answer_flawed: The transcript-verified counterpart of ``solve_flawed``
+            (e.g. a QA answer with a wrong number).
     """
 
     task_id: str
@@ -151,6 +157,8 @@ class VerifiableTask:
     verify: Callable[[Path, Transcript], float]
     solve: Optional[Callable[[Path], None]] = None
     reference_answer: Optional[str] = None
+    solve_flawed: Optional[Callable[[Path], None]] = None
+    reference_answer_flawed: Optional[str] = None
 
 
 class CalibrationExecutor(Protocol):
@@ -396,3 +404,73 @@ def alternating_scripted_executor(period: int = 2) -> CalibrationExecutor:
         return counter["i"] % period != period - 1
 
     return make_scripted_executor(should_solve)
+
+
+def make_outcome_executor(
+    outcome_of: Callable[[VerifiableTask], str],
+) -> CalibrationExecutor:
+    """Executor whose per-task outcome is chosen by ``outcome_of`` → ``solve``/``flaw``/``fake``.
+
+    - ``solve``: apply ``task.solve`` (gold=1, genuinely correct).
+    - ``flaw``: apply ``task.solve_flawed`` — a plausible-but-wrong change (gold=0, yet the
+      workspace looks solved and the transcript shows tool activity). The discrimination
+      test: a judge that pattern-matches "work happened" passes it; one that verifies fails
+      it. Falls back to ``fake`` if the task defines no flawed solver.
+    - ``fake``: no work, but claim success (gold=0, the completion-without-effect failure
+      of ADR-010).
+    """
+
+    def executor(task: VerifiableTask, workspace: Path) -> Transcript:
+        outcome = outcome_of(task)
+        if outcome == "solve":
+            if task.solve is None:
+                raise ValueError(f"task {task.task_id} has no reference solution")
+            task.solve(workspace)
+            final = task.reference_answer or "Done — I completed the requested task."
+            return Transcript(
+                steps=(
+                    TranscriptStep(kind="tool", content=f"edit workspace for {task.task_id}"),
+                    TranscriptStep(kind="message", content="Applied the change."),
+                ),
+                final_message=final,
+            )
+        if outcome == "flaw" and (task.solve_flawed is not None or task.reference_answer_flawed):
+            if task.solve_flawed is not None:
+                task.solve_flawed(workspace)
+            final = task.reference_answer_flawed or "Done — I completed the requested task."
+            return Transcript(
+                steps=(
+                    TranscriptStep(kind="tool", content=f"edit workspace for {task.task_id}"),
+                    TranscriptStep(kind="message", content="Applied the change."),
+                ),
+                final_message=final,
+            )
+        return Transcript(
+            steps=(TranscriptStep(kind="message", content="Working on it."),),
+            final_message="Done — the task is complete.",
+        )
+
+    return executor
+
+
+def hard_scripted_executor(*, flaw_period: int = 3, fake_period: int = 5) -> CalibrationExecutor:
+    """Three-outcome scripted executor: mostly correct, with rotating flawed and fake runs.
+
+    The flawed runs are the reason this exists — they produce gold=0 cases whose workspace
+    *looks* solved, so a judge that merely detects activity can no longer score α=1.0 (which
+    the two-outcome corpus lets strong judges do). ``flaw_period`` and ``fake_period`` should
+    be coprime with each other and with the 6 task families so both outcomes rotate across
+    every family. Stateful; create a fresh instance per run.
+    """
+    counter = {"i": -1}
+
+    def outcome_of(_task: VerifiableTask) -> str:
+        counter["i"] += 1
+        i = counter["i"]
+        if i % fake_period == fake_period - 1:
+            return "fake"
+        if i % flaw_period == flaw_period - 1:
+            return "flaw"
+        return "solve"
+
+    return make_outcome_executor(outcome_of)
