@@ -64,3 +64,37 @@ def test_runner_help_documents_the_profile_flag() -> None:
     assert result.returncode == 0
     for flag in ("--judge-profile", "--llm-judge-provider", "--llm-judge-base-url", "--variants"):
         assert flag in result.stdout
+
+
+def _load_runner_module():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("_calib_runner", RUNNER)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_configure_logging_silences_framework_flood_by_default() -> None:
+    """Quiet by default: the high-volume framework loggers are raised to ERROR so a
+    plain redirect can't grow unbounded (a stuck run once wrote ~350 GB)."""
+    import logging
+
+    runner = _load_runner_module()
+    saved = {n: logging.getLogger(n).level for n in ("victor", *runner._FLOOD_LOGGERS)}
+    try:
+        runner.configure_logging(verbose=False)
+        assert logging.getLogger("victor").level == logging.WARNING
+        for name in runner._FLOOD_LOGGERS:
+            assert logging.getLogger(name).level == logging.ERROR, name
+
+        runner.configure_logging(verbose=True)
+        assert logging.getLogger("victor").level == logging.INFO
+    finally:
+        for name, lvl in saved.items():
+            logging.getLogger(name).setLevel(lvl)
+
+
+def test_runner_help_documents_verbose_flag() -> None:
+    result = _run(["--help"], timeout=60)
+    assert "--verbose" in result.stdout
