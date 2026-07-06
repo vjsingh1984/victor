@@ -290,6 +290,49 @@ This is a **non-breaking, additive** change with a staged default flip:
 - `v1.0.x`: default flips to the shipped classifier; Ollama edge becomes opt-in
   (not removed — retained for users who want the LLM boost).
 
+## Phase 7 Validation Run Plan
+
+The parity gate (`victor ml validate`, GREEN) already ships the artifact at
+held-out accuracy. Phase 7 validates the **loop-level** behavior — does trusting
+the classifier (and its delta) in real agent runs help or hurt? Three A/B knobs
+are now env-overridable so each run is a one-liner (no source edits):
+
+| Knob | Env var | Default | What it tests |
+|---|---|---|---|
+| `decision_backend` | `VICTOR_DECISION_BACKEND` | `auto` | `local_classifier` vs `edge` (LLM) vs `heuristic` for micro-decisions |
+| `local_learning_enabled` | `VICTOR_LOCAL_LEARNING_ENABLED` | `true` | on/off for the per-project RL delta |
+| `local_classifier_completion_signal` | `VICTOR_LOCAL_CLASSIFIER_COMPLETION_SIGNAL` | `false` | whether the classifier's `task_completion` head may STOP the loop |
+
+**Run pair (recommended minimum):** the same SWE-bench slice, two arms:
+
+```bash
+# Control: current defaults (classifier serves micro-decisions, delta on,
+#          completion-signal OFF).
+nohup script -q /dev/null bash -c 'victor benchmark run ...' > control.log 2>&1 &
+
+# Treatment: flip the completion-signal on (the behavioral change under test).
+VICTOR_LOCAL_CLASSIFIER_COMPLETION_SIGNAL=true \
+  nohup script -q /dev/null bash -c 'victor benchmark run ...' > treatment.log 2>&1 &
+```
+
+(`script -q /dev/null` wraps a PTY so the keyring is reachable interactively —
+plain `nohup` makes the process non-interactive and the API-key resolver skips
+the keychain. Use the same model + slice + seed for both arms.)
+
+**Decision criteria for flipping `local_classifier_completion_signal` default-on:**
+1. Pass rate on the **un-starved subset** (`tool_calls > 0`) is ≥ control (no
+   regression). Always read the un-starved subset — a rate-limited run starves
+   tasks to 0 patches and corrupts the aggregate.
+2. No measurable increase in **premature stops** (the risk: a confident-but-wrong
+   "pass" stops the loop early). Track via `task_completion` decisions with
+   `source=local_classifier`, `is_complete=True`, on tasks that ultimately failed.
+3. Latency/cost unchanged or improved (the classifier is sub-ms vs a 4s LLM edge
+   timeout).
+
+If both hold, flip the default in `DecisionServiceSettings` and retire the
+Ollama edge default. If (2) regresses, raise the head `threshold` (τ) or the
+consumer `confidence ≥ 0.7` bar before re-running.
+
 ## References
 
 - FEP-0001 (edge model system being replaced as default).
