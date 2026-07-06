@@ -113,6 +113,18 @@ def main() -> int:
         "discrimination test for judges that saturate the easy corpus at α=1.0.",
     )
     parser.add_argument(
+        "--two-phase",
+        action="store_true",
+        help="Run all trajectories first, then all judging (one model swap instead of one "
+        "per task). Auto-enabled in --agent-profile mode; use this to force it for scripted "
+        "runs too.",
+    )
+    parser.add_argument(
+        "--no-two-phase",
+        action="store_true",
+        help="Disable the automatic two-phase scheduling in --agent-profile mode.",
+    )
+    parser.add_argument(
         "--agent-profile",
         default=None,
         help="Generate REAL agent trajectories with this Victor profile instead of the "
@@ -217,9 +229,16 @@ def main() -> int:
         print("executor: scripted")
 
     # ONE executor pass; every judge scores the identical trajectories (essential for the
-    # real-agent executor, which is expensive and non-deterministic per run).
+    # real-agent executor, which is expensive and non-deterministic per run). two-phase
+    # (execute all → judge all) avoids per-task model swapping on a single inference server;
+    # default it on in agent mode, where the executor and judge use different models.
+    two_phase = args.two_phase or (args.agent_profile is not None and not args.no_two_phase)
+    if two_phase:
+        print("scheduling: two-phase (all trajectories, then all judging) — one model swap")
     harness = JudgeCalibrationHarness(default_corpus(variants=args.variants))
-    reports = harness.run_multi_judge(executor, judges, keep_workspaces=args.keep_workspaces)
+    reports = harness.run_multi_judge(
+        executor, judges, keep_workspaces=args.keep_workspaces, two_phase=two_phase
+    )
 
     # Gold distribution: agreement (α) is meaningless if every task shares one gold class.
     # A strong real agent can solve everything (all gold=1); flag that the run measures only
