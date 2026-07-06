@@ -581,6 +581,11 @@ class EvaluationConfig:
     docker_image_override: Optional[str] = None
     swebench_image_source: str = "official"  # official | build | skip
     swebench_image_registry: str = "docker.io/swebench"
+    # Closed-loop verify-and-retry gate (PR2 #404). 0 = OFF (default — the gate
+    # adds latency without benefit for current models; opt-in for stronger ones
+    # that can capitalize on a retry). >0 = max times to feed FAIL_TO_PASS
+    # failures back into the loop after the agent claims done.
+    max_verify_retries: int = 0
 
     # Self-correction settings (generic iterative refinement)
     enable_self_correction: bool = False
