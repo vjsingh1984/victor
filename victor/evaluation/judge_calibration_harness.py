@@ -281,6 +281,7 @@ class JudgeCalibrationHarness:
         *,
         workspace_root: Optional[Path] = None,
         keep_workspaces: bool = False,
+        two_phase: bool = False,
     ) -> dict[str, CalibrationReport]:
         """Generate one trajectory + gold per task, then score EVERY judge on the shared
         trajectories; return a per-judge-name :class:`CalibrationReport`.
@@ -291,9 +292,21 @@ class JudgeCalibrationHarness:
         comparison meaningless. Here every judge scores the identical (transcript,
         workspace) pair.
 
-        Blinding + ordering per task: setup → executor → ALL judges score → verify for gold.
-        Verification runs last so no verifier side effect can reach any judge's view; judges
-        are read-only, so they observe the same workspace state as each other.
+        Blinding + ordering: setup → executor → ALL judges score → verify for gold.
+        Verification runs after judging so no verifier side effect (e.g. ``__pycache__``
+        from importing a fixed module) can reach any judge's view; judges are read-only, so
+        they observe the same workspace state as each other.
+
+        ``two_phase`` controls the call *order* across tasks — results are identical either
+        way (deterministic judges) but throughput differs when the executor and judges use
+        DIFFERENT models on a single local inference server (e.g. a 30B agent + a 70B judge
+        on one Ollama):
+
+        - ``False`` (default): interleave per task (execute→judge→verify, next task). The
+          server swaps executor↔judge models every task — Nx model loads.
+        - ``True``: run all executors first (executor model resident throughout), then all
+          judges (judge model resident throughout), then verify. One model swap total. Use
+          for real-agent runs; harmless (just reordering) for scripted ones.
 
         When ``workspace_root`` is given the caller owns its lifetime; otherwise a temp dir
         is created and removed on exit (``keep_workspaces=True`` retains it for inspection).
@@ -304,25 +317,37 @@ class JudgeCalibrationHarness:
         caller_owned = workspace_root is not None
         root = workspace_root or Path(tempfile.mkdtemp(prefix="judge_calibration_"))
         try:
-            per_judge: dict[str, list[CalibrationSample]] = {name: [] for name in judges}
+            # Phase 1 — execute every task; keep (task, workspace, transcript) records.
+            records: list[tuple[VerifiableTask, Path, Transcript]] = []
+            # Per-task judge scores + gold, filled either inline (interleaved) or in phase 2/3.
+            judged_by_task: list[dict[str, float]] = []
+            gold_by_task: list[float] = []
             for index, task in enumerate(self.tasks):
                 workspace = root / f"{index:04d}_{task.task_id}"
                 workspace.mkdir(parents=True, exist_ok=False)
                 task.setup(workspace)
                 transcript = executor(task, workspace)
-                judged = {
-                    name: float(judge(task.prompt, transcript, workspace))
-                    for name, judge in judges.items()
-                }
-                gold = float(task.verify(workspace, transcript))
+                records.append((task, workspace, transcript))
+                if not two_phase:
+                    # Judge BEFORE verify so verifier side effects never reach the judge.
+                    judged_by_task.append(
+                        {n: float(j(task.prompt, transcript, workspace)) for n, j in judges.items()}
+                    )
+                    gold_by_task.append(float(task.verify(workspace, transcript)))
+
+            if two_phase:
+                # Phase 2 — all judges (judge model resident). Phase 3 — verify (no model).
+                judged_by_task = [
+                    {n: float(j(t.prompt, tr, ws)) for n, j in judges.items()}
+                    for (t, ws, tr) in records
+                ]
+                gold_by_task = [float(t.verify(ws, tr)) for (t, ws, tr) in records]
+
+            per_judge: dict[str, list[CalibrationSample]] = {name: [] for name in judges}
+            for (task, _ws, _tr), judged, gold in zip(records, judged_by_task, gold_by_task):
                 for name in judges:
                     per_judge[name].append(
-                        CalibrationSample(
-                            task_id=task.task_id,
-                            family=task.family,
-                            gold=gold,
-                            judged=judged[name],
-                        )
+                        CalibrationSample(task.task_id, task.family, gold, judged[name])
                     )
             return {name: self._report(samples) for name, samples in per_judge.items()}
         finally:

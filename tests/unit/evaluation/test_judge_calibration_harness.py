@@ -195,6 +195,35 @@ def test_run_delegates_to_multi_judge(tmp_path: Path) -> None:
     assert len(report.samples) == 12
 
 
+def test_two_phase_matches_interleaved_and_reorders_calls(tmp_path: Path) -> None:
+    """two_phase gives identical samples (deterministic judges) but calls the executor for
+    ALL tasks before any judge — the property that avoids per-task model swapping."""
+    order_i: list[str] = []
+    scripted_i = alternating_scripted_executor(period=5)
+    inter = JudgeCalibrationHarness(default_corpus(variants=2)).run_multi_judge(
+        lambda t, w: (order_i.append(f"exec:{t.task_id}"), scripted_i(t, w))[1],
+        {"j": lambda _p, tr, _w: (order_i.append("judge"), 1.0 if tr.tool_steps() else 0.0)[1]},
+        workspace_root=tmp_path / "a",
+        two_phase=False,
+    )
+    order_t: list[str] = []
+    scripted_t = alternating_scripted_executor(period=5)
+    two = JudgeCalibrationHarness(default_corpus(variants=2)).run_multi_judge(
+        lambda t, w: (order_t.append(f"exec:{t.task_id}"), scripted_t(t, w))[1],
+        {"j": lambda _p, tr, _w: (order_t.append("judge"), 1.0 if tr.tool_steps() else 0.0)[1]},
+        workspace_root=tmp_path / "b",
+        two_phase=True,
+    )
+    # Identical results regardless of scheduling.
+    assert [s.judged for s in inter["j"].samples] == [s.judged for s in two["j"].samples]
+    assert [s.gold for s in inter["j"].samples] == [s.gold for s in two["j"].samples]
+    # Interleaved alternates exec/judge; two-phase runs all 12 execs before the first judge.
+    first_judge = order_t.index("judge")
+    assert first_judge == 12
+    assert all(entry.startswith("exec:") for entry in order_t[:first_judge])
+    assert order_i.index("judge") < 12  # interleaved judges early
+
+
 def test_report_shape_and_json_roundtrip(tmp_path: Path) -> None:
     harness = JudgeCalibrationHarness(default_corpus(variants=2))
     report = harness.run(
