@@ -23,6 +23,7 @@ This module provides robust tool execution with:
 """
 
 import asyncio
+import json
 import logging
 import time
 from enum import Enum
@@ -463,6 +464,10 @@ class ToolExecutor:
         - str → int/float (numeric strings)
         - int → float
         - str → bool ("true"/"false")
+        - str → array/object (JSON-serialized): smaller / local models frequently send an
+          array or object parameter as its JSON string (e.g. the ``edit`` tool's ``ops``
+          arg arrived as ``'[{"type":"replace",...}]'`` in real-agent calibration, failing
+          strict validation). If the string parses to the expected type, use the parsed value.
         """
         schema = tool.parameters
         if not schema:
@@ -492,6 +497,11 @@ class ToolExecutor:
                         arguments[key] = False
                 elif expected == "string" and not isinstance(value, str):
                     arguments[key] = str(value)
+                elif expected in ("array", "object") and isinstance(value, str):
+                    parsed = json.loads(value)
+                    want_list = expected == "array"
+                    if isinstance(parsed, (list, dict)) and isinstance(parsed, list) == want_list:
+                        arguments[key] = parsed
             except (ValueError, TypeError):
                 pass  # Leave original value; tool will handle the error
 
@@ -555,6 +565,13 @@ class ToolExecutor:
 
         if effective_mode == ValidationMode.OFF:
             return True, None
+
+        # Coerce safe, lossless serializations (numeric strings, JSON-string arrays/objects)
+        # BEFORE validating — in all modes. A model that JSON-serializes an array arg should
+        # not be rejected by STRICT for a recoverable serialization (real-agent calibration
+        # saw the edit tool's `ops` sent as a JSON string). ``arguments`` is the same dict
+        # that flows to execution, so the coerced values are used downstream too.
+        self._coerce_arg_types(tool, arguments)
 
         # First check for unknown/hallucinated arguments (provides clearer errors)
         valid, unknown_args = self._check_unknown_arguments(tool, arguments)
@@ -830,10 +847,8 @@ class ToolExecutor:
             self._complete_tool_call(call_id, False, error=result.error)
             return result
 
-        # In LENIENT mode, coerce argument types to match schema to prevent
-        # runtime TypeErrors (e.g., string "5" when int expected)
-        if self._get_effective_validation_mode(tool) == ValidationMode.LENIENT:
-            self._coerce_arg_types(tool, normalized_args)
+        # (Argument type coercion now runs pre-validation in _validate_arguments for all
+        # modes; normalized_args is already coerced by the time we get here.)
 
         # Safety check for dangerous operations
         should_proceed, rejection_reason = await self.safety_checker.check_and_confirm(
