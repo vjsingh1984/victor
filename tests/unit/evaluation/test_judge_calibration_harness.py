@@ -64,6 +64,37 @@ def test_every_task_verifies_one_when_solved(tmp_path: Path) -> None:
         assert task.verify(workspace, transcript) == 1.0, task.task_id
 
 
+def test_every_task_has_a_flawed_solver_that_verifies_zero(tmp_path: Path) -> None:
+    """Each flawed solver must make the workspace LOOK worked-on (state differs from setup)
+    yet fail verification — that contrast is the whole discrimination test."""
+    from victor.evaluation.judge_calibration_harness import make_outcome_executor
+
+    def snapshot(ws: Path) -> dict:
+        # Skip __pycache__ bytecode that code-fix verification generates on import.
+        out = {}
+        for p in ws.rglob("*"):
+            if p.is_file() and "__pycache__" not in p.parts:
+                try:
+                    out[str(p.relative_to(ws))] = p.read_text()
+                except UnicodeDecodeError:
+                    pass
+        return out
+
+    flaw_executor = make_outcome_executor(lambda _t: "flaw")
+    for i, task in enumerate(default_corpus(variants=2)):
+        assert task.solve_flawed is not None or task.reference_answer_flawed, task.task_id
+        workspace = tmp_path / f"flawed_{i}"
+        workspace.mkdir()
+        task.setup(workspace)
+        pristine = snapshot(workspace)
+        transcript = flaw_executor(task, workspace)
+        # gold=0: the flawed attempt does not actually satisfy the task.
+        assert task.verify(workspace, transcript) == 0.0, task.task_id
+        # ...but it is not a no-op: either the workspace changed or a wrong answer was given.
+        changed = snapshot(workspace) != pristine or task.reference_answer_flawed is not None
+        assert changed, f"{task.task_id} flawed solve left no trace — not a discrimination case"
+
+
 # --- Harness end-to-end ----------------------------------------------------------------------------
 
 
@@ -125,6 +156,33 @@ def test_multi_judge_scores_all_on_one_executor_pass(tmp_path: Path) -> None:
     # The evidence judge tracks tool activity → agrees; the constant judge does not.
     assert ev.overall.krippendorff_alpha == pytest.approx(1.0)
     assert not co.gate_decision.trusted
+
+
+def test_hard_executor_discriminates_verify_from_activity_judges(tmp_path: Path) -> None:
+    """On the HARD corpus, a judge that only checks for tool activity is fooled by flawed
+    cases (activity present, gold=0) while a gold-aware oracle stays perfect — restoring the
+    discrimination the easy corpus lost when strong judges saturate at α=1.0."""
+    from victor.evaluation.judge_calibration_harness import hard_scripted_executor
+
+    harness = JudgeCalibrationHarness(default_corpus(variants=8))
+
+    def activity_judge(_p: str, transcript: Transcript, _w: Path) -> float:
+        return 1.0 if transcript.tool_steps() else 0.0
+
+    reports = harness.run_multi_judge(
+        hard_scripted_executor(),
+        {"activity": activity_judge},
+        workspace_root=tmp_path,
+    )
+    samples = reports["activity"].samples
+    golds = {s.gold for s in samples}
+    assert golds == {0.0, 1.0}, "hard corpus must produce both gold classes"
+    # Flawed cases: gold=0 but tool activity present → the activity judge scores them 1.0,
+    # i.e. it is fooled. So its agreement must fall BELOW a perfect score (unlike on the
+    # easy corpus, where activity == gold).
+    fooled = [s for s in samples if s.gold == 0.0 and s.judged == 1.0]
+    assert fooled, "hard corpus should fool an activity-only judge on at least one flawed case"
+    assert reports["activity"].overall.krippendorff_alpha < 1.0
 
 
 def test_run_delegates_to_multi_judge(tmp_path: Path) -> None:

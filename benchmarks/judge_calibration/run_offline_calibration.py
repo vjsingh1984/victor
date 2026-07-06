@@ -106,6 +106,13 @@ def main() -> int:
         "Useful for diagnosing what a judge actually saw on a bad run.",
     )
     parser.add_argument(
+        "--hard",
+        action="store_true",
+        help="Use the three-outcome scripted executor (correct / flawed / fake) instead of "
+        "the two-outcome one. Flawed cases look solved but are subtly wrong — the "
+        "discrimination test for judges that saturate the easy corpus at α=1.0.",
+    )
+    parser.add_argument(
         "--agent-profile",
         default=None,
         help="Generate REAL agent trajectories with this Victor profile instead of the "
@@ -200,6 +207,11 @@ def main() -> int:
         )
         executor = make_agent_executor(adapter, timeout_seconds=args.agent_timeout)
         print(f"executor: real agent (profile={args.agent_profile})")
+    elif args.hard:
+        from victor.evaluation.judge_calibration_harness import hard_scripted_executor
+
+        executor = hard_scripted_executor()
+        print("executor: scripted (HARD — includes flawed 'looks-solved-but-wrong' cases)")
     else:
         executor = alternating_scripted_executor(period=5)
         print("executor: scripted")
