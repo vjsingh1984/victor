@@ -389,22 +389,29 @@ class Schema:
     """
 
     # FEP-0012: per-project RL weight overlay (personalization delta). Sparse,
-    # top-K bounded per decision_type, L2-decayed. Lives in the PROJECT db.
+    # FEP-0012 Phase 6: per-label RL weight overlay. One row per
+    # (decision_type, feature_hash, label) so a multi-class head (e.g.
+    # task_completion's fail/partial/pass) can carry a per-label nudge.
+    # feature_spec_version pins the hasher config: a future spec bump
+    # invalidates stale rows (the loader filters to the runtime spec).
+    # Top-K bounded per (decision_type, label), L2-decayed. PROJECT db.
     LOCAL_CLASSIFIER_DELTA = f"""
         CREATE TABLE IF NOT EXISTS {Tables.LOCAL_CLASSIFIER_DELTA} (
             decision_type TEXT NOT NULL,
             feature_hash INTEGER NOT NULL,
+            label TEXT NOT NULL,
             weight REAL DEFAULT 0.0,
             samples INTEGER DEFAULT 0,
             sum_reward REAL DEFAULT 0.0,
+            feature_spec_version TEXT NOT NULL DEFAULT '',
             updated_at TEXT DEFAULT (datetime('now')),
-            PRIMARY KEY (decision_type, feature_hash)
+            PRIMARY KEY (decision_type, feature_hash, label, feature_spec_version)
         )
     """
 
     LOCAL_CLASSIFIER_DELTA_INDEXES = f"""
         CREATE INDEX IF NOT EXISTS idx_local_classifier_delta_type
-            ON {Tables.LOCAL_CLASSIFIER_DELTA}(decision_type);
+            ON {Tables.LOCAL_CLASSIFIER_DELTA}(decision_type, feature_spec_version);
     """
 
     RL_Q_VALUE = f"""
@@ -1273,7 +1280,12 @@ class Schema:
 #   - decision_log + decision_outcome (global): correlated decision records + the
 #     decision->outcome/reward junction, enabling reward-weighted training.
 #   - local_classifier_delta (project): per-project RL weight overlay.
-CURRENT_SCHEMA_VERSION = 8
+# Version 9: FEP-0012 Phase 6 — per-label local_classifier_delta. The v8 scalar
+#   schema could not hold a multi-class head's per-label nudge (task_completion is
+#   fail/partial/pass). Redefined to one row per (decision_type, feature_hash,
+#   label) + a feature_spec_version guard. The table had never been written, so
+#   the v9 migration DROPs+recreates it losslessly.
+CURRENT_SCHEMA_VERSION = 9
 
 
 def get_migration_sql(from_version: int, to_version: int) -> List[str]:
@@ -1379,6 +1391,14 @@ def get_migration_sql(from_version: int, to_version: int) -> List[str]:
         8: [
             Schema.DECISION_LOG,
             Schema.DECISION_OUTCOME,
+            Schema.LOCAL_CLASSIFIER_DELTA,
+        ],
+        # Version 9 (FEP-0012 Phase 6): local_classifier_delta becomes per-label.
+        # The table has never been written (Phase 6 is the first writer), so
+        # DROP+CREATE is lossless. DROP is a no-op on the global DB (the table is
+        # project-scoped). Indexes are re-created via get_project_indexes().
+        9: [
+            f"DROP TABLE IF EXISTS {Tables.LOCAL_CLASSIFIER_DELTA}",
             Schema.LOCAL_CLASSIFIER_DELTA,
         ],
     }

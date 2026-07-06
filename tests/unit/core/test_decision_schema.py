@@ -25,8 +25,8 @@ def test_table_constants_defined():
     assert Tables.LOCAL_CLASSIFIER_DELTA == "local_classifier_delta"
 
 
-def test_schema_version_bumped_to_8():
-    assert CURRENT_SCHEMA_VERSION == 8
+def test_schema_version_bumped_to_9():
+    assert CURRENT_SCHEMA_VERSION == 9
 
 
 def test_global_tables_registered_in_get_all_schemas():
@@ -109,6 +109,51 @@ def test_global_tables_create_and_query():
     conn.close()
 
 
+def test_v9_migration_drops_and_recreates_delta_per_label():
+    """v8->v9 DROPs the old scalar delta table and recreates it per-label."""
+    conn = sqlite3.connect(":memory:")
+    # Simulate a v8-shaped project DB with the OLD scalar delta table + a row.
+    conn.execute(
+        "CREATE TABLE local_classifier_delta ("
+        "decision_type TEXT, feature_hash INTEGER, weight REAL, samples INTEGER,"
+        "sum_reward REAL, updated_at TEXT, PRIMARY KEY (decision_type, feature_hash))"
+    )
+    conn.execute("INSERT INTO local_classifier_delta VALUES ('x', 1, 0.5, 1, 0.5, 't')")
+    conn.commit()
+
+    # Apply the 8->9 migration.
+    _apply(conn, get_migration_sql(8, 9))
+
+    # New per-label columns exist; the old scalar row is gone (DROP+CREATE).
+    cols = [r[1] for r in conn.execute("PRAGMA table_info(local_classifier_delta)").fetchall()]
+    assert "label" in cols and "feature_spec_version" in cols
+    assert conn.execute("SELECT COUNT(*) FROM local_classifier_delta").fetchone()[0] == 0
+
+    # A per-label row inserts cleanly under the new 4-column PK.
+    conn.execute(
+        f"INSERT INTO {Tables.LOCAL_CLASSIFIER_DELTA}"
+        " (decision_type, feature_hash, label, weight, feature_spec_version)"
+        " VALUES (?,?,?,?,?)",
+        ("task_completion", 7, "pass", 0.3, "1"),
+    )
+    # Same (type, hash, label, spec) dedups; a different label coexists.
+    with pytest.raises(sqlite3.IntegrityError):
+        conn.execute(
+            f"INSERT INTO {Tables.LOCAL_CLASSIFIER_DELTA}"
+            " (decision_type, feature_hash, label, weight, feature_spec_version)"
+            " VALUES (?,?,?,?,?)",
+            ("task_completion", 7, "pass", 0.9, "1"),
+        )
+    conn.execute(
+        f"INSERT INTO {Tables.LOCAL_CLASSIFIER_DELTA}"
+        " (decision_type, feature_hash, label, weight, feature_spec_version)"
+        " VALUES (?,?,?,?,?)",
+        ("task_completion", 7, "fail", -0.2, "1"),
+    )
+    assert conn.execute("SELECT COUNT(*) FROM local_classifier_delta").fetchone()[0] == 2
+    conn.close()
+
+
 def test_project_delta_table_creates_and_query():
     conn = sqlite3.connect(":memory:")
     _apply(conn, Schema.get_project_schemas())
@@ -118,20 +163,29 @@ def test_project_delta_table_creates_and_query():
 
     conn.execute(
         f"""INSERT INTO {Tables.LOCAL_CLASSIFIER_DELTA}
-            (decision_type, feature_hash, weight, samples, sum_reward)
-            VALUES (?,?,?,?,?)""",
-        ("task_type_classification", 12345, 0.42, 7, 5.5),
+            (decision_type, feature_hash, label, weight, samples, sum_reward,
+             feature_spec_version)
+            VALUES (?,?,?,?,?,?,?)""",
+        ("task_completion", 12345, "pass", 0.42, 7, 5.5, "1"),
     )
-    # Composite PK dedups on (decision_type, feature_hash).
+    # Composite PK dedups on (decision_type, feature_hash, label, feature_spec_version).
     with pytest.raises(sqlite3.IntegrityError):
         conn.execute(
             f"""INSERT INTO {Tables.LOCAL_CLASSIFIER_DELTA}
-                (decision_type, feature_hash, weight) VALUES (?, ?, ?)""",
-            ("task_type_classification", 12345, 0.9),
+                (decision_type, feature_hash, label, weight, feature_spec_version)
+                VALUES (?, ?, ?, ?, ?)""",
+            ("task_completion", 12345, "pass", 0.9, "1"),
         )
-    row = conn.execute(
-        f"SELECT weight, samples FROM {Tables.LOCAL_CLASSIFIER_DELTA} "
-        f"WHERE decision_type='task_type_classification'"
-    ).fetchone()
-    assert row[0] == pytest.approx(0.42) and row[1] == 7
+    # A different label for the same hash coexists (per-label storage).
+    conn.execute(
+        f"""INSERT INTO {Tables.LOCAL_CLASSIFIER_DELTA}
+            (decision_type, feature_hash, label, weight, feature_spec_version)
+            VALUES (?, ?, ?, ?, ?)""",
+        ("task_completion", 12345, "fail", -0.1, "1"),
+    )
+    rows = conn.execute(
+        f"SELECT label, weight, samples FROM {Tables.LOCAL_CLASSIFIER_DELTA} "
+        f"WHERE decision_type='task_completion' ORDER BY label"
+    ).fetchall()
+    assert rows == [("fail", pytest.approx(-0.1), 0), ("pass", pytest.approx(0.42), 7)]
     conn.close()

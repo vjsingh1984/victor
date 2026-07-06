@@ -4,7 +4,7 @@ title: "Shipped RL-trained edge classifier (replace the Ollama edge default)"
 type: Standards Track
 status: Draft
 created: 2026-06-30
-modified: 2026-06-30
+modified: 2026-07-06
 authors:
   - name: Vijaykumar Singh
     email: singhvjd@gmail.com
@@ -237,9 +237,31 @@ re-asserts). Pure-numpy/Rust; local only.
    `TieredDecisionService`; bootstrap factory; flip the default tier when the
    artifact is present (LLM edge becomes opt-in escalation).
 6. **RL delta (online):** reward-weighted bandit overlay writing
-   `local_classifier_delta` (bounded, L2-decayed), pure-numpy/Rust.
+   `local_classifier_delta` (bounded, L2-decayed), pure-numpy/Rust. **— Shipped
+   (Phase 6).** On each resolved session (`record_session_outcome`),
+   `victor/agent/decisions/local_delta.py` writes a per-label softmax-cross-entropy
+   update toward the observed reward bucket (gradient scaled by where the
+   universal model is wrong), L2-decays and top-K bounds the overlay, and the
+   service blends `α·delta·x` into `predict()` via a TTL-cached `load_delta`.
+   Local-only (project DB), gated by `local_learning_enabled`. Two refinements
+   vs. the original scalar design: the table is **per-label** `(decision_type,
+   feature_hash, label, feature_spec_version)` (schema v8→v9, DROP+CREATE — the
+   table had never been written) because the shipped heads are multi-class
+   (`task_completion` = fail/partial/pass), and it carries a `feature_spec_version`
+   guard so a future hasher-spec bump can't blend stale hashes.
 7. **Validation:** A/B the classifier vs the LLM edge model on held-out
    decisions; ship only at parity on the universal decision types.
+
+> **Known gap (Phase 5/7 follow-up, not Phase 6):** the delta is blended into the
+> logits, but does not yet change an *observable* `task_completion` decision,
+> because (a) `LocalClassifierDecisionService._map_bool` for `TASK_COMPLETION`
+> expects labels `complete/true/yes` while the shipped head produces
+> `pass/partial/fail` (so it always maps to `is_complete=False`), and (b)
+> `task_completion.py` only consumes `decision.source == "llm"`, ignoring the
+> local classifier for stopping. Closing both is a behavioral change to the
+> completion detector and wants A/B validation (Phase 7) before it defaults on.
+> The Phase 6 blend is verified at the predict level via unit tests that bypass
+> the mapper.
 
 ## Migration Path
 
