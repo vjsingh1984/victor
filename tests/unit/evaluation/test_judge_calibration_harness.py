@@ -100,6 +100,43 @@ def test_constant_judge_fails_gate_on_mixed_gold(tmp_path: Path) -> None:
     assert not report.gate_decision.trusted
 
 
+def test_multi_judge_scores_all_on_one_executor_pass(tmp_path: Path) -> None:
+    """run_multi_judge must run the executor once and score every judge on the SAME
+    trajectories — the executor is called exactly once per task, not once per judge."""
+    executor_calls: list[str] = []
+    scripted = alternating_scripted_executor(period=5)  # one instance: its counter persists
+
+    def counting_executor(task, workspace):
+        executor_calls.append(task.task_id)
+        return scripted(task, workspace)
+
+    harness = JudgeCalibrationHarness(default_corpus(variants=2))
+    reports = harness.run_multi_judge(
+        counting_executor,
+        {"evidence": _evidence_judge, "constant": _constant_judge},
+        workspace_root=tmp_path,
+    )
+    assert set(reports) == {"evidence", "constant"}
+    # 12 tasks, executor called once each — NOT 24 (once per judge).
+    assert len(executor_calls) == 12
+    # Both judges scored the same 12 trajectories; their gold columns are identical.
+    ev, co = reports["evidence"], reports["constant"]
+    assert [s.gold for s in ev.samples] == [s.gold for s in co.samples]
+    # The evidence judge tracks tool activity → agrees; the constant judge does not.
+    assert ev.overall.krippendorff_alpha == pytest.approx(1.0)
+    assert not co.gate_decision.trusted
+
+
+def test_run_delegates_to_multi_judge(tmp_path: Path) -> None:
+    """The single-judge run() is a thin wrapper and stays behaviourally identical."""
+    harness = JudgeCalibrationHarness(default_corpus(variants=2))
+    report = harness.run(
+        alternating_scripted_executor(period=5), _evidence_judge, workspace_root=tmp_path
+    )
+    assert report.overall.krippendorff_alpha == pytest.approx(1.0)
+    assert len(report.samples) == 12
+
+
 def test_report_shape_and_json_roundtrip(tmp_path: Path) -> None:
     harness = JudgeCalibrationHarness(default_corpus(variants=2))
     report = harness.run(
