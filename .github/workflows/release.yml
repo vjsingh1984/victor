@@ -467,6 +467,11 @@ jobs:
     needs: [build-python, generate-checksums, create-release]
     if: "!contains(github.ref, 'alpha') && !contains(github.ref, 'beta') && !contains(github.ref, 'rc')"
     runs-on: ubuntu-latest
+    # Uniform with release-contracts/-codegraph/-verticals: the trusted publisher for
+    # victor-ai on PyPI must be registered with environment = pypi (matches this claim).
+    environment:
+      name: pypi
+      url: https://pypi.org/project/victor-ai/
     permissions:
       id-token: write
 
