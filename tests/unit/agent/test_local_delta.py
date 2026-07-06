@@ -247,3 +247,50 @@ def test_update_empty_session_returns_zero():
         "empty-session", reward=1.0, decisions=[], predict_fn=_pfn, head_labels=HEAD_LABELS
     )
     assert n == 0
+
+
+# --------------------------------------------------------------------------
+# Idempotency (production path: double-recorded outcome must not double-count)
+# --------------------------------------------------------------------------
+
+
+def test_update_idempotent_on_repeated_session(monkeypatch):
+    """A second call for the same session is a no-op (no double SGD count).
+
+    Reproduces the benchmark's by-design double-record (per-task on_progress +
+    the post-run safety-net loop both call record_session_outcome per task). The
+    production path (no injected predict_fn) claims the session on first apply.
+    """
+    monkeypatch.setattr(ld, "extract_features", lambda txt: {7: 1.0})
+    # Deterministic artifact-independent predict (production path resolves it
+    # via _get_default_predict).
+    monkeypatch.setattr(
+        ld,
+        "_get_default_predict",
+        lambda: ((lambda dtype, feats: np.array([0.6, 0.3, 0.1])), dict(HEAD_LABELS)),
+    )
+
+    n1 = ld.update_delta_from_session("dup-session", reward=1.0, decisions=_decisions())
+    n2 = ld.update_delta_from_session("dup-session", reward=1.0, decisions=_decisions())
+    assert n1 > 0
+    assert n2 == 0  # already claimed -> skipped
+
+    # Delta weights equal ONE application, not two.
+    delta = ld.load_delta("task_completion", LABELS)
+    vec = delta[7]
+    # Observed pass, model p_pass=0.1 -> grad_pass = 1-0.1 = 0.9; lr default 0.1;
+    # plus 0.995 decay. Two applications would roughly double the magnitude.
+    assert vec[LABELS.index("pass")] == pytest.approx(0.1 * 1.0 * 0.9 * 0.995)
+
+
+def test_update_distinct_sessions_both_applied(monkeypatch):
+    """Distinct sessions are each applied exactly once."""
+    monkeypatch.setattr(ld, "extract_features", lambda txt: {7: 1.0})
+    monkeypatch.setattr(
+        ld,
+        "_get_default_predict",
+        lambda: ((lambda dtype, feats: np.array([0.6, 0.3, 0.1])), dict(HEAD_LABELS)),
+    )
+    n1 = ld.update_delta_from_session("sess-A", reward=1.0, decisions=_decisions())
+    n2 = ld.update_delta_from_session("sess-B", reward=1.0, decisions=_decisions())
+    assert n1 > 0 and n2 > 0
