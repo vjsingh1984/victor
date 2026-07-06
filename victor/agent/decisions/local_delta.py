@@ -76,6 +76,34 @@ PredictFn = Callable[[str, Dict[int, float]], Optional[np.ndarray]]
 _model_cache: Any = None
 _predict_cache: Optional[Tuple[PredictFn, Dict[str, List[str]]]] = None
 
+# Idempotency: sessions whose delta has already been applied this process. Guards
+# against by-design double-records — e.g. the benchmark records each task in the
+# per-task on_progress callback AND again in the post-run safety-net loop (the
+# outcome rows are idempotent via DELETE-then-INSERT, but the SGD update is not).
+# Process-local + capped; a cross-restart duplicate stays bounded by L2 decay +
+# top-K. ``dict`` preserves insertion order (3.7+), so it doubles as an ordered
+# set with FIFO eviction.
+_PROCESSED_SESSIONS: Dict[str, None] = {}
+_PROCESSED_SESSIONS_CAP = 4096
+
+
+def _claim_delta_session(session_id: str) -> bool:
+    """Atomically claim a session for delta processing.
+
+    Returns ``True`` iff this session was NOT already claimed this process
+    (i.e. this is the first application and the caller should proceed). A repeat
+    call for the same session returns ``False`` so the SGD update isn't applied
+    twice for one session's outcome.
+    """
+    if session_id in _PROCESSED_SESSIONS:
+        return False
+    _PROCESSED_SESSIONS[session_id] = None
+    if len(_PROCESSED_SESSIONS) > _PROCESSED_SESSIONS_CAP:
+        # Drop the oldest quarter (FIFO) to bound memory in long-running servers.
+        for stale in list(_PROCESSED_SESSIONS)[: _PROCESSED_SESSIONS_CAP // 4]:
+            _PROCESSED_SESSIONS.pop(stale, None)
+    return True
+
 
 def _artifact_path() -> Optional[Path]:
     """Resolve the shipped-classifier artifact path (env override wins)."""
@@ -340,6 +368,14 @@ def update_delta_from_session(
         logger.debug("delta update: no usable artifact heads for session %s", session_id)
         return 0
 
+    # Idempotency (production path only): skip sessions already applied this
+    # process so a double-recorded outcome (e.g. benchmark on_progress + the
+    # post-run safety-net loop) doesn't double-count the SGD update. Test mode
+    # (injected predict_fn) bypasses this so tests can replay a session.
+    if not test_mode and not _claim_delta_session(session_id):
+        logger.debug("delta update: session %s already applied; skipping", session_id)
+        return 0
+
     acc, touched = _compute_label_updates(decisions, reward, head_labels, predict_fn, lr)
     if not acc:
         return 0
@@ -390,7 +426,7 @@ def load_delta(decision_type: str, labels: List[str]) -> Dict[int, np.ndarray]:
 
 
 def clear_delta_for_tests() -> None:
-    """Delete all delta rows (test isolation). Best-effort."""
+    """Delete all delta rows + reset the claimed-sessions guard (test isolation)."""
     try:
         from victor.core.database import get_project_database
         from victor.core.schema import Tables
@@ -399,3 +435,4 @@ def clear_delta_for_tests() -> None:
         db.execute(f"DELETE FROM {Tables.LOCAL_CLASSIFIER_DELTA}")  # nosemgrep
     except Exception:
         pass
+    _PROCESSED_SESSIONS.clear()
