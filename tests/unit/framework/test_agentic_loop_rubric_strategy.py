@@ -63,6 +63,29 @@ def test_config_from_dict_accepts_rubric_strategy():
     assert "completion_strategy" not in cfg.extra_config  # known field, not spilled to extra
 
 
+# --- _build_rubric_evaluator (ADR-011 fallback contract) -----------------------------------------
+
+
+def test_enhanced_strategy_builds_no_evaluator():
+    assert AgenticLoop._build_rubric_evaluator("enhanced", None) is None
+    assert AgenticLoop._build_rubric_evaluator("enhanced", lambda p: "x") is None
+
+
+def test_rubric_without_llm_judge_reverts_to_enhanced():
+    # No rubric_complete_fn -> None (defer to enhanced), NOT the uncalibrated heuristic (a=-0.092).
+    for strategy in ("rubric", "hybrid"):
+        assert AgenticLoop._build_rubric_evaluator(strategy, None) is None
+
+
+def test_rubric_with_llm_judge_builds_evaluator():
+    async def judge(_prompt):
+        return "correctness: score=0.9 confidence=0.9"
+
+    for strategy in ("rubric", "hybrid"):
+        ev = AgenticLoop._build_rubric_evaluator(strategy, judge)
+        assert ev is not None and hasattr(ev, "aevaluate")  # the async LLM-judge evaluator
+
+
 # --- _rubric_completion_result -------------------------------------------------------------------
 
 

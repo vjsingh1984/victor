@@ -693,32 +693,19 @@ class AgenticLoop:
             )
 
         # Rubric-based completion (ADR-009 / EVR-3) — opt-in via completion_strategy in
-        # {"rubric","hybrid"}. Default "enhanced" leaves this None (zero behavior change). When an
-        # async rubric_complete_fn is injected, use the LLM judge; otherwise the deterministic
-        # heuristic judge. "hybrid" additionally consults the enhanced evaluator (both must agree).
-        self.rubric_completion_evaluator = None
-        if self.config.completion_strategy in ("rubric", "hybrid"):
-            if rubric_complete_fn is not None:
-                from victor.framework.rubric_completion import (
-                    AsyncRubricCompletionEvaluator,
-                    LLMRubricJudge,
-                )
-
-                self.rubric_completion_evaluator = AsyncRubricCompletionEvaluator(
-                    LLMRubricJudge(rubric_complete_fn)
-                )
-                logger.info(
-                    "[RubricCompletion] ENABLED (LLM judge) — strategy=%s",
-                    self.config.completion_strategy,
-                )
-            else:
-                from victor.framework.rubric_completion import RubricCompletionEvaluator
-
-                self.rubric_completion_evaluator = RubricCompletionEvaluator()
-                logger.info(
-                    "[RubricCompletion] ENABLED (heuristic judge) — strategy=%s",
-                    self.config.completion_strategy,
-                )
+        # {"rubric","hybrid"}. Default "enhanced" leaves this None (zero behavior change).
+        #
+        # ADR-011 fallback contract (flag-graduation policy): rubric completion is trusted
+        # ONLY with a calibrated LLM judge. The no-LLM HeuristicRubricJudge scored
+        # Krippendorff α=−0.092 in calibration (benchmarks/judge_calibration/FINDINGS.md) —
+        # worse than the enhanced baseline — so when no rubric_complete_fn is injected we do
+        # NOT silently fall back to it; we leave the evaluator None, which the completion
+        # cascade treats as "defer to enhanced". The caller must inject a judge backed by a
+        # calibrated model (gemma4:31b α=0.865 on real trajectories, or llama3.3:70b α=1.000
+        # — the run-11 / run-10 gate-passers).
+        self.rubric_completion_evaluator = self._build_rubric_evaluator(
+            self.config.completion_strategy, rubric_complete_fn
+        )
 
         # Initialize planning gate for fast-slow architecture
         self.planning_gate = PlanningGate(enabled=self.config.enable_planning_gate)
@@ -2618,6 +2605,41 @@ class AgenticLoop:
             "next i'll ",
         )
         return any(first_line.startswith(p) for p in intent_prefixes)
+
+    @staticmethod
+    def _build_rubric_evaluator(strategy: str, rubric_complete_fn: Any):
+        """Select the rubric completion evaluator, enforcing the ADR-011 fallback contract.
+
+        Rubric completion (ADR-009 / EVR-3) is trusted ONLY with a calibrated LLM judge.
+        Returns:
+          - the LLM-judge evaluator when ``strategy`` is rubric/hybrid AND a
+            ``rubric_complete_fn`` is injected (the caller must back it with a calibrated
+            model — gemma4:31b α=0.865 real-trajectory, or llama3.3:70b α=1.000; see
+            benchmarks/judge_calibration/FINDINGS.md);
+          - ``None`` otherwise — which the completion cascade treats as "defer to enhanced".
+
+        Crucially, a rubric/hybrid strategy WITHOUT an LLM judge returns None rather than the
+        no-LLM HeuristicRubricJudge: that heuristic scored α=−0.092 in calibration (worse than
+        the enhanced baseline), so silently using it would degrade completion decisions.
+        """
+        if strategy not in ("rubric", "hybrid"):
+            return None
+        if rubric_complete_fn is None:
+            logger.warning(
+                "[RubricCompletion] completion_strategy=%s requested but no LLM judge "
+                "(rubric_complete_fn) was injected. The heuristic judge is uncalibrated "
+                "(a=-0.092); reverting to enhanced completion per the ADR-011 fallback "
+                "contract. Inject a calibrated judge to enable rubric completion.",
+                strategy,
+            )
+            return None
+        from victor.framework.rubric_completion import (
+            AsyncRubricCompletionEvaluator,
+            LLMRubricJudge,
+        )
+
+        logger.info("[RubricCompletion] ENABLED (LLM judge) — strategy=%s", strategy)
+        return AsyncRubricCompletionEvaluator(LLMRubricJudge(rubric_complete_fn))
 
     async def _rubric_completion_result(
         self, perception: Any, action_result: Any, state: Dict[str, Any]
