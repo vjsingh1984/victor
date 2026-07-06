@@ -303,11 +303,11 @@ class TestPriority4Migration:
 
             conn.close()
 
-    def test_current_schema_version_is_7(self):
-        """Verify current schema version is 7."""
+    def test_current_schema_version_is_9(self):
+        """Verify current schema version is 9 (v8: decision learning; v9: per-label delta)."""
         assert (
-            CURRENT_SCHEMA_VERSION == 7
-        ), f"Current schema version should be 7, got {CURRENT_SCHEMA_VERSION}"
+            CURRENT_SCHEMA_VERSION == 9
+        ), f"Current schema version should be 9, got {CURRENT_SCHEMA_VERSION}"
 
     def test_rl_outcome_with_session_id(self):
         """Test RLOutcome can be created with session_id."""

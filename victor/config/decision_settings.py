@@ -64,6 +64,21 @@ class DecisionServiceSettings(BaseModel):
         description="Micro-decision backend: auto|local_classifier|edge|llm|heuristic",
     )
 
+    # FEP-0012 Phase 6: per-project online RL personalization delta. On each
+    # session outcome, a reward-weighted per-label nudge is written to the
+    # project DB's local_classifier_delta and blended into the shipped head's
+    # logits at predict time (alpha is the model's own blend knob). Local-only,
+    # bounded (top-K) and L2-decayed so the universal model re-asserts, never
+    # uploaded. Default ON: degrades to a no-op when no outcomes exist.
+    local_learning_enabled: bool = True
+    local_learning_lr: float = Field(default=0.1, description="Per-label SGD step size.")
+    local_learning_top_k: int = Field(
+        default=2000, description="Max rows kept per (decision_type, label) after trimming."
+    )
+    local_learning_decay: float = Field(
+        default=0.995, description="L2 decay applied to all delta weights each update."
+    )
+
     # Classification triage settings (confidence-based routing)
     enable_classification_triage: bool = True
     triage_verification_timeout_ms: int = 2000
