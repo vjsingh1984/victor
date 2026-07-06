@@ -16,11 +16,17 @@ Follows the same pattern as GEPASettings/GEPATierManager.
 
 from __future__ import annotations
 
+import os
 from typing import Any, Dict, Optional
 
 from pydantic import BaseModel, Field
 
 from victor.agent.services.decision_backend import DecisionBackend
+
+
+def _env_bool(name: str, default: bool) -> bool:
+    """Parse a boolean env var (true/1/yes → True)."""
+    return os.getenv(name, "true" if default else "false").strip().lower() in ("true", "1", "yes")
 
 
 class DecisionModelSpec(BaseModel):
@@ -60,8 +66,9 @@ class DecisionServiceSettings(BaseModel):
     # auto-upgrades to the shipped local classifier once its artifact is bundled,
     # else falls back to the legacy flag-based selection. See DecisionBackend.
     decision_backend: DecisionBackend = Field(
-        default=DecisionBackend.AUTO,
-        description="Micro-decision backend: auto|local_classifier|edge|llm|heuristic",
+        default_factory=lambda: DecisionBackend.parse(os.getenv("VICTOR_DECISION_BACKEND", "auto")),
+        description="Micro-decision backend: auto|local_classifier|edge|llm|heuristic. "
+        "Env: VICTOR_DECISION_BACKEND",
     )
 
     # FEP-0012 Phase 6: per-project online RL personalization delta. On each
@@ -70,7 +77,10 @@ class DecisionServiceSettings(BaseModel):
     # logits at predict time (alpha is the model's own blend knob). Local-only,
     # bounded (top-K) and L2-decayed so the universal model re-asserts, never
     # uploaded. Default ON: degrades to a no-op when no outcomes exist.
-    local_learning_enabled: bool = True
+    local_learning_enabled: bool = Field(
+        default_factory=lambda: _env_bool("VICTOR_LOCAL_LEARNING_ENABLED", True),
+        description="Enable the per-project RL delta overlay. Env: VICTOR_LOCAL_LEARNING_ENABLED",
+    )
     local_learning_lr: float = Field(default=0.1, description="Per-label SGD step size.")
     local_learning_top_k: int = Field(
         default=2000, description="Max rows kept per (decision_type, label) after trimming."
@@ -84,7 +94,12 @@ class DecisionServiceSettings(BaseModel):
     # predicts reward buckets (pass/partial/fail); a confident "pass" -> stop.
     # Default OFF: trusting the classifier to stop the loop is a behavioral change
     # that wants Phase-7 A/B validation before it defaults on. Flip to opt in.
-    local_classifier_completion_signal: bool = False
+    # Env: VICTOR_LOCAL_CLASSIFIER_COMPLETION_SIGNAL
+    local_classifier_completion_signal: bool = Field(
+        default_factory=lambda: _env_bool("VICTOR_LOCAL_CLASSIFIER_COMPLETION_SIGNAL", False),
+        description="Let the shipped classifier's task_completion head signal completion. "
+        "Default off (Phase-7 A/B pending). Env: VICTOR_LOCAL_CLASSIFIER_COMPLETION_SIGNAL",
+    )
 
     # Classification triage settings (confidence-based routing)
     enable_classification_triage: bool = True
