@@ -33,6 +33,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import logging
 from pathlib import Path
 
 from victor.evaluation.calibration_corpus import default_corpus
@@ -42,6 +43,33 @@ from victor.evaluation.judge_calibration_harness import (
     Transcript,
     alternating_scripted_executor,
 )
+
+# Framework loggers that emit high-volume, per-turn / per-workspace lines during a
+# real-agent run — the source of the stdout flood.
+_FLOOD_LOGGERS = (
+    "victor.agent",
+    "victor.providers",
+    "victor.core.database",
+    "victor.evaluation.agent_adapter",
+    "victor.framework.agentic_loop",
+)
+
+
+def configure_logging(verbose: bool) -> None:
+    """Keep captured output bounded by silencing the framework's stdout flood.
+
+    A real-agent calibration drives the full orchestrator + provider, which log every
+    turn, every provider round-trip, and a per-workspace DB migration. Redirected to a file
+    (``> run.log 2>&1``) that stream is UNBOUNDED — a stuck run once wrote ~350 GB of
+    trajectories to a single log. Quiet by default (only ERROR from the flood sources,
+    WARNING elsewhere); ``--verbose`` restores INFO. When you genuinely want verbose but
+    bounded output, pipe through a rotating appender, e.g.
+    ``... 2>&1 | python3 ~/tools/caplog.py run.log``.
+    """
+    logging.getLogger("victor").setLevel(logging.INFO if verbose else logging.WARNING)
+    if not verbose:
+        for name in _FLOOD_LOGGERS:
+            logging.getLogger(name).setLevel(logging.ERROR)
 
 
 def credulous_judge(_prompt: str, transcript: Transcript, _workspace: Path) -> float:
@@ -148,7 +176,18 @@ def main() -> int:
         default=240,
         help="Per-task timeout for a real agent run (seconds).",
     )
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Restore INFO-level framework logging. OFF by default — the framework floods "
+        "stdout with per-turn/per-workspace lines that an unbounded redirect turns into "
+        "hundreds of GB.",
+    )
     args = parser.parse_args()
+
+    # Silence the framework flood BEFORE any adapter/agent runs (a stuck run wrote ~350 GB
+    # to a single redirected log before this existed).
+    configure_logging(args.verbose)
 
     judges = {
         "credulous": credulous_judge,
