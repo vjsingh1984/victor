@@ -23,12 +23,14 @@ name: Release
 on:
   push:
     tags:
+      # victor-ai releases only. Sibling packages have their own release-*.yml workflows,
+      # but their 'v'-prefixed tags also match 'v*' and would spuriously trigger this run
+      # (each wasted ~30 min before failing). Exclude every sibling tag pattern here whenever
+      # a new release-*.yml is added.
       - 'v*'
-      - '!sdk-v*'
-      # victor-codegraph releases have their own workflow (release-codegraph.yml)
-      # but 'victor-codegraph-v*' matches 'v*', spuriously triggering this one
-      # (every such run failed after ~30 wasted minutes).
-      - '!victor-codegraph-v*'
+      - '!sdk-v*'                 # release-contracts.yml
+      - '!victor-codegraph-v*'   # release-codegraph.yml
+      - '!verticals-v*'          # release-verticals.yml
   workflow_dispatch:
     inputs:
       publish_testpypi:

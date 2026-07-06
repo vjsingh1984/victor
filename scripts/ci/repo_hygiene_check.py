@@ -686,6 +686,56 @@ def check_archived_doc_banners(root: Path) -> list[HygieneFinding]:
     return findings
 
 
+def check_release_tag_routing(root: Path) -> list[HygieneFinding]:
+    """Each release-*.yml tag must trigger exactly one release workflow.
+
+    The victor-ai release (release.yml) fires on ``v*``, which also matches sibling tags
+    like ``victor-codegraph-v*`` and ``verticals-v*`` — so every sibling pattern must be
+    excluded in release.yml, or pushing that tag spuriously runs (and fails) the victor-ai
+    release. This has bitten twice; the guard makes a new release-*.yml that forgets the
+    exclusion fail CI instead.
+    """
+    import fnmatch
+
+    findings: list[HygieneFinding] = []
+    wf_dir = root / ".github" / "workflows"
+
+    def tag_patterns(path: Path) -> list[str]:
+        try:
+            data = yaml.safe_load(path.read_text())
+        except Exception:
+            return []
+        push = (data or {}).get(True, {})  # PyYAML parses `on:` as the bool key True
+        push = push.get("push", {}) if isinstance(push, dict) else {}
+        tags = push.get("tags", []) if isinstance(push, dict) else []
+        return [str(t) for t in tags] if isinstance(tags, list) else []
+
+    def triggers(tag: str, patterns: list[str]) -> bool:
+        pos = [p for p in patterns if not p.startswith("!")]
+        neg = [p[1:] for p in patterns if p.startswith("!")]
+        return any(fnmatch.fnmatch(tag, p) for p in pos) and not any(
+            fnmatch.fnmatch(tag, n) for n in neg
+        )
+
+    release_wfs = {p.name: tag_patterns(p) for p in sorted(wf_dir.glob("release*.yml"))}
+    # A representative concrete tag for each sibling's positive pattern (`*` → a version).
+    for wf_name, patterns in release_wfs.items():
+        if wf_name == "release.yml":
+            continue
+        for pattern in [p for p in patterns if not p.startswith("!")]:
+            sample = pattern.replace("*", "0.0.0")
+            firing = [w for w, pats in release_wfs.items() if triggers(sample, pats)]
+            if firing != [wf_name]:
+                findings.append(
+                    HygieneFinding(
+                        Path(".github/workflows/release.yml"),
+                        f"tag '{sample}' (from {wf_name}) triggers {firing}, not just "
+                        f"[{wf_name}] — add '!{pattern}' to release.yml's tag exclusions.",
+                    )
+                )
+    return findings
+
+
 def check_canonical_doc_pointers(root: Path) -> list[HygieneFinding]:
     """Ensure canonical pointer docs exist and their relative links resolve (TD-18).
 
@@ -1151,6 +1201,7 @@ def run_checks(root: Path) -> list[HygieneFinding]:
     findings.extend(check_uppercase_roadmap_links(root))
     findings.extend(check_archived_doc_banners(root))
     findings.extend(check_canonical_doc_pointers(root))
+    findings.extend(check_release_tag_routing(root))
     findings.extend(check_removed_legacy_paths(root))
     findings.extend(check_makefile_lint_gate(root))
     findings.extend(check_vertical_extra_metadata(root))
