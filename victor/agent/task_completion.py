@@ -55,6 +55,22 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def _classifier_completion_signal_enabled() -> bool:
+    """FEP-0012: whether the shipped local classifier may signal task completion.
+
+    The task_completion head predicts reward buckets (pass/partial/fail). Trusting
+    a confident "pass" to STOP the agentic loop is a behavioral change, so it is
+    gated off by default and surfaced for Phase-7 A/B validation before it ships
+    as a default. See ``DecisionServiceSettings.local_classifier_completion_signal``.
+    """
+    try:
+        from victor.config.decision_settings import DecisionServiceSettings
+
+        return DecisionServiceSettings().local_classifier_completion_signal
+    except Exception:
+        return False
+
+
 class DeliverableType(Enum):
     """Types of deliverables an agent can produce."""
 
@@ -718,7 +734,13 @@ class TaskCompletionDetector:
                 if (
                     decision is not None
                     and decision.result is not None
-                    and decision.source == "llm"
+                    and (
+                        decision.source == "llm"
+                        or (
+                            decision.source == "local_classifier"
+                            and _classifier_completion_signal_enabled()
+                        )
+                    )
                     and hasattr(decision.result, "is_complete")
                 ):
                     if decision.result.is_complete and decision.confidence >= 0.7:
@@ -1079,7 +1101,13 @@ class TaskCompletionDetector:
                 if (
                     decision is not None
                     and decision.result is not None
-                    and decision.source == "llm"
+                    and (
+                        decision.source == "llm"
+                        or (
+                            decision.source == "local_classifier"
+                            and _classifier_completion_signal_enabled()
+                        )
+                    )
                     and hasattr(decision.result, "is_complete")
                 ):
                     if decision.result.is_complete and decision.confidence >= 0.7:

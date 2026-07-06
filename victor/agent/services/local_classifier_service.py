@@ -89,14 +89,33 @@ def _map_bool(
     return model_cls(**{field: value, "confidence": float(conf)})
 
 
+# task_completion head labels ARE reward buckets (pass/partial/fail), so a plain
+# bool map is wrong: a "pass" prediction means "this looks like a successful
+# completion" -> is_complete=True; "fail" -> False; "partial"/unknown -> defer
+# (return None so the heuristic path handles it). Also accepts the legacy
+# complete/incomplete convention for forward-compat with a differently-trained head.
+_COMPLETION_TRUE_LABELS = ("pass", "complete", "true", "yes", "done", "finished")
+_COMPLETION_FALSE_LABELS = ("fail", "incomplete", "false", "no", "unfinished")
+_COMPLETION_DEFER_LABELS = ("partial",)
+
+
+def _map_completion(label: str, conf: float) -> Optional[Any]:
+    norm = label.strip().lower()
+    if norm in _COMPLETION_DEFER_LABELS:
+        return None
+    if norm in _COMPLETION_TRUE_LABELS:
+        return TaskCompletionDecision(is_complete=True, confidence=float(conf))
+    if norm in _COMPLETION_FALSE_LABELS:
+        return TaskCompletionDecision(is_complete=False, confidence=float(conf))
+    return None  # unknown label -> defer to heuristic
+
+
 # Per-DecisionType mapper: (label, confidence) -> Pydantic decision object (or None to defer).
 _MAPPERS: Dict[DecisionType, Callable[[str, float], Optional[Any]]] = {
     DecisionType.TASK_TYPE_CLASSIFICATION: lambda label, conf: _map_enum(
         label, conf, TaskTypeDecision, "task_type", TaskCategoryType
     ),
-    DecisionType.TASK_COMPLETION: lambda label, conf: _map_bool(
-        label, conf, TaskCompletionDecision, "is_complete", ("complete", "true", "yes")
-    ),
+    DecisionType.TASK_COMPLETION: _map_completion,
     DecisionType.TOOL_NECESSITY: lambda label, conf: _map_bool(
         label, conf, ToolNecessityDecision, "requires_tools", ("requires_tools", "true", "yes")
     ),

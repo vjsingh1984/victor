@@ -79,6 +79,13 @@ class DecisionServiceSettings(BaseModel):
         default=0.995, description="L2 decay applied to all delta weights each update."
     )
 
+    # FEP-0012 acceptance #1: allow the shipped local classifier's task_completion
+    # head to SIGNAL completion (so the agentic loop can stop on it). The head
+    # predicts reward buckets (pass/partial/fail); a confident "pass" -> stop.
+    # Default OFF: trusting the classifier to stop the loop is a behavioral change
+    # that wants Phase-7 A/B validation before it defaults on. Flip to opt in.
+    local_classifier_completion_signal: bool = False
+
     # Classification triage settings (confidence-based routing)
     enable_classification_triage: bool = True
     triage_verification_timeout_ms: int = 2000

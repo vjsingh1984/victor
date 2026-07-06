@@ -186,3 +186,51 @@ class TestTaskCompletionWithLLMService:
 
         # budget_exhausted means no LLM result, should be NONE
         assert detector.get_completion_confidence() == CompletionConfidence.NONE
+
+
+class TestTaskCompletionLocalClassifierGate:
+    """FEP-0012: the shipped local classifier may signal completion only when
+    ``local_classifier_completion_signal`` is opted in (default off). The head
+    predicts reward buckets; a confident 'pass' -> is_complete."""
+
+    def test_local_classifier_rejected_by_default(self):
+        """source=local_classifier is ignored for completion when the flag is off."""
+        service = _make_decision_service(
+            is_complete=True, confidence=0.9, phase="done", source="local_classifier"
+        )
+        detector = TaskCompletionDetector(decision_service=service)
+        # Default setting is off -> local_classifier does NOT upgrade confidence.
+        assert detector.get_completion_confidence() == CompletionConfidence.NONE
+
+    def test_local_classifier_accepted_when_enabled(self, monkeypatch):
+        class _Enabled:
+            local_classifier_completion_signal = True
+
+        monkeypatch.setattr("victor.config.decision_settings.DecisionServiceSettings", _Enabled)
+        service = _make_decision_service(
+            is_complete=True, confidence=0.9, phase="done", source="local_classifier"
+        )
+        detector = TaskCompletionDetector(decision_service=service)
+        assert detector.get_completion_confidence() == CompletionConfidence.MEDIUM
+
+    def test_local_classifier_low_confidence_no_upgrade(self, monkeypatch):
+        class _Enabled:
+            local_classifier_completion_signal = True
+
+        monkeypatch.setattr("victor.config.decision_settings.DecisionServiceSettings", _Enabled)
+        service = _make_decision_service(
+            is_complete=True, confidence=0.5, phase="done", source="local_classifier"
+        )
+        detector = TaskCompletionDetector(decision_service=service)
+        assert detector.get_completion_confidence() == CompletionConfidence.NONE
+
+    def test_local_classifier_says_not_complete(self, monkeypatch):
+        class _Enabled:
+            local_classifier_completion_signal = True
+
+        monkeypatch.setattr("victor.config.decision_settings.DecisionServiceSettings", _Enabled)
+        service = _make_decision_service(
+            is_complete=False, confidence=0.9, phase="working", source="local_classifier"
+        )
+        detector = TaskCompletionDetector(decision_service=service)
+        assert detector.get_completion_confidence() == CompletionConfidence.NONE
