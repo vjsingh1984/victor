@@ -105,6 +105,30 @@ def main() -> int:
         help="Keep the per-task workspace dirs for inspection (default: cleaned up). "
         "Useful for diagnosing what a judge actually saw on a bad run.",
     )
+    parser.add_argument(
+        "--agent-profile",
+        default=None,
+        help="Generate REAL agent trajectories with this Victor profile instead of the "
+        "scripted executor — the production-distribution validation. Expensive (one full "
+        "agent run per task). A capable agent may solve everything (single-class gold); "
+        "watch the printed gold distribution.",
+    )
+    parser.add_argument(
+        "--agent-base-url",
+        default=None,
+        help="Base URL override for the agent's provider (e.g. WSL→Windows Ollama gateway).",
+    )
+    parser.add_argument(
+        "--agent-model",
+        default=None,
+        help="Model override for the agent profile (default: the profile's model).",
+    )
+    parser.add_argument(
+        "--agent-timeout",
+        type=int,
+        default=240,
+        help="Per-task timeout for a real agent run (seconds).",
+    )
     args = parser.parse_args()
 
     judges = {
@@ -162,19 +186,51 @@ def main() -> int:
             ),
             stats=llm_stats,
         )
-    exit_code = 0
-    for name, judge in judges.items():
-        harness = JudgeCalibrationHarness(default_corpus(variants=args.variants))
-        # period=5 is coprime with the 6 task families, so scripted failures rotate
-        # across every family instead of always hitting the same ones.
-        report = harness.run(
-            alternating_scripted_executor(period=5),
-            judge,
-            keep_workspaces=args.keep_workspaces,
+    # Executor: real agent trajectories (--agent-profile) or the deterministic scripted
+    # stand-in. period=5 is coprime with the 6 task families, so scripted failures rotate
+    # across every family instead of always hitting the same ones.
+    if args.agent_profile:
+        from victor.evaluation.agent_adapter import VictorAgentAdapter
+        from victor.evaluation.calibration_agent_executor import make_agent_executor
+
+        adapter = VictorAgentAdapter.from_profile(
+            args.agent_profile,
+            base_url=args.agent_base_url,
+            model_override=args.agent_model,
         )
+        executor = make_agent_executor(adapter, timeout_seconds=args.agent_timeout)
+        print(f"executor: real agent (profile={args.agent_profile})")
+    else:
+        executor = alternating_scripted_executor(period=5)
+        print("executor: scripted")
+
+    # ONE executor pass; every judge scores the identical trajectories (essential for the
+    # real-agent executor, which is expensive and non-deterministic per run).
+    harness = JudgeCalibrationHarness(default_corpus(variants=args.variants))
+    reports = harness.run_multi_judge(executor, judges, keep_workspaces=args.keep_workspaces)
+
+    # Gold distribution: agreement (α) is meaningless if every task shares one gold class.
+    # A strong real agent can solve everything (all gold=1); flag that the run measures only
+    # true-positive rate, not discrimination.
+    any_report = next(iter(reports.values()))
+    gold_counts: dict[float, int] = {}
+    for s in any_report.samples:
+        gold_counts[s.gold] = gold_counts.get(s.gold, 0) + 1
+    print(f"gold distribution: {gold_counts}")
+    degenerate_gold = len(gold_counts) < 2
+    if degenerate_gold:
+        print(
+            "⚠ gold is single-class — α cannot measure discrimination (no negative/positive "
+            "contrast). This run only shows whether the judge agrees on that one class."
+        )
+
+    exit_code = 0
+    for name, report in reports.items():
         report.save(args.out / f"{name}.json")
         decision = report.gate_decision
         verdict = "TRUSTED" if decision.trusted else "NOT TRUSTED"
+        if degenerate_gold and verdict == "TRUSTED":
+            verdict = "TRUSTED (single-class gold — not discriminative)"
         if name == "rubric-llm" and llm_stats is not None:
             print(f"[rubric-llm] grading-call integrity: {llm_stats.summary()}")
             if not llm_stats.clean:

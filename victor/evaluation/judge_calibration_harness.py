@@ -52,7 +52,17 @@ import asyncio
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Coroutine, Hashable, Optional, Protocol, Sequence, TypeVar
+from typing import (
+    Any,
+    Callable,
+    Coroutine,
+    Hashable,
+    Mapping,
+    Optional,
+    Protocol,
+    Sequence,
+    TypeVar,
+)
 
 from victor.evaluation.judge_calibration import (
     GateDecision,
@@ -244,13 +254,41 @@ class JudgeCalibrationHarness:
         workspace_root: Optional[Path] = None,
         keep_workspaces: bool = False,
     ) -> CalibrationReport:
-        """Run the corpus and return a :class:`CalibrationReport`.
+        """Run the corpus against a single judge and return its :class:`CalibrationReport`.
 
-        When ``workspace_root`` is given, the caller owns that directory and its lifetime.
-        When it is not, a fresh temp dir is created and **removed on exit** (this harness
-        previously orphaned one ``judge_calibration_*`` dir per run in the system temp
-        directory). Set ``keep_workspaces=True`` to retain the auto-created dir for post-hoc
-        inspection of what a judge actually saw.
+        Thin wrapper over :meth:`run_multi_judge` — see it for the workspace-lifetime and
+        blinding contract.
+        """
+        return self.run_multi_judge(
+            executor,
+            {"judge": judge},
+            workspace_root=workspace_root,
+            keep_workspaces=keep_workspaces,
+        )["judge"]
+
+    def run_multi_judge(
+        self,
+        executor: CalibrationExecutor,
+        judges: Mapping[str, CalibrationJudge],
+        *,
+        workspace_root: Optional[Path] = None,
+        keep_workspaces: bool = False,
+    ) -> dict[str, CalibrationReport]:
+        """Generate one trajectory + gold per task, then score EVERY judge on the shared
+        trajectories; return a per-judge-name :class:`CalibrationReport`.
+
+        Running the executor once (not once per judge) is essential for expensive or
+        non-deterministic executors: a real agent costs Nx to run per judge and — worse —
+        produces DIFFERENT trajectories each time, which would make the cross-judge
+        comparison meaningless. Here every judge scores the identical (transcript,
+        workspace) pair.
+
+        Blinding + ordering per task: setup → executor → ALL judges score → verify for gold.
+        Verification runs last so no verifier side effect can reach any judge's view; judges
+        are read-only, so they observe the same workspace state as each other.
+
+        When ``workspace_root`` is given the caller owns its lifetime; otherwise a temp dir
+        is created and removed on exit (``keep_workspaces=True`` retains it for inspection).
         """
         import shutil
         import tempfile
@@ -258,35 +296,44 @@ class JudgeCalibrationHarness:
         caller_owned = workspace_root is not None
         root = workspace_root or Path(tempfile.mkdtemp(prefix="judge_calibration_"))
         try:
-            samples: list[CalibrationSample] = []
+            per_judge: dict[str, list[CalibrationSample]] = {name: [] for name in judges}
             for index, task in enumerate(self.tasks):
                 workspace = root / f"{index:04d}_{task.task_id}"
                 workspace.mkdir(parents=True, exist_ok=False)
                 task.setup(workspace)
                 transcript = executor(task, workspace)
-                judged = float(judge(task.prompt, transcript, workspace))
+                judged = {
+                    name: float(judge(task.prompt, transcript, workspace))
+                    for name, judge in judges.items()
+                }
                 gold = float(task.verify(workspace, transcript))
-                samples.append(
-                    CalibrationSample(
-                        task_id=task.task_id, family=task.family, gold=gold, judged=judged
+                for name in judges:
+                    per_judge[name].append(
+                        CalibrationSample(
+                            task_id=task.task_id,
+                            family=task.family,
+                            gold=gold,
+                            judged=judged[name],
+                        )
                     )
-                )
-
-            overall = self._agreement(samples)
-            per_family: dict[str, JudgeReliability] = {}
-            for family in sorted({s.family for s in samples}):
-                per_family[family] = self._agreement([s for s in samples if s.family == family])
-            return CalibrationReport(
-                samples=tuple(samples),
-                overall=overall,
-                per_family=per_family,
-                gate_decision=self.gate.decide(overall),
-                alpha_threshold=self.gate.alpha_threshold,
-            )
+            return {name: self._report(samples) for name, samples in per_judge.items()}
         finally:
             # Only remove what we created; a caller-provided root is theirs to keep.
             if not caller_owned and not keep_workspaces:
                 shutil.rmtree(root, ignore_errors=True)
+
+    def _report(self, samples: Sequence[CalibrationSample]) -> CalibrationReport:
+        overall = self._agreement(samples)
+        per_family: dict[str, JudgeReliability] = {}
+        for family in sorted({s.family for s in samples}):
+            per_family[family] = self._agreement([s for s in samples if s.family == family])
+        return CalibrationReport(
+            samples=tuple(samples),
+            overall=overall,
+            per_family=per_family,
+            gate_decision=self.gate.decide(overall),
+            alpha_threshold=self.gate.alpha_threshold,
+        )
 
     def _agreement(self, samples: Sequence[CalibrationSample]) -> JudgeReliability:
         return evaluate_judge_agreement(
