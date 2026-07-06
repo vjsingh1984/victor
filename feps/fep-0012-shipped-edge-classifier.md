@@ -252,16 +252,19 @@ re-asserts). Pure-numpy/Rust; local only.
 7. **Validation:** A/B the classifier vs the LLM edge model on held-out
    decisions; ship only at parity on the universal decision types.
 
-> **Known gap (Phase 5/7 follow-up, not Phase 6):** the delta is blended into the
-> logits, but does not yet change an *observable* `task_completion` decision,
-> because (a) `LocalClassifierDecisionService._map_bool` for `TASK_COMPLETION`
-> expects labels `complete/true/yes` while the shipped head produces
-> `pass/partial/fail` (so it always maps to `is_complete=False`), and (b)
-> `task_completion.py` only consumes `decision.source == "llm"`, ignoring the
-> local classifier for stopping. Closing both is a behavioral change to the
-> completion detector and wants A/B validation (Phase 7) before it defaults on.
-> The Phase 6 blend is verified at the predict level via unit tests that bypass
-> the mapper.
+> **task_completion consumption wiring (mapper + source gate) — landed behind a
+> flag.** The shipped `task_completion` head predicts reward buckets
+> (`pass/partial/fail`). Two earlier gaps made the classifier (and the Phase 6
+> delta) a no-op for loop-stopping: (a) the service mapper expected labels
+> `complete/true/yes` and (b) `task_completion.py` only consumed
+> `decision.source == "llm"`. Both are fixed: the mapper is now reward-bucket
+> aware (`pass`→complete, `fail`→incomplete, `partial`→defer; also accepts legacy
+> labels), and both completion sites accept `source == "local_classifier"` when
+> `DecisionServiceSettings.local_classifier_completion_signal` is on. **The flag
+> defaults OFF** — trusting the classifier to stop the loop is a behavioral
+> change that wants Phase-7 A/B validation before it defaults on. With it off,
+> behavior is identical to pre-wiring (the mapper fix alone has no effect because
+> the source gate still excludes `local_classifier`).
 
 ## Migration Path
 
