@@ -331,4 +331,15 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    import os
+    import sys
+
+    _code = main()
+    # Force exit after the reports are written. The agent orchestrator leaves non-daemon
+    # threads and open event loops alive (SharedSignalPool, DB connections, the per-judge
+    # PersistentLoopRunner), which make a normal SystemExit hang WAITING for them — a stuck
+    # run once lingered 7.5 h holding its (redirected) log open and filled the disk. os._exit
+    # skips buffer flushing, so flush first.
+    sys.stdout.flush()
+    sys.stderr.flush()
+    os._exit(_code)
