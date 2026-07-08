@@ -12,9 +12,7 @@ from pathlib import Path
 
 
 def _load():
-    path = (
-        Path(__file__).resolve().parents[3] / "scripts" / "ci" / "check_docs_drift.py"
-    )
+    path = Path(__file__).resolve().parents[3] / "scripts" / "ci" / "check_docs_drift.py"
     spec = importlib.util.spec_from_file_location("check_docs_drift", path)
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)
@@ -46,10 +44,7 @@ def test_wrong_version_stamp_in_canonical_doc_flagged():
 
 def test_version_stamp_ignored_in_noncanonical_doc():
     # Spec/FEP docs carry their own independent version — must NOT be flagged.
-    assert (
-        scan("docs/feps/vertical-package-spec.md", "**Version**: 1.0.0", "0.7.1", 24)
-        == []
-    )
+    assert scan("docs/feps/vertical-package-spec.md", "**Version**: 1.0.0", "0.7.1", 24) == []
 
 
 def test_wrong_provider_count_flagged_anywhere():
