@@ -1006,7 +1006,7 @@ class VerticalRegistry:
         registry = get_entry_point_registry()
         group_obj = registry.get_group(cls.ENTRY_POINT_GROUP)
 
-        eps = [(ep, loaded) for ep, loaded in group_obj.entry_points.values()] if group_obj else []
+        eps = list(group_obj.entry_points.values()) if group_obj else []
         if eps:
             cls._warn_legacy_entry_point_usage(ep.name for ep, _loaded in eps)
 

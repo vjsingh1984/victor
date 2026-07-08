@@ -47,12 +47,18 @@ from __future__ import annotations
 # Framework consumers import from here; SDK owns the class definitions.
 from victor_contracts.team_schema import (  # noqa: F401
     RoleConfig,
+    TeamAgentCategory,
+    TeamFormation,
+    TeamMemberSpec,
     TeamSpec,
     create_team_spec,
 )
 
 __all__ = [
     "TeamSpec",
+    "TeamMemberSpec",
+    "TeamFormation",
+    "TeamAgentCategory",
     "RoleConfig",
     "create_team_spec",
 ]

@@ -20,7 +20,7 @@ agent teams with different coordination patterns (formations).
 Formations:
 - SEQUENTIAL: One agent after another, passing context
 - PARALLEL: All agents simultaneously on independent aspects
-- HIERARCHICAL: Manager delegates to workers
+- HIERARCHICAL: Supervisor delegates to specialists
 - PIPELINE: Output chains from one agent to the next
 
 Design Principles:
@@ -71,7 +71,7 @@ from victor.teams.types import (
     TeamConfig,
     TeamFormation,
     TeamMember,
-    TeamMemberAdapter,
+    TeamParticipant,
     TeamResult,
 )
 
@@ -461,7 +461,7 @@ class TeamCoordinator(ITeamCoordinator):
                 adapted.append(member)
             else:
                 adapted.append(
-                    TeamMemberAdapter(
+                    TeamParticipant(
                         member=member,
                         executor=self._build_unified_member_executor(member, config),
                     )
@@ -782,9 +782,9 @@ class TeamCoordinator(ITeamCoordinator):
         execution: TeamExecution,
         on_member_complete: Optional[Callable[[str, MemberResult], None]],
     ) -> TeamResult:
-        """Execute with manager delegating to workers.
+        """Execute with a supervisor delegating to specialists.
 
-        Manager analyzes the goal, delegates sub-tasks to workers,
+        Supervisor analyzes the goal, delegates sub-tasks to specialists,
         and synthesizes their results.
 
         Args:
@@ -795,58 +795,58 @@ class TeamCoordinator(ITeamCoordinator):
             TeamResult with all member results
         """
         config = execution.config
-        manager = config.get_manager()
-        workers = config.get_workers()
+        supervisor = config.get_supervisor()
+        specialists = config.get_specialists()
         member_results: Dict[str, MemberResult] = {}
         total_tool_calls = 0
 
-        if not manager:
-            raise ValueError("Hierarchical formation requires a manager")
+        if not supervisor:
+            raise ValueError("Hierarchical formation requires a supervisor")
 
-        # Phase 1: Manager analyzes and plans
-        self._report_progress(execution.team_id, f"{manager.name} planning...", 10)
-        execution.member_statuses[manager.id] = MemberStatus.WORKING
+        # Phase 1: Supervisor analyzes and plans
+        self._report_progress(execution.team_id, f"{supervisor.name} planning...", 10)
+        execution.member_statuses[supervisor.id] = MemberStatus.WORKING
 
-        manager_planning_prompt = f"""You are the team manager. Your goal: {config.goal}
+        supervisor_planning_prompt = f"""You are the team supervisor. Your goal: {config.goal}
 
 You have the following team members to delegate to:
-{self._format_worker_list(workers)}
+{self._format_worker_list(specialists)}
 
-Analyze the goal and create a delegation plan. For each worker, specify what they should do.
+Analyze the goal and create a delegation plan. For each specialist, specify what they should do.
 Output your plan in a structured format."""
 
-        manager_result = await self._execute_member(
-            manager,
-            manager_planning_prompt,
+        supervisor_result = await self._execute_member(
+            supervisor,
+            supervisor_planning_prompt,
             execution,
         )
-        member_results[manager.id] = manager_result
-        total_tool_calls += manager_result.tool_calls_used
+        member_results[supervisor.id] = supervisor_result
+        total_tool_calls += supervisor_result.tool_calls_used
 
-        if not manager_result.success:
+        if not supervisor_result.success:
             return TeamResult(
                 success=False,
-                final_output=f"Manager failed to plan: {manager_result.error}",
+                final_output=f"Supervisor failed to plan: {supervisor_result.error}",
                 member_results=member_results,
                 total_tool_calls=total_tool_calls,
                 total_duration=time.time() - execution.start_time,
                 formation=TeamFormation.HIERARCHICAL,
             )
 
-        execution.member_statuses[manager.id] = MemberStatus.DELEGATING
+        execution.member_statuses[supervisor.id] = MemberStatus.DELEGATING
 
-        # Phase 2: Workers execute in parallel
-        self._report_progress(execution.team_id, "Delegating to workers...", 30)
+        # Phase 2: Specialists execute in parallel
+        self._report_progress(execution.team_id, "Delegating to specialists...", 30)
 
         worker_tasks = []
-        for worker in workers:
+        for worker in specialists:
             execution.member_statuses[worker.id] = MemberStatus.WORKING
-            worker_context = f"""You are {worker.name}, a {worker.role.value} agent.
+            worker_context = f"""You are {worker.name}, a {worker.role.value} specialist agent.
 
 Team Goal: {config.goal}
 
-Manager's Instructions:
-{manager_result.output}
+Supervisor's Instructions:
+{supervisor_result.output}
 
 Your specific goal: {worker.goal}
 
@@ -866,7 +866,7 @@ Execute your assigned tasks and report your findings."""
             max_concurrent=min(len(worker_tasks), 4),
         )
 
-        for worker, sub_result in zip(workers, worker_fan_out.results):
+        for worker, sub_result in zip(specialists, worker_fan_out.results):
             result = self._convert_subagent_result(worker.id, sub_result)
             member_results[worker.id] = result
             total_tool_calls += result.tool_calls_used
@@ -878,34 +878,34 @@ Execute your assigned tasks and report your findings."""
             if on_member_complete:
                 on_member_complete(worker.id, result)
 
-        # Phase 3: Manager synthesizes
-        self._report_progress(execution.team_id, f"{manager.name} synthesizing...", 80)
-        execution.member_statuses[manager.id] = MemberStatus.WORKING
+        # Phase 3: Supervisor synthesizes
+        self._report_progress(execution.team_id, f"{supervisor.name} synthesizing...", 80)
+        execution.member_statuses[supervisor.id] = MemberStatus.WORKING
 
         worker_reports = "\n\n".join(
-            f"**{w.name}**:\n{member_results[w.id].output}" for w in workers
+            f"**{w.name}**:\n{member_results[w.id].output}" for w in specialists
         )
 
-        synthesis_prompt = f"""You are the team manager completing the team's work.
+        synthesis_prompt = f"""You are the team supervisor completing the team's work.
 
 Original Goal: {config.goal}
 
-Worker Reports:
+Specialist Reports:
 {worker_reports}
 
 Synthesize these reports into a final comprehensive result that addresses the original goal."""
 
         synthesis_result = await self._execute_member(
-            manager,
+            supervisor,
             synthesis_prompt,
             execution,
         )
         total_tool_calls += synthesis_result.tool_calls_used
 
-        execution.member_statuses[manager.id] = MemberStatus.COMPLETED
+        execution.member_statuses[supervisor.id] = MemberStatus.COMPLETED
 
         if on_member_complete:
-            on_member_complete(manager.id, synthesis_result)
+            on_member_complete(supervisor.id, synthesis_result)
 
         return TeamResult(
             success=worker_fan_out.all_success and synthesis_result.success,
@@ -1257,16 +1257,16 @@ Start the pipeline by {member.goal.lower()}. Your output will be passed to the n
         return "\n".join(lines)
 
     def _format_worker_list(self, workers: List[TeamMember]) -> str:
-        """Format worker list for manager context.
+        """Format specialist list for supervisor context.
 
-        Includes expertise information to help managers make informed
+        Includes expertise information to help supervisors make informed
         delegation decisions.
 
         Args:
-            workers: List of worker members
+            workers: List of specialist members
 
         Returns:
-            Formatted worker list with roles, goals, and expertise
+            Formatted specialist list with roles, goals, and expertise
         """
         lines = []
         for worker in workers:

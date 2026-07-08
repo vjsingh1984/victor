@@ -25,6 +25,8 @@ import time
 import warnings
 from typing import TYPE_CHECKING, Any
 
+from victor.teams.types import TeamAgentCategory, TeamFormation, TeamMember
+
 if TYPE_CHECKING:
     from victor.workflows.definition import TeamStepWorkflow
     from victor.workflows.runtime_types import WorkflowState
@@ -43,7 +45,6 @@ class TeamStepExecutor:
         from victor.agent.subagents import SubAgentRole
         from victor.framework.state_merging import MergeMode
         from victor.framework.workflows.nodes import TeamStep, TeamStepConfig
-        from victor.teams.types import TeamFormation, TeamMember
         from victor.workflows.runtime_types import GraphNodeResult
 
         logger.info("Executing team step: %s", node.id)
@@ -125,6 +126,12 @@ class TeamStepExecutor:
                     goal=member.get("goal", ""),
                     tool_budget=member.get("tool_budget", 15),
                     allowed_tools=member.get("allowed_tools"),
+                    agent_category=TeamAgentCategory(
+                        member.get(
+                            "agent_category",
+                            "supervisor" if member.get("is_manager", False) else "specialist",
+                        )
+                    ),
                     can_delegate=member.get("can_delegate", False),
                     delegation_targets=member.get("delegation_targets"),
                     is_manager=member.get("is_manager", False),

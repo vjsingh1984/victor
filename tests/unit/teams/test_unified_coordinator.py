@@ -350,18 +350,20 @@ class TestFormations:
 
     @pytest.mark.asyncio
     async def test_hierarchical_execution(self):
-        """Hierarchical formation should have manager plan and synthesize."""
+        """Hierarchical formation should have supervisor plan and synthesize."""
         coordinator = UnifiedTeamCoordinator(enable_observability=False)
         manager = MockTeamMember("manager", "Plan: do X")
         worker = MockTeamMember("worker", "Did X")
         coordinator.add_member(manager)
         coordinator.add_member(worker)
-        coordinator.set_manager(manager)
+        coordinator.set_supervisor(manager)
         coordinator.set_formation(TeamFormation.HIERARCHICAL)
 
         result = await coordinator.execute_task("Test task", {})
 
         assert result["success"] is True
+        assert coordinator.supervisor is manager
+        assert coordinator.manager is manager
         assert "manager" in result["member_results"]
         assert "worker" in result["member_results"]
         assert result["formation"] == "hierarchical"

@@ -44,6 +44,7 @@ from victor.protocols.team import (
     IMessageBusProvider,
     ISharedMemoryProvider,
     IEnhancedTeamCoordinator,
+    ISupervisorAgent,
     TeamCoordinatorProtocol,
     TeamMemberProtocol,
 )
@@ -58,6 +59,7 @@ __all__ = [
     "IMessageBusProvider",
     "ISharedMemoryProvider",
     "IEnhancedTeamCoordinator",
+    "ISupervisorAgent",
     "TeamCoordinatorProtocol",
     "TeamMemberProtocol",
 ]

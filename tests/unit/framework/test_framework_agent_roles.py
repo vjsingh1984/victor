@@ -26,6 +26,31 @@ from typing import Set
 # =============================================================================
 
 
+class TestSupervisorRole:
+    """Tests for the canonical SupervisorRole."""
+
+    def test_supervisor_role_exists(self):
+        """SupervisorRole should be importable."""
+        from victor.framework.agent_roles import SupervisorRole
+
+        assert SupervisorRole is not None
+
+    def test_supervisor_role_name(self):
+        """SupervisorRole should have name 'supervisor'."""
+        from victor.framework.agent_roles import SupervisorRole
+
+        role = SupervisorRole()
+        assert role.name == "supervisor"
+
+    def test_supervisor_role_has_delegate_capability(self):
+        """SupervisorRole should have DELEGATE capability."""
+        from victor.framework.agent_protocols import AgentCapability
+        from victor.framework.agent_roles import SupervisorRole
+
+        role = SupervisorRole()
+        assert AgentCapability.DELEGATE in role.capabilities
+
+
 class TestManagerRole:
     """Tests for ManagerRole."""
 
@@ -356,6 +381,12 @@ class TestRoleRegistry:
 
         assert "manager" in ROLE_REGISTRY
 
+    def test_registry_contains_supervisor(self):
+        """ROLE_REGISTRY should contain 'supervisor'."""
+        from victor.framework.agent_roles import ROLE_REGISTRY
+
+        assert "supervisor" in ROLE_REGISTRY
+
     def test_registry_contains_researcher(self):
         """ROLE_REGISTRY should contain 'researcher'."""
         from victor.framework.agent_roles import ROLE_REGISTRY
@@ -388,6 +419,16 @@ class TestRoleRegistry:
         role = get_role("manager")
         assert role is not None
         assert isinstance(role, ManagerRole)
+        assert isinstance(role, IAgentRole)
+
+    def test_get_role_returns_supervisor(self):
+        """get_role('supervisor') should return SupervisorRole instance."""
+        from victor.framework.agent_protocols import IAgentRole
+        from victor.framework.agent_roles import SupervisorRole, get_role
+
+        role = get_role("supervisor")
+        assert role is not None
+        assert isinstance(role, SupervisorRole)
         assert isinstance(role, IAgentRole)
 
     def test_get_role_returns_researcher(self):
@@ -523,6 +564,18 @@ class TestModuleExports:
         from victor.framework.agent_roles import ManagerRole
 
         assert ManagerRole is not None
+
+    def test_exports_supervisor_role(self):
+        """agent_roles should export SupervisorRole."""
+        from victor.framework.agent_roles import SupervisorRole
+
+        assert SupervisorRole is not None
+
+    def test_framework_exports_supervisor_role(self):
+        """victor.framework should export SupervisorRole."""
+        from victor.framework import SupervisorRole
+
+        assert SupervisorRole is not None
 
     def test_exports_researcher_role(self):
         """agent_roles should export ResearcherRole."""

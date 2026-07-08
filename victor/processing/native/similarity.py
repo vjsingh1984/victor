@@ -120,7 +120,7 @@ def top_k_similar(
 
     # Pure Python fallback
     similarities = batch_cosine_similarity(query, corpus)
-    indexed = [(i, sim) for i, sim in enumerate(similarities)]
+    indexed = list(enumerate(similarities))
     indexed.sort(key=lambda x: x[1], reverse=True)
     return indexed[:k]
 
