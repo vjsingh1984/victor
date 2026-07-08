@@ -76,3 +76,13 @@ def test_bare_vertical_counts_are_not_flagged():
 def test_repo_docs_currently_pass():
     # The live tree must be aligned (guards against regressions in this very check).
     assert mod.main() == 0
+
+
+def test_instruction_files_are_scanned():
+    # F-001: root instruction files (CLAUDE.md, .victor/init.md, AGENTS.md) carry
+    # canon counts and must be in the scan set so a future drift there is caught.
+    scanned = {str(p.relative_to(mod.ROOT)) for p in mod._doc_files()}
+    assert "CLAUDE.md" in scanned
+    assert ".victor/init.md" in scanned
+    # AGENTS.md is optional (may not exist) but must be scanned when present.
+    assert "AGENTS.md" in scanned or not (mod.ROOT / "AGENTS.md").exists()

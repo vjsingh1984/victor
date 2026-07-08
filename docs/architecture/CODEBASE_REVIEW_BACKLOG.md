@@ -25,12 +25,13 @@ can be resumed across sessions without re-deriving context.
 ## TIER 1 — High Impact, Low/Medium Effort
 
 ### F-001 · Reconcile doc-vs-code count drift — `HL`
-- **Status**: OPEN
-- **Evidence**:
-  - CLAUDE.md "24 providers / 34 tools" vs `ls victor/providers/*.py` = **49**, `ls victor/tools/*.py` = **79**.
-  - init.md "42 BaseTool / 39 BaseProvider / 54 slash commands" vs CLAUDE.md "55 / 36 / 46" — the two instruction files disagree with each other.
-- **Rationale**: When guidance docs contradict each other on counts, every agent-driven change works from stale premises. Make counts auto-derived from the graph index (single source of truth) or add a `make check-repo-hygiene`-style assertion.
-- **Action**: Add a CI guard that derives these counts and fails if docs drift; update CLAUDE.md/init.md once.
+- **Status**: DONE (provider/tool counts verified correct; gate coverage extended to instruction files)
+- **Evidence (re-verified 2026-04)**:
+  - A CI gate ALREADY EXISTS: `.github/workflows/ci-fast.yml:110` runs `scripts/ci/check_docs_drift.py` (passed green in PR #433). It auto-derives `providers` from `victor/providers/*_provider.py` (excl base/compat) and pins `CANON_TOOL_MODULES=34`, `CANON_VERTICALS=9`.
+  - Original backlog evidence was partly WRONG: CLAUDE.md:113 "24 LLM provider adapters" and :114 "34 tool modules" are **CORRECT** (match the derived canon `providers=24`, `tool_modules=34`). The raw `ls *.py`=49/79 counts include `__init__.py`/`base.py`/utils, not real adapters — not comparable.
+  - Genuine gap found: the gate's scan set (`DOC_GLOB`/`EXTRA_FILES`) only covered `docs/**/*.md` + `mkdocs.yml` + `docs/conf.py` — it did **NOT** scan the root instruction files (CLAUDE.md, .victor/init.md, AGENTS.md) that F-001 flagged. A future drift there would be silently missed.
+- **Action taken**: Extended `EXTRA_FILES` to include `CLAUDE.md`, `AGENTS.md`, `.victor/init.md`. Verified bidirectionally (wrong count "25" → gate fails with `.victor/init.md:37 provider count 25 != 24`; restored → passes). Added regression test `test_instruction_files_are_scanned`.
+- **WONTFIX scope (subclass counts)**: CLAUDE.md:215 "55 BaseTool / 36 BaseProvider / 46 slash commands" vs init.md:37 "42 / 39 / 54" disagree, but these cite *graph-index transitive* counts, not grep-derivable direct-inheritance counts (grep gives 16/23/55). Making these self-enforcing would require a graph-index count query in CI — out of scope for a docs gate. Left as-is.
 - **Effort**: Low. **Impact**: Medium.
 
 ### F-002 · Orchestrator holds 13 `_initialize_*` methods despite Facade contract — `HM`
@@ -165,3 +166,4 @@ can be resumed across sessions without re-deriving context.
 ## Changelog
 - **2026-04 review**: Initial findings F-001..F-010 written; F-❌-A (victor_sdk) and F-❌-B (MagicMock) recorded as INVALIDATED after verification.
 - **F-009 execution (2026-04):** F-009a/b done via `git mv` to `scripts/`; F-009c recovered 5 shell-limit tests into `tests/unit/tools/test_shell_limits.py` (all passing); deleted 2 dead/duplicate root tests (`test_performance_improvements.py`, `test_planning_integration.py` — the latter imported a removed `planning_coordinator` module). F-009d (rewrite dead `USE_SERVICE_LAYER_FOR_AGENT` verify script) still OPEN.
+- **F-001 execution (2026-07):** Extended `scripts/ci/check_docs_drift.py` EXTRA_FILES to scan CLAUDE.md/.victor/init.md/AGENTS.md (the exact files F-001 flagged); added regression test; verified bidirectionally. Provider/tool-module counts confirmed already correct (original evidence misread raw file count vs adapter count).
