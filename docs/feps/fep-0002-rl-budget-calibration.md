@@ -168,10 +168,12 @@ Docs parity: `docs/reference/configuration-options.md` documents both settings
    evidence. Default changed in `tool_settings.py` and docs.
 2. **Precedence (review #2): explicit overrides win absolutely.** Resolved by
    accepting an `explicit_override` flag on the seam (short-circuit to
-   identity-return when `True`). This is *blocked* on a separate pre-existing
-   bug: `SessionConfig.tool_budget` is validated but never applied inside
-   `apply_to_settings()` — the precedence test cannot exercise the real CLI path
-   until that is fixed. That fix is filed as a prerequisite, not part of this FEP.
+   identity-return when `True`). The prerequisite pre-existing bug is now
+   **fixed**: `SessionConfig.tool_budget` is applied to
+   `settings.tools.tool_call_budget` inside `apply_to_settings()` (TDD coverage
+   in `TestSessionConfigApplyToolBudget`, 3 tests). The real CLI override path is
+   now exercisable. The remaining deferred work is the seam's `explicit_override`
+   flag wiring + the precedence integration test.
 
 ## References
 

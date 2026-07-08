@@ -40,6 +40,7 @@ logger = logging.getLogger(__name__)
 def apply_budget_calibration(
     settings: Settings,
     db: Optional[Any] = None,
+    explicit_override: bool = False,
 ) -> ToolSettings:
     """Apply RL-driven budget calibration to the session's tool settings.
 
@@ -48,27 +49,42 @@ def apply_budget_calibration(
         db: Optional DB handle exposing ``cursor()``. When ``None`` the
             reader lazily resolves the canonical global DB. Injected for
             testability.
+        explicit_override: When ``True``, the caller has already applied an
+            explicit (e.g. CLI ``--tool-budget``) override via
+            ``SessionConfig.apply_to_settings``. Per FEP-0002 review decision
+            #2, explicit overrides win absolutely, so the seam short-circuits
+            to identity-return without reading the DB. Default ``False``.
 
     Returns:
         The (possibly calibrated) ``ToolSettings``. When calibration is
-        disabled or low-confidence, the baseline ``settings.tools`` is
-        returned by identity. Never mutates the input.
+        disabled, low-confidence, or an explicit override is present, the
+        baseline ``settings.tools`` is returned by identity. Never mutates the
+        input.
     """
     baseline = settings.tools
     if baseline is None:
         return baseline  # nothing to calibrate
 
+    # Gate 0 (precedence): an explicit override wins absolutely. Short-circuit
+    # before any DB read so calibration can never re-tighten a user-set budget.
+    if explicit_override:
+        return baseline
+
     # Gate 1: opt-in toggle (default OFF -> zero behavior change).
     if not getattr(baseline, "tool_budget_calibration_enabled", False):
         return baseline
 
-    min_conf = float(getattr(baseline, "tool_budget_calibration_min_confidence", 0.5))
+    min_conf = float(
+        getattr(baseline, "tool_budget_calibration_min_confidence", 0.7)
+    )
 
     try:
         reader = BudgetSignalReader()
         tools = reader.load_tool_signals(db=db)
         decisions = reader.load_decision_outcomes(db=db)
-        rec = BudgetCalibrator().recommend(tools=tools, decisions=decisions, baseline=baseline)
+        rec = BudgetCalibrator().recommend(
+            tools=tools, decisions=decisions, baseline=baseline
+        )
     except Exception as exc:  # noqa: BLE001 - never break bootstrap
         logger.debug(f"budget_calibration: pipeline failed, retaining baseline: {exc}")
         return baseline

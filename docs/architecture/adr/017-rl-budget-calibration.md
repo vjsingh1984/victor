@@ -121,12 +121,18 @@ Docs parity: `docs/reference/configuration-options.md` documents both settings
   after the existing `session_config.apply_to_settings(settings)` call), assigning
   `settings.tools = apply_budget_calibration(settings)`. (Review correction: the
   apply point is `Agent.create()`, not `AgentFactory.create()`.)
-- A prerequisite fix: `SessionConfig.apply_to_settings()` must actually apply
-  `self.tool_budget` (currently validated but dropped), so the
-  `explicit_override` precedence path is exercisable.
 - An integration test asserting the orchestrator receives the overlay only when
   no explicit budget override wins.
 - Runtime behavior change is intentionally gated behind the FEP's review window.
+
+**Completed prerequisite (unblocked):**
+
+- `SessionConfig.apply_to_settings()` now applies `self.tool_budget` to the
+  canonical `settings.tools.tool_call_budget` field (previously validated but
+  dropped — a pre-existing dead-wire bug). TDD coverage in
+  `tests/unit/framework/test_session_config.py::TestSessionConfigApplyToolBudget`
+  (3 tests). This makes the FEP-0002 `explicit_override` precedence path
+  exercisable against the real CLI override.
 
 ## Alternatives Considered
 

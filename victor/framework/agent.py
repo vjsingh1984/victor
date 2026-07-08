@@ -239,6 +239,23 @@ class Agent:
         profile_overrides: Dict[str, Any] = {}
         if session_config is not None:
             session_config.apply_to_settings(settings)
+            # FEP-0002: apply RL-driven budget calibration after SessionConfig
+            # overrides land. An explicit ``--tool-budget`` override (now
+            # applied by apply_to_settings above) wins absolutely — the seam
+            # short-circuits to identity-return when explicit_override is set,
+            # so calibration can never re-tighten a user-set budget. Default
+            # OFF via ``tool_budget_calibration_enabled`` -> zero behavior
+            # change for sessions that don't opt in.
+            from victor.framework.rl.budget_calibration_seam import (
+                apply_budget_calibration,
+            )
+
+            explicit_override = session_config.tool_budget is not None
+            calibrated_tools = apply_budget_calibration(
+                settings, explicit_override=explicit_override
+            )
+            if calibrated_tools is not settings.tools:
+                object.__setattr__(settings, "tools", calibrated_tools)
             profile = session_config.agent_profile or profile
             provider_override = getattr(session_config, "provider_override", None)
             if provider_override is not None:
@@ -822,9 +839,13 @@ class Agent:
             agent.set_tool_budget(50)
         """
         if hasattr(self._orchestrator, "unified_tracker"):
-            self._orchestrator.unified_tracker.set_tool_budget(budget, user_override=user_override)
+            self._orchestrator.unified_tracker.set_tool_budget(
+                budget, user_override=user_override
+            )
 
-    def set_max_iterations(self, max_iterations: int, *, user_override: bool = False) -> None:
+    def set_max_iterations(
+        self, max_iterations: int, *, user_override: bool = False
+    ) -> None:
         """Set the maximum number of agentic loop iterations.
 
         Args:
@@ -853,7 +874,9 @@ class Agent:
                     print(event.content)
         """
         if hasattr(self._orchestrator, "provider"):
-            return getattr(self._orchestrator.provider, "supports_streaming", lambda: True)()
+            return getattr(
+                self._orchestrator.provider, "supports_streaming", lambda: True
+            )()
         return True
 
     def start_embedding_preload(self) -> None:
@@ -1037,12 +1060,16 @@ class Agent:
         """
         # Check if vertical is configured
         if not self._vertical:
-            raise AgentError("No vertical configured. Create agent with vertical= parameter.")
+            raise AgentError(
+                "No vertical configured. Create agent with vertical= parameter."
+            )
 
         # Get workflow provider from vertical
         workflow_provider = self._vertical.get_workflow_provider()
         if not workflow_provider:
-            raise AgentError(f"Vertical '{self._vertical.name}' does not provide workflows.")
+            raise AgentError(
+                f"Vertical '{self._vertical.name}' does not provide workflows."
+            )
 
         # Use canonical API: run_compiled_workflow (uses UnifiedWorkflowCompiler internally)
         result = await workflow_provider.run_compiled_workflow(
@@ -1098,20 +1125,30 @@ class Agent:
 
         # Check if vertical is configured
         if not self._vertical:
-            raise AgentError("No vertical configured. Create agent with vertical= parameter.")
+            raise AgentError(
+                "No vertical configured. Create agent with vertical= parameter."
+            )
 
         team_catalog = resolve_vertical_team_catalog(self._vertical)
         if not team_catalog.supported:
-            raise AgentError(f"Vertical '{self._vertical.name}' does not support teams.")
+            raise AgentError(
+                f"Vertical '{self._vertical.name}' does not support teams."
+            )
         if not team_catalog.provider_available:
-            raise AgentError(f"Vertical '{self._vertical.name}' does not provide team specs.")
+            raise AgentError(
+                f"Vertical '{self._vertical.name}' does not provide team specs."
+            )
         if not team_catalog.has_team_specs:
-            raise AgentError(f"Vertical '{self._vertical.name}' has no team specs defined.")
+            raise AgentError(
+                f"Vertical '{self._vertical.name}' has no team specs defined."
+            )
 
         team_spec = team_catalog.get(team_name)
         if not team_spec:
             available = team_catalog.list_names()
-            raise AgentError(f"Team '{team_name}' not found. " f"Available: {', '.join(available)}")
+            raise AgentError(
+                f"Team '{team_name}' not found. " f"Available: {', '.join(available)}"
+            )
 
         team_execution = await run_named_team(
             self._orchestrator,
@@ -1229,7 +1266,9 @@ class Agent:
 
         orchestration_facade = getattr(self._orchestrator, "orchestration_facade", None)
         if orchestration_facade is None:
-            orchestration_facade = getattr(self._orchestrator, "_orchestration_facade", None)
+            orchestration_facade = getattr(
+                self._orchestrator, "_orchestration_facade", None
+            )
 
         coordination_state_passed = (
             getattr(orchestration_facade, "coordination_state_passed", None)

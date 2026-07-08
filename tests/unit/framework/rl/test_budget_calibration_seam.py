@@ -63,16 +63,28 @@ class FakeDB:
 
 # Reliable signals: many samples, mixed Q.
 GOOD_TOOLS = [
-    {"tool_name": "read", "q_value": 0.92, "selection_count": 6189, "success_count": 5855},
-    {"tool_name": "shell", "q_value": 0.36, "selection_count": 271, "success_count": 120},
+    {
+        "tool_name": "read",
+        "q_value": 0.92,
+        "selection_count": 6189,
+        "success_count": 5855,
+    },
+    {
+        "tool_name": "shell",
+        "q_value": 0.36,
+        "selection_count": 271,
+        "success_count": 120,
+    },
 ]
 # 1303 rows, ~78% failure (matches observed decision_outcome).
-FAILING_OUTCOMES = [{"success": 0, "quality_score": 0.0, "attributed_reward": 0.0}] * 1015 + [
-    {"success": 1, "quality_score": 0.9, "attributed_reward": 1.0}
-] * 288
+FAILING_OUTCOMES = [
+    {"success": 0, "quality_score": 0.0, "attributed_reward": 0.0}
+] * 1015 + [{"success": 1, "quality_score": 0.9, "attributed_reward": 1.0}] * 288
 
 
-def _settings(enabled: bool = False, min_conf: float = 0.5, budget: int = 100) -> Settings:
+def _settings(
+    enabled: bool = False, min_conf: float = 0.5, budget: int = 100
+) -> Settings:
     """Build a Settings instance with controllable calibration flags."""
     s = Settings()
     s.tools = ToolSettings(
@@ -117,6 +129,35 @@ class TestGatingContract:
         apply_budget_calibration(base, db=db)  # type: ignore[arg-type]
         # Baseline never mutated.
         assert base.tools.tool_call_budget == original_budget
+
+    def test_explicit_override_short_circuits_before_db_read(self):
+        """FEP-0002 precedence: an explicit override wins absolutely.
+
+        Even with calibration enabled + high-confidence signals present, the
+        seam returns the baseline by identity (no DB read, no overlay) when
+        explicit_override=True. Verified via a DB that raises if read.
+        """
+        base = _settings(enabled=True, min_conf=0.0, budget=100)
+
+        class ExplodingDB:
+            def cursor(self):
+                raise AssertionError(
+                    "explicit_override must short-circuit before any DB read"
+                )
+
+        result = apply_budget_calibration(
+            base, db=ExplodingDB(), explicit_override=True  # type: ignore[arg-type]
+        )
+        assert result is base.tools  # identity, no overlay
+
+    def test_explicit_override_false_uses_normal_pipeline(self):
+        """Default (explicit_override=False) must not change existing behavior."""
+        base = _settings(enabled=True, min_conf=0.4, budget=100)
+        db = FakeDB(GOOD_TOOLS, FAILING_OUTCOMES)
+        result = apply_budget_calibration(
+            base, db=db, explicit_override=False  # type: ignore[arg-type]
+        )
+        assert result is not base.tools  # overlay applied as usual
 
 
 # ---------------------------------------------------------------------------
