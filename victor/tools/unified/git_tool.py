@@ -274,6 +274,14 @@ async def git_tool(cmd: str) -> str:
     if parsed.subcommand == "pr":
         return await _handle_pr(parsed)
 
+    # Agent-layer attribution: proactively append the Victor AI co-author trailer to
+    # an *explicit* commit message (``-m``), Claude-Code-style — injected into the
+    # message itself so it applies in any repo without a git hook. The ``--ai`` path
+    # is attributed inside ``_handle_ai_commit``. Idempotent; opt out with
+    # ``VICTOR_COMMIT_ATTRIBUTION=0``.
+    if parsed.subcommand == "commit" and not getattr(parsed, "ai", False):
+        parsed.message = _attributed_commit_message(parsed.message)
+
     # AI commit: generate message first, then commit.
     if parsed.subcommand == "commit" and getattr(parsed, "ai", False):
         return await _handle_ai_commit(parsed)
@@ -317,6 +325,8 @@ async def _handle_ai_commit(parsed: argparse.Namespace) -> str:
             return (
                 f"### ❌ ERROR\nCould not generate a commit message.\n{_format_result(msg_result)}"
             )
+        # Agent-layer attribution on the AI-generated message too (hook-free).
+        message = _attributed_commit_message(message)
         commit_result = await git_fn(
             operation="commit",
             message=message,
@@ -339,6 +349,30 @@ def _extract_generated_message(result: Any) -> Optional[str]:
     if isinstance(result, str) and result.strip():
         return result.strip()
     return None
+
+
+def _attributed_commit_message(message: Optional[str]) -> Optional[str]:
+    """Proactively append the Victor AI co-author trailer to a commit message.
+
+    Claude-Code-style agent-layer attribution: injected into the message text
+    itself (not a git hook), so it applies in any repo without setup. Idempotent;
+    opt out by setting ``VICTOR_COMMIT_ATTRIBUTION=0``.
+    """
+    import os
+
+    if not message:
+        return message
+    disabled = os.getenv("VICTOR_COMMIT_ATTRIBUTION", "1").strip().lower() in {
+        "0",
+        "false",
+        "no",
+        "off",
+    }
+    if disabled:
+        return message
+    from victor.core.attribution import append_victor_commit_attribution
+
+    return append_victor_commit_attribution(message)
 
 
 async def _handle_pr(parsed: argparse.Namespace) -> str:
