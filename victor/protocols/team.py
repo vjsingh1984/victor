@@ -134,6 +134,26 @@ class ITeamMember(IAgent, Protocol):
 
 
 @runtime_checkable
+class ISupervisorAgent(ITeamMember, Protocol):
+    """Protocol for the coordinating member of a supervised formation."""
+
+    @property
+    def is_supervisor(self) -> bool:
+        """Whether this member coordinates team execution."""
+        ...
+
+    @property
+    def can_delegate(self) -> bool:
+        """Whether this member may delegate work to specialists."""
+        ...
+
+    @property
+    def delegation_targets(self) -> Optional[List[str]]:
+        """Optional allow-list of member IDs this supervisor may delegate to."""
+        ...
+
+
+@runtime_checkable
 class ITeamCoordinator(Protocol):
     """Base protocol for team coordinators.
 

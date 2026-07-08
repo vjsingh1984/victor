@@ -27,6 +27,7 @@ from victor.framework.multi_agent.personas import (
 )
 from victor.framework.multi_agent.teams import (
     TaskAssignmentStrategy,
+    TeamAgentCategory,
     TeamMember,
     TeamSpec,
     TeamTemplate,
@@ -125,6 +126,19 @@ class TestTeamMember:
         )
 
         assert member.is_leader is False
+        assert member.is_supervisor is False
+        assert member.agent_category == TeamAgentCategory.SPECIALIST
+
+    def test_supervisor_category_sets_legacy_leader(self, sample_persona):
+        """Supervisor category should imply the legacy leader flag."""
+        member = TeamMember(
+            persona=sample_persona,
+            role_in_team="lead_tester",
+            agent_category=TeamAgentCategory.SUPERVISOR,
+        )
+
+        assert member.is_supervisor is True
+        assert member.is_leader is True
 
     def test_default_max_concurrent_tasks(self, sample_persona):
         """TeamMember should default to max_concurrent_tasks=1."""
@@ -450,6 +464,7 @@ class TestTeamSpec:
         assert leader is not None
         assert leader.is_leader is True
         assert leader.name == "Researcher"
+        assert spec.supervisor is leader
 
     def test_leader_property_returns_none_when_no_leader(self, sample_template):
         """leader property should return None when no leader is set."""

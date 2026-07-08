@@ -8,6 +8,7 @@ import importlib
 from typing import Any, Dict, List, Optional
 
 from victor_contracts.constants import get_canonical_name
+from victor_contracts.team_schema import TeamAgentCategory, TeamFormation, TeamMemberSpec
 
 
 def get_runtime_persona_provider() -> Any:
@@ -118,6 +119,14 @@ class TeamTopology(Enum):
     PIPELINE = "pipeline"
     HUB_SPOKE = "hub_spoke"
 
+    def to_formation(self) -> TeamFormation:
+        """Map persona-template topology to the canonical execution formation."""
+        if self is TeamTopology.PIPELINE:
+            return TeamFormation.PIPELINE
+        if self is TeamTopology.MESH:
+            return TeamFormation.PARALLEL
+        return TeamFormation.HIERARCHICAL
+
 
 class TaskAssignmentStrategy(Enum):
     """Strategies for assigning tasks to team members."""
@@ -129,16 +138,27 @@ class TaskAssignmentStrategy(Enum):
 
 @dataclass
 class TeamMember:
-    """A member of a multi-agent team."""
+    """A member of a persona-driven multi-agent team.
+
+    `agent_category` is the canonical coordination category. `is_leader`
+    remains as the legacy/persona-facing alias for supervisor membership.
+    """
 
     persona: PersonaTraits
     role_in_team: str
     is_leader: bool = False
+    agent_category: TeamAgentCategory = TeamAgentCategory.SPECIALIST
     max_concurrent_tasks: int = 1
     tool_access: List[str] = field(default_factory=list)
 
     def __post_init__(self) -> None:
-        """Normalize tool access to canonical names."""
+        """Normalize coordination category and tool access."""
+        if isinstance(self.agent_category, str):
+            self.agent_category = TeamAgentCategory(self.agent_category)
+        if self.is_leader:
+            self.agent_category = TeamAgentCategory.SUPERVISOR
+        if self.agent_category is TeamAgentCategory.SUPERVISOR:
+            self.is_leader = True
         self.tool_access = [get_canonical_name(tool) for tool in self.tool_access]
 
     @property
@@ -150,6 +170,11 @@ class TeamMember:
     def expertise_level(self) -> Any:
         """Get the member's expertise level from persona."""
         return self.persona.expertise_level
+
+    @property
+    def is_supervisor(self) -> bool:
+        """Compatibility alias for the canonical supervisor category."""
+        return self.agent_category is TeamAgentCategory.SUPERVISOR
 
 
 @dataclass
@@ -199,12 +224,17 @@ class TeamSpec:
     members: List[TeamMember] = field(default_factory=list)
 
     @property
-    def leader(self) -> Optional[TeamMember]:
-        """Get the team leader if one exists."""
+    def supervisor(self) -> Optional[TeamMember]:
+        """Get the coordinating supervisor if one exists."""
         for member in self.members:
-            if member.is_leader:
+            if member.is_supervisor:
                 return member
         return None
+
+    @property
+    def leader(self) -> Optional[TeamMember]:
+        """Compatibility alias for supervisor."""
+        return self.supervisor
 
     @property
     def name(self) -> str:
@@ -215,6 +245,11 @@ class TeamSpec:
     def topology(self) -> TeamTopology:
         """Get the team topology from template."""
         return self.template.topology
+
+    @property
+    def formation(self) -> TeamFormation:
+        """Get the canonical runtime formation for this team."""
+        return self.template.topology.to_formation()
 
     def get_members_by_role(self, role: str) -> List[TeamMember]:
         """Get all members with a specific role."""
@@ -245,6 +280,7 @@ class TeamSpec:
                     "persona": member.persona.to_dict(),
                     "role_in_team": member.role_in_team,
                     "is_leader": member.is_leader,
+                    "agent_category": member.agent_category.value,
                     "max_concurrent_tasks": member.max_concurrent_tasks,
                     "tool_access": member.tool_access,
                 }
@@ -259,6 +295,7 @@ __all__ = [
     "PersonaTemplate",
     "PersonaTraits",
     "TaskAssignmentStrategy",
+    "TeamAgentCategory",
     "TeamFormation",
     "TeamMember",
     "TeamMemberSpec",
@@ -267,44 +304,3 @@ __all__ = [
     "TeamTopology",
     "get_runtime_persona_provider",
 ]
-
-
-# ── Promoted from victor.teams.types / victor.framework.teams ──────────
-
-
-class TeamFormation(str, Enum):
-    """Team coordination formation types.
-
-    Promoted from victor.teams.types for contract-only vertical development.
-    """
-
-    SEQUENTIAL = "sequential"
-    PARALLEL = "parallel"
-    HIERARCHICAL = "hierarchical"
-    PIPELINE = "pipeline"
-    CONSENSUS = "consensus"
-
-
-@dataclass
-class TeamMemberSpec:
-    """Specification for a team member agent.
-
-    Promoted from victor.framework.teams for contract-only vertical development.
-    """
-
-    role: str
-    goal: str
-    name: str = ""
-    tool_budget: int = 10
-    allowed_tools: List[str] = field(default_factory=list)
-    is_manager: bool = False
-    priority: int = 0
-    backstory: str = ""
-    expertise: str = ""
-    personality: str = ""
-    max_delegation_depth: int = 1
-    memory: bool = False
-    memory_config: Dict[str, Any] = field(default_factory=dict)
-    cache: bool = False
-    verbose: bool = False
-    max_iterations: int = 10

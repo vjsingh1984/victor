@@ -407,12 +407,18 @@ class Agent:
             async for event in team.stream():
                 print(f"{event.type}: {event.message}")
 
-        Example - Hierarchical with manager:
+        Example - Hierarchical with supervisor:
+            from victor.framework.teams import TeamAgentCategory
+
             team = await Agent.create_team(
                 name="Project Team",
                 goal="Build a REST API",
                 members=[
-                    TeamMemberSpec(role="planner", goal="Coordinate team", is_manager=True),
+                    TeamMemberSpec(
+                        role="planner",
+                        goal="Coordinate team",
+                        agent_category=TeamAgentCategory.SUPERVISOR,
+                    ),
                     TeamMemberSpec(role="researcher", goal="Research API patterns"),
                     TeamMemberSpec(role="executor", goal="Implement endpoints"),
                     TeamMemberSpec(role="reviewer", goal="Test and review"),

@@ -14,7 +14,7 @@
 
 """Hierarchical formation strategy.
 
-Manager agent delegates to worker agents,
+Supervisor agent delegates to specialist agents,
 then synthesizes results.
 """
 
@@ -28,20 +28,20 @@ logger = logging.getLogger(__name__)
 
 
 class HierarchicalFormation(BaseFormationStrategy):
-    """Execute with manager-worker delegation pattern.
+    """Execute with supervisor-specialist delegation pattern.
 
     In hierarchical formation:
-    - First agent (manager) delegates tasks to workers
-    - Workers execute in parallel
-    - Manager synthesizes worker results
-    - Requires manager role in first position
+    - One supervisor delegates tasks to specialists
+    - Specialists execute in parallel
+    - Supervisor synthesizes specialist results
+    - Prefers an explicit supervisor category/contract
 
     Use case: Complex task decomposition, supervised execution
     """
 
     def get_required_roles(self) -> Optional[List[str]]:
-        """Hierarchical formation requires manager role."""
-        return ["manager", "coordinator", "lead"]
+        """Hierarchical formation requires a coordinating supervisor role."""
+        return ["supervisor", "coordinator", "lead", "manager"]
 
     async def execute(
         self,
@@ -49,94 +49,145 @@ class HierarchicalFormation(BaseFormationStrategy):
         context: TeamContext,
         task: AgentMessage,
     ) -> List[MemberResult]:
-        """Execute with manager-worker pattern."""
+        """Execute with supervisor-specialist pattern."""
         if len(agents) < 2:
             raise ValueError(
-                "Hierarchical formation requires at least 2 agents (manager + workers)"
+                "Hierarchical formation requires at least 2 agents "
+                "(supervisor + specialists)"
             )
 
-        # Check for explicit manager in context first
-        explicit_manager_id = context.shared_state.get("explicit_manager_id")
+        # Check for explicit supervisor in context first. Keep the older
+        # explicit_manager_id key readable for serialized compatibility.
+        explicit_supervisor_id = context.shared_state.get(
+            "explicit_supervisor_id",
+            context.shared_state.get("explicit_manager_id"),
+        )
 
-        # Auto-detect manager: find agent with DELEGATE capability or role attribute
-        manager = None
-        workers = []
+        # Auto-detect supervisor: prefer the explicit category/contract, then
+        # fall back to legacy manager/lead role signals.
+        supervisor = None
+        specialists = []
 
-        for i, agent in enumerate(agents):
-            # If explicit manager is set, use it
-            if explicit_manager_id and agent.id == explicit_manager_id:
-                manager = agent
+        for agent in agents:
+            # If explicit supervisor is set, use it.
+            if explicit_supervisor_id and agent.id == explicit_supervisor_id:
+                supervisor = agent
+                continue
+            if explicit_supervisor_id:
+                specialists.append(agent)
                 continue
 
-            # Otherwise check for manager by capability
-            is_manager = False
+            # Otherwise check for explicit supervisor/member metadata.
+            is_supervisor = False
+            if getattr(agent, "is_supervisor", False):
+                is_supervisor = True
+
+            member = getattr(agent, "_member", None)
+            if (
+                not is_supervisor
+                and member is not None
+                and getattr(member, "is_supervisor", False)
+            ):
+                is_supervisor = True
+
+            if not is_supervisor and getattr(agent, "can_delegate", False):
+                is_supervisor = True
+            if (
+                not is_supervisor
+                and member is not None
+                and getattr(member, "can_delegate", False)
+                and getattr(member, "is_manager", False)
+            ):
+                is_supervisor = True
+
             if hasattr(agent, "role") and hasattr(agent.role, "capabilities"):
                 from victor.framework.agent_protocols import AgentCapability
 
                 if AgentCapability.DELEGATE in agent.role.capabilities:
-                    is_manager = True
+                    is_supervisor = True
 
-            # Check if agent has _role attribute with manager in name
-            if not is_manager and hasattr(agent, "_role") and hasattr(agent._role, "name"):
+            # Check if agent has _role attribute with a coordinator-like name.
+            if not is_supervisor and hasattr(agent, "_role") and hasattr(agent._role, "name"):
                 role_name = agent._role.name.lower()
-                if "manager" in role_name or "lead" in role_name or "coordinator" in role_name:
-                    is_manager = True
+                if (
+                    "supervisor" in role_name
+                    or "manager" in role_name
+                    or "lead" in role_name
+                    or "coordinator" in role_name
+                ):
+                    is_supervisor = True
 
-            if is_manager:
-                manager = agent
+            if is_supervisor:
+                supervisor = agent
             else:
-                workers.append(agent)
+                specialists.append(agent)
 
-        # If no manager found by capability, use first agent as fallback
-        if manager is None:
+        # If no supervisor found by contract/capability, use first agent as fallback.
+        if supervisor is None:
             logger.warning(
-                "HierarchicalFormation: no manager detected by capability, using first agent as manager"
+                "HierarchicalFormation: no supervisor detected by contract/capability, "
+                "using first agent as supervisor"
             )
-            manager = agents[0]
-            workers = agents[1:]
+            supervisor = agents[0]
+            specialists = agents[1:]
         else:
-            if explicit_manager_id:
-                logger.info(f"HierarchicalFormation: using explicit manager={manager.id}")
+            if explicit_supervisor_id:
+                logger.info(
+                    f"HierarchicalFormation: using explicit supervisor={supervisor.id}"
+                )
             else:
-                logger.info(f"HierarchicalFormation: auto-detected manager={manager.id}")
+                logger.info(
+                    f"HierarchicalFormation: auto-detected supervisor={supervisor.id}"
+                )
 
         logger.debug(
-            f"HierarchicalFormation: manager={manager.id}, workers={[w.id for w in workers]}"
+            f"HierarchicalFormation: supervisor={supervisor.id}, "
+            f"specialists={[s.id for s in specialists]}"
         )
 
-        # Phase 1: Manager plans and delegates (executes first!)
-        manager_result = await manager.execute(task, context)
+        # Phase 1: Supervisor plans and delegates (executes first).
+        supervisor_result = await supervisor.execute(task, context)
 
-        # Create results list with manager first, followed by workers in original order
+        # Create results list with supervisor first, followed by specialists in original order.
         results = []
-        results.append(manager_result)
+        results.append(supervisor_result)
 
-        # Check if manager created delegation tasks
-        if not manager_result.success or not manager_result.metadata.get("delegated_tasks"):
+        # Check if supervisor created delegation tasks.
+        if not supervisor_result.success or not supervisor_result.metadata.get(
+            "delegated_tasks"
+        ):
             logger.info(
-                "HierarchicalFormation: manager did not delegate tasks, executing all workers with original task"
+                "HierarchicalFormation: supervisor did not delegate tasks, "
+                "executing all specialists with original task"
             )
-            # Fallback: Execute all workers with the original task
-            worker_tasks = [
-                self._execute_worker(worker, task, context, i) for i, worker in enumerate(workers)
+            # Fallback: Execute all specialists with the original task.
+            specialist_tasks = [
+                self._execute_specialist(specialist, task, context, i)
+                for i, specialist in enumerate(specialists)
             ]
 
-            # Execute workers in parallel
+            # Execute specialists in parallel.
             import asyncio
 
-            worker_results = await asyncio.gather(*worker_tasks, return_exceptions=True)
+            specialist_results = await asyncio.gather(
+                *specialist_tasks,
+                return_exceptions=True,
+            )
 
-            # Process worker results
-            for i, result in enumerate(worker_results):
+            # Process specialist results.
+            for i, result in enumerate(specialist_results):
                 if isinstance(result, Exception):
-                    logger.error(f"HierarchicalFormation: worker {workers[i].id} failed: {result}")
+                    logger.error(
+                        f"HierarchicalFormation: specialist {specialists[i].id} "
+                        f"failed: {result}"
+                    )
                     results.append(
                         MemberResult(
-                            member_id=workers[i].id,
+                            member_id=specialists[i].id,
                             success=False,
                             output="",
                             error=str(result),
-                            metadata={"index": i + 1, "role": "worker"},
+                            metadata={"index": i + 1, "role": "specialist"},
                         )
                     )
                 else:
@@ -144,80 +195,92 @@ class HierarchicalFormation(BaseFormationStrategy):
 
             return results
 
-        # Phase 2: Workers execute delegated tasks in parallel
-        delegated_tasks = manager_result.metadata["delegated_tasks"]
+        # Phase 2: Specialists execute delegated tasks in parallel.
+        delegated_tasks = supervisor_result.metadata["delegated_tasks"]
 
-        if len(delegated_tasks) != len(workers):
+        if len(delegated_tasks) != len(specialists):
             logger.warning(
                 f"HierarchicalFormation: task count mismatch: "
-                f"{len(delegated_tasks)} tasks vs {len(workers)} workers"
+                f"{len(delegated_tasks)} tasks vs {len(specialists)} specialists"
             )
 
-        worker_tasks = []
-        for i, worker in enumerate(workers):
+        specialist_tasks = []
+        for i, specialist in enumerate(specialists):
             if i < len(delegated_tasks):
-                worker_task = delegated_tasks[i]
-                worker_tasks.append(self._execute_worker(worker, worker_task, context, i))
+                specialist_task = delegated_tasks[i]
+                specialist_tasks.append(
+                    self._execute_specialist(specialist, specialist_task, context, i)
+                )
 
-        # Execute workers in parallel
+        # Execute specialists in parallel.
         import asyncio
 
-        worker_results = await asyncio.gather(*worker_tasks, return_exceptions=True)
+        specialist_results = await asyncio.gather(
+            *specialist_tasks,
+            return_exceptions=True,
+        )
 
-        # Process worker results
-        for i, result in enumerate(worker_results):
+        # Process specialist results.
+        for i, result in enumerate(specialist_results):
             if isinstance(result, Exception):
-                logger.error(f"HierarchicalFormation: worker {workers[i].id} failed: {result}")
+                logger.error(
+                    f"HierarchicalFormation: specialist {specialists[i].id} "
+                    f"failed: {result}"
+                )
                 results.append(
                     MemberResult(
-                        member_id=workers[i].id,
+                        member_id=specialists[i].id,
                         success=False,
                         output="",
                         error=str(result),
-                        metadata={"index": i + 1, "role": "worker"},
+                        metadata={"index": i + 1, "role": "specialist"},
                     )
                 )
             else:
                 results.append(result)
 
-        # Phase 3: Manager synthesizes results
+        # Phase 3: Supervisor synthesizes results.
+        synthesis_inputs = [
+            {
+                "agent_id": r.member_id,
+                "success": r.success,
+                "content": r.output,
+            }
+            for r in results[1:]
+        ]
         synthesis_task = AgentMessage(
             message_type=MessageType.RESULT,
             sender_id="system",
-            recipient_id=manager.id,
+            recipient_id=supervisor.id,
             content={
-                "task": "Synthesize worker results",
-                "worker_results": [
-                    {
-                        "agent_id": r.member_id,
-                        "success": r.success,
-                        "content": r.output,
-                    }
-                    for r in results[1:]
-                ],
+                "task": "Synthesize specialist results",
+                "specialist_results": synthesis_inputs,
+                "worker_results": synthesis_inputs,
             },
         )
 
-        synthesis_result = await manager.execute(synthesis_task, context)
+        synthesis_result = await supervisor.execute(synthesis_task, context)
         results[0] = synthesis_result  # Replace with final synthesis
 
         return results
 
-    async def _execute_worker(
+    async def _execute_specialist(
         self,
-        worker: Any,
+        specialist: Any,
         task: AgentMessage,
         context: TeamContext,
         index: int,
     ) -> MemberResult:
-        """Execute a single worker."""
-        logger.debug(f"HierarchicalFormation: executing worker {index+1}: {worker.id}")
-        return await worker.execute(task, context)
+        """Execute a single specialist."""
+        logger.debug(
+            f"HierarchicalFormation: executing specialist {index + 1}: {specialist.id}"
+        )
+        return await specialist.execute(task, context)
 
     def validate_context(self, context: TeamContext) -> bool:
         """Hierarchical formation requires delegation support."""
         return context is not None and hasattr(context, "shared_state")
 
     def supports_early_termination(self) -> bool:
-        """Hierarchical formation requires all workers to complete."""
+        """Hierarchical formation requires all specialists to complete."""
         return False

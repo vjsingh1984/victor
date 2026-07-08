@@ -140,6 +140,7 @@ from victor_contracts.multi_agent import (
     TeamTemplate,
     TeamTopology,
 )
+from victor_contracts.team_schema import TeamAgentCategory, TeamFormation, TeamMemberSpec
 from victor_contracts.tools import (
     AccessMode,
     CostTier,
@@ -307,7 +308,10 @@ __all__ = [
     "PersonaTemplate",
     "PersonaTraits",
     "TaskAssignmentStrategy",
+    "TeamAgentCategory",
+    "TeamFormation",
     "TeamMember",
+    "TeamMemberSpec",
     "TeamSpec",
     "TeamTemplate",
     "TeamTopology",

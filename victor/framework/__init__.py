@@ -369,6 +369,7 @@ _LAZY_IMPORTS: dict[str, list[str]] = {
         "ResearcherRole",
         "ReviewerRole",
         "ROLE_REGISTRY",
+        "SupervisorRole",
         "get_role",
     ],
     "victor.framework.chain_registry": [
