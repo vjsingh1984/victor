@@ -12,7 +12,9 @@ from pathlib import Path
 
 
 def _load():
-    path = Path(__file__).resolve().parents[3] / "scripts" / "ci" / "check_docs_drift.py"
+    path = (
+        Path(__file__).resolve().parents[3] / "scripts" / "ci" / "check_docs_drift.py"
+    )
     spec = importlib.util.spec_from_file_location("check_docs_drift", path)
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)
@@ -44,7 +46,10 @@ def test_wrong_version_stamp_in_canonical_doc_flagged():
 
 def test_version_stamp_ignored_in_noncanonical_doc():
     # Spec/FEP docs carry their own independent version — must NOT be flagged.
-    assert scan("docs/feps/vertical-package-spec.md", "**Version**: 1.0.0", "0.7.1", 24) == []
+    assert (
+        scan("docs/feps/vertical-package-spec.md", "**Version**: 1.0.0", "0.7.1", 24)
+        == []
+    )
 
 
 def test_wrong_provider_count_flagged_anywhere():
@@ -81,8 +86,14 @@ def test_repo_docs_currently_pass():
 def test_instruction_files_are_scanned():
     # F-001: root instruction files (CLAUDE.md, .victor/init.md, AGENTS.md) carry
     # canon counts and must be in the scan set so a future drift there is caught.
+    #
+    # These files are intentionally gitignored (machine-local instruction
+    # context), so they are present in a developer checkout but ABSENT in CI's
+    # fresh checkout. The scanner's contract is "scan when present"; the test
+    # therefore mirrors that conditional contract: it asserts the file appears
+    # in the scan set *iff* it exists on disk. This keeps the drift guard
+    # active locally without producing an environment-fragile CI failure.
     scanned = {str(p.relative_to(mod.ROOT)) for p in mod._doc_files()}
-    assert "CLAUDE.md" in scanned
-    assert ".victor/init.md" in scanned
-    # AGENTS.md is optional (may not exist) but must be scanned when present.
+    assert "CLAUDE.md" in scanned or not (mod.ROOT / "CLAUDE.md").exists()
+    assert ".victor/init.md" in scanned or not (mod.ROOT / ".victor/init.md").exists()
     assert "AGENTS.md" in scanned or not (mod.ROOT / "AGENTS.md").exists()
