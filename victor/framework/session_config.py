@@ -154,11 +154,7 @@ class ProviderOverrideConfig:
         normalized_model = model
         normalized_auth_mode = auth_mode.lower() if auth_mode else None
 
-        if (
-            endpoint
-            and normalized_provider
-            and normalized_provider not in LOCAL_ENDPOINT_PROVIDERS
-        ):
+        if endpoint and normalized_provider and normalized_provider not in LOCAL_ENDPOINT_PROVIDERS:
             raise ValueError(
                 "--endpoint is only supported for local providers "
                 "(ollama, lmstudio, vllm, mlx, llama.cpp)."
@@ -331,9 +327,7 @@ class SessionConfig:
     compaction: CompactionConfig = field(default_factory=CompactionConfig)
     smart_routing: SmartRoutingConfig = field(default_factory=SmartRoutingConfig)
     tool_output: ToolOutputConfig = field(default_factory=ToolOutputConfig)
-    provider_override: ProviderOverrideConfig = field(
-        default_factory=ProviderOverrideConfig
-    )
+    provider_override: ProviderOverrideConfig = field(default_factory=ProviderOverrideConfig)
     bayesian: BayesianConfig = field(default_factory=BayesianConfig)
     tool_approval: ToolApprovalConfig = field(default_factory=ToolApprovalConfig)
     shell_safety: ShellSafetyConfig = field(default_factory=ShellSafetyConfig)
@@ -353,9 +347,7 @@ class SessionConfig:
             raise ValueError(f"max_iterations must be >= 1, got {self.max_iterations}")
 
         # Compaction threshold validation (via composed config)
-        if self.compaction.threshold is not None and not (
-            0.0 <= self.compaction.threshold <= 1.0
-        ):
+        if self.compaction.threshold is not None and not (0.0 <= self.compaction.threshold <= 1.0):
             raise ValueError(
                 f"compaction.threshold must be in [0.0, 1.0], got {self.compaction.threshold}"
             )
@@ -559,9 +551,7 @@ class SessionConfig:
         if self.tool_budget is not None:
             tools_group = getattr(settings, "tools", None)
             if tools_group is not None and hasattr(tools_group, "tool_call_budget"):
-                object.__setattr__(
-                    tools_group, "tool_call_budget", self.tool_budget
-                )
+                object.__setattr__(tools_group, "tool_call_budget", self.tool_budget)
 
         observability_settings = getattr(settings, "observability", None)
         if self.observability_logging is not None:
@@ -580,9 +570,7 @@ class SessionConfig:
                     self.observability_logging,
                 )
 
-        if self.auto_skill_enabled is not None and hasattr(
-            settings, "skill_auto_select_enabled"
-        ):
+        if self.auto_skill_enabled is not None and hasattr(settings, "skill_auto_select_enabled"):
             object.__setattr__(
                 settings,
                 "skill_auto_select_enabled",
@@ -606,9 +594,7 @@ class SessionConfig:
         provider_override = self.provider_override
         provider_settings = getattr(settings, "provider", None)
         if provider_settings is not None:
-            if provider_override.provider and hasattr(
-                provider_settings, "default_provider"
-            ):
+            if provider_override.provider and hasattr(provider_settings, "default_provider"):
                 object.__setattr__(
                     provider_settings,
                     "default_provider",
@@ -620,9 +606,7 @@ class SessionConfig:
                     "default_model",
                     provider_override.model,
                 )
-            if provider_override.timeout is not None and hasattr(
-                provider_settings, "timeout"
-            ):
+            if provider_override.timeout is not None and hasattr(provider_settings, "timeout"):
                 object.__setattr__(
                     provider_settings,
                     "timeout",
@@ -662,13 +646,8 @@ class SessionConfig:
             if routing is not None:
                 if hasattr(routing, "profile"):
                     object.__setattr__(routing, "profile", self.smart_routing.profile)
-                if (
-                    hasattr(routing, "fallback_chain")
-                    and self.smart_routing.fallback_chain
-                ):
-                    object.__setattr__(
-                        routing, "fallback_chain", self.smart_routing.fallback_chain
-                    )
+                if hasattr(routing, "fallback_chain") and self.smart_routing.fallback_chain:
+                    object.__setattr__(routing, "fallback_chain", self.smart_routing.fallback_chain)
 
         # Human-in-the-loop tool approval: turn on the governance policy engine and
         # route the named tools through the ASK path. A surface still has to register a
@@ -680,9 +659,7 @@ class SessionConfig:
                 if hasattr(governance, "enabled"):
                     object.__setattr__(governance, "enabled", True)
                 if hasattr(governance, "ask_fallback"):
-                    object.__setattr__(
-                        governance, "ask_fallback", self.tool_approval.ask_fallback
-                    )
+                    object.__setattr__(governance, "ask_fallback", self.tool_approval.ask_fallback)
                 if hasattr(governance, "ask_on_tools"):
                     # Union with any pre-configured tools, preserving order.
                     existing = list(getattr(governance, "ask_on_tools", []) or [])

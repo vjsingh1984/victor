@@ -77,14 +77,12 @@ GOOD_TOOLS = [
     },
 ]
 # 1303 rows, ~78% failure (matches observed decision_outcome).
-FAILING_OUTCOMES = [
-    {"success": 0, "quality_score": 0.0, "attributed_reward": 0.0}
-] * 1015 + [{"success": 1, "quality_score": 0.9, "attributed_reward": 1.0}] * 288
+FAILING_OUTCOMES = [{"success": 0, "quality_score": 0.0, "attributed_reward": 0.0}] * 1015 + [
+    {"success": 1, "quality_score": 0.9, "attributed_reward": 1.0}
+] * 288
 
 
-def _settings(
-    enabled: bool = False, min_conf: float = 0.5, budget: int = 100
-) -> Settings:
+def _settings(enabled: bool = False, min_conf: float = 0.5, budget: int = 100) -> Settings:
     """Build a Settings instance with controllable calibration flags."""
     s = Settings()
     s.tools = ToolSettings(
@@ -141,9 +139,7 @@ class TestGatingContract:
 
         class ExplodingDB:
             def cursor(self):
-                raise AssertionError(
-                    "explicit_override must short-circuit before any DB read"
-                )
+                raise AssertionError("explicit_override must short-circuit before any DB read")
 
         result = apply_budget_calibration(
             base, db=ExplodingDB(), explicit_override=True  # type: ignore[arg-type]

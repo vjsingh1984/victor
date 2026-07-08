@@ -50,14 +50,10 @@ class TestSessionConfigValidation:
         """compaction.threshold must be in [0.0, 1.0] if set."""
         from victor.framework.session_config import CompactionConfig
 
-        with pytest.raises(
-            ValueError, match="compaction.threshold must be in \\[0.0, 1.0\\]"
-        ):
+        with pytest.raises(ValueError, match="compaction.threshold must be in \\[0.0, 1.0\\]"):
             SessionConfig(compaction=CompactionConfig(threshold=-0.1))
 
-        with pytest.raises(
-            ValueError, match="compaction.threshold must be in \\[0.0, 1.0\\]"
-        ):
+        with pytest.raises(ValueError, match="compaction.threshold must be in \\[0.0, 1.0\\]"):
             SessionConfig(compaction=CompactionConfig(threshold=1.5))
 
     def test_compaction_threshold_bounds_pass(self):
@@ -74,9 +70,7 @@ class TestSessionConfigValidation:
         """bayesian.simple_threshold and complex_threshold must be in [0.0, 1.0]."""
         from victor.framework.bayesian_config import BayesianConfig
 
-        with pytest.raises(
-            ValueError, match="bayesian.simple_threshold must be in \\[0.0, 1.0\\]"
-        ):
+        with pytest.raises(ValueError, match="bayesian.simple_threshold must be in \\[0.0, 1.0\\]"):
             SessionConfig(bayesian=BayesianConfig(simple_threshold=-0.1))
 
         with pytest.raises(
@@ -106,16 +100,12 @@ class TestSessionConfigValidation:
 
     def test_from_cli_flags_with_invalid_compaction_threshold_raises(self):
         """from_cli_flags should reject compaction_threshold outside [0, 1]."""
-        with pytest.raises(
-            ValueError, match="compaction.threshold must be in \\[0.0, 1.0\\]"
-        ):
+        with pytest.raises(ValueError, match="compaction.threshold must be in \\[0.0, 1.0\\]"):
             SessionConfig.from_cli_flags(compaction_threshold=1.5)
 
     def test_from_cli_flags_with_invalid_bayesian_thresholds_raises(self):
         """from_cli_flags should reject bayesian thresholds outside [0, 1]."""
-        with pytest.raises(
-            ValueError, match="bayesian.simple_threshold must be in \\[0.0, 1.0\\]"
-        ):
+        with pytest.raises(ValueError, match="bayesian.simple_threshold must be in \\[0.0, 1.0\\]"):
             SessionConfig.from_cli_flags(simple_threshold=1.1)
 
         with pytest.raises(

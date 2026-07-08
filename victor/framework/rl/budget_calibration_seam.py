@@ -74,17 +74,13 @@ def apply_budget_calibration(
     if not getattr(baseline, "tool_budget_calibration_enabled", False):
         return baseline
 
-    min_conf = float(
-        getattr(baseline, "tool_budget_calibration_min_confidence", 0.7)
-    )
+    min_conf = float(getattr(baseline, "tool_budget_calibration_min_confidence", 0.7))
 
     try:
         reader = BudgetSignalReader()
         tools = reader.load_tool_signals(db=db)
         decisions = reader.load_decision_outcomes(db=db)
-        rec = BudgetCalibrator().recommend(
-            tools=tools, decisions=decisions, baseline=baseline
-        )
+        rec = BudgetCalibrator().recommend(tools=tools, decisions=decisions, baseline=baseline)
     except Exception as exc:  # noqa: BLE001 - never break bootstrap
         logger.debug(f"budget_calibration: pipeline failed, retaining baseline: {exc}")
         return baseline
