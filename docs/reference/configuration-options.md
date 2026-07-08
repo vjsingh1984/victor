@@ -112,7 +112,7 @@ All tool settings are under the `tools` config group (`settings.tools.*`).
 | `tool_call_budget_warning_threshold` | `1800` | Warn when approaching budget (90%) |
 | `fallback_max_tools` | `8` | Cap tool list broadcast to LLM per turn (1-20, CI-guarded) |
 | `tool_budget_calibration_enabled` | `false` | Opt-in RL-driven tool-budget calibration. When `true`, the session tool budget is derived from aggregated `rl_tool_q` + `decision_outcome` signals via `BudgetCalibrator`. Default `false` = unchanged behavior; low-confidence recommendations always retain the baseline. |
-| `tool_budget_calibration_min_confidence` | `0.5` | Minimum calibrator confidence required to apply a calibrated budget overlay (0.0-1.0). Below this threshold the baseline budget is returned unchanged. |
+| `tool_budget_calibration_min_confidence` | `0.7` | Minimum calibrator confidence required to apply a calibrated budget overlay (0.0-1.0). Below this threshold the baseline budget is returned unchanged. Default raised from `0.5` to `0.7` per FEP-0002 review (requires modestly more RL evidence before applying). |
 
 When `tool_budget_calibration_enabled` is `true`, the calibration pipeline runs
 at session bootstrap:

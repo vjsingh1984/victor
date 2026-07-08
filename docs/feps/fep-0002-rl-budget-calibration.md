@@ -58,7 +58,8 @@ productive sessions.
 3. **`apply_budget_calibration()` seam** — the single composition entry point,
    gated by:
    - `tool_budget_calibration_enabled: bool = False`
-   - `tool_budget_calibration_min_confidence: float = 0.5` (0.0-1.0)
+   - `tool_budget_calibration_min_confidence: float = 0.7` (0.0-1.0; see Open
+     Questions #1 — raised from 0.5 per FEP review)
 
 ### The identity-return contract
 
@@ -75,22 +76,42 @@ pipeline exception occurs. Consequences:
 
 ### Wiring (this FEP's subject)
 
-A single call inside `AgentFactory.create()`, after
-`SessionConfig.apply_to_settings()`:
+A single call inside `Agent.create()` in `victor/framework/agent.py`, immediately
+after the existing `session_config.apply_to_settings(settings)` call (currently
+at line 241):
 
     from victor.framework.rl.budget_calibration_seam import apply_budget_calibration
     settings.tools = apply_budget_calibration(settings)
 
+(Review correction: the original draft cited `AgentFactory.create()`; that
+method contains only `_apply_profile_overrides()` / `validate()` /
+`ensure_bootstrapped()` and has no SessionConfig application point. The real
+apply point is `Agent.create()`.)
+
 Because the seam is identity-returning when disabled, this line is a no-op unless
 a user opts in.
+
+**Precedence (review decision #2):** an explicit session/CLI budget override
+must win absolutely. The seam accepts an `explicit_override: bool` flag and
+short-circuits to identity-return when it is `True` (e.g. when
+`session_config.tool_budget` was provided). NOTE: `SessionConfig.tool_budget` is
+currently validated but *not* applied inside `apply_to_settings()` (see
+Open Questions #2 / Additional Risks) — the precedence wiring is blocked on a
+separate fix that actually applies that override.
 
 ### UX and observability (non-runtime, not FEP-blocked)
 
 - Structured logging at the seam on every apply decision, with confidence,
-  baseline, recommended budget, and rationale.
-- `/system` provenance: when enabled, the tool-budget line shows the calibrated
-  value with provenance (confidence, baseline). Provenance is *not* threaded
-  through `ToolSettings` (config stays pure); it is surfaced via the log/observation path.
+  baseline, recommended budget, and rationale. This is the *only* place runtime
+  provenance surfaces; it is not threaded through `ToolSettings` (config stays
+  pure).
+- `/system` surfaces *configured* calibration state — the
+  `tool_budget_calibration_enabled` flag (on/off) and the
+  `tool_budget_calibration_min_confidence` value. It does **not** show runtime
+  provenance (per-call confidence/baseline/rationale), because the seam returns
+  only the resulting `ToolSettings` and exposes provenance solely via logs. (Review
+  correction: an earlier draft claimed `/system` shows the calibrated value with
+  confidence/baseline; that was inaccurate.)
 
 ## Rationale and Alternatives
 
@@ -140,12 +161,17 @@ Docs parity: `docs/reference/configuration-options.md` documents both settings
 
 ## Open Questions
 
-1. Is the default `min_confidence = 0.5` the right gate, or should it be higher
-   (e.g. 0.7) for a first opt-in release?
-2. Should the seam apply calibration *before* or *after* session-config budget
-   overrides take precedence? Current design: calibration runs after
-   `apply_to_settings`, so it can re-tighten — needs reviewer decision on
-   precedence.
+1. ~~Default `min_confidence`~~ — **DECIDED (review #1): 0.7.** `_sample_confidence()`
+   returns ~0.63 at the configured minimum sample size and ~0.95 at 3x; combined
+   confidence is `0.6*decision_conf + 0.4*tool_conf`. A 0.5 gate would apply as
+   soon as both sources barely clear reliability gates; 0.7 requires modestly more
+   evidence. Default changed in `tool_settings.py` and docs.
+2. **Precedence (review #2): explicit overrides win absolutely.** Resolved by
+   accepting an `explicit_override` flag on the seam (short-circuit to
+   identity-return when `True`). This is *blocked* on a separate pre-existing
+   bug: `SessionConfig.tool_budget` is validated but never applied inside
+   `apply_to_settings()` — the precedence test cannot exercise the real CLI path
+   until that is fixed. That fix is filed as a prerequisite, not part of this FEP.
 
 ## References
 

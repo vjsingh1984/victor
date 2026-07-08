@@ -96,8 +96,11 @@ exceptions are caught and also retain the baseline. This has two consequences:
 - **Negative**: Introduces a bootstrap-time DB read when enabled (amortized once
   per session). Opt-in means most users see no change; the feature requires
   accumulated RL signal to produce non-baseline recommendations.
-- **Neutral**: `ToolSettings` schema, the global DB schema, and all consumption
-  sites are unchanged. The 4 canonical budget consumers require no edits.
+- **Neutral**: `ToolSettings` adds two new optional fields with safe defaults
+  and bounds (`tool_budget_calibration_enabled=False`,
+  `tool_budget_calibration_min_confidence` in [0,1]); no existing field is removed
+  or renamed, so no migration is needed and all 4 canonical budget consumers
+  require no edits. The global DB schema is unchanged.
 
 ## Implementation
 
@@ -114,10 +117,15 @@ Docs parity: `docs/reference/configuration-options.md` documents both settings
 
 **Deferred (blocked on FEP-0002 review — see "References"):**
 
-- The single wiring call inside `AgentFactory.create()`, after
-  `SessionConfig.apply_to_settings()`, assigning
-  `settings.tools = apply_budget_calibration(settings)`.
-- An integration test asserting the orchestrator receives the overlay.
+- The single wiring call inside `Agent.create()` (`victor/framework/agent.py`,
+  after the existing `session_config.apply_to_settings(settings)` call), assigning
+  `settings.tools = apply_budget_calibration(settings)`. (Review correction: the
+  apply point is `Agent.create()`, not `AgentFactory.create()`.)
+- A prerequisite fix: `SessionConfig.apply_to_settings()` must actually apply
+  `self.tool_budget` (currently validated but dropped), so the
+  `explicit_override` precedence path is exercisable.
+- An integration test asserting the orchestrator receives the overlay only when
+  no explicit budget override wins.
 - Runtime behavior change is intentionally gated behind the FEP's review window.
 
 ## Alternatives Considered
