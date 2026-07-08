@@ -354,9 +354,7 @@ class ProviderConfig(BaseSettings):
         for name in secret_fields:
             val = getattr(self, name, None)
             if val is not None:
-                result[name] = (
-                    val.get_secret_value() if isinstance(val, SecretStr) else val
-                )
+                result[name] = val.get_secret_value() if isinstance(val, SecretStr) else val
         return result
 
 
@@ -365,13 +363,9 @@ class ProfileConfig(BaseSettings):
 
     model_config = SettingsConfigDict(extra="allow")
 
-    provider: str = Field(
-        ..., description="Provider name (ollama, anthropic, openai, google)"
-    )
+    provider: str = Field(..., description="Provider name (ollama, anthropic, openai, google)")
     model: str = Field(..., description="Model identifier")
-    temperature: float = Field(
-        0.6, ge=0.0, le=2.0
-    )  # ADR-013 default flip 0.7→0.6 (A/B 2026-06-22)
+    temperature: float = Field(0.6, ge=0.0, le=2.0)  # ADR-013 default flip 0.7→0.6 (A/B 2026-06-22)
     temperatures: Optional[Dict[str, float]] = Field(
         None,
         description="Per-task temperature overrides (task_type -> temperature), e.g. {'plan': 0.5}. "
@@ -454,9 +448,7 @@ class ProfileConfig(BaseSettings):
 
     @field_validator("tool_selection")
     @classmethod
-    def validate_tool_selection(
-        cls, v: Optional[Dict[str, Any]]
-    ) -> Optional[Dict[str, Any]]:
+    def validate_tool_selection(cls, v: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
         """Validate tool_selection configuration.
 
         Args:
@@ -493,21 +485,15 @@ class ProfileConfig(BaseSettings):
         if "base_threshold" in v:
             threshold = v["base_threshold"]
             if not isinstance(threshold, (int, float)):
-                raise ValueError(
-                    f"base_threshold must be a number, got {type(threshold)}"
-                )
+                raise ValueError(f"base_threshold must be a number, got {type(threshold)}")
             if not (0.0 <= threshold <= 1.0):
-                raise ValueError(
-                    f"base_threshold must be between 0.0 and 1.0, got {threshold}"
-                )
+                raise ValueError(f"base_threshold must be between 0.0 and 1.0, got {threshold}")
 
         # Validate base_max_tools
         if "base_max_tools" in v:
             max_tools = v["base_max_tools"]
             if not isinstance(max_tools, int):
-                raise ValueError(
-                    f"base_max_tools must be an integer, got {type(max_tools)}"
-                )
+                raise ValueError(f"base_max_tools must be an integer, got {type(max_tools)}")
             if max_tools < 1:
                 raise ValueError(f"base_max_tools must be positive, got {max_tools}")
 
@@ -740,9 +726,7 @@ class Settings(BaseSettings):
         for env_key, env_value in os.environ.items():
             if env_key.startswith("VICTOR_") and "__" in env_key:
                 # Convert VICTOR_PROVIDER__DEFAULT_PROVIDER -> provider.default_provider
-                parts = env_key.replace("VICTOR_", "", 1).split(
-                    "__"
-                )  # Remove VICTOR_ prefix
+                parts = env_key.replace("VICTOR_", "", 1).split("__")  # Remove VICTOR_ prefix
                 if len(parts) >= 2:
                     # This is a nested env var like PROVIDER__DEFAULT_PROVIDER
                     nested_path = ".".join([p.lower() for p in parts])
@@ -1082,9 +1066,7 @@ class Settings(BaseSettings):
             api_key_value = data["api_key"]
             if isinstance(api_key_value, str):
                 # Try to determine which provider based on the default_provider
-                default_provider = data.get(
-                    "default_provider", data.get("provider", "ollama")
-                )
+                default_provider = data.get("default_provider", data.get("provider", "ollama"))
                 if default_provider in ["anthropic", "claude"]:
                     data["anthropic_api_key"] = api_key_value
                 elif default_provider in ["openai", "gpt"]:
@@ -1106,58 +1088,34 @@ class Settings(BaseSettings):
     provider: Optional[ProviderSettings] = Field(default=None, exclude=True, repr=False)
     tools: Optional[ToolSettings] = Field(default=None, exclude=True, repr=False)
     search: Optional[SearchSettings] = Field(default=None, exclude=True, repr=False)
-    resilience: Optional[ResilienceSettings] = Field(
-        default=None, exclude=True, repr=False
-    )
+    resilience: Optional[ResilienceSettings] = Field(default=None, exclude=True, repr=False)
     security: Optional[SecuritySettings] = Field(default=None, exclude=True, repr=False)
     events: Optional[EventSettings] = Field(default=None, exclude=True, repr=False)
     event_debouncing: Optional[EventDebouncingSettings] = Field(
         default=None, exclude=True, repr=False
     )
     pipeline: Optional[PipelineSettings] = Field(default=None, exclude=True, repr=False)
-    observability: Optional[ObservabilitySettings] = Field(
-        default=None, exclude=True, repr=False
-    )
+    observability: Optional[ObservabilitySettings] = Field(default=None, exclude=True, repr=False)
     context: Optional[ContextSettings] = Field(default=None, exclude=True, repr=False)
-    checkpoint: Optional[CheckpointSettings] = Field(
-        default=None, exclude=True, repr=False
-    )
+    checkpoint: Optional[CheckpointSettings] = Field(default=None, exclude=True, repr=False)
     ui: Optional[UISettings] = Field(default=None, exclude=True, repr=False)
-    feature_flags: Optional[FeatureFlagSettings] = Field(
-        default=None, exclude=True, repr=False
-    )
-    enrichment: Optional[PromptEnrichmentSettings] = Field(
-        default=None, exclude=True, repr=False
-    )
+    feature_flags: Optional[FeatureFlagSettings] = Field(default=None, exclude=True, repr=False)
+    enrichment: Optional[PromptEnrichmentSettings] = Field(default=None, exclude=True, repr=False)
     hitl: Optional[HITLSettings] = Field(default=None, exclude=True, repr=False)
     plugins: Optional[PluginSettings] = Field(default=None, exclude=True, repr=False)
-    prompt_policy: Optional[PromptPolicySettings] = Field(
-        default=None, exclude=True, repr=False
-    )
-    conversation: Optional[ConversationSettings] = Field(
-        default=None, exclude=True, repr=False
-    )
-    exploration: Optional[ExplorationSettings] = Field(
-        default=None, exclude=True, repr=False
-    )
-    serialization: Optional[SerializationSettings] = Field(
-        default=None, exclude=True, repr=False
-    )
-    automation: Optional[AutomationSettings] = Field(
-        default=None, exclude=True, repr=False
-    )
+    prompt_policy: Optional[PromptPolicySettings] = Field(default=None, exclude=True, repr=False)
+    conversation: Optional[ConversationSettings] = Field(default=None, exclude=True, repr=False)
+    exploration: Optional[ExplorationSettings] = Field(default=None, exclude=True, repr=False)
+    serialization: Optional[SerializationSettings] = Field(default=None, exclude=True, repr=False)
+    automation: Optional[AutomationSettings] = Field(default=None, exclude=True, repr=False)
     code_correction: Optional[CodeCorrectionSettings] = Field(
         default=None, exclude=True, repr=False
     )
     mcp: Optional[McpSettings] = Field(default=None, exclude=True, repr=False)
     sandbox: Optional[SandboxSettings] = Field(default=None, exclude=True, repr=False)
     hooks: Optional[HooksSettings] = Field(default=None, exclude=True, repr=False)
-    compaction: Optional[CompactionSettings] = Field(
-        default=None, exclude=True, repr=False
-    )
-    permissions: Optional[PermissionSettings] = Field(
-        default=None, exclude=True, repr=False
-    )
+    compaction: Optional[CompactionSettings] = Field(default=None, exclude=True, repr=False)
+    permissions: Optional[PermissionSettings] = Field(default=None, exclude=True, repr=False)
     prompt_optimization: Optional[PromptOptimizationSettings] = Field(
         default=None, exclude=True, repr=False
     )
@@ -1170,30 +1128,18 @@ class Settings(BaseSettings):
     server: Optional[ServerSettings] = Field(default=None, exclude=True, repr=False)
     codebase: Optional[CodebaseSettings] = Field(default=None, exclude=True, repr=False)
     usage: Optional[UsageSettings] = Field(default=None, exclude=True, repr=False)
-    subprocess: Optional[SubprocessSettings] = Field(
-        default=None, exclude=True, repr=False
-    )
+    subprocess: Optional[SubprocessSettings] = Field(default=None, exclude=True, repr=False)
     headless: Optional[HeadlessSettings] = Field(default=None, exclude=True, repr=False)
     workflow: Optional[WorkflowSettings] = Field(default=None, exclude=True, repr=False)
     response: Optional[ResponseSettings] = Field(default=None, exclude=True, repr=False)
     cache: Optional[CacheSettings] = Field(default=None, exclude=True, repr=False)
     recovery: Optional[RecoverySettings] = Field(default=None, exclude=True, repr=False)
-    analytics: Optional[AnalyticsSettings] = Field(
-        default=None, exclude=True, repr=False
-    )
+    analytics: Optional[AnalyticsSettings] = Field(default=None, exclude=True, repr=False)
     network: Optional[NetworkSettings] = Field(default=None, exclude=True, repr=False)
-    embedding: Optional[EmbeddingSettings] = Field(
-        default=None, exclude=True, repr=False
-    )
-    tool_selection: Optional[ToolSelectionSettings] = Field(
-        default=None, exclude=True, repr=False
-    )
-    fuzzy_matching: Optional[FuzzyMatchingSettings] = Field(
-        default=None, exclude=True, repr=False
-    )
-    governance: Optional[GovernanceSettings] = Field(
-        default=None, exclude=True, repr=False
-    )
+    embedding: Optional[EmbeddingSettings] = Field(default=None, exclude=True, repr=False)
+    tool_selection: Optional[ToolSelectionSettings] = Field(default=None, exclude=True, repr=False)
+    fuzzy_matching: Optional[FuzzyMatchingSettings] = Field(default=None, exclude=True, repr=False)
+    governance: Optional[GovernanceSettings] = Field(default=None, exclude=True, repr=False)
     temperature_policy: Optional[TemperatureSettings] = Field(
         default=None, exclude=True, repr=False
     )
@@ -1224,12 +1170,8 @@ class Settings(BaseSettings):
     # ==========================================================================
     # Verticals are domain-specific configurations that customize Victor's behavior.
     # Available verticals: coding, research, devops (extensible via plugins)
-    default_vertical: str = (
-        DEFAULT_VERTICAL  # Default vertical when --vertical not specified
-    )
-    auto_detect_vertical: bool = (
-        False  # Auto-detect vertical from project context (experimental)
-    )
+    default_vertical: str = DEFAULT_VERTICAL  # Default vertical when --vertical not specified
+    auto_detect_vertical: bool = False  # Auto-detect vertical from project context (experimental)
 
     # Server Security (FastAPI/WebSocket layer)
     # NOTE: server_* fields now in server nested group
@@ -1283,9 +1225,7 @@ class Settings(BaseSettings):
     # NOTE: These fields are now in search nested group
 
     # RL-based threshold learning per (embedding_model, task_type, tool_context)
-    enable_semantic_threshold_rl_learning: bool = (
-        False  # Enable automatic threshold learning
-    )
+    enable_semantic_threshold_rl_learning: bool = False  # Enable automatic threshold learning
     semantic_threshold_overrides: dict = {}  # Format: {"model:task:tool": threshold}
 
     # Tool call deduplication
@@ -1296,9 +1236,7 @@ class Settings(BaseSettings):
 
     # MCP
     use_mcp_tools: bool = False
-    mcp_command: Optional[str] = (
-        None  # e.g., "python mcp_server.py" or "node mcp-server.js"
-    )
+    mcp_command: Optional[str] = None  # e.g., "python mcp_server.py" or "node mcp-server.js"
     mcp_prefix: str = "mcp"
 
     # Tool Execution Settings
@@ -1465,9 +1403,7 @@ class Settings(BaseSettings):
     prompt_enrichment_enabled: bool = True  # Master toggle for prompt enrichment
     prompt_enrichment_max_tokens: int = 2000  # Max tokens to add via enrichment
     prompt_enrichment_timeout_ms: float = 500.0  # Timeout in milliseconds
-    prompt_enrichment_cache_enabled: bool = (
-        True  # Cache enrichments for repeated prompts
-    )
+    prompt_enrichment_cache_enabled: bool = True  # Cache enrichments for repeated prompts
     prompt_enrichment_cache_ttl: int = 300  # Cache TTL in seconds (5 minutes)
     prompt_enrichment_strategies: List[str] = Field(
         default_factory=lambda: ["knowledge_graph", "conversation", "web_search"],
@@ -1580,9 +1516,7 @@ class Settings(BaseSettings):
     # TOON (Token-Oriented Object Notation) provides 30-60% savings for tabular data.
     # NOTE: serialization_* fields now in pipeline nested group
     serialization_default_format: Optional[str] = None  # None = auto-select best format
-    serialization_min_savings_threshold: float = (
-        0.15  # Min savings to use alternative format
-    )
+    serialization_min_savings_threshold: float = 0.15  # Min savings to use alternative format
 
     # ==========================================================================
     # Intelligent Agent Pipeline (RL-based Learning, Quality Scoring)
@@ -1854,9 +1788,7 @@ class Settings(BaseSettings):
     # ==========================================================================
     # Debug Settings (from VictorSettings merge)
     # ==========================================================================
-    debug_logging: bool = Field(
-        default=False, description="Enable verbose debug logging"
-    )
+    debug_logging: bool = Field(default=False, description="Enable verbose debug logging")
 
     # ==========================================================================
     # System Prompt Policy (from VictorSettings merge)
@@ -1884,18 +1816,14 @@ class Settings(BaseSettings):
     ) -> Dict[str, str]:
         """Validate per-topic overflow policy overrides."""
         if not isinstance(value, dict):
-            raise ValueError(
-                "event_queue_overflow_topic_policies must be a dict[str, str]"
-            )
+            raise ValueError("event_queue_overflow_topic_policies must be a dict[str, str]")
 
         allowed = {"drop_newest", "drop_oldest", "block_with_timeout"}
         normalized: Dict[str, str] = {}
         for topic_pattern, policy in value.items():
             pattern = str(topic_pattern).strip()
             if not pattern:
-                raise ValueError(
-                    "event_queue_overflow_topic_policies keys must be non-empty"
-                )
+                raise ValueError("event_queue_overflow_topic_policies keys must be non-empty")
             normalized_policy = str(policy).strip().lower()
             if normalized_policy not in allowed:
                 allowed_csv = ", ".join(sorted(allowed))
@@ -1932,9 +1860,7 @@ class Settings(BaseSettings):
                     "event_queue_overflow_topic_block_timeout_ms values must be numeric"
                 ) from None
             if parsed_timeout < 0:
-                raise ValueError(
-                    "event_queue_overflow_topic_block_timeout_ms values must be >= 0"
-                )
+                raise ValueError("event_queue_overflow_topic_block_timeout_ms values must be >= 0")
             normalized[pattern] = parsed_timeout
         return normalized
 
@@ -1965,10 +1891,7 @@ class Settings(BaseSettings):
                     # prevent type-mismatch when two models share a field name (e.g.
                     # Settings.feature_flags: FeatureFlagSettings vs
                     # CompactionSettings.feature_flags: CompactionFeatureFlags).
-                    if (
-                        field_name in settings_fields
-                        and field_name not in nested_group_names
-                    ):
+                    if field_name in settings_fields and field_name not in nested_group_names:
                         data[field_name] = getattr(self, field_name)
                 object.__setattr__(self, group_name, model_cls(**data))
 
@@ -1987,13 +1910,8 @@ class Settings(BaseSettings):
         if self.extension_loader_pressure_cooldown_seconds < 0:
             raise ValueError("extension_loader_pressure_cooldown_seconds must be >= 0")
         if self.extension_loader_metrics_reporter_interval_seconds <= 0:
-            raise ValueError(
-                "extension_loader_metrics_reporter_interval_seconds must be > 0"
-            )
-        if (
-            self.extension_loader_error_queue_threshold
-            < self.extension_loader_warn_queue_threshold
-        ):
+            raise ValueError("extension_loader_metrics_reporter_interval_seconds must be > 0")
+        if self.extension_loader_error_queue_threshold < self.extension_loader_warn_queue_threshold:
             raise ValueError(
                 "extension_loader_error_queue_threshold must be >= "
                 "extension_loader_warn_queue_threshold"
@@ -2030,9 +1948,7 @@ class Settings(BaseSettings):
             and self.cache.http_connection_pool_max_connections_per_host is not None
             and self.cache.http_connection_pool_max_connections_per_host < 1
         ):
-            raise ValueError(
-                "http_connection_pool_max_connections_per_host must be >= 1"
-            )
+            raise ValueError("http_connection_pool_max_connections_per_host must be >= 1")
         if (
             self.cache
             and self.cache.http_connection_pool_connection_timeout is not None
@@ -2071,9 +1987,7 @@ class Settings(BaseSettings):
         """Validate write approval mode."""
         valid_modes = ["off", "risky_only", "all_writes"]
         if v not in valid_modes:
-            raise ValueError(
-                f"Invalid write_approval_mode: {v}. Must be one of {valid_modes}"
-            )
+            raise ValueError(f"Invalid write_approval_mode: {v}. Must be one of {valid_modes}")
         return v
 
     @field_validator("tool_validation_mode")
@@ -2082,9 +1996,7 @@ class Settings(BaseSettings):
         """Validate tool validation mode."""
         valid_modes = ["strict", "lenient", "off"]
         if v not in valid_modes:
-            raise ValueError(
-                f"Invalid tool_validation_mode: {v}. Must be one of {valid_modes}"
-            )
+            raise ValueError(f"Invalid tool_validation_mode: {v}. Must be one of {valid_modes}")
         return v
 
     @field_validator("context_compaction_strategy")
@@ -2094,8 +2006,7 @@ class Settings(BaseSettings):
         valid_strategies = ["simple", "tiered", "semantic", "hybrid"]
         if v not in valid_strategies:
             raise ValueError(
-                f"Invalid context_compaction_strategy: {v}. "
-                f"Must be one of {valid_strategies}"
+                f"Invalid context_compaction_strategy: {v}. " f"Must be one of {valid_strategies}"
             )
         return v
 
@@ -2104,13 +2015,10 @@ class Settings(BaseSettings):
         """Validate that hybrid search weights sum to 1.0."""
         if self.search and self.search.enable_hybrid_search:
             total_weight = (
-                self.search.hybrid_search_semantic_weight
-                + self.search.hybrid_search_keyword_weight
+                self.search.hybrid_search_semantic_weight + self.search.hybrid_search_keyword_weight
             )
             if abs(total_weight - 1.0) > 0.01:
-                raise ValueError(
-                    f"Hybrid search weights must sum to 1.0, got {total_weight}"
-                )
+                raise ValueError(f"Hybrid search weights must sum to 1.0, got {total_weight}")
         return self
 
     @model_validator(mode="after")
@@ -2132,10 +2040,7 @@ class Settings(BaseSettings):
                     UserWarning,
                     stacklevel=2,
                 )
-        if (
-            self.search
-            and self.search.codebase_embedding_provider not in known_providers
-        ):
+        if self.search and self.search.codebase_embedding_provider not in known_providers:
             val = self.search.codebase_embedding_provider
             if val:
                 warnings.warn(
@@ -2321,9 +2226,7 @@ class Settings(BaseSettings):
 
         detected_vram = cls._detect_vram_gb()
         max_vram = (
-            max_vram_gb
-            if max_vram_gb is not None
-            else getattr(cls, "lmstudio_max_vram_gb", None)
+            max_vram_gb if max_vram_gb is not None else getattr(cls, "lmstudio_max_vram_gb", None)
         )
         available_vram = None
         if detected_vram and max_vram:
@@ -2451,11 +2354,7 @@ class Settings(BaseSettings):
             if provider_data:
                 # Expand environment variables
                 for key, value in provider_data.items():
-                    if (
-                        isinstance(value, str)
-                        and value.startswith("${")
-                        and value.endswith("}")
-                    ):
+                    if isinstance(value, str) and value.startswith("${") and value.endswith("}"):
                         env_var = value[2:-1]
                         provider_data[key] = os.getenv(env_var)
 
@@ -2697,8 +2596,7 @@ def validate_default_model(settings: "Settings") -> tuple[bool, str | None]:
         )
     except subprocess.TimeoutExpired:
         return False, (
-            "Ollama command timed out. Check if Ollama is running:\n"
-            "  [cyan]ollama serve[/]"
+            "Ollama command timed out. Check if Ollama is running:\n" "  [cyan]ollama serve[/]"
         )
     except Exception:
         # Unexpected error - don't block startup

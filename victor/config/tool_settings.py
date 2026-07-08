@@ -14,9 +14,7 @@ from victor.config.orchestrator_constants import BUDGET_LIMITS
 class ToolSettings(BaseModel):
     """Tool execution, selection, and retry configuration."""
 
-    tool_call_budget: int = Field(
-        default_factory=lambda: BUDGET_LIMITS.max_session_budget
-    )
+    tool_call_budget: int = Field(default_factory=lambda: BUDGET_LIMITS.max_session_budget)
     tool_call_budget_warning_threshold: int = Field(
         default_factory=lambda: int(
             BUDGET_LIMITS.max_session_budget * BUDGET_LIMITS.warning_threshold_pct

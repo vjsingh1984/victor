@@ -87,7 +87,9 @@ class TestBenignTestHomePathDetection:
 class TestSecureHomeManipulationSuppression:
     """SEC-001: suppress benign test noise but never weaken real detection."""
 
-    def test_detection_still_fires_but_audit_redirected_under_test_mode(self, monkeypatch, tmp_path):
+    def test_detection_still_fires_but_audit_redirected_under_test_mode(
+        self, monkeypatch, tmp_path
+    ):
         """SEC-001 contract: detection must fire for any env/passwd mismatch.
 
         We do NOT suppress benign detections at the detector (that would weaken a
@@ -110,7 +112,9 @@ class TestSecureHomeManipulationSuppression:
         logged = []
         with (
             patch.object(
-                secure_paths, "_log_security_event", side_effect=lambda *a, **k: logged.append(a)
+                secure_paths,
+                "_log_security_event",
+                side_effect=lambda *a, **k: logged.append(a),
             ),
             patch.object(secure_paths, "get_real_home_from_passwd", return_value=passwd_home),
         ):
@@ -138,7 +142,9 @@ class TestSecureHomeManipulationSuppression:
         logged = []
         with (
             patch.object(
-                secure_paths, "_log_security_event", side_effect=lambda *a, **k: logged.append(a)
+                secure_paths,
+                "_log_security_event",
+                side_effect=lambda *a, **k: logged.append(a),
             ),
             patch.object(secure_paths, "get_real_home_from_passwd", return_value=passwd_home),
         ):
