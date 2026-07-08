@@ -20,6 +20,7 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from victor.tools.bash import shell
+from victor.tools.bash import _maybe_attribute_shell_git_commit
 
 
 @pytest.mark.asyncio
@@ -329,3 +330,58 @@ class TestReadonlyQuoteAwareSubstitutions:
     )
     def test_real_substitution_mutations_rejected(self, cmd):
         assert self._valid(cmd) is False
+
+
+class TestShellGitCommitAttribution:
+    """Best-effort agent-layer attribution for raw ``git commit -m "..."``
+    issued through the shell escape hatch (mirrors the ``git`` tool wiring)."""
+
+    TRAILER = "Co-authored-by: victor-code-ai"
+
+    @pytest.mark.parametrize(
+        "cmd",
+        [
+            'git commit -m "fix: x"',
+            "git commit -m 'fix: x'",
+            "git commit --message 'fix: x'",
+            'git commit --message="fix: x"',
+            'git commit -m="fix: x"',
+        ],
+    )
+    def test_plain_commit_gets_trailer(self, cmd, monkeypatch):
+        monkeypatch.delenv("VICTOR_COMMIT_ATTRIBUTION", raising=False)
+        out = _maybe_attribute_shell_git_commit(cmd)
+        assert self.TRAILER in out
+        # Command shape preserved.
+        assert out.startswith("git commit")
+
+    @pytest.mark.parametrize(
+        "cmd",
+        [
+            'git add . && git commit -m "x"',  # chaining
+            'git commit -m "x" | tee log',  # pipe
+            'git commit -m "$(date)"',  # command substitution
+            "git commit -F - <<EOF",  # heredoc
+            'git commit --amend -m "x"',  # amend
+            "echo hi",  # not a git commit
+            "git commit -F msg.txt",  # message-file form
+            'git -c core.x=1 commit -m "hi"',  # -c config form
+            "git status",  # not a commit
+        ],
+    )
+    def test_compound_or_dynamic_commands_left_untouched(self, cmd, monkeypatch):
+        monkeypatch.delenv("VICTOR_COMMIT_ATTRIBUTION", raising=False)
+        assert _maybe_attribute_shell_git_commit(cmd) == cmd
+
+    def test_opt_out_leaves_message_untouched(self, monkeypatch):
+        monkeypatch.setenv("VICTOR_COMMIT_ATTRIBUTION", "0")
+        cmd = 'git commit -m "fix: x"'
+        assert _maybe_attribute_shell_git_commit(cmd) == cmd
+
+    def test_idempotent_on_reapplication(self, monkeypatch):
+        # Running the rewriter twice must not duplicate the trailer.
+        monkeypatch.delenv("VICTOR_COMMIT_ATTRIBUTION", raising=False)
+        once = _maybe_attribute_shell_git_commit('git commit -m "fix: x"')
+        twice = _maybe_attribute_shell_git_commit(once)
+        assert once.count(self.TRAILER) == 1
+        assert twice == once
