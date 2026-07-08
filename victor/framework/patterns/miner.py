@@ -337,15 +337,11 @@ class PatternMiner:
         # Check for supervisor/specialist naming, with legacy manager/worker
         # trace labels accepted for historical executions.
         has_supervisor = any(
-            "supervisor" in n.lower()
-            or "manager" in n.lower()
-            or "coordinator" in n.lower()
+            "supervisor" in n.lower() or "manager" in n.lower() or "coordinator" in n.lower()
             for n in trace.nodes_executed
         )
         has_specialist = any(
-            "specialist" in n.lower()
-            or "worker" in n.lower()
-            or "agent" in n.lower()
+            "specialist" in n.lower() or "worker" in n.lower() or "agent" in n.lower()
             for n in trace.nodes_executed
         )
 

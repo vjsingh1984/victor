@@ -756,9 +756,7 @@ class TeamConfig:
         if self.formation == TeamFormation.HIERARCHICAL:
             supervisors = [m for m in self.members if m.is_supervisor]
             if len(supervisors) != 1:
-                raise ValueError(
-                    "Hierarchical teams must have exactly one manager/supervisor"
-                )
+                raise ValueError("Hierarchical teams must have exactly one manager/supervisor")
 
     def get_member(self, member_id: str) -> Optional[TeamMember]:
         """Get a member by ID."""

@@ -122,8 +122,7 @@ class TeamRecommendation:
                         tool_budget=budget_per_member,
                         agent_category=(
                             TeamAgentCategory.SUPERVISOR
-                            if self.formation == TeamFormation.HIERARCHICAL
-                            and member_idx == 1
+                            if self.formation == TeamFormation.HIERARCHICAL and member_idx == 1
                             else TeamAgentCategory.SPECIALIST
                         ),
                         is_manager=(

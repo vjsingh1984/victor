@@ -52,8 +52,7 @@ class HierarchicalFormation(BaseFormationStrategy):
         """Execute with supervisor-specialist pattern."""
         if len(agents) < 2:
             raise ValueError(
-                "Hierarchical formation requires at least 2 agents "
-                "(supervisor + specialists)"
+                "Hierarchical formation requires at least 2 agents " "(supervisor + specialists)"
             )
 
         # Check for explicit supervisor in context first. Keep the older
@@ -83,11 +82,7 @@ class HierarchicalFormation(BaseFormationStrategy):
                 is_supervisor = True
 
             member = getattr(agent, "_member", None)
-            if (
-                not is_supervisor
-                and member is not None
-                and getattr(member, "is_supervisor", False)
-            ):
+            if not is_supervisor and member is not None and getattr(member, "is_supervisor", False):
                 is_supervisor = True
 
             if not is_supervisor and getattr(agent, "can_delegate", False):
@@ -132,13 +127,9 @@ class HierarchicalFormation(BaseFormationStrategy):
             specialists = agents[1:]
         else:
             if explicit_supervisor_id:
-                logger.info(
-                    f"HierarchicalFormation: using explicit supervisor={supervisor.id}"
-                )
+                logger.info(f"HierarchicalFormation: using explicit supervisor={supervisor.id}")
             else:
-                logger.info(
-                    f"HierarchicalFormation: auto-detected supervisor={supervisor.id}"
-                )
+                logger.info(f"HierarchicalFormation: auto-detected supervisor={supervisor.id}")
 
         logger.debug(
             f"HierarchicalFormation: supervisor={supervisor.id}, "
@@ -153,9 +144,7 @@ class HierarchicalFormation(BaseFormationStrategy):
         results.append(supervisor_result)
 
         # Check if supervisor created delegation tasks.
-        if not supervisor_result.success or not supervisor_result.metadata.get(
-            "delegated_tasks"
-        ):
+        if not supervisor_result.success or not supervisor_result.metadata.get("delegated_tasks"):
             logger.info(
                 "HierarchicalFormation: supervisor did not delegate tasks, "
                 "executing all specialists with original task"
@@ -224,8 +213,7 @@ class HierarchicalFormation(BaseFormationStrategy):
         for i, result in enumerate(specialist_results):
             if isinstance(result, Exception):
                 logger.error(
-                    f"HierarchicalFormation: specialist {specialists[i].id} "
-                    f"failed: {result}"
+                    f"HierarchicalFormation: specialist {specialists[i].id} " f"failed: {result}"
                 )
                 results.append(
                     MemberResult(
@@ -272,9 +260,7 @@ class HierarchicalFormation(BaseFormationStrategy):
         index: int,
     ) -> MemberResult:
         """Execute a single specialist."""
-        logger.debug(
-            f"HierarchicalFormation: executing specialist {index + 1}: {specialist.id}"
-        )
+        logger.debug(f"HierarchicalFormation: executing specialist {index + 1}: {specialist.id}")
         return await specialist.execute(task, context)
 
     def validate_context(self, context: TeamContext) -> bool:

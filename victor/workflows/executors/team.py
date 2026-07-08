@@ -25,6 +25,8 @@ import time
 import warnings
 from typing import TYPE_CHECKING, Any
 
+from victor.teams.types import TeamAgentCategory, TeamFormation, TeamMember
+
 if TYPE_CHECKING:
     from victor.workflows.definition import TeamStepWorkflow
     from victor.workflows.runtime_types import WorkflowState
@@ -43,7 +45,6 @@ class TeamStepExecutor:
         from victor.agent.subagents import SubAgentRole
         from victor.framework.state_merging import MergeMode
         from victor.framework.workflows.nodes import TeamStep, TeamStepConfig
-        from victor.teams.types import TeamAgentCategory, TeamFormation, TeamMember
         from victor.workflows.runtime_types import GraphNodeResult
 
         logger.info("Executing team step: %s", node.id)
