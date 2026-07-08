@@ -111,6 +111,23 @@ All tool settings are under the `tools` config group (`settings.tools.*`).
 | `tool_call_budget` | `2000` | Maximum tool calls per session (hard limit) |
 | `tool_call_budget_warning_threshold` | `1800` | Warn when approaching budget (90%) |
 | `fallback_max_tools` | `8` | Cap tool list broadcast to LLM per turn (1-20, CI-guarded) |
+| `tool_budget_calibration_enabled` | `false` | Opt-in RL-driven tool-budget calibration. When `true`, the session tool budget is derived from aggregated `rl_tool_q` + `decision_outcome` signals via `BudgetCalibrator`. Default `false` = unchanged behavior; low-confidence recommendations always retain the baseline. |
+| `tool_budget_calibration_min_confidence` | `0.5` | Minimum calibrator confidence required to apply a calibrated budget overlay (0.0-1.0). Below this threshold the baseline budget is returned unchanged. |
+
+When `tool_budget_calibration_enabled` is `true`, the calibration pipeline runs
+at session bootstrap:
+
+1. `BudgetSignalReader` loads aggregated RL signals (`rl_tool_q` Q-values and
+   `decision_outcome` success/failure/reward aggregates) from the global Victor
+   database (`~/.victor/victor.db`).
+2. `BudgetCalibrator` maps those signals to a `BudgetRecommendation` with a
+   calibrated `tool_call_budget` and a `confidence` score.
+3. `apply_budget_calibration()` applies the overlay only if the toggle is on
+   *and* the confidence meets `tool_budget_calibration_min_confidence`.
+
+The overlay is applied immutably (a new `ToolSettings` instance); the baseline
+is never mutated. Pipeline exceptions and cold-start (confidence `<= 0.0`)
+always retain the baseline, so calibration can never break session bootstrap.
 
 Task-based budgets override the default based on detected complexity:
 
