@@ -168,7 +168,8 @@ async def test_run_streaming_requires_a_port():
 
 def test_extract_turn_content_handles_empty_tool_turn():
     """Regression: a tool-only TurnResult has empty content; extraction must return "" (a str),
-    never the CompletionResponse object (which crashed the content-repetition .strip() check)."""
+    never the CompletionResponse object (which crashed the content-repetition .strip() check).
+    """
     from victor.agent.services.turn_execution_runtime import TurnResult
     from victor.providers.base import CompletionResponse
 
@@ -219,7 +220,9 @@ def test_inject_decide_nudges_adds_message_on_continue():
     loop = _nudge_loop(chat_ctx, should_inject_nudge=True)
 
     loop._inject_decide_nudges(
-        EvaluationResult(decision=EvaluationDecision.CONTINUE, score=0.3, reason="x"), 1, 5
+        EvaluationResult(decision=EvaluationDecision.CONTINUE, score=0.3, reason="x"),
+        1,
+        5,
     )
 
     assert added == [("system", "use a tool")]
@@ -231,7 +234,9 @@ def test_inject_decide_nudges_noop_on_terminal_decision():
     loop = _nudge_loop(chat_ctx, should_inject_nudge=True)
 
     loop._inject_decide_nudges(
-        EvaluationResult(decision=EvaluationDecision.COMPLETE, score=1.0, reason="done"), 1, 5
+        EvaluationResult(decision=EvaluationDecision.COMPLETE, score=1.0, reason="done"),
+        1,
+        5,
     )
 
     assert added == []
@@ -242,7 +247,9 @@ def test_inject_decide_nudges_noop_without_turn_executor():
     loop.turn_executor = None
     # Should simply return without touching nudge_policy / chat context.
     loop._inject_decide_nudges(
-        EvaluationResult(decision=EvaluationDecision.CONTINUE, score=0.2, reason="x"), 2, 5
+        EvaluationResult(decision=EvaluationDecision.CONTINUE, score=0.2, reason="x"),
+        2,
+        5,
     )
 
 
@@ -322,3 +329,60 @@ def test_is_refusal_response_patterns():
     assert not loop._is_refusal_response("I cannot find any bugs in this file.")
     assert not loop._is_refusal_response("Here are three improvement areas: ...")
     assert not loop._is_refusal_response("")
+
+
+def test_is_intent_only_response_meta_deliberation_narration_true():
+    # Regression: the transcript failure mode. The model narrates imminent
+    # action ("Executing now", "Going now", "Calling now", "no more
+    # deliberation") without ever invoking a tool. The first line does NOT
+    # start with an intent prefix, so the OLD first-line-only check let this
+    # through as a "substantial answer" and exited the loop before any tool
+    # ran. The full-response density check must now classify it as intent-only.
+    loop = AgenticLoop.__new__(AgenticLoop)
+    narration = (
+        "Not yet — I hadn't started merging. Executing now.\n\n"
+        "Final command: gh pr checks 435. Going. (Calling.)\n\n"
+        "I need to stop the meta-deliberation loop from before and just execute. "
+        "Making the call. (Done.)\n\n"
+        "Executing with gh pr checks. Going. (Final.)\n\n"
+        "Producing the call."
+    )
+    assert loop._is_intent_only_response(narration) is True
+
+
+def test_is_intent_only_response_real_answer_with_code_false():
+    # A real answer carrying a fenced code block must NOT be flagged as
+    # intent-only, even if it happens to mention an action word.
+    loop = AgenticLoop.__new__(AgenticLoop)
+    answer = (
+        "Here are the results:\n\n"
+        "```bash\n"
+        "$ gh pr view 435\n"
+        "```()\n\n"
+        "The PR is not yet merged and is mergeable. I recommend --squash."
+    )
+    assert loop._is_intent_only_response(answer) is False
+
+
+def test_is_intent_only_response_real_answer_with_table_false():
+    loop = AgenticLoop.__new__(AgenticLoop)
+    answer = (
+        "Checks summary:\n\n"
+        "| Name | Status | Conclusion |\n"
+        "|------|--------|------------|\n"
+        "| CI   | pass   | success    |\n\n"
+        "All checks are green."
+    )
+    assert loop._is_intent_only_response(answer) is False
+
+
+def test_is_terminal_answer_meta_deliberation_not_terminal():
+    # End-to-end guard: even after prior tools ran (which satisfies the
+    # substance gate), meta-deliberation narration is NOT a terminal answer —
+    # the loop must continue rather than exit before the tool is invoked.
+    loop = _terminal_loop(total_tool_calls=2)
+    narration = (
+        "Executing now. Going. (Calling.) I need to stop the meta-deliberation "
+        "loop and just execute. Making the call. (Done.) No more deliberation."
+    )
+    assert loop._is_terminal_answer(_turn(narration)) is False

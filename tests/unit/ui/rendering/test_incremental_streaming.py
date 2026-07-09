@@ -135,7 +135,8 @@ class TestIncrementalRender:
         assert mock_render.call_args_list[-1].args[0] == visible
 
     @patch(
-        "victor.ui.rendering.live_renderer.find_safe_split", side_effect=RuntimeError("split boom")
+        "victor.ui.rendering.live_renderer.find_safe_split",
+        side_effect=RuntimeError("split boom"),
     )
     @patch("victor.ui.rendering.live_renderer.render_markdown_with_hooks")
     @patch("victor.ui.rendering.live_renderer.Live")

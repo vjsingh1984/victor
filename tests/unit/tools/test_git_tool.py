@@ -172,17 +172,35 @@ class TestDelegationPath:
         assert result == "clean tree"
 
     @pytest.mark.asyncio
-    async def test_commit_delegates_with_message(self):
+    async def test_commit_delegates_with_message(self, monkeypatch):
+        # Agent-layer attribution proactively appends the Victor co-author trailer to
+        # an explicit commit message (hook-free, Claude-Code-style). Default ON.
+        monkeypatch.delenv("VICTOR_COMMIT_ATTRIBUTION", raising=False)
         mock_git = AsyncMock(return_value={"success": True, "output": "Committed"})
         with patch(
             "victor.tools.unified.git_tool.resolve_vertical_callable",
             return_value=(mock_git, "victor_devops.tools.git_tool"),
         ):
             result = await git_tool('git commit -m "fix: x"')
-        mock_git.assert_awaited_once_with(
-            operation="commit", message="fix: x", author_name=None, author_email=None
-        )
+        second_call = mock_git.await_args
+        assert second_call.kwargs["operation"] == "commit"
+        assert second_call.kwargs["message"].startswith("fix: x")
+        assert "Co-authored-by: victor-code-ai" in second_call.kwargs["message"]
+        assert second_call.kwargs["author_name"] is None
+        assert second_call.kwargs["author_email"] is None
         assert "Committed" in result
+
+    @pytest.mark.asyncio
+    async def test_commit_attribution_opt_out(self, monkeypatch):
+        # VICTOR_COMMIT_ATTRIBUTION=0 leaves the message untouched.
+        monkeypatch.setenv("VICTOR_COMMIT_ATTRIBUTION", "0")
+        mock_git = AsyncMock(return_value={"success": True, "output": "Committed"})
+        with patch(
+            "victor.tools.unified.git_tool.resolve_vertical_callable",
+            return_value=(mock_git, "victor_devops.tools.git_tool"),
+        ):
+            await git_tool('git commit -m "fix: x"')
+        assert mock_git.await_args.kwargs["message"] == "fix: x"
 
     @pytest.mark.asyncio
     async def test_failed_devops_result_is_formatted_as_error(self):
@@ -231,7 +249,9 @@ class TestAiCommit:
     """AI commit message generation flow."""
 
     @pytest.mark.asyncio
-    async def test_ai_commit_generates_then_commits(self):
+    async def test_ai_commit_generates_then_commits(self, monkeypatch):
+        # The AI-generated message is also attributed (hook-free) by default.
+        monkeypatch.delenv("VICTOR_COMMIT_ATTRIBUTION", raising=False)
         mock_git = AsyncMock(
             side_effect=[
                 {"success": True, "message": "feat: add x"},  # commit_msg
@@ -247,14 +267,13 @@ class TestAiCommit:
         # First call generates the message.
         first_call = mock_git.await_args_list[0]
         assert first_call.kwargs["operation"] == "commit_msg"
-        # Second call commits with the generated message.
+        # Second call commits with the generated message + attribution trailer.
         second_call = mock_git.await_args_list[1]
-        assert second_call.kwargs == {
-            "operation": "commit",
-            "message": "feat: add x",
-            "author_name": None,
-            "author_email": None,
-        }
+        assert second_call.kwargs["operation"] == "commit"
+        assert second_call.kwargs["message"].startswith("feat: add x")
+        assert "Co-authored-by: victor-code-ai" in second_call.kwargs["message"]
+        assert second_call.kwargs["author_name"] is None
+        assert second_call.kwargs["author_email"] is None
         assert "feat: add x" in result
         assert "Committed" in result
 

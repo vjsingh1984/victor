@@ -22,6 +22,7 @@ import csv
 import json
 import logging
 import os
+import tempfile
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -38,6 +39,34 @@ from .protocol import (
 
 logger = logging.getLogger(__name__)
 
+# Environment sentinels indicating the process is running under pytest. Mirrors
+# the telemetry-redirect logic in ``victor/core/bootstrap.py`` so test sessions
+# never pollute the project audit database (two-database / test-isolation rule).
+_TEST_MODE_SENTINELS = ("TEST_MODE", "PYTEST_XDIST_WORKER", "PYTEST_CURRENT_TEST")
+
+
+def _is_test_mode() -> bool:
+    """Return True when the process is running under the pytest test harness."""
+    return any(os.getenv(v) for v in _TEST_MODE_SENTINELS)
+
+
+def _resolve_audit_dir(root_path: Path | None) -> Path:
+    """Resolve the audit directory, redirecting to a temp dir under test mode.
+
+    Mirrors the usage-logger redirect in ``victor/core/bootstrap.py``: when a
+    test sentinel is set, audit events go to ``<tmp>/victor_test_audit`` so they
+    never land in the project ``./audit/`` directory. In production the audit
+    directory stays alongside the provided (or project) root.
+    """
+    if _is_test_mode():
+        audit_dir = Path(tempfile.gettempdir()) / "victor_test_audit"
+        audit_dir.mkdir(parents=True, exist_ok=True)
+        return audit_dir
+    if root_path:
+        return root_path / "audit"
+    paths = get_project_paths()
+    return paths.project_victor_dir / "audit"
+
 
 class FileAuditLogger(AuditLoggerProtocol):
     """File-based audit logger with JSON storage."""
@@ -47,12 +76,12 @@ class FileAuditLogger(AuditLoggerProtocol):
 
         Args:
             root_path: Root path for audit logs. Defaults to .victor/audit/
+
+        Under test mode (any pytest sentinel env var set) audit logs are
+        redirected to ``<tmp>/victor_test_audit`` to avoid polluting the project
+        audit database — mirroring the usage-logger redirect in bootstrap.py.
         """
-        if root_path:
-            self._audit_dir = root_path / "audit"
-        else:
-            paths = get_project_paths()
-            self._audit_dir = paths.project_victor_dir / "audit"
+        self._audit_dir = _resolve_audit_dir(root_path)
 
         self._audit_dir.mkdir(parents=True, exist_ok=True)
         self._current_log_file = self._get_log_file()
