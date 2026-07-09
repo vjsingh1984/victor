@@ -82,17 +82,13 @@ class TestIncrementalRender:
         renderer.on_content("AAA.\n\n")
         renderer.on_content("BBB.\n\n")
         head = "AAA.\n\nBBB.\n\n"
-        head_render_count_before = sum(
-            1 for c in mock_render.call_args_list if c.args[0] == head
-        )
+        head_render_count_before = sum(1 for c in mock_render.call_args_list if c.args[0] == head)
 
         # Stream the third (in-progress) block over many ticks.
         for _ in range(20):
             renderer.on_content("CCC")
 
-        head_render_count_after = sum(
-            1 for c in mock_render.call_args_list if c.args[0] == head
-        )
+        head_render_count_after = sum(1 for c in mock_render.call_args_list if c.args[0] == head)
         # HEAD was rendered when block 2 completed, then NOT again during the 20 ticks.
         assert head_render_count_after == head_render_count_before == 1
 
@@ -131,9 +127,7 @@ class TestIncrementalRender:
     def test_flag_off_falls_back_to_full_render(self, mock_live_class, mock_render):
         """VICTOR_INCREMENTAL_RENDER=0 disables the optimization (full re-render)."""
         renderer, _ = _renderer_with_mock_live(mock_live_class, mock_render)
-        with patch.object(
-            LiveDisplayRenderer, "_incremental_render_enabled", return_value=False
-        ):
+        with patch.object(LiveDisplayRenderer, "_incremental_render_enabled", return_value=False):
             renderer.on_content("A.\n\n")
             renderer.on_content("B.")
         visible = renderer._content_buffer
@@ -146,9 +140,7 @@ class TestIncrementalRender:
     )
     @patch("victor.ui.rendering.live_renderer.render_markdown_with_hooks")
     @patch("victor.ui.rendering.live_renderer.Live")
-    def test_exception_falls_back_to_full_render(
-        self, mock_live_class, mock_render, _mock_split
-    ):
+    def test_exception_falls_back_to_full_render(self, mock_live_class, mock_render, _mock_split):
         """If the incremental path raises, the stream must not break — fall back
         to a full re-render of the visible slice."""
         mock_live = MagicMock()
@@ -162,6 +154,4 @@ class TestIncrementalRender:
         renderer.on_content("A.\n\nB.")  # must not raise
         visible = renderer._content_buffer
         assert renderer._rendered_head is None  # cache reset by the fallback
-        assert (
-            mock_render.call_args_list[-1].args[0] == visible
-        )  # full visible rendered
+        assert mock_render.call_args_list[-1].args[0] == visible  # full visible rendered
