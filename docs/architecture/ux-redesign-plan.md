@@ -96,63 +96,186 @@ The existing event dispatcher had:
 
 ---
 
-## Phase 4: Preambles & Prompt UX (PLANNED)
+## Phase 4: Preambles & Prompt UX (COMPLETED)
 
-### Analysis Points to Address
+### Implementation
 
-1. **System prompt visibility**: Users should be able to see what system prompt is active
-2. **Prompt section management**: Current 5 sections should be toggleable and visible
-3. **Prompt optimization feedback**: GEPA/MIPROv2/CoT distillation should show what changed
-4. **Preamble customization**: Users should be able to inject custom preambles per session
+**Files created:**
+- `victor/framework/preamble.py` — `PreambleManager` class (16.5 KB, 400+ lines)
+- `victor/ui/slash/commands/preamble.py` — `/preamble` slash command (11.3 KB, 280+ lines)
 
-### Proposed Implementation
+### PreambleManager API
 
-```python
-class PreambleManager:
-    """Manages system prompt sections and user preambles."""
-    
-    def get_active_sections(self) -> dict[str, str]:
-        """Return currently active prompt sections."""
-        
-    def set_preamble(self, text: str, position: PreamblePosition) -> None:
-        """Inject custom preamble at specified position."""
-        
-    def toggle_section(self, section_name: str, enabled: bool) -> None:
-        """Enable/disable a specific prompt section."""
-```
+| Method | Description |
+|--------|-------------|
+| `get_active_sections()` | Return all prompt sections with metadata |
+| `get_section(name)` | Get info about a specific section |
+| `list_toggleable_sections()` | Return sections that can be toggled |
+| `get_full_prompt()` | Return complete system prompt with preambles |
+| `toggle_section(name, enabled)` | Enable/disable a prompt section |
+| `is_section_enabled(name)` | Check if a section is enabled |
+| `set_preamble(text, position, target)` | Inject custom preamble at position |
+| `remove_preamble(index)` | Remove a preamble by index |
+| `list_preambles()` | Return all active preamble entries |
+| `clear_preambles()` | Remove all preamble entries |
+| `reset()` | Reset prompt to default state |
+| `get_optimization_status()` | Get GEPA/MIPROv2 optimization status |
 
-**Slash commands to add:**
-- `/preamble show` — Display current system prompt structure
-- `/preamble set <text>` — Inject custom preamble
-- `/preamble reset` — Reset to defaults
-- `/prompt optimize status` — Show GEPA/MIPROv2 optimization state
+### Preamble Positions
+
+| Position | Description |
+|----------|-------------|
+| `TOP` | Before all sections (priority=1) |
+| `BOTTOM` | After all sections (priority=999) |
+| `BEFORE_SECTION` | Before a specific named section |
+| `AFTER_SECTION` | After a specific named section |
+
+### Slash Commands
+
+| Command | Description |
+|---------|-------------|
+| `/preamble show` | Display current system prompt structure |
+| `/preamble sections` | List all sections with enable/disable status |
+| `/preamble toggle <name>` | Enable/disable a specific section |
+| `/preamble set <text>` | Inject custom preamble at top |
+| `/preamble set-bottom <text>` | Inject custom preamble at bottom |
+| `/preamble list` | Show active preamble entries |
+| `/preamble remove <n>` | Remove preamble at index |
+| `/preamble clear` | Remove all preambles |
+| `/preamble reset` | Reset to default prompt structure |
+| `/preamble optimize` | Show prompt optimization status |
+
+### Protected Sections
+
+Sections that cannot be toggled: `identity`, `capabilities`
+
+Toggleable sections: `tool_hints`, `safety_rules`, `grounding`, `context`, `analysis_efficiency`
 
 ---
 
-## Phase 5: Conversation Flow UX (PLANNED)
+## Phase 5: Conversation Flow UX (COMPLETED)
 
-### Analysis Points to Address
+### Implementation
 
-1. **Turn boundaries**: Enhanced with turn numbers and metadata
-2. **Context window awareness**: Show when context is approaching limits
-3. **Message threading**: Visual threading of related tool calls and responses
-4. **Cost tracking per turn**: Show token/cost estimates per conversation turn
+**Files created:**
+- `victor/ui/rendering/turn_tracker.py` — `TurnTracker` class (14.3 KB, 350+ lines)
 
-### Proposed Implementation
+### TurnTracker API
+
+| Method | Description |
+|--------|-------------|
+| `start_turn()` | Begin a new turn, return turn number |
+| `end_turn(input_tokens, output_tokens)` | End turn and record metrics |
+| `record_tool_call(tool_name)` | Record a tool invocation |
+| `record_tool_result(tool_name, duration_ms)` | Record tool execution result |
+| `get_context_usage()` | Return current context window usage |
+| `get_current_turn_metrics()` | Get current in-progress turn metrics |
+| `get_completed_turns()` | Get all completed turns |
+| `get_turn_count()` | Get total turn count |
+| `get_session_summary()` | Get session-level aggregated metrics |
+| `format_turn_header(turn_number)` | Format turn header for display |
+| `format_turn_metadata(metrics)` | Format turn metadata for display |
+| `format_context_warning()` | Format context window warning |
+
+### TurnMetrics
+
+| Field | Description |
+|-------|-------------|
+| `turn_number` | Sequential turn number (1-based) |
+| `tool_calls` | Number of tool invocations in this turn |
+| `tool_categories` | Tool categories used (search, filesystem, git, etc.) |
+| `input_tokens` | Estimated input tokens |
+| `output_tokens` | Estimated output tokens |
+| `cost_estimate_usd` | Estimated cost in USD |
+| `duration_ms` | Duration in milliseconds |
+
+### Context Window Awareness
+
+| Threshold | Action |
+|-----------|--------|
+| > 80% | Yellow warning: "Context window at N%" |
+| > 95% | Red warning: "Context window nearly full" |
+
+### Tool Categorization
+
+Tools are automatically categorized by name prefix:
+- `filesystem`: read, write, ls, edit, file_info
+- `search`: code_search, semantic_code_search, search, grep
+- `git`: git_status, git_diff, git_log, git_blame
+- `analysis`: overview, analyze, inspect, metrics
+- `execution`: shell, bash, run, code_exec
+- `web`: web_search, fetch, http
+- `testing`: test, pytest, run_tests
+
+### Cost Estimation
+
+Per-model cost tables in `ESTIMATED_COST_PER_1K`:
+- GPT-4: $0.03/$0.06 per 1K in/out
+- GPT-4o: $0.0025/$0.01 per 1K in/out
+- Claude 3.5 Sonnet: $0.003/$0.015 per 1K in/out
+- Local models (llama-3): Free
+
+---
+
+## Phase 7: Cross-Platform UX (COMPLETED)
+
+### Implementation
+
+**Files created:**
+- `victor/ui/rendering/terminal_capabilities.py` — `TerminalCapabilities` class (15.5 KB, 350+ lines)
+
+### TerminalCapabilities API
+
+| Method | Description |
+|--------|-------------|
+| `supports_emoji()` | Check if terminal supports emoji display |
+| `supports_unicode()` | Check if terminal supports Unicode |
+| `get_color_depth()` | Return detected color depth (MONOCHROME/ANSI_8/ANSI_256/TRUECOLOR) |
+| `supports_color()` | Return color depth as integer (0/8/256/16777216) |
+| `get_terminal_width()` | Return terminal width in characters |
+| `get_terminal_height()` | Return terminal height in characters |
+| `get_profile()` | Return full TerminalProfile with all detected capabilities |
+| `is_interactive()` | Check if running in an interactive terminal |
+| `is_ci_environment()` | Check if running in CI/CD environment |
+| `get_capability_level()` | Return overall capability level (FULL/BASIC/RESTRICTED) |
+| `emoji_or_text(emoji, text)` | Return emoji or text fallback based on terminal support |
+| `status_icon(status)` | Return status icon adapted to terminal capabilities |
+| `section_header(title)` | Return section header adapted to terminal capabilities |
+
+### Detection Strategy
+
+| Feature | Detection Method |
+|---------|-----------------|
+| **Terminal emulator** | `TERM_PROGRAM` env var, `TERM` parsing, OS-specific defaults |
+| **Color depth** | `COLORTERM` env var, `TERM` suffix, `tput colors` fallback |
+| **Unicode support** | OS type, terminal emulator, locale (LC_ALL/LC_CTYPE/LANG) |
+| **Emoji support** | OS type, terminal emulator, CI/CD detection |
+| **CI/CD detection** | Environment variables (CI, GITHUB_ACTIONS, GITLAB_CI, etc.) |
+| **Interactive detection** | `os.isatty(1)`, `VICTOR_NON_INTERACTIVE` env var |
+| **Terminal size** | `shutil.get_terminal_size()`, default 80x24 |
+
+### Adaptation Helpers
 
 ```python
-class TurnTracker:
-    """Tracks conversation turns with metadata."""
-    
-    def start_turn(self) -> int:
-        """Begin a new turn, return turn number."""
-        
-    def end_turn(self, metrics: TurnMetrics) -> None:
-        """Record turn completion with metrics."""
-        
-    def get_context_usage(self) -> ContextUsage:
-        """Return current context window usage."""
+# Emoji with ASCII fallback
+caps = TerminalCapabilities()
+icon = caps.emoji_or_text("🔍", "[?]")  # Returns 🔍 or [?]
+
+# Status icons with text fallback
+success_icon = caps.status_icon("success")  # Returns ✅ or [OK]
+cached_icon = caps.status_icon("cached")    # Returns ⚡ or [CACHE]
+
+# Section headers with Unicode fallback
+header = caps.section_header("Tools")  # Returns ──── Tools ──── or --- Tools ---
 ```
+
+### Capability Levels
+
+| Level | Description | When Active |
+|-------|-------------|-------------|
+| `FULL` | All features (emoji, Unicode, TrueColor) | Interactive, not CI, modern terminal |
+| `BASIC` | ASCII-only, limited colors | Non-interactive, CI, old terminals |
+| `RESTRICTED` | Plain text, no formatting | Piped output, non-TTY stdout |
 
 ---
 
