@@ -40,7 +40,9 @@ import re
 from typing import Dict, List, Tuple
 
 from victor_contracts.verticals.protocols import SafetyExtensionProtocol
-from victor_contracts.verticals.protocols.promoted_types import SafetyPatternData as SafetyPattern
+from victor_contracts.verticals.protocols.promoted_types import (
+    SafetyPatternData as SafetyPattern,
+)
 from victor_contracts.safety.framework import SafetyEnforcer, SafetyRule, SafetyLevel
 from victor_contracts.safety import (
     PIISeverity,

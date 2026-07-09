@@ -161,7 +161,8 @@ class TestRaisedException:
     def test_all_fields(self):
         """Test RaisedException with all fields."""
         exc = RaisedException(
-            exception_type="FileNotFoundError", description="When the config file doesn't exist"
+            exception_type="FileNotFoundError",
+            description="When the config file doesn't exist",
         )
         assert exc.exception_type == "FileNotFoundError"
         assert exc.description == "When the config file doesn't exist"
@@ -276,7 +277,10 @@ class TestFunctionDoc:
     def test_property(self):
         """Test FunctionDoc for property."""
         func = FunctionDoc(
-            name="value", signature="value(self) -> int", is_property=True, decorators=["@property"]
+            name="value",
+            signature="value(self) -> int",
+            is_property=True,
+            decorators=["@property"],
         )
         assert func.is_property is True
 

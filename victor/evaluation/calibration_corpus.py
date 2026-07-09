@@ -72,6 +72,10 @@ def _file_create_task(i: int) -> VerifiableTask:
     def solve(ws: Path) -> None:
         (ws / filename).write_text(f"{line}\n")
 
+    def solve_flawed(ws: Path) -> None:
+        # File created (looks done) but with the wrong port value.
+        (ws / filename).write_text(f"port = {9000 + i}\n")
+
     return VerifiableTask(
         task_id=f"file-create-{i:02d}",
         family="file-create",
@@ -79,6 +83,7 @@ def _file_create_task(i: int) -> VerifiableTask:
         setup=setup,
         verify=verify,
         solve=solve,
+        solve_flawed=solve_flawed,
     )
 
 
@@ -111,6 +116,16 @@ def _code_fix_task(i: int) -> VerifiableTask:
     def solve(ws: Path) -> None:
         (ws / f"{module_name}.py").write_text(fixed)
 
+    # Changed the code (looks fixed) but still wrong: overshoots by including n+1.
+    flawed = (
+        "def sum_upto(n):\n"
+        '    """Sum of integers from 1 to n inclusive."""\n'
+        "    return sum(range(1, n + 2))\n"
+    )
+
+    def solve_flawed(ws: Path) -> None:
+        (ws / f"{module_name}.py").write_text(flawed)
+
     return VerifiableTask(
         task_id=f"code-fix-{i:02d}",
         family="code-fix",
@@ -121,6 +136,7 @@ def _code_fix_task(i: int) -> VerifiableTask:
         setup=setup,
         verify=verify,
         solve=solve,
+        solve_flawed=solve_flawed,
     )
 
 
@@ -151,6 +167,12 @@ def _rename_task(i: int) -> VerifiableTask:
             path = ws / name
             path.write_text(path.read_text().replace(old, new))
 
+    def solve_flawed(ws: Path) -> None:
+        # Renamed in the definition file only — the call site in app still uses the old
+        # name, so the rename is incomplete (a classic missed-reference refactor).
+        path = ws / core
+        path.write_text(path.read_text().replace(old, new))
+
     return VerifiableTask(
         task_id=f"refactor-rename-{i:02d}",
         family="refactor",
@@ -158,6 +180,7 @@ def _rename_task(i: int) -> VerifiableTask:
         setup=setup,
         verify=verify,
         solve=solve,
+        solve_flawed=solve_flawed,
     )
 
 
@@ -181,6 +204,11 @@ def _docs_link_task(i: int) -> VerifiableTask:
         path = ws / readme
         path.write_text(path.read_text().replace(missing, existing))
 
+    def solve_flawed(ws: Path) -> None:
+        # Changed the link (looks fixed) but to another doc that also does not exist.
+        path = ws / readme
+        path.write_text(path.read_text().replace(missing, f"docs/overview_{i}.md"))
+
     return VerifiableTask(
         task_id=f"docs-link-{i:02d}",
         family="docs",
@@ -191,6 +219,7 @@ def _docs_link_task(i: int) -> VerifiableTask:
         setup=setup,
         verify=verify,
         solve=solve,
+        solve_flawed=solve_flawed,
     )
 
 
@@ -213,6 +242,11 @@ def _dead_code_task(i: int) -> VerifiableTask:
     def solve(ws: Path) -> None:
         (ws / module).write_text(kept_src)
 
+    def solve_flawed(ws: Path) -> None:
+        # Removed a function (looks done) but the WRONG one — deleted active_transform and
+        # left the dead function behind.
+        (ws / module).write_text(f"def {dead}(y):\n    return y - {i}\n")
+
     return VerifiableTask(
         task_id=f"dead-code-{i:02d}",
         family="refactor",
@@ -220,6 +254,7 @@ def _dead_code_task(i: int) -> VerifiableTask:
         setup=setup,
         verify=verify,
         solve=solve,
+        solve_flawed=solve_flawed,
     )
 
 
@@ -241,6 +276,8 @@ def _qa_task(i: int) -> VerifiableTask:
         verify=verify,
         solve=lambda ws: None,
         reference_answer=f"The service listens on port {port} (from {config}).",
+        # A confident, well-formed answer with the WRONG number (transposed digits).
+        reference_answer_flawed=f"The service listens on port {port + 10} (from {config}).",
     )
 
 

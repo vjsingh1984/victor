@@ -41,7 +41,10 @@ async def test_stream_chat_finalizes_metrics_with_cumulative_usage(monkeypatch):
     rt = ServiceStreamingRuntime(orch)
 
     ctx = SimpleNamespace(cumulative_usage=_usage(120, 40))
-    state_dict = {"_current_stream_context": ctx, "_cumulative_token_usage": _usage(0, 0)}
+    state_dict = {
+        "_current_stream_context": ctx,
+        "_cumulative_token_usage": _usage(0, 0),
+    }
     bindings = SimpleNamespace(
         state_host=orch,
         state_dict=state_dict,
@@ -72,7 +75,10 @@ async def test_finalize_failure_does_not_break_the_stream(monkeypatch):
     orch = SimpleNamespace(_finalize_stream_metrics=MagicMock(side_effect=RuntimeError("boom")))
     rt = ServiceStreamingRuntime(orch)
     ctx = SimpleNamespace(cumulative_usage=_usage(10, 5))
-    state_dict = {"_current_stream_context": ctx, "_cumulative_token_usage": _usage(0, 0)}
+    state_dict = {
+        "_current_stream_context": ctx,
+        "_cumulative_token_usage": _usage(0, 0),
+    }
     bindings = SimpleNamespace(
         state_host=orch,
         state_dict=state_dict,

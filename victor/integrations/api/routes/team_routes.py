@@ -63,11 +63,16 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
                     "tool_budget": total_tool_budget // len(members) if members else 0,
                     "tools_used": 0,
                     "discoveries": [],
+                    "agent_category": m.get(
+                        "agent_category",
+                        "supervisor" if m.get("is_manager", False) else "specialist",
+                    ),
                     "is_manager": m.get("is_manager", False),
                 }
                 team_members.append(member)
 
             if formation == "hierarchical" and team_members:
+                team_members[0]["agent_category"] = "supervisor"
                 team_members[0]["is_manager"] = True
 
             _teams[team_id] = {
@@ -158,6 +163,7 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
             try:
                 from victor.teams import (
                     TeamConfig,
+                    TeamAgentCategory,
                     TeamMember,
                     TeamFormation,
                     create_coordinator,
@@ -190,6 +196,12 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
                             name=m["name"],
                             goal=m["goal"],
                             tool_budget=m["tool_budget"],
+                            agent_category=TeamAgentCategory(
+                                m.get(
+                                    "agent_category",
+                                    ("supervisor" if m.get("is_manager", False) else "specialist"),
+                                )
+                            ),
                             is_manager=m.get("is_manager", False),
                         )
                     )

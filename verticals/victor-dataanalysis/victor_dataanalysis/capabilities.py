@@ -325,7 +325,9 @@ def configure_data_privacy(
         log_access: Log data access for audit trail
     """
     # Delegate to framework privacy capability
-    from victor_contracts.capabilities import configure_data_privacy as framework_privacy
+    from victor_contracts.capabilities import (
+        configure_data_privacy as framework_privacy,
+    )
 
     framework_privacy(
         orchestrator,
@@ -348,7 +350,9 @@ def get_privacy_config(orchestrator: Any) -> Dict[str, Any]:
         Privacy configuration dict
     """
     # Delegate to framework privacy capability
-    from victor_contracts.capabilities import get_privacy_config as framework_get_privacy
+    from victor_contracts.capabilities import (
+        get_privacy_config as framework_get_privacy,
+    )
 
     return framework_get_privacy(orchestrator)
 

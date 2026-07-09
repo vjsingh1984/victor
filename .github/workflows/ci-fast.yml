@@ -70,7 +70,7 @@ jobs:
           cache: pip
 
       - name: Install Ruff
-        run: pip install ruff
+        run: pip install ruff==0.15.20
 
       - name: Lint with Ruff
         run: ruff check victor
@@ -450,7 +450,10 @@ jobs:
     # develop gate stays proportional to the change. The full non-slow suite is ~7h
     # single-process / ~hours even sharded, so it can't be a per-PR gate — it runs sharded at
     # develop -> main instead (see workflows/README.md CI Gating Strategy).
-    timeout-minutes: 12
+    # Cap is generous (25m) because broad PRs (repo-wide formatting/refactor) map to a large
+    # mirror-test set that legitimately needs ~15-20m — observed a 228-file formatting PR pass
+    # all tests but get cancelled at 61% under the old 12m cap.
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
         with:

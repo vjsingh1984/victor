@@ -48,6 +48,25 @@ class ToolSettings(BaseModel):
         le=5,
         description="Maximum number of progress-based budget relief grants per turn",
     )
+    tool_budget_calibration_enabled: bool = Field(
+        default=False,
+        description=(
+            "Opt-in RL-driven tool-budget calibration. When True, the session "
+            "overlay is derived from aggregated rl_tool_q + decision_outcome "
+            "signals via BudgetCalibrator. Default False = unchanged behavior; "
+            "low-confidence recommendations always retain the baseline."
+        ),
+    )
+    tool_budget_calibration_min_confidence: float = Field(
+        default=0.7,
+        ge=0.0,
+        le=1.0,
+        description=(
+            "Minimum calibrator confidence required to apply a calibrated "
+            "overlay; below this the baseline settings are returned unchanged. "
+            "Default 0.7 per FEP-0002 review (see Open Questions #1)."
+        ),
+    )
     tool_calling_models: Dict[str, list[str]] = Field(
         default_factory=_load_tool_capable_patterns_from_yaml
     )

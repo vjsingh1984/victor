@@ -35,8 +35,18 @@ ROOT = Path(__file__).resolve().parents[2]
 CANON_TOOL_MODULES = 34
 CANON_VERTICALS = 9
 
+# Beyond docs/, also scan the root instruction files that carry canon counts
+# (CLAUDE.md, AGENTS.md, .victor/init.md). These are hand-written and drift the
+# same way the docs do, so a provider/tool/vertical claim made here must stay
+# aligned too.
 DOC_GLOB = "docs/**/*.md"
-EXTRA_FILES = ("mkdocs.yml", "docs/conf.py")
+EXTRA_FILES = (
+    "mkdocs.yml",
+    "docs/conf.py",
+    "CLAUDE.md",
+    "AGENTS.md",
+    ".victor/init.md",
+)
 
 # The release version is checked ONLY in the canonical pages that carry it. Spec/FEP docs (e.g.
 # vertical-package-spec.md) legitimately have their own independent **Version** stamp.

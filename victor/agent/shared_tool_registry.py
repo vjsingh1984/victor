@@ -327,7 +327,10 @@ class SharedToolRegistry:
             tool_obj = getattr(module, member_name)
         except Exception as exc:
             logger.debug(
-                "Failed to load bootstrap tool %s from %s: %s", tool_name, module_name, exc
+                "Failed to load bootstrap tool %s from %s: %s",
+                tool_name,
+                module_name,
+                exc,
             )
             return None
 

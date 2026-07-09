@@ -137,10 +137,19 @@ class ResearchSafetyProvider(SafetyProvider):
     def __init__(self):
         self._dangerous_patterns = [
             # Web scraping dangerous patterns
-            {"pattern": "web_scrape --infinite", "description": "Infinite scraping loop"},
-            {"pattern": "web_crawl --depth 100", "description": "Excessive crawl depth"},
+            {
+                "pattern": "web_scrape --infinite",
+                "description": "Infinite scraping loop",
+            },
+            {
+                "pattern": "web_crawl --depth 100",
+                "description": "Excessive crawl depth",
+            },
             # File operations
-            {"pattern": "write --force /etc/", "description": "Writing to system directories"},
+            {
+                "pattern": "write --force /etc/",
+                "description": "Writing to system directories",
+            },
         ]
 
     def get_extensions(self) -> List[Any]:

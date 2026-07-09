@@ -167,9 +167,7 @@ class TreeSitterExtractor:
         """
         try:
             content = Path(file_path).read_text(encoding="utf-8", errors="ignore")
-            parsed = _victor_codegraph.parse(
-                content, language=language, file_path=str(file_path)
-            )
+            parsed = _victor_codegraph.parse(content, language=language, file_path=str(file_path))
         except Exception as e:  # noqa: BLE001 - fall back on any delegation failure
             logger.debug(f"victor-codegraph symbol delegation failed for {file_path}: {e}")
             return None

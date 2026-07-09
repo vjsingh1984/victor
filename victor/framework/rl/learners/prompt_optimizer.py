@@ -906,7 +906,11 @@ class PromptOptimizerLearner(BaseLearner):
                 from victor.config.settings import load_settings
 
                 ttl = float(
-                    getattr(load_settings().prompt_optimization, "cache_traces_ttl_seconds", 0.0)
+                    getattr(
+                        load_settings().prompt_optimization,
+                        "cache_traces_ttl_seconds",
+                        0.0,
+                    )
                 )
             except Exception:  # settings unavailable -> disabled (current behavior)
                 ttl = 0.0

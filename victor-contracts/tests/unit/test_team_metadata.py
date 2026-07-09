@@ -3,6 +3,7 @@
 import pytest
 
 from victor_contracts import TeamMetadata, VerticalDefinition
+from victor_contracts.core.types import normalize_team_member_definition
 from victor_contracts.core.exceptions import VerticalConfigurationError
 from victor_contracts.verticals.protocols.base import VerticalBase
 
@@ -66,6 +67,31 @@ def test_team_metadata_default_team_must_reference_declared_team() -> None:
             system_prompt="Invalid",
             team_metadata=TeamMetadata(default_team="missing_team"),
         )
+
+
+def test_team_member_definition_normalizes_supervisor_category() -> None:
+    """Definition-layer team members should carry canonical supervisor metadata."""
+
+    member = normalize_team_member_definition(
+        {
+            "role": "planner",
+            "goal": "Coordinate work",
+            "agent_category": "supervisor",
+        }
+    )
+    legacy_member = normalize_team_member_definition(
+        {
+            "role": "planner",
+            "goal": "Coordinate work",
+            "is_manager": True,
+        }
+    )
+
+    assert member.agent_category == "supervisor"
+    assert member.is_manager is True
+    assert member.max_delegation_depth == 1
+    assert member.to_dict()["agent_category"] == "supervisor"
+    assert legacy_member.agent_category == "supervisor"
 
 
 def test_sdk_vertical_base_exposes_team_metadata_hooks() -> None:

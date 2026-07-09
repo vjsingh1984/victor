@@ -1,6 +1,6 @@
 # Judge-Calibration Findings — EVR-2 / ADR-011 first live measurements
 
-**Date**: 2026-07-02/05 (8 runs) · **Corpus**: `default_calibration_corpus(variants=8)` — 48 tasks,
+**Date**: 2026-07-02/06 (11 runs) · **Corpus**: `default_calibration_corpus(variants=8)` — 48 tasks,
 6 families · **Executor**: scripted (`alternating_scripted_executor(period=5)`, ~38 solved /
 ~10 completion-without-effect fakes) · **Gate**: Krippendorff α ≥ 0.7 (binary completion
 verdicts vs programmatic verifier gold) · **Judges measured**: local Ollama (offline,
@@ -21,6 +21,9 @@ runs 1–5, 7) and cloud DeepSeek (run 6); all cloud/paced runs integrity-verifi
 | 6 | rubric-llm, **deepseek-chat (cloud)** | run-5 code state; `--judge-delay 5`; first clean cloud run (integrity: calls=48 retries=0 failures=0) | **0.279** | NOT TRUSTED | **New best**, and the first cross-provider data point. Per-family fingerprint nearly identical to run 5: file-create 1.000, qa 1.000, refactor 0.372, code-fix −0.190, docs −0.500 — and again **zero false completions**; all 15 errors are missed completions on solved docs-link (6/7), code-fix (5/7), and dead-code (4/7) tasks. Two unrelated judges (local qwen-32b, cloud DeepSeek) producing the same family-level failure signature confirms the bottleneck is the **narration-free scripted transcripts**, not judge capability — the judges refuse to certify work nobody described, which is defensible behavior against a corpus artifact. Preceding runs on this machine also validated the new guardrails live: a fully rate-limited GLM-5.2 attempt was correctly VOIDed (α would have equaled the heuristic's to 3 decimals), and a DeepSeek attempt exposed the per-call-event-loop bug (PR #394). |
 | 7 | rubric-llm, **gemma4:31b (LOCAL, Ollama on Apple Silicon)** | run-5 code state; default 2 s pacing (~84 s/call inference); integrity: calls=48 retries=0 failures=0 | **0.929** | **TRUSTED — first gate pass** | 47/48 verdicts correct. Per-family: code-fix **1.000** (the family that broke every prior judge), docs 1.000, file-create 1.000, qa 1.000, refactor 0.823 — clears the gate overall AND per-family. The single error is the series' **first false completion** (refactor-rename-02: unsolved rename judged complete) — a changed error polarity worth watching at larger n. This result **overturns run 5/6's corpus-ceiling diagnosis**: gemma4 passed on the same narration-free scripted claims that capped qwen-32b and DeepSeek, proving the workspace-state evidence in the view was sufficient all along and the earlier judges' refusals were model disposition, not a corpus artifact. The gate-passing judge is fully local — no API cost, no rate limits, no data egress. |
 | 8 | rubric-llm, qwen3.5:27b-q4 (local) | run-7 code state; integrity: calls=48 retries=0 failures=0 — but see diagnosis | **−0.092** | NOT TRUSTED (should be VOID) | **Third integrity blindspot found**: every verdict was 1.0 — 10 false completions, 0 misses — matching rubric-heuristic's α sample-for-sample, the signature of a judge contributing zero signal. Transport succeeded, but no `score=` line ever parsed: every dimension fell back to 0.5@≤0.2 (below the engagement floor), so the DimensionAwareFilter defaulted every task to COMPLETE. Suspected cause: qwen3.5 is a thinking-family model that exhausted the 512-token grading budget on reasoning preamble (~72 s/call supports this). Fixed: `JudgeCallStats.ungradable` now counts all-fallback results and VOIDs the run; `--judge-max-tokens` (default raised to 1024) gives thinking judges headroom. Retest qwen3.5 with `--judge-max-tokens 2048` to distinguish format-mismatch from truncation. |
+| 9 | rubric-llm, **llama3.3:70b (local, Ollama on the Windows-host GPU)** | run-8 code state (`--judge-max-tokens 1024`, ungradable guard active); integrity: calls=48 retries=0 failures=0 ungradable=0 | **1.000** | **TRUSTED — perfect score** | 48/48 verdicts correct, zero errors of either polarity, every family at α=1.000. Second gate-passer (of six judge models measured), confirming gate-passing judges are not rare among strong models — and the first ceiling hit: a perfect score at n=48 means this corpus can no longer discriminate among top judges. Ranking so far: llama3.3:70b 1.000 > gemma4:31b 0.929 > deepseek-chat 0.279 > qwen2.5-coder:32b 0.173 ≫ qwen3.5:27b (ungraded). Run also validated the run-8 ungradable guard end-to-end in a live measurement (`ungradable=0` reported). |
+| 10 | rubric-llm, **llama3.3:70b (local)** — **variants-16 CONFIRMATION** | run-9 code + workspace-cleanup; n=16/family (96 tasks); integrity: calls=96 retries=0 failures=0 ungradable=0 | **1.000** | **TRUSTED — gating-grade** | 96/96 correct, α=1.000 on every family, zero errors of either polarity. Doubles the sample size of run 9 and holds perfect — this is the gating-grade evidence (n≥16/family) FINDINGS required before per-family α counts. **Graduation-checklist item 1 is satisfied for llama3.3:70b.** Decisively separates the two gate-passers: llama3.3:70b is confirmed perfect at n=96, while gemma4:31b has only n=8 evidence with one false completion — llama3.3:70b is the pinned judge candidate. |
+| 11 | rubric-llm, **gemma4:31b** — **REAL AGENT TRAJECTORIES** (checklist item 2) | agent=qwen3-coder-tools:30b via VictorAgentAdapter, two-phase, `--judge-max-tokens 2560`; integrity: calls=48 retries=0 failures=0 ungradable=0 | **0.865** | **TRUSTED — the graduation gate** | The first calibration on REAL agent behavior instead of scripted stand-ins. 46/48 correct; per-family code-fix/docs/file-create/qa all 1.000, refactor 0.754 (all ≥ 0.7); **zero false completions**, 2 missed (both dead-code). Gold was a real 40/8 mix from the agent's own successes and failures (81% solve rate; the 30B agent also hit an `edit`-tool arg-format bug — `ops` sent as str not array — a real capability limit, not a harness fault). The headline contrast: on these SAME real trajectories the scripted-perfect baselines collapsed — `evidence` (tool activity) went 1.000→**−0.092**, `rubric-heuristic` 0.852→−0.092 — because real agents produce tool activity while failing. gemma4:31b held at 0.865. This is the production distribution the gate exists for, and gemma4:31b clears it — **checklist item 2 satisfied.** Two harness fixes made this run possible: real-agent mode + two-phase scheduling (one model swap, ~40 min vs a killed 3 h interleaved run), and the ungradable guard caught a first attempt (`ungradable=9` at 1024 tokens — real transcripts are longer) and VOIDed it before this clean retry. |
 
 ## What the series established
 
@@ -60,25 +63,37 @@ Reports (per-family α, gate decision, every sample) land in
 
 ## Verdict and open items
 
-**First gate pass: gemma4:31b (local Ollama) at α=0.929, TRUSTED overall and per-family**
-(run 7). `completion_strategy=rubric` stays opt-in pending the confirmation steps below,
-but graduation now has a concrete candidate configuration rather than a research direction.
-Trust is **judge-specific**: this evidence graduates gemma4:31b as the rubric judge, not
-LLM-judging in the abstract (same code scored 0.173–0.279 with other models — see point 4).
+**All three graduation gates are now cleared — by two complementary judges.** The scripted
+gate at gating-grade n is met by llama3.3:70b (run 10: α=1.000, n=96), and the real-agent
+trajectory gate is met by gemma4:31b (run 11: α=0.865, integrity clean, zero false
+completions). `completion_strategy=rubric` has the evidence to graduate. Trust is
+**judge-specific**: this graduates these calibrated judges, not LLM-judging in the abstract
+(identical code scored 0.173–0.279 with other models, and one thinking model produced zero
+usable grades — see point 4 and the run-8 guard).
 
-Graduation checklist for `completion_strategy=rubric` + gemma4:31b (TD-17 evidence):
+Judge selection — **gemma4:31b is the recommended default**: it cleared BOTH the scripted
+(0.929, run 7) and real-trajectory (0.865, run 11) gates, fits a 20 GB GPU fully (fast, no
+offload), and is the model that carried the real-trajectory pass. llama3.3:70b is the
+higher-accuracy alternative (1.000 scripted) where its ~42 GB footprint is affordable.
 
-1. **Confirmation at gating-grade n** — re-run `--variants 16`+ (n ≥ 16/family; ~2–4 h at
-   local inference speed) so per-family α and the new false-completion polarity (run 7's
-   single error blessed unsolved work — the series' first) are measured, not anecdotal.
-2. **Real agent trajectories** (`make_agent_executor` + `VictorAgentAdapter.from_profile`) —
-   the production distribution: real agents narrate, fail partially, and recover;
-   scripted transcripts do none of that (and make the evidence baseline artificially
-   perfect). Gate must hold there too.
-3. **Pin the judge identity in the flag criteria** — default-on only with a calibrated
-   judge model; falling back to the heuristic (α=−0.092) or an uncalibrated model must
-   revert to `enhanced`, per the ADR-011 fallback contract.
+Graduation checklist for `completion_strategy=rubric` (TD-17 evidence):
 
-Deprioritized after run 7 (were top levers when the corpus looked like the ceiling):
-prompt evidence-transfer guidance and the order-swap ensemble — both remain available if
-the confirmation runs regress, and the ensemble may still help judges below the gate.
+1. ✅ **Confirmation at gating-grade n** — DONE (run 10, llama3.3:70b): `--variants 16`,
+   n=16/family, 96/96 correct, α=1.000 every family. (Open: a variants-16 scripted
+   confirmation for gemma4:31b specifically would let one judge own both gates; gemma4 has
+   n=8 scripted (0.929) + real-trajectory (0.865) today.)
+2. ✅ **Real agent trajectories** — DONE (run 11, gemma4:31b): α=0.865 on real
+   qwen3-coder:30b trajectories, all families ≥ 0.7, zero false completions, integrity
+   clean. The production distribution the gate exists for; the scripted-perfect `evidence`
+   and `rubric-heuristic` baselines collapsed to −0.092 on the same trajectories.
+3. ⏳ **Pin the judge identity in the flag criteria** — the remaining step: wire
+   `completion_strategy=rubric` default-on ONLY with a calibrated judge (gemma4:31b or
+   llama3.3:70b); an uncalibrated model or the heuristic fallback (α=−0.092) must revert to
+   `enhanced`, per the ADR-011 fallback contract and the
+   [flag-graduation policy](../../docs/architecture/flag-graduation-policy.md). This is a
+   code change to the flag wiring, not another measurement.
+
+Open follow-ups (no longer blocking graduation): a variants-16 scripted run for gemma4:31b
+(single-judge rigor); the `--hard` corpus (run 0/PR #417) against the gate-passers to probe
+discrimination past the α=1.0 ceiling; and the agent-side `edit` arg-format bug surfaced in
+run 11 (the 30B model sends `ops` as a string).

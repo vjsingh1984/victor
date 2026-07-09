@@ -118,8 +118,16 @@ class TestResearchEscapeHatches:
         ctx = {
             "gaps": ["pricing", "benchmarks"],
             "validated_sources": [
-                {"url": "https://example.com/a", "credibility": 0.86, "source_type": "web"},
-                {"url": "https://example.com/b", "credibility": 0.82, "source_type": "academic"},
+                {
+                    "url": "https://example.com/a",
+                    "credibility": 0.86,
+                    "source_type": "web",
+                },
+                {
+                    "url": "https://example.com/b",
+                    "credibility": 0.82,
+                    "source_type": "academic",
+                },
             ],
             "research_memory_trace": [
                 {
@@ -140,8 +148,16 @@ class TestResearchEscapeHatches:
         ctx = {
             "gaps": ["pricing", "benchmarks"],
             "validated_sources": [
-                {"url": "https://example.com/a", "credibility": 0.86, "source_type": "web"},
-                {"url": "https://example.com/b", "credibility": 0.82, "source_type": "academic"},
+                {
+                    "url": "https://example.com/a",
+                    "credibility": 0.86,
+                    "source_type": "web",
+                },
+                {
+                    "url": "https://example.com/b",
+                    "credibility": 0.82,
+                    "source_type": "academic",
+                },
             ],
             "research_memory_trace": [
                 {

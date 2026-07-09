@@ -57,7 +57,10 @@ async def test_rag_delete_maps_doc_id():
     captured: dict = {}
     with patch(
         "victor.tools.unified.rag_tool.resolve_vertical_callable",
-        return_value=(_fake_tool_class(captured, "deleted"), "victor_rag.tools.management"),
+        return_value=(
+            _fake_tool_class(captured, "deleted"),
+            "victor_rag.tools.management",
+        ),
     ):
         result = await rag_tool("rag delete doc-42")
     assert captured == {"doc_id": "doc-42"}
@@ -71,7 +74,10 @@ async def test_rag_ingest_maps_path_and_type():
     captured: dict = {}
     with patch(
         "victor.tools.unified.rag_tool.resolve_vertical_callable",
-        return_value=(_fake_tool_class(captured, "ingested"), "victor_rag.tools.ingest"),
+        return_value=(
+            _fake_tool_class(captured, "ingested"),
+            "victor_rag.tools.ingest",
+        ),
     ):
         await rag_tool("rag ingest --path docs.md --type markdown")
     assert captured["path"] == "docs.md"

@@ -53,7 +53,11 @@ LABELED: list[tuple[str, str, bool]] = [
         "test suite passes (12/12). The diff edits line 88.",
         True,
     ),
-    ("coding", "I found the parser. Now I need to read it to understand the bug.", False),
+    (
+        "coding",
+        "I found the parser. Now I need to read it to understand the bug.",
+        False,
+    ),
     (
         "analysis",
         "## Summary\nThe auth flow has 3 stages: login, token refresh, and logout. The refresh path "
@@ -61,7 +65,11 @@ LABELED: list[tuple[str, str, bool]] = [
         "retry with backoff.",
         True,
     ),
-    ("analysis", "Here are the files. Would you like me to analyze the auth flow next?", False),
+    (
+        "analysis",
+        "Here are the files. Would you like me to analyze the auth flow next?",
+        False,
+    ),
 ]
 
 

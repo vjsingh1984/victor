@@ -31,6 +31,20 @@ class TeamFormation(str, Enum):
     CONSENSUS = "consensus"
 
 
+class TeamAgentCategory(str, Enum):
+    """Declarative coordination category for a team member.
+
+    ``SUPERVISOR`` is the explicit contract for the coordinating member in a
+    hierarchical team. ``SPECIALIST`` members perform delegated domain work.
+    ``is_manager`` remains supported as a compatibility alias, but new team
+    specs should use this field to make coordination intent visible at the
+    contract boundary.
+    """
+
+    SPECIALIST = "specialist"
+    SUPERVISOR = "supervisor"
+
+
 def get_runtime_team_registry() -> Any:
     """Return the Victor host team registry when the runtime package is installed."""
 
@@ -80,6 +94,10 @@ class MemoryConfig:
 
 
 ROLE_MAPPING: Dict[str, str] = {
+    "supervisor": "PLANNER",
+    "manager": "PLANNER",
+    "lead": "PLANNER",
+    "coordinator": "PLANNER",
     "researcher": "RESEARCHER",
     "research": "RESEARCHER",
     "planner": "PLANNER",
@@ -106,7 +124,9 @@ class TeamMemberSpec:
     name: Optional[str] = None
     tool_budget: Optional[int] = None
     allowed_tools: Optional[List[str]] = None
+    agent_category: TeamAgentCategory = TeamAgentCategory.SPECIALIST
     is_manager: bool = False
+    can_delegate: bool = False
     priority: int = 0
     backstory: str = ""
     expertise: List[str] = field(default_factory=list)
@@ -120,8 +140,22 @@ class TeamMemberSpec:
 
     def __post_init__(self) -> None:
         """Normalize canonical tool names at definition time."""
+        if isinstance(self.agent_category, str):
+            self.agent_category = TeamAgentCategory(self.agent_category)
+        if self.is_manager:
+            self.agent_category = TeamAgentCategory.SUPERVISOR
+        if self.agent_category == TeamAgentCategory.SUPERVISOR:
+            self.is_manager = True
+            self.can_delegate = True
+            if self.max_delegation_depth < 1:
+                self.max_delegation_depth = 1
         if self.allowed_tools:
             self.allowed_tools = [get_canonical_name(tool) for tool in self.allowed_tools]
+
+    @property
+    def is_supervisor(self) -> bool:
+        """Return whether this member is the team's coordinating supervisor."""
+        return self.agent_category == TeamAgentCategory.SUPERVISOR or self.is_manager
 
     def to_team_member(self, index: int = 0) -> "TeamMember":
         """Convert this SDK definition into the host runtime TeamMember model."""
@@ -155,7 +189,9 @@ class TeamMemberSpec:
             goal=self.goal,
             tool_budget=tool_budget,
             allowed_tools=self.allowed_tools,
+            agent_category=self.agent_category,
             is_manager=self.is_manager,
+            can_delegate=self.can_delegate,
             priority=self.priority if self.priority else index,
             backstory=self.backstory,
             expertise=list(self.expertise),
@@ -252,6 +288,7 @@ class TeamSpec:
                     "name": member.name,
                     "tool_budget": member.tool_budget,
                     "allowed_tools": list(member.allowed_tools or []),
+                    "agent_category": member.agent_category.value,
                     "backstory": member.backstory,
                     "expertise": list(member.expertise),
                     "personality": member.personality,
@@ -260,6 +297,7 @@ class TeamSpec:
                         member.memory_config.to_dict() if member.memory_config else None
                     ),
                     "is_manager": member.is_manager,
+                    "can_delegate": member.can_delegate,
                     "priority": member.priority,
                     "cache": member.cache,
                     "verbose": member.verbose,
@@ -287,6 +325,19 @@ class TeamSpec:
                 name=member_data.get("name"),
                 tool_budget=member_data.get("tool_budget"),
                 allowed_tools=member_data.get("allowed_tools"),
+                agent_category=TeamAgentCategory(
+                    member_data.get(
+                        "agent_category",
+                        member_data.get(
+                            "agent_class",
+                            (
+                                TeamAgentCategory.SUPERVISOR.value
+                                if member_data.get("is_manager", False)
+                                else TeamAgentCategory.SPECIALIST.value
+                            ),
+                        ),
+                    )
+                ),
                 backstory=member_data.get("backstory", ""),
                 expertise=list(member_data.get("expertise", [])),
                 personality=member_data.get("personality", ""),
@@ -295,6 +346,7 @@ class TeamSpec:
                     MemoryConfig.from_dict(memory_config_data) if memory_config_data else None
                 ),
                 is_manager=member_data.get("is_manager", False),
+                can_delegate=member_data.get("can_delegate", False),
                 priority=member_data.get("priority", 0),
                 cache=member_data.get("cache", True),
                 verbose=member_data.get("verbose", False),
@@ -343,6 +395,7 @@ __all__ = [
     "MemoryConfig",
     "ROLE_MAPPING",
     "RoleConfig",
+    "TeamAgentCategory",
     "TeamFormation",
     "TeamMemberSpec",
     "TeamSpec",

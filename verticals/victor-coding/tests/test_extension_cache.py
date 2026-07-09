@@ -655,7 +655,9 @@ class TestVerticalLoaderObservabilityEvents:
         assert "stats" in data
 
     @pytest.mark.asyncio
-    async def test_discover_verticals_async_concurrent_cache_hit_telemetry_is_correct(self):
+    async def test_discover_verticals_async_concurrent_cache_hit_telemetry_is_correct(
+        self,
+    ):
         """Concurrent async discovery should report one miss and one cache hit."""
         loader = VerticalLoader()
         emitted = []

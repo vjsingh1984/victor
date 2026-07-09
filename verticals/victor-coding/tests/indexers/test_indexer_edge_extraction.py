@@ -27,7 +27,11 @@ pytest.importorskip("victor_coding.codebase.graph.registry")
 pytest.importorskip("victor_coding.codebase.indexer")
 
 from victor_coding.codebase.graph.registry import create_graph_store
-from victor_coding.codebase.indexer import CodebaseIndex, _process_file_parallel, _PRIMITIVE_TYPES
+from victor_coding.codebase.indexer import (
+    CodebaseIndex,
+    _process_file_parallel,
+    _PRIMITIVE_TYPES,
+)
 
 
 def _skip_if_no_parser(language: str):

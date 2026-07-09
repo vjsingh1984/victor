@@ -415,7 +415,10 @@ class QueryEnhancer:
             EnhancedQuery with all enhancements applied
         """
         if techniques is None:
-            techniques = [EnhancementTechnique.REWRITE, EnhancementTechnique.ENTITY_EXPAND]
+            techniques = [
+                EnhancementTechnique.REWRITE,
+                EnhancementTechnique.ENTITY_EXPAND,
+            ]
 
         # Start with entity expansion (always fast, no LLM needed)
         enhanced_query = self._fallback_rewrite(query, entities)
@@ -451,7 +454,7 @@ class QueryEnhancer:
         return EnhancedQuery(
             original=query,
             enhanced=enhanced_query,
-            technique=techniques[0] if techniques else EnhancementTechnique.ENTITY_EXPAND,
+            technique=(techniques[0] if techniques else EnhancementTechnique.ENTITY_EXPAND),
             variants=list(set(variants)),
             hypothetical_doc=hypothetical,
             metadata=all_metadata,

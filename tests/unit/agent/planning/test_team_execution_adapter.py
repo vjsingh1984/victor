@@ -21,6 +21,9 @@ class RecordingCoordinator:
         return self
 
     def set_manager(self, manager):
+        return self.set_supervisor(manager)
+
+    def set_supervisor(self, manager):
         self.manager = manager
         if manager not in self.members:
             self.members.insert(0, manager)

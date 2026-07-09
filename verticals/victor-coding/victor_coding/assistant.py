@@ -224,14 +224,24 @@ You have access to 45+ tools. Use them efficiently to accomplish tasks."""
             "INITIAL": StageDefinition(
                 name="INITIAL",
                 description="Understanding the coding request",
-                tools={ToolNames.READ, ToolNames.LS, ToolNames.OVERVIEW, ToolNames.GREP},
+                tools={
+                    ToolNames.READ,
+                    ToolNames.LS,
+                    ToolNames.OVERVIEW,
+                    ToolNames.GREP,
+                },
                 keywords=["what", "how", "explain", "where", "show me"],
                 next_stages={"PLANNING", "READING"},
             ),
             "PLANNING": StageDefinition(
                 name="PLANNING",
                 description="Planning the implementation approach",
-                tools={ToolNames.GREP, ToolNames.PLAN, ToolNames.OVERVIEW, ToolNames.READ},
+                tools={
+                    ToolNames.GREP,
+                    ToolNames.PLAN,
+                    ToolNames.OVERVIEW,
+                    ToolNames.READ,
+                },
                 keywords=["plan", "approach", "design", "architecture", "strategy"],
                 next_stages={"READING", "EXECUTION"},
             ),
@@ -252,7 +262,12 @@ You have access to 45+ tools. Use them efficiently to accomplish tasks."""
             "ANALYSIS": StageDefinition(
                 name="ANALYSIS",
                 description="Analyzing code structure and dependencies",
-                tools={ToolNames.LSP, ToolNames.SYMBOL, ToolNames.REFS, ToolNames.OVERVIEW},
+                tools={
+                    ToolNames.LSP,
+                    ToolNames.SYMBOL,
+                    ToolNames.REFS,
+                    ToolNames.OVERVIEW,
+                },
                 keywords=["analyze", "review", "understand", "why", "how does"],
                 next_stages={"EXECUTION", "PLANNING"},
             ),

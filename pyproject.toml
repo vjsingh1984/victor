@@ -18,7 +18,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "victor-ai"
-version = "0.7.3"
+version = "0.7.4"
 description = "Open-source agentic AI framework with multi-provider support, workflow orchestration, and extensible tool system"
 readme = "README.md"
 license = {text = "Apache-2.0"}
@@ -177,7 +177,7 @@ dev = [
     "pandas>=2.0",  # For data analysis handler tests
 
     # Linting/Formatting
-    "ruff>=0.5",
+    "ruff==0.15.20",
     "mypy>=1.10",
     "black==26.3.1",
 
@@ -222,7 +222,7 @@ ci = [
     "scikit-learn>=1.4",  # FEP-0012 edge-classifier trainer round-trip tests
 
     # Linting/Formatting/Typing
-    "ruff>=0.5",
+    "ruff==0.15.20",
     "mypy>=1.10",
     "black==26.3.1",
     "radon>=6.0",

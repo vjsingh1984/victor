@@ -4,7 +4,11 @@ from victor.agent.prompt_section_registry import get_section_registry
 r = get_section_registry()
 base_map = {s.name: (s.default_text or "") for s in r.get_all()}
 con = sqlite3.connect("/Users/vijaysingh/.victor/victor.db")
-sections = ["GROUNDING_RULES_EXTENDED", "PARALLEL_READ_GUIDANCE", "LARGE_FILE_PAGINATION_GUIDANCE"]
+sections = [
+    "GROUNDING_RULES_EXTENDED",
+    "PARALLEL_READ_GUIDANCE",
+    "LARGE_FILE_PAGINATION_GUIDANCE",
+]
 for sec in sections:
     base = base_map.get(sec, "")
     row = con.execute(

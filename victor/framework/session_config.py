@@ -542,6 +542,17 @@ class SessionConfig:
                     self.tool_output.pruning_safe_only,
                 )
 
+        # Tool budget override (canonical consumer field is ``settings.tools``;
+        # ``/system`` and the calibration seam both read
+        # ``settings.tools.tool_call_budget``). Prior to this, ``tool_budget``
+        # was validated by __post_init__ but never applied here, so an explicit
+        # ``--tool-budget`` override was silently dropped. This also unblocks
+        # the FEP-0002 calibration precedence path (explicit overrides win).
+        if self.tool_budget is not None:
+            tools_group = getattr(settings, "tools", None)
+            if tools_group is not None and hasattr(tools_group, "tool_call_budget"):
+                object.__setattr__(tools_group, "tool_call_budget", self.tool_budget)
+
         observability_settings = getattr(settings, "observability", None)
         if self.observability_logging is not None:
             if observability_settings is not None and hasattr(

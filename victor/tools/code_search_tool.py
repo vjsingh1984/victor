@@ -62,7 +62,9 @@ def _normalize_search_filters(filters: Any) -> SearchFilters:
 def _build_codebase_embedding_config(settings: Any) -> Dict[str, Any]:
     """Build embedding config (STUB - deprecated)."""
     warnings.warn(
-        "_build_codebase_embedding_config is deprecated.", DeprecationWarning, stacklevel=2
+        "_build_codebase_embedding_config is deprecated.",
+        DeprecationWarning,
+        stacklevel=2,
     )
     return {}
 
@@ -70,14 +72,20 @@ def _build_codebase_embedding_config(settings: Any) -> Dict[str, Any]:
 def _decorate_literal_fallback_result(result: Any, query: str) -> Dict[str, Any]:
     """Decorate literal search result (STUB - deprecated)."""
     warnings.warn(
-        "_decorate_literal_fallback_result is deprecated.", DeprecationWarning, stacklevel=2
+        "_decorate_literal_fallback_result is deprecated.",
+        DeprecationWarning,
+        stacklevel=2,
     )
     return {"result": result, "query": query}
 
 
 def _get_index_build_failure_cache() -> Optional[Any]:
     """Get index build failure cache (STUB - deprecated)."""
-    warnings.warn("_get_index_build_failure_cache is deprecated.", DeprecationWarning, stacklevel=2)
+    warnings.warn(
+        "_get_index_build_failure_cache is deprecated.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     return None
 
 
@@ -153,7 +161,11 @@ async def _probe_index_integrity(index: Any) -> IntegrityProbeOutcome:
 
 def _calculate_index_build_timeout(file_count: int, base_timeout: float = 300.0) -> float:
     """Calculate index build timeout (STUB - deprecated)."""
-    warnings.warn("_calculate_index_build_timeout is deprecated.", DeprecationWarning, stacklevel=2)
+    warnings.warn(
+        "_calculate_index_build_timeout is deprecated.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     return base_timeout
 
 

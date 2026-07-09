@@ -33,6 +33,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import logging
 from pathlib import Path
 
 from victor.evaluation.calibration_corpus import default_corpus
@@ -42,6 +43,33 @@ from victor.evaluation.judge_calibration_harness import (
     Transcript,
     alternating_scripted_executor,
 )
+
+# Framework loggers that emit high-volume, per-turn / per-workspace lines during a
+# real-agent run — the source of the stdout flood.
+_FLOOD_LOGGERS = (
+    "victor.agent",
+    "victor.providers",
+    "victor.core.database",
+    "victor.evaluation.agent_adapter",
+    "victor.framework.agentic_loop",
+)
+
+
+def configure_logging(verbose: bool) -> None:
+    """Keep captured output bounded by silencing the framework's stdout flood.
+
+    A real-agent calibration drives the full orchestrator + provider, which log every
+    turn, every provider round-trip, and a per-workspace DB migration. Redirected to a file
+    (``> run.log 2>&1``) that stream is UNBOUNDED — a stuck run once wrote ~350 GB of
+    trajectories to a single log. Quiet by default (only ERROR from the flood sources,
+    WARNING elsewhere); ``--verbose`` restores INFO. When you genuinely want verbose but
+    bounded output, pipe through a rotating appender, e.g.
+    ``... 2>&1 | python3 ~/tools/caplog.py run.log``.
+    """
+    logging.getLogger("victor").setLevel(logging.INFO if verbose else logging.WARNING)
+    if not verbose:
+        for name in _FLOOD_LOGGERS:
+            logging.getLogger(name).setLevel(logging.ERROR)
 
 
 def credulous_judge(_prompt: str, transcript: Transcript, _workspace: Path) -> float:
@@ -99,7 +127,67 @@ def main() -> int:
         "on reasoning before the grade lines — if the integrity line reports "
         "ungradable>0, raise this (2048+).",
     )
+    parser.add_argument(
+        "--keep-workspaces",
+        action="store_true",
+        help="Keep the per-task workspace dirs for inspection (default: cleaned up). "
+        "Useful for diagnosing what a judge actually saw on a bad run.",
+    )
+    parser.add_argument(
+        "--hard",
+        action="store_true",
+        help="Use the three-outcome scripted executor (correct / flawed / fake) instead of "
+        "the two-outcome one. Flawed cases look solved but are subtly wrong — the "
+        "discrimination test for judges that saturate the easy corpus at α=1.0.",
+    )
+    parser.add_argument(
+        "--two-phase",
+        action="store_true",
+        help="Run all trajectories first, then all judging (one model swap instead of one "
+        "per task). Auto-enabled in --agent-profile mode; use this to force it for scripted "
+        "runs too.",
+    )
+    parser.add_argument(
+        "--no-two-phase",
+        action="store_true",
+        help="Disable the automatic two-phase scheduling in --agent-profile mode.",
+    )
+    parser.add_argument(
+        "--agent-profile",
+        default=None,
+        help="Generate REAL agent trajectories with this Victor profile instead of the "
+        "scripted executor — the production-distribution validation. Expensive (one full "
+        "agent run per task). A capable agent may solve everything (single-class gold); "
+        "watch the printed gold distribution.",
+    )
+    parser.add_argument(
+        "--agent-base-url",
+        default=None,
+        help="Base URL override for the agent's provider (e.g. WSL→Windows Ollama gateway).",
+    )
+    parser.add_argument(
+        "--agent-model",
+        default=None,
+        help="Model override for the agent profile (default: the profile's model).",
+    )
+    parser.add_argument(
+        "--agent-timeout",
+        type=int,
+        default=240,
+        help="Per-task timeout for a real agent run (seconds).",
+    )
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Restore INFO-level framework logging. OFF by default — the framework floods "
+        "stdout with per-turn/per-workspace lines that an unbounded redirect turns into "
+        "hundreds of GB.",
+    )
     args = parser.parse_args()
+
+    # Silence the framework flood BEFORE any adapter/agent runs (a stuck run wrote ~350 GB
+    # to a single redirected log before this existed).
+    configure_logging(args.verbose)
 
     judges = {
         "credulous": credulous_judge,
@@ -156,15 +244,63 @@ def main() -> int:
             ),
             stats=llm_stats,
         )
+    # Executor: real agent trajectories (--agent-profile) or the deterministic scripted
+    # stand-in. period=5 is coprime with the 6 task families, so scripted failures rotate
+    # across every family instead of always hitting the same ones.
+    if args.agent_profile:
+        from victor.evaluation.agent_adapter import VictorAgentAdapter
+        from victor.evaluation.calibration_agent_executor import make_agent_executor
+
+        adapter = VictorAgentAdapter.from_profile(
+            args.agent_profile,
+            base_url=args.agent_base_url,
+            model_override=args.agent_model,
+        )
+        executor = make_agent_executor(adapter, timeout_seconds=args.agent_timeout)
+        print(f"executor: real agent (profile={args.agent_profile})")
+    elif args.hard:
+        from victor.evaluation.judge_calibration_harness import hard_scripted_executor
+
+        executor = hard_scripted_executor()
+        print("executor: scripted (HARD — includes flawed 'looks-solved-but-wrong' cases)")
+    else:
+        executor = alternating_scripted_executor(period=5)
+        print("executor: scripted")
+
+    # ONE executor pass; every judge scores the identical trajectories (essential for the
+    # real-agent executor, which is expensive and non-deterministic per run). two-phase
+    # (execute all → judge all) avoids per-task model swapping on a single inference server;
+    # default it on in agent mode, where the executor and judge use different models.
+    two_phase = args.two_phase or (args.agent_profile is not None and not args.no_two_phase)
+    if two_phase:
+        print("scheduling: two-phase (all trajectories, then all judging) — one model swap")
+    harness = JudgeCalibrationHarness(default_corpus(variants=args.variants))
+    reports = harness.run_multi_judge(
+        executor, judges, keep_workspaces=args.keep_workspaces, two_phase=two_phase
+    )
+
+    # Gold distribution: agreement (α) is meaningless if every task shares one gold class.
+    # A strong real agent can solve everything (all gold=1); flag that the run measures only
+    # true-positive rate, not discrimination.
+    any_report = next(iter(reports.values()))
+    gold_counts: dict[float, int] = {}
+    for s in any_report.samples:
+        gold_counts[s.gold] = gold_counts.get(s.gold, 0) + 1
+    print(f"gold distribution: {gold_counts}")
+    degenerate_gold = len(gold_counts) < 2
+    if degenerate_gold:
+        print(
+            "⚠ gold is single-class — α cannot measure discrimination (no negative/positive "
+            "contrast). This run only shows whether the judge agrees on that one class."
+        )
+
     exit_code = 0
-    for name, judge in judges.items():
-        harness = JudgeCalibrationHarness(default_corpus(variants=args.variants))
-        # period=5 is coprime with the 6 task families, so scripted failures rotate
-        # across every family instead of always hitting the same ones.
-        report = harness.run(alternating_scripted_executor(period=5), judge)
+    for name, report in reports.items():
         report.save(args.out / f"{name}.json")
         decision = report.gate_decision
         verdict = "TRUSTED" if decision.trusted else "NOT TRUSTED"
+        if degenerate_gold and verdict == "TRUSTED":
+            verdict = "TRUSTED (single-class gold — not discriminative)"
         if name == "rubric-llm" and llm_stats is not None:
             print(f"[rubric-llm] grading-call integrity: {llm_stats.summary()}")
             if not llm_stats.clean:
@@ -195,4 +331,15 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    import os
+    import sys
+
+    _code = main()
+    # Force exit after the reports are written. The agent orchestrator leaves non-daemon
+    # threads and open event loops alive (SharedSignalPool, DB connections, the per-judge
+    # PersistentLoopRunner), which make a normal SystemExit hang WAITING for them — a stuck
+    # run once lingered 7.5 h holding its (redirected) log open and filled the disk. os._exit
+    # skips buffer flushing, so flush first.
+    sys.stdout.flush()
+    sys.stderr.flush()
+    os._exit(_code)

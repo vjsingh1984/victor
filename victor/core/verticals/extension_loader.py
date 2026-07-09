@@ -138,7 +138,7 @@ def _build_team_spec_provider_from_definition(definition: Any) -> Optional[Any]:
 
     from victor.framework.team_schema import TeamSpec
     from victor.framework.teams import TeamMemberSpec
-    from victor.teams.types import MemoryConfig, TeamFormation
+    from victor.teams.types import MemoryConfig, TeamAgentCategory, TeamFormation
 
     @dataclass(frozen=True)
     class _TeamSpecProvider:
@@ -163,6 +163,7 @@ def _build_team_spec_provider_from_definition(definition: Any) -> Optional[Any]:
                     name=member.name,
                     tool_budget=member.tool_budget,
                     allowed_tools=member.allowed_tools or None,
+                    agent_category=TeamAgentCategory(member.agent_category),
                     is_manager=member.is_manager,
                     priority=member.priority,
                     backstory=member.backstory,

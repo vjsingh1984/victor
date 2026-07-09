@@ -176,7 +176,11 @@ async def test_make_executor_forwards_provider_model(monkeypatch):
     async def _recording_spawn(self, role, task, **kwargs):
         recorded.update(kwargs)
         return types.SimpleNamespace(
-            success=True, summary="done", error=None, tool_calls_used=0, duration_seconds=0.1
+            success=True,
+            summary="done",
+            error=None,
+            tool_calls_used=0,
+            duration_seconds=0.1,
         )
 
     monkeypatch.setattr(SubAgentOrchestrator, "spawn", _recording_spawn)
@@ -397,7 +401,11 @@ async def test_make_executor_forwards_reasoning_effort(monkeypatch):
     async def _recording_spawn(self, role, task, **kwargs):
         recorded.update(kwargs)
         return types.SimpleNamespace(
-            success=True, summary="done", error=None, tool_calls_used=0, duration_seconds=0.1
+            success=True,
+            summary="done",
+            error=None,
+            tool_calls_used=0,
+            duration_seconds=0.1,
         )
 
     monkeypatch.setattr(SubAgentOrchestrator, "spawn", _recording_spawn)

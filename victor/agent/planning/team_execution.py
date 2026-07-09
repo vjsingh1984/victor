@@ -19,7 +19,13 @@ from victor.agent.planning.base import (
 from victor.agent.planning.readable_schema import ReadableTaskPlan, TaskComplexity
 from victor.agent.runtime.naming import build_display_name
 from victor.agent.subagents import SubAgentOrchestrator, SubAgentRole
-from victor.teams.types import TeamFormation, TeamMember, TeamMemberAdapter, TeamResult
+from victor.teams.types import (
+    TeamAgentCategory,
+    TeamFormation,
+    TeamMember,
+    TeamParticipant,
+    TeamResult,
+)
 from victor.tools.core_tool_aliases import canonicalize_core_tool_name
 
 
@@ -154,12 +160,12 @@ class PlanningTeamExecutionAdapter:
 
         coordinator = self._create_coordinator()
         members = self._build_members(execution_plan, team_id, current_step=step)
-        manager = members["plan_manager"]
+        supervisor = members["plan_manager"]
 
         coordinator.set_formation(TeamFormation.HIERARCHICAL)
-        coordinator.set_manager(manager)
+        coordinator.set_supervisor(supervisor)
         for member_id, member in members.items():
-            if member_id != manager.id:
+            if member_id != supervisor.id:
                 coordinator.add_member(member)
 
         result = await coordinator.execute_task(task, context)
@@ -193,11 +199,11 @@ class PlanningTeamExecutionAdapter:
         """Run a step as an explicit team formation."""
         coordinator = self._create_coordinator()
         members = self._build_members(execution_plan, team_id, current_step=step)
-        manager = members["plan_manager"]
+        supervisor = members["plan_manager"]
         coordinator.set_formation(TeamFormation.HIERARCHICAL)
-        coordinator.set_manager(manager)
+        coordinator.set_supervisor(supervisor)
         for member_id, member in members.items():
-            if member_id != manager.id:
+            if member_id != supervisor.id:
                 coordinator.add_member(member)
         task = self._task_description_for_step(step, plan_state)
         result = await coordinator.execute_task(task, context)
@@ -817,6 +823,7 @@ class PlanningTeamExecutionAdapter:
             goal=f"Coordinate and synthesize plan {execution_plan.id}",
             tool_budget=10,
             allowed_tools=manager_allowed_tools,
+            agent_category=TeamAgentCategory.SUPERVISOR,
             is_manager=True,
             can_delegate=True,
         )
@@ -933,7 +940,7 @@ class PlanningTeamExecutionAdapter:
         plan_id: str,
         *,
         plan_step_id: Optional[str] = None,
-    ) -> TeamMemberAdapter:
+    ) -> TeamParticipant:
         async def _execute(task: str, context: Dict[str, Any]) -> Dict[str, Any]:
             subagents = self._subagents()
             parent_session_id = context.get("parent_session_id") or context.get("root_session_id")
@@ -964,7 +971,7 @@ class PlanningTeamExecutionAdapter:
                 "duration_seconds": result.duration_seconds,
             }
 
-        return TeamMemberAdapter(member=member, executor=_execute)
+        return TeamParticipant(member=member, executor=_execute)
 
     @staticmethod
     def _subagent_output_for_parent(result: Any) -> str:

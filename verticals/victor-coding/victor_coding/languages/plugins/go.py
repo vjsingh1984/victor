@@ -106,7 +106,8 @@ class GoPlugin(BaseLanguagePlugin):
                 QueryPattern("function", "(function_declaration name: (identifier) @name)"),
                 QueryPattern("function", "(method_declaration name: (field_identifier) @name)"),
                 QueryPattern(
-                    "class", "(type_declaration (type_spec name: (type_identifier) @name))"
+                    "class",
+                    "(type_declaration (type_spec name: (type_identifier) @name))",
                 ),
             ],
             calls="""

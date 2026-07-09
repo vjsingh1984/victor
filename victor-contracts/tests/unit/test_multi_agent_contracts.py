@@ -7,11 +7,17 @@ from victor_contracts.multi_agent import (
     PersonaTemplate,
     PersonaTraits,
     TaskAssignmentStrategy,
+    TeamAgentCategory,
+    TeamFormation,
+    TeamMember,
     TeamSpec,
     TeamTemplate,
     TeamTopology,
     get_runtime_persona_provider,
 )
+from victor_contracts.team_schema import TeamFormation as SchemaTeamFormation
+from victor_contracts.team_schema import TeamMemberSpec as SchemaTeamMemberSpec
+from victor_contracts.multi_agent import TeamMemberSpec
 
 
 def test_persona_template_creates_overridden_persona() -> None:
@@ -53,6 +59,36 @@ def test_team_spec_reports_missing_slots() -> None:
     )
 
     assert spec.validate_slots() == ["Role 'reviewer' requires 2 members, got 0"]
+
+
+def test_multi_agent_reuses_canonical_team_schema_types() -> None:
+    assert TeamFormation is SchemaTeamFormation
+    assert TeamMemberSpec is SchemaTeamMemberSpec
+
+
+def test_persona_team_maps_topology_and_leader_to_canonical_semantics() -> None:
+    persona = PersonaTraits(
+        name="Lead",
+        role="planner",
+        description="Coordinates work",
+    )
+    member = TeamMember(
+        persona=persona,
+        role_in_team="planner",
+        is_leader=True,
+    )
+    spec = TeamSpec(
+        template=TeamTemplate(
+            name="Supervised",
+            description="Supervised team",
+            topology=TeamTopology.HUB_SPOKE,
+        ),
+        members=[member],
+    )
+
+    assert spec.formation is TeamFormation.HIERARCHICAL
+    assert spec.supervisor is member
+    assert member.agent_category is TeamAgentCategory.SUPERVISOR
 
 
 def test_multi_agent_exposes_runtime_persona_provider_adapter() -> None:

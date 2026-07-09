@@ -167,7 +167,10 @@ class ArchitectureAnalyzer:
     def find_config_files(self) -> None:
         """Find important configuration files."""
         config_patterns = [
-            ("pyproject.toml", "Project configuration, dependencies, and build settings"),
+            (
+                "pyproject.toml",
+                "Project configuration, dependencies, and build settings",
+            ),
             ("setup.py", "Legacy Python package setup"),
             ("setup.cfg", "Package configuration"),
             (".env.example", "Environment variable template"),

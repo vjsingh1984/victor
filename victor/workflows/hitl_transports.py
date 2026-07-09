@@ -898,11 +898,19 @@ class TeamsTransport(BaseTransport):
         actions: List[Dict[str, Any]] = []
         if urls.get("approve_url"):
             actions.append(
-                {"type": "Action.OpenUrl", "title": "✓ Approve", "url": urls["approve_url"]}
+                {
+                    "type": "Action.OpenUrl",
+                    "title": "✓ Approve",
+                    "url": urls["approve_url"],
+                }
             )
         if urls.get("reject_url"):
             actions.append(
-                {"type": "Action.OpenUrl", "title": "✗ Reject", "url": urls["reject_url"]}
+                {
+                    "type": "Action.OpenUrl",
+                    "title": "✗ Reject",
+                    "url": urls["reject_url"],
+                }
             )
 
         return {
@@ -1538,14 +1546,20 @@ class JiraTransport(BaseTransport):
                 data = await resp.json()
         status_name = (data.get("fields", {}).get("status", {}) or {}).get("name", "")
         lowered = status_name.lower()
-        if cfg.approval_transition.lower() in lowered or lowered in ("approved", "done"):
+        if cfg.approval_transition.lower() in lowered or lowered in (
+            "approved",
+            "done",
+        ):
             return HITLResponse(
                 request_id=request_id,
                 status=HITLStatus.APPROVED,
                 approved=True,
                 reason=f"Jira issue {status_name}",
             )
-        if cfg.rejection_transition.lower() in lowered or lowered in ("rejected", "won't do"):
+        if cfg.rejection_transition.lower() in lowered or lowered in (
+            "rejected",
+            "won't do",
+        ):
             return HITLResponse(
                 request_id=request_id,
                 status=HITLStatus.REJECTED,

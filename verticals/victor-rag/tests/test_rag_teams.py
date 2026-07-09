@@ -14,7 +14,6 @@
 
 """Tests for RAG teams configuration."""
 
-
 from victor.framework.teams import TeamFormation, TeamMemberSpec
 
 
@@ -51,7 +50,8 @@ class TestRAGTeamSpecProvider:
         from victor_rag.teams import RAG_TEAM_SPECS
 
         synthesis_key = next(
-            (k for k in RAG_TEAM_SPECS if "synthesis" in k.lower() or "answer" in k.lower()), None
+            (k for k in RAG_TEAM_SPECS if "synthesis" in k.lower() or "answer" in k.lower()),
+            None,
         )
         assert synthesis_key is not None, "Should have a synthesis team"
 

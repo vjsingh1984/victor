@@ -3605,7 +3605,10 @@ async def code_search(
                 }
         elif mode == "graph":
             # Graph-based multi-hop search using Graph RAG pipeline
-            from victor_contracts.feature_flag_runtime import get_feature_flag_manager, FeatureFlag
+            from victor_contracts.feature_flag_runtime import (
+                get_feature_flag_manager,
+                FeatureFlag,
+            )
 
             flag_manager = get_feature_flag_manager()
             graph_enabled = flag_manager.is_enabled(

@@ -40,7 +40,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from victor.agent.subagents import SubAgentRole
 
 # Import canonical types from victor.teams.types
-from victor.teams.types import TeamConfig, TeamFormation, TeamMember
+from victor.teams.types import TeamAgentCategory, TeamConfig, TeamFormation, TeamMember
 from victor.agent.teams.metrics import (
     TaskCategory,
     TeamMetrics,
@@ -120,6 +120,11 @@ class TeamRecommendation:
                         name=f"{role_name.title()} {i + 1}",
                         goal=role_goal,
                         tool_budget=budget_per_member,
+                        agent_category=(
+                            TeamAgentCategory.SUPERVISOR
+                            if self.formation == TeamFormation.HIERARCHICAL and member_idx == 1
+                            else TeamAgentCategory.SPECIALIST
+                        ),
                         is_manager=(
                             self.formation == TeamFormation.HIERARCHICAL and member_idx == 1
                         ),

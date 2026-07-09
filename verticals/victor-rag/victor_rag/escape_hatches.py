@@ -327,8 +327,7 @@ def classify_retrieval_gap(ctx: Dict[str, Any]) -> str:
         return "query_ambiguity"
 
     if any(
-        phrase in issue_text
-        for phrase in ("conflict", "contradict", "inconsistent", "disagree")
+        phrase in issue_text for phrase in ("conflict", "contradict", "inconsistent", "disagree")
     ):
         return "contradictory_evidence"
 
@@ -591,7 +590,9 @@ def score_retrieval_utility(ctx: Dict[str, Any]) -> Dict[str, Any]:
     source_diversity = len(unique_sources)
     average_relevance = total_relevance / candidate_count if candidate_count else 0.0
     average_rank_score = (
-        sum(score for score, _, _, _ in rescored_results) / candidate_count if candidate_count else 0.0
+        sum(score for score, _, _, _ in rescored_results) / candidate_count
+        if candidate_count
+        else 0.0
     )
 
     retrieval_utility = {
@@ -642,7 +643,7 @@ def aggregate_ingestion_stats(ctx: Dict[str, Any]) -> Dict[str, Any]:
         "total_documents": total_docs,
         "total_chunks": total_chunks,
         "total_errors": total_errors,
-        "success_rate": (total_docs - total_errors) / total_docs if total_docs > 0 else 0,
+        "success_rate": ((total_docs - total_errors) / total_docs if total_docs > 0 else 0),
         "by_type": {
             "pdf": pdf_stats.get("documents", 0),
             "docx": docx_stats.get("documents", 0),

@@ -31,7 +31,10 @@ from typing import Optional
 import httpx
 
 from victor.workflows.isolation import IsolationConfig, ResourceLimits
-from victor.workflows.sandbox_executor import SANDBOX_CONTAINER_LABEL, build_docker_run_flags
+from victor.workflows.sandbox_executor import (
+    SANDBOX_CONTAINER_LABEL,
+    build_docker_run_flags,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -414,7 +417,11 @@ class EvalContainer:
             cmd += ["-e", f"{key}={value}"]
         cmd += [self.name, "bash", "-lc", shell_cmd]
         rc, out, err = await self._run(cmd, timeout=timeout)
-        return rc, out.decode("utf-8", errors="replace"), err.decode("utf-8", errors="replace")
+        return (
+            rc,
+            out.decode("utf-8", errors="replace"),
+            err.decode("utf-8", errors="replace"),
+        )
 
     async def stop(self) -> None:
         """Force-remove the container. Never raises (cleanup is best-effort)."""

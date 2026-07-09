@@ -348,7 +348,10 @@ SCENARIOS: List[Scenario] = [
         id="S2",
         label="single tool then answer",
         message="How many lines in app.py?",
-        turns=[_read_turn("read", path="app.py"), TurnScript(content="app.py has 10 lines.")],
+        turns=[
+            _read_turn("read", path="app.py"),
+            TurnScript(content="app.py has 10 lines."),
+        ],
         tools=["read"],
         expect_content_contains="10 lines",
         expect_tools=["read"],
@@ -410,7 +413,10 @@ SCENARIOS: List[Scenario] = [
         id="W2",
         label="write: create new file",
         message="Create a README.",
-        turns=[_read_turn("write", path="README.md"), TurnScript(content="Created README.md.")],
+        turns=[
+            _read_turn("write", path="README.md"),
+            TurnScript(content="Created README.md."),
+        ],
         tools=["write"],
         expect_content_contains="created",
         expect_tools=["write"],

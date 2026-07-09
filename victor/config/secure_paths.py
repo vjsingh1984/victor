@@ -39,6 +39,7 @@ import logging
 import os
 import platform
 import pwd
+import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional, Tuple
@@ -52,35 +53,160 @@ SECURITY_EVENT_SYMLINK_DETECTED = "SYMLINK_IN_CRITICAL_PATH"
 SECURITY_EVENT_SYMLINK_ESCAPE = "SYMLINK_ESCAPE_ATTEMPT"
 SECURITY_EVENT_INSECURE_PERMISSIONS = "INSECURE_FILE_PERMISSIONS"
 
+# Environment sentinels indicating the process is running under pytest. Mirrors
+# the telemetry-redirect logic in ``victor/core/bootstrap.py`` so test sessions
+# never pollute the project audit database with benign events.
+_TEST_MODE_SENTINELS = ("TEST_MODE", "PYTEST_XDIST_WORKER", "PYTEST_CURRENT_TEST")
+
+# Benign HOME values legitimately set by the test suite (temp dirs created via
+# ``tmp_path``/``mkdtemp``). These are *not* attacks and account for >99% of the
+# audit noise observed in audit/ (6,518 of 6,544 HOME_MANIPULATION events).
+_BENIGN_TEST_HOME_MARKERS = ("victor_test_home", "fake_home")
+
+
+def is_test_mode() -> bool:
+    """Return True when the process is running under the pytest test harness.
+
+    Detection mirrors ``victor.core.bootstrap._register_usage_logger``: any of
+    the standard pytest environment sentinels being set counts as test mode.
+    """
+    return any(os.getenv(v) for v in _TEST_MODE_SENTINELS)
+
+
+def _real_temp_dir() -> Path:
+    """Return the system temp directory (resolved for macOS /private/var)."""
+    return Path(tempfile.gettempdir()).resolve()
+
+
+def _recognized_temp_prefixes() -> set[str]:
+    """Return the set of recognized OS temp-root prefixes (string forms).
+
+    Covers this machine's ``tempfile.gettempdir()`` plus the *convention*
+    prefixes used across Linux/macOS so a temp HOME created on any machine or
+    by any user is recognized:
+    - Linux: ``/tmp``, ``/var/tmp``
+    - macOS: ``/var/folders/.../T`` (and resolved ``/private/var/folders/.../T``)
+    - This machine's own temp dir (resolved + raw)
+    - Windows: ``$TEMP`` / ``%LOCALAPPDATA%\\Temp`` (returned by gettempdir)
+    """
+    prefixes: set[str] = set()
+
+    # Convention roots
+    for convention in ("/tmp", "/var/tmp", "/private/tmp"):
+        prefixes.add(convention)
+    # macOS per-user temp convention: /var/folders/<hash>/<hash>/T and its
+    # resolved form /private/var/folders/<hash>/<hash>/T
+    prefixes.add("/var/folders")
+    prefixes.add("/private/var/folders")
+
+    # This machine's actual temp dir(s) — both raw and resolved
+    try:
+        raw = str(Path(tempfile.gettempdir()))
+        prefixes.add(raw)
+        resolved = str(Path(tempfile.gettempdir()).resolve())
+        if resolved != raw:
+            prefixes.add(resolved)
+    except OSError:
+        pass
+
+    return prefixes
+
+
+def is_benign_test_home_path(path: Path) -> bool:
+    """Classify a HOME value as a benign test/temp directory (not an attack).
+
+    A path is benign when it lives under the system temp directory AND either
+    carries a known test-suite marker (e.g. ``victor_test_home``) or the process
+    is explicitly in test mode. Real manipulation (HOME pointed at an
+    attacker-controlled, non-temp location) never matches.
+
+    Args:
+        path: Candidate HOME path.
+
+    Returns:
+        True if the path is a legitimate test/temp HOME value.
+    """
+    try:
+        resolved = Path(path).resolve()
+    except OSError:
+        return False
+
+    # Recognize any standard OS temp-root convention, not just this machine's
+    # exact ``tempfile.gettempdir()``. Test suites legitimately create homes under
+    # ``/tmp`` (Linux), ``/var/folders/<hash>/T`` (macOS, any user/machine), or
+    # their resolved ``/private/...`` forms. Matching these broadly is safe
+    # because the benign classification ALSO requires a test marker or test mode.
+    temp_prefixes = _recognized_temp_prefixes()
+
+    try:
+        matched = any(
+            str(resolved) == p or str(resolved).startswith(p + os.sep) for p in temp_prefixes
+        )
+        if not matched:
+            return False  # Not under any recognized temp dir -> cannot be benign
+    except (ValueError, OSError):
+        return False
+
+    text = str(resolved).lower()
+    if any(marker in text for marker in _BENIGN_TEST_HOME_MARKERS):
+        return True
+    return is_test_mode()
+
+
+def _get_audit_manager():
+    """Resolve the AuditManager singleton, or None when unavailable.
+
+    Wrapped so callers can be patched in tests and remain robust to the audit
+    module being absent (e.g. optional dependency not installed).
+    """
+    try:
+        from victor.security.audit import AuditManager
+
+        return AuditManager.get_instance()
+    except ImportError:
+        return None
+    except Exception as e:  # pragma: no cover - defensive singleton init failure
+        logger.debug(f"Could not resolve audit manager: {e}")
+        return None
+
 
 def _log_security_event(event_type: str, details: dict) -> None:
     """Log a security event for audit purposes.
 
-    This function logs security-relevant events at WARNING level
-    and attempts to write to the audit system if available.
+    Security detections are surfaced at WARNING severity (never INFO): a
+    detected manipulation attempt is a notable security signal regardless of
+    whether it was benign.
 
     Args:
         event_type: Type of security event
         details: Event details dictionary
     """
+    from victor.security.audit.protocol import Severity
+
     # Always log to standard logger at WARNING level
     logger.warning(f"SECURITY: {event_type} - {details}")
 
     # Try to log to audit system if available
+    audit = _get_audit_manager()
+    if audit is None:
+        return
     try:
-        from victor.security.audit import AuditManager, AuditEventType
-
-        audit = AuditManager.get_instance()
         audit.log_event(
-            event_type=AuditEventType.SECURITY_EVENT,
+            event_type=_audit_security_event_type(),
             action=event_type,
             details=details,
+            severity=Severity.WARNING,
         )
-    except ImportError:
-        # Audit module not available, standard logging is sufficient
-        pass
     except Exception as e:
         logger.debug(f"Could not log to audit system: {e}")
+
+
+# Resolved lazily to avoid importing the audit package at module import time
+# (the SDK-contracts boundary keeps these modules independently installable).
+def _audit_security_event_type():
+    from victor.security.audit import AuditEventType
+
+    return AuditEventType.SECURITY_EVENT
 
 
 def get_real_home_from_passwd() -> Optional[Path]:
@@ -133,6 +259,13 @@ def get_secure_home() -> Path:
         passwd_resolved = passwd_home.resolve()
 
         if env_resolved != passwd_resolved:
+            # NOTE: We intentionally do NOT suppress benign test/temp HOME values
+            # here. The HOME-manipulation detector is a *security* control and
+            # must fire for any env/passwd mismatch (legacy contract, enforced by
+            # test_secure_paths.py::test_detects_home_manipulation). The audit
+            # *noise* problem is solved at the logging layer instead:
+            # FileAuditLogger redirects to <tmp>/victor_test_audit under test
+            # mode, so benign detections never pollute the project database.
             _log_security_event(
                 SECURITY_EVENT_HOME_MANIPULATION,
                 {

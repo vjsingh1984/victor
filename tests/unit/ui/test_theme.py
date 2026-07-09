@@ -47,7 +47,9 @@ class TestTerminalCapabilityDetection:
         }
 
     @patch.dict(
-        "os.environ", {"TERM": "xterm-256color", "COLORTERM": "", "TERM_PROGRAM": ""}, clear=False
+        "os.environ",
+        {"TERM": "xterm-256color", "COLORTERM": "", "TERM_PROGRAM": ""},
+        clear=False,
     )
     def test_detect_256color_terminal(self):
         """Should detect 256-color terminal."""
@@ -55,7 +57,11 @@ class TestTerminalCapabilityDetection:
         # xterm-256color should be detected as standard
         assert result in {TerminalCapability.STANDARD, TerminalCapability.TRUECOLOR}
 
-    @patch.dict("os.environ", {"TERM": "xterm", "TERM_PROGRAM": "", "COLORTERM": ""}, clear=False)
+    @patch.dict(
+        "os.environ",
+        {"TERM": "xterm", "TERM_PROGRAM": "", "COLORTERM": ""},
+        clear=False,
+    )
     def test_detect_basic_terminal(self):
         """Should detect basic terminal."""
         result = TerminalCapability.detect()

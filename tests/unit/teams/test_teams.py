@@ -26,7 +26,7 @@ from victor.agent.teams import (
     TeamMessageBus,
     TeamSharedMemory,
 )
-from victor.teams.types import MemberStatus
+from victor.teams.types import MemberStatus, TeamAgentCategory
 
 # Use canonical types from victor.teams.types
 from victor.teams.types import TeamFormation, MemberResult, TeamResult
@@ -114,7 +114,24 @@ class TestTeamMember:
         assert member.allowed_tools == ["read", "ls"]
         assert member.can_delegate is True
         assert member.is_manager is True
+        assert member.is_supervisor is True
+        assert member.agent_category == TeamAgentCategory.SUPERVISOR
         assert member.priority == 1
+
+    def test_supervisor_category_sets_manager_delegation_contract(self):
+        """Supervisor category should imply legacy manager/delegation fields."""
+        member = TeamMember(
+            id="lead",
+            role=SubAgentRole.PLANNER,
+            name="Lead",
+            goal="Coordinate team",
+            agent_category=TeamAgentCategory.SUPERVISOR,
+        )
+
+        assert member.is_supervisor is True
+        assert member.is_manager is True
+        assert member.can_delegate is True
+        assert member.max_delegation_depth == 1
 
 
 class TestTeamConfig:
@@ -197,15 +214,15 @@ class TestTeamConfig:
         assert config.get_member("e1").name == "E1"
         assert config.get_member("unknown") is None
 
-    def test_get_manager(self):
-        """get_manager returns the manager."""
+    def test_get_supervisor(self):
+        """get_supervisor returns the coordinating supervisor."""
         members = [
             TeamMember(
                 id="mgr",
                 role=SubAgentRole.PLANNER,
                 name="Mgr",
                 goal="Manage",
-                is_manager=True,
+                agent_category=TeamAgentCategory.SUPERVISOR,
             ),
             TeamMember(id="w1", role=SubAgentRole.EXECUTOR, name="W1", goal="Work"),
         ]
@@ -216,19 +233,20 @@ class TestTeamConfig:
             formation=TeamFormation.HIERARCHICAL,
         )
 
-        manager = config.get_manager()
-        assert manager is not None
-        assert manager.id == "mgr"
+        supervisor = config.get_supervisor()
+        assert supervisor is not None
+        assert supervisor.id == "mgr"
+        assert config.get_manager() is supervisor
 
-    def test_get_workers(self):
-        """get_workers returns non-manager members."""
+    def test_get_specialists(self):
+        """get_specialists returns non-supervisor members."""
         members = [
             TeamMember(
                 id="mgr",
                 role=SubAgentRole.PLANNER,
                 name="Mgr",
                 goal="Manage",
-                is_manager=True,
+                agent_category=TeamAgentCategory.SUPERVISOR,
             ),
             TeamMember(id="w1", role=SubAgentRole.EXECUTOR, name="W1", goal="Work1"),
             TeamMember(id="w2", role=SubAgentRole.EXECUTOR, name="W2", goal="Work2"),
@@ -240,9 +258,10 @@ class TestTeamConfig:
             formation=TeamFormation.HIERARCHICAL,
         )
 
-        workers = config.get_workers()
-        assert len(workers) == 2
-        assert all(not w.is_manager for w in workers)
+        specialists = config.get_specialists()
+        assert len(specialists) == 2
+        assert all(not w.is_supervisor for w in specialists)
+        assert config.get_workers() == specialists
 
     def test_to_dict(self):
         """to_dict serializes correctly."""
