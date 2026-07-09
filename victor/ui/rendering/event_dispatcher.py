@@ -141,7 +141,9 @@ class EventDispatcher:
         kwargs = self._build_tool_result_kwargs(result_data, event_tool_name)
         self.renderer.on_tool_result(**kwargs)
 
-    def _build_tool_result_kwargs(self, result_data: dict, event_tool_name: Optional[str]) -> dict:
+    def _build_tool_result_kwargs(
+        self, result_data: dict, event_tool_name: Optional[str]
+    ) -> dict:
         """Build keyword arguments for on_tool_result from result data."""
         kwargs = {
             "name": str(result_data.get("name", event_tool_name or "unknown")),
@@ -161,7 +163,9 @@ class EventDispatcher:
     def _handle_error(self, event: Any, event_content: str) -> None:
         """Handle an ERROR event."""
         error_text = (
-            getattr(event, "error", None) or event_content or "The provider returned an error."
+            getattr(event, "error", None)
+            or event_content
+            or "The provider returned an error."
         )
         self.renderer.on_status(f"\u274c {error_text}")
         self.error_surfaced = True
@@ -210,7 +214,9 @@ class EventDispatcher:
             diff=event_metadata["edit_preview"],
         )
 
-    def _handle_reasoning_content(self, event_metadata: dict, event_content: str) -> None:
+    def _handle_reasoning_content(
+        self, event_metadata: dict, event_content: str
+    ) -> None:
         """Handle reasoning content from DeepSeek API."""
         reasoning = event_metadata["reasoning_content"]
         if reasoning and not self.suppress_thinking:
