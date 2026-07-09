@@ -179,7 +179,10 @@ class TestBuildCacheAuditRecord:
 
     def test_no_cache_provider(self):
         provider = _make_mock_provider(
-            name="ollama", supports_caching=False, has_boundary=False, has_serializer=None
+            name="ollama",
+            supports_caching=False,
+            has_boundary=False,
+            has_serializer=None,
         )
         record = build_cache_audit_record(provider)
         assert record.cache_supports is False
@@ -235,7 +238,9 @@ class TestGenerateCacheAudit:
     def test_generate_from_explicit_list(self):
         providers = [
             _make_mock_provider(
-                name="openai", supports_caching=True, has_serializer="build_openai_messages"
+                name="openai",
+                supports_caching=True,
+                has_serializer="build_openai_messages",
             ),
             _make_mock_provider(
                 name="anthropic",
@@ -263,13 +268,19 @@ class TestGenerateCacheAudit:
         """Auto-prefix family vs explicit-markers family are distinguishable."""
         providers = [
             _make_mock_provider(
-                name="openai", supports_caching=True, has_serializer="build_openai_messages"
+                name="openai",
+                supports_caching=True,
+                has_serializer="build_openai_messages",
             ),
             _make_mock_provider(
-                name="xai", supports_caching=True, has_serializer="build_openai_messages"
+                name="xai",
+                supports_caching=True,
+                has_serializer="build_openai_messages",
             ),
             _make_mock_provider(
-                name="deepseek", supports_caching=True, has_serializer="build_openai_messages"
+                name="deepseek",
+                supports_caching=True,
+                has_serializer="build_openai_messages",
             ),
             _make_mock_provider(
                 name="anthropic",

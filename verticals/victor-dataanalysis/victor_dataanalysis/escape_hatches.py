@@ -241,7 +241,7 @@ def aggregate_model_results(ctx: Dict[str, Any]) -> Dict[str, Any]:
         "all_models": results,
         "best_model": best_model,
         "best_model_name": best_model["name"] if best_model else None,
-        "best_model_score": best_model["metrics"].get("accuracy", 0) if best_model else 0,
+        "best_model_score": (best_model["metrics"].get("accuracy", 0) if best_model else 0),
     }
 
 

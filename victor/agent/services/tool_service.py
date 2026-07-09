@@ -1958,7 +1958,16 @@ class ToolService:
     # gpt-oss via Ollama) leak as a tool-call name when the response format is not
     # parsed correctly. These are never real tool names.
     _CHANNEL_ARTIFACT_NAMES = frozenset(
-        {"assistant", "user", "system", "developer", "tool", "analysis", "commentary", "final"}
+        {
+            "assistant",
+            "user",
+            "system",
+            "developer",
+            "tool",
+            "analysis",
+            "commentary",
+            "final",
+        }
     )
 
     def _all_tool_calls_are_channel_artifacts(

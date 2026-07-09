@@ -11,7 +11,10 @@ import pytest
 pytest.importorskip("tree_sitter_language_pack")
 
 from victor_codegraph import CodeSymbolType, parse  # noqa: E402
-from victor_codegraph.treesitter_parser import GrammarUnavailable, parse_treesitter  # noqa: E402
+from victor_codegraph.treesitter_parser import (
+    GrammarUnavailable,
+    parse_treesitter,
+)  # noqa: E402
 
 JS = """\
 import { x } from "./x";

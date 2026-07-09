@@ -98,7 +98,11 @@ def test_update_then_load_assembles_vectors_in_label_order(monkeypatch):
     from victor.core.database import get_project_database
 
     n = ld.update_delta_from_session(
-        "s1", reward=1.0, decisions=_decisions(), predict_fn=_pfn, head_labels=HEAD_LABELS
+        "s1",
+        reward=1.0,
+        decisions=_decisions(),
+        predict_fn=_pfn,
+        head_labels=HEAD_LABELS,
     )
     assert n > 0
 
@@ -166,7 +170,12 @@ def test_top_k_trims_per_label(monkeypatch):
     # Run an update that touches none of these hashes but triggers a trim.
     monkeypatch.setattr(ld, "extract_features", lambda txt: {999: 1.0})
     ld.update_delta_from_session(
-        "s", reward=1.0, decisions=_decisions(), predict_fn=_pfn, head_labels=HEAD_LABELS, top_k=3
+        "s",
+        reward=1.0,
+        decisions=_decisions(),
+        predict_fn=_pfn,
+        head_labels=HEAD_LABELS,
+        top_k=3,
     )
     rows = db.execute(
         f"SELECT feature_hash FROM {Tables.LOCAL_CLASSIFIER_DELTA} "
@@ -191,7 +200,12 @@ def test_l2_decay_shrinks_weights(monkeypatch):
     )
     monkeypatch.setattr(ld, "extract_features", lambda txt: {2: 1.0})
     ld.update_delta_from_session(
-        "s", reward=1.0, decisions=_decisions(), predict_fn=_pfn, head_labels=HEAD_LABELS, decay=0.5
+        "s",
+        reward=1.0,
+        decisions=_decisions(),
+        predict_fn=_pfn,
+        head_labels=HEAD_LABELS,
+        decay=0.5,
     )
     # The pre-existing hash-1/pass row decayed by 0.5 (no gradient touched it).
     w = db.execute(
@@ -218,7 +232,11 @@ def test_update_is_best_effort_on_db_error(monkeypatch):
 
     monkeypatch.setattr(dbmod, "get_project_database", _boom)
     n = ld.update_delta_from_session(
-        "s", reward=1.0, decisions=_decisions(), predict_fn=_pfn, head_labels=HEAD_LABELS
+        "s",
+        reward=1.0,
+        decisions=_decisions(),
+        predict_fn=_pfn,
+        head_labels=HEAD_LABELS,
     )
     assert n == 0  # swallowed, not raised
 
@@ -244,7 +262,11 @@ def test_update_disabled_returns_zero(monkeypatch):
 
 def test_update_empty_session_returns_zero():
     n = ld.update_delta_from_session(
-        "empty-session", reward=1.0, decisions=[], predict_fn=_pfn, head_labels=HEAD_LABELS
+        "empty-session",
+        reward=1.0,
+        decisions=[],
+        predict_fn=_pfn,
+        head_labels=HEAD_LABELS,
     )
     assert n == 0
 

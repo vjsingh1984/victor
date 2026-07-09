@@ -131,7 +131,9 @@ class BackendFactory:
         if prefer_native and cls.has_native_indexer():
             try:
                 indexer = PerformanceBackendRegistry.create(
-                    FastIndexerProtocol, config, backend_config=BackendConfig(use_native=True)
+                    FastIndexerProtocol,
+                    config,
+                    backend_config=BackendConfig(use_native=True),
                 )
                 if indexer is not None:
                     logger.info("Using native tree-sitter indexer")
@@ -168,7 +170,9 @@ class BackendFactory:
         if prefer_native and cls.has_native_chunker():
             try:
                 chunker = PerformanceBackendRegistry.create(
-                    FastChunkerProtocol, config, backend_config=BackendConfig(use_native=True)
+                    FastChunkerProtocol,
+                    config,
+                    backend_config=BackendConfig(use_native=True),
                 )
                 if chunker is not None:
                     logger.info("Using native chunker")

@@ -85,8 +85,18 @@ class _RoutingCursor:
 # ---------------------------------------------------------------------------
 
 TOOL_ROWS = [
-    {"tool_name": "read", "q_value": 0.918, "selection_count": 6189, "success_count": 5855},
-    {"tool_name": "shell", "q_value": 0.360, "selection_count": 271, "success_count": 120},
+    {
+        "tool_name": "read",
+        "q_value": 0.918,
+        "selection_count": 6189,
+        "success_count": 5855,
+    },
+    {
+        "tool_name": "shell",
+        "q_value": 0.360,
+        "selection_count": 271,
+        "success_count": 120,
+    },
 ]
 
 
@@ -106,7 +116,14 @@ class TestLoadToolSignals:
 
     def test_clamps_q_value_into_range(self):
         # Defends against out-of-range data (e.g. legacy/0.0 default rows).
-        rows = [{"tool_name": "x", "q_value": 1.5, "selection_count": 10, "success_count": 8}]
+        rows = [
+            {
+                "tool_name": "x",
+                "q_value": 1.5,
+                "selection_count": 10,
+                "success_count": 8,
+            }
+        ]
         db = FakeDB(rows, [])
         signals = BudgetSignalReader().load_tool_signals(db=db)  # type: ignore[arg-type]
         assert all(0.0 <= s.q_value <= 1.0 for s in signals)

@@ -1091,7 +1091,9 @@ def test_canonical_doc_pointers_pass_when_targets_resolve(tmp_path: Path) -> Non
     assert findings == []
 
 
-def test_canonical_doc_pointers_flag_missing_doc_and_broken_link(tmp_path: Path) -> None:
+def test_canonical_doc_pointers_flag_missing_doc_and_broken_link(
+    tmp_path: Path,
+) -> None:
     _write_canonical_pointer_docs(tmp_path)
     (tmp_path / "docs" / "roadmap.md").unlink()
     write_file(
@@ -1141,9 +1143,15 @@ def test_release_tag_routing_accepts_excluded_siblings(tmp_path: Path) -> None:
     )
     write_file(tmp_path, ".github/workflows/release-contracts.yml", _release_wf(["sdk-v*"]))
     write_file(
-        tmp_path, ".github/workflows/release-codegraph.yml", _release_wf(["victor-codegraph-v*"])
+        tmp_path,
+        ".github/workflows/release-codegraph.yml",
+        _release_wf(["victor-codegraph-v*"]),
     )
-    write_file(tmp_path, ".github/workflows/release-verticals.yml", _release_wf(["verticals-v*"]))
+    write_file(
+        tmp_path,
+        ".github/workflows/release-verticals.yml",
+        _release_wf(["verticals-v*"]),
+    )
 
     assert repo_hygiene_check.check_release_tag_routing(tmp_path) == []
 
@@ -1151,7 +1159,11 @@ def test_release_tag_routing_accepts_excluded_siblings(tmp_path: Path) -> None:
 def test_release_tag_routing_flags_unexcluded_sibling(tmp_path: Path) -> None:
     # release.yml forgets to exclude verticals-v* → verticals-v0.0.0 also fires release.yml.
     write_file(tmp_path, ".github/workflows/release.yml", _release_wf(["v*", "!sdk-v*"]))
-    write_file(tmp_path, ".github/workflows/release-verticals.yml", _release_wf(["verticals-v*"]))
+    write_file(
+        tmp_path,
+        ".github/workflows/release-verticals.yml",
+        _release_wf(["verticals-v*"]),
+    )
 
     findings = repo_hygiene_check.check_release_tag_routing(tmp_path)
     assert findings, "collision between release.yml (v*) and verticals-v* was not caught"

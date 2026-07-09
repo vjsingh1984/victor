@@ -260,10 +260,18 @@ class TestReviewRuleSet:
         """Create sample rules."""
         return [
             ReviewRule(
-                id="R1", name="Rule 1", description="", category=ReviewCategory.STYLE, enabled=True
+                id="R1",
+                name="Rule 1",
+                description="",
+                category=ReviewCategory.STYLE,
+                enabled=True,
             ),
             ReviewRule(
-                id="R2", name="Rule 2", description="", category=ReviewCategory.STYLE, enabled=False
+                id="R2",
+                name="Rule 2",
+                description="",
+                category=ReviewCategory.STYLE,
+                enabled=False,
             ),
             ReviewRule(
                 id="R3",

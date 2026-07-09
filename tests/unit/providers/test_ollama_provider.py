@@ -292,7 +292,11 @@ def test_reasoning_not_leaked_into_content_for_think_models(ollama_provider):
 def test_thinking_mirrored_to_content_for_nonreasoning_models(ollama_provider):
     """gemma-style models that answer via `thinking` still surface that as content."""
     chunk = ollama_provider._parse_stream_chunk(
-        {"model": "gemma3:4b", "message": {"content": "", "thinking": "the answer"}, "done": True}
+        {
+            "model": "gemma3:4b",
+            "message": {"content": "", "thinking": "the answer"},
+            "done": True,
+        }
     )
     assert chunk.content == "the answer"
 

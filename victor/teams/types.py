@@ -1074,7 +1074,7 @@ class TeamParticipant:
                 success=success,
                 output=output,
                 error=error,
-                duration_seconds=duration_override if duration_override is not None else duration,
+                duration_seconds=(duration_override if duration_override is not None else duration),
                 metadata=metadata,
                 tool_calls_used=tool_calls_used,
                 discoveries=discoveries,

@@ -129,7 +129,7 @@ class TeamStepExecutor:
                     agent_category=TeamAgentCategory(
                         member.get(
                             "agent_category",
-                            "supervisor" if member.get("is_manager", False) else "specialist",
+                            ("supervisor" if member.get("is_manager", False) else "specialist"),
                         )
                     ),
                     can_delegate=member.get("can_delegate", False),

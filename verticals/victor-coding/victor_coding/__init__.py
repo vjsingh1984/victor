@@ -74,7 +74,10 @@ _EXPORTS = {
     "CodingPlugin": ("victor_coding.plugin", "CodingPlugin"),
     "plugin": ("victor_coding.plugin", "plugin"),
     "CodingMiddleware": ("victor_coding.middleware", "CodingMiddleware"),
-    "CodeCorrectionMiddleware": ("victor_coding.middleware", "CodeCorrectionMiddleware"),
+    "CodeCorrectionMiddleware": (
+        "victor_coding.middleware",
+        "CodeCorrectionMiddleware",
+    ),
     "CodingSafetyExtension": ("victor_coding.safety", "CodingSafetyExtension"),
     "EnhancedCodingSafetyExtension": (
         "victor_coding.safety_enhanced",
@@ -87,10 +90,22 @@ _EXPORTS = {
     "CodingSafetyRules": ("victor_coding.safety_enhanced", "CodingSafetyRules"),
     "CodingContext": ("victor_coding.conversation_enhanced", "CodingContext"),
     "CodingPromptContributor": ("victor_coding.prompts", "CodingPromptContributor"),
-    "CodingModeConfigProvider": ("victor_coding.mode_config", "CodingModeConfigProvider"),
-    "CodingServiceProvider": ("victor_coding.service_provider", "CodingServiceProvider"),
-    "CodingCapabilityProvider": ("victor_coding.capabilities", "CodingCapabilityProvider"),
-    "get_coding_capabilities": ("victor_coding.capabilities", "get_coding_capabilities"),
+    "CodingModeConfigProvider": (
+        "victor_coding.mode_config",
+        "CodingModeConfigProvider",
+    ),
+    "CodingServiceProvider": (
+        "victor_coding.service_provider",
+        "CodingServiceProvider",
+    ),
+    "CodingCapabilityProvider": (
+        "victor_coding.capabilities",
+        "CodingCapabilityProvider",
+    ),
+    "get_coding_capabilities": (
+        "victor_coding.capabilities",
+        "get_coding_capabilities",
+    ),
     "create_coding_capability_loader": (
         "victor_coding.capabilities",
         "create_coding_capability_loader",

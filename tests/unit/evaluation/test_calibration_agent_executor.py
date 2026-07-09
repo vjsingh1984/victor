@@ -25,7 +25,10 @@ from victor.evaluation.calibration_agent_executor import (
     verifiable_to_benchmark_task,
 )
 from victor.evaluation.calibration_corpus import default_corpus
-from victor.evaluation.judge_calibration_harness import JudgeCalibrationHarness, Transcript
+from victor.evaluation.judge_calibration_harness import (
+    JudgeCalibrationHarness,
+    Transcript,
+)
 from victor.evaluation.protocol import BenchmarkType
 
 

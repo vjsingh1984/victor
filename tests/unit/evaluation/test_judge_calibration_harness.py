@@ -36,7 +36,13 @@ def test_corpus_task_ids_are_unique_and_families_covered() -> None:
     tasks = default_corpus(variants=3)
     ids = [t.task_id for t in tasks]
     assert len(ids) == len(set(ids)) == 18
-    assert {t.family for t in tasks} == {"file-create", "code-fix", "refactor", "docs", "qa"}
+    assert {t.family for t in tasks} == {
+        "file-create",
+        "code-fix",
+        "refactor",
+        "docs",
+        "qa",
+    }
 
 
 def test_corpus_rejects_zero_variants() -> None:
@@ -158,7 +164,9 @@ def test_multi_judge_scores_all_on_one_executor_pass(tmp_path: Path) -> None:
     assert not co.gate_decision.trusted
 
 
-def test_hard_executor_discriminates_verify_from_activity_judges(tmp_path: Path) -> None:
+def test_hard_executor_discriminates_verify_from_activity_judges(
+    tmp_path: Path,
+) -> None:
     """On the HARD corpus, a judge that only checks for tool activity is fooled by flawed
     cases (activity present, gold=0) while a gold-aware oracle stays perfect — restoring the
     discrimination the easy corpus lost when strong judges saturate at α=1.0."""
@@ -189,7 +197,9 @@ def test_run_delegates_to_multi_judge(tmp_path: Path) -> None:
     """The single-judge run() is a thin wrapper and stays behaviourally identical."""
     harness = JudgeCalibrationHarness(default_corpus(variants=2))
     report = harness.run(
-        alternating_scripted_executor(period=5), _evidence_judge, workspace_root=tmp_path
+        alternating_scripted_executor(period=5),
+        _evidence_judge,
+        workspace_root=tmp_path,
     )
     assert report.overall.krippendorff_alpha == pytest.approx(1.0)
     assert len(report.samples) == 12
@@ -202,7 +212,12 @@ def test_two_phase_matches_interleaved_and_reorders_calls(tmp_path: Path) -> Non
     scripted_i = alternating_scripted_executor(period=5)
     inter = JudgeCalibrationHarness(default_corpus(variants=2)).run_multi_judge(
         lambda t, w: (order_i.append(f"exec:{t.task_id}"), scripted_i(t, w))[1],
-        {"j": lambda _p, tr, _w: (order_i.append("judge"), 1.0 if tr.tool_steps() else 0.0)[1]},
+        {
+            "j": lambda _p, tr, _w: (
+                order_i.append("judge"),
+                1.0 if tr.tool_steps() else 0.0,
+            )[1]
+        },
         workspace_root=tmp_path / "a",
         two_phase=False,
     )
@@ -210,7 +225,12 @@ def test_two_phase_matches_interleaved_and_reorders_calls(tmp_path: Path) -> Non
     scripted_t = alternating_scripted_executor(period=5)
     two = JudgeCalibrationHarness(default_corpus(variants=2)).run_multi_judge(
         lambda t, w: (order_t.append(f"exec:{t.task_id}"), scripted_t(t, w))[1],
-        {"j": lambda _p, tr, _w: (order_t.append("judge"), 1.0 if tr.tool_steps() else 0.0)[1]},
+        {
+            "j": lambda _p, tr, _w: (
+                order_t.append("judge"),
+                1.0 if tr.tool_steps() else 0.0,
+            )[1]
+        },
         workspace_root=tmp_path / "b",
         two_phase=True,
     )
@@ -235,7 +255,13 @@ def test_report_shape_and_json_roundtrip(tmp_path: Path) -> None:
     report.save(out)
     data = json.loads(out.read_text())
     assert data["n"] == 12
-    assert set(data["per_family"]) == {"file-create", "code-fix", "refactor", "docs", "qa"}
+    assert set(data["per_family"]) == {
+        "file-create",
+        "code-fix",
+        "refactor",
+        "docs",
+        "qa",
+    }
     assert data["gate"]["trusted"] is True
     assert "completion verdicts only" in data["gate"]["scope"]
     assert all({"task_id", "family", "gold", "judged"} <= set(s) for s in data["samples"])
@@ -301,7 +327,11 @@ def test_caller_provided_workspace_is_not_deleted(tmp_path: Path) -> None:
     root = tmp_path / "mine"
     root.mkdir()
     harness = JudgeCalibrationHarness(default_corpus(variants=1))
-    harness.run(make_scripted_executor(lambda _t: True), lambda p, t, w: 1.0, workspace_root=root)
+    harness.run(
+        make_scripted_executor(lambda _t: True),
+        lambda p, t, w: 1.0,
+        workspace_root=root,
+    )
     assert root.is_dir(), "caller-owned workspace_root must survive the run"
     assert any(root.iterdir()), "caller-owned root should retain the per-task workspaces"
 
@@ -309,7 +339,11 @@ def test_caller_provided_workspace_is_not_deleted(tmp_path: Path) -> None:
 def test_keep_workspaces_retains_auto_created_dir(tmp_path: Path, monkeypatch) -> None:
     root = _isolated_tempdir(tmp_path, monkeypatch)
     harness = JudgeCalibrationHarness(default_corpus(variants=1))
-    harness.run(make_scripted_executor(lambda _t: True), lambda p, t, w: 1.0, keep_workspaces=True)
+    harness.run(
+        make_scripted_executor(lambda _t: True),
+        lambda p, t, w: 1.0,
+        keep_workspaces=True,
+    )
     kept = list(root.glob("judge_calibration_*"))
     assert len(kept) == 1, "keep_workspaces should retain the temp dir"
     assert any(kept[0].iterdir()), "kept workspace should contain the per-task dirs"

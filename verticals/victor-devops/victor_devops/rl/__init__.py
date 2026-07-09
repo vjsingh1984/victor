@@ -52,9 +52,24 @@ class DevOpsRLConfig(BaseRLConfig):
                 ToolNames.READ,
                 ToolNames.WRITE,
             ],
-            "monitoring": [ToolNames.SHELL, ToolNames.READ, ToolNames.WRITE, ToolNames.GREP],
-            "configuration": [ToolNames.READ, ToolNames.WRITE, ToolNames.EDIT, ToolNames.GREP],
-            "troubleshooting": [ToolNames.SHELL, ToolNames.READ, ToolNames.GREP, ToolNames.DOCKER],
+            "monitoring": [
+                ToolNames.SHELL,
+                ToolNames.READ,
+                ToolNames.WRITE,
+                ToolNames.GREP,
+            ],
+            "configuration": [
+                ToolNames.READ,
+                ToolNames.WRITE,
+                ToolNames.EDIT,
+                ToolNames.GREP,
+            ],
+            "troubleshooting": [
+                ToolNames.SHELL,
+                ToolNames.READ,
+                ToolNames.GREP,
+                ToolNames.DOCKER,
+            ],
         }
     )
 

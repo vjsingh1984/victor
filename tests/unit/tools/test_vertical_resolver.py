@@ -81,7 +81,9 @@ def test_absent_package_fallback_returns_none_without_raising(monkeypatch):
 def test_non_callable_entry_point_falls_through_to_import(monkeypatch):
     """An entry point that loads to a non-callable falls through to the fallback."""
     monkeypatch.setattr(
-        resolver, "_entry_point_callables", lambda: {"git": _fake_ep("git", "not-callable")}
+        resolver,
+        "_entry_point_callables",
+        lambda: {"git": _fake_ep("git", "not-callable")},
     )
 
     fn, src = resolve_vertical_callable(

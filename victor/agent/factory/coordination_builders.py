@@ -79,7 +79,9 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def build_policy_emitter(container: Any) -> Optional[Callable[[str, Dict[str, Any]], None]]:
+def build_policy_emitter(
+    container: Any,
+) -> Optional[Callable[[str, Dict[str, Any]], None]]:
     """Build a sync emitter forwarding policy DENY/ASK to the event bus.
 
     The PolicyEngine calls the emitter synchronously from within an async
@@ -561,7 +563,9 @@ class CoordinationBuildersMixin:
                 """Resolve a live session snapshot for policy evaluation."""
                 cost = 0.0
                 try:
-                    from victor.agent.conversation.controller import ConversationController
+                    from victor.agent.conversation.controller import (
+                        ConversationController,
+                    )
 
                     controller = self.container.get_optional(ConversationController)
                     if controller is not None:

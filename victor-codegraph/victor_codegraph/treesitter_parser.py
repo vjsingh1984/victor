@@ -134,7 +134,7 @@ def _walk_collect(node, src, file_path, language, scope, symbols, relations):
             stype = (
                 CodeSymbolType.STRUCT
                 if t.startswith("struct")
-                else CodeSymbolType.INTERFACE if "interface" in t else CodeSymbolType.CLASS
+                else (CodeSymbolType.INTERFACE if "interface" in t else CodeSymbolType.CLASS)
             )
             sym = _mk(child, src, file_path, language, name, stype, scope)
             symbols.append(sym)

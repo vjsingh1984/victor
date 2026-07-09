@@ -72,7 +72,12 @@ async def test_stream_turn_act_bridges_and_maps_turn_result():
     chunks = [
         chunk
         async for chunk in adapter.stream_turn_act(
-            query="q", state={}, perception=None, plan=None, turn_index=3, outcome=outcome
+            query="q",
+            state={},
+            perception=None,
+            plan=None,
+            turn_index=3,
+            outcome=outcome,
         )
     ]
 

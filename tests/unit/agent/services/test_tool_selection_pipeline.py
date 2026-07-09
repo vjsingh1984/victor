@@ -18,7 +18,9 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from victor.agent.services.orchestrator_protocol_adapter import OrchestratorProtocolAdapter
+from victor.agent.services.orchestrator_protocol_adapter import (
+    OrchestratorProtocolAdapter,
+)
 from victor.agent.services.tool_selection_runtime import (
     ToolSelectionRuntime,
     _SelectionStage,

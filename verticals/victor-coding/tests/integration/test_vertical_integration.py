@@ -2130,7 +2130,9 @@ class TestIntegrationPlanCache:
         assert second.get_step_status("stateful")["status"] == "skipped"
         assert second.get_step_status("stateful")["details"]["reason"] == "integration_plan_noop"
 
-    def test_cache_hit_applies_delta_when_only_some_side_effect_fingerprints_change(self):
+    def test_cache_hit_applies_delta_when_only_some_side_effect_fingerprints_change(
+        self,
+    ):
         """Delta mode should skip unchanged side-effect handlers and re-run changed ones."""
         orchestrator = MockOrchestrator()
         pipeline = VerticalIntegrationPipeline(enable_cache=True)

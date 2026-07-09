@@ -47,7 +47,11 @@ def test_helper_explicit_override_wins():
     orch = _orch()
     assert (
         resolve_effective_temperature(
-            orch, task_type="debug", model="claude", base_temperature=0.7, explicit_override=0.42
+            orch,
+            task_type="debug",
+            model="claude",
+            base_temperature=0.7,
+            explicit_override=0.42,
         )
         == 0.42
     )

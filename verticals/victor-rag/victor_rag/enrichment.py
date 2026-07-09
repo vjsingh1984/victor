@@ -342,12 +342,27 @@ class RAGEnrichmentStrategy:
         query_lower = query.lower()
 
         # Detect comparison keywords
-        comparison_keywords = ["compare", "versus", "vs", "difference", "between", "against"]
+        comparison_keywords = [
+            "compare",
+            "versus",
+            "vs",
+            "difference",
+            "between",
+            "against",
+        ]
         is_comparison = any(kw in query_lower for kw in comparison_keywords)
 
         # Basic financial term detection
         financial_terms = []
-        for term in ["revenue", "profit", "growth", "margin", "sales", "income", "earnings"]:
+        for term in [
+            "revenue",
+            "profit",
+            "growth",
+            "margin",
+            "sales",
+            "income",
+            "earnings",
+        ]:
             if term in query_lower:
                 financial_terms.append(term)
 

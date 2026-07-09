@@ -313,7 +313,10 @@ class RecoveryScorer:
         score = recovered / len(failure_idxs)
         confidence = clamp(len(failure_idxs) / 2.0, 0.4, 1.0)
         return DimensionScore(
-            self.dimension, score, confidence, f"recovered {recovered}/{len(failure_idxs)} failures"
+            self.dimension,
+            score,
+            confidence,
+            f"recovered {recovered}/{len(failure_idxs)} failures",
         )
 
 

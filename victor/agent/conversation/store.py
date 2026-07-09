@@ -422,7 +422,9 @@ class ConversationStore:
             "session_id": row_map.get("session_id"),
             "created_at": datetime.fromisoformat(row_map["created_at"]),
             "last_activity": datetime.fromisoformat(row_map["last_activity"]),
-            "project_path": Path(row_map["project_path"]) if row_map.get("project_path") else None,
+            "project_path": (
+                Path(row_map["project_path"]) if row_map.get("project_path") else None
+            ),
             "model": row_map.get("model"),
             "profile": row_map.get("profile"),
             "max_tokens": row_map.get("max_tokens"),

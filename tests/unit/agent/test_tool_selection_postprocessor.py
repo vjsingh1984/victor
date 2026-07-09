@@ -80,7 +80,10 @@ def test_truncation_preserves_selected_web_tool():
 
     processor = ToolSelectionPostProcessor()
     # web_search sits at index 8 (just past fallback_max_tools=8) — the exact failing shape.
-    tools = [_tool(f"tool_{i}") for i in range(8)] + [_tool("web_search"), _tool("tool_9")]
+    tools = [_tool(f"tool_{i}") for i in range(8)] + [
+        _tool("web_search"),
+        _tool("tool_9"),
+    ]
     context = ToolSelectionPostProcessContext(
         user_message="research the SDLC 3.0 white paper and cite sources",
         stage=None,
@@ -204,7 +207,9 @@ def test_postprocessor_skips_optional_transforms_when_disabled():
 
 
 def _ctx(**over):
-    from victor.agent.tool_selection_postprocessor import ToolSelectionPostProcessContext
+    from victor.agent.tool_selection_postprocessor import (
+        ToolSelectionPostProcessContext,
+    )
 
     base = {
         "user_message": "do work",

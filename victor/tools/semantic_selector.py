@@ -234,7 +234,9 @@ class SemanticToolSelector:
 
     def _get_tiered_service(self) -> Optional[Any]:
         """Return TieredDecisionService if tiered classification is enabled."""
-        from victor.agent.services.classification_backend import use_tiered_classification
+        from victor.agent.services.classification_backend import (
+            use_tiered_classification,
+        )
 
         if not use_tiered_classification():
             return None

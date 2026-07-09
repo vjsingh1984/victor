@@ -603,7 +603,7 @@ class SWEBenchRunner(BaseBenchmarkRunner):
                     test_cmd[0] = "python"
                 _repo_prefix = str(cached_repo.resolve()) + "/"
                 test_cmd = [
-                    arg.replace(_repo_prefix, "") if arg.startswith(_repo_prefix) else arg
+                    (arg.replace(_repo_prefix, "") if arg.startswith(_repo_prefix) else arg)
                     for arg in test_cmd
                 ]
                 if runner_cfg.runner_type == "pytest" and "-m" in test_cmd:

@@ -23,7 +23,10 @@ import numpy as np
 from victor.storage.vector_stores.base import EmbeddingConfig
 from victor.storage.vector_stores.lancedb_provider import LanceDBProvider
 from victor.storage.vector_stores.chromadb_provider import ChromaDBProvider
-from victor.storage.vector_stores.models import SentenceTransformerModel, EmbeddingModelConfig
+from victor.storage.vector_stores.models import (
+    SentenceTransformerModel,
+    EmbeddingModelConfig,
+)
 
 # Check if chromadb is available and can be imported
 try:
@@ -91,7 +94,9 @@ class TestUnifiedEmbeddingModel:
     def test_unified_model_dimensions(self):
         """Test that unified model has 384 dimensions."""
         config = EmbeddingModelConfig(
-            model_type="sentence-transformers", model_name="all-MiniLM-L12-v2", dimension=384
+            model_type="sentence-transformers",
+            model_name="all-MiniLM-L12-v2",
+            dimension=384,
         )
         assert config.dimension == 384
 
@@ -109,7 +114,9 @@ class TestUnifiedEmbeddingModel:
         mock_service._ensure_model_loaded = MagicMock()
 
         config = EmbeddingModelConfig(
-            model_type="sentence-transformers", model_name="all-MiniLM-L12-v2", dimension=384
+            model_type="sentence-transformers",
+            model_name="all-MiniLM-L12-v2",
+            dimension=384,
         )
 
         # Patch at the location where it's imported in the model's initialize() method
@@ -138,7 +145,9 @@ class TestUnifiedEmbeddingModel:
             MockST.return_value = mock_model
 
             config = EmbeddingModelConfig(
-                model_type="sentence-transformers", model_name="all-MiniLM-L12-v2", dimension=384
+                model_type="sentence-transformers",
+                model_name="all-MiniLM-L12-v2",
+                dimension=384,
             )
 
             model = SentenceTransformerModel(config)
@@ -249,7 +258,12 @@ class TestLanceDBProvider:
             # Mock LanceDB
             mock_table = MagicMock()
             mock_table.search.return_value.limit.return_value.to_list.return_value = [
-                {"id": "doc1", "content": "test content", "file_path": "test.py", "_distance": 0.1}
+                {
+                    "id": "doc1",
+                    "content": "test content",
+                    "file_path": "test.py",
+                    "_distance": 0.1,
+                }
             ]
 
             mock_db = MagicMock()
@@ -268,7 +282,11 @@ class TestLanceDBProvider:
 
             # Index document
             documents = [
-                {"id": "doc1", "content": "test content", "metadata": {"file_path": "test.py"}}
+                {
+                    "id": "doc1",
+                    "content": "test content",
+                    "metadata": {"file_path": "test.py"},
+                }
             ]
             await provider.index_documents(documents)
 
@@ -290,7 +308,8 @@ class TestChromaDBProvider:
 
     @pytest.mark.asyncio
     @pytest.mark.skipif(
-        not CHROMADB_AVAILABLE, reason="chromadb is an optional dependency (not installed)"
+        not CHROMADB_AVAILABLE,
+        reason="chromadb is an optional dependency (not installed)",
     )
     async def test_chromadb_initialization_offline(self, temp_dir):
         """Test that ChromaDB initializes without network."""
@@ -330,7 +349,9 @@ class TestMemoryOptimization:
         # Expected: 120MB for all-MiniLM-L12-v2
         # This is 40% less than separate models (80MB + 120MB = 200MB)
         config = EmbeddingModelConfig(
-            model_type="sentence-transformers", model_name="all-MiniLM-L12-v2", dimension=384
+            model_type="sentence-transformers",
+            model_name="all-MiniLM-L12-v2",
+            dimension=384,
         )
 
         # Model size is approximately 120MB
@@ -344,7 +365,9 @@ class TestMemoryOptimization:
         """Document that separate models would use 200MB vs 120MB."""
         # Tool selection model
         tool_model = EmbeddingModelConfig(
-            model_type="sentence-transformers", model_name="all-MiniLM-L6-v2", dimension=384  # 80MB
+            model_type="sentence-transformers",
+            model_name="all-MiniLM-L6-v2",
+            dimension=384,  # 80MB
         )
 
         # Codebase search model

@@ -268,7 +268,10 @@ def test_detect_high_confidence_completion_defers_when_tools_pending():
 
     assert (
         ex._detect_high_confidence_completion(
-            orch, stream_ctx, full_content="x", tool_calls=[{"name": "read", "arguments": {}}]
+            orch,
+            stream_ctx,
+            full_content="x",
+            tool_calls=[{"name": "read", "arguments": {}}],
         )
         is False
     )

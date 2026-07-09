@@ -26,14 +26,22 @@ _DATA_ANALYSIS_SAFETY_TUPLES: List[Tuple[str, str, str]] = [
     (r"(?i)(social[_\s-]?security|ssn)[^\w]", "Social Security Number exposure", HIGH),
     (r"(?i)(credit[_\s-]?card|card[_\s-]?number)", "Credit card data exposure", HIGH),
     (r"\b\d{3}[-.]?\d{2}[-.]?\d{4}\b", "SSN pattern detected", HIGH),
-    (r"\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b", "Credit card pattern detected", HIGH),
+    (
+        r"\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b",
+        "Credit card pattern detected",
+        HIGH,
+    ),
     (r"(?i)password|passwd|pwd", "Password column exposure", HIGH),
     (r"(?i)medical|diagnosis|health[_\s-]?record", "Medical data exposure", HIGH),
     # Medium-risk patterns - semi-sensitive
     (r"(?i)(email|e-mail)[^\w]", "Email addresses in output", MEDIUM),
     (r"(?i)(phone|mobile|cell)[^\w]", "Phone numbers in output", MEDIUM),
     (r"(?i)(address|street|zip[_\s-]?code)", "Physical address exposure", MEDIUM),
-    (r"(?i)(date[_\s-]?of[_\s-]?birth|dob|birth[_\s-]?date)", "Date of birth exposure", MEDIUM),
+    (
+        r"(?i)(date[_\s-]?of[_\s-]?birth|dob|birth[_\s-]?date)",
+        "Date of birth exposure",
+        MEDIUM,
+    ),
     (r"(?i)(salary|income|wage)", "Financial data exposure", MEDIUM),
     # Low-risk patterns - best practices
     (r"(?i)print\(.*df\)", "Full dataframe print", LOW),

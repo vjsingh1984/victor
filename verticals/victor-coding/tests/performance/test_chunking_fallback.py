@@ -209,11 +209,21 @@ class TestFallbackIntegration:
         test_cases = [
             # (filename, content, description, should_chunk)
             ("test.py", "def foo(): pass", "Python code", True),
-            ("test.js", "function bar() {}", "JavaScript code", False),  # Known: may not chunk
+            (
+                "test.js",
+                "function bar() {}",
+                "JavaScript code",
+                False,
+            ),  # Known: may not chunk
             ("README.md", "# Title\n\nContent", "Markdown", True),
             ("config.yaml", "key: value", "YAML config", True),
             ("data.json", '{"key": "value"}', "JSON data", True),
-            ("unknown.xyz", "Random content", "Unknown file type", False),  # Known: may not chunk
+            (
+                "unknown.xyz",
+                "Random content",
+                "Unknown file type",
+                False,
+            ),  # Known: may not chunk
         ]
 
         with TemporaryDirectory() as tmpdir:

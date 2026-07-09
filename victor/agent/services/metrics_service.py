@@ -722,7 +722,8 @@ class AgentMetricsService:
             ),
             completion_tokens=int(
                 token_summary.get(
-                    "completion", self._cumulative_token_usage.get("completion_tokens", 0)
+                    "completion",
+                    self._cumulative_token_usage.get("completion_tokens", 0),
                 )
                 or 0
             ),

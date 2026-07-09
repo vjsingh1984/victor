@@ -40,7 +40,13 @@ CANON_VERTICALS = 9
 # same way the docs do, so a provider/tool/vertical claim made here must stay
 # aligned too.
 DOC_GLOB = "docs/**/*.md"
-EXTRA_FILES = ("mkdocs.yml", "docs/conf.py", "CLAUDE.md", "AGENTS.md", ".victor/init.md")
+EXTRA_FILES = (
+    "mkdocs.yml",
+    "docs/conf.py",
+    "CLAUDE.md",
+    "AGENTS.md",
+    ".victor/init.md",
+)
 
 # The release version is checked ONLY in the canonical pages that carry it. Spec/FEP docs (e.g.
 # vertical-package-spec.md) legitimately have their own independent **Version** stamp.

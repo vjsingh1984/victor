@@ -68,7 +68,11 @@ class _FakeStep:
 
 class _FakeAction:
     def __init__(
-        self, name: str = "", payload: Optional[Dict[str, Any]] = None, label: str = "", **_: Any
+        self,
+        name: str = "",
+        payload: Optional[Dict[str, Any]] = None,
+        label: str = "",
+        **_: Any,
     ) -> None:
         self.name = name
         self.payload = payload or {}

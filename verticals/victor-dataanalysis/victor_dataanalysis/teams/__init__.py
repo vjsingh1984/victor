@@ -156,7 +156,11 @@ DATA_ANALYSIS_TEAM_SPECS: Dict[str, DataAnalysisTeamSpec] = {
                     "statistics can lie, so you always look at the shape of the data. You flag "
                     "potential data quality issues and anomalies."
                 ),
-                expertise=["descriptive statistics", "distribution analysis", "data quality"],
+                expertise=[
+                    "descriptive statistics",
+                    "distribution analysis",
+                    "data quality",
+                ],
                 personality="thorough and curious; wants to understand every column",
                 memory=True,  # Share profile with visualizer
             ),
@@ -208,7 +212,11 @@ DATA_ANALYSIS_TEAM_SPECS: Dict[str, DataAnalysisTeamSpec] = {
                     "logical contradictions. You categorize issues by severity and impact. "
                     "You know that data quality issues often hide in edge cases."
                 ),
-                expertise=["data quality assessment", "anomaly detection", "data profiling"],
+                expertise=[
+                    "data quality assessment",
+                    "anomaly detection",
+                    "data profiling",
+                ],
                 personality="suspicious and thorough; assumes data is guilty until proven innocent",
                 memory=True,  # Share issues with planner
             ),
@@ -223,7 +231,11 @@ DATA_ANALYSIS_TEAM_SPECS: Dict[str, DataAnalysisTeamSpec] = {
                     "when to drop, and when to flag for manual review. You design cleaning "
                     "pipelines that are reproducible and auditable."
                 ),
-                expertise=["data cleaning strategy", "missing value handling", "reproducibility"],
+                expertise=[
+                    "data cleaning strategy",
+                    "missing value handling",
+                    "reproducibility",
+                ],
                 personality="strategic and pragmatic; makes defensible trade-offs",
                 memory=True,  # Share plan with cleaner
             ),
@@ -275,7 +287,11 @@ DATA_ANALYSIS_TEAM_SPECS: Dict[str, DataAnalysisTeamSpec] = {
                     "appropriate statistical methods based on data characteristics and research "
                     "goals. You consider sample size, power, and multiple testing issues."
                 ),
-                expertise=["research design", "hypothesis formulation", "statistical methods"],
+                expertise=[
+                    "research design",
+                    "hypothesis formulation",
+                    "statistical methods",
+                ],
                 personality="rigorous and thoughtful; designs for validity",
                 memory=True,  # Share design with analyst
             ),
@@ -304,7 +320,11 @@ DATA_ANALYSIS_TEAM_SPECS: Dict[str, DataAnalysisTeamSpec] = {
                     "confidence intervals, effect sizes, and uncertainty. You put results in "
                     "context and discuss limitations honestly."
                 ),
-                expertise=["statistical interpretation", "effect size", "scientific communication"],
+                expertise=[
+                    "statistical interpretation",
+                    "effect size",
+                    "scientific communication",
+                ],
                 personality="nuanced and honest; never oversells findings",
             ),
             TeamMemberSpec(
@@ -318,7 +338,11 @@ DATA_ANALYSIS_TEAM_SPECS: Dict[str, DataAnalysisTeamSpec] = {
                     "include appropriate visualizations. You state conclusions clearly and "
                     "acknowledge limitations."
                 ),
-                expertise=["statistical writing", "data visualization", "scientific communication"],
+                expertise=[
+                    "statistical writing",
+                    "data visualization",
+                    "scientific communication",
+                ],
                 personality="clear and precise; writes for the target audience",
             ),
         ],
@@ -340,7 +364,11 @@ DATA_ANALYSIS_TEAM_SPECS: Dict[str, DataAnalysisTeamSpec] = {
                     "metrics that align with business value. You identify potential pitfalls "
                     "like data leakage and selection bias early."
                 ),
-                expertise=["ML problem framing", "metrics selection", "business alignment"],
+                expertise=[
+                    "ML problem framing",
+                    "metrics selection",
+                    "business alignment",
+                ],
                 personality="strategic and questioning; asks 'why' before 'how'",
                 memory=True,  # Share problem definition
             ),
@@ -355,7 +383,11 @@ DATA_ANALYSIS_TEAM_SPECS: Dict[str, DataAnalysisTeamSpec] = {
                     "categorical variables, dates, text, and interactions. You validate that "
                     "features are available at prediction time."
                 ),
-                expertise=["feature engineering", "sklearn pipelines", "domain encoding"],
+                expertise=[
+                    "feature engineering",
+                    "sklearn pipelines",
+                    "domain encoding",
+                ],
                 personality="creative and practical; turns data into signal",
                 memory=True,  # Share features with trainer
             ),
@@ -370,7 +402,12 @@ DATA_ANALYSIS_TEAM_SPECS: Dict[str, DataAnalysisTeamSpec] = {
                     "systematically. You try appropriate algorithms for the problem type. "
                     "You track experiments and ensure reproducibility."
                 ),
-                expertise=["scikit-learn", "XGBoost", "cross-validation", "hyperparameter tuning"],
+                expertise=[
+                    "scikit-learn",
+                    "XGBoost",
+                    "cross-validation",
+                    "hyperparameter tuning",
+                ],
                 personality="systematic and experimental; treats ML as science",
             ),
             TeamMemberSpec(
@@ -405,7 +442,11 @@ DATA_ANALYSIS_TEAM_SPECS: Dict[str, DataAnalysisTeamSpec] = {
                     "the audience and their questions. You identify the key messages that "
                     "visualizations should convey. You prioritize impact over comprehensiveness."
                 ),
-                expertise=["data storytelling", "audience analysis", "visual narratives"],
+                expertise=[
+                    "data storytelling",
+                    "audience analysis",
+                    "visual narratives",
+                ],
                 personality="strategic and focused; less is more",
                 memory=True,  # Share story with creator
             ),
@@ -455,7 +496,11 @@ DATA_ANALYSIS_TEAM_SPECS: Dict[str, DataAnalysisTeamSpec] = {
                     "outputs. You gather charts, tables, statistics, and insights. You organize "
                     "them logically and identify gaps. You ensure nothing important is missed."
                 ),
-                expertise=["content organization", "information synthesis", "documentation"],
+                expertise=[
+                    "content organization",
+                    "information synthesis",
+                    "documentation",
+                ],
                 personality="organized and thorough; creates structure from chaos",
                 memory=True,
             ),
@@ -471,7 +516,11 @@ DATA_ANALYSIS_TEAM_SPECS: Dict[str, DataAnalysisTeamSpec] = {
                     "recommendations. You write for your audience and use visualizations "
                     "effectively. Your reports are polished and professional."
                 ),
-                expertise=["technical writing", "report structure", "executive communication"],
+                expertise=[
+                    "technical writing",
+                    "report structure",
+                    "executive communication",
+                ],
                 personality="clear and persuasive; writes for impact",
             ),
             TeamMemberSpec(
@@ -686,7 +735,9 @@ def register_data_analysis_teams() -> int:
         Number of teams registered.
     """
     try:
-        from victor_contracts.team_schema import get_runtime_team_registry as get_team_registry
+        from victor_contracts.team_schema import (
+            get_runtime_team_registry as get_team_registry,
+        )
 
         registry = get_team_registry()
         count = registry.register_from_vertical("data_analysis", DATA_ANALYSIS_TEAM_SPECS)
