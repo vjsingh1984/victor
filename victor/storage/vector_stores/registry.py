@@ -37,10 +37,10 @@ class EmbeddingRegistry:
 
     Usage:
         # Register a provider
-        EmbeddingRegistry.register("chromadb", ChromaDBProvider)
+        EmbeddingRegistry.register("lancedb", LanceDBProvider)
 
         # Create a provider (cached - returns same instance for same config)
-        config = EmbeddingConfig(vector_store="chromadb", persist_directory="~/.victor/embeddings")
+        config = EmbeddingConfig(vector_store="lancedb", persist_directory="~/.victor/embeddings")
         provider = EmbeddingRegistry.create(config)
 
         # Clear cache (mainly for testing)
@@ -97,7 +97,7 @@ class EmbeddingRegistry:
                     raise KeyError(
                         f"The '{name}' vector store is only available through victor-coding's "
                         f"embedding registry, not victor's core registry. "
-                        f"Use the upstream vector store directly (e.g., 'lancedb', 'chromadb') "
+                        f"Use the upstream vector store directly (e.g., 'lancedb') "
                         f"or access through victor-coding's CodebaseIndex factory.\n"
                         f"Available providers in victor's registry: {available if available else 'none'}"
                     )
@@ -120,7 +120,7 @@ class EmbeddingRegistry:
         """Generate a unique cache key for the configuration.
 
         Key components:
-        - vector_store: The provider type (lancedb, chromadb, etc.)
+        - vector_store: The provider type (lancedb, etc.)
         - persist_directory: The database path (critical for singleton)
         - embedding_model_type: Model type (sentence-transformers, ollama, etc.)
         - embedding_model_name: Model name (affects embedding dimension)
@@ -259,13 +259,6 @@ class EmbeddingRegistry:
 # Auto-discovery: Import and register all providers
 def _auto_register_providers() -> None:
     """Automatically discover and register embedding providers."""
-    try:
-        from victor.storage.vector_stores.chromadb_provider import ChromaDBProvider
-
-        EmbeddingRegistry.register("chromadb", ChromaDBProvider)
-    except ImportError:
-        pass  # ChromaDB not installed
-
     try:
         from victor.storage.vector_stores.lancedb_provider import LanceDBProvider
 
