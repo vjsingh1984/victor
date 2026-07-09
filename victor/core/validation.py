@@ -580,164 +580,6 @@ class AgentConfigSchema(BaseModel):
 
 
 # =============================================================================
-# Mode Configuration Schemas
-# =============================================================================
-
-
-class ModeConfigSchema(BaseModel):
-    """Validated mode configuration schema.
-
-    Provides type safety and constraint validation for core mode parameters.
-    All verticals (including third-party plugins) benefit from consistent
-    validation without additional implementation effort.
-
-    Attributes:
-        tool_budget: Maximum tool calls allowed (1-500)
-        max_iterations: Maximum conversation iterations (1-500)
-        exploration_multiplier: Factor for exploration iterations (0.1-10.0)
-        allowed_tools: Optional set of allowed tool names
-    """
-
-    tool_budget: int = Field(default=15, ge=1, le=500)
-    max_iterations: int = Field(default=10, ge=1, le=500)
-    exploration_multiplier: float = Field(default=1.0, ge=0.1, le=10.0)
-    allowed_tools: Optional[Set[Any]] = None
-
-    @field_validator("allowed_tools", mode="before")
-    @classmethod
-    def convert_list_to_set(cls, v: Any) -> Optional[Set[str]]:
-        """Convert list to set for allowed_tools."""
-        if v is None:
-            return None
-        if isinstance(v, list):
-            return set(v)
-        if isinstance(v, set):
-            return v
-        raise ValueError(f"allowed_tools must be a list or set, got {type(v).__name__}")
-
-    model_config = {"extra": "forbid"}
-
-
-class ModeDefinitionSchema(BaseModel):
-    """Validated mode definition schema with full configuration.
-
-    Extended schema for complete mode definitions including LLM settings,
-    stage controls, and tool prioritization.
-
-    Attributes:
-        name: Mode identifier (1-50 chars)
-        description: Human-readable description (max 500 chars)
-        temperature: LLM temperature setting (0.0-2.0)
-        max_iterations: Maximum conversation iterations (1-500)
-        tool_budget: Maximum tool calls allowed (1-500)
-        exploration_multiplier: Factor for exploration iterations (0.1-10.0)
-        allowed_tools: Optional set of allowed tool names
-        disallowed_tools: Optional set of disallowed tool names
-        allowed_stages: Optional list of allowed workflow stages
-        priority_tools: Optional list of tools to prioritize
-        max_files_per_operation: Maximum files per operation (1-100)
-        max_context_chars: Maximum context characters (1000-500000)
-        metadata: Additional mode-specific configuration
-    """
-
-    name: str = Field(min_length=1, max_length=50)
-    description: str = Field(default="", max_length=500)
-
-    # LLM settings
-    temperature: float = Field(default=0.7, ge=0.0, le=2.0)
-    max_iterations: int = Field(default=10, ge=1, le=500)
-    tool_budget: int = Field(default=15, ge=1, le=500)
-
-    # Exploration
-    exploration_multiplier: float = Field(default=1.0, ge=0.1, le=10.0)
-
-    # Tool access
-    allowed_tools: Optional[Set[Any]] = None
-    disallowed_tools: Optional[Set[Any]] = None
-
-    # Stage controls
-    allowed_stages: List[str] = Field(default_factory=list)
-    priority_tools: List[str] = Field(default_factory=list)
-
-    # Limits
-    max_files_per_operation: int = Field(default=10, ge=1, le=100)
-    max_context_chars: int = Field(default=100000, ge=1000, le=500000)
-
-    # Additional config
-    metadata: Dict[str, Any] = Field(default_factory=dict)
-
-    @model_validator(mode="after")
-    def validate_tool_sets_disjoint(self) -> "ModeDefinitionSchema":
-        """Ensure allowed and disallowed tools don't overlap."""
-        if self.allowed_tools and self.disallowed_tools:
-            overlap = self.allowed_tools & self.disallowed_tools
-            if overlap:
-                raise ValueError(f"Tools cannot be both allowed and disallowed: {overlap}")
-        return self
-
-    @field_validator("allowed_tools", "disallowed_tools", mode="before")
-    @classmethod
-    def convert_to_set(cls, v: Any) -> Optional[Set[str]]:
-        """Convert list to set for tool sets."""
-        if v is None:
-            return None
-        if isinstance(v, list):
-            return set(v)
-        if isinstance(v, set):
-            return v
-        raise ValueError(f"Tool set must be a list or set, got {type(v).__name__}")
-
-    model_config = {"extra": "forbid"}
-
-    def to_mode_config_schema(self) -> ModeConfigSchema:
-        """Convert to basic ModeConfigSchema."""
-        return ModeConfigSchema(
-            tool_budget=self.tool_budget,
-            max_iterations=self.max_iterations,
-            exploration_multiplier=self.exploration_multiplier,
-            allowed_tools=self.allowed_tools,
-        )
-
-
-class VerticalModeConfigSchema(BaseModel):
-    """Validated vertical mode configuration schema.
-
-    Schema for vertical-specific mode configurations including
-    mode overrides and task-based budgets.
-
-    Attributes:
-        vertical_name: Name of the vertical (1-50 chars)
-        modes: Vertical-specific mode definitions
-        task_budgets: Task type to tool budget mapping
-        default_mode: Name of the default mode
-        default_budget: Default tool budget (1-500)
-    """
-
-    vertical_name: str = Field(min_length=1, max_length=50)
-    modes: Dict[str, ModeDefinitionSchema] = Field(default_factory=dict)
-    task_budgets: Dict[str, int] = Field(default_factory=dict)
-    default_mode: str = Field(default="standard", min_length=1, max_length=50)
-    default_budget: int = Field(default=10, ge=1, le=500)
-
-    @field_validator("task_budgets", mode="before")
-    @classmethod
-    def validate_task_budgets(cls, v: Any) -> Dict[str, int]:
-        """Validate task budget values are within range."""
-        if not isinstance(v, dict):
-            return v
-        for task, budget in v.items():
-            if not isinstance(budget, int):
-                raise ValueError(f"Budget for task '{task}' must be an integer")
-            if not (1 <= budget <= 500):
-                raise ValueError(
-                    f"Budget for task '{task}' must be between 1 and 500, got {budget}"
-                )
-        return v
-
-    model_config = {"extra": "forbid"}
-
-
-# =============================================================================
 # Config Validator (Facade)
 # =============================================================================
 
@@ -971,53 +813,6 @@ def validate_agent_config(config: Dict[str, Any]) -> ConfigValidationResult:
     return validator.validate(config, AgentConfigSchema)
 
 
-def validate_mode_config_dict(config: Dict[str, Any]) -> ModeConfigSchema:
-    """Validate and create ModeConfigSchema from dict.
-
-    Args:
-        config: Dictionary with mode configuration values
-
-    Returns:
-        Validated ModeConfigSchema instance
-
-    Raises:
-        ValidationError: If configuration is invalid
-    """
-    return ModeConfigSchema.model_validate(config)
-
-
-def validate_mode_definition_dict(definition: Dict[str, Any]) -> ModeDefinitionSchema:
-    """Validate and create ModeDefinitionSchema from dict.
-
-    Args:
-        definition: Dictionary with mode definition values
-
-    Returns:
-        Validated ModeDefinitionSchema instance
-
-    Raises:
-        ValidationError: If definition is invalid
-    """
-    return ModeDefinitionSchema.model_validate(definition)
-
-
-def validate_vertical_mode_config_dict(
-    config: Dict[str, Any],
-) -> VerticalModeConfigSchema:
-    """Validate and create VerticalModeConfigSchema from dict.
-
-    Args:
-        config: Dictionary with vertical mode configuration values
-
-    Returns:
-        Validated VerticalModeConfigSchema instance
-
-    Raises:
-        ValidationError: If configuration is invalid
-    """
-    return VerticalModeConfigSchema.model_validate(config)
-
-
 __all__ = [
     # Severity and Issues
     "ValidationSeverity",
@@ -1038,10 +833,6 @@ __all__ = [
     "ResilienceConfigSchema",
     "ObservabilityConfigSchema",
     "AgentConfigSchema",
-    # Mode Schemas
-    "ModeConfigSchema",
-    "ModeDefinitionSchema",
-    "VerticalModeConfigSchema",
     # Validator and Builder
     "ConfigValidator",
     "ConfigurationBuilder",
@@ -1049,9 +840,6 @@ __all__ = [
     "validate_provider_config",
     "validate_model_config",
     "validate_agent_config",
-    "validate_mode_config_dict",
-    "validate_mode_definition_dict",
-    "validate_vertical_mode_config_dict",
     # Re-export ValidationError from pydantic
     "ValidationError",
 ]
