@@ -54,6 +54,8 @@ from typing import (
     TypeVar,
 )
 
+from victor.core.retry import compute_backoff_delay
+
 if TYPE_CHECKING:
     from victor.workflows.definition import WorkflowDefinition
     from victor.workflows.context import WorkflowResult
@@ -596,7 +598,7 @@ class BatchWorkflowExecutor(Generic[T]):
         if item_result.attempts <= config.max_retries:
             if config.retry_strategy == BatchRetryStrategy.IMMEDIATE:
                 # Retry immediately with backoff
-                delay = config.retry_delay_seconds * (2 ** (item_result.attempts - 1))
+                delay = compute_backoff_delay(item_result.attempts - 1, config.retry_delay_seconds)
                 logger.debug(f"Retrying item {idx} after {delay}s (attempt {item_result.attempts})")
                 item_result.status = ItemStatus.RETRYING
                 await asyncio.sleep(delay)
@@ -660,7 +662,7 @@ class BatchWorkflowExecutor(Generic[T]):
             # Apply backoff delay for exponential strategy
             if config.retry_strategy == BatchRetryStrategy.EXPONENTIAL_BACKOFF:
                 max_attempts = max(item_results[idx].attempts for idx in batch)
-                delay = config.retry_delay_seconds * (2 ** (max_attempts - 1))
+                delay = compute_backoff_delay(max_attempts - 1, config.retry_delay_seconds)
                 await asyncio.sleep(delay)
 
             # Clear retry queue and re-execute

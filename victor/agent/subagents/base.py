@@ -65,6 +65,7 @@ from typing import (
 
 from victor.agent.subagents.protocols import SubAgentContext, SubAgentContextAdapter
 from victor.agent.runtime.naming import build_display_name, generate_agent_id
+from victor.core.retry import compute_backoff_delay
 
 if TYPE_CHECKING:
     from victor.agent.runtime.context import AgentRuntimeContext
@@ -528,7 +529,7 @@ class SubAgent(IAgent):  # type: ignore[misc]
                     delay = min(float(retry_after), max_delay)
                 else:
                     # Calculate exponential backoff delay: 2^(attempt-1) * base_delay.
-                    delay = min(base_delay * (2 ** (attempt - 1)), max_delay)
+                    delay = compute_backoff_delay(attempt - 1, base_delay, max_delay=max_delay)
 
                 logger.info(
                     f"Sub-agent {self.config.role.value}: Attempt {attempt}/{max_attempts} failed with "
