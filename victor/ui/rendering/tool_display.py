@@ -52,9 +52,16 @@ logger = logging.getLogger(__name__)
 # ── Constants ────────────────────────────────────────────────────────────────
 
 _SLOW_TOOL_PREFIXES = (
-    "shell", "bash", "code_exec", "code_search",
-    "web_", "browser", "docker", "graph_",
-    "embedding_", "vector_",
+    "shell",
+    "bash",
+    "code_exec",
+    "code_search",
+    "web_",
+    "browser",
+    "docker",
+    "graph_",
+    "embedding_",
+    "vector_",
 )
 
 _TOOL_CATEGORIES: dict[str, list[str]] = {
@@ -75,8 +82,10 @@ _CONCISE_TOOLS = {"read", "ls", "file_info", "git_status", "git_blame"}
 
 # ── Tool Status Icons ────────────────────────────────────────────────────────
 
+
 class _ToolStatusIcon:
     """Icons for tool lifecycle states."""
+
     PENDING = "⏳"
     RUNNING = "🔄"
     SUCCESS = "✅"
@@ -87,6 +96,7 @@ class _ToolStatusIcon:
 
 
 # ── ToolDisplayManager ───────────────────────────────────────────────────────
+
 
 class ToolDisplayManager:
     """Manages tool execution display in the Live streaming context.
@@ -175,14 +185,14 @@ class ToolDisplayManager:
             self._tool_section_shown = True
 
         # Categorize and display tool
-        category = self._categorize_tool(name)
+        self._categorize_tool(name)
         display_name = format_tool_display_name(name)
         metadata = get_tool_metadata_for_display(name)
         badges = format_tool_metadata_badges(**metadata)
 
         # Build the invocation display
         icon = _ToolStatusIcon.RUNNING
-        args_str = format_bash_command_invocation(name, arguments)
+        format_bash_command_invocation(name, arguments)
         invocation = f"  {icon} [{display_name}]{badges}"
 
         self._live_manager.console.print(invocation)
@@ -246,9 +256,7 @@ class ToolDisplayManager:
                 TimeElapsedColumn(),
                 console=self._live_manager.console,
             )
-            task = progress_bar.add_task(
-                f"  {format_tool_display_name(name)}", total=100
-            )
+            task = progress_bar.add_task(f"  {format_tool_display_name(name)}", total=100)
             progress_bar.update(task, completed=int(progress * 100))
 
             renderable = Group(
@@ -349,9 +357,7 @@ class ToolDisplayManager:
 
         # Show error details
         if error:
-            self._live_manager.console.print(
-                f"    [red]Error: {error[:200]}[/]"
-            )
+            self._live_manager.console.print(f"    [red]Error: {error[:200]}[/]")
 
         # Show smart preview
         if success and result:
@@ -364,9 +370,7 @@ class ToolDisplayManager:
             for suggestion in follow_up_suggestions[:2]:
                 label = suggestion.get("label", suggestion.get("command", ""))
                 if label:
-                    self._live_manager.console.print(
-                        f"    [dim]💡 {label}[/]"
-                    )
+                    self._live_manager.console.print(f"    [dim]💡 {label}[/]")
 
         self._tool_progress_active = False
         self._current_tool_start_time = None
@@ -429,7 +433,7 @@ class ToolDisplayManager:
                 code = exit_match.group(1)
                 return f"exit {code}" if code != "0" else "completed"
             # Show last non-empty line as summary
-            lines = [l.strip() for l in output.splitlines() if l.strip()]
+            lines = [line.strip() for line in output.splitlines() if line.strip()]
             if lines:
                 last = lines[-1][:80]
                 return f"→ {last}"
