@@ -70,7 +70,7 @@ jobs:
           cache: pip
 
       - name: Install Ruff
-        run: pip install ruff
+        run: pip install ruff==0.15.20
 
       - name: Lint with Ruff
         run: ruff check victor
