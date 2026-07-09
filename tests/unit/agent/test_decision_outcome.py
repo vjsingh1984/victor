@@ -65,9 +65,21 @@ class TestRecordSessionOutcome:
             log,
             {
                 "S1": [
-                    {"decision_id": "d1", "type": "task_completion", "input": {"m": "a"}},
-                    {"decision_id": "d2", "type": "task_completion", "input": {"m": "b"}},
-                    {"decision_id": "d3", "type": "stage_detection", "input": {"m": "c"}},
+                    {
+                        "decision_id": "d1",
+                        "type": "task_completion",
+                        "input": {"m": "a"},
+                    },
+                    {
+                        "decision_id": "d2",
+                        "type": "task_completion",
+                        "input": {"m": "b"},
+                    },
+                    {
+                        "decision_id": "d3",
+                        "type": "stage_detection",
+                        "input": {"m": "c"},
+                    },
                 ]
             },
         )
@@ -143,12 +155,28 @@ class TestLoadOutcomeSamples:
             log,
             {
                 "SP": [
-                    {"decision_id": "p1", "type": "task_completion", "input": {"m": "pass1"}},
-                    {"decision_id": "p2", "type": "task_completion", "input": {"m": "pass2"}},
+                    {
+                        "decision_id": "p1",
+                        "type": "task_completion",
+                        "input": {"m": "pass1"},
+                    },
+                    {
+                        "decision_id": "p2",
+                        "type": "task_completion",
+                        "input": {"m": "pass2"},
+                    },
                 ],
                 "SF": [
-                    {"decision_id": "f1", "type": "task_completion", "input": {"m": "fail1"}},
-                    {"decision_id": "f2", "type": "stage_detection", "input": {"m": "fail2"}},
+                    {
+                        "decision_id": "f1",
+                        "type": "task_completion",
+                        "input": {"m": "fail1"},
+                    },
+                    {
+                        "decision_id": "f2",
+                        "type": "stage_detection",
+                        "input": {"m": "fail2"},
+                    },
                 ],
             },
         )
@@ -202,14 +230,25 @@ class TestDeltaWriteFromOutcome:
         _, log = isolated_db_and_log
         _write_decisions(
             log,
-            {"S1": [{"decision_id": "d1", "type": "task_completion", "input": {"m": "all done"}}]},
+            {
+                "S1": [
+                    {
+                        "decision_id": "d1",
+                        "type": "task_completion",
+                        "input": {"m": "all done"},
+                    }
+                ]
+            },
         )
         # Deterministic, artifact-independent predict path.
         labels = ["fail", "partial", "pass"]
         monkeypatch.setattr(
             ld,
             "_get_default_predict",
-            lambda: ((lambda dtype, feats: np.array([0.6, 0.3, 0.1])), {"task_completion": labels}),
+            lambda: (
+                (lambda dtype, feats: np.array([0.6, 0.3, 0.1])),
+                {"task_completion": labels},
+            ),
         )
         ld.clear_delta_for_tests()
 
@@ -234,7 +273,16 @@ class TestDeltaWriteFromOutcome:
 
         _, log = isolated_db_and_log
         _write_decisions(
-            log, {"S1": [{"decision_id": "d1", "type": "task_completion", "input": {"m": "x"}}]}
+            log,
+            {
+                "S1": [
+                    {
+                        "decision_id": "d1",
+                        "type": "task_completion",
+                        "input": {"m": "x"},
+                    }
+                ]
+            },
         )
 
         class _Disabled:

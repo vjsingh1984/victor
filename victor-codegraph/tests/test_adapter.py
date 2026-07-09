@@ -4,14 +4,14 @@ from __future__ import annotations
 
 from victor_codegraph import parse, to_proxima_records
 
-SAMPLE = '''\
+SAMPLE = """\
 def a():
     return b()
 
 
 def b():
     return 1
-'''
+"""
 
 
 def test_symbol_records_shape():
@@ -45,9 +45,7 @@ def test_edge_records_reference_node_oids():
 
 def test_embedder_populates_embedding_cell():
     parsed = parse(SAMPLE, file_path="m.py")
-    records = to_proxima_records(
-        parsed, repo_graph_id="repo1", embedder=lambda text: [0.0] * 384
-    )
+    records = to_proxima_records(parsed, repo_graph_id="repo1", embedder=lambda text: [0.0] * 384)
     node = next(r for r in records if "graph_node" in r["labels"])
     assert len(node["embeddings"]) == 1
     cell = node["embeddings"][0]

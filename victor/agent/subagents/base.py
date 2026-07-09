@@ -357,7 +357,9 @@ class SubAgent(IAgent):  # type: ignore[misc]
         model = self.config.model_override or self._context.model
         if self.config.provider_override is not None:
             provider_name = getattr(
-                self.config.provider_override, "provider_name", self._context.provider_name
+                self.config.provider_override,
+                "provider_name",
+                self._context.provider_name,
             )
         else:
             provider_name = self._context.provider_name

@@ -364,15 +364,18 @@ class BaseYAMLWorkflowProvider(WorkflowProviderProtocol, ABC):
             # while provider-specific hatches still take precedence (provider wins
             # on name conflicts). Best-effort: never fail config creation on this.
             try:
-                from victor.framework.escape_hatch_registry import get_escape_hatch_registry
+                from victor.framework.escape_hatch_registry import (
+                    get_escape_hatch_registry,
+                )
                 from victor.workflows.escape_hatches import (
                     ensure_global_escape_hatches_registered,
                 )
 
                 ensure_global_escape_hatches_registered()
-                global_conditions, global_transforms = (
-                    get_escape_hatch_registry().get_registry_for_vertical("", include_global=True)
-                )
+                (
+                    global_conditions,
+                    global_transforms,
+                ) = get_escape_hatch_registry().get_registry_for_vertical("", include_global=True)
                 conditions = {**global_conditions, **conditions}
                 transforms = {**global_transforms, **transforms}
             except Exception as exc:  # pragma: no cover - defensive

@@ -177,7 +177,10 @@ async def main(
             )
         # Best combo = match-or-beats with the fewest mean turns, then most concise.
         if winners:
-            best = min(winners, key=lambda k: (summ[k]["mean_turns"], summ[k]["mean_answer_len"]))
+            best = min(
+                winners,
+                key=lambda k: (summ[k]["mean_turns"], summ[k]["mean_answer_len"]),
+            )
             print(f"  → best combo: {best[0]}@{best[1]:.2f}")
         print(
             "  NOTE: only flip to a rubric/hybrid path whose LLM judge clears α≥0.7 "

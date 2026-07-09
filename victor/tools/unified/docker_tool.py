@@ -79,7 +79,10 @@ def _map_kwargs(parsed: argparse.Namespace) -> Tuple[str, Dict[str, Any]]:
     if sub in {"ps", "images", "stats", "networks", "volumes"}:
         return sub, {}
     if sub == "exec":
-        return "exec", {"resource_id": parsed.resource_id, "options": {"command": parsed.command}}
+        return "exec", {
+            "resource_id": parsed.resource_id,
+            "options": {"command": parsed.command},
+        }
     if sub == "pull":
         return "pull", {"resource_id": parsed.resource_id, "resource_type": "image"}
     if sub in {"logs", "start", "stop", "restart", "rm", "inspect"}:
@@ -156,7 +159,9 @@ async def docker_tool(cmd: str) -> str:
         )
 
     docker_fn, _src = resolve_vertical_callable(
-        "docker", fallback_module="victor_devops.tools.docker_tool", fallback_attr="docker"
+        "docker",
+        fallback_module="victor_devops.tools.docker_tool",
+        fallback_attr="docker",
     )
     if docker_fn is not None:
         try:

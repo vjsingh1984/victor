@@ -26,7 +26,11 @@ from victor.agent.services.decision_backend import DecisionBackend
 
 def _env_bool(name: str, default: bool) -> bool:
     """Parse a boolean env var (true/1/yes → True)."""
-    return os.getenv(name, "true" if default else "false").strip().lower() in ("true", "1", "yes")
+    return os.getenv(name, "true" if default else "false").strip().lower() in (
+        "true",
+        "1",
+        "yes",
+    )
 
 
 class DecisionModelSpec(BaseModel):
@@ -83,7 +87,8 @@ class DecisionServiceSettings(BaseModel):
     )
     local_learning_lr: float = Field(default=0.1, description="Per-label SGD step size.")
     local_learning_top_k: int = Field(
-        default=2000, description="Max rows kept per (decision_type, label) after trimming."
+        default=2000,
+        description="Max rows kept per (decision_type, label) after trimming.",
     )
     local_learning_decay: float = Field(
         default=0.995, description="L2 decay applied to all delta weights each update."

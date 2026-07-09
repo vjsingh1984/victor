@@ -139,7 +139,9 @@ def test_default_rubric_judge_is_deterministic_and_offline(tmp_path: Path) -> No
 def test_default_rubric_judge_composes_with_harness(tmp_path: Path) -> None:
     harness = JudgeCalibrationHarness(default_corpus(variants=1))
     report = harness.run(
-        make_scripted_executor(lambda _t: True), make_rubric_judge(), workspace_root=tmp_path
+        make_scripted_executor(lambda _t: True),
+        make_rubric_judge(),
+        workspace_root=tmp_path,
     )
     assert len(report.samples) == 6
     assert all(sample.judged in (0.0, 1.0) for sample in report.samples)
@@ -291,7 +293,9 @@ class _RateLimitedProvider(_StubProvider):
         return await super().chat(messages, **kwargs)
 
 
-def test_provider_complete_fn_retries_rate_limits_and_tracks_stats(tmp_path: Path) -> None:
+def test_provider_complete_fn_retries_rate_limits_and_tracks_stats(
+    tmp_path: Path,
+) -> None:
     from victor.evaluation.calibration_rubric_judge import (
         JudgeCallStats,
         make_provider_complete_fn,
@@ -309,7 +313,9 @@ def test_provider_complete_fn_retries_rate_limits_and_tracks_stats(tmp_path: Pat
     assert stats.clean
 
 
-def test_provider_complete_fn_exhausted_retries_count_as_failure(tmp_path: Path) -> None:
+def test_provider_complete_fn_exhausted_retries_count_as_failure(
+    tmp_path: Path,
+) -> None:
     from victor.evaluation.calibration_rubric_judge import (
         JudgeCallStats,
         make_provider_complete_fn,
@@ -319,7 +325,11 @@ def test_provider_complete_fn_exhausted_retries_count_as_failure(tmp_path: Path)
     provider = _RateLimitedProvider(_grade_lines(0.9), fail_n=99)
     judge = make_llm_rubric_judge(
         make_provider_complete_fn(
-            provider, "test-model", max_attempts=3, retry_backoff_seconds=0.0, stats=stats
+            provider,
+            "test-model",
+            max_attempts=3,
+            retry_backoff_seconds=0.0,
+            stats=stats,
         )
     )
     # LLMRubricJudge degrades the propagated error to the neutral fallback (verdict 1.0) —
@@ -329,7 +339,9 @@ def test_provider_complete_fn_exhausted_retries_count_as_failure(tmp_path: Path)
     assert not stats.clean
 
 
-def test_provider_complete_fn_does_not_retry_non_rate_limit_errors(tmp_path: Path) -> None:
+def test_provider_complete_fn_does_not_retry_non_rate_limit_errors(
+    tmp_path: Path,
+) -> None:
     from victor.evaluation.calibration_rubric_judge import (
         JudgeCallStats,
         make_provider_complete_fn,

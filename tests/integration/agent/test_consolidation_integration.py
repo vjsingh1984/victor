@@ -250,7 +250,9 @@ class TestCoordinatorIntegration:
         # The entire workflow_facade compatibility shim was removed; importing
         # it must fail rather than silently resolve.
         with pytest.raises(ImportError):
-            from victor.agent.facades.workflow_facade import WorkflowFacade  # noqa: F401
+            from victor.agent.facades.workflow_facade import (
+                WorkflowFacade,
+            )  # noqa: F401
 
         assert hasattr(AgentOrchestrator, "_mode_workflow_team_coordinator") is False
         assert hasattr(OrchestratorFactory, "create_mode_workflow_team_coordinator") is False

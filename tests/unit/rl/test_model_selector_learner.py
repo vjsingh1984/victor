@@ -292,10 +292,18 @@ class TestModelSelectorMultiProviderABTesting:
         # `success` is what drives the learned Q-value; give openai a clear edge.
         for _ in range(8):
             _record_selection_outcome(
-                learner, provider="openai", success=True, quality_score=0.9, task_type="coding"
+                learner,
+                provider="openai",
+                success=True,
+                quality_score=0.9,
+                task_type="coding",
             )
             _record_selection_outcome(
-                learner, provider="anthropic", success=False, quality_score=0.2, task_type="coding"
+                learner,
+                provider="anthropic",
+                success=False,
+                quality_score=0.2,
+                task_type="coding",
             )
 
         rec_a = learner.get_recommendation(json.dumps(["anthropic", "openai"]), "", "coding")

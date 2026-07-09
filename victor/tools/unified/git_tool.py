@@ -64,7 +64,9 @@ class UnifiedGitParser(argparse.ArgumentParser):
 def create_git_parser() -> UnifiedGitParser:
     """Create the parser for the git tool."""
     parser = UnifiedGitParser(
-        prog="git", description="Unified git version-control operations.", exit_on_error=False
+        prog="git",
+        description="Unified git version-control operations.",
+        exit_on_error=False,
     )
     subparsers = parser.add_subparsers(dest="subcommand", help="The operation to perform")
 
@@ -90,10 +92,16 @@ def create_git_parser() -> UnifiedGitParser:
         "--ai", action="store_true", help="Generate the commit message with AI"
     )
     commit_parser.add_argument(
-        "--author-name", dest="author_name", default=None, help="Override commit author name"
+        "--author-name",
+        dest="author_name",
+        default=None,
+        help="Override commit author name",
     )
     commit_parser.add_argument(
-        "--author-email", dest="author_email", default=None, help="Override commit author email"
+        "--author-email",
+        dest="author_email",
+        default=None,
+        help="Override commit author email",
     )
 
     subparsers.add_parser("commit_msg", help="Generate an AI commit message from the staged diff")

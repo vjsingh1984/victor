@@ -8,7 +8,11 @@ import importlib
 from typing import Any, Dict, List, Optional
 
 from victor_contracts.constants import get_canonical_name
-from victor_contracts.team_schema import TeamAgentCategory, TeamFormation, TeamMemberSpec
+from victor_contracts.team_schema import (
+    TeamAgentCategory,
+    TeamFormation,
+    TeamMemberSpec,
+)
 
 
 def get_runtime_persona_provider() -> Any:

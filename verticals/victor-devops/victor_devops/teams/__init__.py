@@ -171,7 +171,14 @@ DEVOPS_TEAM_SPECS: Dict[str, TeamSpec] = {
                     "drift and dependency issues that others miss. Your assessments are thorough and "
                     "you never make assumptions without verifying the actual infrastructure state."
                 ),
-                expertise=["AWS", "GCP", "Azure", "Terraform", "Kubernetes", "networking"],
+                expertise=[
+                    "AWS",
+                    "GCP",
+                    "Azure",
+                    "Terraform",
+                    "Kubernetes",
+                    "networking",
+                ],
                 personality="methodical and thorough; documents findings with severity ratings",
                 memory=True,  # Persist discoveries for team
             ),
@@ -208,7 +215,13 @@ DEVOPS_TEAM_SPECS: Dict[str, TeamSpec] = {
                     "builds, pin versions, include health checks, and document every configuration "
                     "decision. Your Infrastructure as Code is clean, versioned, and reproducible."
                 ),
-                expertise=["Terraform", "Docker", "Kubernetes", "Ansible", "CI/CD pipelines"],
+                expertise=[
+                    "Terraform",
+                    "Docker",
+                    "Kubernetes",
+                    "Ansible",
+                    "CI/CD pipelines",
+                ],
                 personality="precise and efficient; prefers declarative over imperative",
                 cache=True,  # Cache file reads for efficiency
             ),
@@ -253,7 +266,12 @@ DEVOPS_TEAM_SPECS: Dict[str, TeamSpec] = {
                     "containerized, what can share base images, and what should stay external. "
                     "You spot anti-patterns like running as root or storing state in containers."
                 ),
-                expertise=["Docker", "OCI standards", "container runtimes", "Linux namespaces"],
+                expertise=[
+                    "Docker",
+                    "OCI standards",
+                    "container runtimes",
+                    "Linux namespaces",
+                ],
                 personality="analytical and pragmatic; focuses on containerization readiness",
                 memory=True,  # Share analysis with engineer
             ),
@@ -289,7 +307,12 @@ DEVOPS_TEAM_SPECS: Dict[str, TeamSpec] = {
                     "orchestration environments, handle restarts gracefully, and produce proper logs. "
                     "You reject images that don't meet security baselines."
                 ),
-                expertise=["container scanning", "Trivy", "Clair", "container orchestration"],
+                expertise=[
+                    "container scanning",
+                    "Trivy",
+                    "Clair",
+                    "container orchestration",
+                ],
                 personality="security-conscious; rejects insecure configurations",
             ),
         ],
@@ -335,7 +358,13 @@ DEVOPS_TEAM_SPECS: Dict[str, TeamSpec] = {
                     "clear runbooks, your dashboards tell stories, and your metrics have proper "
                     "cardinality. You avoid alert fatigue by setting meaningful thresholds."
                 ),
-                expertise=["Prometheus", "Grafana", "Alertmanager", "Loki", "OpenTelemetry"],
+                expertise=[
+                    "Prometheus",
+                    "Grafana",
+                    "Alertmanager",
+                    "Loki",
+                    "OpenTelemetry",
+                ],
                 personality="systematic; believes in infrastructure as code for monitoring too",
             ),
         ],
@@ -430,7 +459,11 @@ DEVOPS_TEAM_SPECS: Dict[str, TeamSpec] = {
                     "You know the OWASP Top 10, CIS benchmarks, and cloud security best practices. "
                     "You prioritize findings by exploitability and impact."
                 ),
-                expertise=["vulnerability scanning", "penetration testing", "CIS benchmarks"],
+                expertise=[
+                    "vulnerability scanning",
+                    "penetration testing",
+                    "CIS benchmarks",
+                ],
                 personality="thorough and paranoid; assumes everything is vulnerable",
             ),
             TeamMemberSpec(
@@ -458,7 +491,11 @@ DEVOPS_TEAM_SPECS: Dict[str, TeamSpec] = {
                     "create phased approaches. Your plans are specific, achievable, and "
                     "include verification steps."
                 ),
-                expertise=["risk assessment", "remediation planning", "security roadmaps"],
+                expertise=[
+                    "risk assessment",
+                    "remediation planning",
+                    "security roadmaps",
+                ],
                 personality="pragmatic; balances security with operability",
             ),
         ],

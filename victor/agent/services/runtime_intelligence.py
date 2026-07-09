@@ -1183,7 +1183,9 @@ class RuntimeIntelligenceService:
         container: Any,
     ) -> Optional["LLMDecisionServiceProtocol"]:
         """Resolve the decision service from a DI container when available."""
-        from victor.agent.services.protocols.decision_service import get_decision_service
+        from victor.agent.services.protocols.decision_service import (
+            get_decision_service,
+        )
 
         return get_decision_service(container)
 

@@ -114,10 +114,12 @@ class TypeScriptPlugin(BaseLanguagePlugin):
                 QueryPattern("class", "(class_declaration name: (type_identifier) @name) @def"),
                 QueryPattern("function", "(function_declaration name: (identifier) @name) @def"),
                 QueryPattern(
-                    "function", "(method_signature name: (property_identifier) @name) @def"
+                    "function",
+                    "(method_signature name: (property_identifier) @name) @def",
                 ),
                 QueryPattern(
-                    "function", "(method_definition name: (property_identifier) @name) @def"
+                    "function",
+                    "(method_definition name: (property_identifier) @name) @def",
                 ),
                 QueryPattern(
                     "function",

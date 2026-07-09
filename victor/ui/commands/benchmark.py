@@ -1869,7 +1869,9 @@ async def _run_benchmark_async(
                         and getattr(config, "eval_backend", None) == "docker"
                         and getattr(benchmark_task, "repo", None)
                     ):
-                        from victor.evaluation.benchmarks.swe_bench import SWEBenchRunner
+                        from victor.evaluation.benchmarks.swe_bench import (
+                            SWEBenchRunner,
+                        )
 
                         _verify_runner = SWEBenchRunner()
 

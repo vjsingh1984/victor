@@ -916,7 +916,12 @@ async def web_fetch(
         if not content:
             return {"success": False, "error": "No content could be extracted from URL"}
 
-        result_payload = {"success": True, "content": content, "url": url, "render": "http"}
+        result_payload = {
+            "success": True,
+            "content": content,
+            "url": url,
+            "render": "http",
+        }
         if cache is not None:
             cache.set(
                 ResultType.SEARCH,

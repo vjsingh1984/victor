@@ -117,7 +117,11 @@ _MAPPERS: Dict[DecisionType, Callable[[str, float], Optional[Any]]] = {
     ),
     DecisionType.TASK_COMPLETION: _map_completion,
     DecisionType.TOOL_NECESSITY: lambda label, conf: _map_bool(
-        label, conf, ToolNecessityDecision, "requires_tools", ("requires_tools", "true", "yes")
+        label,
+        conf,
+        ToolNecessityDecision,
+        "requires_tools",
+        ("requires_tools", "true", "yes"),
     ),
     DecisionType.INTENT_CLASSIFICATION: lambda label, conf: _map_enum(
         label, conf, IntentDecision, "intent", IntentType
@@ -244,14 +248,22 @@ class LocalClassifierDecisionService:
         # Fast path: heuristic already confident enough.
         if heuristic_confidence >= self._heuristic_threshold:
             return self._result(
-                decision_type, heuristic_result, "heuristic", heuristic_confidence, start
+                decision_type,
+                heuristic_result,
+                "heuristic",
+                heuristic_confidence,
+                start,
             )
 
         # No artifact / unsupported type -> defer to heuristic.
         mapper = _MAPPERS.get(decision_type)
         if self._model is None or mapper is None:
             return self._result(
-                decision_type, heuristic_result, "heuristic", heuristic_confidence, start
+                decision_type,
+                heuristic_result,
+                "heuristic",
+                heuristic_confidence,
+                start,
             )
 
         text = _extract_text(decision_type, context)
@@ -263,14 +275,22 @@ class LocalClassifierDecisionService:
         if label is None:
             # Unconfident (below τ) -> defer to heuristic.
             return self._result(
-                decision_type, heuristic_result, "heuristic", heuristic_confidence, start
+                decision_type,
+                heuristic_result,
+                "heuristic",
+                heuristic_confidence,
+                start,
             )
 
         decision = mapper(label, confidence)
         if decision is None:
             # Predicted label doesn't map to a valid enum value -> defer.
             return self._result(
-                decision_type, heuristic_result, "heuristic", heuristic_confidence, start
+                decision_type,
+                heuristic_result,
+                "heuristic",
+                heuristic_confidence,
+                start,
             )
 
         self._metrics.llm_calls += 1  # reuse field as "classifier decisions served"

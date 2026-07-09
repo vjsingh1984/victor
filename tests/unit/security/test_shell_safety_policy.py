@@ -78,7 +78,8 @@ def _benchmark(**kw) -> DamageScopedShellSafetyPolicy:
 
 
 @pytest.mark.parametrize(
-    "cmd", ["rm -rf /", "rm -rf /*", "dd if=/dev/zero of=/dev/sda", "mkfs.ext4 /dev/sda1"]
+    "cmd",
+    ["rm -rf /", "rm -rf /*", "dd if=/dev/zero of=/dev/sda", "mkfs.ext4 /dev/sda1"],
 )
 def test_l0_catastrophic_denied_in_every_profile(cmd):
     for profile in (
@@ -123,7 +124,11 @@ def test_mined_corpus_allowed_in_workspace_benchmark(cmd):
 
 def test_mined_corpus_allowed_in_workspace_strict():
     # Non-network in-workspace writes are allowed under STRICT too.
-    for cmd in ("echo hi > out.txt", "sed -i 's/a/b/' src/mod.py", "rm build/artifact.o"):
+    for cmd in (
+        "echo hi > out.txt",
+        "sed -i 's/a/b/' src/mod.py",
+        "rm build/artifact.o",
+    ):
         d = _strict().evaluate(_ctx(cmd))
         assert d.verdict is SafetyVerdict.ALLOW, f"{cmd!r} -> {d}"
 
@@ -240,7 +245,9 @@ def test_write_command_effective_readonly_false():
 
 def test_deny_pattern_forces_deny():
     pol = DamageScopedShellSafetyPolicy(
-        profile=ShellSafetyProfile.BENCHMARK, workspace_root=REPO, deny_patterns=[r"\bshutdown\b"]
+        profile=ShellSafetyProfile.BENCHMARK,
+        workspace_root=REPO,
+        deny_patterns=[r"\bshutdown\b"],
     )
     d = pol.evaluate(_ctx("echo running shutdown now"))
     assert d.verdict is SafetyVerdict.DENY
@@ -370,7 +377,9 @@ def test_configure_from_session_derives_workspace_from_settings():
 
 def test_session_config_from_cli_flags_shell_safety():
     sc = SessionConfig.from_cli_flags(
-        shell_safety_profile="benchmark", shell_workspace_root=REPO, shell_allow_network=True
+        shell_safety_profile="benchmark",
+        shell_workspace_root=REPO,
+        shell_allow_network=True,
     )
     assert sc.shell_safety.profile == "benchmark"
     assert sc.shell_safety.workspace_root == REPO

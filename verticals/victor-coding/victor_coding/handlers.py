@@ -47,7 +47,9 @@ from victor_contracts.workflows import (
 )
 
 if TYPE_CHECKING:
-    from victor_contracts.verticals.protocols.tools import ToolRegistryProtocol as ToolRegistry
+    from victor_contracts.verticals.protocols.tools import (
+        ToolRegistryProtocol as ToolRegistry,
+    )
     from victor_contracts.workflows import ComputeNodeProtocol as ComputeNode
     from victor_contracts.workflows import WorkflowContextProtocol as WorkflowContext
 

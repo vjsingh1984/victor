@@ -331,7 +331,9 @@ class CppPlugin(BaseLanguagePlugin):
                     if child.type == "field_declaration_list":
                         for grandchild in child.children:
                             traverse(
-                                grandchild, class_name or enclosing_function, namespace_context
+                                grandchild,
+                                class_name or enclosing_function,
+                                namespace_context,
                             )
                     else:
                         traverse(child, enclosing_function, namespace_context)

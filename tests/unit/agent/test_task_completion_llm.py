@@ -230,7 +230,10 @@ class TestTaskCompletionLocalClassifierGate:
 
         monkeypatch.setattr("victor.config.decision_settings.DecisionServiceSettings", _Enabled)
         service = _make_decision_service(
-            is_complete=False, confidence=0.9, phase="working", source="local_classifier"
+            is_complete=False,
+            confidence=0.9,
+            phase="working",
+            source="local_classifier",
         )
         detector = TaskCompletionDetector(decision_service=service)
         assert detector.get_completion_confidence() == CompletionConfidence.NONE

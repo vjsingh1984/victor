@@ -46,14 +46,20 @@ async def test_no_trace_uses_static_preference():
 
 async def test_over_budget_trace_biases_to_local():
     eng = _engine("high")  # static pref would favor cloud; trace must override
-    trace = {"total_cost_usd": _COST_TRACE_USD_THRESHOLD + 0.01, "duration_seconds": 1.0}
+    trace = {
+        "total_cost_usd": _COST_TRACE_USD_THRESHOLD + 0.01,
+        "duration_seconds": 1.0,
+    }
     assert await eng._score_cost("ollama", cost_trace=trace) == 1.0
     assert await eng._score_cost("anthropic", cost_trace=trace) == 0.2
 
 
 async def test_slow_trace_biases_to_local():
     eng = _engine("high")
-    trace = {"total_cost_usd": 0.0, "duration_seconds": _COST_TRACE_LATENCY_THRESHOLD_S + 5}
+    trace = {
+        "total_cost_usd": 0.0,
+        "duration_seconds": _COST_TRACE_LATENCY_THRESHOLD_S + 5,
+    }
     assert await eng._score_cost("vllm", cost_trace=trace) == 1.0
     assert await eng._score_cost("openai", cost_trace=trace) == 0.2
 

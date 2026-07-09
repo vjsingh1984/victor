@@ -122,7 +122,12 @@ class TestPerFileIsolation:
         file_a.write_text("VALUE_A = 1\n")
         result = await edit(
             ops=[
-                {"type": "replace", "path": str(file_a), "old_str": "NOPE", "new_str": "x"},
+                {
+                    "type": "replace",
+                    "path": str(file_a),
+                    "old_str": "NOPE",
+                    "new_str": "x",
+                },
             ]
         )
         assert result["success"] is False
@@ -156,9 +161,24 @@ class TestPerFileIsolation:
 
         result = await edit(
             ops=[
-                {"type": "replace", "path": str(file_a), "old_str": "A1", "new_str": "A1x"},
-                {"type": "replace", "path": str(file_a), "old_str": "NOMATCH", "new_str": "z"},
-                {"type": "replace", "path": str(file_b), "old_str": "B1", "new_str": "B1x"},
+                {
+                    "type": "replace",
+                    "path": str(file_a),
+                    "old_str": "A1",
+                    "new_str": "A1x",
+                },
+                {
+                    "type": "replace",
+                    "path": str(file_a),
+                    "old_str": "NOMATCH",
+                    "new_str": "z",
+                },
+                {
+                    "type": "replace",
+                    "path": str(file_b),
+                    "old_str": "B1",
+                    "new_str": "B1x",
+                },
             ]
         )
         # File A unchanged (its group failed atomically)...

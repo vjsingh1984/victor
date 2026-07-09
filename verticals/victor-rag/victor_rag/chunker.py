@@ -154,7 +154,9 @@ def detect_document_type(source: str, content: str) -> str:
 
     # HTML detection - look for HTML tags
     if re.search(
-        r"<(!DOCTYPE|html|head|body|div|p|table|section)\b", content_sample, re.IGNORECASE
+        r"<(!DOCTYPE|html|head|body|div|p|table|section)\b",
+        content_sample,
+        re.IGNORECASE,
     ):
         logger.debug("Detected doc_type=html from content")
         return "html"
@@ -181,7 +183,9 @@ def detect_document_type(source: str, content: str) -> str:
 
     # Code detection - function/class definitions
     if re.search(
-        r"^(def |class |function |fn |func |import |from |package )", content_sample, re.MULTILINE
+        r"^(def |class |function |fn |func |import |from |package )",
+        content_sample,
+        re.MULTILINE,
     ):
         logger.debug("Detected doc_type=code from content")
         return "code"

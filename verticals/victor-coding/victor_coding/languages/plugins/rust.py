@@ -157,7 +157,10 @@ class RustPlugin(BaseLanguagePlugin):
             file_pattern="*_test.rs",
             discover_args=["--no-run"],
             run_args=["--", "--nocapture"],
-            coverage_args=["--", "--show-output"],  # Use cargo-tarpaulin for real coverage
+            coverage_args=[
+                "--",
+                "--show-output",
+            ],  # Use cargo-tarpaulin for real coverage
             parallel_args=["--", "--test-threads=auto"],
             output_format="text",
         )
@@ -345,7 +348,12 @@ class RustPlugin(BaseLanguagePlugin):
         order, none of which the shared traverser models.
         """
         results: List[tuple["Node", str, Optional[int], Optional[str]]] = []
-        _SKIP = {"string_literal", "raw_string_literal", "line_comment", "block_comment"}
+        _SKIP = {
+            "string_literal",
+            "raw_string_literal",
+            "line_comment",
+            "block_comment",
+        }
 
         def walk(
             node: "Node",
@@ -369,7 +377,12 @@ class RustPlugin(BaseLanguagePlugin):
                 new_scope = {"bindings": {}, "impl_type": current_impl}
                 self._populate_parameter_bindings(node, new_scope)
                 for child in node.children:
-                    walk(child, scope_stack + [new_scope], fn_name or caller_name, current_impl)
+                    walk(
+                        child,
+                        scope_stack + [new_scope],
+                        fn_name or caller_name,
+                        current_impl,
+                    )
                 return
 
             if nt == "let_declaration":

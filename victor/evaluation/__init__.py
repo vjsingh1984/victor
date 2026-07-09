@@ -280,7 +280,9 @@ from victor.evaluation.judge_calibration_harness import (
     make_outcome_executor,
     make_scripted_executor,
 )
-from victor.evaluation.calibration_corpus import default_corpus as default_calibration_corpus
+from victor.evaluation.calibration_corpus import (
+    default_corpus as default_calibration_corpus,
+)
 from victor.evaluation.calibration_agent_executor import (
     execute_verifiable_task,
     make_agent_executor,

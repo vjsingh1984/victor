@@ -150,7 +150,10 @@ class OperationStats:
                 if update_ewma:
                     self.python_ewma_samples += 1
                     self.python_ewma_ms = _ewma_update(
-                        self.python_ewma_ms, duration_ms, alpha, self.python_ewma_samples
+                        self.python_ewma_ms,
+                        duration_ms,
+                        alpha,
+                        self.python_ewma_samples,
                     )
 
     def preferred_backend(self, min_samples: Optional[int] = None) -> Optional[str]:

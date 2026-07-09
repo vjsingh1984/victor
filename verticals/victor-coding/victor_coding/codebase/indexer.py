@@ -43,7 +43,10 @@ from tree_sitter import Query
 
 from victor_coding.codebase.graph.protocol import GraphEdge, GraphNode
 from victor_coding.codebase.tree_sitter_extractor import TreeSitterExtractor
-from victor_coding.codebase.unified_extractor import UnifiedSymbolExtractor, EnrichedSymbol
+from victor_coding.codebase.unified_extractor import (
+    UnifiedSymbolExtractor,
+    EnrichedSymbol,
+)
 from victor_coding.languages.registry import get_language_registry
 from victor_coding.languages.tiers import get_tier, LanguageTier
 from victor_coding.codebase.graph.registry import create_graph_store
@@ -1805,7 +1808,11 @@ class CodebaseIndex:
         return language.startswith("config")
 
     def _extract_references(
-        self, file_path: Path, language: str, fallback_calls: List[str], imports: List[str]
+        self,
+        file_path: Path,
+        language: str,
+        fallback_calls: List[str],
+        imports: List[str],
     ) -> List[str]:
         """Extract identifier references using tree-sitter when available."""
         refs: Set[str] = set(fallback_calls) | set(imports)
@@ -2953,7 +2960,10 @@ class CodebaseIndex:
             config: Embedding configuration dict (overrides settings if provided)
         """
         try:
-            from victor_coding.codebase.embeddings import EmbeddingConfig, EmbeddingRegistry
+            from victor_coding.codebase.embeddings import (
+                EmbeddingConfig,
+                EmbeddingRegistry,
+            )
 
             # Create config with defaults from settings
             if not config:

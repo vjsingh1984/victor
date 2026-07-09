@@ -55,7 +55,9 @@ class TestTreeSitterEntityExtractor:
     @pytest.fixture
     def extractor(self):
         """Create extractor instance."""
-        from victor.storage.memory.extractors.tree_sitter_extractor import TreeSitterEntityExtractor
+        from victor.storage.memory.extractors.tree_sitter_extractor import (
+            TreeSitterEntityExtractor,
+        )
 
         return TreeSitterEntityExtractor(auto_discover_plugins=True)
 
@@ -186,7 +188,9 @@ class TestTreeSitterFileExtractor:
     @pytest.fixture
     def extractor(self):
         """Create file extractor instance."""
-        from victor.storage.memory.extractors.tree_sitter_extractor import TreeSitterFileExtractor
+        from victor.storage.memory.extractors.tree_sitter_extractor import (
+            TreeSitterFileExtractor,
+        )
 
         return TreeSitterFileExtractor()
 

@@ -29,7 +29,9 @@ from victor_contracts.verticals import (
     MiddlewareProtocol,
     MiddlewareResult,
 )
-from victor_contracts.middleware_runtime import GitSafetyMiddleware as _FrameworkGitSafety
+from victor_contracts.middleware_runtime import (
+    GitSafetyMiddleware as _FrameworkGitSafety,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -237,7 +239,10 @@ class CodeCorrectionMiddleware(MiddlewareProtocol):
         if inner is None:
             # Return a minimal "no issues" result
             from victor_contracts.middleware_runtime import CorrectionResult
-            from victor_contracts.middleware_runtime import CodeValidationResult, Language
+            from victor_contracts.middleware_runtime import (
+                CodeValidationResult,
+                Language,
+            )
 
             return CorrectionResult(
                 original_code="",

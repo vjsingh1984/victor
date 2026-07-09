@@ -50,7 +50,9 @@ class UnifiedRagParser(argparse.ArgumentParser):
 
 def create_rag_parser() -> UnifiedRagParser:
     parser = UnifiedRagParser(
-        prog="rag", description="Unified RAG knowledge-base operations.", exit_on_error=False
+        prog="rag",
+        description="Unified RAG knowledge-base operations.",
+        exit_on_error=False,
     )
     subparsers = parser.add_subparsers(dest="subcommand", help="The operation to perform")
 
@@ -71,7 +73,10 @@ def create_rag_parser() -> UnifiedRagParser:
     query.add_argument("question")
     query.add_argument("--k", default=5, type=int)
     query.add_argument(
-        "--no-synthesize", dest="synthesize", action="store_false", help="Context only, no LLM"
+        "--no-synthesize",
+        dest="synthesize",
+        action="store_false",
+        help="Context only, no LLM",
     )
     query.add_argument("--provider", default=None)
     query.add_argument("--model", default=None)
@@ -144,7 +149,14 @@ def _format_tool_result(result: Any) -> str:
     danger_level=DangerLevel.LOW,
     execution_category=ExecutionCategory.MIXED,
     priority=Priority.MEDIUM,
-    keywords=["rag", "knowledge base", "embedding", "vector", "retrieval", "semantic search"],
+    keywords=[
+        "rag",
+        "knowledge base",
+        "embedding",
+        "vector",
+        "retrieval",
+        "semantic search",
+    ],
     task_types=["search", "analysis", "action"],
 )
 async def rag_tool(cmd: str) -> str:

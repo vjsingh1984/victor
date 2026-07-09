@@ -17,7 +17,9 @@ import pytest
 
 from victor.agent.decisions import local_delta as ld
 from victor.agent.decisions.schemas import DecisionType
-from victor.agent.services.local_classifier_service import LocalClassifierDecisionService
+from victor.agent.services.local_classifier_service import (
+    LocalClassifierDecisionService,
+)
 from victor.core.database import get_project_database
 from victor.core.schema import Tables
 from victor.ml.model import DecisionHead, EdgeClassifierModel

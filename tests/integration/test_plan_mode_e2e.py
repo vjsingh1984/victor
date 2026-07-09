@@ -58,7 +58,9 @@ class TestPlanModeApprovalFlow:
         # PlanningConfig.auto_approve defaults to True (intended production
         # behavior). Opt into the interactive-approval path under test.
         coordinator = PlanningCoordinator(
-            mock_orchestrator, config=PlanningConfig(auto_approve=False), renderer=mock_renderer
+            mock_orchestrator,
+            config=PlanningConfig(auto_approve=False),
+            renderer=mock_renderer,
         )
 
         # Create a test plan
@@ -175,7 +177,9 @@ class TestPlanPersistence:
         # PlanningConfig.auto_approve defaults to True (intended production
         # behavior). Opt into the interactive-approval path under test.
         coordinator = PlanningCoordinator(
-            mock_orchestrator, config=PlanningConfig(auto_approve=False), renderer=mock_renderer
+            mock_orchestrator,
+            config=PlanningConfig(auto_approve=False),
+            renderer=mock_renderer,
         )
 
         plan = ReadableTaskPlan(
@@ -223,7 +227,9 @@ class TestPlanPersistence:
         # PlanningConfig.auto_approve defaults to True (intended production
         # behavior). Opt into the interactive-approval path under test.
         coordinator = PlanningCoordinator(
-            mock_orchestrator, config=PlanningConfig(auto_approve=False), renderer=mock_renderer
+            mock_orchestrator,
+            config=PlanningConfig(auto_approve=False),
+            renderer=mock_renderer,
         )
 
         plan = ReadableTaskPlan(
@@ -270,7 +276,9 @@ class TestPlanPersistence:
         # PlanningConfig.auto_approve defaults to True (intended production
         # behavior). Opt into the interactive-approval path under test.
         coordinator = PlanningCoordinator(
-            mock_orchestrator, config=PlanningConfig(auto_approve=False), renderer=mock_renderer
+            mock_orchestrator,
+            config=PlanningConfig(auto_approve=False),
+            renderer=mock_renderer,
         )
 
         plan1 = ReadableTaskPlan(
@@ -318,7 +326,9 @@ class TestPlanModeRenderingIntegration:
         # PlanningConfig.auto_approve defaults to True (intended production
         # behavior). Opt into the interactive-approval path under test.
         coordinator = PlanningCoordinator(
-            mock_orchestrator, config=PlanningConfig(auto_approve=False), renderer=mock_renderer
+            mock_orchestrator,
+            config=PlanningConfig(auto_approve=False),
+            renderer=mock_renderer,
         )
 
         plan = ReadableTaskPlan(
@@ -377,7 +387,9 @@ class TestPlanModeRenderingIntegration:
         # PlanningConfig.auto_approve defaults to True (intended production
         # behavior). Opt into the interactive-approval path under test.
         coordinator = PlanningCoordinator(
-            mock_orchestrator, config=PlanningConfig(auto_approve=False), renderer=mock_renderer
+            mock_orchestrator,
+            config=PlanningConfig(auto_approve=False),
+            renderer=mock_renderer,
         )
 
         plan = ReadableTaskPlan(
@@ -443,7 +455,9 @@ class TestPlanModeEndToEnd:
         # PlanningConfig.auto_approve defaults to True (intended production
         # behavior). Opt into the interactive-approval path under test.
         coordinator = PlanningCoordinator(
-            mock_orchestrator, config=PlanningConfig(auto_approve=False), renderer=mock_renderer
+            mock_orchestrator,
+            config=PlanningConfig(auto_approve=False),
+            renderer=mock_renderer,
         )
 
         # Simulate user approving the plan
@@ -525,7 +539,9 @@ class TestPlanModeEndToEnd:
         # PlanningConfig.auto_approve defaults to True (intended production
         # behavior). Opt into the interactive-approval path under test.
         coordinator = PlanningCoordinator(
-            mock_orchestrator, config=PlanningConfig(auto_approve=False), renderer=mock_renderer
+            mock_orchestrator,
+            config=PlanningConfig(auto_approve=False),
+            renderer=mock_renderer,
         )
 
         # Create a complex multi-step plan

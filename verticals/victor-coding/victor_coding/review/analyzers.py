@@ -158,7 +158,7 @@ class ComplexityAnalyzer(BaseAnalyzer):
                             message=f"Function '{node.name}' has cyclomatic complexity {cc} (max: {threshold})",
                             file_path=file_path,
                             line=node.lineno,
-                            snippet=lines[node.lineno - 1] if node.lineno <= len(lines) else "",
+                            snippet=(lines[node.lineno - 1] if node.lineno <= len(lines) else ""),
                             suggestion="Consider breaking this function into smaller functions",
                         )
                     )
@@ -359,7 +359,7 @@ class NamingAnalyzer(BaseAnalyzer):
                             message=f"Class '{node.name}' should use PascalCase",
                             file_path=file_path,
                             line=node.lineno,
-                            snippet=lines[node.lineno - 1] if node.lineno <= len(lines) else "",
+                            snippet=(lines[node.lineno - 1] if node.lineno <= len(lines) else ""),
                             suggestion=f"Rename to '{self._to_pascal_case(node.name)}'",
                         )
                     )
@@ -389,7 +389,7 @@ class NamingAnalyzer(BaseAnalyzer):
                             message=f"Function '{node.name}' should use snake_case",
                             file_path=file_path,
                             line=node.lineno,
-                            snippet=lines[node.lineno - 1] if node.lineno <= len(lines) else "",
+                            snippet=(lines[node.lineno - 1] if node.lineno <= len(lines) else ""),
                             suggestion=f"Rename to '{self._to_snake_case(node.name)}'",
                         )
                     )
@@ -445,7 +445,7 @@ class NamingAnalyzer(BaseAnalyzer):
                             message=f"Variable '{name}' should use snake_case or UPPER_CASE",
                             file_path=file_path,
                             line=node.lineno,
-                            snippet=lines[node.lineno - 1] if node.lineno <= len(lines) else "",
+                            snippet=(lines[node.lineno - 1] if node.lineno <= len(lines) else ""),
                         )
                     )
 
@@ -693,7 +693,7 @@ class SecurityAnalyzer(BaseAnalyzer):
                             message=self.DANGEROUS_CALLS[func_name],
                             file_path=file_path,
                             line=node.lineno,
-                            snippet=lines[node.lineno - 1] if node.lineno <= len(lines) else "",
+                            snippet=(lines[node.lineno - 1] if node.lineno <= len(lines) else ""),
                         )
                     )
 

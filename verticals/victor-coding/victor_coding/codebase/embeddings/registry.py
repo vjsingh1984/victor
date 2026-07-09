@@ -17,7 +17,10 @@
 import logging
 from typing import Dict, List, Type
 
-from victor_coding.codebase.embeddings.base import BaseEmbeddingProvider, EmbeddingConfig
+from victor_coding.codebase.embeddings.base import (
+    BaseEmbeddingProvider,
+    EmbeddingConfig,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -131,7 +134,9 @@ def _auto_register_providers() -> None:
         pass  # LanceDB not installed
 
     try:
-        from victor_coding.codebase.embeddings.proximadb_provider import ProximaDBProvider
+        from victor_coding.codebase.embeddings.proximadb_provider import (
+            ProximaDBProvider,
+        )
 
         EmbeddingRegistry.register("proximadb", ProximaDBProvider)
     except ImportError:

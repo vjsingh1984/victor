@@ -52,7 +52,14 @@ def test_runner_executes_offline_and_writes_reports(tmp_path: Path) -> None:
 
 def test_runner_rejects_unknown_judge_profile(tmp_path: Path) -> None:
     result = _run(
-        ["--variants", "1", "--out", str(tmp_path), "--judge-profile", "no-such-profile-xyz"]
+        [
+            "--variants",
+            "1",
+            "--out",
+            str(tmp_path),
+            "--judge-profile",
+            "no-such-profile-xyz",
+        ]
     )
     assert result.returncode != 0
     assert "not found" in result.stderr
@@ -62,7 +69,12 @@ def test_runner_rejects_unknown_judge_profile(tmp_path: Path) -> None:
 def test_runner_help_documents_the_profile_flag() -> None:
     result = _run(["--help"], timeout=60)
     assert result.returncode == 0
-    for flag in ("--judge-profile", "--llm-judge-provider", "--llm-judge-base-url", "--variants"):
+    for flag in (
+        "--judge-profile",
+        "--llm-judge-provider",
+        "--llm-judge-base-url",
+        "--variants",
+    ):
         assert flag in result.stdout
 
 

@@ -274,7 +274,9 @@ async def test_critique_prompt_includes_original_task_and_verdict_request():
         shared_state={"generator": gen, "critic": crit},
     )
     task = AgentMessage(
-        sender_id="t", content="Implement feature X correctly", message_type=MessageType.TASK
+        sender_id="t",
+        content="Implement feature X correctly",
+        message_type=MessageType.TASK,
     )
 
     results = await ReflectionFormation(max_iterations=3).execute([], ctx, task)

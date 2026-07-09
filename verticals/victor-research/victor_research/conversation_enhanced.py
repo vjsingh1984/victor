@@ -97,10 +97,12 @@ class ResearchContext:
             hypothesis: Hypothesis statement
             status: Status (untested, testing, confirmed, rejected)
         """
-        self.hypotheses.append({
-            "statement": hypothesis,
-            "status": status,
-        })
+        self.hypotheses.append(
+            {
+                "statement": hypothesis,
+                "status": status,
+            }
+        )
         logger.debug(f"Recorded hypothesis: {hypothesis} (status={status})")
 
     def add_data_source(self, source: str, source_type: str) -> None:
@@ -110,10 +112,12 @@ class ResearchContext:
             source: Data source identifier
             source_type: Type (paper, dataset, web, api, etc.)
         """
-        self.data_sources.append({
-            "source": source,
-            "type": source_type,
-        })
+        self.data_sources.append(
+            {
+                "source": source,
+                "type": source_type,
+            }
+        )
         logger.debug(f"Recorded data source: {source} ({source_type})")
 
     def add_experiment(self, experiment: str, result: str) -> None:
@@ -123,10 +127,12 @@ class ResearchContext:
             experiment: Experiment description
             result: Result or outcome
         """
-        self.experiments.append({
-            "description": experiment,
-            "result": result,
-        })
+        self.experiments.append(
+            {
+                "description": experiment,
+                "result": result,
+            }
+        )
         logger.debug(f"Recorded experiment: {experiment}")
 
     def add_finding(self, finding: str, category: str = "general") -> None:
@@ -136,10 +142,12 @@ class ResearchContext:
             finding: Key finding or insight
             category: Category (general, methodological, data-related)
         """
-        self.findings.append({
-            "finding": finding,
-            "category": category,
-        })
+        self.findings.append(
+            {
+                "finding": finding,
+                "category": category,
+            }
+        )
         logger.debug(f"Recorded finding: {finding}")
 
 
@@ -196,7 +204,7 @@ class EnhancedResearchConversationManager:
         )
 
     # =========================================================================
-   # Message Management (delegates to ConversationCoordinator)
+    # Message Management (delegates to ConversationCoordinator)
     # =========================================================================
 
     def add_message(
@@ -239,9 +247,7 @@ class EnhancedResearchConversationManager:
         Returns:
             List of message dictionaries
         """
-        return self._conversation_coordinator.get_history(
-            max_turns, include_system, include_tool
-        )
+        return self._conversation_coordinator.get_history(max_turns, include_system, include_tool)
 
     def clear_history(self, keep_summaries: bool = True) -> None:
         """Clear conversation history.
@@ -255,7 +261,7 @@ class EnhancedResearchConversationManager:
         logger.info("Conversation history cleared")
 
     # =========================================================================
-   # Research-Specific Context Tracking
+    # Research-Specific Context Tracking
     # =========================================================================
 
     def track_research_question(self, question: str) -> None:
@@ -303,7 +309,7 @@ class EnhancedResearchConversationManager:
         self._research_context.add_finding(finding, category)
 
     # =========================================================================
-   # Summarization
+    # Summarization
     # =========================================================================
 
     def needs_summarization(self) -> bool:
@@ -379,7 +385,7 @@ class EnhancedResearchConversationManager:
         return "\n".join(parts)
 
     # =========================================================================
-   # Statistics and Observability
+    # Statistics and Observability
     # =========================================================================
 
     def get_stats(self) -> ConversationStats:

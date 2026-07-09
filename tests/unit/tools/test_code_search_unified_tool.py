@@ -46,7 +46,12 @@ class TestCodeSearchSemanticDelegation:
             return_value={
                 "success": True,
                 "results": [
-                    {"file": "auth.py", "line": 12, "score": 0.9, "snippet": "def login()"}
+                    {
+                        "file": "auth.py",
+                        "line": 12,
+                        "score": 0.9,
+                        "snippet": "def login()",
+                    }
                 ],
             }
         )

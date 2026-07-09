@@ -1726,7 +1726,9 @@ class TurnExecutor:
         orchestrator-owned :class:`TemperatureResolver`; if unavailable (state-passed contexts), fall
         back to the provider-context temperature so behaviour is never worse than before.
         """
-        from victor.agent.services.temperature_resolution import resolve_effective_temperature
+        from victor.agent.services.temperature_resolution import (
+            resolve_effective_temperature,
+        )
 
         return resolve_effective_temperature(
             self._resolve_orchestrator(),

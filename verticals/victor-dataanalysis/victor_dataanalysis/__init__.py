@@ -36,9 +36,11 @@ from victor_dataanalysis.conversation_enhanced import (
     EnhancedDataAnalysisConversationManager,
 )
 
-__all__.extend([
-    "DataAnalysisSafetyRules",
-    "EnhancedDataAnalysisSafetyExtension",
-    "DataAnalysisContext",
-    "EnhancedDataAnalysisConversationManager",
-])
+__all__.extend(
+    [
+        "DataAnalysisSafetyRules",
+        "EnhancedDataAnalysisSafetyExtension",
+        "DataAnalysisContext",
+        "EnhancedDataAnalysisConversationManager",
+    ]
+)

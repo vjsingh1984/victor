@@ -599,7 +599,7 @@ class TeamStep:
                 agent_category=TeamAgentCategory(
                     member_data.get(
                         "agent_category",
-                        "supervisor" if member_data.get("is_manager", False) else "specialist",
+                        ("supervisor" if member_data.get("is_manager", False) else "specialist"),
                     )
                 ),
                 can_delegate=member_data.get("can_delegate", False),

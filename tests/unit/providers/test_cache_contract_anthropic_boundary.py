@@ -218,7 +218,12 @@ class TestCacheMarkerPlacement:
         from victor.providers.base import Message
 
         tools = _make_tools(
-            [("read", "full"), ("write", "full"), ("search", "compact"), ("jira", "stub")]
+            [
+                ("read", "full"),
+                ("write", "full"),
+                ("search", "compact"),
+                ("jira", "stub"),
+            ]
         )
 
         async def run():

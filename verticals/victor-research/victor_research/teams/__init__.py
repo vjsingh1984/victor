@@ -207,7 +207,11 @@ RESEARCH_TEAM_SPECS: Dict[str, TeamSpec] = {
                     "triangulate important claims across multiple independent sources. You "
                     "document your search strategy and maintain impeccable research notes."
                 ),
-                expertise=["information retrieval", "source evaluation", "research methodology"],
+                expertise=[
+                    "information retrieval",
+                    "source evaluation",
+                    "research methodology",
+                ],
                 personality="curious and methodical; leaves no stone unturned",
                 memory=True,  # Persist findings for team
             ),
@@ -224,7 +228,11 @@ RESEARCH_TEAM_SPECS: Dict[str, TeamSpec] = {
                     "findings into clear frameworks and highlight both certainties and gaps "
                     "in the evidence."
                 ),
-                expertise=["data synthesis", "pattern recognition", "critical analysis"],
+                expertise=[
+                    "data synthesis",
+                    "pattern recognition",
+                    "critical analysis",
+                ],
                 personality="analytical and precise; values nuance over simplification",
                 memory=True,  # Analysis builds on research
             ),
@@ -255,7 +263,11 @@ RESEARCH_TEAM_SPECS: Dict[str, TeamSpec] = {
                     "clarity and precision, properly cite all sources, and distinguish between "
                     "established facts, likely conclusions, and areas of uncertainty."
                 ),
-                expertise=["technical writing", "academic writing", "information architecture"],
+                expertise=[
+                    "technical writing",
+                    "academic writing",
+                    "information architecture",
+                ],
                 personality="clear and thorough; makes complex simple without losing accuracy",
             ),
         ],
@@ -279,7 +291,11 @@ RESEARCH_TEAM_SPECS: Dict[str, TeamSpec] = {
                     "against each claim. You categorize claims by type: factual, statistical, "
                     "causal, or opinion-based."
                 ),
-                expertise=["logical analysis", "argumentation theory", "claim decomposition"],
+                expertise=[
+                    "logical analysis",
+                    "argumentation theory",
+                    "claim decomposition",
+                ],
                 personality="precise and logical; treats claims as puzzles to solve",
                 memory=True,  # Share parsed claims with researcher
             ),
@@ -295,7 +311,11 @@ RESEARCH_TEAM_SPECS: Dict[str, TeamSpec] = {
                     "systematically, documenting what you searched for and what you found. "
                     "You identify the strongest evidence on both sides of a claim."
                 ),
-                expertise=["evidence research", "database searching", "primary sources"],
+                expertise=[
+                    "evidence research",
+                    "database searching",
+                    "primary sources",
+                ],
                 personality="thorough and impartial; seeks truth over confirmation",
                 memory=True,  # Share evidence with reviewer
             ),
@@ -311,7 +331,11 @@ RESEARCH_TEAM_SPECS: Dict[str, TeamSpec] = {
                     "Mostly True, Mixed, Mostly False, False, Unverifiable. You always explain "
                     "your reasoning and acknowledge uncertainty when evidence is limited."
                 ),
-                expertise=["evidence evaluation", "judgment calibration", "verdict rendering"],
+                expertise=[
+                    "evidence evaluation",
+                    "judgment calibration",
+                    "verdict rendering",
+                ],
                 personality="judicious and fair; explains reasoning transparently",
             ),
         ],
@@ -335,7 +359,11 @@ RESEARCH_TEAM_SPECS: Dict[str, TeamSpec] = {
                     "and design the review to minimize them. Your protocols are clear enough "
                     "that another researcher could replicate your approach."
                 ),
-                expertise=["systematic review methodology", "research design", "PRISMA guidelines"],
+                expertise=[
+                    "systematic review methodology",
+                    "research design",
+                    "PRISMA guidelines",
+                ],
                 personality="methodical and rigorous; plans for reproducibility",
                 memory=True,  # Share protocol with searcher
             ),
@@ -351,7 +379,11 @@ RESEARCH_TEAM_SPECS: Dict[str, TeamSpec] = {
                     "wildcards, and MeSH terms. You track your searches meticulously and know "
                     "when to expand or narrow based on results."
                 ),
-                expertise=["database searching", "Boolean logic", "academic repositories"],
+                expertise=[
+                    "database searching",
+                    "Boolean logic",
+                    "academic repositories",
+                ],
                 personality="persistent and systematic; finds the unfindable",
                 memory=True,  # Share papers with analyst
             ),
@@ -368,7 +400,11 @@ RESEARCH_TEAM_SPECS: Dict[str, TeamSpec] = {
                     "You can synthesize findings across studies to identify consensus and "
                     "controversies."
                 ),
-                expertise=["data extraction", "study quality assessment", "meta-analysis"],
+                expertise=[
+                    "data extraction",
+                    "study quality assessment",
+                    "meta-analysis",
+                ],
                 personality="efficient and accurate; sees both forest and trees",
             ),
             TeamMemberSpec(
@@ -383,7 +419,11 @@ RESEARCH_TEAM_SPECS: Dict[str, TeamSpec] = {
                     "gaps, and suggesting future directions. You cite properly and present "
                     "conflicting findings fairly."
                 ),
-                expertise=["academic writing", "citation management", "synthesis writing"],
+                expertise=[
+                    "academic writing",
+                    "citation management",
+                    "synthesis writing",
+                ],
                 personality="scholarly and clear; writes for both experts and newcomers",
             ),
         ],
@@ -422,7 +462,11 @@ RESEARCH_TEAM_SPECS: Dict[str, TeamSpec] = {
                     "segments, and spot emerging opportunities. You think in frameworks: Porter's "
                     "Five Forces, SWOT, value chain analysis."
                 ),
-                expertise=["market analysis", "strategic frameworks", "trend forecasting"],
+                expertise=[
+                    "market analysis",
+                    "strategic frameworks",
+                    "trend forecasting",
+                ],
                 personality="strategic and data-driven; sees the big picture",
             ),
             TeamMemberSpec(
@@ -437,7 +481,11 @@ RESEARCH_TEAM_SPECS: Dict[str, TeamSpec] = {
                     "tables, positioning maps, feature matrices. Your reports answer 'so what?' "
                     "and 'now what?' for the reader."
                 ),
-                expertise=["business writing", "data visualization", "executive communication"],
+                expertise=[
+                    "business writing",
+                    "data visualization",
+                    "executive communication",
+                ],
                 personality="actionable and concise; respects the reader's time",
             ),
         ],
@@ -461,7 +509,11 @@ RESEARCH_TEAM_SPECS: Dict[str, TeamSpec] = {
                     "build knowledge graphs. You make connections visible and ensure nothing "
                     "important gets lost in the noise."
                 ),
-                expertise=["information architecture", "knowledge management", "content curation"],
+                expertise=[
+                    "information architecture",
+                    "knowledge management",
+                    "content curation",
+                ],
                 personality="organized and systematic; creates order from chaos",
                 memory=True,  # Share organization with analyst
             ),
@@ -497,7 +549,11 @@ RESEARCH_TEAM_SPECS: Dict[str, TeamSpec] = {
                     "Your syntheses are more than the sum of their parts - they generate new "
                     "insights that weren't visible in any single source."
                 ),
-                expertise=["narrative synthesis", "integrative writing", "insight generation"],
+                expertise=[
+                    "narrative synthesis",
+                    "integrative writing",
+                    "insight generation",
+                ],
                 personality="creative and rigorous; tells true stories with impact",
             ),
             TeamMemberSpec(
@@ -511,7 +567,11 @@ RESEARCH_TEAM_SPECS: Dict[str, TeamSpec] = {
                     "that alternative perspectives are fairly represented. You verify citations, "
                     "flag logical gaps, and ensure the final product meets professional standards."
                 ),
-                expertise=["quality assurance", "editorial review", "consistency checking"],
+                expertise=[
+                    "quality assurance",
+                    "editorial review",
+                    "consistency checking",
+                ],
                 personality="meticulous and fair; improves everything they touch",
             ),
         ],
@@ -551,7 +611,11 @@ RESEARCH_TEAM_SPECS: Dict[str, TeamSpec] = {
                     "objectively, identifying when each is appropriate. You think about edge "
                     "cases, failure modes, and long-term maintainability."
                 ),
-                expertise=["technical analysis", "architecture evaluation", "trade-off assessment"],
+                expertise=[
+                    "technical analysis",
+                    "architecture evaluation",
+                    "trade-off assessment",
+                ],
                 personality="pragmatic and thorough; considers real-world constraints",
             ),
             TeamMemberSpec(
@@ -565,7 +629,11 @@ RESEARCH_TEAM_SPECS: Dict[str, TeamSpec] = {
                     "includes working examples, common pitfalls, and clear recommendations. You "
                     "structure content so readers can find what they need quickly."
                 ),
-                expertise=["technical writing", "developer documentation", "code examples"],
+                expertise=[
+                    "technical writing",
+                    "developer documentation",
+                    "code examples",
+                ],
                 personality="clear and practical; writes what developers need",
             ),
         ],

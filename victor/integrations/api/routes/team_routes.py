@@ -199,7 +199,7 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
                             agent_category=TeamAgentCategory(
                                 m.get(
                                     "agent_category",
-                                    "supervisor" if m.get("is_manager", False) else "specialist",
+                                    ("supervisor" if m.get("is_manager", False) else "specialist"),
                                 )
                             ),
                             is_manager=m.get("is_manager", False),

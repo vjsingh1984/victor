@@ -142,7 +142,11 @@ async def test_unconfigured_raises(fake_aiohttp, request_obj):
 
 def test_teams_transport_is_registered():
     from victor.workflows.hitl import HITLMode
-    from victor.workflows.hitl_transports import TeamsConfig, TeamsTransport, get_transport
+    from victor.workflows.hitl_transports import (
+        TeamsConfig,
+        TeamsTransport,
+        get_transport,
+    )
 
     transport = get_transport(HITLMode.TEAMS, TeamsConfig())
     assert isinstance(transport, TeamsTransport)

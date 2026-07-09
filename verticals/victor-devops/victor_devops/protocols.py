@@ -148,14 +148,23 @@ class DevOpsSafetyProvider(SafetyProvider):
             # Docker dangerous commands
             {"pattern": "docker rm -f", "description": "Force remove containers"},
             {"pattern": "docker rmi -f", "description": "Force remove images"},
-            {"pattern": "docker system prune -f", "description": "Prune all Docker data"},
+            {
+                "pattern": "docker system prune -f",
+                "description": "Prune all Docker data",
+            },
             # Kubernetes dangerous commands
             {"pattern": "kubectl delete", "description": "Delete K8s resources"},
-            {"pattern": "kubectl apply --force", "description": "Force apply K8s resources"},
+            {
+                "pattern": "kubectl apply --force",
+                "description": "Force apply K8s resources",
+            },
             {"pattern": "kubectl drain", "description": "Drain K8s node"},
             # Terraform dangerous commands
             {"pattern": "terraform destroy", "description": "Destroy infrastructure"},
-            {"pattern": "terraform apply -auto-approve", "description": "Auto-approve changes"},
+            {
+                "pattern": "terraform apply -auto-approve",
+                "description": "Auto-approve changes",
+            },
             # Production dangerous commands
             {"pattern": "rm -rf /", "description": "Recursive root deletion"},
             {"pattern": "dd if=/dev/zero", "description": "Disk wiping"},

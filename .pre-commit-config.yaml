@@ -31,11 +31,11 @@ repos:
     rev: 26.3.1
     hooks:
       - id: black
-        args: [--line-length=100, --target-version=py310]
+        args: [--line-length=100, --target-version=py311]
 
   # Python linting with Ruff
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.9.6
+    rev: v0.15.20
     hooks:
       - id: ruff
         args: [--fix, --exit-non-zero-on-fix]

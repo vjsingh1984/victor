@@ -56,7 +56,11 @@ def test_action_task_still_force_adds_mutation_tools(monkeypatch):
     monkeypatch.setattr(
         rt,
         "_available_tool_defs_by_name",
-        lambda: {"edit": _tool("edit"), "write": _tool("write"), "shell": _tool("shell")},
+        lambda: {
+            "edit": _tool("edit"),
+            "write": _tool("write"),
+            "shell": _tool("shell"),
+        },
     )
     out = rt._ensure_write_tools_for_write_intent([_tool("read")], ActionIntent.WRITE_ALLOWED)
     names = {ToolSelectionRuntime._tool_name(t) for t in out}

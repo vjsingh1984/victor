@@ -91,7 +91,11 @@ class EnhancedDataAnalysisConversationManager:
 
     def get_observability_data(self) -> Dict[str, Any]:
         obs = self._conversation_coordinator.get_observability_data()
-        return {**obs, "dataanalysis_context": self._context.to_dict(), "vertical": "dataanalysis"}
+        return {
+            **obs,
+            "dataanalysis_context": self._context.to_dict(),
+            "vertical": "dataanalysis",
+        }
 
     def get_stats(self) -> ConversationStats:
         return self._conversation_coordinator.get_stats()

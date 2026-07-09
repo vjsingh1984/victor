@@ -30,7 +30,9 @@ def get_entry_point_loader_stats() -> Dict[str, Any]:
     by the lazy PEP 562 victor/__init__). A module-level delegate keeps the
     import deferred while preserving the patch seam tests rely on.
     """
-    from victor.framework.entry_point_loader import get_entry_point_loader_stats as _impl
+    from victor.framework.entry_point_loader import (
+        get_entry_point_loader_stats as _impl,
+    )
 
     return _impl()
 

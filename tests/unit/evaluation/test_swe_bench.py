@@ -177,7 +177,9 @@ class TestVerifyPatchInContainer:
             trm,
             "detect_test_runner",
             lambda project_root, test_files=None: SimpleNamespace(
-                command=["python", "-m", "pytest", "tests/"], env={}, runner_type="pytest"
+                command=["python", "-m", "pytest", "tests/"],
+                env={},
+                runner_type="pytest",
             ),
         )
 

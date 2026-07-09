@@ -87,7 +87,11 @@ def _import_callable(
     try:
         module = importlib.import_module(module_path)
     except ImportError as exc:
-        logger.debug("Vertical module '%s' not available; will use fallback: %s", module_path, exc)
+        logger.debug(
+            "Vertical module '%s' not available; will use fallback: %s",
+            module_path,
+            exc,
+        )
         return None, None
     except Exception as exc:  # pragma: no cover - defensive
         logger.debug("Vertical module '%s' failed to import: %s", module_path, exc)

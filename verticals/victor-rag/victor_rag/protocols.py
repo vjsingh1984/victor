@@ -89,7 +89,12 @@ class RAGToolSelectionStrategy(ToolSelectionStrategy):
     def get_tools_for_stage(self, stage: str, task_type: str) -> List[str]:
         """Return optimized tools for given stage and task type."""
         stage_tools: Dict[str, List[str]] = {
-            "ingest": ["document_ingest", "document_parse", "document_chunk", "vector_add"],
+            "ingest": [
+                "document_ingest",
+                "document_parse",
+                "document_chunk",
+                "vector_add",
+            ],
             "index": ["embedding_create", "vector_index", "embedding_batch"],
             "retrieve": ["semantic_search", "vector_search", "hybrid_search"],
             "rerank": ["rerank_results", "vector_search"],
@@ -113,9 +118,15 @@ class RAGSafetyProvider(SafetyProvider):
     def __init__(self):
         self._dangerous_patterns = [
             # Vector database dangerous commands
-            {"pattern": "vector_delete --all", "description": "Delete entire vector index"},
+            {
+                "pattern": "vector_delete --all",
+                "description": "Delete entire vector index",
+            },
             {"pattern": "vector_index --drop", "description": "Drop vector collection"},
-            {"pattern": "knowledge_delete --force", "description": "Force delete knowledge"},
+            {
+                "pattern": "knowledge_delete --force",
+                "description": "Force delete knowledge",
+            },
         ]
 
     def get_extensions(self) -> List[Any]:

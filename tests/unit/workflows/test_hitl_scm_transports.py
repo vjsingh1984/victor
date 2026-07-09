@@ -136,7 +136,12 @@ async def test_jira_send_creates_issue_and_poll_reads_status(monkeypatch):
         ),
     )
     t = JiraTransport(
-        JiraConfig(base_url="https://j.example", email="me@x", api_token="tok", project_key="OPS")
+        JiraConfig(
+            base_url="https://j.example",
+            email="me@x",
+            api_token="tok",
+            project_key="OPS",
+        )
     )
     ref = await t.send(_request(), "wf")
     create = next(c for c in calls if c["verb"] == "POST")
@@ -168,7 +173,8 @@ async def test_terraform_cloud_poll_maps_run_status(monkeypatch):
     assert (await t.poll("rid", ref)).approved is True
 
     _install_fake_aiohttp(
-        monkeypatch, lambda m, u: (200, {"data": {"attributes": {"status": "discarded"}}})
+        monkeypatch,
+        lambda m, u: (200, {"data": {"attributes": {"status": "discarded"}}}),
     )
     assert (await t.poll("rid", "tfc:run:run-abc")).status == HITLStatus.REJECTED
 
@@ -177,7 +183,9 @@ async def test_github_deployment_poll_resolves_when_not_pending(monkeypatch):
     # pending_deployments empty -> gate resolved; run not cancelled -> approved
     _install_fake_aiohttp(
         monkeypatch,
-        lambda m, u: (200, []) if "pending_deployments" in u else (200, {"conclusion": "success"}),
+        lambda m, u: (
+            (200, []) if "pending_deployments" in u else (200, {"conclusion": "success"})
+        ),
     )
     t = GitHubDeploymentTransport(GitHubConfig(token="t", owner="o", repo="r", environment="prod"))
     ref = await t.send(_request({"run_id": 1234}), "wf")

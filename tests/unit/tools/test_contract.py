@@ -39,7 +39,10 @@ def test_explicit_metadata_returned_as_is():
 def test_autogen_matches_generate_from_tool():
     t = _AutogenTool()
     expected = ToolMetadata.generate_from_tool(
-        name=t.name, description=t.description, parameters=t.parameters, cost_tier=t.cost_tier
+        name=t.name,
+        description=t.description,
+        parameters=t.parameters,
+        cost_tier=t.cost_tier,
     )
     assert resolve_contract(t).to_dict() == expected.to_dict()
 

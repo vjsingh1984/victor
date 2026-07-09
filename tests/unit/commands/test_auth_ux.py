@@ -19,11 +19,19 @@ from types import SimpleNamespace
 from typer.testing import CliRunner
 
 import victor.ui.commands.auth as auth
-from victor.ui.commands.auth import AuthStatus, _oauth_status_value, _provider_key_cell, auth_app
+from victor.ui.commands.auth import (
+    AuthStatus,
+    _oauth_status_value,
+    _provider_key_cell,
+    auth_app,
+)
 
 
 def test_provider_key_cell_local_configured_missing():
-    status = {"zai": {"configured": True, "source": "keyring"}, "openai": {"configured": False}}
+    status = {
+        "zai": {"configured": True, "source": "keyring"},
+        "openai": {"configured": False},
+    }
     assert _provider_key_cell("ollama", status, plain=True) == "local"
     assert _provider_key_cell("zai", status, plain=True) == "key:keyring"
     assert _provider_key_cell("openai", status, plain=True) == "missing"

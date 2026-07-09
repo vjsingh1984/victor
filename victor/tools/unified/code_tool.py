@@ -189,7 +189,10 @@ async def code_tool(cmd: str) -> str:
             return f"### ❌ ERROR\nMetrics analysis failed: {e}"
 
     elif parsed_args.subcommand == "grep":
-        from victor.tools.unified._search_helpers import format_grep_results, grep_search
+        from victor.tools.unified._search_helpers import (
+            format_grep_results,
+            grep_search,
+        )
 
         try:
             results = await grep_search(
