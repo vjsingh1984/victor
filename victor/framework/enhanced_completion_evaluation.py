@@ -136,10 +136,7 @@ class EnhancedCompletionEvaluator:
         self.enable_completion_scoring = enable_completion_scoring
         self.enable_context_keywords = enable_context_keywords
         policy = evaluation_policy or RuntimeEvaluationPolicy()
-        if (
-            completion_threshold is not None
-            and completion_threshold != policy.completion_threshold
-        ):
+        if completion_threshold is not None and completion_threshold != policy.completion_threshold:
             policy = replace(policy, completion_threshold=completion_threshold)
         self._evaluation_policy = policy
         self.completion_threshold = self._evaluation_policy.completion_threshold
@@ -162,9 +159,7 @@ class EnhancedCompletionEvaluator:
 
         # Initialize components
         self.requirement_validator = RequirementValidator()
-        self.completion_scorer = CompletionScorer(
-            default_threshold=self.completion_threshold
-        )
+        self.completion_scorer = CompletionScorer(default_threshold=self.completion_threshold)
         self.keyword_detector = ContextAwareKeywordDetector()
 
     async def evaluate(
@@ -370,9 +365,7 @@ class EnhancedCompletionEvaluator:
             logger.warning(f"Enhanced evaluation failed: {e}, falling back to legacy")
             return None
 
-    def _check_spin_detection(
-        self, spin_detector: Any, action_result: Any = None
-    ) -> Optional[Any]:
+    def _check_spin_detection(self, spin_detector: Any, action_result: Any = None) -> Optional[Any]:
         """Check for spin detection (agent stuck).
 
         Returns EvaluationResult if spin detected, None otherwise.
@@ -403,9 +396,7 @@ class EnhancedCompletionEvaluator:
             if hasattr(spin_detector, "consecutive_no_tool_turns"):
                 had_prior_tools = getattr(spin_detector, "total_tool_calls", 0) > 0
                 response_text = (
-                    self._extract_response(action_result)
-                    if action_result is not None
-                    else ""
+                    self._extract_response(action_result) if action_result is not None else ""
                 ) or ""
                 response_substantial = len(
                     response_text.strip()
@@ -617,9 +608,7 @@ class EnhancedCompletionEvaluator:
 
         # Legacy: Confidence-based fallback
         if perception is not None and hasattr(perception, "confidence"):
-            return self._evaluation_policy.get_confidence_evaluation(
-                perception.confidence
-            )
+            return self._evaluation_policy.get_confidence_evaluation(perception.confidence)
 
         # Default: continue with low confidence
         return EvaluationResult(
@@ -755,9 +744,7 @@ class EnhancedCompletionEvaluator:
             return 0.90, reasons
 
         if getattr(action_result, "has_tool_calls", False):
-            successful = max(
-                0, int(getattr(action_result, "successful_tool_count", 0) or 0)
-            )
+            successful = max(0, int(getattr(action_result, "successful_tool_count", 0) or 0))
             total = int(getattr(action_result, "tool_calls_count", 0) or 0)
             if total <= 0 and hasattr(action_result, "tool_calls"):
                 total = len(action_result.tool_calls or [])

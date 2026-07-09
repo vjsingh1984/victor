@@ -37,15 +37,11 @@ def _fake_port(turns):
     """
 
     class _Port:
-        async def stream_turn_act(
-            self, *, query, state, perception, plan, turn_index, outcome
-        ):
+        async def stream_turn_act(self, *, query, state, perception, plan, turn_index, outcome):
             chunks = turns[turn_index - 1] if turn_index - 1 < len(turns) else []
             for text in chunks:
                 yield StreamChunk(content=text)
-            outcome.turn_result = SimpleNamespace(
-                content="".join(chunks), tag=f"turn{turn_index}"
-            )
+            outcome.turn_result = SimpleNamespace(content="".join(chunks), tag=f"turn{turn_index}")
 
     return _Port()
 
@@ -96,9 +92,7 @@ async def test_run_streaming_yields_chunks_and_completes_on_first_turn():
     loop = _loop(
         port,
         evaluations=[
-            EvaluationResult(
-                decision=EvaluationDecision.COMPLETE, score=1.0, reason="done"
-            )
+            EvaluationResult(decision=EvaluationDecision.COMPLETE, score=1.0, reason="done")
         ],
     )
 
@@ -113,12 +107,8 @@ async def test_run_streaming_iterates_until_complete():
     loop = _loop(
         port,
         evaluations=[
-            EvaluationResult(
-                decision=EvaluationDecision.CONTINUE, score=0.4, reason="more"
-            ),
-            EvaluationResult(
-                decision=EvaluationDecision.COMPLETE, score=0.9, reason="done"
-            ),
+            EvaluationResult(decision=EvaluationDecision.CONTINUE, score=0.4, reason="more"),
+            EvaluationResult(decision=EvaluationDecision.COMPLETE, score=0.9, reason="done"),
         ],
     )
 
@@ -136,9 +126,7 @@ async def test_run_streaming_feeds_act_turn_result_to_evaluate():
     loop = _loop(
         port,
         evaluations=[
-            EvaluationResult(
-                decision=EvaluationDecision.COMPLETE, score=1.0, reason="done"
-            )
+            EvaluationResult(decision=EvaluationDecision.COMPLETE, score=1.0, reason="done")
         ],
     )
 
@@ -161,9 +149,7 @@ async def test_run_streaming_stops_on_fail():
     port = _fake_port([["x"]])
     loop = _loop(
         port,
-        evaluations=[
-            EvaluationResult(decision=EvaluationDecision.FAIL, score=0.0, reason="bad")
-        ],
+        evaluations=[EvaluationResult(decision=EvaluationDecision.FAIL, score=0.0, reason="bad")],
     )
 
     chunks = [c async for c in loop.run_streaming("q")]
@@ -188,9 +174,7 @@ def test_extract_turn_content_handles_empty_tool_turn():
     from victor.providers.base import CompletionResponse
 
     tool_turn = TurnResult(
-        response=CompletionResponse(
-            content="", tool_calls=[{"name": "read", "arguments": {}}]
-        ),
+        response=CompletionResponse(content="", tool_calls=[{"name": "read", "arguments": {}}]),
         tool_results=[{"success": True, "name": "read"}],
         has_tool_calls=True,
         tool_calls_count=1,
@@ -203,9 +187,7 @@ def test_extract_turn_content_handles_empty_tool_turn():
     # Raw string response and a bare CompletionResponse both coerce to a string.
     assert AgenticLoop._extract_turn_content("plain string") == "plain string"
     assert (
-        AgenticLoop._extract_turn_content(
-            SimpleNamespace(response=CompletionResponse(content="x"))
-        )
+        AgenticLoop._extract_turn_content(SimpleNamespace(response=CompletionResponse(content="x")))
         == "x"
     )
 
@@ -252,9 +234,7 @@ def test_inject_decide_nudges_noop_on_terminal_decision():
     loop = _nudge_loop(chat_ctx, should_inject_nudge=True)
 
     loop._inject_decide_nudges(
-        EvaluationResult(
-            decision=EvaluationDecision.COMPLETE, score=1.0, reason="done"
-        ),
+        EvaluationResult(decision=EvaluationDecision.COMPLETE, score=1.0, reason="done"),
         1,
         5,
     )
@@ -295,9 +275,7 @@ def test_is_terminal_answer_substantial_no_tools_true():
 
 def test_is_terminal_answer_short_after_prior_tools_true():
     # Short final answer counts once tools have already run this task.
-    assert (
-        _terminal_loop(total_tool_calls=2)._is_terminal_answer(_turn("Done.")) is True
-    )
+    assert _terminal_loop(total_tool_calls=2)._is_terminal_answer(_turn("Done.")) is True
 
 
 def test_is_terminal_answer_short_no_prior_tools_false():
@@ -306,9 +284,7 @@ def test_is_terminal_answer_short_no_prior_tools_false():
 
 def test_is_terminal_answer_tool_call_turn_false():
     assert (
-        _terminal_loop()._is_terminal_answer(
-            _turn("x" * 150, tool_calls=[{"name": "read"}])
-        )
+        _terminal_loop()._is_terminal_answer(_turn("x" * 150, tool_calls=[{"name": "read"}]))
         is False
     )
 
@@ -316,17 +292,11 @@ def test_is_terminal_answer_tool_call_turn_false():
 def test_is_terminal_answer_intent_only_false():
     # Prior tools satisfy the substance gate, but intent narration is not a final answer.
     loop = _terminal_loop(total_tool_calls=2)
-    assert (
-        loop._is_terminal_answer(_turn("I'll now read the file and summarize it."))
-        is False
-    )
+    assert loop._is_terminal_answer(_turn("I'll now read the file and summarize it.")) is False
 
 
 def test_is_terminal_answer_continuation_request_false():
-    text = (
-        "Here is the summary so far. Would you like me to continue with the next file? "
-        * 2
-    )
+    text = "Here is the summary so far. Would you like me to continue with the next file? " * 2
     assert _terminal_loop()._is_terminal_answer(_turn(text)) is False
 
 
