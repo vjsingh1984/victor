@@ -120,7 +120,7 @@ class ShellCommand(BaseSlashCommand):
 
             result = subprocess.run(
                 command,
-                shell=True,
+                shell=True,  # nosec B602 — intentional: /shell REPL runs user-typed shell input
                 capture_output=True,
                 text=True,
                 timeout=_SHELL_TIMEOUT,
