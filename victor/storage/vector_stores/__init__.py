@@ -8,7 +8,6 @@ multiple backend and embedding model options:
 
 **Vector Store Backends:**
 - **LanceDBProvider**: Production, fast, disk-based (default)
-- **ChromaDBProvider**: Development, lightweight
 - **ProximaDBProvider**: Production, fast vector + graph (recommended)
 
 **Embedding Models:**
