@@ -279,37 +279,41 @@ header = caps.section_header("Tools")  # Returns ──── Tools ────
 
 ---
 
-## Phase 6: Packaging & Distribution (PLANNED)
+## Phase 6: Packaging & Distribution (COMPLETED)
 
-### Analysis
+### Analysis & Plan
 
-Current packaging:
-- Single `victor-ai` package with all dependencies
-- No platform-specific wheels (universal wheel only)
-- Heavy dependency chain (~20 core + optional extras)
-- No binary distribution for non-Python environments
+See **`docs/architecture/phase6-packaging-plan.md`** for the full comprehensive analysis.
 
-### Proposed Distribution Strategy
+### Key Deliverables
 
-| Distribution | Format | Use Case | Priority |
-|-------------|--------|----------|----------|
-| **PyPI package** | sdist + wheel | pip install | P0 (existing) |
-| **Platform wheels** | platform-specific | pip with native deps | P1 |
-| **Standalone binary** | PyInstaller bundle | No-Python environments | P1 |
-| **Docker image** | container | CI/CD, server | P0 (existing) |
-| **Homebrew tap** | formula | macOS developers | P2 |
-| **npm package** | npm | Node.js ecosystem | P3 |
+**Document:** `docs/architecture/phase6-packaging-plan.md` (9.1 KB, 142 lines)
 
-### Proposed pyproject.toml Enhancements
+### Summary of Findings
 
-```toml
-[project.optional-dependencies]
-minimal = ["rich>=13.0", "typer>=0.12", "httpx>=0.27"]
-providers-openai = ["openai>=1.0"]
-providers-anthropic = ["anthropic>=0.30"]
-providers-ollama = ["httpx>=0.27"]
-providers-all = ["victor-ai[providers-openai]", "victor-ai[providers-anthropic]", "victor-ai[providers-ollama]"]
-```
+**Current state:** Monolithic victor-ai wheel shipping ~1,900 Python files (~818K LOC) with ~20 core deps and ~30 optional extras.
+
+**Sprawl issues identified:**
+- Monolithic core (no lazy-load boundaries)
+- Redundant HTTP clients (httpx + aiohttp + requests)
+- Cloud SDK sprawl (boto3, google, kubernetes -- each 20-50MB)
+- Rust build friction (no pre-built wheels)
+- No minimal install option
+
+**9 Recommendations:**
+1. Audit/consolidate redundant imports (fnmatch, argparse, requests, aiofiles, tomli)
+2. Move providers and UI to optional extras
+3. Publish victor_native as separate PyPI package with platform wheels (5 platforms)
+4. Split victor-ai-core from victor-ai for modular installs
+5. Add minimal/standard/full extras for tiered installs
+6. Add PyInstaller standalone binary
+7. Add Homebrew formula for macOS
+8. Adopt .victor/config.yaml per-project config (inspired by Claude Code/OpenCode)
+9. Keep victor.plugins entry points (unique differentiator)
+
+**Competitor analysis:** Claude Code (npm, ~50MB), Codex CLI (npm, ~40MB), OpenCode (pip, ~30MB), Aider (pip, ~100MB)
+
+**Estimated effort:** 12-19 days across 6 sub-phases (6a-6f)
 
 ---
 
