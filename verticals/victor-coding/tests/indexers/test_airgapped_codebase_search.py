@@ -22,19 +22,10 @@ import numpy as np
 
 from victor.storage.vector_stores.base import EmbeddingConfig
 from victor.storage.vector_stores.lancedb_provider import LanceDBProvider
-from victor.storage.vector_stores.chromadb_provider import ChromaDBProvider
 from victor.storage.vector_stores.models import (
     SentenceTransformerModel,
     EmbeddingModelConfig,
 )
-
-# Check if chromadb is available and can be imported
-try:
-    import chromadb  # noqa: F401
-
-    CHROMADB_AVAILABLE = True
-except ImportError:
-    CHROMADB_AVAILABLE = False
 
 # Check if sentence-transformers is available
 try:
@@ -80,7 +71,7 @@ class TestEmbeddingConfigDefaults:
         """Test that default configuration works offline."""
         config = EmbeddingConfig()
         assert config.embedding_model_type == "sentence-transformers"  # Offline
-        assert config.vector_store in ["lancedb", "chromadb"]  # Both work offline
+        assert config.vector_store == "lancedb"  # Default, works offline
         assert config.embedding_api_key is None  # No API key needed
 
 
@@ -295,50 +286,6 @@ class TestLanceDBProvider:
 
             assert len(results) == 1
             assert results[0].content == "test content"
-
-
-class TestChromaDBProvider:
-    """Test ChromaDB provider as alternative to LanceDB."""
-
-    @pytest.fixture
-    def temp_dir(self):
-        """Create temporary directory for testing."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            yield Path(tmpdir)
-
-    @pytest.mark.asyncio
-    @pytest.mark.skipif(
-        not CHROMADB_AVAILABLE,
-        reason="chromadb is an optional dependency (not installed)",
-    )
-    async def test_chromadb_initialization_offline(self, temp_dir):
-        """Test that ChromaDB initializes without network."""
-        config = EmbeddingConfig(
-            vector_store="chromadb",
-            embedding_model_type="sentence-transformers",
-            embedding_model_name="all-MiniLM-L12-v2",
-            persist_directory=str(temp_dir),
-            extra_config={"collection_name": "test", "dimension": 384},
-        )
-
-        with (
-            patch("chromadb.Client") as MockClient,
-            patch("sentence_transformers.SentenceTransformer") as MockST,
-        ):
-
-            mock_client = MagicMock()
-            mock_collection = MagicMock()
-            mock_client.get_or_create_collection.return_value = mock_collection
-            MockClient.return_value = mock_client
-
-            mock_model = MagicMock()
-            mock_model.get_sentence_embedding_dimension.return_value = 384
-            MockST.return_value = mock_model
-
-            provider = ChromaDBProvider(config)
-            await provider.initialize()
-
-            assert provider._initialized
 
 
 class TestMemoryOptimization:
