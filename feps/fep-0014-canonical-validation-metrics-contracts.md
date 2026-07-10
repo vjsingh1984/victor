@@ -251,12 +251,34 @@ None new. Consolidation only.
 
 **Deliverable**: canonical contracts exist; guard in place (initially xfail-listing known dupes).
 
-### Phase 2: Migrate consumers (N small PRs, one per owning subsystem)
-- [ ] `config/validation.py`, `framework/middleware.py`, `framework/capabilities/validation.py` → re-export canonical severity/result.
-- [ ] `tools/tool_call_validator.py`, `config/connection_validation.py`, `workflows/protocols.py`, `framework/requirement_validator.py` → migrate result field access via adapters.
-- [ ] Tag the five `MetricsCollector`s as implementing `MetricsCollectorProtocol`.
+### Phase 2: Migrate consumers (detailed — informed by Phase 1 findings)
 
-**Deliverable**: all consumers on canonical types; guard's xfail list empties.
+**Phase 1 discovery that reshapes this phase**: the five `ValidationResult` types are **not one concept** (same name, different meaning — verified by reading each). They split into "true duplicate → migrate" vs "different concept → rename". Blindly re-pointing all five at the canonical type would corrupt semantics. Each item below is its own small PR that also removes its entry from the guard allowlist.
+
+**2a — `ValidationSeverity` (all genuinely the same concept → re-export):**
+- [ ] `config/validation.py:26`, `framework/middleware.py:89`, `framework/capabilities/validation.py:53` → replace each local enum with `from victor.core.validation import ValidationSeverity`. Members are `{ERROR,WARNING,INFO}` (+ `CRITICAL` in middleware, already in canonical), so no member loss. Verify `severity_rank`-based comparisons where any code ordered severities.
+
+**2b — `ValidationResult` Tier A (true duplicates → migrate to canonical `{is_valid, issues}`):**
+- [ ] `tools/tool_call_validator.py:17` — `{valid, errors: list[str], warnings: list[str]}`: map `valid`→`is_valid`; wrap the `str` errors/warnings as `ValidationIssue(severity=ERROR/WARNING, message=...)`. Update call sites reading `.valid`/`.errors`/`.warnings`.
+- [ ] `framework/capabilities/validation.py:62` — `{is_valid, error_message, severity}`: closest fit; migrate to canonical, deriving `error_message` from the property.
+
+**2c — `ValidationResult` Tier B (same NAME, different CONCEPT → RENAME, do not merge):**
+- [ ] `config/connection_validation.py:54` — `{status: ValidationStatus, message, details}` is a **status-enum** result, not `bool + issues`. Rename to `ConnectionValidationResult`; keep its shape. (Removing the name from the tree satisfies the guard without a false merge.)
+- [ ] `framework/requirement_validator.py:88` — `{is_satisfied, satisfaction_score, …}` is a **requirement-satisfaction** value object (1 importer). Rename to `RequirementResult`.
+- Note: `workflows/protocols.py:759` `ValidationResult` exists only inside a docstring example — no code change; already excluded from the guard.
+
+**2d — `MetricsCollector` → conform to `MetricsCollectorProtocol` via ADAPTER METHODS (ratified approach):**
+Phase 1 found the five collectors share no public method today (`record` vs `record_tool_execution`/`record_first_token`; `get_snapshot` vs `get_summary`/`get_metrics`). Rather than narrow the protocol, add **thin adapter methods** to each so they satisfy `record_metric(name, value, **tags)` + `get_snapshot()`:
+- [ ] `observability/metrics.py:607` — add `record_metric`/`get_snapshot` delegating to its existing record path + `get_summary`.
+- [ ] `framework/observability/metrics.py:1124` — already has `get_snapshot`; add `record_metric` delegating to `record`.
+- [ ] `agent/metrics_collector.py:162` — add generic `record_metric` + `get_snapshot` alongside its typed `record_*` methods.
+- [ ] `integrations/api/event_bridge.py:139`, `experiments/ab_testing/metrics.py:45` — add the two adapter methods delegating to existing internals.
+- [ ] Then assert `isinstance(x, MetricsCollectorProtocol)` for all five in a test; remove the Phase-1 "not-yet-conforming" baseline assertion.
+
+**2e — Prep quick-win (unblocks the canonical name):**
+- [ ] Rename `core/pickle_cache.py:ValidationResult{ok,delete,reason}` → `CacheValidation` (3 in-tree sites: `semantic_selector.py`, `collections.py`, `test_pickle_cache.py`). An unrelated collision introduced by PR #449; renaming removes that pragmatic guard-allowlist entry.
+
+**Deliverable**: guard allowlist empties (the done-signal); every consumer on the canonical severity/result or an honestly-renamed distinct type; all five collectors conform to `MetricsCollectorProtocol`.
 
 ### Phase 3: Remove shims (1 PR, next minor)
 - [ ] Delete the re-export shims and duplicate definitions.
