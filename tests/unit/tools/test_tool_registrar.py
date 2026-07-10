@@ -277,25 +277,37 @@ class TestDynamicToolRegistration:
         This test verifies at least one of those search-capable domains is
         registered via dynamic discovery.
         """
-        settings = MagicMock()
-        settings.load_tool_config.return_value = {}
-        # Force non-lazy mode for this test
-        config = ToolRegistrarConfig(lazy_startup=False)
-        registrar = ToolRegistrar(
-            tools=ToolRegistry(),
-            settings=settings,
-            config=config,
-        )
+        # _register_dynamic_tools reads the process-global SharedToolRegistry
+        # singleton; a prior test in the same shard can leave it in a state that
+        # yields zero tools (test-isolation/ordering flake). Reset to a clean
+        # instance so this test is self-contained (mirrors the pattern in
+        # tests/unit/core/test_shared_tool_registry.py), and reset again after so
+        # we don't leak our populated singleton to later tests.
+        from victor.agent.shared_tool_registry import SharedToolRegistry
 
-        count = registrar._register_dynamic_tools()
+        SharedToolRegistry.reset_instance()
+        try:
+            settings = MagicMock()
+            settings.load_tool_config.return_value = {}
+            # Force non-lazy mode for this test
+            config = ToolRegistrarConfig(lazy_startup=False)
+            registrar = ToolRegistrar(
+                tools=ToolRegistry(),
+                settings=settings,
+                config=config,
+            )
 
-        assert count > 0
-        tool_names = [t.name for t in registrar.tools.list_tools()]
-        # ``code`` and ``fs`` are the unified command domains that own search.
-        has_search_domain = any(name in {"code", "fs", "search"} for name in tool_names)
-        assert (
-            has_search_domain
-        ), f"Expected a search-capable unified domain (code/fs/search), got: {tool_names[:10]}..."
+            count = registrar._register_dynamic_tools()
+
+            assert count > 0
+            tool_names = [t.name for t in registrar.tools.list_tools()]
+            # ``code`` and ``fs`` are the unified command domains that own search.
+            has_search_domain = any(name in {"code", "fs", "search"} for name in tool_names)
+            assert (
+                has_search_domain
+            ), f"Expected a search-capable unified domain (code/fs/search), got: {tool_names[:10]}..."
+        finally:
+            SharedToolRegistry.reset_instance()
 
     def test_excluded_files(self, registrar):
         """Test that excluded files are not loaded."""
