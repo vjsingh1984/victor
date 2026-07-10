@@ -5,8 +5,28 @@ from unittest.mock import MagicMock
 from victor.agent.runtime.initialization_manager import (
     InitializationPhaseManager,
     InitializationResult,
+    PhaseGroup,
     PhaseResult,
 )
+
+
+def _mock_orchestrator_all_phases():
+    """A MagicMock orchestrator whose 9 _initialize_* phases are plain callables."""
+    orch = MagicMock()
+    for name in (
+        "_initialize_provider_runtime",
+        "_initialize_metrics_runtime",
+        "_initialize_workflow_runtime",
+        "_initialize_memory_runtime",
+        "_initialize_resilience_runtime",
+        "_initialize_coordination_runtime",
+        "_initialize_interaction_runtime",
+        "_initialize_services",
+        "_initialize_credit_runtime",
+    ):
+        setattr(orch, name, MagicMock())
+    orch._context_compactor = MagicMock()
+    return orch
 
 
 class TestPhaseResult:
@@ -112,3 +132,73 @@ class TestInitializationPhaseManager:
         assert not result.all_succeeded
         assert len(result.failed_phases) == 1
         assert result.failed_phases[0].name == "metrics_runtime"
+
+
+class TestRunGroup:
+    """FEP-0016: phases run in three groups at construction boundaries."""
+
+    def test_group_membership(self):
+        """EARLY=4, ASSEMBLY=2, SERVICE=3, covering all 9 phases exactly once."""
+        manager = InitializationPhaseManager()
+        specs = manager._phase_specs(_mock_orchestrator_all_phases())
+        by_group = {g: [s.name for s in specs if s.group is g] for g in PhaseGroup}
+        assert by_group[PhaseGroup.EARLY] == [
+            "provider_runtime",
+            "metrics_runtime",
+            "workflow_runtime",
+            "memory_runtime",
+        ]
+        assert by_group[PhaseGroup.ASSEMBLY] == ["resilience_runtime", "coordination_runtime"]
+        assert by_group[PhaseGroup.SERVICE] == [
+            "interaction_runtime",
+            "services",
+            "credit_runtime",
+        ]
+
+    def test_run_group_runs_only_that_group(self):
+        manager = InitializationPhaseManager()
+        orch = _mock_orchestrator_all_phases()
+
+        result = manager.run_group(orch, PhaseGroup.EARLY)
+
+        assert [p.name for p in result.phases] == [
+            "provider_runtime",
+            "metrics_runtime",
+            "workflow_runtime",
+            "memory_runtime",
+        ]
+        orch._initialize_provider_runtime.assert_called_once()
+        orch._initialize_memory_runtime.assert_called_once()
+        # A later-group phase must NOT have run yet.
+        orch._initialize_interaction_runtime.assert_not_called()
+        orch._initialize_credit_runtime.assert_not_called()
+
+    def test_groups_accumulate_and_cross_group_deps_satisfied(self):
+        """Running the 3 groups in order = all 9 phases; cross-group deps (e.g.
+        resilience_runtime -> provider_runtime) are NOT skipped."""
+        manager = InitializationPhaseManager()
+        orch = _mock_orchestrator_all_phases()
+
+        manager.run_group(orch, PhaseGroup.EARLY)
+        manager.run_group(orch, PhaseGroup.ASSEMBLY)
+        result = manager.run_group(orch, PhaseGroup.SERVICE)
+
+        assert result.all_succeeded is True
+        assert len(result.phases) == 9
+        assert result.skipped_phases == []  # provider succeeded in EARLY, so resilience runs
+        orch._initialize_credit_runtime.assert_called_once()  # the phase that was lost before
+
+    def test_critical_phase_failure_in_group_fails_fast(self):
+        """A failed critical phase raises InitializationError from its group."""
+        import pytest
+
+        from victor.agent.runtime.initialization_manager import InitializationError
+
+        manager = InitializationPhaseManager()
+        orch = _mock_orchestrator_all_phases()
+        # provider_runtime (critical, EARLY) fails -> EARLY raises immediately.
+        orch._initialize_provider_runtime = MagicMock(side_effect=RuntimeError("no provider"))
+
+        with pytest.raises(InitializationError) as exc_info:
+            manager.run_group(orch, PhaseGroup.EARLY)
+        assert exc_info.value.phase == "provider_runtime"
