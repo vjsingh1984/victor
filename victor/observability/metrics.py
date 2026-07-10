@@ -633,6 +633,11 @@ class MetricsCollector:
         """
         self._registry = registry or MetricsRegistry.get_instance()
         self._prefix = prefix
+        # Ad-hoc metrics recorded via the MetricsCollectorProtocol adapter
+        # (``record_metric``). Kept separate from the fixed, event-driven metrics
+        # so the adapter can accept arbitrary metric names without polluting the
+        # shared registry.
+        self._adhoc_metrics: Dict[str, float] = {}
         self._setup_metrics()
 
     def _setup_metrics(self) -> None:
@@ -767,3 +772,38 @@ class MetricsCollector:
             "model_latency_p50": self.model_latency.percentile(50),
             "model_latency_p95": self.model_latency.percentile(95),
         }
+
+    # =========================================================================
+    # MetricsCollectorProtocol adapter (FEP-0014)
+    # =========================================================================
+
+    def record_metric(self, name: str, value: float, **tags: str) -> None:
+        """Record a single ad-hoc metric observation (protocol adapter).
+
+        Stores the value under ``name`` (tag-qualified when tags are supplied)
+        in the ad-hoc metrics store. This complements the event-driven metrics
+        wired via :meth:`wire_observability_bus`.
+
+        Args:
+            name: Metric name.
+            value: Numeric value to record.
+            **tags: Optional string-valued dimensional tags, appended to the key.
+        """
+        key = name
+        if tags:
+            tag_suffix = ",".join(f"{k}={v}" for k, v in sorted(tags.items()))
+            key = f"{name}{{{tag_suffix}}}"
+        self._adhoc_metrics[key] = float(value)
+
+    def get_snapshot(self) -> Dict[str, Any]:
+        """Return a point-in-time snapshot of collected metrics (protocol adapter).
+
+        Merges the event-driven summary from :meth:`get_summary` with any ad-hoc
+        metrics recorded via :meth:`record_metric`.
+
+        Returns:
+            A mapping of the collector's current metric state.
+        """
+        snapshot: Dict[str, Any] = dict(self.get_summary())
+        snapshot.update(self._adhoc_metrics)
+        return snapshot

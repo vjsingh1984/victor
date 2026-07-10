@@ -1274,6 +1274,29 @@ class MetricsCollector:
         self._sampled_count = 0
         self._total_count = 0
 
+    def record_metric(self, name: str, value: float, **tags: str) -> None:
+        """Record a single metric observation (MetricsCollectorProtocol adapter).
+
+        Adapts the ``(name, value, **tags)`` protocol surface onto this
+        collector's :meth:`record`, which expects a :class:`Metric`. The value is
+        wrapped as a :class:`GaugeMetric` and tags become metric labels.
+
+        Args:
+            name: Metric name.
+            value: Numeric value to record.
+            **tags: Optional string-valued dimensional tags, recorded as labels.
+        """
+        labels = tuple(MetricLabel(key=k, value=v) for k, v in sorted(tags.items()))
+        self.record(
+            GaugeMetric(
+                name=name,
+                description="",
+                metric_type=MetricType.GAUGE,
+                labels=labels,
+                value=float(value),
+            )
+        )
+
     def get_snapshot(self) -> MetricsSnapshot:
         """Get a snapshot of current metrics.
 

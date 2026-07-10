@@ -86,6 +86,50 @@ class MetricsCollector:
         # Event subscription handles
         self._subscription_handles: List = []
 
+        # Ad-hoc metrics recorded via the MetricsCollectorProtocol adapter
+        # (``record_metric``). The native surface here is async/DB-backed
+        # experiment aggregation, so generic name/value observations are backed
+        # by a small in-memory dict.
+        self._adhoc_metrics: Dict[str, float] = {}
+
+    # =========================================================================
+    # MetricsCollectorProtocol adapter (FEP-0014)
+    # =========================================================================
+
+    def record_metric(self, name: str, value: float, **tags: str) -> None:
+        """Record a single ad-hoc metric observation (protocol adapter).
+
+        The native surface here collects experiment execution metrics from the
+        ObservabilityBus into SQLite; this stores generic name/value
+        observations so the collector satisfies ``MetricsCollectorProtocol``.
+
+        Args:
+            name: Metric name.
+            value: Numeric value to record.
+            **tags: Optional string-valued dimensional tags, appended to the key.
+        """
+        key = name
+        if tags:
+            tag_suffix = ",".join(f"{k}={v}" for k, v in sorted(tags.items()))
+            key = f"{name}{{{tag_suffix}}}"
+        self._adhoc_metrics[key] = float(value)
+
+    def get_snapshot(self) -> Dict[str, Any]:
+        """Return a point-in-time snapshot of collected metrics (protocol adapter).
+
+        Reports the buffered-execution count and any ad-hoc metrics recorded via
+        :meth:`record_metric`. (Aggregated per-variant metrics are retrieved
+        asynchronously via :meth:`get_variant_metrics`.)
+
+        Returns:
+            A mapping of the collector's current metric state.
+        """
+        snapshot: Dict[str, Any] = {
+            "buffered_executions": len(self._metrics_buffer),
+        }
+        snapshot.update(self._adhoc_metrics)
+        return snapshot
+
     async def start(self) -> None:
         """Start collecting metrics from ObservabilityBus."""
         bus = get_observability_bus()
