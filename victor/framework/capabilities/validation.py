@@ -47,15 +47,9 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Set, Type, Union
-from enum import Enum
 
-
-class ValidationSeverity(Enum):
-    """Severity levels for validation failures."""
-
-    ERROR = "error"  # Critical validation failure (blocks execution)
-    WARNING = "warning"  # Non-critical issue (should be acknowledged)
-    INFO = "info"  # Informational (can be ignored)
+# FEP-0014 Phase 2a: re-export the canonical severity instead of redefining it.
+from victor.core.validation import ValidationSeverity
 
 
 @dataclass

@@ -41,11 +41,10 @@ _CANONICAL = "victor/core/validation.py"
 # root. FEP-0014 Phase 2 migrates each of these onto the canonical types, removing it
 # from this allowlist; the set is expected to reach {} by the end of Phase 3.
 _ALLOWLIST: dict[str, set[str]] = {
-    "ValidationSeverity": {
-        "victor/config/validation.py",
-        "victor/framework/middleware.py",
-        "victor/framework/capabilities/validation.py",
-    },
+    # FEP-0014 Phase 2a (done): all three ValidationSeverity duplicates now
+    # re-export the canonical enum, so the allowlist is empty — the guard still
+    # scans for (and rejects) any NEW ValidationSeverity duplicate.
+    "ValidationSeverity": set(),
     "ValidationResult": {
         "victor/tools/tool_call_validator.py",
         "victor/config/connection_validation.py",
