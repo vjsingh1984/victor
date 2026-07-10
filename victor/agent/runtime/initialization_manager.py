@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Set
 
 logger = logging.getLogger(__name__)
@@ -61,72 +62,100 @@ class InitializationResult:
         return [p for p in self.phases if p.skipped]
 
 
+class PhaseGroup(Enum):
+    """Init-phase groups aligned to orchestrator construction boundaries (FEP-0016).
+
+    The 9 phases are structurally interleaved with component assembly, so they run
+    as three grouped calls at their natural lifecycle points rather than a single
+    ``run_all_phases``:
+
+    - ``EARLY``    — phases 1-4, before component assembly (in ``orchestrator.__init__``).
+    - ``ASSEMBLY`` — phases 5-6, after ``_context_compactor`` exists (in
+      ``ComponentAssembler.assemble_intelligence``).
+    - ``SERVICE``  — phases 7-9, after ``_checkpoint_manager`` and assembled
+      components exist (in ``AgentRuntimeBootstrapper.prepare_components``).
+    """
+
+    EARLY = "early"
+    ASSEMBLY = "assembly"
+    SERVICE = "service"
+
+
+@dataclass
+class _PhaseSpec:
+    """One initialization phase: its runner, expected components, and constraints."""
+
+    name: str
+    initializer: Callable[[], None]
+    components: List[str]
+    critical: bool
+    dependencies: List[str]
+    group: PhaseGroup
+
+
 class InitializationPhaseManager:
     """Manages orchestrator runtime initialization phases.
 
-    Wraps the 9 _initialize_* methods on the orchestrator to provide
-    structured timing, error reporting, component tracking, fail-fast
-    for critical phases, and dependency-based skipping.
+    Wraps the 9 ``_initialize_*`` methods on the orchestrator to provide structured
+    timing, error reporting, component tracking, fail-fast for critical phases, and
+    dependency-based skipping.
+
+    The phases are interleaved with component assembly (FEP-0016), so the orchestrator
+    invokes :meth:`run_group` at three construction boundaries. Cross-group
+    dependencies (e.g. ``resilience_runtime`` depends on ``provider_runtime``) are
+    satisfied because the manager accumulates succeeded-phase state across the calls.
 
     Usage:
         manager = InitializationPhaseManager()
-        result = manager.run_all_phases(orchestrator)
+        manager.run_group(orchestrator, PhaseGroup.EARLY)
+        # ... component assembly builds _context_compactor ...
+        manager.run_group(orchestrator, PhaseGroup.ASSEMBLY)
+        # ... prepare_components builds _checkpoint_manager ...
+        manager.run_group(orchestrator, PhaseGroup.SERVICE)
     """
 
-    def run_all_phases(self, orchestrator: Any) -> InitializationResult:
-        """Run all initialization phases in dependency order.
+    def __init__(self) -> None:
+        # Accumulated across run_group() calls so later groups see earlier successes.
+        self._result = InitializationResult()
+        self._succeeded_phases: Set[str] = set()
 
-        Phase order:
-        1. provider_runtime — canonical provider runtime boundary and optional pool (CRITICAL)
-        2. metrics_runtime — metrics collectors and coordinators
-        3. workflow_runtime — lazy workflow registry
-        4. memory_runtime — memory manager and embedding store
-        5. resilience_runtime — recovery handler and integration
-        6. coordination_runtime — recovery/chunk/planner/task coordinators
-        7. interaction_runtime — canonical interaction services plus compatibility shims (CRITICAL)
-        8. services — DI service layer delegation (Strangler Fig)
-        9. credit_runtime — credit assignment tracking (opt-in)
-
-        Raises:
-            InitializationError: If a critical phase fails.
-        """
-        result = InitializationResult()
-        succeeded_phases: Set[str] = set()
-
-        phases: List[tuple[str, Callable[[], None], List[str], bool, List[str]]] = [
-            (
+    def _phase_specs(self, orchestrator: Any) -> List[_PhaseSpec]:
+        """The 9 initialization phases in dependency order, tagged with their
+        construction-boundary group (FEP-0016). Phase bodies are unchanged."""
+        return [
+            _PhaseSpec(
                 "provider_runtime",
                 orchestrator._initialize_provider_runtime,
                 ["provider_runtime"],
                 True,  # critical
-                [],  # dependencies
+                [],
+                PhaseGroup.EARLY,
             ),
-            (
+            _PhaseSpec(
                 "metrics_runtime",
                 orchestrator._initialize_metrics_runtime,
-                [
-                    "usage_logger",
-                    "streaming_metrics_collector",
-                    "metrics_coordinator",
-                ],
+                ["usage_logger", "streaming_metrics_collector", "metrics_coordinator"],
                 False,
                 [],
+                PhaseGroup.EARLY,
             ),
-            (
+            _PhaseSpec(
                 "workflow_runtime",
                 orchestrator._initialize_workflow_runtime,
                 ["workflow_registry"],
                 False,
                 [],
+                PhaseGroup.EARLY,
             ),
-            (
+            _PhaseSpec(
                 "memory_runtime",
                 orchestrator._initialize_memory_runtime,
                 ["memory_manager"],
                 False,
                 [],
+                PhaseGroup.EARLY,
             ),
-            (
+            _PhaseSpec(
                 "resilience_runtime",
                 lambda: orchestrator._initialize_resilience_runtime(
                     context_compactor=orchestrator._context_compactor,
@@ -134,109 +163,127 @@ class InitializationPhaseManager:
                 ["recovery_handler", "recovery_integration"],
                 False,
                 ["provider_runtime"],
+                PhaseGroup.ASSEMBLY,
             ),
-            (
+            _PhaseSpec(
                 "coordination_runtime",
                 orchestrator._initialize_coordination_runtime,
-                [
-                    "recovery_coordinator",
-                    "chunk_generator",
-                    "tool_planner",
-                    "task_coordinator",
-                ],
+                ["recovery_coordinator", "chunk_generator", "tool_planner", "task_coordinator"],
                 False,
                 ["provider_runtime"],
+                PhaseGroup.ASSEMBLY,
             ),
-            (
+            _PhaseSpec(
                 "interaction_runtime",
                 orchestrator._initialize_interaction_runtime,
-                [
-                    "chat_service",
-                    "session_service",
-                ],
+                ["chat_service", "session_service"],
                 True,  # critical
                 ["provider_runtime", "coordination_runtime"],
+                PhaseGroup.SERVICE,
             ),
-            (
+            _PhaseSpec(
                 "services",
                 orchestrator._initialize_services,
-                [
-                    "chat_service",
-                    "tool_service",
-                    "session_service",
-                    "context_service",
-                ],
+                ["chat_service", "tool_service", "session_service", "context_service"],
                 False,
                 ["interaction_runtime"],
+                PhaseGroup.SERVICE,
             ),
-            (
+            _PhaseSpec(
                 "credit_runtime",
                 orchestrator._initialize_credit_runtime,
                 ["credit_tracking_service"],
-                False,  # non-critical
+                False,
                 ["interaction_runtime"],
+                PhaseGroup.SERVICE,
             ),
         ]
 
-        for name, initializer, components, critical, dependencies in phases:
-            # Check if all dependencies succeeded
-            missing_deps = [dep for dep in dependencies if dep not in succeeded_phases]
+    def run_group(self, orchestrator: Any, group: PhaseGroup) -> InitializationResult:
+        """Run the phases in ``group`` (FEP-0016) in dependency order.
+
+        Accumulates into the manager's result / succeeded-phase state so a phase in a
+        later group can depend on a phase from an earlier group's call. Returns the
+        aggregate :class:`InitializationResult` so far.
+
+        Raises:
+            InitializationError: If a critical phase in this group fails or is skipped.
+        """
+        specs = [s for s in self._phase_specs(orchestrator) if s.group is group]
+        self._run_specs(specs)
+        return self._result
+
+    def run_all_phases(self, orchestrator: Any) -> InitializationResult:
+        """Run all 9 phases in order in a single call, resetting state first.
+
+        NOTE: in production the phases are interleaved with component assembly, so the
+        orchestrator invokes :meth:`run_group` at three boundaries instead. This method
+        remains for direct/unit use and assumes every phase's prerequisites already
+        exist on ``orchestrator``.
+
+        Raises:
+            InitializationError: If a critical phase fails.
+        """
+        self._result = InitializationResult()
+        self._succeeded_phases = set()
+        self._run_specs(self._phase_specs(orchestrator))
+
+        if self._result.all_succeeded:
+            logger.debug(
+                "All %d initialization phases completed in %.1fms",
+                len(self._result.phases),
+                self._result.total_duration_ms,
+            )
+        else:
+            failed = ", ".join(p.name for p in self._result.failed_phases)
+            logger.warning("Initialization failures in phases: %s", failed)
+
+        return self._result
+
+    def _run_specs(self, specs: List[_PhaseSpec]) -> None:
+        """Run phase specs with dependency-skip, fail-fast, and timing, appending to
+        ``self._result`` and tracking ``self._succeeded_phases``."""
+        for spec in specs:
+            missing_deps = [d for d in spec.dependencies if d not in self._succeeded_phases]
             if missing_deps:
-                reason = (
-                    f"skipped due to failed/skipped dependencies: " f"{', '.join(missing_deps)}"
-                )
-                phase_result = PhaseResult(
-                    name=name,
-                    success=False,
-                    skipped=True,
-                    skip_reason=reason,
-                    error=reason,
-                )
-                result.phases.append(phase_result)
-                logger.warning(
-                    "Phase '%s' %s",
-                    name,
-                    reason,
-                )
-                if critical:
-                    raise InitializationError(
-                        phase=name,
+                reason = f"skipped due to failed/skipped dependencies: {', '.join(missing_deps)}"
+                self._result.phases.append(
+                    PhaseResult(
+                        name=spec.name,
+                        success=False,
+                        skipped=True,
+                        skip_reason=reason,
                         error=reason,
-                        completed_phases=sorted(succeeded_phases),
+                    )
+                )
+                logger.warning("Phase '%s' %s", spec.name, reason)
+                if spec.critical:
+                    raise InitializationError(
+                        phase=spec.name,
+                        error=reason,
+                        completed_phases=sorted(self._succeeded_phases),
                     )
                 continue
 
-            phase_result = self._run_phase(name, initializer, components)
-            result.phases.append(phase_result)
+            phase_result = self._run_phase(spec.name, spec.initializer, spec.components)
+            self._result.phases.append(phase_result)
 
             if phase_result.success:
-                succeeded_phases.add(name)
-            elif critical:
+                self._succeeded_phases.add(spec.name)
+            elif spec.critical:
                 raise InitializationError(
-                    phase=name,
+                    phase=spec.name,
                     error=phase_result.error or "unknown error",
-                    completed_phases=sorted(succeeded_phases),
+                    completed_phases=sorted(self._succeeded_phases),
                 )
             else:
                 logger.warning(
                     "Non-critical phase '%s' failed: %s — "
                     "system will continue with degraded %s functionality",
-                    name,
+                    spec.name,
                     phase_result.error,
-                    name.replace("_runtime", "").replace("_", " "),
+                    spec.name.replace("_runtime", "").replace("_", " "),
                 )
-
-        if result.all_succeeded:
-            logger.debug(
-                "All %d initialization phases completed in %.1fms",
-                len(result.phases),
-                result.total_duration_ms,
-            )
-        else:
-            failed = ", ".join(p.name for p in result.failed_phases)
-            logger.warning("Initialization failures in phases: %s", failed)
-
-        return result
 
     def _run_phase(
         self,
