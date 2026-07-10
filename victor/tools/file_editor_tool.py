@@ -413,7 +413,7 @@ def _is_file_editor_available() -> bool:
 
 
 from victor.tools.decorators import tool
-from victor.tools.filesystem import enforce_sandbox_path
+from victor.tools.filesystem import enforce_read_before_write, enforce_sandbox_path
 
 
 @tool(
@@ -768,6 +768,17 @@ async def edit(
                     _all_failed_indices.add(_idx)
                     continue
             elif _otype == "modify":
+                # read-before-overwrite guard: modify targets an existing file,
+                # so it must have been read this session (unless force=True).
+                if _fp.exists():
+                    try:
+                        enforce_read_before_write(_fp, force=bool(_op.get("force", False)))
+                    except PermissionError as _pe:
+                        failed_files.append(
+                            {"path": _path, "op_index": _idx, "error": str(_pe)}
+                        )
+                        _all_failed_indices.add(_idx)
+                        continue
                 _content = _op.get("new_content")
                 if _content is None:
                     _content = _op.get("content")
@@ -798,6 +809,17 @@ async def edit(
                     )
                     _all_failed_indices.add(_idx)
                     continue
+                # read-before-overwrite guard: overwriting an existing file
+                # (mode != "new") requires it was read this session.
+                if _op_mode != "new" and _fp.exists():
+                    try:
+                        enforce_read_before_write(_fp, force=bool(_op.get("force", False)))
+                    except PermissionError as _pe:
+                        failed_files.append(
+                            {"path": _path, "op_index": _idx, "error": str(_pe)}
+                        )
+                        _all_failed_indices.add(_idx)
+                        continue
                 _working = _op.get("content", "")
             # delete / rename: no text content to validate at this stage
         _applicable_keys.add(_key)
