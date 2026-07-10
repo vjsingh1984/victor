@@ -2,7 +2,7 @@
 fep: "0016"
 title: "Wire the initialization phase manager (centralize orchestrator runtime init)"
 type: Standards Track
-status: Draft
+status: Accepted
 created: 2026-07-10
 modified: 2026-07-10
 authors:
@@ -277,7 +277,15 @@ Internal refactor; no external migration. Each phase is independently revertible
 - [ ] Behavior-parity test approach adequate for a hot path
 
 ### Decisions
-- **Recommendation**: [Pending]
+- **Recommendation**: Accept (**Design A**)
+- **Decision date**: 2026-07-10
+- **Approved by**: Vijaykumar Singh (repo owner)
+- **Resolved choices**:
+  - Approach: **Design A** — manager owns the phase contract, invoked at the 3 natural boundaries (grouped). Alternative B (reorder for fewer calls) rejected as worst risk/reward on the hot path; Alternative C (delete the manager) rejected in favor of the fail-fast/timing value.
+  - API: single **`run_group(PhaseGroup)`** (one code path), not three named methods.
+  - Criticality: **per-phase** `critical` flags unchanged (no group-level fail-fast).
+  - Rollout: **SERVICE → EARLY → ASSEMBLY**, one PR per group, each behavior-parity validated and independently revertible.
+- **Rationale**: The concrete headline bug (`credit_runtime` never running) is already fixed (#464); the remaining value is incremental but real — a single authoritative phase contract (so a phase can't be silently lost again), fail-fast on critical phases, and per-phase timing on an opaque hot path. Design A captures that at contained, behavior-preserving risk.
 
 ## Acceptance Criteria
 
