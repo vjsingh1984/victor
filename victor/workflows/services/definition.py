@@ -1189,26 +1189,6 @@ class ServicePresets:
         )
 
     @staticmethod
-    def chromadb(
-        name: str = "chromadb",
-        version: str = "latest",
-        port: int = 8000,
-    ) -> ServiceConfig:
-        """ChromaDB vector database preset (for RAG)."""
-        return ServiceConfig(
-            name=name,
-            provider="docker",
-            image=f"chromadb/chroma:{version}",
-            ports=[PortMapping(container_port=8000, host_port=port)],
-            health_check=HealthCheckConfig.for_http(8000, "/api/v1/heartbeat"),
-            exports={
-                "CHROMA_URL": "http://{host}:{port}",
-                "CHROMA_HOST": "{host}",
-                "CHROMA_PORT": "{port}",
-            },
-        )
-
-    @staticmethod
     def milvus(
         name: str = "milvus",
         version: str = "latest",

@@ -9,7 +9,6 @@ setup(
     python_requires=">=3.10",
     install_requires=[
         "victor-ai>=0.5.6",
-        "chromadb>=0.4.0",
         "sentence-transformers>=2.2.0",
         "lancedb>=0.6.0",
         "pyarrow>=14.0",
