@@ -111,7 +111,7 @@ can be resumed across sessions without re-deriving context.
 - **Effort**: Medium. **Impact**: Medium.
 
 ### F-012 · Validation/metrics types fragmented into divergent same-name variants — `MH`
-- **Status**: FEP ACCEPTED — [FEP-0014](../../feps/fep-0014-canonical-validation-metrics-contracts.md) accepted 2026-07-09 (PR #452). Implementation in progress, Phase 1 first (canonical types + `MetricsCollectorProtocol` + guard).
+- **Status**: DONE — [FEP-0014](../../feps/fep-0014-canonical-validation-metrics-contracts.md) **Implemented**. Phase 1 (#453 canonical `ValidationSeverity`/`ValidationResult` + `severity_rank` + `MetricsCollectorProtocol` + guard). Phase 2: #459 (severity re-export ×3), #460 (the four divergent `ValidationResult`s **renamed** to distinct types — ground truth showed merge would lose domain data), #458 (5 collectors conform via adapter methods), #457 (`pickle_cache` rename). Guard allowlist empty for both names. Phase 3 absorbed (re-exports are the end state; results renamed, no shims). F-012 footgun eliminated.
 - **Evidence (verified 2026-07)**:
   - `ValidationSeverity` × **4**: `config/validation.py:26`, `core/validation.py:82`, `framework/middleware.py:89`, `framework/capabilities/validation.py:53`. Three are `{ERROR,WARNING,INFO}`; **`framework/middleware.py:89` uniquely adds `CRITICAL`** → a severity comparison silently means different things by layer.
   - `ValidationResult` × **5** with incompatible fields: `tools/tool_call_validator.py:17`, `config/connection_validation.py:54`, `workflows/protocols.py:759` (nested), `framework/requirement_validator.py:88`, `framework/capabilities/validation.py:62`.
@@ -149,7 +149,7 @@ can be resumed across sessions without re-deriving context.
 - **Effort**: Medium (triage). **Impact**: Medium.
 
 ### F-013 · `framework/step_handlers.py` exports internal-only symbols — FEP-gated — `ML`
-- **Status**: FEP ACCEPTED — [FEP-0015](../../feps/fep-0015-trim-internal-framework-exports.md) accepted 2026-07-09 (PR #452). Implementation in progress, Phase 1 (unexport + `_ExtensionHandler` rename + deprecation shim + guard).
+- **Status**: PHASE 1 DONE — [FEP-0015](../../feps/fep-0015-trim-internal-framework-exports.md) Phase 1 landed (#454: unexported both symbols, `_ExtensionHandler` rename, `__getattr__` deprecation shim, guard). **Phase 2 (remove shim) is release-gated** — deferred until one minor release elapses so out-of-tree importers had their deprecation window. FEP stays `Accepted` until then.
 - **Evidence (verified 2026-07)**:
   - `victor/framework/step_handlers.py:2629` `__all__` includes `CapabilityConfigStepHandler` (class L968) and `ExtensionHandler` (class L2047), but **neither is imported anywhere outside this module**.
   - `ExtensionHandler` is heavily used *internally* (instantiated L2346–2361), so it is **not dead** — only its `__all__` export is unused.
@@ -221,8 +221,8 @@ can be resumed across sessions without re-deriving context.
 | 10 | F-010 legacy-marker triage | Med | Med |
 | ~~11~~ | ~~F-011 rename colliding enums~~ — ✅ DONE (#447) | Low-Med | **Med-High** |
 | ~~12~~ | ~~F-014 backoff/pickle-cache consolidation~~ — ✅ DONE partial (#448, #449) | Med | Med |
-| 13 | F-013 `step_handlers` `__all__` cleanup — 📋 FEP-0015 drafted (#452) | Low+FEP | Low-Med |
-| 14 | F-012 unify validation/metrics types — 📋 FEP-0014 drafted (#452) | High | High |
+| 13 | F-013 `step_handlers` `__all__` cleanup — ⏳ FEP-0015 Phase 1 DONE (#454); Phase 2 release-gated | Low+FEP | Low-Med |
+| ~~14~~ | ~~F-012 unify validation/metrics types~~ — ✅ DONE (FEP-0014 implemented, #453/#457/#458/#459/#460) | High | High |
 
 ---
 
@@ -233,3 +233,4 @@ can be resumed across sessions without re-deriving context.
 - **2026-07 audit cycle:** Landed F-C1 (PR #442, provider capability-surface collapse) and F-C2 (PR #443, verified-dead-code removal) — ~850 LOC removed, both CI-green. Added F-011..F-014 from the same 4-agent duplication audit, each recorded only after **independently verifying** its evidence (the majority of the audit's raw findings were rejected as unverified or mischaracterized). F-012/F-013 are FEP-gated (framework/core public surface); F-011 is a correctness footgun (colliding enums with live consumers, so rename — not delete).
 - **F-011/F-014 execution (2026-07):** Implemented in parallel via three worktree-isolated agents, each diff-reviewed independently before PR. F-011 → PR #447 (enum renames); F-014a → PR #448 (`compute_backoff_delay` helper, 3/4 sites migrated); F-014b → PR #449 (`core/pickle_cache.py` helper + tests, 2/4 sites migrated). Divergent-semantics sites deliberately skipped and documented (F-C3/F-C4). Mid-flight, an external main-sync (PR #446) broke `test-verticals` by deleting a core module a vertical test imported; fixed via PR #451 to unblock the cascade. All four squash-merged CI-green.
 - **F-012/F-013 FEP drafts (2026-07):** Authored FEP-0014 (canonical validation/metrics contracts) and FEP-0015 (framework export hygiene) → PR #452, awaiting review. Backlog statuses moved OPEN → FEP DRAFTED; implementation gated on FEP acceptance.
+- **F-012/F-013 acceptance + implementation (2026-07):** Both FEPs accepted (#452). FEP-0015 Phase 1 landed (#454); its Phase 2 (shim removal) is release-gated. FEP-0014 **fully implemented** across Phase 1 (#453) + Phase 2 (#457/#458/#459/#460, doc #462) — F-012 → DONE. Key course-correction during Phase 2: the four divergent `ValidationResult`s carry domain-specific fields, so they were **renamed to distinct types** (not lossy-merged into the canonical) — the accepted plan's "Tier A migrate" was revised to "rename" after ground-truthing (the F-011 lesson). Both guard-allowlist sets emptied; the guard now rejects any new duplicate. Also fixed a repo-wide CI flake mid-cascade: `hotspot-size-guard` had `timeout-minutes: 2` on a 2min+ cold-cache install → intermittent `cancelled` → false red (#455, raised to 10).

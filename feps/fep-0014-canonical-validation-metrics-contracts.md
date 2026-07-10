@@ -2,7 +2,7 @@
 fep: "0014"
 title: "Canonical validation and metrics contracts (deduplicate ValidationSeverity / ValidationResult / MetricsCollector)"
 type: Standards Track
-status: Accepted
+status: Implemented
 created: 2026-07-09
 modified: 2026-07-09
 authors:
