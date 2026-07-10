@@ -153,6 +153,43 @@ class BaseRetryStrategy(ABC):
         """
 
 
+def compute_backoff_delay(
+    attempt: int,
+    base_delay: float,
+    *,
+    multiplier: float = 2.0,
+    max_delay: Optional[float] = None,
+    jitter: float = 0.0,
+) -> float:
+    """Compute a single exponential-backoff delay.
+
+    Pure helper that centralizes the exponential-backoff delay formula so
+    call sites do not reimplement ``base * multiplier ** attempt`` inline.
+    The delay is ``base_delay * multiplier ** attempt``, optionally capped at
+    ``max_delay`` and perturbed by symmetric ``+/- jitter`` fractional jitter.
+
+    Args:
+        attempt: Zero-based exponent for the growth term. A value of ``0``
+            yields ``base_delay``; ``1`` yields ``base_delay * multiplier``.
+            Callers whose loop counter starts at 1 should pass ``counter - 1``.
+        base_delay: Delay in seconds for ``attempt == 0``.
+        multiplier: Exponential growth factor (default ``2.0`` = doubling).
+        max_delay: Optional cap in seconds. ``None`` leaves the delay uncapped.
+        jitter: Symmetric jitter fraction applied after the cap. ``0.0``
+            disables jitter (deterministic); ``0.1`` gives +/-10% randomness.
+
+    Returns:
+        Delay in seconds, never negative.
+    """
+    delay = base_delay * (multiplier**attempt)
+    if max_delay is not None:
+        delay = min(delay, max_delay)
+    if jitter > 0:
+        jitter_amount = delay * jitter
+        delay += random.uniform(-jitter_amount, jitter_amount)
+    return max(0.0, delay)
+
+
 class ExponentialBackoffStrategy(BaseRetryStrategy):
     """Exponential backoff with optional jitter.
 
