@@ -37,7 +37,6 @@ classifiers = [
 ]
 dependencies = [
     "victor-contracts>=0.6.0,<1.0",
-    "chromadb>=0.4.0",
     "sentence-transformers>=2.2.0",
     "lancedb>=0.6.0",
     "pyarrow>=14.0",
