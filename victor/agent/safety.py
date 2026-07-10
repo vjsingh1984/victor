@@ -94,7 +94,7 @@ class OperationalRiskLevel(Enum):
         return SeverityLevel.from_operational_risk(self)
 
 
-class ApprovalMode(Enum):
+class WriteApprovalMode(Enum):
     """Mode for write operation approval.
 
     Controls when user confirmation is required for file modifications.
@@ -270,7 +270,7 @@ class SafetyChecker:
         confirmation_callback: Optional[ConfirmationCallback] = None,
         auto_confirm_low_risk: bool = True,
         require_confirmation_threshold: OperationalRiskLevel = OperationalRiskLevel.HIGH,
-        approval_mode: ApprovalMode = ApprovalMode.RISKY_ONLY,
+        approval_mode: WriteApprovalMode = WriteApprovalMode.RISKY_ONLY,
     ):
         """Initialize safety checker.
 
@@ -465,7 +465,7 @@ class SafetyChecker:
         canonical_tool_name = get_canonical_name(tool_name)
 
         # Fast path: approval mode OFF - auto-approve everything
-        if self.approval_mode == ApprovalMode.OFF:
+        if self.approval_mode == WriteApprovalMode.OFF:
             return True, None
 
         risk_level = OperationalRiskLevel.SAFE
@@ -514,7 +514,7 @@ class SafetyChecker:
         requires_confirmation = False
 
         # ALL_WRITES mode: require confirmation for any write operation
-        if self.approval_mode == ApprovalMode.ALL_WRITES and is_write_operation:
+        if self.approval_mode == WriteApprovalMode.ALL_WRITES and is_write_operation:
             requires_confirmation = True
             # If no descriptions yet, add a generic one
             if not descriptions:
@@ -525,7 +525,7 @@ class SafetyChecker:
                 details.append("Write operation requiring approval")
 
         # RISKY_ONLY mode: only require confirmation for high-risk operations
-        elif self.approval_mode == ApprovalMode.RISKY_ONLY:
+        elif self.approval_mode == WriteApprovalMode.RISKY_ONLY:
             if _RISK_ORDER[risk_level] >= _RISK_ORDER[self.require_confirmation_threshold]:
                 requires_confirmation = True
 
@@ -540,7 +540,7 @@ class SafetyChecker:
                     f"High-risk operation without confirmation callback: "
                     f"{tool_name} - {', '.join(details)}"
                 )
-            elif self.approval_mode == ApprovalMode.ALL_WRITES:
+            elif self.approval_mode == WriteApprovalMode.ALL_WRITES:
                 logger.warning(
                     f"Write operation without confirmation callback in ALL_WRITES mode: "
                     f"{tool_name}"
@@ -577,14 +577,14 @@ class SafetyChecker:
 _default_checker: Optional[SafetyChecker] = None
 
 
-def _resolve_approval_mode(mode_str: str) -> ApprovalMode:
+def _resolve_approval_mode(mode_str: str) -> WriteApprovalMode:
     """Resolve approval mode from string setting."""
     mode_map = {
-        "off": ApprovalMode.OFF,
-        "risky_only": ApprovalMode.RISKY_ONLY,
-        "all_writes": ApprovalMode.ALL_WRITES,
+        "off": WriteApprovalMode.OFF,
+        "risky_only": WriteApprovalMode.RISKY_ONLY,
+        "all_writes": WriteApprovalMode.ALL_WRITES,
     }
-    return mode_map.get(mode_str.lower(), ApprovalMode.RISKY_ONLY)
+    return mode_map.get(mode_str.lower(), WriteApprovalMode.RISKY_ONLY)
 
 
 def get_safety_checker() -> SafetyChecker:
@@ -605,7 +605,7 @@ def get_safety_checker() -> SafetyChecker:
             approval_mode = _resolve_approval_mode(settings.security.write_approval_mode)
         except Exception:
             # Default to RISKY_ONLY if settings unavailable
-            approval_mode = ApprovalMode.RISKY_ONLY
+            approval_mode = WriteApprovalMode.RISKY_ONLY
 
         _default_checker = SafetyChecker(approval_mode=approval_mode)
     return _default_checker
