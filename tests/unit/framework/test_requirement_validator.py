@@ -22,7 +22,7 @@ from unittest.mock import Mock
 
 from victor.framework.requirement_validator import (
     RequirementValidator,
-    ValidationResult,
+    RequirementResult,
     RequirementStatus,
 )
 from victor.framework.perception_integration import RequirementType, Requirement

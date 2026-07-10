@@ -31,7 +31,7 @@ Based on research from:
 Example:
     from victor.framework.requirement_validator import (
         RequirementValidator,
-        ValidationResult,
+        RequirementResult,
     )
 
     validator = RequirementValidator()
@@ -85,7 +85,7 @@ class RequirementStatus:
 
 
 @dataclass
-class ValidationResult:
+class RequirementResult:
     """Result of validating completion against requirements.
 
     Attributes:
@@ -164,7 +164,7 @@ class RequirementValidator:
         requirements: List[Requirement],
         action_result: Any,
         context: Dict[str, Any],
-    ) -> ValidationResult:
+    ) -> RequirementResult:
         """Validate completion against extracted requirements.
 
         Args:
@@ -173,11 +173,11 @@ class RequirementValidator:
             context: Additional context (files modified, tools used, etc.)
 
         Returns:
-            ValidationResult with satisfaction status and details
+            RequirementResult with satisfaction status and details
         """
         if not requirements:
             # No requirements extracted - use legacy behavior
-            return ValidationResult(
+            return RequirementResult(
                 is_satisfied=False,
                 satisfaction_score=0.5,
                 summary="No requirements to validate - using heuristics",
@@ -209,7 +209,7 @@ class RequirementValidator:
             is_satisfied, satisfaction_score, satisfied, missing, critical_gaps
         )
 
-        return ValidationResult(
+        return RequirementResult(
             is_satisfied=is_satisfied,
             satisfaction_score=satisfaction_score,
             satisfied_requirements=satisfied,

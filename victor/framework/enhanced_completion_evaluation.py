@@ -78,7 +78,7 @@ from victor.framework.runtime_evaluation_policy import (
 )
 from victor.framework.requirement_validator import (
     RequirementValidator,
-    ValidationResult,
+    RequirementResult,
 )
 
 logger = logging.getLogger(__name__)
@@ -707,7 +707,7 @@ class EnhancedCompletionEvaluator:
         perception: Perception,
         action_result: Any,
         state: Dict[str, Any],
-        requirement_result: Optional[ValidationResult],
+        requirement_result: Optional[RequirementResult],
         keyword_result: Optional[CompletionSignal],
     ) -> CompletionCalibration:
         """Adjust raw completion score using support and execution signals."""

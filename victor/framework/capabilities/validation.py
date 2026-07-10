@@ -53,7 +53,7 @@ from victor.core.validation import ValidationSeverity
 
 
 @dataclass
-class ValidationResult:
+class CapabilityValidationResult:
     """Result of a validation operation.
 
     Attributes:
@@ -81,7 +81,7 @@ class ValidationResult:
         }
 
     @classmethod
-    def success(cls, details: Optional[Dict[str, Any]] = None) -> "ValidationResult":
+    def success(cls, details: Optional[Dict[str, Any]] = None) -> "CapabilityValidationResult":
         """Create a successful validation result."""
         return cls(is_valid=True, details=details or {})
 
@@ -92,7 +92,7 @@ class ValidationResult:
         severity: ValidationSeverity = ValidationSeverity.ERROR,
         details: Optional[Dict[str, Any]] = None,
         validator_id: str = "",
-    ) -> "ValidationResult":
+    ) -> "CapabilityValidationResult":
         """Create a failed validation result."""
         return cls(
             is_valid=False,
@@ -117,7 +117,9 @@ class Validator(ABC):
         pass
 
     @abstractmethod
-    def validate(self, value: Any, context: Optional[Dict[str, Any]] = None) -> ValidationResult:
+    def validate(
+        self, value: Any, context: Optional[Dict[str, Any]] = None
+    ) -> CapabilityValidationResult:
         """Validate a value.
 
         Args:
@@ -125,7 +127,7 @@ class Validator(ABC):
             context: Optional context for validation
 
         Returns:
-            ValidationResult with validation outcome
+            CapabilityValidationResult with validation outcome
         """
         pass
 
@@ -160,7 +162,9 @@ class FilePathValidator(Validator):
     def validator_id(self) -> str:
         return "file_path"
 
-    def validate(self, value: Any, context: Optional[Dict[str, Any]] = None) -> ValidationResult:
+    def validate(
+        self, value: Any, context: Optional[Dict[str, Any]] = None
+    ) -> CapabilityValidationResult:
         """Validate a file path.
 
         Args:
@@ -168,10 +172,10 @@ class FilePathValidator(Validator):
             context: Optional validation context
 
         Returns:
-            ValidationResult
+            CapabilityValidationResult
         """
         if not isinstance(value, (str, Path)):
-            return ValidationResult.failure(
+            return CapabilityValidationResult.failure(
                 f"File path must be a string or Path object, got {type(value).__name__}",
                 validator_id=self.validator_id,
             )
@@ -179,7 +183,7 @@ class FilePathValidator(Validator):
         try:
             path = Path(value).resolve()
         except Exception as e:
-            return ValidationResult.failure(
+            return CapabilityValidationResult.failure(
                 f"Invalid file path: {e}",
                 validator_id=self.validator_id,
             )
@@ -187,7 +191,7 @@ class FilePathValidator(Validator):
         # Check for path traversal
         if not self._allow_traversal:
             if ".." in str(value):
-                return ValidationResult.failure(
+                return CapabilityValidationResult.failure(
                     "Path traversal (../) is not allowed",
                     severity=ValidationSeverity.ERROR,
                     validator_id=self.validator_id,
@@ -199,7 +203,7 @@ class FilePathValidator(Validator):
                 str(path).startswith(str(allowed_dir)) for allowed_dir in self._allowed_dirs
             )
             if not is_allowed:
-                return ValidationResult.failure(
+                return CapabilityValidationResult.failure(
                     f"Path is not within allowed directories: {self._allowed_dirs}",
                     severity=ValidationSeverity.ERROR,
                     validator_id=self.validator_id,
@@ -207,13 +211,13 @@ class FilePathValidator(Validator):
 
         # Check if path exists (if required)
         if self._require_exists and not path.exists():
-            return ValidationResult.failure(
+            return CapabilityValidationResult.failure(
                 f"Path does not exist: {path}",
                 severity=ValidationSeverity.ERROR,
                 validator_id=self.validator_id,
             )
 
-        return ValidationResult.success(
+        return CapabilityValidationResult.success(
             details={"resolved_path": str(path), "exists": path.exists()}
         )
 
@@ -237,7 +241,9 @@ class CodeSyntaxValidator(Validator):
     def validator_id(self) -> str:
         return f"code_syntax_{self._language}"
 
-    def validate(self, value: Any, context: Optional[Dict[str, Any]] = None) -> ValidationResult:
+    def validate(
+        self, value: Any, context: Optional[Dict[str, Any]] = None
+    ) -> CapabilityValidationResult:
         """Validate code syntax.
 
         Args:
@@ -245,10 +251,10 @@ class CodeSyntaxValidator(Validator):
             context: Optional validation context
 
         Returns:
-            ValidationResult
+            CapabilityValidationResult
         """
         if not isinstance(value, str):
-            return ValidationResult.failure(
+            return CapabilityValidationResult.failure(
                 f"Code must be a string, got {type(value).__name__}",
                 validator_id=self.validator_id,
             )
@@ -265,32 +271,32 @@ class CodeSyntaxValidator(Validator):
             elif self._language == "yaml":
                 return self._validate_yaml(value)
             else:
-                return ValidationResult.failure(
+                return CapabilityValidationResult.failure(
                     f"Unsupported language: {self._language}",
                     severity=ValidationSeverity.WARNING,
                     validator_id=self.validator_id,
                 )
         except Exception as e:
-            return ValidationResult.failure(
+            return CapabilityValidationResult.failure(
                 f"Syntax validation error: {e}",
                 validator_id=self.validator_id,
             )
 
-    def _validate_python(self, code: str) -> ValidationResult:
+    def _validate_python(self, code: str) -> CapabilityValidationResult:
         """Validate Python syntax."""
         try:
             import ast
 
             ast.parse(code)
-            return ValidationResult.success()
+            return CapabilityValidationResult.success()
         except SyntaxError as e:
-            return ValidationResult.failure(
+            return CapabilityValidationResult.failure(
                 f"Python syntax error at line {e.lineno}: {e.msg}",
                 details={"line": e.lineno, "offset": e.offset},
                 validator_id=self.validator_id,
             )
 
-    def _validate_javascript(self, code: str) -> ValidationResult:
+    def _validate_javascript(self, code: str) -> CapabilityValidationResult:
         """Validate JavaScript syntax."""
         # Basic validation - look for obvious syntax issues
         # Full validation would require a JS parser
@@ -300,50 +306,50 @@ class CodeSyntaxValidator(Validator):
         close_parens = code.count(")")
 
         if open_braces != close_braces:
-            return ValidationResult.failure(
+            return CapabilityValidationResult.failure(
                 f"Unbalanced braces: {open_braces} open, {close_braces} close",
                 severity=ValidationSeverity.WARNING,
                 validator_id=self.validator_id,
             )
 
         if open_parens != close_parens:
-            return ValidationResult.failure(
+            return CapabilityValidationResult.failure(
                 f"Unbalanced parentheses: {open_parens} open, {close_parens} close",
                 severity=ValidationSeverity.WARNING,
                 validator_id=self.validator_id,
             )
 
-        return ValidationResult.success()
+        return CapabilityValidationResult.success()
 
-    def _validate_typescript(self, code: str) -> ValidationResult:
+    def _validate_typescript(self, code: str) -> CapabilityValidationResult:
         """Validate TypeScript syntax (basic checks)."""
         # TypeScript syntax validation would require a TS parser
         # For now, do basic brace/parenthesis balancing
         return self._validate_javascript(code)
 
-    def _validate_json(self, code: str) -> ValidationResult:
+    def _validate_json(self, code: str) -> CapabilityValidationResult:
         """Validate JSON syntax."""
         try:
             import json
 
             json.loads(code)
-            return ValidationResult.success()
+            return CapabilityValidationResult.success()
         except json.JSONDecodeError as e:
-            return ValidationResult.failure(
+            return CapabilityValidationResult.failure(
                 f"JSON syntax error at line {e.lineno}, column {e.colno}: {e.msg}",
                 details={"line": e.lineno, "column": e.colno},
                 validator_id=self.validator_id,
             )
 
-    def _validate_yaml(self, code: str) -> ValidationResult:
+    def _validate_yaml(self, code: str) -> CapabilityValidationResult:
         """Validate YAML syntax."""
         try:
             import yaml
 
             yaml.safe_load(code)
-            return ValidationResult.success()
+            return CapabilityValidationResult.success()
         except yaml.YAMLError as e:
-            return ValidationResult.failure(
+            return CapabilityValidationResult.failure(
                 f"YAML syntax error: {e}",
                 validator_id=self.validator_id,
             )
@@ -379,7 +385,9 @@ class ConfigurationValidator(Validator):
     def validator_id(self) -> str:
         return "configuration"
 
-    def validate(self, value: Any, context: Optional[Dict[str, Any]] = None) -> ValidationResult:
+    def validate(
+        self, value: Any, context: Optional[Dict[str, Any]] = None
+    ) -> CapabilityValidationResult:
         """Validate a configuration dictionary.
 
         Args:
@@ -387,10 +395,10 @@ class ConfigurationValidator(Validator):
             context: Optional validation context
 
         Returns:
-            ValidationResult
+            CapabilityValidationResult
         """
         if not isinstance(value, dict):
-            return ValidationResult.failure(
+            return CapabilityValidationResult.failure(
                 f"Configuration must be a dictionary, got {type(value).__name__}",
                 validator_id=self.validator_id,
             )
@@ -398,7 +406,7 @@ class ConfigurationValidator(Validator):
         # Check required keys
         missing_keys = self._required_keys - set(value.keys())
         if missing_keys:
-            return ValidationResult.failure(
+            return CapabilityValidationResult.failure(
                 f"Missing required configuration keys: {missing_keys}",
                 validator_id=self.validator_id,
             )
@@ -406,7 +414,7 @@ class ConfigurationValidator(Validator):
         # Check key types
         for key, expected_type in self._key_types.items():
             if key in value and not isinstance(value[key], expected_type):
-                return ValidationResult.failure(
+                return CapabilityValidationResult.failure(
                     f"Configuration key '{key}' must be of type {expected_type.__name__}, "
                     f"got {type(value[key]).__name__}",
                     validator_id=self.validator_id,
@@ -417,17 +425,17 @@ class ConfigurationValidator(Validator):
             if key in value:
                 try:
                     if not validator_func(value[key]):
-                        return ValidationResult.failure(
+                        return CapabilityValidationResult.failure(
                             f"Configuration key '{key}' failed custom validation",
                             validator_id=self.validator_id,
                         )
                 except Exception as e:
-                    return ValidationResult.failure(
+                    return CapabilityValidationResult.failure(
                         f"Error validating configuration key '{key}': {e}",
                         validator_id=self.validator_id,
                     )
 
-        return ValidationResult.success()
+        return CapabilityValidationResult.success()
 
 
 class OutputFormatValidator(Validator):
@@ -460,7 +468,9 @@ class OutputFormatValidator(Validator):
     def validator_id(self) -> str:
         return "output_format"
 
-    def validate(self, value: Any, context: Optional[Dict[str, Any]] = None) -> ValidationResult:
+    def validate(
+        self, value: Any, context: Optional[Dict[str, Any]] = None
+    ) -> CapabilityValidationResult:
         """Validate output format.
 
         Args:
@@ -468,17 +478,17 @@ class OutputFormatValidator(Validator):
             context: Optional validation context
 
         Returns:
-            ValidationResult
+            CapabilityValidationResult
         """
         if not isinstance(value, str):
-            return ValidationResult.failure(
+            return CapabilityValidationResult.failure(
                 f"Output must be a string, got {type(value).__name__}",
                 validator_id=self.validator_id,
             )
 
         # Check max length
         if self._max_length and len(value) > self._max_length:
-            return ValidationResult.failure(
+            return CapabilityValidationResult.failure(
                 f"Output exceeds maximum length of {self._max_length} characters "
                 f"(got {len(value)} characters)",
                 validator_id=self.validator_id,
@@ -491,7 +501,7 @@ class OutputFormatValidator(Validator):
                 missing_patterns.append(pattern.pattern)
 
         if missing_patterns:
-            return ValidationResult.failure(
+            return CapabilityValidationResult.failure(
                 f"Output missing required patterns: {missing_patterns}",
                 validator_id=self.validator_id,
             )
@@ -503,12 +513,12 @@ class OutputFormatValidator(Validator):
                 found_forbidden.append(pattern.pattern)
 
         if found_forbidden:
-            return ValidationResult.failure(
+            return CapabilityValidationResult.failure(
                 f"Output contains forbidden patterns: {found_forbidden}",
                 validator_id=self.validator_id,
             )
 
-        return ValidationResult.success()
+        return CapabilityValidationResult.success()
 
 
 class ValidationCapabilityProvider:
@@ -603,7 +613,7 @@ class ValidationCapabilityProvider:
         validator_id: str,
         value: Any,
         context: Optional[Dict[str, Any]] = None,
-    ) -> ValidationResult:
+    ) -> CapabilityValidationResult:
         """Validate a value using a specific validator.
 
         Args:
@@ -612,7 +622,7 @@ class ValidationCapabilityProvider:
             context: Optional validation context
 
         Returns:
-            ValidationResult
+            CapabilityValidationResult
 
         Raises:
             KeyError: If validator_id is not registered
@@ -627,7 +637,7 @@ class ValidationCapabilityProvider:
         self,
         validations: Dict[str, Any],
         context: Optional[Dict[str, Any]] = None,
-    ) -> List[ValidationResult]:
+    ) -> List[CapabilityValidationResult]:
         """Validate multiple values.
 
         Args:
@@ -650,7 +660,7 @@ class ValidationCapabilityProvider:
                         break
             except KeyError as e:
                 results.append(
-                    ValidationResult.failure(
+                    CapabilityValidationResult.failure(
                         f"Validator not found: {e}",
                         validator_id=validator_id,
                     )
@@ -663,7 +673,7 @@ class ValidationCapabilityProvider:
         validator_ids: List[str],
         value: Any,
         context: Optional[Dict[str, Any]] = None,
-    ) -> ValidationResult:
+    ) -> CapabilityValidationResult:
         """Validate a value through a chain of validators.
 
         Args:
@@ -672,14 +682,14 @@ class ValidationCapabilityProvider:
             context: Optional validation context
 
         Returns:
-            ValidationResult from first failed validator, or success if all pass
+            CapabilityValidationResult from first failed validator, or success if all pass
         """
         for validator_id in validator_ids:
             result = self.validate(validator_id, value, context=context)
             if not result.is_valid:
                 return result
 
-        return ValidationResult.success()
+        return CapabilityValidationResult.success()
 
 
 __all__ = [
@@ -689,6 +699,6 @@ __all__ = [
     "CodeSyntaxValidator",
     "ConfigurationValidator",
     "OutputFormatValidator",
-    "ValidationResult",
+    "CapabilityValidationResult",
     "ValidationSeverity",
 ]
