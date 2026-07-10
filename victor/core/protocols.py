@@ -53,6 +53,7 @@ from typing import (
     Callable,
     Dict,
     List,
+    Mapping,
     Optional,
     Protocol,
     TYPE_CHECKING,
@@ -521,6 +522,49 @@ class CacheProtocol(Protocol):
         ...
 
 
+@runtime_checkable
+class MetricsCollectorProtocol(Protocol):
+    """Structural protocol for metrics collectors (FEP-0014).
+
+    Captures the canonical "record a metric / read a snapshot" surface so callers can
+    depend on *a* metrics collector abstractly instead of importing one of the five
+    concrete ``MetricsCollector`` implementations (``observability``,
+    ``integrations/api/event_bridge``, ``agent``, ``experiments/ab_testing``,
+    ``framework/observability``).
+
+    Derivation note (Phase 1 finding): reading all five implementations showed their
+    *current* public surfaces are entirely disjoint — they share no public method
+    (only ``__init__``). The FEP's expected common surface (``record_metric`` /
+    ``get_snapshot``) is the ratified canonical target, not the present-day
+    intersection: only ``framework/observability`` exposes ``get_snapshot`` today
+    (its record method is named ``record``), and ``record_metric`` currently lives on
+    other metrics services (``core.container.MetricsServiceProtocol`` implementers,
+    ``NullMetricsService``, the RL coordinator). Phase 2 therefore *adapts/renames*
+    the five collectors onto this protocol; none is modified in Phase 1.
+
+    Because this is ``runtime_checkable``, ``isinstance`` verifies method *presence*
+    by name only (not signatures).
+    """
+
+    def record_metric(self, name: str, value: float, **tags: str) -> None:
+        """Record a single metric observation.
+
+        Args:
+            name: Metric name.
+            value: Numeric value to record.
+            **tags: Optional string-valued dimensional tags.
+        """
+        ...
+
+    def get_snapshot(self) -> Mapping[str, Any]:
+        """Return a point-in-time snapshot of collected metrics.
+
+        Returns:
+            A read-only mapping of the collector's current metric state.
+        """
+        ...
+
+
 # Factory type for lazy service creation
 ServiceFactory = Callable[[], T]
 
@@ -536,6 +580,7 @@ __all__ = [
     "IntelligentPipelineProtocol",
     "ProviderProtocol",
     "CacheProtocol",
+    "MetricsCollectorProtocol",
     # Result Protocols (for classifier return types)
     "TaskClassificationResultProtocol",
     "IntentClassificationResultProtocol",
