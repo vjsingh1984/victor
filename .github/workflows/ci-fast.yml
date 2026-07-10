@@ -540,7 +540,12 @@ jobs:
   hotspot-size-guard:
     name: Hotspot Size Guard
     runs-on: ubuntu-latest
-    timeout-minutes: 2
+    # 10 min, not 2: the test is ~1.4s but the job does a full editable
+    # `pip install -e ".[dev]"` (needed so pytest can collect conftest, which
+    # imports victor). A cold pip cache routinely pushes that install past 2
+    # min, timing the job out -> "cancelled" -> the CI Success aggregate fails,
+    # intermittently blocking every PR (and develop's own CI).
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
