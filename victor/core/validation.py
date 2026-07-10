@@ -80,11 +80,46 @@ from pydantic import BaseModel, Field, ValidationError, field_validator, model_v
 
 
 class ValidationSeverity(str, Enum):
-    """Severity levels for validation issues."""
+    """Severity levels for validation issues.
+
+    Canonical severity enum for the whole tree (FEP-0014). The member set is the
+    superset ``{INFO, WARNING, ERROR, CRITICAL}`` — ``CRITICAL`` is adopted from the
+    ``framework/middleware.py`` variant so no layer loses a level. The pre-existing
+    members and their string values are unchanged for backward compatibility; only
+    ``CRITICAL`` is additive.
+
+    Note:
+        Because this is a ``str`` Enum, the native ``<`` / ``>=`` operators compare
+        the underlying *string values* (alphabetical), which does NOT match logical
+        severity order. Use :func:`severity_rank` for severity-aware comparisons.
+    """
 
     ERROR = "error"
     WARNING = "warning"
     INFO = "info"
+    CRITICAL = "critical"
+
+
+# Logical ordering of severities (ascending). Used instead of the native ``str``
+# Enum comparison operators, which order by string value rather than by severity.
+_SEVERITY_ORDER: Dict[ValidationSeverity, int] = {
+    ValidationSeverity.INFO: 0,
+    ValidationSeverity.WARNING: 1,
+    ValidationSeverity.ERROR: 2,
+    ValidationSeverity.CRITICAL: 3,
+}
+
+
+def severity_rank(severity: ValidationSeverity) -> int:
+    """Return the logical rank of a severity (higher == more severe).
+
+    Args:
+        severity: The severity to rank.
+
+    Returns:
+        Integer rank where ``INFO=0 < WARNING=1 < ERROR=2 < CRITICAL=3``.
+    """
+    return _SEVERITY_ORDER[severity]
 
 
 @dataclass
@@ -191,6 +226,52 @@ class ConfigValidationResult:
                 for i in self.issues
             ],
         }
+
+
+# =============================================================================
+# Canonical Validation Result (FEP-0014)
+# =============================================================================
+
+
+@dataclass(frozen=True)
+class ValidationResult:
+    """Canonical validation result (FEP-0014).
+
+    The single "bool + list of problems" shape for the whole tree. It supersedes the
+    five divergent ``ValidationResult`` variants (``is_valid``/``status``,
+    ``errors``/``issues``/``error_message``) that previously lived in ``tools``,
+    ``config``, ``workflows`` and ``framework``. Consumers are migrated onto this
+    type in FEP-0014 Phase 2; Phase 1 only introduces it additively.
+
+    This is distinct from :class:`ConfigValidationResult` (kept as-is): that type is a
+    mutable builder with ``add_error``/``merge`` helpers used by the config validator,
+    whereas this is a frozen value object for passing results across layer boundaries.
+
+    Attributes:
+        is_valid: Whether validation passed.
+        issues: All validation issues (of any severity).
+    """
+
+    is_valid: bool
+    issues: List[ValidationIssue] = field(default_factory=list)
+
+    @property
+    def errors(self) -> List[ValidationIssue]:
+        """Issues at severity ``ERROR`` or higher (i.e. ``ERROR`` or ``CRITICAL``).
+
+        Uses :func:`severity_rank` rather than the native ``str`` Enum ``>=`` so the
+        comparison is by logical severity, not alphabetical string value.
+        """
+        threshold = severity_rank(ValidationSeverity.ERROR)
+        return [i for i in self.issues if severity_rank(i.severity) >= threshold]
+
+    @property
+    def error_message(self) -> str:
+        """Convenience: newline-joined messages of the error-level issues.
+
+        Empty string when there are no error-level issues.
+        """
+        return "\n".join(i.message for i in self.errors)
 
 
 # =============================================================================
@@ -816,7 +897,9 @@ def validate_agent_config(config: Dict[str, Any]) -> ConfigValidationResult:
 __all__ = [
     # Severity and Issues
     "ValidationSeverity",
+    "severity_rank",
     "ValidationIssue",
+    "ValidationResult",
     "ConfigValidationResult",
     # Rules
     "ValidationRule",
