@@ -20,15 +20,9 @@ separating warnings from errors and providing actionable suggestions.
 
 from dataclasses import dataclass, field
 from typing import List, Optional
-from enum import Enum
 
-
-class ValidationSeverity(Enum):
-    """Severity level for validation issues."""
-
-    ERROR = "error"
-    WARNING = "warning"
-    INFO = "info"
+# FEP-0014 Phase 2a: re-export the canonical severity instead of redefining it.
+from victor.core.validation import ValidationSeverity
 
 
 @dataclass
@@ -44,6 +38,7 @@ class ValidationIssue:
     def __str__(self) -> str:
         """Format validation issue for display."""
         severity_icon = {
+            ValidationSeverity.CRITICAL: "🛑",
             ValidationSeverity.ERROR: "✗",
             ValidationSeverity.WARNING: "⚠",
             ValidationSeverity.INFO: "ℹ",

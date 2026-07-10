@@ -71,8 +71,10 @@ import logging
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Protocol, Set, runtime_checkable
+
+# FEP-0014 Phase 2a: re-export the canonical severity instead of redefining it.
+from victor.core.validation import ValidationSeverity
 
 from victor.core.vertical_types import MiddlewarePriority, MiddlewareResult
 from victor.core.verticals.protocols import MiddlewareProtocol
@@ -84,15 +86,6 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 # Output Validation Types
 # =============================================================================
-
-
-class ValidationSeverity(Enum):
-    """Severity level for validation issues."""
-
-    INFO = "info"  # Informational, no action needed
-    WARNING = "warning"  # May need attention
-    ERROR = "error"  # Must be fixed
-    CRITICAL = "critical"  # Blocks execution
 
 
 @dataclass

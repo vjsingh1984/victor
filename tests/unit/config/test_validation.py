@@ -67,7 +67,8 @@ class TestValidationIssue:
         for sev in ValidationSeverity:
             issue = ValidationIssue(category="x", severity=sev, message="m")
             icons.add(str(issue)[0])
-        assert len(icons) == 3
+        # Distinct icon per canonical severity (now includes CRITICAL, FEP-0014).
+        assert len(icons) == len(list(ValidationSeverity))
 
 
 class TestConfigValidationResult:
