@@ -30,6 +30,14 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 import httpx
 
+from victor.core.pickle_cache import (
+    ValidationResult,
+    delete_cache_file,
+    invalid,
+    load_validated_pickle,
+    save_pickle_with_metadata,
+    valid,
+)
 from victor.providers.base import ToolDefinition
 from victor.tools.enums import CostTier
 from victor.tools.registry import ToolRegistry
@@ -412,12 +420,7 @@ class SemanticToolSelector:
         Args:
             reason: Reason for deletion (for logging)
         """
-        try:
-            if self.cache_file.exists():
-                self.cache_file.unlink()
-                logger.info(f"Tool embeddings: deleted stale cache ({reason})")
-        except Exception as e:
-            logger.warning(f"Tool embeddings: failed to delete cache: {e}")
+        delete_cache_file(self.cache_file, reason, logger, label="Tool embeddings")
 
     def _load_from_cache(self, tools_hash: str) -> bool:
         """Load embeddings from pickle cache if valid.
@@ -435,14 +438,9 @@ class SemanticToolSelector:
         Returns:
             True if loaded successfully, False otherwise
         """
-        if not self.cache_file.exists():
-            logger.debug("No embedding cache file found, will rebuild")
-            return False
+        numpy = _ensure_numpy()
 
-        try:
-            with open(self.cache_file, "rb") as f:
-                cache_data = pickle.load(f)
-
+        def _check_version(cache_data: Dict[str, Any]) -> ValidationResult:
             # 1. Check cache version first (breaking changes)
             cached_version = cache_data.get("cache_version", 1)
             if cached_version != self.CACHE_VERSION:
@@ -450,9 +448,10 @@ class SemanticToolSelector:
                     f"Cache version mismatch (cached: v{cached_version}, current: v{self.CACHE_VERSION}), "
                     "rebuilding embeddings"
                 )
-                self._delete_cache("version mismatch")
-                return False
+                return invalid(delete=True, reason="version mismatch")
+            return valid()
 
+        def _check_tools_hash(cache_data: Dict[str, Any]) -> ValidationResult:
             # 2. Verify cache is for same tools (hash includes count, names, and definitions)
             if cache_data.get("tools_hash") != tools_hash:
                 cached_count = cache_data.get("tool_count", "?")
@@ -471,39 +470,39 @@ class SemanticToolSelector:
                         logger.debug(f"Tools added since cache: {added}")
                     if removed:
                         logger.debug(f"Tools removed since cache: {removed}")
-                return False
+                # Hash mismatch intentionally keeps the cache file (no delete).
+                return invalid(delete=False)
+            return valid()
 
+        def _check_model(cache_data: Dict[str, Any]) -> ValidationResult:
             # 3. Verify cache is for same embedding model
             if cache_data.get("embedding_model") != self.embedding_model:
                 logger.info(
                     f"Embedding model changed (cached: {cache_data.get('embedding_model')}, "
                     f"current: {self.embedding_model}), rebuilding embeddings"
                 )
-                self._delete_cache("model mismatch")
-                return False
+                return invalid(delete=True, reason="model mismatch")
+            return valid()
 
+        def _check_embeddings(cache_data: Dict[str, Any]) -> ValidationResult:
             # 4. Validate embeddings exist and have correct structure
             embeddings = cache_data.get("embeddings", {})
             if not embeddings:
                 logger.warning("Tool embeddings: cache missing embeddings dict")
-                self._delete_cache("missing embeddings")
-                return False
+                return invalid(delete=True, reason="missing embeddings")
 
             # 5. Validate embedding dimensions and integrity
-            numpy = _ensure_numpy()
             expected_dim = None
             for tool_name, embedding in embeddings.items():
                 if not isinstance(embedding, numpy.ndarray):
                     logger.warning(f"Tool embeddings: '{tool_name}' is not a numpy array")
-                    self._delete_cache("invalid type")
-                    return False
+                    return invalid(delete=True, reason="invalid type")
 
                 if len(embedding.shape) != 1:
                     logger.warning(
                         f"Tool embeddings: '{tool_name}' has wrong shape: {embedding.shape}"
                     )
-                    self._delete_cache("invalid shape")
-                    return False
+                    return invalid(delete=True, reason="invalid shape")
 
                 if expected_dim is None:
                     expected_dim = embedding.shape[0]
@@ -512,29 +511,28 @@ class SemanticToolSelector:
                         f"Tool embeddings: dimension mismatch for '{tool_name}' "
                         f"(got {embedding.shape[0]}, expected {expected_dim})"
                     )
-                    self._delete_cache("dimension inconsistency")
-                    return False
+                    return invalid(delete=True, reason="dimension inconsistency")
 
                 # Check for NaN or Inf (corruption detection)
                 if not numpy.isfinite(embedding).all():
                     logger.warning(f"Tool embeddings: '{tool_name}' contains NaN or Inf values")
-                    self._delete_cache("corrupted embeddings")
-                    return False
+                    return invalid(delete=True, reason="corrupted embeddings")
+            return valid()
 
-            # All checks passed - load embeddings
-            self._tool_embedding_cache = embeddings
-            self._tools_hash = tools_hash
-
-            return True
-
-        except (pickle.UnpicklingError, EOFError) as e:
-            logger.warning(f"Tool embeddings: cache file corrupted: {e}")
-            self._delete_cache("unpickling error")
+        cache_data = load_validated_pickle(
+            self.cache_file,
+            validators=[_check_version, _check_tools_hash, _check_model, _check_embeddings],
+            logger=logger,
+            label="Tool embeddings",
+            missing_message="No embedding cache file found, will rebuild",
+        )
+        if cache_data is None:
             return False
-        except Exception as e:
-            logger.warning(f"Failed to load embedding cache (corrupted?): {e}, will rebuild")
-            self._delete_cache("load error")
-            return False
+
+        # All checks passed - load embeddings
+        self._tool_embedding_cache = cache_data["embeddings"]
+        self._tools_hash = tools_hash
+        return True
 
     def _save_to_cache(self, tools_hash: str) -> None:
         """Save embeddings to pickle cache with full metadata for robust invalidation.
@@ -542,28 +540,24 @@ class SemanticToolSelector:
         Args:
             tools_hash: Hash of tool definitions
         """
-        try:
-            tool_names = sorted(self._tool_embedding_cache.keys())
-            cache_data = {
-                "cache_version": self.CACHE_VERSION,
-                "embedding_model": self.embedding_model,
-                "tools_hash": tools_hash,
-                "tool_count": len(tool_names),
-                "tool_names": tool_names,  # Explicit list for debugging
-                "embeddings": self._tool_embedding_cache,
-            }
+        tool_names = sorted(self._tool_embedding_cache.keys())
+        cache_data = {
+            "cache_version": self.CACHE_VERSION,
+            "embedding_model": self.embedding_model,
+            "tools_hash": tools_hash,
+            "tool_count": len(tool_names),
+            "tool_names": tool_names,  # Explicit list for debugging
+            "embeddings": self._tool_embedding_cache,
+        }
 
-            with open(self.cache_file, "wb") as f:
-                pickle.dump(cache_data, f)
-
+        if save_pickle_with_metadata(
+            self.cache_file, cache_data, logger=logger, label="Tool embeddings"
+        ):
             cache_size = self.cache_file.stat().st_size / 1024  # KB
             logger.info(
                 f"Saved embedding cache to {self.cache_file} "
                 f"({cache_size:.1f} KB, {len(tool_names)} tools, v{self.CACHE_VERSION})"
             )
-
-        except Exception as e:
-            logger.warning(f"Failed to save embedding cache: {e}")
 
     # Category alias mappings for logical category names
     # Maps logical names (file_ops, git_ops) to registry categories
