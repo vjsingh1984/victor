@@ -51,7 +51,13 @@ jobs:
     # 12-way split lands shards near 40-45 min and many were cancelled at the
     # old 45-min cap. Raise headroom while the fixture-speed/duration-balancing
     # work is tracked separately. See the CI-Tests stabilization issue.
-    timeout-minutes: 75
+    #
+    # Raised again 45->75->120: with the suite growth since 0.7.4, Shard 1 (the
+    # heaviest, duration-split) now exceeds 75 min and was cancelled at the cap
+    # on the develop->main promotion (shards 2-12 still pass well under). +60%
+    # headroom unblocks promotion; the real fix remains fixture speed / fresh
+    # .test_durations rebalancing (generate-test-durations.yml).
+    timeout-minutes: 120
     needs: []  # No dependencies - run in parallel with ci-fast
     env:
       PYTHONPATH: ${{ github.workspace }}
