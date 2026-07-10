@@ -61,7 +61,7 @@ can be resumed across sessions without re-deriving context.
 - **Effort**: Medium. **Impact**: Medium-High.
 
 ### F-011 · Same-name enum collisions across domains (`ApprovalMode`, `AgentMode`) — `HL`
-- **Status**: OPEN
+- **Status**: DONE (PR #447) — renamed the lower-usage variant of each pair: `config.py` `AgentMode`→`AgentLifecycleMode` (1 importer) and `safety.py` `ApprovalMode`→`WriteApprovalMode` (0 external importers). Members/values preserved; canonical `mode_controller.AgentMode` / `tool_approval.ApprovalMode` untouched.
 - **Evidence (verified 2026-07)**:
   - `ApprovalMode` defined twice with **incompatible members**: `victor/agent/safety.py:97` (`OFF`/… write-operation approval) vs `victor/agent/tool_approval.py:21` (`AUTO`/`DANGEROUS`/`ALL`, tool-approval workflow).
   - `AgentMode` defined twice: `victor/agent/mode_controller.py:32` (**canonical**, 12 importers — coding workflow modes) vs `victor/agent/config.py:65` (**1 importer** — agent lifecycle). Different concepts, same name.
@@ -111,7 +111,7 @@ can be resumed across sessions without re-deriving context.
 - **Effort**: Medium. **Impact**: Medium.
 
 ### F-012 · Validation/metrics types fragmented into divergent same-name variants — `MH`
-- **Status**: OPEN
+- **Status**: FEP ACCEPTED — [FEP-0014](../../feps/fep-0014-canonical-validation-metrics-contracts.md) accepted 2026-07-09 (PR #452). Implementation in progress, Phase 1 first (canonical types + `MetricsCollectorProtocol` + guard).
 - **Evidence (verified 2026-07)**:
   - `ValidationSeverity` × **4**: `config/validation.py:26`, `core/validation.py:82`, `framework/middleware.py:89`, `framework/capabilities/validation.py:53`. Three are `{ERROR,WARNING,INFO}`; **`framework/middleware.py:89` uniquely adds `CRITICAL`** → a severity comparison silently means different things by layer.
   - `ValidationResult` × **5** with incompatible fields: `tools/tool_call_validator.py:17`, `config/connection_validation.py:54`, `workflows/protocols.py:759` (nested), `framework/requirement_validator.py:88`, `framework/capabilities/validation.py:62`.
@@ -149,7 +149,7 @@ can be resumed across sessions without re-deriving context.
 - **Effort**: Medium (triage). **Impact**: Medium.
 
 ### F-013 · `framework/step_handlers.py` exports internal-only symbols — FEP-gated — `ML`
-- **Status**: OPEN (FEP required)
+- **Status**: FEP ACCEPTED — [FEP-0015](../../feps/fep-0015-trim-internal-framework-exports.md) accepted 2026-07-09 (PR #452). Implementation in progress, Phase 1 (unexport + `_ExtensionHandler` rename + deprecation shim + guard).
 - **Evidence (verified 2026-07)**:
   - `victor/framework/step_handlers.py:2629` `__all__` includes `CapabilityConfigStepHandler` (class L968) and `ExtensionHandler` (class L2047), but **neither is imported anywhere outside this module**.
   - `ExtensionHandler` is heavily used *internally* (instantiated L2346–2361), so it is **not dead** — only its `__all__` export is unused.
@@ -158,7 +158,7 @@ can be resumed across sessions without re-deriving context.
 - **Effort**: Low (mechanical) + FEP overhead. **Impact**: Low-Medium.
 
 ### F-014 · Ad-hoc retry/backoff + pickle-cache logic bypasses existing canonicals — `ML`
-- **Status**: OPEN
+- **Status**: DONE (partial, conservative) — F-014a: PR #448; F-014b: PR #449. Migrated where behavior is provably identical; behaviorally-divergent sites deliberately left (documented below).
 - **Evidence (verified 2026-07)**:
   - Canonical retry EXISTS: `victor/core/retry.py:156` `ExponentialBackoffStrategy` (+ `with_retry` L498). Yet 3 sites reimplement `2 ** attempt` backoff inline: `agent/subagents/base.py:533`, `workflows/batch_executor.py:599` & `:663`, `storage/embeddings/service.py:284`.
   - Pickle load-validate-save duplicated across **4** files: `tools/semantic_selector.py`, `storage/embeddings/collections.py`, `agent/prompt_corpus_registry.py`, `agent/services/decision_cache.py`.
@@ -176,6 +176,17 @@ can be resumed across sessions without re-deriving context.
 ### F-C2 · Verified-dead code removed — DONE (PR #443)
 - Deleted orphan module `victor/core/typed_models.py` (12 types, zero importers), the dead `StreamingProvider`/`StreamChatProvider` protocols in `providers/stream_adapter.py`, and the unused `ModeConfigSchema`/`ModeDefinitionSchema`/`VerticalModeConfigSchema` + `validate_*_dict` cluster in `core/validation.py`. Net **−566 LOC**. Verified: full-suite collection-check clean, 173 targeted tests green.
 - **Provenance note**: Originated from a 4-agent duplication audit whose **majority of raw findings were rejected on verification** — e.g. the "414 `to_dict` copies → mixin" was a mischaracterization (mostly legitimately-distinct types), and a claim that a test imports the `stream_adapter` protocols was false. Only independently-verified-dead items were removed; the surviving design issues became F-011..F-014.
+
+### F-C3 · F-011 enum-collision renames — DONE (PR #447)
+- `config.py` `AgentMode`→`AgentLifecycleMode`, `safety.py` `ApprovalMode`→`WriteApprovalMode` (lower-usage variant of each pair). Pure rename; members preserved; canonical variants untouched. Implemented via a worktree-isolated parallel agent, diff-reviewed, CI-green.
+
+### F-C4 · F-014 backoff + pickle-cache consolidation — DONE partial (PRs #448, #449)
+- **F-014a (#448)**: added pure `compute_backoff_delay()` to `core/retry.py`; migrated 3 inline sites (`subagents/base.py`, `batch_executor.py` ×2) with proven numeric equivalence. **Left** `storage/embeddings/service.py:284` — multiplicative jitter `[0.75,1.25]` the additive-jitter helper cannot reproduce.
+- **F-014b (#449)**: extracted `victor/core/pickle_cache.py` (validator-based load/validate/save, +8 tests); migrated `semantic_selector.py` and `collections.py` preserving exact validation order and delete-vs-keep flags. **Left** `prompt_corpus_registry.py` (never deletes on failure) and `decision_cache.py` (bare-dict pickle, no metadata wrapper) — helper cannot express their semantics.
+- Both implemented via worktree-isolated parallel agents, independently diff-reviewed, CI-green.
+
+### Blocker cleared this cycle — vertical CI unblock (PR #451)
+- An external main→develop sync (PR #446) deleted core `victor/storage/vector_stores/chromadb_provider.py` but left a vertical test importing it → `test-verticals` collection error blocked **all** PRs into develop. Fixed by removing the stale import + orphaned `TestChromaDBProvider` (PR #450 independently removed chromadb from verticals around the same time).
 
 ---
 
@@ -208,10 +219,10 @@ can be resumed across sessions without re-deriving context.
 | 8 | F-007 provider/tool taxonomy | Med | Med |
 | 9 | F-008 conversation store disposition | Med | Med |
 | 10 | F-010 legacy-marker triage | Med | Med |
-| 11 | F-011 rename colliding enums (`ApprovalMode`/`AgentMode`) | Low-Med | **Med-High** |
-| 12 | F-014 backoff/pickle-cache consolidation vs canonicals | Med | Med |
-| 13 | F-013 `step_handlers` `__all__` cleanup (FEP) | Low+FEP | Low-Med |
-| 14 | F-012 unify validation/metrics types (FEP) | High | High |
+| ~~11~~ | ~~F-011 rename colliding enums~~ — ✅ DONE (#447) | Low-Med | **Med-High** |
+| ~~12~~ | ~~F-014 backoff/pickle-cache consolidation~~ — ✅ DONE partial (#448, #449) | Med | Med |
+| 13 | F-013 `step_handlers` `__all__` cleanup — 📋 FEP-0015 drafted (#452) | Low+FEP | Low-Med |
+| 14 | F-012 unify validation/metrics types — 📋 FEP-0014 drafted (#452) | High | High |
 
 ---
 
@@ -220,3 +231,5 @@ can be resumed across sessions without re-deriving context.
 - **F-009 execution (2026-04):** F-009a/b done via `git mv` to `scripts/`; F-009c recovered 5 shell-limit tests into `tests/unit/tools/test_shell_limits.py` (all passing); deleted 2 dead/duplicate root tests (`test_performance_improvements.py`, `test_planning_integration.py` — the latter imported a removed `planning_coordinator` module). F-009d (rewrite dead `USE_SERVICE_LAYER_FOR_AGENT` verify script) still OPEN.
 - **F-001 execution (2026-07):** Extended `scripts/ci/check_docs_drift.py` EXTRA_FILES to scan CLAUDE.md/.victor/init.md/AGENTS.md (the exact files F-001 flagged); added regression test; verified bidirectionally. Provider/tool-module counts confirmed already correct (original evidence misread raw file count vs adapter count).
 - **2026-07 audit cycle:** Landed F-C1 (PR #442, provider capability-surface collapse) and F-C2 (PR #443, verified-dead-code removal) — ~850 LOC removed, both CI-green. Added F-011..F-014 from the same 4-agent duplication audit, each recorded only after **independently verifying** its evidence (the majority of the audit's raw findings were rejected as unverified or mischaracterized). F-012/F-013 are FEP-gated (framework/core public surface); F-011 is a correctness footgun (colliding enums with live consumers, so rename — not delete).
+- **F-011/F-014 execution (2026-07):** Implemented in parallel via three worktree-isolated agents, each diff-reviewed independently before PR. F-011 → PR #447 (enum renames); F-014a → PR #448 (`compute_backoff_delay` helper, 3/4 sites migrated); F-014b → PR #449 (`core/pickle_cache.py` helper + tests, 2/4 sites migrated). Divergent-semantics sites deliberately skipped and documented (F-C3/F-C4). Mid-flight, an external main-sync (PR #446) broke `test-verticals` by deleting a core module a vertical test imported; fixed via PR #451 to unblock the cascade. All four squash-merged CI-green.
+- **F-012/F-013 FEP drafts (2026-07):** Authored FEP-0014 (canonical validation/metrics contracts) and FEP-0015 (framework export hygiene) → PR #452, awaiting review. Backlog statuses moved OPEN → FEP DRAFTED; implementation gated on FEP acceptance.
