@@ -186,3 +186,28 @@ class TestPerFileIsolation:
         # ...File B's independent group still applied.
         assert file_b.read_text() == "B1x\n"
         assert result.get("partial") is True
+
+    @pytest.mark.asyncio
+    async def test_same_file_valid_sibling_reported_as_rolled_back(self, tmp_path):
+        """A valid same-file op is reported (not silently dropped) when a sibling fails."""
+        file_a = tmp_path / "a.py"
+        file_b = tmp_path / "b.py"
+        file_a.write_text("A1\nA2\n")
+        file_b.write_text("B1\n")
+
+        result = await edit(
+            ops=[
+                {"type": "replace", "path": str(file_a), "old_str": "A1", "new_str": "A1x"},
+                {"type": "replace", "path": str(file_a), "old_str": "NOMATCH", "new_str": "z"},
+                {"type": "replace", "path": str(file_b), "old_str": "B1", "new_str": "B1x"},
+            ]
+        )
+
+        # file_a rolled back atomically; file_b's independent group still applied.
+        assert file_a.read_text() == "A1\nA2\n"
+        assert file_b.read_text() == "B1x\n"
+        assert result.get("partial") is True
+        # The otherwise-valid file_a op is surfaced with a rollback reason so the
+        # model knows to re-read and retry the whole file.
+        rolled_back = [f for f in result["failed"] if "rolled back" in f.get("error", "")]
+        assert rolled_back, f"expected a rolled-back sibling report, got: {result.get('failed')}"
