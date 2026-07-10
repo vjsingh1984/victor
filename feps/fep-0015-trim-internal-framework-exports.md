@@ -183,10 +183,20 @@ def __getattr__(name: str):
 
 **Deliverable**: symbols removed from public API; shim warns; internal behavior unchanged.
 
-### Phase 2: Remove shim (1 PR, next minor)
-- [ ] Delete the `__getattr__` shim.
+### Phase 2: Remove shim (1 small PR — release-gated)
 
-**Deliverable**: names fully internal.
+Gated on **one minor release** elapsing after Phase 1 (PR #454), so any out-of-tree
+importer had its deprecation window. Then:
+- [ ] Delete the `__getattr__` shim and the `_FEP_0015_DEPRECATED` map from `step_handlers.py`
+      (also drop the now-unused `import warnings` if nothing else uses it).
+- [ ] Tighten the guard test (`test_step_handlers_exports.py`): replace the "old name warns
+      and resolves" case with an assertion that `from victor.framework.step_handlers import
+      ExtensionHandler` now raises `ImportError`/`AttributeError` (fully internal).
+- [ ] Re-grep `victor/ tests/ verticals/` for the old names immediately before merging; expect
+      zero (unchanged from Phase 1) — abort/extend the window if any appeared.
+
+**Deliverable**: `ExtensionHandler`/`CapabilityConfigStepHandler` are fully internal; no shim,
+no deprecation surface. `_ExtensionHandler` remains the internal name.
 
 ### Testing Strategy
 - Guard test: `CapabilityConfigStepHandler`/`ExtensionHandler` not in `step_handlers.__all__`
