@@ -69,8 +69,9 @@ Step Handler Execution Order:
     └── ContextStepHandler - Final context attachment
 
 Usage:
+    # CapabilityConfigStepHandler is internal-only (FEP-0015); prefer the
+    # StepHandlerRegistry.default() surface over importing handlers directly.
     from victor.framework.step_handlers import (
-        CapabilityConfigStepHandler,
         ToolStepHandler,
         TieredConfigStepHandler,
         PromptStepHandler,
@@ -82,7 +83,6 @@ Usage:
 
     # Create handlers (or use StepHandlerRegistry.default())
     handlers = [
-        CapabilityConfigStepHandler(),
         ToolStepHandler(),
         TieredConfigStepHandler(),
         PromptStepHandler(),
@@ -100,6 +100,7 @@ Usage:
 from __future__ import annotations
 
 import logging
+import warnings
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
@@ -2044,11 +2045,12 @@ class ContextStepHandler(BaseStepHandler):
 
 
 @dataclass
-class ExtensionHandler:
+class _ExtensionHandler:
     """Handler for a specific extension type.
 
-    Provides OCP-compliant extension handling where new extension types
-    can be added without modifying the ExtensionsStepHandler.
+    Internal to ``step_handlers`` (not part of the framework public API; see
+    FEP-0015). Provides OCP-compliant extension handling where new extension
+    types can be added without modifying the ExtensionsStepHandler.
 
     Attributes:
         name: Extension type name (matches VerticalExtensions field)
@@ -2069,7 +2071,7 @@ class ExtensionHandlerRegistry:
 
     Usage:
         registry = ExtensionHandlerRegistry.default()
-        registry.register(ExtensionHandler(
+        registry.register(_ExtensionHandler(
             name="custom_extension",
             handler=my_handler,
             priority=60,
@@ -2077,13 +2079,13 @@ class ExtensionHandlerRegistry:
     """
 
     def __init__(self) -> None:
-        self._handlers: Dict[str, ExtensionHandler] = {}
+        self._handlers: Dict[str, _ExtensionHandler] = {}
 
-    def register(self, handler: ExtensionHandler, replace: bool = False) -> None:
+    def register(self, handler: _ExtensionHandler, replace: bool = False) -> None:
         """Register an extension handler.
 
         Args:
-            handler: ExtensionHandler to register
+            handler: _ExtensionHandler to register
             replace: If True, replace existing handler
         """
         if handler.name in self._handlers and not replace:
@@ -2106,7 +2108,7 @@ class ExtensionHandlerRegistry:
             return True
         return False
 
-    def get_ordered_handlers(self) -> List[ExtensionHandler]:
+    def get_ordered_handlers(self) -> List[_ExtensionHandler]:
         """Get handlers in priority order."""
         return sorted(self._handlers.values(), key=lambda h: h.priority)
 
@@ -2343,28 +2345,28 @@ class ExtensionsStepHandler(BaseStepHandler):
         # Register default handlers with priorities
         # Service provider first (priority=5) so services are available to other handlers
         self._extension_registry.register(
-            ExtensionHandler("service_provider", handle_service_provider, priority=5)
+            _ExtensionHandler("service_provider", handle_service_provider, priority=5)
         )
         self._extension_registry.register(
-            ExtensionHandler("middleware", handle_middleware, priority=10)
+            _ExtensionHandler("middleware", handle_middleware, priority=10)
         )
         self._extension_registry.register(
-            ExtensionHandler("safety_extensions", handle_safety, priority=20)
+            _ExtensionHandler("safety_extensions", handle_safety, priority=20)
         )
         self._extension_registry.register(
-            ExtensionHandler("prompt_contributors", handle_prompts, priority=30)
+            _ExtensionHandler("prompt_contributors", handle_prompts, priority=30)
         )
         self._extension_registry.register(
-            ExtensionHandler("mode_config_provider", handle_mode_config, priority=40)
+            _ExtensionHandler("mode_config_provider", handle_mode_config, priority=40)
         )
         self._extension_registry.register(
-            ExtensionHandler("tool_dependency_provider", handle_tool_deps, priority=50)
+            _ExtensionHandler("tool_dependency_provider", handle_tool_deps, priority=50)
         )
         self._extension_registry.register(
-            ExtensionHandler("enrichment_strategy", handle_enrichment, priority=60)
+            _ExtensionHandler("enrichment_strategy", handle_enrichment, priority=60)
         )
         self._extension_registry.register(
-            ExtensionHandler("tool_selection_strategy", handle_tool_selection, priority=15)
+            _ExtensionHandler("tool_selection_strategy", handle_tool_selection, priority=15)
         )
 
     def _do_apply(
@@ -2634,7 +2636,7 @@ __all__ = [
     # Concrete handlers
     "ToolStepHandler",
     "TieredConfigStepHandler",  # Phase 1: Gap fix
-    "CapabilityConfigStepHandler",  # SOLID: Centralized config storage
+    # CapabilityConfigStepHandler: internal-only (FEP-0015); use StepHandlerRegistry.
     "PromptStepHandler",
     "SafetyStepHandler",
     "ConfigStepHandler",
@@ -2644,7 +2646,7 @@ __all__ = [
     "ExtensionsStepHandler",
     # Registries
     "StepHandlerRegistry",
-    "ExtensionHandler",  # Phase 2: OCP
+    # ExtensionHandler: renamed to _ExtensionHandler and unexported (FEP-0015).
     "ExtensionHandlerRegistry",  # Phase 2: OCP
     # Capability helpers
     "_check_capability",
@@ -2652,3 +2654,28 @@ __all__ = [
     # Tiered config helper (Workstream D)
     "get_tiered_config",
 ]
+
+
+# FEP-0015 deprecation shim: ``ExtensionHandler`` and ``CapabilityConfigStepHandler``
+# were removed from the public API (``__all__``). They remain importable by their old
+# names for one minor release so out-of-tree code relying on the previously-advertised
+# surface gets a clear ``DeprecationWarning`` rather than an immediate ``ImportError``.
+_FEP_0015_DEPRECATED = {
+    "ExtensionHandler": "_ExtensionHandler",
+    "CapabilityConfigStepHandler": "CapabilityConfigStepHandler",
+}
+
+
+def __getattr__(name: str) -> Any:
+    """Emit a deprecation warning for symbols unexported by FEP-0015."""
+    target = _FEP_0015_DEPRECATED.get(name)
+    if target is not None:
+        warnings.warn(
+            f"{name} is internal to step_handlers and no longer part of the "
+            "framework public API (FEP-0015). Depend on the public "
+            "StepHandlerRegistry / ExtensionsStepHandler surface instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return globals()[target]
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
