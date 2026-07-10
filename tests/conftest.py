@@ -53,6 +53,23 @@ def reset_tool_message_cleanup_stats():
         yield
 
 
+@pytest.fixture(autouse=True)
+def _disable_read_before_write_gate(monkeypatch):
+    """Disable the read-before-overwrite guard for the test suite by default.
+
+    The guard (``enforce_read_before_write``, env ``VICTOR_ENFORCE_READ_BEFORE_WRITE``)
+    is a *model*-safety feature that defaults ON in production: it stops an agent
+    from silently clobbering an existing file it never read. In the test suite the
+    test author controls every write, so that scenario does not apply and the guard
+    would only break existing tests that intentionally overwrite unread files.
+
+    Dedicated coverage lives in ``tests/unit/tools/test_read_before_write_gate.py``,
+    which re-enables the guard (``monkeypatch.delenv``) per test.
+    """
+    monkeypatch.setenv("VICTOR_ENFORCE_READ_BEFORE_WRITE", "0")
+    yield
+
+
 def pytest_configure(config):
     """Configure pytest with custom markers."""
     config.addinivalue_line(
