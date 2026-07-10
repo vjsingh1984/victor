@@ -42,7 +42,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
 __all__ = [
-    "ValidationResult",
+    "CacheValidation",
     "valid",
     "invalid",
     "PickleCacheValidator",
@@ -53,7 +53,7 @@ __all__ = [
 
 
 @dataclass(frozen=True)
-class ValidationResult:
+class CacheValidation:
     """Outcome of a single cache validator.
 
     Attributes:
@@ -68,23 +68,23 @@ class ValidationResult:
     reason: str = ""
 
 
-def valid() -> ValidationResult:
-    """Return a passing :class:`ValidationResult`."""
-    return ValidationResult(ok=True)
+def valid() -> CacheValidation:
+    """Return a passing :class:`CacheValidation`."""
+    return CacheValidation(ok=True)
 
 
-def invalid(*, delete: bool, reason: str = "") -> ValidationResult:
-    """Return a failing :class:`ValidationResult`.
+def invalid(*, delete: bool, reason: str = "") -> CacheValidation:
+    """Return a failing :class:`CacheValidation`.
 
     Args:
         delete: Whether the stale cache file should be deleted on this failure.
         reason: Short reason string used in the deletion log message.
     """
-    return ValidationResult(ok=False, delete=delete, reason=reason)
+    return CacheValidation(ok=False, delete=delete, reason=reason)
 
 
-# A validator inspects the loaded cache dict and returns a ``ValidationResult``.
-PickleCacheValidator = Callable[[Dict[str, Any]], ValidationResult]
+# A validator inspects the loaded cache dict and returns a ``CacheValidation``.
+PickleCacheValidator = Callable[[Dict[str, Any]], CacheValidation]
 
 
 def delete_cache_file(path: Path, reason: str, logger: logging.Logger, *, label: str) -> None:
@@ -124,7 +124,7 @@ def load_validated_pickle(
     Args:
         path: Cache file path.
         validators: Ordered validators. Each receives the loaded cache ``dict``
-            and returns a :class:`ValidationResult`. Order and per-validator
+            and returns a :class:`CacheValidation`. Order and per-validator
             delete behavior fully determine the invalidation semantics.
         logger: Logger for debug/info/warning output.
         label: Human-readable prefix identifying the cache in log messages.
