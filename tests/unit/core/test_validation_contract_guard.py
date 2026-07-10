@@ -54,10 +54,6 @@ _ALLOWLIST: dict[str, set[str]] = {
         # (correctly) does not see it and it is intentionally NOT allowlisted.
         "victor/framework/requirement_validator.py",
         "victor/framework/capabilities/validation.py",
-        # Unrelated pre-existing "bool + reason" result inside core (pickle cache
-        # validators). Kept on the allowlist because FEP-0014 does not touch it — it
-        # is not a validation *severity/issue* result and is out of scope.
-        "victor/core/pickle_cache.py",
     },
 }
 

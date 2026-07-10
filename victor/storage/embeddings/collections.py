@@ -31,7 +31,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from victor.core.pickle_cache import (
-    ValidationResult,
+    CacheValidation,
     delete_cache_file,
     invalid,
     load_validated_pickle,
@@ -182,7 +182,7 @@ class StaticEmbeddingCollection:
             True if loaded successfully, False otherwise
         """
 
-        def _check_version(cache_data: Dict[str, Any]) -> ValidationResult:
+        def _check_version(cache_data: Dict[str, Any]) -> CacheValidation:
             # 1. Check cache version (breaking changes to format)
             cached_version = cache_data.get("cache_version", 1)
             if cached_version != self.CACHE_VERSION:
@@ -193,7 +193,7 @@ class StaticEmbeddingCollection:
                 return invalid(delete=True, reason="version mismatch")
             return valid()
 
-        def _check_items_hash(cache_data: Dict[str, Any]) -> ValidationResult:
+        def _check_items_hash(cache_data: Dict[str, Any]) -> CacheValidation:
             # 2. Verify cache matches current items
             if cache_data.get("items_hash") != items_hash:
                 logger.info(f"Collection '{self.name}': items changed, cache invalidated")
@@ -201,7 +201,7 @@ class StaticEmbeddingCollection:
                 return invalid(delete=False)
             return valid()
 
-        def _check_model(cache_data: Dict[str, Any]) -> ValidationResult:
+        def _check_model(cache_data: Dict[str, Any]) -> CacheValidation:
             # 3. Verify embedding model matches
             model_name = self.embedding_service.model_name
             if cache_data.get("model_name") != model_name:
@@ -212,7 +212,7 @@ class StaticEmbeddingCollection:
                 return invalid(delete=True, reason="model mismatch")
             return valid()
 
-        def _check_embeddings(cache_data: Dict[str, Any]) -> ValidationResult:
+        def _check_embeddings(cache_data: Dict[str, Any]) -> CacheValidation:
             # 4. Validate embedding dimensions match current model
             embeddings = cache_data.get("embeddings")
             if embeddings is None:

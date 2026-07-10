@@ -31,7 +31,7 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 import httpx
 
 from victor.core.pickle_cache import (
-    ValidationResult,
+    CacheValidation,
     delete_cache_file,
     invalid,
     load_validated_pickle,
@@ -440,7 +440,7 @@ class SemanticToolSelector:
         """
         numpy = _ensure_numpy()
 
-        def _check_version(cache_data: Dict[str, Any]) -> ValidationResult:
+        def _check_version(cache_data: Dict[str, Any]) -> CacheValidation:
             # 1. Check cache version first (breaking changes)
             cached_version = cache_data.get("cache_version", 1)
             if cached_version != self.CACHE_VERSION:
@@ -451,7 +451,7 @@ class SemanticToolSelector:
                 return invalid(delete=True, reason="version mismatch")
             return valid()
 
-        def _check_tools_hash(cache_data: Dict[str, Any]) -> ValidationResult:
+        def _check_tools_hash(cache_data: Dict[str, Any]) -> CacheValidation:
             # 2. Verify cache is for same tools (hash includes count, names, and definitions)
             if cache_data.get("tools_hash") != tools_hash:
                 cached_count = cache_data.get("tool_count", "?")
@@ -474,7 +474,7 @@ class SemanticToolSelector:
                 return invalid(delete=False)
             return valid()
 
-        def _check_model(cache_data: Dict[str, Any]) -> ValidationResult:
+        def _check_model(cache_data: Dict[str, Any]) -> CacheValidation:
             # 3. Verify cache is for same embedding model
             if cache_data.get("embedding_model") != self.embedding_model:
                 logger.info(
@@ -484,7 +484,7 @@ class SemanticToolSelector:
                 return invalid(delete=True, reason="model mismatch")
             return valid()
 
-        def _check_embeddings(cache_data: Dict[str, Any]) -> ValidationResult:
+        def _check_embeddings(cache_data: Dict[str, Any]) -> CacheValidation:
             # 4. Validate embeddings exist and have correct structure
             embeddings = cache_data.get("embeddings", {})
             if not embeddings:
