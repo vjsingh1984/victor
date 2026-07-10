@@ -774,9 +774,7 @@ async def edit(
                     try:
                         enforce_read_before_write(_fp, force=bool(_op.get("force", False)))
                     except PermissionError as _pe:
-                        failed_files.append(
-                            {"path": _path, "op_index": _idx, "error": str(_pe)}
-                        )
+                        failed_files.append({"path": _path, "op_index": _idx, "error": str(_pe)})
                         _all_failed_indices.add(_idx)
                         continue
                 _content = _op.get("new_content")
@@ -815,9 +813,7 @@ async def edit(
                     try:
                         enforce_read_before_write(_fp, force=bool(_op.get("force", False)))
                     except PermissionError as _pe:
-                        failed_files.append(
-                            {"path": _path, "op_index": _idx, "error": str(_pe)}
-                        )
+                        failed_files.append({"path": _path, "op_index": _idx, "error": str(_pe)})
                         _all_failed_indices.add(_idx)
                         continue
                 _working = _op.get("content", "")

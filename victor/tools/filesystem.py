@@ -1921,31 +1921,52 @@ async def read(
 # Extensions auto-eligible for LSP validate/format on write (see write()).
 _LSP_SUPPORTED_EXTENSIONS = frozenset(
     {
-        ".py", ".pyi", ".pyx",  # Python
-        ".c", ".h", ".cpp", ".hpp", ".cc", ".cxx",  # C/C++
+        ".py",
+        ".pyi",
+        ".pyx",  # Python
+        ".c",
+        ".h",
+        ".cpp",
+        ".hpp",
+        ".cc",
+        ".cxx",  # C/C++
         ".rs",  # Rust
-        ".ts", ".tsx", ".js", ".jsx",  # JavaScript/TypeScript
+        ".ts",
+        ".tsx",
+        ".js",
+        ".jsx",  # JavaScript/TypeScript
         ".go",  # Go
         ".java",  # Java
-        ".kt", ".kts",  # Kotlin
+        ".kt",
+        ".kts",  # Kotlin
         ".swift",  # Swift
         ".scala",  # Scala
         ".cs",  # C#
         ".php",  # PHP
         ".rb",  # Ruby
         ".lua",  # Lua
-        ".ex", ".exs",  # Elixir
+        ".ex",
+        ".exs",  # Elixir
         ".hs",  # Haskell
-        ".r", ".R",  # R
-        ".json", ".jsonc",  # JSON
-        ".yaml", ".yml",  # YAML
+        ".r",
+        ".R",  # R
+        ".json",
+        ".jsonc",  # JSON
+        ".yaml",
+        ".yml",  # YAML
         ".toml",  # TOML
         ".xml",  # XML
-        ".html", ".htm",  # HTML
-        ".css", ".scss", ".less",  # CSS
-        ".sh", ".bash", ".zsh",  # Shell
+        ".html",
+        ".htm",  # HTML
+        ".css",
+        ".scss",
+        ".less",  # CSS
+        ".sh",
+        ".bash",
+        ".zsh",  # Shell
         ".sql",  # SQL
-        ".md", ".markdown",  # Markdown
+        ".md",
+        ".markdown",  # Markdown
     }
 )
 
@@ -1961,9 +1982,7 @@ async def _delegate_write(path: str, content: str, force: bool) -> Dict[str, Any
     from victor.tools.file_editor_tool import edit as _edit
 
     op_type = "modify" if Path(path).expanduser().exists() else "create"
-    return await _edit(
-        ops=[{"type": op_type, "path": path, "content": content, "force": force}]
-    )
+    return await _edit(ops=[{"type": op_type, "path": path, "content": content, "force": force}])
 
 
 def _editor_available() -> bool:

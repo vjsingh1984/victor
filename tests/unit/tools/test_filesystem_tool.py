@@ -217,9 +217,10 @@ async def test_write_file_exception_handling():
     with tempfile.TemporaryDirectory() as tmpdir:
         file_path = os.path.join(tmpdir, "test.txt")
 
-        with patch(
-            "victor.tools.filesystem._editor_available", return_value=False
-        ), patch("aiofiles.open", side_effect=PermissionError("Write denied")):
+        with (
+            patch("victor.tools.filesystem._editor_available", return_value=False),
+            patch("aiofiles.open", side_effect=PermissionError("Write denied")),
+        ):
             with pytest.raises(PermissionError):
                 await write(path=file_path, content="test content")
 

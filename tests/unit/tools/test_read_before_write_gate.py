@@ -28,10 +28,18 @@ import pytest
 from victor.tools.file_editor_tool import edit
 from victor.tools.filesystem import (
     ReadStateTracker,
+    _editor_available,
     enforce_read_before_write,
     get_read_state,
     read,
     write,
+)
+
+# edit() requires the optional victor-coding extra; the "changed files" CI job
+# installs only .[dev], so skip the direct-edit() tests there. write() tests are
+# NOT skipped — write() has a direct-write fallback that covers that environment.
+requires_editor = pytest.mark.skipif(
+    not _editor_available(), reason="Enhanced editor (victor-coding) not available"
 )
 
 
@@ -212,6 +220,7 @@ async def test_mtime_change_after_read_re_blocks_write():
 
 
 @pytest.mark.asyncio
+@requires_editor
 async def test_edit_create_blocks_unread_overwrite():
     with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
         f.write("original\n")
@@ -226,6 +235,7 @@ async def test_edit_create_blocks_unread_overwrite():
 
 
 @pytest.mark.asyncio
+@requires_editor
 async def test_edit_modify_blocks_unread():
     with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
         f.write("original\n")
@@ -239,6 +249,7 @@ async def test_edit_modify_blocks_unread():
 
 
 @pytest.mark.asyncio
+@requires_editor
 async def test_edit_modify_after_read_succeeds():
     with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
         f.write("original\n")
@@ -253,6 +264,7 @@ async def test_edit_modify_after_read_succeeds():
 
 
 @pytest.mark.asyncio
+@requires_editor
 async def test_edit_modify_force_overrides_gate():
     with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
         f.write("original\n")
@@ -268,6 +280,7 @@ async def test_edit_modify_force_overrides_gate():
 
 
 @pytest.mark.asyncio
+@requires_editor
 async def test_edit_replace_still_protected_by_exact_match():
     # replace is already byte-exact-protected; with the gate ON and unread it
     # must still fail (the old_str won't be resolved from an un-read working copy
