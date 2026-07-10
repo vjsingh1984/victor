@@ -241,6 +241,10 @@ class TestAgentRuntimeBootstrapper:
         # Verify runtime boundaries were initialized
         orch._initialize_interaction_runtime.assert_called_once()
         orch._initialize_services.assert_called_once()
+        # Credit-assignment runtime must run in production (regression guard: it
+        # was previously only registered on the unwired InitializationPhaseManager,
+        # so the opt-in feature silently never initialized).
+        orch._initialize_credit_runtime.assert_called_once()
         orch.__init_capability_registry__.assert_called_once()
 
         # Verify lazy placeholders are None
