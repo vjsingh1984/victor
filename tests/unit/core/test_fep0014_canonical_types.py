@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Unit tests for FEP-0014 Phase 1 canonical validation/metrics contracts."""
+"""Unit tests for FEP-0014 canonical validation/metrics contracts (Phase 1 + 2d)."""
 
 from __future__ import annotations
 
@@ -178,20 +178,97 @@ def test_protocol_rejects_partial_surface() -> None:
     assert not isinstance(_MissingSnapshot(), MetricsCollectorProtocol)
 
 
-def test_named_collectors_not_yet_conforming_phase2_surface() -> None:
-    """FEP-0014 finding: the five named MetricsCollectors do not yet conform.
+def _construct_all_five_collectors(tmp_path: Any) -> list[Any]:
+    """Construct one instance of each of the five named MetricsCollectors.
 
-    Their present public surfaces are disjoint (no shared public method); Phase 2
-    adapts/renames them onto MetricsCollectorProtocol. This test documents the
-    Phase-1 baseline so a future accidental partial-conformance is noticed.
+    Phase 2d added thin adapter methods (``record_metric`` / ``get_snapshot``) to
+    each so they conform to ``MetricsCollectorProtocol``.
     """
+    from victor.observability.metrics import MetricsCollector as ObsCollector
+    from victor.framework.observability.metrics import (
+        MetricsCollector as FrameworkObsCollector,
+    )
+    from victor.agent.metrics_collector import (
+        MetricsCollector as AgentCollector,
+        MetricsCollectorConfig,
+    )
+    from victor.integrations.api.event_bridge import (
+        MetricsCollector as EventBridgeCollector,
+    )
+    from victor.experiments.ab_testing.metrics import (
+        MetricsCollector as ABTestingCollector,
+    )
+
+    class _NullUsageLogger:
+        def log_event(self, *args: Any, **kwargs: Any) -> None:
+            return None
+
+    return [
+        ObsCollector(),
+        FrameworkObsCollector(),
+        AgentCollector(MetricsCollectorConfig(), usage_logger=_NullUsageLogger()),
+        EventBridgeCollector(),
+        ABTestingCollector(storage_path=str(tmp_path / "ab.db")),
+    ]
+
+
+def test_all_five_named_collectors_conform(tmp_path: Any) -> None:
+    """FEP-0014 Phase 2d: all five named MetricsCollectors satisfy the protocol."""
+    collectors = _construct_all_five_collectors(tmp_path)
+    assert len(collectors) == 5
+    for collector in collectors:
+        assert isinstance(collector, MetricsCollectorProtocol)
+
+
+def test_named_collectors_record_metric_reflected_in_snapshot(tmp_path: Any) -> None:
+    """record_metric then get_snapshot reflects the recorded metric.
+
+    The observability, framework, agent, event-bridge, and A/B collectors all
+    surface ad-hoc metrics in their snapshot. (The framework collector stores the
+    metric as a Metric object in a MetricsSnapshot rather than a plain mapping, so
+    it is checked separately below.)
+    """
+    from victor.observability.metrics import MetricsCollector as ObsCollector
+    from victor.agent.metrics_collector import (
+        MetricsCollector as AgentCollector,
+        MetricsCollectorConfig,
+    )
+    from victor.integrations.api.event_bridge import (
+        MetricsCollector as EventBridgeCollector,
+    )
+    from victor.experiments.ab_testing.metrics import (
+        MetricsCollector as ABTestingCollector,
+    )
+
+    class _NullUsageLogger:
+        def log_event(self, *args: Any, **kwargs: Any) -> None:
+            return None
+
+    obs = ObsCollector()
+    obs.record_metric("custom_gauge", 42.0)
+    assert obs.get_snapshot()["custom_gauge"] == 42.0
+
+    agent = AgentCollector(MetricsCollectorConfig(), usage_logger=_NullUsageLogger())
+    agent.record_metric("agent_metric", 7.0)
+    assert agent.get_snapshot()["adhoc_metrics"]["agent_metric"] == 7.0
+
+    bridge = EventBridgeCollector()
+    bridge.record_metric("bridge_metric", 3.0)
+    assert bridge.get_snapshot()["bridge_metric"] == 3.0
+
+    ab = ABTestingCollector(storage_path=str(tmp_path / "ab.db"))
+    ab.record_metric("ab_metric", 9.0)
+    assert ab.get_snapshot()["ab_metric"] == 9.0
+
+
+def test_framework_collector_record_metric_reflected_in_snapshot() -> None:
+    """The framework collector records a metric object visible in its snapshot."""
     from victor.framework.observability.metrics import (
         MetricsCollector as FrameworkObsCollector,
     )
 
-    collector = FrameworkObsCollector()
-    # Has get_snapshot but its record method is named ``record`` (not record_metric),
-    # so it does not structurally satisfy the canonical protocol yet.
-    assert hasattr(collector, "get_snapshot")
-    assert not hasattr(collector, "record_metric")
-    assert not isinstance(collector, MetricsCollectorProtocol)
+    collector = FrameworkObsCollector()  # sample_rate defaults to 1.0
+    collector.record_metric("fw_metric", 5.0, env="test")
+    snapshot = collector.get_snapshot()
+    names = {m.name for m in snapshot.metrics}
+    assert "fw_metric" in names

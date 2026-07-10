@@ -154,6 +154,10 @@ class MetricsCollector:
         self._dispatch_latency_p95_slo_ms = 200.0
         self._last_slo_breach_log_ts = 0.0
         self._slo_breach_log_interval_sec = 30.0
+        # Ad-hoc metrics recorded via the MetricsCollectorProtocol adapter
+        # (``record_metric``). This collector's native surface is SLO counters,
+        # so generic name/value observations are backed by a small dict.
+        self._adhoc_metrics: Dict[str, float] = {}
 
     def reset(self) -> None:
         """Zero the counters (used on full restart / test isolation)."""
@@ -163,6 +167,42 @@ class MetricsCollector:
         self._client_send_failure_count = 0
         self._events_dispatched_count = 0
         self._last_slo_breach_log_ts = 0.0
+        self._adhoc_metrics.clear()
+
+    # =========================================================================
+    # MetricsCollectorProtocol adapter (FEP-0014)
+    # =========================================================================
+
+    def record_metric(self, name: str, value: float, **tags: str) -> None:
+        """Record a single ad-hoc metric observation (protocol adapter).
+
+        The native surface here is SLO/reliability counters; this stores generic
+        name/value observations so the collector satisfies
+        ``MetricsCollectorProtocol``.
+
+        Args:
+            name: Metric name.
+            value: Numeric value to record.
+            **tags: Optional string-valued dimensional tags, appended to the key.
+        """
+        key = name
+        if tags:
+            tag_suffix = ",".join(f"{k}={v}" for k, v in sorted(tags.items()))
+            key = f"{name}{{{tag_suffix}}}"
+        self._adhoc_metrics[key] = float(value)
+
+    def get_snapshot(self) -> Dict[str, Any]:
+        """Return a point-in-time snapshot of collected metrics (protocol adapter).
+
+        Merges the reliability dashboard from :meth:`get_reliability_dashboard`
+        with any ad-hoc metrics recorded via :meth:`record_metric`.
+
+        Returns:
+            A mapping of the collector's current metric state.
+        """
+        snapshot: Dict[str, Any] = dict(self.get_reliability_dashboard())
+        snapshot.update(self._adhoc_metrics)
+        return snapshot
 
     def get_reliability_dashboard(self) -> Dict[str, Any]:
         """Get event-bridge reliability metrics and SLO status."""
