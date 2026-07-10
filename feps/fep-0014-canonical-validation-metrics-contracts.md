@@ -258,14 +258,16 @@ None new. Consolidation only.
 **2a — `ValidationSeverity` (all genuinely the same concept → re-export):**
 - [ ] `config/validation.py:26`, `framework/middleware.py:89`, `framework/capabilities/validation.py:53` → replace each local enum with `from victor.core.validation import ValidationSeverity`. Members are `{ERROR,WARNING,INFO}` (+ `CRITICAL` in middleware, already in canonical), so no member loss. Verify `severity_rank`-based comparisons where any code ordered severities.
 
-**2b — `ValidationResult` Tier A (true duplicates → migrate to canonical `{is_valid, issues}`):**
-- [ ] `tools/tool_call_validator.py:17` — `{valid, errors: list[str], warnings: list[str]}`: map `valid`→`is_valid`; wrap the `str` errors/warnings as `ValidationIssue(severity=ERROR/WARNING, message=...)`. Update call sites reading `.valid`/`.errors`/`.warnings`.
-- [ ] `framework/capabilities/validation.py:62` — `{is_valid, error_message, severity}`: closest fit; migrate to canonical, deriving `error_message` from the property.
+**2b + 2c — `ValidationResult` disambiguation (DONE, PR #460). Revised from the original Tier-A/Tier-B split:**
 
-**2c — `ValidationResult` Tier B (same NAME, different CONCEPT → RENAME, do not merge):**
-- [ ] `config/connection_validation.py:54` — `{status: ValidationStatus, message, details}` is a **status-enum** result, not `bool + issues`. Rename to `ConnectionValidationResult`; keep its shape. (Removing the name from the tree satisfies the guard without a false merge.)
-- [ ] `framework/requirement_validator.py:88` — `{is_satisfied, satisfaction_score, …}` is a **requirement-satisfaction** value object (1 importer). Rename to `RequirementResult`.
-- Note: `workflows/protocols.py:759` `ValidationResult` exists only inside a docstring example — no code change; already excluded from the guard.
+Executing 2b revealed that the two "Tier A" candidates carry **domain-specific extra fields** the canonical `{is_valid, issues}` lacks, so migrating them would **lose data**. Ground truth: *all four* `ValidationResult`s are distinct concepts sharing a name (the F-011 / `ApprovalMode` lesson) — so each was **renamed** to a distinct name rather than merged. The canonical `ValidationResult` stays the sanctioned shape for new code; the F-012 goal (kill the name collision) is met by disambiguation.
+
+- [x] `tools/tool_call_validator.py` — `{valid, errors, warnings, **normalized_args**}` → **`ToolCallValidationResult`** (merge would drop `normalized_args`).
+- [x] `framework/capabilities/validation.py` — `{is_valid, error_message, **severity, details, validator_id**}` → **`CapabilityValidationResult`**.
+- [x] `config/connection_validation.py` — `{**status: enum**, message, details}` → **`ConnectionValidationResult`**.
+- [x] `framework/requirement_validator.py` — `{is_satisfied, **satisfaction_score**, …}` → **`RequirementResult`**.
+- Note: `workflows/protocols.py:759` `ValidationResult` is a docstring-only mention; the AST guard never saw it.
+- Guard allowlist `ValidationResult` set now empty (with the empty `ValidationSeverity` set from 2a, the validation-consolidation portion of Phase 2 is complete).
 
 **2d — `MetricsCollector` → conform to `MetricsCollectorProtocol` via ADAPTER METHODS (ratified approach):**
 Phase 1 found the five collectors share no public method today (`record` vs `record_tool_execution`/`record_first_token`; `get_snapshot` vs `get_summary`/`get_metrics`). Rather than narrow the protocol, add **thin adapter methods** to each so they satisfy `record_metric(name, value, **tags)` + `get_snapshot()`:
