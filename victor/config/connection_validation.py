@@ -51,7 +51,7 @@ class ValidationStatus(Enum):
 
 
 @dataclass
-class ValidationResult:
+class ConnectionValidationResult:
     """Result of a validation check."""
 
     status: ValidationStatus
@@ -72,13 +72,13 @@ class ConnectionTestResult:
     account_name: str
     provider: str
     model: str
-    validations: List[ValidationResult] = field(default_factory=list)
+    validations: List[ConnectionValidationResult] = field(default_factory=list)
 
     # Overall test info
     latency_ms: Optional[int] = None
     error: Optional[str] = None
 
-    def add_validation(self, result: ValidationResult) -> None:
+    def add_validation(self, result: ConnectionValidationResult) -> None:
         """Add a validation result."""
         self.validations.append(result)
 
@@ -235,7 +235,7 @@ class ConnectionValidator:
                     if response.status < 500:
                         result.success = True
                         result.add_validation(
-                            ValidationResult(
+                            ConnectionValidationResult(
                                 status=ValidationStatus.SUCCESS,
                                 message=f"{account.provider.capitalize()} is running",
                             )
@@ -249,10 +249,10 @@ class ConnectionValidator:
 
         return result
 
-    async def _validate_auth(self, account: ProviderAccount) -> ValidationResult:
+    async def _validate_auth(self, account: ProviderAccount) -> ConnectionValidationResult:
         """Validate authentication configuration."""
         if account.auth.method == "none":
-            return ValidationResult(
+            return ConnectionValidationResult(
                 status=ValidationStatus.SUCCESS,
                 message="No authentication required",
             )
@@ -261,12 +261,12 @@ class ConnectionValidator:
             # Check for OAuth client_id
             client_id = self._get_oauth_client_id(account.provider)
             if client_id:
-                return ValidationResult(
+                return ConnectionValidationResult(
                     status=ValidationStatus.SUCCESS,
                     message="OAuth client_id configured",
                 )
             else:
-                return ValidationResult(
+                return ConnectionValidationResult(
                     status=ValidationStatus.FAILED,
                     message="OAuth client_id not found in keyring",
                 )
@@ -275,7 +275,7 @@ class ConnectionValidator:
         api_key = self._get_api_key(account)
 
         if not api_key:
-            return ValidationResult(
+            return ConnectionValidationResult(
                 status=ValidationStatus.FAILED,
                 message="API key not found",
                 details="Checked keyring and environment variables",
@@ -283,18 +283,18 @@ class ConnectionValidator:
 
         # Validate API key format
         if not self._validate_api_key_format(account.provider, api_key):
-            return ValidationResult(
+            return ConnectionValidationResult(
                 status=ValidationStatus.WARNING,
                 message="API key format may be invalid",
                 details="Key doesn't match expected format for this provider",
             )
 
-        return ValidationResult(
+        return ConnectionValidationResult(
             status=ValidationStatus.SUCCESS,
             message="API key found",
         )
 
-    async def _test_endpoint(self, account: ProviderAccount) -> ValidationResult:
+    async def _test_endpoint(self, account: ProviderAccount) -> ConnectionValidationResult:
         """Test the provider API endpoint."""
         import time
         import aiohttp
@@ -302,7 +302,7 @@ class ConnectionValidator:
         endpoint = account.endpoint or self._resolve_endpoint(account)
 
         if not endpoint:
-            return ValidationResult(
+            return ConnectionValidationResult(
                 status=ValidationStatus.WARNING,
                 message="No endpoint configured",
                 details="Using provider default",
@@ -326,30 +326,30 @@ class ConnectionValidator:
 
                     if response.status in (200, 401, 403):
                         # 200 = success, 401/403 = endpoint reachable but auth failed
-                        return ValidationResult(
+                        return ConnectionValidationResult(
                             status=ValidationStatus.SUCCESS,
                             message="Endpoint reachable",
                             latency_ms=latency,
                         )
                     else:
-                        return ValidationResult(
+                        return ConnectionValidationResult(
                             status=ValidationStatus.WARNING,
                             message=f"Endpoint returned status {response.status}",
                             latency_ms=latency,
                         )
 
         except asyncio.TimeoutError:
-            return ValidationResult(
+            return ConnectionValidationResult(
                 status=ValidationStatus.FAILED,
                 message="Connection timed out",
             )
         except Exception as e:
-            return ValidationResult(
+            return ConnectionValidationResult(
                 status=ValidationStatus.FAILED,
                 message=f"Connection failed: {e}",
             )
 
-    async def _validate_model(self, account: ProviderAccount) -> ValidationResult:
+    async def _validate_model(self, account: ProviderAccount) -> ConnectionValidationResult:
         """Validate that the model is available."""
         # This is a simplified check - in reality, we'd query the provider
         # for available models. For now, we just do basic format validation.
@@ -358,7 +358,7 @@ class ConnectionValidator:
 
         # Check model format
         if not model or model == "default":
-            return ValidationResult(
+            return ConnectionValidationResult(
                 status=ValidationStatus.WARNING,
                 message="No specific model selected",
                 details="Using provider default",
@@ -370,13 +370,13 @@ class ConnectionValidator:
             if account.provider == "zai":
                 valid_variants = {"coding", "standard", "china", "anthropic"}
                 if variant not in valid_variants:
-                    return ValidationResult(
+                    return ConnectionValidationResult(
                         status=ValidationStatus.WARNING,
                         message=f"Unknown model variant: {variant}",
                         details=f"Valid variants for {account.provider}: {', '.join(valid_variants)}",
                     )
 
-        return ValidationResult(
+        return ConnectionValidationResult(
             status=ValidationStatus.SUCCESS,
             message=f"Model '{model}' selected",
         )
@@ -560,7 +560,7 @@ async def validate_account_async(account: ProviderAccount) -> ConnectionTestResu
     return await validator.test_account(account)
 
 
-def ping_provider(provider: str, endpoint: Optional[str] = None) -> ValidationResult:
+def ping_provider(provider: str, endpoint: Optional[str] = None) -> ConnectionValidationResult:
     """Quick ping test for a provider.
 
     Args:
@@ -568,7 +568,7 @@ def ping_provider(provider: str, endpoint: Optional[str] = None) -> ValidationRe
         endpoint: Custom endpoint (optional)
 
     Returns:
-        ValidationResult with status
+        ConnectionValidationResult with status
     """
     import time
 
@@ -585,7 +585,7 @@ def ping_provider(provider: str, endpoint: Optional[str] = None) -> ValidationRe
     validator = ConnectionValidator()
     result = validator.test_account_sync(account)
 
-    return ValidationResult(
+    return ConnectionValidationResult(
         status=ValidationStatus.SUCCESS if result.success else ValidationStatus.FAILED,
         message=result.get_summary(),
         latency_ms=result.latency_ms,

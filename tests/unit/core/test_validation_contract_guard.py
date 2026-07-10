@@ -45,15 +45,13 @@ _ALLOWLIST: dict[str, set[str]] = {
     # re-export the canonical enum, so the allowlist is empty — the guard still
     # scans for (and rejects) any NEW ValidationSeverity duplicate.
     "ValidationSeverity": set(),
-    "ValidationResult": {
-        "victor/tools/tool_call_validator.py",
-        "victor/config/connection_validation.py",
-        # NOTE: victor/workflows/protocols.py mentions a ValidationResult only inside
-        # a docstring example, not as a real class definition, so this AST-based guard
-        # (correctly) does not see it and it is intentionally NOT allowlisted.
-        "victor/framework/requirement_validator.py",
-        "victor/framework/capabilities/validation.py",
-    },
+    # FEP-0014 Phase 2b/2c (done): the four divergent ValidationResult types were
+    # distinct concepts sharing a name, so each was renamed to a domain-specific
+    # name (ToolCallValidationResult, ConnectionValidationResult, RequirementResult,
+    # CapabilityValidationResult) rather than merged into the canonical type. No
+    # ValidationResult duplicates remain outside canonical — the guard still scans
+    # for (and rejects) any NEW ValidationResult duplicate.
+    "ValidationResult": set(),
 }
 
 _TARGET_NAMES = frozenset(_ALLOWLIST)

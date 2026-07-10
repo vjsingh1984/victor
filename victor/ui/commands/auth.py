@@ -62,7 +62,7 @@ from victor.config.accounts import (
     get_account_manager,
 )
 from victor.config.api_keys import LOCAL_PROVIDERS, APIKeyManager
-from victor.config.connection_validation import ConnectionValidator, ValidationResult
+from victor.config.connection_validation import ConnectionValidator, ConnectionValidationResult
 from victor.ui.json_utils import create_json_option, print_json_data
 from victor.config.migration import (
     ConfigMigrator,

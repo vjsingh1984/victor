@@ -63,7 +63,7 @@ from victor.config.migration import (
 
 from victor.config.connection_validation import (
     ConnectionValidator,
-    ValidationResult,
+    ConnectionValidationResult,
     ConnectionTestResult,
     validate_account_sync,
     validate_account_async,
@@ -106,7 +106,7 @@ __all__ = [
     "rollback_migration",
     # Connection validation
     "ConnectionValidator",
-    "ValidationResult",
+    "ConnectionValidationResult",
     "ConnectionTestResult",
     "validate_account_sync",
     "validate_account_async",

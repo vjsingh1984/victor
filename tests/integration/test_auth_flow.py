@@ -37,7 +37,7 @@ from victor.config.accounts import (
 )
 from victor.config.connection_validation import (
     ConnectionValidator,
-    ValidationResult,
+    ConnectionValidationResult,
     ConnectionTestResult,
     ValidationStatus,
 )
@@ -251,7 +251,7 @@ class TestConnectionValidationIntegration:
         with patch.object(
             validator,
             "_validate_auth",
-            return_value=ValidationResult(
+            return_value=ConnectionValidationResult(
                 status=ValidationStatus.SUCCESS, message="API key is valid"
             ),
         ):
@@ -259,7 +259,7 @@ class TestConnectionValidationIntegration:
             with patch.object(
                 validator,
                 "_test_endpoint",
-                return_value=ValidationResult(
+                return_value=ConnectionValidationResult(
                     status=ValidationStatus.SUCCESS, message="Endpoint reachable"
                 ),
             ):
@@ -291,7 +291,7 @@ class TestConnectionValidationIntegration:
             with patch.object(
                 validator,
                 "_validate_auth",
-                return_value=ValidationResult(
+                return_value=ConnectionValidationResult(
                     status=ValidationStatus.SUCCESS,
                     message="OAuth client_id configured",
                 ),
