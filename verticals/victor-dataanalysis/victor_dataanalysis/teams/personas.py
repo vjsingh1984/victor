@@ -755,7 +755,9 @@ def register_data_analysis_personas() -> int:
         Number of personas registered.
     """
     try:
-        from victor_contracts.multi_agent import get_runtime_persona_provider as get_persona_provider
+        from victor_contracts.multi_agent import (
+            get_runtime_persona_provider as get_persona_provider,
+        )
 
         provider = get_persona_provider()
         count = 0

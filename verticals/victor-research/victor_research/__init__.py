@@ -22,10 +22,19 @@ __all__ = [
 
 _EXPORTS = {
     "ResearchAssistant": ("victor_research.assistant", "ResearchAssistant"),
-    "ResearchPromptContributor": ("victor_research.prompts", "ResearchPromptContributor"),
-    "ResearchModeConfigProvider": ("victor_research.mode_config", "ResearchModeConfigProvider"),
+    "ResearchPromptContributor": (
+        "victor_research.prompts",
+        "ResearchPromptContributor",
+    ),
+    "ResearchModeConfigProvider": (
+        "victor_research.mode_config",
+        "ResearchModeConfigProvider",
+    ),
     "ResearchSafetyExtension": ("victor_research.safety", "ResearchSafetyExtension"),
-    "ResearchCapabilityProvider": ("victor_research.capabilities", "ResearchCapabilityProvider"),
+    "ResearchCapabilityProvider": (
+        "victor_research.capabilities",
+        "ResearchCapabilityProvider",
+    ),
     "ResearchPlugin": ("victor_research.plugin", "ResearchPlugin"),
     "plugin": ("victor_research.plugin", "plugin"),
     "ResearchSafetyRules": ("victor_research.safety_enhanced", "ResearchSafetyRules"),

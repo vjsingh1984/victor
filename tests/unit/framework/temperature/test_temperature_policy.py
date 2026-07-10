@@ -58,7 +58,7 @@ def test_settings_per_task_source():
 
 def test_task_hint_constant_source_reads_provider():
     provider = SimpleNamespace(
-        get_hint=lambda t: SimpleNamespace(temperature_override=0.1) if t == "debug" else None
+        get_hint=lambda t: (SimpleNamespace(temperature_override=0.1) if t == "debug" else None)
     )
     s = TaskHintConstantSource(provider)
     assert s.resolve(_req(task_type="debug")) == 0.1

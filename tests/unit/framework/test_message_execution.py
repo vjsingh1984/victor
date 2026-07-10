@@ -307,6 +307,7 @@ def test_build_task_result_metadata_propagates_agentic_loop_iterations():
     assert md["agentic_loop_iterations"] == 6
     # absent on the response → 0 (harness then falls back to "turns"/proxy)
     md2 = _build_task_result_metadata(
-        SimpleNamespace(), SimpleNamespace(usage={}, model="m", stop_reason="stop", metadata={})
+        SimpleNamespace(),
+        SimpleNamespace(usage={}, model="m", stop_reason="stop", metadata={}),
     )
     assert md2["agentic_loop_iterations"] == 0

@@ -42,7 +42,9 @@ def parse(content: str, language: str | None = None, file_path: str = "<unknown>
     )
 
 
-def _sliding_window(content: str, file_path: str, language: str, config: ChunkConfig) -> list[CodeChunk]:
+def _sliding_window(
+    content: str, file_path: str, language: str, config: ChunkConfig
+) -> list[CodeChunk]:
     """Universal fallback when no symbols were extracted."""
 
     if not content:

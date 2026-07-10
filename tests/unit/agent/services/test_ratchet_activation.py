@@ -19,7 +19,11 @@ from types import SimpleNamespace
 
 from victor.agent.services.temperature_resolution import resolve_effective_temperature
 from victor.framework.capabilities.task_hints import TaskTypeHintCapabilityProvider
-from victor.framework.temperature import RatchetState, SpinSignal, build_default_resolver
+from victor.framework.temperature import (
+    RatchetState,
+    SpinSignal,
+    build_default_resolver,
+)
 
 
 def _orch(ratchet: RatchetState, *, base=0.6, model="claude"):

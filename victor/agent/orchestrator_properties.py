@@ -223,7 +223,9 @@ def _temperature_resolver(self: "AgentOrchestrator") -> Any:
     """
     cached = getattr(self, "_temperature_resolver_cached", None)
     if cached is None:
-        from victor.framework.capabilities.task_hints import TaskTypeHintCapabilityProvider
+        from victor.framework.capabilities.task_hints import (
+            TaskTypeHintCapabilityProvider,
+        )
         from victor.framework.temperature import build_resolver_from_settings
 
         cached = build_resolver_from_settings(

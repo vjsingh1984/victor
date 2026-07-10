@@ -351,7 +351,10 @@ def _resolve_replace(current_content: str, old_str: str, new_str: str, path: str
     norm_result = _try_backslash_normalized_replace(current_content, old_str, new_str, path)
     if norm_result is not None:
         return norm_result
-    return {"ok": False, "reason": _replace_not_found_detail(current_content, old_str, path)}
+    return {
+        "ok": False,
+        "reason": _replace_not_found_detail(current_content, old_str, path),
+    }
 
 
 from victor.tools.base import AccessMode, DangerLevel, Priority
@@ -640,7 +643,14 @@ async def edit(
                 "error": f"Operation {i} missing required field: type",
             }
 
-        if op_type not in ["create", "modify", "delete", "rename", "replace", "replace_lines"]:
+        if op_type not in [
+            "create",
+            "modify",
+            "delete",
+            "rename",
+            "replace",
+            "replace_lines",
+        ]:
             return {
                 "success": False,
                 "error": f"Operation {i} has invalid type: {op_type}. Must be create, modify, delete, rename, or replace",

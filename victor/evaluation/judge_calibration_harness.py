@@ -52,7 +52,17 @@ import asyncio
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Coroutine, Hashable, Optional, Protocol, Sequence, TypeVar
+from typing import (
+    Any,
+    Callable,
+    Coroutine,
+    Hashable,
+    Mapping,
+    Optional,
+    Protocol,
+    Sequence,
+    TypeVar,
+)
 
 from victor.evaluation.judge_calibration import (
     GateDecision,
@@ -132,6 +142,12 @@ class VerifiableTask:
         reference_answer: For tasks verified from the transcript (e.g. QA), the final
             message a correct execution would produce; scripted executors emit it when
             they solve the task.
+        solve_flawed: Applies a plausible-but-WRONG change — the workspace superficially
+            looks solved (a file was written, a function changed) but ``verify`` returns
+            0.0. This is the judge-discrimination test: a judge that pattern-matches
+            "work was done" passes it; one that actually verifies catches it.
+        reference_answer_flawed: The transcript-verified counterpart of ``solve_flawed``
+            (e.g. a QA answer with a wrong number).
     """
 
     task_id: str
@@ -141,6 +157,8 @@ class VerifiableTask:
     verify: Callable[[Path, Transcript], float]
     solve: Optional[Callable[[Path], None]] = None
     reference_answer: Optional[str] = None
+    solve_flawed: Optional[Callable[[Path], None]] = None
+    reference_answer_flawed: Optional[str] = None
 
 
 class CalibrationExecutor(Protocol):
@@ -242,24 +260,102 @@ class JudgeCalibrationHarness:
         judge: CalibrationJudge,
         *,
         workspace_root: Optional[Path] = None,
+        keep_workspaces: bool = False,
     ) -> CalibrationReport:
+        """Run the corpus against a single judge and return its :class:`CalibrationReport`.
+
+        Thin wrapper over :meth:`run_multi_judge` — see it for the workspace-lifetime and
+        blinding contract.
+        """
+        return self.run_multi_judge(
+            executor,
+            {"judge": judge},
+            workspace_root=workspace_root,
+            keep_workspaces=keep_workspaces,
+        )["judge"]
+
+    def run_multi_judge(
+        self,
+        executor: CalibrationExecutor,
+        judges: Mapping[str, CalibrationJudge],
+        *,
+        workspace_root: Optional[Path] = None,
+        keep_workspaces: bool = False,
+        two_phase: bool = False,
+    ) -> dict[str, CalibrationReport]:
+        """Generate one trajectory + gold per task, then score EVERY judge on the shared
+        trajectories; return a per-judge-name :class:`CalibrationReport`.
+
+        Running the executor once (not once per judge) is essential for expensive or
+        non-deterministic executors: a real agent costs Nx to run per judge and — worse —
+        produces DIFFERENT trajectories each time, which would make the cross-judge
+        comparison meaningless. Here every judge scores the identical (transcript,
+        workspace) pair.
+
+        Blinding + ordering: setup → executor → ALL judges score → verify for gold.
+        Verification runs after judging so no verifier side effect (e.g. ``__pycache__``
+        from importing a fixed module) can reach any judge's view; judges are read-only, so
+        they observe the same workspace state as each other.
+
+        ``two_phase`` controls the call *order* across tasks — results are identical either
+        way (deterministic judges) but throughput differs when the executor and judges use
+        DIFFERENT models on a single local inference server (e.g. a 30B agent + a 70B judge
+        on one Ollama):
+
+        - ``False`` (default): interleave per task (execute→judge→verify, next task). The
+          server swaps executor↔judge models every task — Nx model loads.
+        - ``True``: run all executors first (executor model resident throughout), then all
+          judges (judge model resident throughout), then verify. One model swap total. Use
+          for real-agent runs; harmless (just reordering) for scripted ones.
+
+        When ``workspace_root`` is given the caller owns its lifetime; otherwise a temp dir
+        is created and removed on exit (``keep_workspaces=True`` retains it for inspection).
+        """
+        import shutil
         import tempfile
 
+        caller_owned = workspace_root is not None
         root = workspace_root or Path(tempfile.mkdtemp(prefix="judge_calibration_"))
-        samples: list[CalibrationSample] = []
-        for index, task in enumerate(self.tasks):
-            workspace = root / f"{index:04d}_{task.task_id}"
-            workspace.mkdir(parents=True, exist_ok=False)
-            task.setup(workspace)
-            transcript = executor(task, workspace)
-            judged = float(judge(task.prompt, transcript, workspace))
-            gold = float(task.verify(workspace, transcript))
-            samples.append(
-                CalibrationSample(
-                    task_id=task.task_id, family=task.family, gold=gold, judged=judged
-                )
-            )
+        try:
+            # Phase 1 — execute every task; keep (task, workspace, transcript) records.
+            records: list[tuple[VerifiableTask, Path, Transcript]] = []
+            # Per-task judge scores + gold, filled either inline (interleaved) or in phase 2/3.
+            judged_by_task: list[dict[str, float]] = []
+            gold_by_task: list[float] = []
+            for index, task in enumerate(self.tasks):
+                workspace = root / f"{index:04d}_{task.task_id}"
+                workspace.mkdir(parents=True, exist_ok=False)
+                task.setup(workspace)
+                transcript = executor(task, workspace)
+                records.append((task, workspace, transcript))
+                if not two_phase:
+                    # Judge BEFORE verify so verifier side effects never reach the judge.
+                    judged_by_task.append(
+                        {n: float(j(task.prompt, transcript, workspace)) for n, j in judges.items()}
+                    )
+                    gold_by_task.append(float(task.verify(workspace, transcript)))
 
+            if two_phase:
+                # Phase 2 — all judges (judge model resident). Phase 3 — verify (no model).
+                judged_by_task = [
+                    {n: float(j(t.prompt, tr, ws)) for n, j in judges.items()}
+                    for (t, ws, tr) in records
+                ]
+                gold_by_task = [float(t.verify(ws, tr)) for (t, ws, tr) in records]
+
+            per_judge: dict[str, list[CalibrationSample]] = {name: [] for name in judges}
+            for (task, _ws, _tr), judged, gold in zip(records, judged_by_task, gold_by_task):
+                for name in judges:
+                    per_judge[name].append(
+                        CalibrationSample(task.task_id, task.family, gold, judged[name])
+                    )
+            return {name: self._report(samples) for name, samples in per_judge.items()}
+        finally:
+            # Only remove what we created; a caller-provided root is theirs to keep.
+            if not caller_owned and not keep_workspaces:
+                shutil.rmtree(root, ignore_errors=True)
+
+    def _report(self, samples: Sequence[CalibrationSample]) -> CalibrationReport:
         overall = self._agreement(samples)
         per_family: dict[str, JudgeReliability] = {}
         for family in sorted({s.family for s in samples}):
@@ -333,3 +429,73 @@ def alternating_scripted_executor(period: int = 2) -> CalibrationExecutor:
         return counter["i"] % period != period - 1
 
     return make_scripted_executor(should_solve)
+
+
+def make_outcome_executor(
+    outcome_of: Callable[[VerifiableTask], str],
+) -> CalibrationExecutor:
+    """Executor whose per-task outcome is chosen by ``outcome_of`` → ``solve``/``flaw``/``fake``.
+
+    - ``solve``: apply ``task.solve`` (gold=1, genuinely correct).
+    - ``flaw``: apply ``task.solve_flawed`` — a plausible-but-wrong change (gold=0, yet the
+      workspace looks solved and the transcript shows tool activity). The discrimination
+      test: a judge that pattern-matches "work happened" passes it; one that verifies fails
+      it. Falls back to ``fake`` if the task defines no flawed solver.
+    - ``fake``: no work, but claim success (gold=0, the completion-without-effect failure
+      of ADR-010).
+    """
+
+    def executor(task: VerifiableTask, workspace: Path) -> Transcript:
+        outcome = outcome_of(task)
+        if outcome == "solve":
+            if task.solve is None:
+                raise ValueError(f"task {task.task_id} has no reference solution")
+            task.solve(workspace)
+            final = task.reference_answer or "Done — I completed the requested task."
+            return Transcript(
+                steps=(
+                    TranscriptStep(kind="tool", content=f"edit workspace for {task.task_id}"),
+                    TranscriptStep(kind="message", content="Applied the change."),
+                ),
+                final_message=final,
+            )
+        if outcome == "flaw" and (task.solve_flawed is not None or task.reference_answer_flawed):
+            if task.solve_flawed is not None:
+                task.solve_flawed(workspace)
+            final = task.reference_answer_flawed or "Done — I completed the requested task."
+            return Transcript(
+                steps=(
+                    TranscriptStep(kind="tool", content=f"edit workspace for {task.task_id}"),
+                    TranscriptStep(kind="message", content="Applied the change."),
+                ),
+                final_message=final,
+            )
+        return Transcript(
+            steps=(TranscriptStep(kind="message", content="Working on it."),),
+            final_message="Done — the task is complete.",
+        )
+
+    return executor
+
+
+def hard_scripted_executor(*, flaw_period: int = 3, fake_period: int = 5) -> CalibrationExecutor:
+    """Three-outcome scripted executor: mostly correct, with rotating flawed and fake runs.
+
+    The flawed runs are the reason this exists — they produce gold=0 cases whose workspace
+    *looks* solved, so a judge that merely detects activity can no longer score α=1.0 (which
+    the two-outcome corpus lets strong judges do). ``flaw_period`` and ``fake_period`` should
+    be coprime with each other and with the 6 task families so both outcomes rotate across
+    every family. Stateful; create a fresh instance per run.
+    """
+    counter = {"i": -1}
+
+    def outcome_of(_task: VerifiableTask) -> str:
+        counter["i"] += 1
+        i = counter["i"]
+        if i % fake_period == fake_period - 1:
+            return "fake"
+        if i % flaw_period == flaw_period - 1:
+            return "flaw"
+        return "solve"
+
+    return make_outcome_executor(outcome_of)

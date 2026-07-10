@@ -206,7 +206,10 @@ async def test_client_assertion_credential_uses_jwt_bearer(monkeypatch):
 async def test_client_secret_credential_raises_on_error(monkeypatch):
     _install_fake_aiohttp(
         monkeypatch,
-        lambda url, **k: (401, {"error": "invalid_client", "error_description": "bad secret"}),
+        lambda url, **k: (
+            401,
+            {"error": "invalid_client", "error_description": "bad secret"},
+        ),
     )
     with pytest.raises(RuntimeError, match="bad secret"):
         await ClientSecretCredential("t", "c", "s").get_token("scope")

@@ -487,7 +487,10 @@ class TestRefactorCapabilities:
     def test_custom_capabilities(self):
         """Test custom capabilities."""
         caps = RefactorCapabilities(
-            supported_refactors=[RefactorType.RENAME_SYMBOL, RefactorType.EXTRACT_FUNCTION],
+            supported_refactors=[
+                RefactorType.RENAME_SYMBOL,
+                RefactorType.EXTRACT_FUNCTION,
+            ],
             supported_languages=["python", "typescript"],
             supports_preview=True,
             supports_undo=False,

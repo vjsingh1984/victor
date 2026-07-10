@@ -77,7 +77,8 @@ class TestRAGWorkflowProvider:
 
         # Check for maintenance workflow
         maint_key = next(
-            (k for k in workflows if "maintenance" in k.lower() or "optimize" in k.lower()), None
+            (k for k in workflows if "maintenance" in k.lower() or "optimize" in k.lower()),
+            None,
         )
         assert maint_key is not None, "Should have a maintenance workflow"
         workflow = workflows[maint_key]
@@ -383,7 +384,10 @@ class TestRAGEscapeHatches:
 
         ctx = {
             "coverage_assessment": {"has_answer": True, "confidence": "medium"},
-            "verification": {"passed": False, "issues": ["Sources conflict on the timeline"]},
+            "verification": {
+                "passed": False,
+                "issues": ["Sources conflict on the timeline"],
+            },
             "retrieval_utility": {"utility_score": 0.8, "authority_hits": 3},
         }
 
@@ -395,7 +399,10 @@ class TestRAGEscapeHatches:
 
         ctx = {
             "coverage_assessment": {"has_answer": False, "confidence": "low"},
-            "verification": {"passed": False, "issues": ["Missing supporting evidence"]},
+            "verification": {
+                "passed": False,
+                "issues": ["Missing supporting evidence"],
+            },
             "repair_attempt_count": 0,
             "max_repair_attempts": 2,
         }
@@ -422,7 +429,10 @@ class TestRAGEscapeHatches:
 
         ctx = {
             "coverage_assessment": {"has_answer": True, "confidence": "high"},
-            "verification": {"passed": False, "issues": ["Answer overstates one claim"]},
+            "verification": {
+                "passed": False,
+                "issues": ["Answer overstates one claim"],
+            },
             "retrieval_utility": {"utility_score": 0.82, "authority_hits": 3},
             "repair_attempt_count": 0,
             "max_repair_attempts": 2,
@@ -436,7 +446,10 @@ class TestRAGEscapeHatches:
 
         ctx = {
             "coverage_assessment": {"has_answer": False, "confidence": "low"},
-            "verification": {"passed": False, "issues": ["Need external clarification"]},
+            "verification": {
+                "passed": False,
+                "issues": ["Need external clarification"],
+            },
             "repair_attempt_count": 2,
             "max_repair_attempts": 2,
         }

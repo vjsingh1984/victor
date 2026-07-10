@@ -30,7 +30,11 @@ _RESEARCH_SAFETY_TUPLES: List[Tuple[str, str, str]] = [
     (r"(?i)always|never|guaranteed|proven\s+fact", "Absolute claims", MEDIUM),
     (r"(?i)everyone\s+knows|obviously|clearly", "Unsupported generalizations", MEDIUM),
     (r"(?i)studies\s+show|research\s+proves", "Unattributed research claims", MEDIUM),
-    (r"(?i)secret|they\s+don't\s+want\s+you\s+to\s+know", "Conspiracy language", MEDIUM),
+    (
+        r"(?i)secret|they\s+don't\s+want\s+you\s+to\s+know",
+        "Conspiracy language",
+        MEDIUM,
+    ),
     # Low-risk patterns - style improvements (research-specific)
     (r"(?i)probably|maybe|might\s+be", "Hedging language", LOW),
     (r"(?i)in\s+my\s+opinion|I\s+think|I\s+believe", "Opinion markers", LOW),

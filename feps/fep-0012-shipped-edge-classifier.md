@@ -4,7 +4,7 @@ title: "Shipped RL-trained edge classifier (replace the Ollama edge default)"
 type: Standards Track
 status: Draft
 created: 2026-06-30
-modified: 2026-06-30
+modified: 2026-07-06
 authors:
   - name: Vijaykumar Singh
     email: singhvjd@gmail.com
@@ -237,9 +237,34 @@ re-asserts). Pure-numpy/Rust; local only.
    `TieredDecisionService`; bootstrap factory; flip the default tier when the
    artifact is present (LLM edge becomes opt-in escalation).
 6. **RL delta (online):** reward-weighted bandit overlay writing
-   `local_classifier_delta` (bounded, L2-decayed), pure-numpy/Rust.
+   `local_classifier_delta` (bounded, L2-decayed), pure-numpy/Rust. **— Shipped
+   (Phase 6).** On each resolved session (`record_session_outcome`),
+   `victor/agent/decisions/local_delta.py` writes a per-label softmax-cross-entropy
+   update toward the observed reward bucket (gradient scaled by where the
+   universal model is wrong), L2-decays and top-K bounds the overlay, and the
+   service blends `α·delta·x` into `predict()` via a TTL-cached `load_delta`.
+   Local-only (project DB), gated by `local_learning_enabled`. Two refinements
+   vs. the original scalar design: the table is **per-label** `(decision_type,
+   feature_hash, label, feature_spec_version)` (schema v8→v9, DROP+CREATE — the
+   table had never been written) because the shipped heads are multi-class
+   (`task_completion` = fail/partial/pass), and it carries a `feature_spec_version`
+   guard so a future hasher-spec bump can't blend stale hashes.
 7. **Validation:** A/B the classifier vs the LLM edge model on held-out
    decisions; ship only at parity on the universal decision types.
+
+> **task_completion consumption wiring (mapper + source gate) — landed behind a
+> flag.** The shipped `task_completion` head predicts reward buckets
+> (`pass/partial/fail`). Two earlier gaps made the classifier (and the Phase 6
+> delta) a no-op for loop-stopping: (a) the service mapper expected labels
+> `complete/true/yes` and (b) `task_completion.py` only consumed
+> `decision.source == "llm"`. Both are fixed: the mapper is now reward-bucket
+> aware (`pass`→complete, `fail`→incomplete, `partial`→defer; also accepts legacy
+> labels), and both completion sites accept `source == "local_classifier"` when
+> `DecisionServiceSettings.local_classifier_completion_signal` is on. **The flag
+> defaults OFF** — trusting the classifier to stop the loop is a behavioral
+> change that wants Phase-7 A/B validation before it defaults on. With it off,
+> behavior is identical to pre-wiring (the mapper fix alone has no effect because
+> the source gate still excludes `local_classifier`).
 
 ## Migration Path
 
@@ -264,6 +289,49 @@ This is a **non-breaking, additive** change with a staged default flip:
 - `v0.9.x`: data model + classifier behind `USE_LOCAL_CLASSIFIER` (off).
 - `v1.0.x`: default flips to the shipped classifier; Ollama edge becomes opt-in
   (not removed — retained for users who want the LLM boost).
+
+## Phase 7 Validation Run Plan
+
+The parity gate (`victor ml validate`, GREEN) already ships the artifact at
+held-out accuracy. Phase 7 validates the **loop-level** behavior — does trusting
+the classifier (and its delta) in real agent runs help or hurt? Three A/B knobs
+are now env-overridable so each run is a one-liner (no source edits):
+
+| Knob | Env var | Default | What it tests |
+|---|---|---|---|
+| `decision_backend` | `VICTOR_DECISION_BACKEND` | `auto` | `local_classifier` vs `edge` (LLM) vs `heuristic` for micro-decisions |
+| `local_learning_enabled` | `VICTOR_LOCAL_LEARNING_ENABLED` | `true` | on/off for the per-project RL delta |
+| `local_classifier_completion_signal` | `VICTOR_LOCAL_CLASSIFIER_COMPLETION_SIGNAL` | `false` | whether the classifier's `task_completion` head may STOP the loop |
+
+**Run pair (recommended minimum):** the same SWE-bench slice, two arms:
+
+```bash
+# Control: current defaults (classifier serves micro-decisions, delta on,
+#          completion-signal OFF).
+nohup script -q /dev/null bash -c 'victor benchmark run ...' > control.log 2>&1 &
+
+# Treatment: flip the completion-signal on (the behavioral change under test).
+VICTOR_LOCAL_CLASSIFIER_COMPLETION_SIGNAL=true \
+  nohup script -q /dev/null bash -c 'victor benchmark run ...' > treatment.log 2>&1 &
+```
+
+(`script -q /dev/null` wraps a PTY so the keyring is reachable interactively —
+plain `nohup` makes the process non-interactive and the API-key resolver skips
+the keychain. Use the same model + slice + seed for both arms.)
+
+**Decision criteria for flipping `local_classifier_completion_signal` default-on:**
+1. Pass rate on the **un-starved subset** (`tool_calls > 0`) is ≥ control (no
+   regression). Always read the un-starved subset — a rate-limited run starves
+   tasks to 0 patches and corrupts the aggregate.
+2. No measurable increase in **premature stops** (the risk: a confident-but-wrong
+   "pass" stops the loop early). Track via `task_completion` decisions with
+   `source=local_classifier`, `is_complete=True`, on tasks that ultimately failed.
+3. Latency/cost unchanged or improved (the classifier is sub-ms vs a 4s LLM edge
+   timeout).
+
+If both hold, flip the default in `DecisionServiceSettings` and retire the
+Ollama edge default. If (2) regresses, raise the head `threshold` (τ) or the
+consumer `confidence ≥ 0.7` bar before re-running.
 
 ## References
 

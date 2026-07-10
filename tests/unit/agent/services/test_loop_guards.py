@@ -28,7 +28,9 @@ from victor.agent.services.chat_stream_executor import (
     _count_productive_tools,
     _tool_call_signatures,
 )
-from victor.agent.services.orchestrator_protocol_adapter import OrchestratorProtocolAdapter
+from victor.agent.services.orchestrator_protocol_adapter import (
+    OrchestratorProtocolAdapter,
+)
 from victor.agent.services.tool_selection_runtime import ToolSelectionRuntime
 from victor.agent.streaming.tool_execution import ToolExecutionResult
 from victor.agent.turn_policy import SpinDetector, SpinState

@@ -37,8 +37,8 @@ Example:
     )
 
     # Check if a role has delegation capability
-    if AgentCapability.DELEGATE in manager_role.capabilities:
-        # Manager can delegate tasks to other agents
+    if AgentCapability.DELEGATE in supervisor_role.capabilities:
+        # Supervisor can delegate tasks to other agents
         pass
 
     # Configure team formation

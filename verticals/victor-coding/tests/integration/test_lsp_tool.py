@@ -100,7 +100,12 @@ class TestLspStatus:
         }
         mock_manager.get_available_servers.return_value = [
             {"language": "python", "name": "pylsp", "installed": True, "running": True},
-            {"language": "typescript", "name": "tsserver", "installed": True, "running": False},
+            {
+                "language": "typescript",
+                "name": "tsserver",
+                "installed": True,
+                "running": False,
+            },
         ]
 
         with patch("victor_coding.lsp.manager.get_lsp_manager", return_value=mock_manager):

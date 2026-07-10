@@ -3187,7 +3187,11 @@ class TestPrepareStream:
     async def test_prepare_stream_promotes_write_followup_to_action_budget(self, orchestrator):
         """Explicit write-authorized follow-ups should be promoted out of simple/general."""
         from victor.agent.unified_task_tracker import TrackerTaskType
-        from victor.framework.task import DEFAULT_BUDGETS, TaskClassification, TaskComplexity
+        from victor.framework.task import (
+            DEFAULT_BUDGETS,
+            TaskClassification,
+            TaskComplexity,
+        )
         from victor.agent.action_authorizer import ActionIntent, IntentClassification
 
         # This test verifies the write-followup -> ACTION promotion *logic*. The

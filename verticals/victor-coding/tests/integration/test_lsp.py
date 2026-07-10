@@ -297,7 +297,10 @@ class TestCompletionItem:
             {
                 "label": "func",
                 "kind": 3,
-                "documentation": {"kind": "markdown", "value": "# Function\nDoes stuff"},
+                "documentation": {
+                    "kind": "markdown",
+                    "value": "# Function\nDoes stuff",
+                },
             }
         )
 

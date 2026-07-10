@@ -14,7 +14,9 @@
 
 import pytest
 from unittest.mock import MagicMock, patch
-from victor.storage.memory.extractors.tree_sitter_extractor import TreeSitterEntityExtractor
+from victor.storage.memory.extractors.tree_sitter_extractor import (
+    TreeSitterEntityExtractor,
+)
 from victor.storage.memory.entity_types import RelationType
 
 

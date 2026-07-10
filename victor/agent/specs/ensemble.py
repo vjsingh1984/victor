@@ -52,7 +52,7 @@ class EnsembleType(str, Enum):
 
     PIPELINE = "pipeline"  # Sequential: A -> B -> C
     PARALLEL = "parallel"  # Concurrent: A | B | C
-    HIERARCHICAL = "hierarchical"  # Manager delegates to workers
+    HIERARCHICAL = "hierarchical"  # Supervisor delegates to specialists
     ROUTER = "router"  # Route to appropriate agent
     CONSENSUS = "consensus"  # Multiple agents vote/agree
 

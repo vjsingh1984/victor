@@ -1,0 +1,136 @@
+# Release workflow for the first-party verticals folded into this monorepo:
+#   victor-coding, victor-dataanalysis, victor-devops, victor-rag, victor-research
+#
+# These were previously published from their own repositories; this workflow carries that
+# publishing forward now that they live under verticals/ here. All five are version-synced
+# (see `make sync-version`) and released together.
+#
+# Triggers:
+#   - Push tag: verticals-v*  (e.g. verticals-v0.7.1) — builds + publishes ALL five.
+#   - Manual dispatch (optionally TestPyPI only).
+# `skip-existing: true` makes republishing an unchanged version a no-op, so re-tagging the
+# set is safe even if only one vertical actually changed.
+#
+# Publishing uses PyPI Trusted Publishing (OIDC) — NO API token secret required.
+# One-time PyPI setup, PER vertical project (5 total), at
+# https://pypi.org/manage/account/publishing/ → add a "GitHub" trusted publisher with:
+#     owner       = vjsingh1984
+#     repo        = victor
+#     workflow    = release-verticals.yml
+#     environment = pypi          (and `testpypi` for the optional TestPyPI publisher)
+# The workflow filename + environment are identical for all five; PyPI matches the package
+# by the uploaded distribution's metadata, not by the OIDC token. No secrets to add.
+
+name: Release verticals
+
+on:
+  push:
+    tags:
+      - 'verticals-v*'
+  workflow_dispatch:
+    inputs:
+      publish_testpypi:
+        description: 'Publish to TestPyPI only'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  PYTHON_VERSION: '3.12'
+
+jobs:
+  build:
+    name: Build ${{ matrix.vertical }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        vertical:
+          - victor-coding
+          - victor-dataanalysis
+          - victor-devops
+          - victor-rag
+          - victor-research
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install build tools
+        run: pip install build twine
+      - name: Build sdist + wheel
+        working-directory: verticals/${{ matrix.vertical }}
+        run: python -m build
+      - name: Check metadata
+        run: twine check verticals/${{ matrix.vertical }}/dist/*
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.vertical }}-dist
+          path: verticals/${{ matrix.vertical }}/dist/
+
+  publish-testpypi:
+    name: Publish ${{ matrix.vertical }} to TestPyPI (advisory)
+    needs: build
+    # Advisory/optional: attempts on every tag + dispatch, never blocks the release.
+    # A missing TestPyPI trusted publisher fails softly; publish-pypi does not depend on it.
+    if: ${{ startsWith(github.ref, 'refs/tags/verticals-v') || github.event_name == 'workflow_dispatch' }}
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        vertical:
+          - victor-coding
+          - victor-dataanalysis
+          - victor-devops
+          - victor-rag
+          - victor-research
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/project/${{ matrix.vertical }}/
+    permissions:
+      id-token: write
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ matrix.vertical }}-dist
+          path: dist/
+      - name: Publish to TestPyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        continue-on-error: true
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          skip-existing: true
+
+  publish-pypi:
+    name: Publish ${{ matrix.vertical }} to PyPI
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/verticals-v') && !contains(github.ref, 'alpha') && !contains(github.ref, 'beta') && !contains(github.ref, 'rc')
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        vertical:
+          - victor-coding
+          - victor-dataanalysis
+          - victor-devops
+          - victor-rag
+          - victor-research
+    environment:
+      name: pypi
+      url: https://pypi.org/project/${{ matrix.vertical }}/
+    permissions:
+      id-token: write
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ matrix.vertical }}-dist
+          path: dist/
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          verbose: true
+          skip-existing: true

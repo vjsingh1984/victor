@@ -164,7 +164,11 @@ def test_ci_brackets_mean_and_clamps():
 
 def test_score_battery_reports_intervals():
     ev = TrajectoryEvaluator()
-    traces = [_trace(tools=[True, True]), _trace(tools=[True, False]), _trace(tools=[False, True])]
+    traces = [
+        _trace(tools=[True, True]),
+        _trace(tools=[True, False]),
+        _trace(tools=[False, True]),
+    ]
     result = ev.score_battery(traces)
     assert result.overall is not None and result.overall.n == 3
     dims = {d.dimension for d in result.per_dimension}

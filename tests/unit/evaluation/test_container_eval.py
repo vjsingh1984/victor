@@ -148,7 +148,11 @@ async def test_repo_image_index_dedupes_lookups_per_repo(monkeypatch):
 
     monkeypatch.setattr(ce.httpx, "AsyncClient", _CountingClient)
     # Three instances of the same repo → the lookup should fire only once.
-    for tid in ("astropy__astropy-12907", "astropy__astropy-14182", "astropy__astropy-7166"):
+    for tid in (
+        "astropy__astropy-12907",
+        "astropy__astropy-14182",
+        "astropy__astropy-7166",
+    ):
         await ce.resolve_swebench_image_exact(_Task(task_id=tid), _Config())
     assert calls["n"] == 1
     # The empty result is cached, so a network failure isn't retried per task.
@@ -240,7 +244,8 @@ async def test_eval_container_start_exec_stop_issues_correct_docker_cmds(monkeyp
     monkeypatch.setattr(ce, "_run_cmd", _fake_run_factory(issued))
 
     c = EvalContainer(
-        image="sweb.eval.astropy:astropy__astropy-12907", workspace_host_path="/tmp/repo"
+        image="sweb.eval.astropy:astropy__astropy-12907",
+        workspace_host_path="/tmp/repo",
     )
     await c.start()
     assert c.container_id == "deadbeefcafe"
@@ -263,7 +268,11 @@ async def test_eval_container_start_exec_stop_issues_correct_docker_cmds(monkeyp
     assert "--name" in create_cmd
     assert any("victor.sandbox=eval" in flag for flag in create_cmd)
     assert any("/tmp/repo:/workspace:rw" == flag for flag in create_cmd)
-    assert create_cmd[-3:] == ["sweb.eval.astropy:astropy__astropy-12907", "sleep", "infinity"]
+    assert create_cmd[-3:] == [
+        "sweb.eval.astropy:astropy__astropy-12907",
+        "sleep",
+        "infinity",
+    ]
     # The pull also pins the platform (so the right arch variant is fetched).
     pull_cmd = next(cmd for cmd in issued if cmd[1] == "pull")
     assert "--platform" in pull_cmd and "linux/amd64" in pull_cmd
@@ -276,7 +285,9 @@ async def test_eval_container_start_exec_stop_issues_correct_docker_cmds(monkeyp
     assert "python" in exec_cmd[-1]  # the joined shell command
 
 
-async def test_eval_container_start_raises_docker_unavailable_when_daemon_down(monkeypatch):
+async def test_eval_container_start_raises_docker_unavailable_when_daemon_down(
+    monkeypatch,
+):
     issued: list = []
     monkeypatch.setattr(ce, "_run_cmd", _fake_run_factory(issued, docker_ok=False))
 

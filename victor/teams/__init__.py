@@ -39,7 +39,7 @@ Import from here instead of victor.framework or victor.agent.teams.
     # Parallel: Execute all agents simultaneously
     coordinator.set_formation(TeamFormation.PARALLEL)
 
-    # Hierarchical: Manager delegates to workers
+    # Hierarchical: Supervisor delegates to specialists
     coordinator.set_formation(TeamFormation.HIERARCHICAL)
 
     # Pipeline: Processing pipeline with output passing
@@ -65,6 +65,7 @@ Factory Functions:
 
 Types (canonical):
     TeamFormation: Team organization patterns
+    TeamAgentCategory: Member coordination categories
     MessageType: Message types for inter-agent communication
     AgentMessage: Agent message structure
     MemberResult: Result from member execution
@@ -100,7 +101,9 @@ from victor.teams.types import (
     MemberResult,
     MessagePriority,
     MessageType,
+    TeamAgentCategory,
     TeamFormation,
+    TeamParticipant,
     TeamResult,
 )
 
@@ -116,6 +119,7 @@ if TYPE_CHECKING:
         IObservableCoordinator,
         IRLCoordinator,
         ISharedMemoryProvider,
+        ISupervisorAgent,
         ITeamCoordinator,
         ITeamMember,
         TeamCoordinatorProtocol,
@@ -132,6 +136,7 @@ else:
     IObservableCoordinator = None  # type: ignore
     IRLCoordinator = None  # type: ignore
     ISharedMemoryProvider = None  # type: ignore
+    ISupervisorAgent = None  # type: ignore
     ITeamCoordinator = None  # type: ignore
     ITeamMember = None  # type: ignore
     TeamCoordinatorProtocol = None  # type: ignore
@@ -256,6 +261,7 @@ def __getattr__(name: str) -> Any:
         "IObservableCoordinator",
         "IRLCoordinator",
         "ISharedMemoryProvider",
+        "ISupervisorAgent",
         "ITeamCoordinator",
         "ITeamMember",
         "TeamCoordinatorProtocol",
@@ -269,6 +275,7 @@ def __getattr__(name: str) -> Any:
             IObservableCoordinator,
             IRLCoordinator,
             ISharedMemoryProvider,
+            ISupervisorAgent,
             ITeamCoordinator,
             ITeamMember,
             TeamCoordinatorProtocol,

@@ -32,7 +32,7 @@ import logging
 import os
 import time
 from pathlib import Path
-from typing import Any, Callable, Dict, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from victor.agent.decisions.schemas import (
     DecisionType,
@@ -57,6 +57,10 @@ _DEFAULT_ARTIFACT = (
 
 # Heuristic confidence at/above which we skip classification entirely.
 _DEFAULT_HEURISTIC_THRESHOLD = 0.6
+
+# Per-project RL delta cache TTL (FEP-0012 Phase 6). The delta table is tiny
+# and top-K bounded; reload at most this often so predict stays sub-ms.
+_DELTA_CACHE_TTL_S = 60.0
 
 
 # --------------------------------------------------------------------------
@@ -85,16 +89,39 @@ def _map_bool(
     return model_cls(**{field: value, "confidence": float(conf)})
 
 
+# task_completion head labels ARE reward buckets (pass/partial/fail), so a plain
+# bool map is wrong: a "pass" prediction means "this looks like a successful
+# completion" -> is_complete=True; "fail" -> False; "partial"/unknown -> defer
+# (return None so the heuristic path handles it). Also accepts the legacy
+# complete/incomplete convention for forward-compat with a differently-trained head.
+_COMPLETION_TRUE_LABELS = ("pass", "complete", "true", "yes", "done", "finished")
+_COMPLETION_FALSE_LABELS = ("fail", "incomplete", "false", "no", "unfinished")
+_COMPLETION_DEFER_LABELS = ("partial",)
+
+
+def _map_completion(label: str, conf: float) -> Optional[Any]:
+    norm = label.strip().lower()
+    if norm in _COMPLETION_DEFER_LABELS:
+        return None
+    if norm in _COMPLETION_TRUE_LABELS:
+        return TaskCompletionDecision(is_complete=True, confidence=float(conf))
+    if norm in _COMPLETION_FALSE_LABELS:
+        return TaskCompletionDecision(is_complete=False, confidence=float(conf))
+    return None  # unknown label -> defer to heuristic
+
+
 # Per-DecisionType mapper: (label, confidence) -> Pydantic decision object (or None to defer).
 _MAPPERS: Dict[DecisionType, Callable[[str, float], Optional[Any]]] = {
     DecisionType.TASK_TYPE_CLASSIFICATION: lambda label, conf: _map_enum(
         label, conf, TaskTypeDecision, "task_type", TaskCategoryType
     ),
-    DecisionType.TASK_COMPLETION: lambda label, conf: _map_bool(
-        label, conf, TaskCompletionDecision, "is_complete", ("complete", "true", "yes")
-    ),
+    DecisionType.TASK_COMPLETION: _map_completion,
     DecisionType.TOOL_NECESSITY: lambda label, conf: _map_bool(
-        label, conf, ToolNecessityDecision, "requires_tools", ("requires_tools", "true", "yes")
+        label,
+        conf,
+        ToolNecessityDecision,
+        "requires_tools",
+        ("requires_tools", "true", "yes"),
     ),
     DecisionType.INTENT_CLASSIFICATION: lambda label, conf: _map_enum(
         label, conf, IntentDecision, "intent", IntentType
@@ -131,6 +158,10 @@ class LocalClassifierDecisionService:
         self._model = model
         self._heuristic_threshold = heuristic_threshold
         self._metrics = DecisionMetrics()
+        # FEP-0012 Phase 6: per-project RL delta, cached per decision type with
+        # a TTL so a fresh project DB read doesn't happen on every micro-decision.
+        # {decision_type: (loaded_at_perf, delta_dict)}; None entry = disabled.
+        self._delta_cache: Dict[str, Tuple[float, Optional[Dict[int, Any]]]] = {}
 
     # --------------------------------------------------------------- factory
     @classmethod
@@ -217,29 +248,49 @@ class LocalClassifierDecisionService:
         # Fast path: heuristic already confident enough.
         if heuristic_confidence >= self._heuristic_threshold:
             return self._result(
-                decision_type, heuristic_result, "heuristic", heuristic_confidence, start
+                decision_type,
+                heuristic_result,
+                "heuristic",
+                heuristic_confidence,
+                start,
             )
 
         # No artifact / unsupported type -> defer to heuristic.
         mapper = _MAPPERS.get(decision_type)
         if self._model is None or mapper is None:
             return self._result(
-                decision_type, heuristic_result, "heuristic", heuristic_confidence, start
+                decision_type,
+                heuristic_result,
+                "heuristic",
+                heuristic_confidence,
+                start,
             )
 
         text = _extract_text(decision_type, context)
-        label, confidence = self._model.predict(decision_type.value, text)
+        head = self._model.heads.get(decision_type.value)
+        delta = (
+            self._load_delta_cached(decision_type.value, head.labels) if head is not None else None
+        )
+        label, confidence = self._model.predict(decision_type.value, text, delta=delta)
         if label is None:
             # Unconfident (below τ) -> defer to heuristic.
             return self._result(
-                decision_type, heuristic_result, "heuristic", heuristic_confidence, start
+                decision_type,
+                heuristic_result,
+                "heuristic",
+                heuristic_confidence,
+                start,
             )
 
         decision = mapper(label, confidence)
         if decision is None:
             # Predicted label doesn't map to a valid enum value -> defer.
             return self._result(
-                decision_type, heuristic_result, "heuristic", heuristic_confidence, start
+                decision_type,
+                heuristic_result,
+                "heuristic",
+                heuristic_confidence,
+                start,
             )
 
         self._metrics.llm_calls += 1  # reuse field as "classifier decisions served"
@@ -264,6 +315,40 @@ class LocalClassifierDecisionService:
             confidence=confidence,
             latency_ms=latency_ms,
         )
+
+    # ----------------------------------------------- FEP-0012 Phase 6 delta
+    def _load_delta_cached(self, decision_type: str, labels: List[str]) -> Optional[Dict[int, Any]]:
+        """Return the per-project RL delta for ``decision_type`` (cached, gated).
+
+        Returns ``None`` (→ no blend) when local learning is disabled, the
+        artifact has no head for this type, or the project DB is empty/unreadable.
+        The delta is reloaded at most every ``_DELTA_CACHE_TTL_S`` seconds.
+        """
+        if not labels:
+            return None
+        try:
+            from victor.config.decision_settings import DecisionServiceSettings
+
+            if not DecisionServiceSettings().local_learning_enabled:
+                return None
+        except Exception:
+            return None
+
+        now = time.perf_counter()
+        cached = self._delta_cache.get(decision_type)
+        if cached is not None and (now - cached[0]) < _DELTA_CACHE_TTL_S:
+            return cached[1]
+
+        delta: Optional[Dict[int, Any]] = None
+        try:
+            from victor.agent.decisions.local_delta import load_delta
+
+            loaded = load_delta(decision_type, list(labels))
+            delta = loaded if loaded else None
+        except Exception as exc:  # degrade gracefully — never block a decision
+            logger.debug("delta load failed for %s: %s", decision_type, exc)
+        self._delta_cache[decision_type] = (now, delta)
+        return delta
 
 
 def create_local_classifier_decision_service(

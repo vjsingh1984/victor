@@ -40,7 +40,10 @@ _EXPORTS = {
     "DevOpsPlugin": ("victor_devops.plugin", "DevOpsPlugin"),
     "plugin": ("victor_devops.plugin", "plugin"),
     "DevOpsPromptContributor": ("victor_devops.prompts", "DevOpsPromptContributor"),
-    "DevOpsModeConfigProvider": ("victor_devops.mode_config", "DevOpsModeConfigProvider"),
+    "DevOpsModeConfigProvider": (
+        "victor_devops.mode_config",
+        "DevOpsModeConfigProvider",
+    ),
     "DevOpsSafetyExtension": ("victor_devops.safety", "DevOpsSafetyExtension"),
     "EnhancedDevOpsSafetyExtension": (
         "victor_devops.safety_enhanced",
@@ -56,7 +59,10 @@ _EXPORTS = {
         "victor_devops.tool_dependencies",
         "DevOpsToolDependencyProvider",
     ),
-    "DevOpsCapabilityProvider": ("victor_devops.capabilities", "DevOpsCapabilityProvider"),
+    "DevOpsCapabilityProvider": (
+        "victor_devops.capabilities",
+        "DevOpsCapabilityProvider",
+    ),
     "DevOpsSandboxProvider": ("victor_devops.protocols", "DevOpsSandboxProvider"),
     "DevOpsPermissionProvider": ("victor_devops.protocols", "DevOpsPermissionProvider"),
     "DevOpsHookProvider": ("victor_devops.protocols", "DevOpsHookProvider"),

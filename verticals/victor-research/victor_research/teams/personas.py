@@ -691,7 +691,9 @@ def get_personas_for_role(role: str) -> List[ResearchPersona]:
     return [p for p in RESEARCH_PERSONAS.values() if p.role == role]
 
 
-def get_persona_by_expertise(expertise: ResearchExpertiseCategory) -> List[ResearchPersona]:
+def get_persona_by_expertise(
+    expertise: ResearchExpertiseCategory,
+) -> List[ResearchPersona]:
     """Get personas that have a specific expertise.
 
     Args:
@@ -794,7 +796,9 @@ __all__ = [
 # =============================================================================
 
 
-def _register_research_personas(provider: PersonaRegistryProtocol | None = None) -> None:
+def _register_research_personas(
+    provider: PersonaRegistryProtocol | None = None,
+) -> None:
     """Register all research personas with FrameworkPersonaProvider.
 
     This function is called at module import time to automatically register

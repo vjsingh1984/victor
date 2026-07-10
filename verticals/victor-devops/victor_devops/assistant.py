@@ -98,14 +98,24 @@ class DevOpsAssistant(VerticalBase):
             "PLANNING": StageDefinition(
                 name="PLANNING",
                 description="Planning infrastructure changes",
-                tools={ToolNames.READ, ToolNames.GREP, ToolNames.WEB_SEARCH, ToolNames.WEB_FETCH},
+                tools={
+                    ToolNames.READ,
+                    ToolNames.GREP,
+                    ToolNames.WEB_SEARCH,
+                    ToolNames.WEB_FETCH,
+                },
                 keywords=["plan", "design", "architecture", "strategy"],
                 next_stages={"IMPLEMENTATION"},
             ),
             "IMPLEMENTATION": StageDefinition(
                 name="IMPLEMENTATION",
                 description="Implementing infrastructure changes",
-                tools={ToolNames.WRITE, ToolNames.EDIT, ToolNames.SHELL, ToolNames.DOCKER},
+                tools={
+                    ToolNames.WRITE,
+                    ToolNames.EDIT,
+                    ToolNames.SHELL,
+                    ToolNames.DOCKER,
+                },
                 keywords=["create", "build", "configure", "implement", "deploy"],
                 next_stages={"VALIDATION", "DEPLOYMENT"},
             ),
@@ -206,7 +216,10 @@ When creating configurations:
             .git_safety(
                 block_dangerous=True,  # Strict for infrastructure
                 warn_on_risky=True,
-                protected_branches={"production", "staging"},  # Additional protected branches
+                protected_branches={
+                    "production",
+                    "staging",
+                },  # Additional protected branches
             )
             .secret_masking(
                 replacement="[REDACTED]",

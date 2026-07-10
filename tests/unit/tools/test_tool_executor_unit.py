@@ -2327,3 +2327,78 @@ class TestIntentBasedToolFilter:
         except ValueError:
             crashed = True
         assert crashed  # ValueError expected — caller must guard with try/except
+
+
+class TestCoerceJsonStringArgs:
+    """JSON-string → array/object coercion (real-agent calibration: `ops` sent as a string)."""
+
+    @staticmethod
+    def _tool(props):
+        t = MagicMock(spec=BaseTool)
+        t.name = "edit"
+        t.parameters = {"type": "object", "properties": props}
+        return t
+
+    def test_json_string_array_is_parsed(self):
+        from victor.agent.tool_executor import ToolExecutor
+
+        tool = self._tool({"ops": {"type": "array"}})
+        args = {"ops": '[{"type": "replace", "old": "a", "new": "b"}]'}
+        ToolExecutor._coerce_arg_types(tool, args)
+        assert args["ops"] == [{"type": "replace", "old": "a", "new": "b"}]
+
+    def test_json_string_object_is_parsed(self):
+        from victor.agent.tool_executor import ToolExecutor
+
+        tool = self._tool({"cfg": {"type": "object"}})
+        args = {"cfg": '{"k": 1}'}
+        ToolExecutor._coerce_arg_types(tool, args)
+        assert args["cfg"] == {"k": 1}
+
+    def test_type_mismatch_left_unchanged(self):
+        # array param given a JSON *object* string → not coerced (the tool/validator decides).
+        from victor.agent.tool_executor import ToolExecutor
+
+        tool = self._tool({"ops": {"type": "array"}})
+        args = {"ops": '{"not": "an array"}'}
+        ToolExecutor._coerce_arg_types(tool, args)
+        assert args["ops"] == '{"not": "an array"}'
+
+    def test_non_json_string_left_unchanged(self):
+        from victor.agent.tool_executor import ToolExecutor
+
+        tool = self._tool({"ops": {"type": "array"}})
+        args = {"ops": "not json at all"}
+        ToolExecutor._coerce_arg_types(tool, args)
+        assert args["ops"] == "not json at all"
+
+    def test_already_correct_type_untouched(self):
+        from victor.agent.tool_executor import ToolExecutor
+
+        tool = self._tool({"ops": {"type": "array"}})
+        real = [{"type": "replace"}]
+        args = {"ops": real}
+        ToolExecutor._coerce_arg_types(tool, args)
+        assert args["ops"] is real
+
+    def test_strict_validation_coerces_before_validating(self):
+        """The end-to-end bug: STRICT mode must coerce a JSON-string array before validating,
+        so a recoverable serialization is not rejected."""
+        from victor.agent.tool_executor import ToolExecutor, ValidationMode
+        from victor.tools.base import ToolValidationResult
+
+        tool = self._tool({"ops": {"type": "array"}})
+        # The real validator would pass on a list; assert coercion happened before it ran.
+        seen = {}
+
+        def _validate(**kwargs):
+            seen.update(kwargs)
+            return ToolValidationResult(valid=True, errors=[])
+
+        tool.validate_parameters_detailed = _validate
+        executor = ToolExecutor(tool_registry=ToolRegistry(), validation_mode=ValidationMode.STRICT)
+        args = {"ops": '[{"type": "replace"}]'}
+        proceed, _ = executor._validate_arguments(tool, args)
+        assert proceed is True
+        assert seen["ops"] == [{"type": "replace"}]  # validator saw the parsed list
+        assert args["ops"] == [{"type": "replace"}]  # and execution args are coerced too

@@ -44,7 +44,7 @@ class EmbeddingSettings(BaseModel):
     # ==========================================================================
     # Codebase Semantic Search (Air-gapped by Default)
     # ==========================================================================
-    codebase_vector_store: str = "lancedb"  # lancedb (recommended), chromadb
+    codebase_vector_store: str = "lancedb"  # lancedb (recommended)
     codebase_embedding_provider: str = "sentence-transformers"  # Local, offline, fast
     codebase_embedding_model: str = unified_embedding_model  # Shared with tool selection
     codebase_persist_directory: Optional[str] = None  # Default: ~/.victor/embeddings/codebase

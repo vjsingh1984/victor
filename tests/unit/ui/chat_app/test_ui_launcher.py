@@ -60,7 +60,13 @@ def test_no_profile_env_when_unset(monkeypatch):
 def test_missing_chainlit_exits_with_hint(monkeypatch):
     monkeypatch.setattr(uimod, "_chainlit_available", lambda: False)
     try:
-        uimod._launch(host="127.0.0.1", port=8000, headless=True, watch=False, profile="zai-coding")
+        uimod._launch(
+            host="127.0.0.1",
+            port=8000,
+            headless=True,
+            watch=False,
+            profile="zai-coding",
+        )
         raise AssertionError("expected typer.Exit")
     except typer.Exit as exc:
         assert exc.exit_code == 1

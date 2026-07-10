@@ -24,25 +24,52 @@ def test_split_double_quotes():
 def test_split_triple_double_quotes():
     cmd = 'fs write app.py --content """def foo():\n    return "bar"\n"""'
     args = split_command(cmd)
-    assert args == ["fs", "write", "app.py", "--content", 'def foo():\n    return "bar"\n']
+    assert args == [
+        "fs",
+        "write",
+        "app.py",
+        "--content",
+        'def foo():\n    return "bar"\n',
+    ]
 
 
 def test_split_triple_single_quotes():
     cmd = "fs write app.py --content '''print('hello')\nprint(\"world\")'''"
     args = split_command(cmd)
-    assert args == ["fs", "write", "app.py", "--content", "print('hello')\nprint(\"world\")"]
+    assert args == [
+        "fs",
+        "write",
+        "app.py",
+        "--content",
+        "print('hello')\nprint(\"world\")",
+    ]
 
 
 def test_split_nested_quotes():
     cmd = 'fs write test.py -c """print("double")\nprint(\'single\')"""'
     args = split_command(cmd)
-    assert args == ["fs", "write", "test.py", "-c", "print(\"double\")\nprint('single')"]
+    assert args == [
+        "fs",
+        "write",
+        "test.py",
+        "-c",
+        "print(\"double\")\nprint('single')",
+    ]
 
 
 def test_split_multiple_triple_quotes():
     cmd = 'fs patch -f app.py --search """old_code""" --replace """new_code"""'
     args = split_command(cmd)
-    assert args == ["fs", "patch", "-f", "app.py", "--search", "old_code", "--replace", "new_code"]
+    assert args == [
+        "fs",
+        "patch",
+        "-f",
+        "app.py",
+        "--search",
+        "old_code",
+        "--replace",
+        "new_code",
+    ]
 
 
 def test_shlex_handles_escaped_quotes():

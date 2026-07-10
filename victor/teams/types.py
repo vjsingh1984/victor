@@ -33,7 +33,7 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Mapping, Optional, Set
 
 if TYPE_CHECKING:
     # Team member dependencies
@@ -52,7 +52,7 @@ class TeamFormation(str, Enum):
     Attributes:
         SEQUENTIAL: Execute members one after another, context chaining
         PARALLEL: Execute all members simultaneously, independent work
-        HIERARCHICAL: Manager delegates to workers, synthesizes results
+        HIERARCHICAL: Supervisor delegates to specialists, synthesizes results
         PIPELINE: Output of one member feeds into the next
         CONSENSUS: All members must agree (multiple rounds if needed)
         REFLECTION: Generator → critic → refine loop with early-exit on satisfaction
@@ -64,6 +64,18 @@ class TeamFormation(str, Enum):
     PIPELINE = "pipeline"
     CONSENSUS = "consensus"
     REFLECTION = "reflection"
+
+
+class TeamAgentCategory(str, Enum):
+    """Coordination category for a team member.
+
+    Roles describe domain work (researcher, planner, executor, reviewer).
+    Categories describe coordination responsibility. A hierarchical team has
+    exactly one supervisor and one or more specialists.
+    """
+
+    SPECIALIST = "specialist"
+    SUPERVISOR = "supervisor"
 
 
 class MessageType(str, Enum):
@@ -293,7 +305,7 @@ class TeamMember:
 
     Each member has a specific role, goal, and optional persona attributes
     within the team context. Members can delegate to other team members
-    (in hierarchical formations) or be designated as the team manager.
+    (in hierarchical formations) or be designated as the team supervisor.
 
     The persona system is inspired by CrewAI and allows rich characterization
     of agents through backstory, expertise domains, and personality traits.
@@ -307,8 +319,8 @@ class TeamMember:
         allowed_tools: Override for allowed tools (default: role-based)
         can_delegate: Whether this member can delegate to others
         delegation_targets: Specific member IDs this member can delegate to
-        reports_to: ID of the manager this member reports to (hierarchical)
-        is_manager: Whether this member is the team manager
+        reports_to: ID of the supervisor this member reports to (hierarchical)
+        is_manager: Legacy alias for supervisor membership
         priority: Execution priority (lower = earlier, for sequential/pipeline)
         backstory: Rich persona description defining agent's history and character
         expertise: List of domain expertise areas for context-aware behavior
@@ -353,7 +365,7 @@ class TeamMember:
             tool_budget=25,
         )
 
-        # Team manager with delegation capabilities
+        # Team supervisor with delegation capabilities
         tech_lead = TeamMember(
             id="tech_lead",
             role=SubAgentRole.PLANNER,
@@ -362,7 +374,7 @@ class TeamMember:
             backstory="15 years as a software architect, now leading teams.",
             expertise=["architecture", "team-leadership", "security", "scalability"],
             personality="collaborative; focuses on big picture; empowers team members",
-            is_manager=True,
+            agent_category=TeamAgentCategory.SUPERVISOR,
             can_delegate=True,
             max_delegation_depth=3,
             delegation_targets=["security_analyst", "code_implementer", "test_writer"],
@@ -376,6 +388,7 @@ class TeamMember:
     goal: str
     tool_budget: int = 15
     allowed_tools: Optional[List[str]] = None
+    agent_category: TeamAgentCategory = TeamAgentCategory.SPECIALIST
     can_delegate: bool = False
     delegation_targets: Optional[List[str]] = None
     reports_to: Optional[str] = None
@@ -409,8 +422,22 @@ class TeamMember:
 
     def __post_init__(self):
         """Generate ID if not provided."""
+        if isinstance(self.agent_category, str):
+            self.agent_category = TeamAgentCategory(self.agent_category)
+        if self.is_manager:
+            self.agent_category = TeamAgentCategory.SUPERVISOR
+        if self.agent_category == TeamAgentCategory.SUPERVISOR:
+            self.is_manager = True
+            self.can_delegate = True
+            if self.max_delegation_depth < 1:
+                self.max_delegation_depth = 1
         if not self.id:
             self.id = f"{self.role.value}_{uuid.uuid4().hex[:8]}"
+
+    @property
+    def is_supervisor(self) -> bool:
+        """Return whether this member coordinates a supervised team."""
+        return self.agent_category == TeamAgentCategory.SUPERVISOR or self.is_manager
 
     def to_system_prompt(self) -> str:
         """Generate system prompt from member persona.
@@ -655,6 +682,7 @@ class TeamMember:
             "goal": self.goal,
             "tool_budget": self.tool_budget,
             "allowed_tools": self.allowed_tools,
+            "agent_category": self.agent_category.value,
             "can_delegate": self.can_delegate,
             "delegation_targets": self.delegation_targets,
             "reports_to": self.reports_to,
@@ -724,11 +752,11 @@ class TeamConfig:
         if len(member_ids) != len(set(member_ids)):
             raise ValueError("Team member IDs must be unique")
 
-        # For hierarchical, ensure exactly one manager
+        # For hierarchical, ensure exactly one supervisor.
         if self.formation == TeamFormation.HIERARCHICAL:
-            managers = [m for m in self.members if m.is_manager]
-            if len(managers) != 1:
-                raise ValueError("Hierarchical teams must have exactly one manager")
+            supervisors = [m for m in self.members if m.is_supervisor]
+            if len(supervisors) != 1:
+                raise ValueError("Hierarchical teams must have exactly one manager/supervisor")
 
     def get_member(self, member_id: str) -> Optional[TeamMember]:
         """Get a member by ID."""
@@ -737,16 +765,24 @@ class TeamConfig:
                 return member
         return None
 
-    def get_manager(self) -> Optional[TeamMember]:
-        """Get the team manager (if any)."""
+    def get_supervisor(self) -> Optional[TeamMember]:
+        """Get the team supervisor (if any)."""
         for member in self.members:
-            if member.is_manager:
+            if member.is_supervisor:
                 return member
         return None
 
+    def get_specialists(self) -> List[TeamMember]:
+        """Get all non-supervisor members."""
+        return [m for m in self.members if not m.is_supervisor]
+
+    def get_manager(self) -> Optional[TeamMember]:
+        """Compatibility alias for get_supervisor()."""
+        return self.get_supervisor()
+
     def get_workers(self) -> List[TeamMember]:
-        """Get all non-manager members."""
-        return [m for m in self.members if not m.is_manager]
+        """Compatibility alias for get_specialists()."""
+        return self.get_specialists()
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for serialization."""
@@ -760,6 +796,7 @@ class TeamConfig:
                     "name": m.name,
                     "goal": m.goal,
                     "tool_budget": m.tool_budget,
+                    "agent_category": m.agent_category.value,
                     "can_delegate": m.can_delegate,
                     "delegation_targets": m.delegation_targets,
                     "reports_to": m.reports_to,
@@ -873,23 +910,101 @@ class TeamResult:
         }
 
 
-@dataclass
-class TeamMemberAdapter:
-    """Adapter that makes a TeamMember configuration implement the IAgent protocol.
+def normalize_member_execution_result(
+    raw_output: Any,
+) -> tuple[bool, str, Optional[str], Dict[str, Any], int, List[str], Optional[float]]:
+    """Normalize member output into ``MemberResult`` fields.
 
-    This adapter allows TeamMember configuration objects to be used wherever
-    IAgent implementations are expected, by providing an executor function
-    that handles actual task execution.
+    Member executors may return a plain string, ``None``, or a mapping with
+    structured runtime metadata. Keeping this normalization at the team type
+    layer gives all formations one result contract and avoids private
+    coordinator-local adapters.
+    """
+    if not isinstance(raw_output, Mapping):
+        return (
+            True,
+            "" if raw_output is None else str(raw_output),
+            None,
+            {},
+            0,
+            [],
+            None,
+        )
+
+    success = bool(raw_output.get("success", True))
+    output_value = (
+        raw_output.get("output")
+        or raw_output.get("final_output")
+        or raw_output.get("content")
+        or ""
+    )
+    error = str(raw_output.get("error")) if raw_output.get("error") is not None else None
+    metadata = dict(raw_output.get("metadata", {}) or {})
+    for key in (
+        "changed_files",
+        "files_touched",
+        "modified_files",
+        "claimed_paths",
+        "readonly_paths",
+        "task_summary",
+        "summary",
+        "result_summary",
+        "validation_run",
+        "validation_status",
+        "validation_summary",
+        "validation_command",
+        "test_command",
+    ):
+        if raw_output.get(key) is not None and key not in metadata:
+            metadata[key] = raw_output.get(key)
+
+    discoveries = list(raw_output.get("discoveries") or [])
+    tool_calls_raw = raw_output.get("tool_calls_used", raw_output.get("tool_calls", 0))
+    try:
+        tool_calls_used = int(tool_calls_raw or 0)
+    except (TypeError, ValueError):
+        tool_calls_used = 0
+
+    duration_raw = raw_output.get("duration_seconds")
+    try:
+        duration_override = float(duration_raw) if duration_raw is not None else None
+    except (TypeError, ValueError):
+        duration_override = None
+
+    return (
+        success,
+        str(output_value),
+        error,
+        metadata,
+        tool_calls_used,
+        discoveries,
+        duration_override,
+    )
+
+
+@dataclass
+class TeamParticipant:
+    """Canonical executable member used by team formations.
+
+    ``TeamMember`` is declarative configuration. ``TeamParticipant`` is the
+    runtime object formations execute. It preserves the public ``ITeamMember``
+    shape while also providing ``execute(AgentMessage, TeamContext)`` for
+    formation strategies, so the coordinator does not need private glue
+    adapters.
 
     Attributes:
-        member: The TeamMember configuration
+        member: The team member object or configuration
         executor: Callable that executes tasks for this member
         message_handler: Optional callable to handle incoming messages
+        base_context: Context inherited from the team execution
+        context_overrides: Per-participant execution context overlays
     """
 
-    member: "TeamMember"
-    executor: Callable[[str, Dict[str, Any]], Any]
+    member: Any
+    executor: Callable[[Any, Dict[str, Any]], Any]
     message_handler: Optional[Callable[[AgentMessage], Optional[AgentMessage]]] = None
+    base_context: Dict[str, Any] = field(default_factory=dict)
+    context_overrides: Dict[str, Any] = field(default_factory=dict)
 
     @property
     def id(self) -> str:
@@ -899,22 +1014,114 @@ class TeamMemberAdapter:
     @property
     def role(self):
         """Role of this agent."""
-        return self.member.role
+        return getattr(self.member, "role", None)
 
     @property
     def persona(self):
-        """Persona of this member (None for TeamMemberAdapter)."""
-        return None
+        """Persona of this member, when exposed by the wrapped object."""
+        return getattr(self.member, "persona", None)
 
-    async def execute_task(self, task: str, context: Dict[str, Any]) -> Any:
+    @property
+    def is_supervisor(self) -> bool:
+        """Whether this adapted member is the team supervisor."""
+        return bool(getattr(self.member, "is_supervisor", False))
+
+    @property
+    def can_delegate(self) -> bool:
+        """Whether this adapted member may delegate work."""
+        return bool(getattr(self.member, "can_delegate", False))
+
+    @property
+    def delegation_targets(self) -> Optional[List[str]]:
+        """Optional delegation target allow-list."""
+        targets = getattr(self.member, "delegation_targets", None)
+        return list(targets) if targets is not None else None
+
+    async def execute_task(self, task: Any, context: Dict[str, Any]) -> Any:
         """Execute a task using the provided executor."""
         return await self.executor(task, context)
+
+    async def execute(self, task: AgentMessage, context: Any) -> MemberResult:
+        """Execute a formation task and return a normalized member result."""
+        start_time = time.time()
+        task_content = task.content
+
+        try:
+            merged_context = self._merged_context(context)
+            raw_output = await self.execute_task(task_content, merged_context)
+            duration = time.time() - start_time
+            (
+                success,
+                output,
+                error,
+                metadata,
+                tool_calls_used,
+                discoveries,
+                duration_override,
+            ) = normalize_member_execution_result(raw_output)
+            metadata.setdefault("task", task_content)
+            for key in (
+                "worktree_assignment",
+                "claimed_paths",
+                "readonly_paths",
+            ):
+                if key in self.context_overrides and key not in metadata:
+                    value = self.context_overrides[key]
+                    metadata[key] = list(value) if isinstance(value, (set, tuple)) else value
+
+            return MemberResult(
+                member_id=self.id,
+                success=success,
+                output=output,
+                error=error,
+                duration_seconds=(duration_override if duration_override is not None else duration),
+                metadata=metadata,
+                tool_calls_used=tool_calls_used,
+                discoveries=discoveries,
+            )
+        except Exception as e:
+            return MemberResult(
+                member_id=self.id,
+                success=False,
+                output="",
+                error=str(e),
+                duration_seconds=time.time() - start_time,
+                metadata={"task": task_content},
+            )
 
     async def receive_message(self, message: AgentMessage) -> Optional[AgentMessage]:
         """Receive and optionally respond to a message."""
         if self.message_handler:
             return await self.message_handler(message)
         return None
+
+    def _merged_context(self, formation_context: Any) -> Dict[str, Any]:
+        """Merge team, formation, and participant context in execution order."""
+        shared_state = getattr(formation_context, "shared_state", {})
+        merged_context = {
+            **self.base_context,
+            **(shared_state if isinstance(shared_state, Mapping) else {}),
+            **self.context_overrides,
+        }
+
+        # Preserve caller-owned mutable context objects when present so external
+        # observers can track execution side effects without losing
+        # formation-managed overlays like ``previous_output``.
+        if isinstance(shared_state, Mapping):
+            for key, value in self.base_context.items():
+                if (
+                    key in shared_state
+                    and shared_state[key] is not value
+                    and isinstance(value, (list, dict, set))
+                ):
+                    merged_context[key] = value
+
+        return merged_context
+
+
+# Backward-compatible name for older imports. New code should use
+# ``TeamParticipant``.
+TeamMemberAdapter = TeamParticipant
 
 
 # Type aliases for backward compatibility

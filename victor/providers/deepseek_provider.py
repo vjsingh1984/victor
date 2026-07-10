@@ -34,7 +34,12 @@ from typing import Any, AsyncIterator, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
-from victor.providers.base import CacheCostModel, CompletionResponse, StreamChunk, ToolDefinition
+from victor.providers.base import (
+    CacheCostModel,
+    CompletionResponse,
+    StreamChunk,
+    ToolDefinition,
+)
 from victor.providers.httpx_openai_compat import build_openai_messages
 from victor.providers.httpx_openai_compat import HttpxOpenAICompatProvider
 from victor.providers.resolution import (

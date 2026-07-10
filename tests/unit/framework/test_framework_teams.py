@@ -22,7 +22,7 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from victor.agent.subagents.base import SubAgentRole
-from victor.teams.types import TeamMember, TeamConfig
+from victor.teams.types import TeamAgentCategory, TeamMember, TeamConfig
 from victor.teams import TeamFormation
 from victor.framework.teams import (
     AgentTeam,
@@ -121,6 +121,21 @@ class TestTeamMemberSpec:
         member = spec.to_team_member()
 
         assert member.is_manager is True
+        assert member.is_supervisor is True
+        assert member.agent_category == TeamAgentCategory.SUPERVISOR
+
+    def test_to_team_member_agent_category_supervisor(self):
+        """to_team_member should preserve explicit supervisor category."""
+        spec = TeamMemberSpec(
+            role="planner",
+            goal="Coordinate specialists",
+            agent_category=TeamAgentCategory.SUPERVISOR,
+        )
+        member = spec.to_team_member()
+
+        assert member.agent_category == TeamAgentCategory.SUPERVISOR
+        assert member.is_supervisor is True
+        assert member.can_delegate is True
 
 
 class TestTeamMemberSpecPersona:
@@ -488,7 +503,12 @@ class TestAgentTeamConfig:
     async def test_create_hierarchical_auto_manager(self, mock_orchestrator):
         """create should auto-assign manager for hierarchical if missing."""
         members = [
-            TeamMemberSpec(role="planner", goal="Coordinate"),
+            TeamMemberSpec(
+                role="planner",
+                goal="Coordinate",
+                backstory="Keeps the team aligned.",
+                provider="anthropic",
+            ),
             TeamMemberSpec(role="executor", goal="Execute"),
         ]
 
@@ -502,13 +522,21 @@ class TestAgentTeamConfig:
 
         # First member should be manager
         assert team.members[0].is_manager is True
+        assert team.members[0].is_supervisor is True
+        assert team.members[0].agent_category == TeamAgentCategory.SUPERVISOR
+        assert team.members[0].backstory == "Keeps the team aligned."
+        assert team.members[0].provider == "anthropic"
 
     @pytest.mark.asyncio
     async def test_create_hierarchical_preserves_explicit_manager(self, mock_orchestrator):
         """create should preserve explicitly set manager."""
         members = [
             TeamMemberSpec(role="researcher", goal="Research"),
-            TeamMemberSpec(role="planner", goal="Coordinate", is_manager=True),
+            TeamMemberSpec(
+                role="planner",
+                goal="Coordinate",
+                agent_category=TeamAgentCategory.SUPERVISOR,
+            ),
             TeamMemberSpec(role="executor", goal="Execute"),
         ]
 
@@ -523,6 +551,7 @@ class TestAgentTeamConfig:
         # Second member (planner) should be manager
         manager = next(m for m in team.members if m.is_manager)
         assert manager.role == SubAgentRole.PLANNER
+        assert manager.is_supervisor is True
 
     @pytest.mark.asyncio
     async def test_create_with_shared_context(self, mock_orchestrator, basic_members):

@@ -369,10 +369,13 @@ class SWEBenchRunner(BaseBenchmarkRunner):
             from victor.context.test_runner import detect_test_runner
             import re as _re
 
+            # Test files come from the test PATCH (whole files), NOT task.
+            # fail_to_pass node-IDs — running only the FAIL_TO_PASS node-IDs
+            # (with --noconftest) failed tests that the whole-file run passes
+            # (validation run dropped 64%→20%). Whole-file scoring is the
+            # proven baseline; fail_to_pass stays carried for reporting/future.
             _test_files = None
-            if hasattr(task, "fail_to_pass") and task.fail_to_pass:
-                _test_files = task.fail_to_pass
-            elif task.test_code:
+            if task.test_code:
                 _extracted = _re.findall(r"diff --git a/(\S+)", task.test_code)
                 _test_files = [f for f in _extracted if "test" in f.lower()]
 
@@ -581,11 +584,11 @@ class SWEBenchRunner(BaseBenchmarkRunner):
                     await container.exec(["git", "apply", f"{ws}/.test_patch.diff"], cwd=testbed)
 
                 # 4. Detect the test runner on the host cached_repo (same
-                #    repo/files) and run its command in /testbed.
+                #    repo/files) and run its command in /testbed. Use whole test
+                #    FILES from the test patch — NOT fail_to_pass node-IDs (the
+                #    node-ID form mis-scores; see _run_tests_in_cached_repo).
                 _test_files = None
-                if getattr(task, "fail_to_pass", None):
-                    _test_files = task.fail_to_pass
-                elif task.test_code:
+                if task.test_code:
                     _test_files = [
                         f
                         for f in _re.findall(r"diff --git a/(\S+)", task.test_code)
@@ -600,7 +603,7 @@ class SWEBenchRunner(BaseBenchmarkRunner):
                     test_cmd[0] = "python"
                 _repo_prefix = str(cached_repo.resolve()) + "/"
                 test_cmd = [
-                    arg.replace(_repo_prefix, "") if arg.startswith(_repo_prefix) else arg
+                    (arg.replace(_repo_prefix, "") if arg.startswith(_repo_prefix) else arg)
                     for arg in test_cmd
                 ]
                 if runner_cfg.runner_type == "pytest" and "-m" in test_cmd:
@@ -628,10 +631,15 @@ class SWEBenchRunner(BaseBenchmarkRunner):
                 else:
                     status = "zero_collected"
                     logger.warning("Tests not collected in container (0/0).")
+                # Surface raw output for ANY non-pass outcome (not just
+                # 0-collected) so partial/all_failed causes are diagnosable —
+                # the JSON doesn't serialize stdout, so the log is the only
+                # record of WHY tests failed.
+                if status != "passed":
                     logger.warning(
-                        "Raw container test output (last 1500 chars) for "
-                        "0-collected task %s:\n%s",
+                        "Raw container test output (last 1500 chars) for " "task %s [%s]:\n%s",
                         getattr(task, "task_id", "?"),
+                        status,
                         raw[-1500:],
                     )
         finally:

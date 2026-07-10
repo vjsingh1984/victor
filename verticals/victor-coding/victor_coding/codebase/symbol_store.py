@@ -796,7 +796,10 @@ class SymbolStore:
         Tree-sitter is error-tolerant and can parse files with syntax errors,
         making it ideal for imperfect codebases.
         """
-        from victor_coding.codebase.tree_sitter_manager import get_parser, LANGUAGE_MODULES
+        from victor_coding.codebase.tree_sitter_manager import (
+            get_parser,
+            LANGUAGE_MODULES,
+        )
 
         # Check if language is supported
         if language not in LANGUAGE_MODULES:

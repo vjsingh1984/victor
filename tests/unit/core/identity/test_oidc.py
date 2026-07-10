@@ -120,7 +120,11 @@ async def test_me_falls_back_to_upn(monkeypatch):
     _install_fake_aiohttp(
         monkeypatch,
         token_payload={"access_token": "T"},
-        me_payload={"id": "oid", "displayName": "Bob", "userPrincipalName": "bob@corp.com"},
+        me_payload={
+            "id": "oid",
+            "displayName": "Bob",
+            "userPrincipalName": "bob@corp.com",
+        },
     )
     identity = await resolve_identity_from_code(_cfg(), "c")
     assert identity.email == "bob@corp.com"

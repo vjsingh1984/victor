@@ -28,7 +28,10 @@ from victor.framework.temperature.defaults import (
     DEFAULT_RATCHET_STEP,
     GLOBAL_DEFAULT,
 )
-from victor.framework.temperature.modifiers import ModelBoundsModifier, SpinRatchetModifier
+from victor.framework.temperature.modifiers import (
+    ModelBoundsModifier,
+    SpinRatchetModifier,
+)
 from victor.framework.temperature.protocols import ReactiveTemperatureAdjuster
 from victor.framework.temperature.recovery_modifier import RecoveryAdjustModifier
 from victor.framework.temperature.resolver import TemperatureResolver

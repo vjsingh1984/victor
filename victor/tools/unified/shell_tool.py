@@ -159,7 +159,9 @@ async def shell_tool(cmd: str) -> str:
 
     try:
         coro = execute_bash(
-            cmd=parsed_args.cmd, sandbox=parsed_args.sandbox, readonly=parsed_args.readonly
+            cmd=parsed_args.cmd,
+            sandbox=parsed_args.sandbox,
+            readonly=parsed_args.readonly,
         )
 
         # Determine if we should enforce a timebound sync

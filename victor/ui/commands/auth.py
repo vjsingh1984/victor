@@ -447,7 +447,7 @@ def auth_list(
                 "provider": provider,
                 "model": model,
                 "key_configured": provider in LOCAL_PROVIDERS or bool(st.get("configured")),
-                "key_source": "local" if provider in LOCAL_PROVIDERS else st.get("source"),
+                "key_source": ("local" if provider in LOCAL_PROVIDERS else st.get("source")),
                 "status": status,
                 "default": is_default,
                 "tags": list(acct.tags) if acct else [],

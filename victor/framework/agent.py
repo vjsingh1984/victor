@@ -239,6 +239,23 @@ class Agent:
         profile_overrides: Dict[str, Any] = {}
         if session_config is not None:
             session_config.apply_to_settings(settings)
+            # FEP-0002: apply RL-driven budget calibration after SessionConfig
+            # overrides land. An explicit ``--tool-budget`` override (now
+            # applied by apply_to_settings above) wins absolutely — the seam
+            # short-circuits to identity-return when explicit_override is set,
+            # so calibration can never re-tighten a user-set budget. Default
+            # OFF via ``tool_budget_calibration_enabled`` -> zero behavior
+            # change for sessions that don't opt in.
+            from victor.framework.rl.budget_calibration_seam import (
+                apply_budget_calibration,
+            )
+
+            explicit_override = session_config.tool_budget is not None
+            calibrated_tools = apply_budget_calibration(
+                settings, explicit_override=explicit_override
+            )
+            if calibrated_tools is not settings.tools:
+                object.__setattr__(settings, "tools", calibrated_tools)
             profile = session_config.agent_profile or profile
             provider_override = getattr(session_config, "provider_override", None)
             if provider_override is not None:
@@ -407,12 +424,18 @@ class Agent:
             async for event in team.stream():
                 print(f"{event.type}: {event.message}")
 
-        Example - Hierarchical with manager:
+        Example - Hierarchical with supervisor:
+            from victor.framework.teams import TeamAgentCategory
+
             team = await Agent.create_team(
                 name="Project Team",
                 goal="Build a REST API",
                 members=[
-                    TeamMemberSpec(role="planner", goal="Coordinate team", is_manager=True),
+                    TeamMemberSpec(
+                        role="planner",
+                        goal="Coordinate team",
+                        agent_category=TeamAgentCategory.SUPERVISOR,
+                    ),
                     TeamMemberSpec(role="researcher", goal="Research API patterns"),
                     TeamMemberSpec(role="executor", goal="Implement endpoints"),
                     TeamMemberSpec(role="reviewer", goal="Test and review"),

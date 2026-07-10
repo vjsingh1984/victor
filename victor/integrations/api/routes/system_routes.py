@@ -150,7 +150,10 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
     @router.delete("/credentials/delete")
     async def credentials_delete(provider: str = Query("")) -> JSONResponse:
         """Delete a provider's API key from the system keyring."""
-        from victor.config.api_keys import clear_api_key_cache, delete_api_key_from_keyring
+        from victor.config.api_keys import (
+            clear_api_key_cache,
+            delete_api_key_from_keyring,
+        )
 
         try:
             success = bool(delete_api_key_from_keyring(provider)) if provider else False
@@ -171,7 +174,11 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
         except Exception:
             configured = []
         return JSONResponse(
-            {"available": available, "backend": backend, "configured_providers": configured}
+            {
+                "available": available,
+                "backend": backend,
+                "configured_providers": configured,
+            }
         )
 
     @router.post("/session/token")

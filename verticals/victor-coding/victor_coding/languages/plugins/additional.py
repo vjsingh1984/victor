@@ -773,7 +773,11 @@ class CSharpPlugin(BaseLanguagePlugin):
                 return
 
             # Check for class/interface declarations
-            if node.type in ("class_declaration", "struct_declaration", "interface_declaration"):
+            if node.type in (
+                "class_declaration",
+                "struct_declaration",
+                "interface_declaration",
+            ):
                 class_name = None
                 for child in node.children:
                     if child.type == "identifier":
@@ -785,7 +789,9 @@ class CSharpPlugin(BaseLanguagePlugin):
                     if child.type == "declaration_list":
                         for grandchild in child.children:
                             traverse(
-                                grandchild, class_name or enclosing_function, namespace_context
+                                grandchild,
+                                class_name or enclosing_function,
+                                namespace_context,
                             )
                     else:
                         traverse(child, enclosing_function, namespace_context)
@@ -1359,7 +1365,11 @@ class PhpPlugin(BaseLanguagePlugin):
                 return
 
             # Check for class/interface/trait declarations
-            if node.type in ("class_declaration", "interface_declaration", "trait_declaration"):
+            if node.type in (
+                "class_declaration",
+                "interface_declaration",
+                "trait_declaration",
+            ):
                 class_name = None
                 for child in node.children:
                     if child.type == "name":
@@ -1371,7 +1381,9 @@ class PhpPlugin(BaseLanguagePlugin):
                     if child.type == "declaration_list":
                         for grandchild in child.children:
                             traverse(
-                                grandchild, class_name or enclosing_function, namespace_context
+                                grandchild,
+                                class_name or enclosing_function,
+                                namespace_context,
                             )
                     else:
                         traverse(child, enclosing_function, namespace_context)
@@ -3429,7 +3441,17 @@ class GlslPlugin(BaseLanguagePlugin):
             name="glsl",
             display_name="GLSL",
             aliases=["shader"],
-            extensions=[".glsl", ".vert", ".frag", ".vs", ".fs", ".gs", ".tcs", ".tes", ".comp"],
+            extensions=[
+                ".glsl",
+                ".vert",
+                ".frag",
+                ".vs",
+                ".fs",
+                ".gs",
+                ".tcs",
+                ".tes",
+                ".comp",
+            ],
             comment_style=CommentStyle.C_STYLE,
             line_comment="//",
             block_comment_start="/*",

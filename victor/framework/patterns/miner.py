@@ -334,15 +334,18 @@ class PatternMiner:
         Returns:
             True if hierarchical pattern detected
         """
-        # Check for manager/worker naming
-        has_manager = any(
-            "manager" in n.lower() or "coordinator" in n.lower() for n in trace.nodes_executed
+        # Check for supervisor/specialist naming, with legacy manager/worker
+        # trace labels accepted for historical executions.
+        has_supervisor = any(
+            "supervisor" in n.lower() or "manager" in n.lower() or "coordinator" in n.lower()
+            for n in trace.nodes_executed
         )
-        has_worker = any(
-            "worker" in n.lower() or "agent" in n.lower() for n in trace.nodes_executed
+        has_specialist = any(
+            "specialist" in n.lower() or "worker" in n.lower() or "agent" in n.lower()
+            for n in trace.nodes_executed
         )
 
-        return has_manager and has_worker
+        return has_supervisor and has_specialist
 
     def _extract_participants(self, traces: List[WorkflowExecutionTrace]) -> List[Dict[str, Any]]:
         """Extract participant specs from traces.
@@ -363,8 +366,12 @@ class PatternMiner:
         participants = []
         for node, count in all_nodes.items():
             role = "executor"
-            if "manager" in node.lower() or "coordinator" in node.lower():
-                role = "manager"
+            if (
+                "supervisor" in node.lower()
+                or "manager" in node.lower()
+                or "coordinator" in node.lower()
+            ):
+                role = "supervisor"
             elif "reviewer" in node.lower():
                 role = "reviewer"
             elif "planner" in node.lower():
@@ -402,8 +409,8 @@ class PatternMiner:
         # Build name parts
         parts = [category.value.title()]
 
-        if role_counts["manager"] > 0:
-            parts.append(f"{role_counts['manager']}M")
+        if role_counts["supervisor"] > 0:
+            parts.append(f"{role_counts['supervisor']}S")
         if role_counts["executor"] > 0:
             parts.append(f"{role_counts['executor']}E")
         if role_counts["reviewer"] > 0:

@@ -40,7 +40,7 @@ provides_capabilities = [
 ]
 
 [vertical.dependencies]
-python = ["chromadb>=0.4.0", "sentence-transformers>=2.2.0"]
+python = ["sentence-transformers>=2.2.0"]
 verticals = []
 
 [vertical.compatibility]

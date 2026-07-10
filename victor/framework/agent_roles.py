@@ -18,23 +18,23 @@ This module provides pre-defined roles for common team configurations.
 Each role defines capabilities, allowed tools, and system prompt sections.
 
 Roles:
-- ManagerRole: Coordinates team, delegates tasks, approves work
+- SupervisorRole: Coordinates team, delegates tasks, approves work
 - ResearcherRole: Analyzes codebase, searches for information
 - ExecutorRole: Implements changes, writes code, executes commands
 - ReviewerRole: Reviews work, provides feedback, approves changes
 
 Example:
-    from victor.framework.agent_roles import get_role, ManagerRole
+    from victor.framework.agent_roles import get_role, SupervisorRole
 
     # Get a role by name
     researcher = get_role("researcher")
 
     # Or instantiate directly
-    manager = ManagerRole()
+    supervisor = SupervisorRole()
 
     # Use in team coordination
-    if AgentCapability.DELEGATE in manager.capabilities:
-        # Manager can delegate tasks
+    if AgentCapability.DELEGATE in supervisor.capabilities:
+        # Supervisor can delegate tasks
         pass
 """
 
@@ -46,31 +46,31 @@ from typing import Dict, Optional, Set, Type
 from victor.framework.agent_protocols import AgentCapability, IAgentRole
 
 # =============================================================================
-# Manager Role
+# Supervisor Role
 # =============================================================================
 
 
 @dataclass
-class ManagerRole:
-    """Role for team managers who coordinate and delegate work.
+class SupervisorRole:
+    """Role for team supervisors who coordinate and delegate work.
 
-    Managers have the ability to delegate tasks to other team members,
+    Supervisors have the ability to delegate tasks to other team members,
     communicate with all agents, and approve completed work. They typically
     have limited direct file manipulation tools but strong coordination
     capabilities.
 
     Attributes:
-        name: Role identifier ('manager')
+        name: Role identifier ('supervisor')
         capabilities: Set of capabilities (DELEGATE, COMMUNICATE, APPROVE)
         allowed_tools: Tools this role can use
         tool_budget: Maximum tool calls (default 20)
 
     Example:
-        manager = ManagerRole()
-        assert AgentCapability.DELEGATE in manager.capabilities
+        supervisor = SupervisorRole()
+        assert AgentCapability.DELEGATE in supervisor.capabilities
     """
 
-    name: str = "manager"
+    name: str = "supervisor"
     capabilities: Set[AgentCapability] = field(
         default_factory=lambda: {
             AgentCapability.DELEGATE,
@@ -94,11 +94,11 @@ class ManagerRole:
         """Get the system prompt section for this role.
 
         Returns:
-            System prompt text describing the manager role.
+            System prompt text describing the supervisor role.
         """
-        return """## Role: Manager
+        return """## Role: Supervisor
 
-You are the team manager responsible for coordinating team activities.
+You are the team supervisor responsible for coordinating team activities.
 
 Your responsibilities:
 - Analyze tasks and break them down into subtasks
@@ -110,6 +110,13 @@ Your responsibilities:
 You should NOT directly write code or make changes. Instead, delegate
 implementation tasks to executor agents and research tasks to researcher agents.
 Focus on coordination, planning, and quality assurance."""
+
+
+@dataclass
+class ManagerRole(SupervisorRole):
+    """Compatibility alias for SupervisorRole."""
+
+    name: str = "manager"
 
 
 # =============================================================================
@@ -322,6 +329,7 @@ When you find issues, provide specific, actionable feedback."""
 
 # Map of role names to role classes
 ROLE_REGISTRY: Dict[str, Type[IAgentRole]] = {
+    "supervisor": SupervisorRole,
     "manager": ManagerRole,
     "researcher": ResearcherRole,
     "executor": ExecutorRole,
@@ -339,7 +347,7 @@ def get_role(name: str) -> Optional[IAgentRole]:
         Role instance if found, None otherwise
 
     Example:
-        manager = get_role("manager")
+        supervisor = get_role("supervisor")
         researcher = get_role("RESEARCHER")  # Case insensitive
     """
     name_lower = name.lower()
@@ -356,6 +364,7 @@ def get_role(name: str) -> Optional[IAgentRole]:
 
 __all__ = [
     # Role classes
+    "SupervisorRole",
     "ManagerRole",
     "ResearcherRole",
     "ExecutorRole",

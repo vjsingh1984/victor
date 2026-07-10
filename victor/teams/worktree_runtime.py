@@ -291,6 +291,7 @@ class WorktreeIsolationPlanner:
                         "member_index": index,
                         "formation": formation.value,
                         "is_manager": bool(getattr(member, "is_manager", False)),
+                        "is_supervisor": _is_supervisor_member(member),
                     },
                 )
             )
@@ -342,9 +343,14 @@ class WorktreeIsolationPlanner:
         member_id = _normalize_text(getattr(member, "id", None)) or f"member-{index + 1}"
         if member_id in explicit_merge_order:
             return explicit_merge_order.index(member_id)
-        if formation == TeamFormation.HIERARCHICAL and bool(getattr(member, "is_manager", False)):
+        if formation == TeamFormation.HIERARCHICAL and _is_supervisor_member(member):
             return len(explicit_merge_order) + 1000
         return len(explicit_merge_order) + index
+
+
+def _is_supervisor_member(member: Any) -> bool:
+    """Return whether a member coordinates a hierarchical team."""
+    return bool(getattr(member, "is_supervisor", False) or getattr(member, "is_manager", False))
 
 
 class GitWorktreeRuntime:

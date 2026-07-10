@@ -52,6 +52,7 @@ Example:
         template=template,
         members=[
             TeamMember(persona=researcher, role_in_team="lead_researcher", is_leader=True),
+            # New code can use agent_category=TeamAgentCategory.SUPERVISOR instead.
         ],
     )
 """
@@ -65,7 +66,10 @@ from victor.framework.multi_agent.personas import (
 from victor.framework.multi_agent.persona_provider import FrameworkPersonaProvider
 from victor.framework.multi_agent.teams import (
     TaskAssignmentStrategy,
+    TeamAgentCategory,
+    TeamFormation,
     TeamMember,
+    TeamMemberSpec,
     TeamSpec,
     TeamTemplate,
     TeamTopology,
@@ -80,7 +84,10 @@ __all__ = [
     "FrameworkPersonaProvider",
     # Teams
     "TaskAssignmentStrategy",
+    "TeamAgentCategory",
+    "TeamFormation",
     "TeamMember",
+    "TeamMemberSpec",
     "TeamSpec",
     "TeamTemplate",
     "TeamTopology",

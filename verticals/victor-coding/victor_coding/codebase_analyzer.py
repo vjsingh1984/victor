@@ -150,7 +150,12 @@ class CodebaseAnalyzer:
         "manager": ["Manager", "Orchestrator", "Controller", "Coordinator", "Director"],
         "model": ["Model", "Schema", "Entity", "Record", "DTO", "ViewModel"],
         "config": ["Config", "Settings", "Options", "Preferences", "Environment"],
-        "base": ["Base", "Abstract", "Interface", "I[A-Z]"],  # IService, IRepository etc.
+        "base": [
+            "Base",
+            "Abstract",
+            "Interface",
+            "I[A-Z]",
+        ],  # IService, IRepository etc.
         "registry": ["Registry", "Repository", "Store", "Cache", "Factory"],
         "service": ["Service", "Worker", "Processor", "UseCase", "Interactor"],
         "component": ["Component", "Widget", "View", "Screen", "Page"],
@@ -688,7 +693,10 @@ class CodebaseAnalyzer:
     def _find_config_files(self) -> None:
         """Find important configuration files."""
         config_patterns = [
-            ("pyproject.toml", "Project configuration, dependencies, and build settings"),
+            (
+                "pyproject.toml",
+                "Project configuration, dependencies, and build settings",
+            ),
             ("setup.py", "Legacy Python package setup"),
             ("setup.cfg", "Package configuration"),
             (".env.example", "Environment variable template"),
@@ -734,7 +742,9 @@ class CodebaseAnalyzer:
 
                 # Parse [project.optional-dependencies]
                 opt_deps_match = re.search(
-                    r"\[project\.optional-dependencies\](.*?)(?=\[|\Z)", content, re.DOTALL
+                    r"\[project\.optional-dependencies\](.*?)(?=\[|\Z)",
+                    content,
+                    re.DOTALL,
                 )
                 if opt_deps_match:
                     opt_section = opt_deps_match.group(1)
@@ -1767,7 +1777,9 @@ async def generate_victor_md_with_llm(
         )
 
 
-def _collect_embedding_status(root_path: Optional[str] = None) -> Optional[Dict[str, Any]]:
+def _collect_embedding_status(
+    root_path: Optional[str] = None,
+) -> Optional[Dict[str, Any]]:
     """Summarize embedding/cache health for init.md enrichment."""
     root = Path(root_path).resolve() if root_path else Path.cwd()
     try:
@@ -2435,7 +2447,11 @@ async def generate_victor_md_from_graph(
     root = Path(root_path).resolve() if root_path else Path.cwd()
     graph_db_path = root / ".victor" / "project.db"
 
-    stats: Dict[str, Any] = {"files_by_language": {}, "total_symbols": 0, "total_files": 0}
+    stats: Dict[str, Any] = {
+        "files_by_language": {},
+        "total_symbols": 0,
+        "total_files": 0,
+    }
     key_components: List[Any] = []
 
     if graph_db_path.exists():
@@ -2470,7 +2486,16 @@ async def generate_victor_md_from_graph(
                 LIMIT 25
             """).fetchall()
 
-            for name, sym_type, file_path, line, lang, signature, docstring, _degree in rows:
+            for (
+                name,
+                sym_type,
+                file_path,
+                line,
+                lang,
+                signature,
+                docstring,
+                _degree,
+            ) in rows:
                 if not name or not file_path:
                     continue
                 try:
@@ -2528,7 +2553,9 @@ async def generate_victor_md_from_graph(
     )
 
 
-async def extract_conversation_insights(root_path: Optional[str] = None) -> Dict[str, Any]:
+async def extract_conversation_insights(
+    root_path: Optional[str] = None,
+) -> Dict[str, Any]:
     """Extract insights from conversation history to enhance init.md.
 
     Analyzes stored conversations to identify:
@@ -2980,7 +3007,12 @@ async def extract_graph_insights(root_path: Optional[str] = None) -> Dict[str, A
 
                 # Sort by weighted in-degree (approximation of module importance)
                 module_importance = [
-                    (mod, module_weighted_in[mod], module_in_degree[mod], module_out_degree[mod])
+                    (
+                        mod,
+                        module_weighted_in[mod],
+                        module_in_degree[mod],
+                        module_out_degree[mod],
+                    )
                     for mod in all_modules
                 ]
                 module_importance.sort(key=lambda x: x[1], reverse=True)
@@ -3425,11 +3457,15 @@ async def generate_enhanced_init_md(
         # Graph data still missing after potential auto-indexing attempt
         if auto_index:
             progress(
-                "graph", "Graph indexing incomplete (retry with 'victor index')", complete=True
+                "graph",
+                "Graph indexing incomplete (retry with 'victor index')",
+                complete=True,
             )
         else:
             progress(
-                "graph", "No graph data (run 'victor index' or enable auto_index)", complete=True
+                "graph",
+                "No graph data (run 'victor index' or enable auto_index)",
+                complete=True,
             )
 
     # Step 3: Deep - Use Agent framework to synthesize init.md (full observability)

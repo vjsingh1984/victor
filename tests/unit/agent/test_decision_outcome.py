@@ -65,9 +65,21 @@ class TestRecordSessionOutcome:
             log,
             {
                 "S1": [
-                    {"decision_id": "d1", "type": "task_completion", "input": {"m": "a"}},
-                    {"decision_id": "d2", "type": "task_completion", "input": {"m": "b"}},
-                    {"decision_id": "d3", "type": "stage_detection", "input": {"m": "c"}},
+                    {
+                        "decision_id": "d1",
+                        "type": "task_completion",
+                        "input": {"m": "a"},
+                    },
+                    {
+                        "decision_id": "d2",
+                        "type": "task_completion",
+                        "input": {"m": "b"},
+                    },
+                    {
+                        "decision_id": "d3",
+                        "type": "stage_detection",
+                        "input": {"m": "c"},
+                    },
                 ]
             },
         )
@@ -143,12 +155,28 @@ class TestLoadOutcomeSamples:
             log,
             {
                 "SP": [
-                    {"decision_id": "p1", "type": "task_completion", "input": {"m": "pass1"}},
-                    {"decision_id": "p2", "type": "task_completion", "input": {"m": "pass2"}},
+                    {
+                        "decision_id": "p1",
+                        "type": "task_completion",
+                        "input": {"m": "pass1"},
+                    },
+                    {
+                        "decision_id": "p2",
+                        "type": "task_completion",
+                        "input": {"m": "pass2"},
+                    },
                 ],
                 "SF": [
-                    {"decision_id": "f1", "type": "task_completion", "input": {"m": "fail1"}},
-                    {"decision_id": "f2", "type": "stage_detection", "input": {"m": "fail2"}},
+                    {
+                        "decision_id": "f1",
+                        "type": "task_completion",
+                        "input": {"m": "fail1"},
+                    },
+                    {
+                        "decision_id": "f2",
+                        "type": "stage_detection",
+                        "input": {"m": "fail2"},
+                    },
                 ],
             },
         )
@@ -188,3 +216,88 @@ class TestLoadOutcomeSamples:
         assert ot_mod._reward_label(0.5) == "partial"
         assert ot_mod._reward_label(0.0) == "fail"
         assert ot_mod._reward_label(0.99) == "partial"
+
+
+class TestDeltaWriteFromOutcome:
+    """FEP-0012 Phase 6 / acceptance #3: a resolved session grows the project delta."""
+
+    def test_outcome_recording_writes_project_delta(self, isolated_db_and_log, monkeypatch):
+        import numpy as np
+
+        from victor.agent.decisions import local_delta as ld
+        from victor.core.database import get_project_database
+
+        _, log = isolated_db_and_log
+        _write_decisions(
+            log,
+            {
+                "S1": [
+                    {
+                        "decision_id": "d1",
+                        "type": "task_completion",
+                        "input": {"m": "all done"},
+                    }
+                ]
+            },
+        )
+        # Deterministic, artifact-independent predict path.
+        labels = ["fail", "partial", "pass"]
+        monkeypatch.setattr(
+            ld,
+            "_get_default_predict",
+            lambda: (
+                (lambda dtype, feats: np.array([0.6, 0.3, 0.1])),
+                {"task_completion": labels},
+            ),
+        )
+        ld.clear_delta_for_tests()
+
+        n = record_session_outcome("S1", success=True, quality_score=1.0)
+        assert n == 1  # one outcome row
+
+        # The project delta grew (FEP #3) — local-only, in the project DB.
+        rows = (
+            get_project_database()
+            .execute(f"SELECT decision_type, label FROM {Tables.LOCAL_CLASSIFIER_DELTA}")
+            .fetchall()
+        )
+        assert rows, "expected local_classifier_delta rows after a resolved session"
+        assert any(r[0] == "task_completion" for r in rows)
+        # Observed pass -> a positive pass nudge exists.
+        delta = ld.load_delta("task_completion", labels)
+        assert any(vec[labels.index("pass")] > 0 for vec in delta.values())
+
+    def test_outcome_recording_no_delta_when_disabled(self, isolated_db_and_log, monkeypatch):
+        from victor.agent.decisions import local_delta as ld
+        from victor.core.database import get_project_database
+
+        _, log = isolated_db_and_log
+        _write_decisions(
+            log,
+            {
+                "S1": [
+                    {
+                        "decision_id": "d1",
+                        "type": "task_completion",
+                        "input": {"m": "x"},
+                    }
+                ]
+            },
+        )
+
+        class _Disabled:
+            local_learning_enabled = False
+            local_learning_lr = 0.1
+            local_learning_top_k = 2000
+            local_learning_decay = 0.995
+
+        monkeypatch.setattr("victor.config.decision_settings.DecisionServiceSettings", _Disabled)
+        ld.clear_delta_for_tests()
+
+        record_session_outcome("S1", success=True, quality_score=1.0)
+        rows = (
+            get_project_database()
+            .execute(f"SELECT COUNT(*) FROM {Tables.LOCAL_CLASSIFIER_DELTA}")
+            .fetchone()
+        )
+        assert rows[0] == 0

@@ -72,14 +72,23 @@ config = TeamConfig(
 
 ### Hierarchical
 
-A manager agent delegates to workers, then synthesizes results.
+A supervisor agent delegates to specialists, then synthesizes results.
 
 ```python
+from victor.teams import TeamAgentCategory
+
 config = TeamConfig(
     name="complex_feature",
     formation=TeamFormation.HIERARCHICAL,
     members=[
-        TeamMember(id="manager", role="Tech Lead", is_manager=True, ...),
+        TeamMember(
+            id="supervisor",
+            role="planner",
+            name="Tech Lead",
+            goal="Plan work, delegate to specialists, and synthesize results",
+            agent_category=TeamAgentCategory.SUPERVISOR,
+            ...
+        ),
         TeamMember(id="dev1", role="Backend Developer", ...),
         TeamMember(id="dev2", role="Frontend Developer", ...),
     ],
@@ -157,7 +166,7 @@ security_expert = PersonaTraits(
 Create team members with rich context:
 
 ```python
-from victor.teams import TeamMember, MemoryConfig
+from victor.teams import TeamAgentCategory, TeamMember, MemoryConfig
 
 researcher = TeamMember(
     id="researcher",
@@ -180,6 +189,41 @@ researcher = TeamMember(
 )
 ```
 
+### Roles vs Categories
+
+Victor separates what a member does from how it coordinates:
+
+| Concept | Purpose | Examples |
+|---------|---------|----------|
+| `role` | Domain work a member performs | `researcher`, `planner`, `executor`, `reviewer` |
+| `agent_category` | Coordination responsibility | `specialist`, `supervisor` |
+| `formation` | Team execution pattern | `sequential`, `parallel`, `hierarchical`, `pipeline`, `consensus`, `reflection` |
+
+Use `agent_category=TeamAgentCategory.SUPERVISOR` for the single coordinating member in a hierarchical team. The older `is_manager=True` flag remains a compatibility alias, but new code should use `agent_category` because it makes the supervisor contract explicit.
+
+```python
+lead = TeamMember(
+    id="lead",
+    role="planner",
+    name="Technical Lead",
+    goal="Decompose work, delegate to specialists, and synthesize results",
+    agent_category=TeamAgentCategory.SUPERVISOR,
+)
+```
+
+### Runtime Model
+
+Victor uses one execution path for teams:
+
+| Layer | Responsibility |
+|-------|----------------|
+| `TeamMember` / `TeamMemberSpec` | Declarative member configuration |
+| `TeamParticipant` | Runtime executable participant used by formations |
+| `UnifiedTeamCoordinator` | Selects members, prepares context, invokes a formation |
+| Formation strategy | Defines execution topology and result ordering |
+
+This keeps the supervisor concept native to the team model instead of hidden in coordinator-local adapters. Formation strategies execute `TeamParticipant` objects directly and receive normalized `MemberResult` values.
+
 ### Member Properties
 
 | Property | Description | Default |
@@ -190,6 +234,7 @@ researcher = TeamMember(
 | `tool_budget` | Max tool calls | 20 |
 | `persona` | PersonaTraits | None |
 | `backstory` | Context/history | None |
+| `agent_category` | Coordination category | `specialist` |
 | `memory` | Memory config | Disabled |
 | `can_delegate` | Allow delegation | False |
 
@@ -227,7 +272,7 @@ from victor_coding.teams import CODE_REVIEW_TEAM
 ```python
 from victor_coding.teams import REFACTORING_TEAM
 
-# Hierarchical: Manager → Executors → Quality Verifier
+# Hierarchical: Supervisor → Executors → Quality Verifier
 ```
 
 ## Inter-Agent Communication

@@ -646,6 +646,7 @@ class TeamMemberDefinition:
     name: Optional[str] = None
     tool_budget: Optional[int] = None
     allowed_tools: List[str] = field(default_factory=list)
+    agent_category: str = "specialist"
     is_manager: bool = False
     priority: int = 0
     backstory: str = ""
@@ -663,6 +664,16 @@ class TeamMemberDefinition:
         """Normalize mutable fields for direct dataclass construction."""
 
         object.__setattr__(self, "allowed_tools", list(self.allowed_tools))
+        agent_category = str(self.agent_category or "").strip().lower()
+        if self.is_manager:
+            agent_category = "supervisor"
+        if agent_category not in {"specialist", "supervisor"}:
+            agent_category = "specialist"
+        object.__setattr__(self, "agent_category", agent_category)
+        if agent_category == "supervisor":
+            object.__setattr__(self, "is_manager", True)
+            if self.max_delegation_depth < 1:
+                object.__setattr__(self, "max_delegation_depth", 1)
         object.__setattr__(self, "expertise", list(self.expertise))
         object.__setattr__(self, "memory_config", dict(self.memory_config))
         object.__setattr__(self, "metadata", dict(self.metadata))
@@ -673,6 +684,7 @@ class TeamMemberDefinition:
         payload: Dict[str, Any] = {
             "role": self.role,
             "goal": self.goal,
+            "agent_category": self.agent_category,
             "is_manager": self.is_manager,
             "priority": self.priority,
             "backstory": self.backstory,
@@ -714,6 +726,12 @@ def normalize_team_member_definition(
             name=member.get("name"),
             tool_budget=member.get("tool_budget"),
             allowed_tools=list(member.get("allowed_tools", [])),
+            agent_category=str(
+                member.get(
+                    "agent_category",
+                    "supervisor" if member.get("is_manager", False) else "specialist",
+                )
+            ),
             is_manager=bool(member.get("is_manager", False)),
             priority=int(member.get("priority", 0)),
             backstory=member.get("backstory", ""),

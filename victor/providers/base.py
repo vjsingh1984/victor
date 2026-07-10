@@ -29,8 +29,6 @@ from typing import (
     Dict,
     List,
     Optional,
-    Protocol,
-    runtime_checkable,
 )
 
 logger = logging.getLogger(__name__)
@@ -45,189 +43,14 @@ from victor.providers.circuit_breaker import (
 from victor.providers.runtime_capabilities import ProviderRuntimeCapabilities
 
 # -----------------------------------------------------------------------------
-# Protocol classes for Interface Segregation (ISP)
-# These allow providers to optionally implement specific capabilities without
-# requiring all providers to implement methods they don't support.
+# Provider capabilities are a single surface: the ``supports_*()`` methods on
+# BaseProvider. They default to False (Interface Segregation — providers only
+# override what they support) and are answerable on every provider (Liskov), so
+# callers query capabilities with a plain ``provider.supports_x()`` call. This
+# is strictly more expressive than boolean Protocol conformance — e.g.
+# ``supports_reasoning_effort(model)`` is per-model — so no parallel Protocol /
+# ``is_*_provider`` helper layer is kept.
 # -----------------------------------------------------------------------------
-
-
-@runtime_checkable
-class StreamingProvider(Protocol):
-    """Protocol for providers that support streaming responses.
-
-    Providers implementing this protocol can stream chat completions
-    incrementally rather than returning the full response at once.
-
-    Example:
-        class MyProvider(BaseProvider):
-            def supports_streaming(self) -> bool:
-                return True
-
-            async def stream(self, messages, **kwargs) -> AsyncIterator[StreamChunk]:
-                # Implementation here
-                ...
-
-    Type checking:
-        if isinstance(provider, StreamingProvider):
-            async for chunk in provider.stream(messages, model=model):
-                print(chunk.content)
-    """
-
-    def supports_streaming(self) -> bool:
-        """Whether the provider supports streaming responses.
-
-        Returns:
-            True if provider supports streaming, False otherwise
-        """
-        ...
-
-    async def stream(
-        self,
-        messages: List["Message"],
-        *,
-        model: str,
-        temperature: float = 0.7,
-        max_tokens: int = 4096,
-        tools: Optional[List["ToolDefinition"]] = None,
-        **kwargs: Any,
-    ) -> AsyncIterator["StreamChunk"]:
-        """Stream a chat completion response.
-
-        Args:
-            messages: List of conversation messages
-            model: Model identifier
-            temperature: Sampling temperature (0-2)
-            max_tokens: Maximum tokens to generate
-            tools: Available tools for the model to use
-            **kwargs: Additional provider-specific parameters
-
-        Yields:
-            StreamChunk objects with incremental content
-        """
-        ...
-
-
-@runtime_checkable
-class VisionProvider(Protocol):
-    """Protocol for providers that support multimodal (image) input.
-
-    Providers implementing this protocol can receive messages with
-    `images` populated and include image content in API requests.
-
-    Type checking:
-        if is_vision_provider(provider):
-            msg = Message(role="user", content="What's in this image?", images=[data_uri])
-            response = await provider.chat([msg], model=model)
-    """
-
-    def supports_vision(self) -> bool:
-        """Whether the provider supports image input in messages."""
-        ...
-
-
-@runtime_checkable
-class ToolCallingProvider(Protocol):
-    """Protocol for providers that support tool/function calling.
-
-    Providers implementing this protocol can receive tool definitions
-    and return structured tool calls in their responses.
-
-    Example:
-        class MyProvider(BaseProvider):
-            def supports_tools(self) -> bool:
-                return True
-
-            async def chat(self, messages, *, model, tools=None, **kwargs):
-                # Handle tools in implementation
-                ...
-
-    Type checking:
-        if isinstance(provider, ToolCallingProvider):
-            response = await provider.chat(
-                messages, model=model, tools=my_tools
-            )
-            if response.tool_calls:
-                # Process tool calls
-                ...
-    """
-
-    def supports_tools(self) -> bool:
-        """Whether the provider supports tool/function calling.
-
-        Returns:
-            True if provider supports tools, False otherwise
-        """
-        ...
-
-
-# Helper functions for type checking
-def is_vision_provider(provider: Any) -> bool:
-    """Check if a provider supports multimodal (image) input."""
-    if hasattr(provider, "supports_vision"):
-        return provider.supports_vision()
-    return False
-
-
-def is_streaming_provider(provider: Any) -> bool:
-    """Check if a provider supports streaming.
-
-    This is a convenience function that checks both protocol implementation
-    and the supports_streaming() method result.
-
-    Args:
-        provider: Provider instance to check
-
-    Returns:
-        True if provider supports streaming responses
-    """
-    if hasattr(provider, "supports_streaming"):
-        return provider.supports_streaming()
-    return False
-
-
-def is_tool_calling_provider(provider: Any) -> bool:
-    """Check if a provider supports tool calling.
-
-    This is a convenience function that checks both protocol implementation
-    and the supports_tools() method result.
-
-    Args:
-        provider: Provider instance to check
-
-    Returns:
-        True if provider supports tool/function calling
-    """
-    if hasattr(provider, "supports_tools"):
-        return provider.supports_tools()
-    return False
-
-
-def is_caching_provider(provider: Any) -> bool:
-    """Check if a provider supports API-level prompt caching (billing discounts).
-
-    Args:
-        provider: Provider instance to check
-
-    Returns:
-        True if provider offers cached token billing discounts
-    """
-    if hasattr(provider, "supports_prompt_caching"):
-        return provider.supports_prompt_caching()
-    return False
-
-
-def has_kv_prefix_caching(provider: Any) -> bool:
-    """Check if a provider benefits from stable prompt prefixes (KV cache reuse).
-
-    Args:
-        provider: Provider instance to check
-
-    Returns:
-        True if provider reuses KV cache for matching prefixes
-    """
-    if hasattr(provider, "supports_kv_prefix_caching"):
-        return provider.supports_kv_prefix_caching()
-    return False
 
 
 class Message(BaseModel):
@@ -420,8 +243,6 @@ class BaseProvider(ABC):
         Segregation Principle - providers don't need to implement tool calling
         if they don't support it.
 
-        See also: ToolCallingProvider protocol for type checking.
-
         Returns:
             True if provider supports tools, False otherwise (default)
         """
@@ -435,10 +256,23 @@ class BaseProvider(ABC):
         Segregation Principle - providers don't need to implement streaming
         if they don't support it.
 
-        See also: StreamingProvider protocol for type checking.
-
         Returns:
             True if provider supports streaming, False otherwise (default)
+        """
+        return False
+
+    def supports_vision(self) -> bool:
+        """Check if provider supports multimodal (image) input.
+
+        Default implementation returns False. Providers that accept messages
+        with ``images`` populated should override this to return True. This
+        follows the Interface Segregation Principle - providers don't need to
+        implement vision if they don't support it - and completes the base
+        capability contract so ``provider.supports_vision()`` is answerable on
+        every provider (Liskov), matching supports_tools/supports_streaming.
+
+        Returns:
+            True if provider supports image input, False otherwise (default)
         """
         return False
 

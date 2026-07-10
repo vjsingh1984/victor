@@ -16,7 +16,10 @@
 
 from victor_contracts.multi_agent import (
     TaskAssignmentStrategy,
+    TeamAgentCategory,
+    TeamFormation,
     TeamMember,
+    TeamMemberSpec,
     TeamSpec,
     TeamTemplate,
     TeamTopology,
@@ -24,7 +27,10 @@ from victor_contracts.multi_agent import (
 
 __all__ = [
     "TaskAssignmentStrategy",
+    "TeamAgentCategory",
+    "TeamFormation",
     "TeamMember",
+    "TeamMemberSpec",
     "TeamSpec",
     "TeamTemplate",
     "TeamTopology",

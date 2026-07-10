@@ -518,8 +518,18 @@ class TestEscapeHatches:
 
         ctx = {
             "validated_sources": [
-                {"title": "Paper A", "authors": ["Smith"], "year": "2024", "url": "https://a.com"},
-                {"title": "Paper B", "authors": ["Jones"], "year": "2023", "url": "https://b.com"},
+                {
+                    "title": "Paper A",
+                    "authors": ["Smith"],
+                    "year": "2024",
+                    "url": "https://a.com",
+                },
+                {
+                    "title": "Paper B",
+                    "authors": ["Jones"],
+                    "year": "2023",
+                    "url": "https://b.com",
+                },
             ],
             "citation_style": "apa",
         }

@@ -51,3 +51,13 @@ From `../arxive/agentic_runtime_roadmap_2026-04-27.md` (standing P0s), reconcile
 Perception + calibrated-confidence fusion, the PPAED loop (FEP-0007 unified), GEPA / MIPROv2 / CoT
 distillation, FulfillmentDetector, semantic response cache, paradigm routing, tool-loop/spin
 detection, offline `AgenticExecutionTrace`.
+
+**Meta-deliberation narration guard.** `_is_intent_only_response` (in both
+`victor/framework/agentic_loop.py` and `victor/framework/enhanced_completion_evaluation.py`)
+now performs a full-response density check in addition to the legacy first-line prefix
+check. When a response carries no payload (no fenced code block, no markdown table) and
+contains 3+ distinct imminent-action markers ("Executing now", "Going now", "Calling now",
+"Making the call", "no more deliberation"), it is classified as intent-only narration rather
+than a substantial answer. This prevents the failure mode where the model narrates imminent
+action without ever invoking a tool, which previously exited the loop before any tool ran.
+Real answers carrying a code block or result table are never flagged.

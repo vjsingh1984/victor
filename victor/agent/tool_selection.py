@@ -2180,7 +2180,11 @@ class ToolSelector(ModeAwareMixin):
                 continue
             src = registered[name]
             result.append(
-                _TD(name=src.name, description=src.description, parameters=src.parameters)
+                _TD(
+                    name=src.name,
+                    description=src.description,
+                    parameters=src.parameters,
+                )
             )
             have.add(name)
         return result

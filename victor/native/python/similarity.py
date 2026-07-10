@@ -138,7 +138,7 @@ class PythonSimilarityComputer(InstrumentedAccelerator):
                 return []
 
             scores = self.batch_cosine(query, corpus)
-            indexed = [(i, score) for i, score in enumerate(scores)]
+            indexed = list(enumerate(scores))
             indexed.sort(key=lambda x: x[1], reverse=True)
             return indexed[:k]
 
