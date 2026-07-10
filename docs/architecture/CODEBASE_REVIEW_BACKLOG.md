@@ -111,7 +111,7 @@ can be resumed across sessions without re-deriving context.
 - **Effort**: Medium. **Impact**: Medium.
 
 ### F-012 · Validation/metrics types fragmented into divergent same-name variants — `MH`
-- **Status**: FEP DRAFTED — [FEP-0014](../../feps/fep-0014-canonical-validation-metrics-contracts.md) proposes the consolidation (PR #452). Awaiting review; implementation gated on acceptance.
+- **Status**: FEP ACCEPTED — [FEP-0014](../../feps/fep-0014-canonical-validation-metrics-contracts.md) accepted 2026-07-09 (PR #452). Implementation in progress, Phase 1 first (canonical types + `MetricsCollectorProtocol` + guard).
 - **Evidence (verified 2026-07)**:
   - `ValidationSeverity` × **4**: `config/validation.py:26`, `core/validation.py:82`, `framework/middleware.py:89`, `framework/capabilities/validation.py:53`. Three are `{ERROR,WARNING,INFO}`; **`framework/middleware.py:89` uniquely adds `CRITICAL`** → a severity comparison silently means different things by layer.
   - `ValidationResult` × **5** with incompatible fields: `tools/tool_call_validator.py:17`, `config/connection_validation.py:54`, `workflows/protocols.py:759` (nested), `framework/requirement_validator.py:88`, `framework/capabilities/validation.py:62`.
@@ -149,7 +149,7 @@ can be resumed across sessions without re-deriving context.
 - **Effort**: Medium (triage). **Impact**: Medium.
 
 ### F-013 · `framework/step_handlers.py` exports internal-only symbols — FEP-gated — `ML`
-- **Status**: FEP DRAFTED — [FEP-0015](../../feps/fep-0015-trim-internal-framework-exports.md) proposes unexporting both symbols with a deprecation shim (PR #452). Awaiting review; implementation gated on acceptance.
+- **Status**: FEP ACCEPTED — [FEP-0015](../../feps/fep-0015-trim-internal-framework-exports.md) accepted 2026-07-09 (PR #452). Implementation in progress, Phase 1 (unexport + `_ExtensionHandler` rename + deprecation shim + guard).
 - **Evidence (verified 2026-07)**:
   - `victor/framework/step_handlers.py:2629` `__all__` includes `CapabilityConfigStepHandler` (class L968) and `ExtensionHandler` (class L2047), but **neither is imported anywhere outside this module**.
   - `ExtensionHandler` is heavily used *internally* (instantiated L2346–2361), so it is **not dead** — only its `__all__` export is unused.

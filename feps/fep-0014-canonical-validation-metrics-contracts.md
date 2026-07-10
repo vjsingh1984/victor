@@ -2,7 +2,7 @@
 fep: "0014"
 title: "Canonical validation and metrics contracts (deduplicate ValidationSeverity / ValidationResult / MetricsCollector)"
 type: Standards Track
-status: Draft
+status: Accepted
 created: 2026-07-09
 modified: 2026-07-09
 authors:
@@ -325,7 +325,10 @@ if result.is_valid and not result.issues: ...
 - [ ] Migration path clear for external verticals
 
 ### Decisions
-- **Recommendation**: [Pending]
+- **Recommendation**: Accept
+- **Decision date**: 2026-07-09
+- **Approved by**: Vijaykumar Singh (repo owner)
+- **Rationale**: The `CRITICAL`-only `ValidationSeverity` divergence and five incompatible `ValidationResult` shapes are a live cross-layer correctness hazard; the phased, shim-backed, guard-enforced plan removes it without behavior change. Implementation proceeds Phase 1 first (canonical types + protocol + guard).
 
 ## Acceptance Criteria
 

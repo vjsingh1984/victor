@@ -2,7 +2,7 @@
 fep: "0015"
 title: "Trim internal-only symbols from the framework public API (step_handlers exports)"
 type: Standards Track
-status: Draft
+status: Accepted
 created: 2026-07-09
 modified: 2026-07-09
 authors:
@@ -242,7 +242,10 @@ from victor.framework.step_handlers import ExtensionHandler
 - [ ] Deprecation messaging clear
 
 ### Decisions
-- **Recommendation**: [Pending]
+- **Recommendation**: Accept
+- **Decision date**: 2026-07-09
+- **Approved by**: Vijaykumar Singh (repo owner)
+- **Rationale**: Exporting two internal-only symbols inflates the framework public contract with zero consumers; unexporting behind a one-release deprecation shim is low-risk and correct. Implementation proceeds Phase 1 (unexport + `_ExtensionHandler` rename + shim + guard).
 
 ## Acceptance Criteria
 
