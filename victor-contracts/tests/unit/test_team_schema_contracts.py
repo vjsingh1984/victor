@@ -4,6 +4,7 @@ import pytest
 
 from victor_contracts.team_schema import (
     RoleConfig,
+    TeamAgentCategory,
     TeamFormation,
     TeamMemberSpec,
     TeamSpec,
@@ -45,6 +46,44 @@ def test_team_spec_round_trips_from_dict() -> None:
     assert restored.formation is TeamFormation.PIPELINE
     assert restored.members[0].allowed_tools == ["read", "git"]
     assert restored.task_types == ["code_review"]
+
+
+def test_team_member_spec_uses_supervisor_category_as_manager_contract() -> None:
+    member = TeamMemberSpec(
+        role="planner",
+        goal="Coordinate specialist agents",
+        agent_category=TeamAgentCategory.SUPERVISOR,
+    )
+
+    assert member.is_supervisor is True
+    assert member.is_manager is True
+    assert member.can_delegate is True
+    assert member.max_delegation_depth == 1
+
+
+def test_team_member_spec_reads_legacy_agent_class_alias() -> None:
+    restored = TeamSpec.from_dict(
+        {
+            "name": "Legacy Team",
+            "description": "Uses the old field name",
+            "vertical": "coding",
+            "formation": "hierarchical",
+            "members": [
+                {
+                    "role": "planner",
+                    "goal": "Coordinate",
+                    "agent_class": "supervisor",
+                },
+                {
+                    "role": "executor",
+                    "goal": "Execute",
+                },
+            ],
+        }
+    )
+
+    assert restored.members[0].agent_category is TeamAgentCategory.SUPERVISOR
+    assert restored.members[0].is_supervisor is True
 
 
 def test_team_member_spec_bridges_to_runtime_member() -> None:

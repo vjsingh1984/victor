@@ -234,11 +234,20 @@ def _make_manifest(tmp_path, monkeypatch, *, run_id="r1"):
         log,
         {
             "SP": [
-                {"type": "task_completion", "input": {"msg": "all tests pass verified"}},
-                {"type": "task_completion", "input": {"msg": "fix complete and checked"}},
+                {
+                    "type": "task_completion",
+                    "input": {"msg": "all tests pass verified"},
+                },
+                {
+                    "type": "task_completion",
+                    "input": {"msg": "fix complete and checked"},
+                },
             ],
             "SF": [
-                {"type": "task_completion", "input": {"msg": "I think this is probably fixed"}},
+                {
+                    "type": "task_completion",
+                    "input": {"msg": "I think this is probably fixed"},
+                },
                 {"type": "task_completion", "input": {"msg": "looks good maybe"}},
                 {"type": "stage_detection", "input": {"msg": "execution"}},
             ],

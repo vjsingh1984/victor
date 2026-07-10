@@ -764,6 +764,8 @@ class Settings(BaseSettings):
             "tool_cache_allowlist": "tools.tool_cache_allowlist",
             "tool_cache_dir": "tools.tool_cache_dir",
             "generic_result_cache_enabled": "tools.generic_result_cache_enabled",
+            "tool_budget_calibration_enabled": "tools.tool_budget_calibration_enabled",
+            "tool_budget_calibration_min_confidence": "tools.tool_budget_calibration_min_confidence",
             "generic_result_cache_ttl": "tools.generic_result_cache_ttl",
             "tool_selection_cache_enabled": "tools.tool_selection_cache_enabled",
             "tool_selection_cache_ttl": "tools.tool_selection_cache_ttl",

@@ -39,7 +39,11 @@ class ChunkConfig:
     def __post_init__(self) -> None:
         self.max_chunk_chars = max(1, int(self.max_chunk_tokens * self.chars_per_token))
         self.chunk_overlap_chars = max(
-            0, min(int(self.chunk_overlap_tokens * self.chars_per_token), self.max_chunk_chars - 1)
+            0,
+            min(
+                int(self.chunk_overlap_tokens * self.chars_per_token),
+                self.max_chunk_chars - 1,
+            ),
         )
 
     def estimate_tokens(self, text: str) -> int:

@@ -143,7 +143,12 @@ def __getattr__(name: str) -> Any:
 DEVOPS_COMPOSED_PATTERNS: Dict[str, Dict[str, any]] = {
     "dockerfile_pipeline": {
         "description": "Create and validate Dockerfile",
-        "sequence": [ToolNames.READ, ToolNames.WRITE, ToolNames.DOCKER, ToolNames.SHELL],
+        "sequence": [
+            ToolNames.READ,
+            ToolNames.WRITE,
+            ToolNames.DOCKER,
+            ToolNames.SHELL,
+        ],
         "inputs": {"application_type", "base_image"},
         "outputs": {"dockerfile_path", "image_id"},
         "weight": 0.9,

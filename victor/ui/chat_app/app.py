@@ -155,7 +155,11 @@ async def _send_settings(client: VictorClient) -> None:
             ),
             Select(id="profile", label="Profile", values=profiles, initial=profiles[0]),
             TextInput(id="model", label="Model (override)", initial=client.model or ""),
-            Switch(id="tool_approval", label="Require approval for risky tools", initial=True),
+            Switch(
+                id="tool_approval",
+                label="Require approval for risky tools",
+                initial=True,
+            ),
         ]
     ).send()
 

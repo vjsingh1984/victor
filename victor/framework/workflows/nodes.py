@@ -96,7 +96,7 @@ from victor.framework.state_merging import (
     create_merge_strategy,
 )
 from victor.core.async_utils import run_sync
-from victor.teams.types import TeamConfig, TeamFormation, TeamMember
+from victor.teams.types import TeamAgentCategory, TeamConfig, TeamFormation, TeamMember
 
 if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
@@ -596,6 +596,12 @@ class TeamStep:
                 goal=member_data["goal"],
                 tool_budget=member_data.get("tool_budget", 15),
                 allowed_tools=member_data.get("allowed_tools"),
+                agent_category=TeamAgentCategory(
+                    member_data.get(
+                        "agent_category",
+                        ("supervisor" if member_data.get("is_manager", False) else "specialist"),
+                    )
+                ),
                 can_delegate=member_data.get("can_delegate", False),
                 delegation_targets=member_data.get("delegation_targets"),
                 is_manager=member_data.get("is_manager", False),

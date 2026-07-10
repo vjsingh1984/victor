@@ -92,7 +92,12 @@ def test_defaults_are_conservative():
 def test_no_priority_or_engine_fields():
     # FEP-0009 Q2: declarable-intent only; ranking/loop-detection knobs stay internal.
     fields = {f.name for f in dataclasses.fields(ToolContract)}
-    for forbidden in ("priority", "priority_hints", "mandatory_keywords", "signature_params"):
+    for forbidden in (
+        "priority",
+        "priority_hints",
+        "mandatory_keywords",
+        "signature_params",
+    ):
         assert forbidden not in fields
 
 

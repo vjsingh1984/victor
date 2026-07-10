@@ -147,7 +147,7 @@ def relation_to_record(
             "confidence": relation.confidence,
             "context": relation.context,
             # call-site line (0 when unknown) — a prop, NOT part of edge identity.
-            "line": relation.call_site.start_line if relation.call_site is not None else 0,
+            "line": (relation.call_site.start_line if relation.call_site is not None else 0),
             # legacy endpoints for mixed-read resolution.
             "legacy_from_oid": f"graph/{repo_graph_id}/node/{relation.from_symbol_id}",
             "legacy_to_oid": f"graph/{repo_graph_id}/node/{relation.to_symbol_id}",

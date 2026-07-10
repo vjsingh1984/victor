@@ -251,7 +251,10 @@ class TestComputeRegistryBoundary:
 
     def test_register_via_registry_visible_in_executor(self):
         from victor.workflows.compute_registry import register_compute_handler
-        from victor.workflows.compute_registry import get_compute_handler, list_compute_handlers
+        from victor.workflows.compute_registry import (
+            get_compute_handler,
+            list_compute_handlers,
+        )
 
         async def stub_handler(node, context, tool_registry):
             pass

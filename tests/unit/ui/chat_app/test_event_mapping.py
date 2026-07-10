@@ -217,7 +217,10 @@ def test_history_messages_handles_dicts_and_enum_roles() -> None:
         {"role": "user", "content": "from a dict"},
         _RoleMsg(enum_role, "from an enum role"),
     ]
-    assert history_messages(msgs) == [("You", "from a dict"), ("Victor", "from an enum role")]
+    assert history_messages(msgs) == [
+        ("You", "from a dict"),
+        ("Victor", "from an enum role"),
+    ]
 
 
 def test_history_messages_empty_input() -> None:

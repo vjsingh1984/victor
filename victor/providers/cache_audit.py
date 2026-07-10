@@ -282,7 +282,9 @@ def log_cache_audit_record(
     )
 
 
-def generate_cache_audit(providers: Optional[List[Any]] = None) -> List[CacheAuditRecord]:
+def generate_cache_audit(
+    providers: Optional[List[Any]] = None,
+) -> List[CacheAuditRecord]:
     """Generate cache audit records for all registered providers.
 
     If ``providers`` is ``None``, attempts to discover all registered providers

@@ -96,12 +96,14 @@ class DevOpsContext:
             status: Deployment status
             version: Optional version deployed
         """
-        self.deployments.append({
-            "service": service,
-            "environment": environment,
-            "status": status,
-            "version": version,
-        })
+        self.deployments.append(
+            {
+                "service": service,
+                "environment": environment,
+                "status": status,
+                "version": version,
+            }
+        )
         logger.debug(f"Recorded deployment: {service} to {environment}")
 
     def add_infrastructure_change(
@@ -117,11 +119,13 @@ class DevOpsContext:
             resource: Resource affected
             tool: Tool used (terraform, kubectl, docker, etc.)
         """
-        self.infrastructure_changes.append({
-            "type": change_type,
-            "resource": resource,
-            "tool": tool,
-        })
+        self.infrastructure_changes.append(
+            {
+                "type": change_type,
+                "resource": resource,
+                "tool": tool,
+            }
+        )
         logger.debug(f"Recorded infrastructure change: {change_type} on {resource}")
 
     def add_container_operation(
@@ -137,11 +141,13 @@ class DevOpsContext:
             container_type: Type (docker, kubernetes, etc.)
             resource_id: Optional resource ID
         """
-        self.container_operations.append({
-            "operation": operation,
-            "type": container_type,
-            "resource_id": resource_id,
-        })
+        self.container_operations.append(
+            {
+                "operation": operation,
+                "type": container_type,
+                "resource_id": resource_id,
+            }
+        )
         logger.debug(f"Recorded container operation: {operation} on {container_type}")
 
     def add_pipeline_run(
@@ -157,11 +163,13 @@ class DevOpsContext:
             status: Run status
             duration: Optional duration in seconds
         """
-        self.pipeline_runs.append({
-            "pipeline": pipeline,
-            "status": status,
-            "duration": duration,
-        })
+        self.pipeline_runs.append(
+            {
+                "pipeline": pipeline,
+                "status": status,
+                "duration": duration,
+            }
+        )
         logger.debug(f"Recorded pipeline run: {pipeline} (status={status})")
 
 
@@ -212,12 +220,11 @@ class EnhancedDevOpsConversationManager:
         self._devops_context = DevOpsContext()
 
         logger.info(
-            f"EnhancedDevOpsConversationManager initialized with "
-            f"max_turns={max_history_turns}"
+            f"EnhancedDevOpsConversationManager initialized with " f"max_turns={max_history_turns}"
         )
 
     # =========================================================================
-   # Message Management (delegates to ConversationCoordinator)
+    # Message Management (delegates to ConversationCoordinator)
     # =========================================================================
 
     def add_message(
@@ -260,9 +267,7 @@ class EnhancedDevOpsConversationManager:
         Returns:
             List of message dictionaries
         """
-        return self._conversation_coordinator.get_history(
-            max_turns, include_system, include_tool
-        )
+        return self._conversation_coordinator.get_history(max_turns, include_system, include_tool)
 
     def clear_history(self, keep_summaries: bool = True) -> None:
         """Clear conversation history.
@@ -276,8 +281,8 @@ class EnhancedDevOpsConversationManager:
         logger.info("Conversation history cleared")
 
     # =========================================================================
-   # DevOps-Specific Context Tracking
-   # =========================================================================
+    # DevOps-Specific Context Tracking
+    # =========================================================================
 
     def track_deployment(
         self,
@@ -342,8 +347,8 @@ class EnhancedDevOpsConversationManager:
         self._devops_context.add_pipeline_run(pipeline, status, duration)
 
     # =========================================================================
-   # Summarization
-   # =========================================================================
+    # Summarization
+    # =========================================================================
 
     def needs_summarization(self) -> bool:
         """Check if conversation needs summarization.
@@ -377,8 +382,7 @@ class EnhancedDevOpsConversationManager:
             for dep in ctx.deployments:
                 version = f" (v{dep['version']})" if dep.get("version") else ""
                 parts.append(
-                    f"- {dep['service']} to {dep['environment']}{version} - "
-                    f"{dep['status']}"
+                    f"- {dep['service']} to {dep['environment']}{version} - " f"{dep['status']}"
                 )
             parts.append("")
 
@@ -416,8 +420,8 @@ class EnhancedDevOpsConversationManager:
         return "\n".join(parts)
 
     # =========================================================================
-   # Statistics and Observability
-   # =========================================================================
+    # Statistics and Observability
+    # =========================================================================
 
     def get_stats(self) -> ConversationStats:
         """Get conversation statistics.

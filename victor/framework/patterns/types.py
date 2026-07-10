@@ -44,7 +44,7 @@ class PatternCategory(Enum):
 
     SEQUENTIAL = "sequential"  # Tasks in sequence
     PARALLEL = "parallel"  # Tasks in parallel
-    HIERARCHICAL = "hierarchical"  # Manager-worker
+    HIERARCHICAL = "hierarchical"  # Supervisor-specialist
     COLLABORATIVE = "collaborative"  # Peer discussion
     COMPETITIVE = "competitive"  # Multiple attempts
     MIXED = "mixed"  # Combination

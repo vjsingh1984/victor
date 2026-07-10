@@ -50,7 +50,7 @@ class TestEmbeddingSettings:
             use_semantic_tool_selection=False,
             preload_embeddings=True,
             embedding_provider="ollama",
-            codebase_vector_store="chromadb",
+            codebase_vector_store="lancedb",
             semantic_similarity_threshold=0.5,
             semantic_max_query_expansions=10,
             enable_hybrid_search=True,
@@ -60,7 +60,7 @@ class TestEmbeddingSettings:
         assert settings.use_semantic_tool_selection is False
         assert settings.preload_embeddings is True
         assert settings.embedding_provider == "ollama"
-        assert settings.codebase_vector_store == "chromadb"
+        assert settings.codebase_vector_store == "lancedb"
         assert settings.semantic_similarity_threshold == 0.5
         assert settings.semantic_max_query_expansions == 10
         assert settings.enable_hybrid_search is True

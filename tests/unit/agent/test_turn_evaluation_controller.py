@@ -36,7 +36,10 @@ def test_overlap_thresholds():
     assert evaluate_overlap_repetition(0.6, 0) == (1, "accumulating")
     assert evaluate_overlap_repetition(0.6, 1) == (2, "high_overlap")
     assert evaluate_overlap_repetition(0.2, 3) == (0, "reset")
-    assert evaluate_overlap_repetition(0.4, 2) == (2, "hold")  # ambiguous: hold, don't decay
+    assert evaluate_overlap_repetition(0.4, 2) == (
+        2,
+        "hold",
+    )  # ambiguous: hold, don't decay
 
 
 # --------------------------------------------------------------------------- #

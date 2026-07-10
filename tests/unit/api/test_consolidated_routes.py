@@ -118,10 +118,17 @@ class TestCredentialRoutes:
 class TestToolsCancel:
     def test_cancel_unknown_returns_not_found(self, server):
         r = _client(server).post("/tools/cancel", json={"tool_call_id": "nope"})
-        assert r.json() == {"tool_call_id": "nope", "cancelled": False, "reason": "not_found"}
+        assert r.json() == {
+            "tool_call_id": "nope",
+            "cancelled": False,
+            "reason": "not_found",
+        }
 
     def test_cancel_resolves_a_pending_approval(self, server):
-        server._pending_tool_approvals["call-1"] = {"tool_name": "shell", "resolved": False}
+        server._pending_tool_approvals["call-1"] = {
+            "tool_name": "shell",
+            "resolved": False,
+        }
         r = _client(server).post("/tools/cancel", json={"tool_call_id": "call-1"})
         assert r.json() == {"tool_call_id": "call-1", "cancelled": True}
         assert "call-1" not in server._pending_tool_approvals

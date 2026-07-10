@@ -15,7 +15,10 @@
 """Refactoring transforms package."""
 
 from victor_coding.refactor.transforms.base import BaseTransform, CodeTransform
-from victor_coding.refactor.transforms.rename import RenameFileTransform, RenameSymbolTransform
+from victor_coding.refactor.transforms.rename import (
+    RenameFileTransform,
+    RenameSymbolTransform,
+)
 from victor_coding.refactor.transforms.extract import (
     ExtractConstantTransform,
     ExtractFunctionTransform,

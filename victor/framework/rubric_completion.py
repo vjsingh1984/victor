@@ -200,7 +200,10 @@ class HeuristicRubricJudge:
         if has_structure:
             base = clamp(base + 0.15, 0.0, 1.0)
         return RubricDimensionScore(
-            dimension.name, base, 0.3, f"heuristic: len={length}, structured={has_structure}"
+            dimension.name,
+            base,
+            0.3,
+            f"heuristic: len={length}, structured={has_structure}",
         )
 
 
@@ -327,7 +330,13 @@ def _build_rubric_prompt(rubric: Rubric, content: str) -> str:
         "Dimensions:",
     ]
     lines += [f"- {d.name}: {d.description}" for d in rubric.dimensions]
-    lines += ["", "RESPONSE:", (content or "")[:4000], "", "Grades (one line per dimension):"]
+    lines += [
+        "",
+        "RESPONSE:",
+        (content or "")[:4000],
+        "",
+        "Grades (one line per dimension):",
+    ]
     return "\n".join(lines)
 
 

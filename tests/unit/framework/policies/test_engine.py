@@ -56,7 +56,10 @@ async def test_empty_engine_allows():
 
 async def test_all_allow_results_in_allow():
     engine = PolicyEngine(
-        [_StubPolicy("a", PolicyVerdict.allow()), _StubPolicy("b", PolicyVerdict.allow())]
+        [
+            _StubPolicy("a", PolicyVerdict.allow()),
+            _StubPolicy("b", PolicyVerdict.allow()),
+        ]
     )
     verdict = await engine.evaluate(_event())
     assert verdict.action is PolicyAction.ALLOW

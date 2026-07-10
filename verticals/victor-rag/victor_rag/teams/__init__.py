@@ -441,7 +441,9 @@ def register_rag_teams() -> int:
         Number of teams registered.
     """
     try:
-        from victor_contracts.team_schema import get_runtime_team_registry as get_team_registry
+        from victor_contracts.team_schema import (
+            get_runtime_team_registry as get_team_registry,
+        )
 
         registry = get_team_registry()
         count = registry.register_from_vertical("rag", RAG_TEAM_SPECS)

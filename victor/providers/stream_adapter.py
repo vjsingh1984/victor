@@ -56,8 +56,6 @@ from typing import (
     Dict,
     List,
     Optional,
-    Protocol,
-    runtime_checkable,
 )
 
 from victor.providers.base import (
@@ -69,51 +67,6 @@ from victor.providers.base import (
 )
 
 logger = logging.getLogger(__name__)
-
-
-# =============================================================================
-# STREAMING PROTOCOLS
-# =============================================================================
-
-
-@runtime_checkable
-class StreamingProvider(Protocol):
-    """Protocol for providers that support streaming."""
-
-    async def stream(
-        self,
-        messages: List[Message],
-        *,
-        model: str,
-        temperature: float = 0.7,
-        max_tokens: int = 4096,
-        tools: Optional[List[ToolDefinition]] = None,
-        **kwargs: Any,
-    ) -> AsyncIterator[StreamChunk]:
-        """Stream chat completion response."""
-        ...
-
-    def supports_streaming(self) -> bool:
-        """Check if provider supports streaming."""
-        ...
-
-
-@runtime_checkable
-class StreamChatProvider(Protocol):
-    """Protocol for providers using stream_chat naming."""
-
-    async def stream_chat(
-        self,
-        messages: List[Message],
-        *,
-        model: str,
-        temperature: float = 0.7,
-        max_tokens: int = 4096,
-        tools: Optional[List[ToolDefinition]] = None,
-        **kwargs: Any,
-    ) -> AsyncIterator[StreamChunk]:
-        """Stream chat completion response (alternate naming)."""
-        ...
 
 
 # =============================================================================

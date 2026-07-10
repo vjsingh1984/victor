@@ -103,7 +103,11 @@ def test_live_renderer_progress_does_not_raise_and_clears_panel():
         assert renderer._tool_progress_active is True
         # Result tears the live panel down so it doesn't freeze into scrollback.
         renderer.on_tool_result(
-            name="shell", success=True, elapsed=0.4, arguments={}, result="line 1\nline 2\n"
+            name="shell",
+            success=True,
+            elapsed=0.4,
+            arguments={},
+            result="line 1\nline 2\n",
         )
         assert renderer._tool_progress_active is False
         assert len(renderer._tool_progress_lines) == 0

@@ -52,7 +52,7 @@ import asyncio
 import logging
 import time
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import Enum
 from typing import (
     TYPE_CHECKING,
@@ -68,6 +68,7 @@ from typing import (
 
 from victor.teams.types import (
     MemoryConfig,
+    TeamAgentCategory,
     TeamConfig,
     TeamMember,
 )
@@ -246,7 +247,9 @@ class TeamMemberSpec:
         goal: What this member should accomplish
         name: Optional display name (auto-generated if not provided)
         tool_budget: Maximum tool calls (default based on role)
-        is_manager: Whether this member is the team manager (for hierarchical)
+        agent_category: Coordination category; use ``SUPERVISOR`` for the
+            coordinating member in hierarchical teams
+        is_manager: Legacy alias for supervisor (for hierarchical)
         priority: Execution priority (lower = earlier, for sequential/pipeline)
         backstory: Rich persona description for agent's history and character
         expertise: List of domain expertise areas for context-aware behavior
@@ -294,6 +297,7 @@ class TeamMemberSpec:
     name: Optional[str] = None
     tool_budget: Optional[int] = None
     allowed_tools: Optional[List[str]] = None
+    agent_category: TeamAgentCategory = TeamAgentCategory.SPECIALIST
     is_manager: bool = False
     priority: int = 0
     # Rich persona attributes (CrewAI-compatible)
@@ -320,6 +324,22 @@ class TeamMemberSpec:
     # Formation role for context-driven formations (e.g. "generator"/"critic"
     # for REFLECTION). None = positional binding.
     formation_role: Optional[str] = None
+
+    def __post_init__(self) -> None:
+        """Normalize compatibility aliases for coordination category."""
+        if isinstance(self.agent_category, str):
+            self.agent_category = TeamAgentCategory(self.agent_category)
+        if self.is_manager:
+            self.agent_category = TeamAgentCategory.SUPERVISOR
+        if self.agent_category == TeamAgentCategory.SUPERVISOR:
+            self.is_manager = True
+            if self.max_delegation_depth < 1:
+                self.max_delegation_depth = 1
+
+    @property
+    def is_supervisor(self) -> bool:
+        """Return whether this spec designates the team supervisor."""
+        return self.agent_category == TeamAgentCategory.SUPERVISOR or self.is_manager
 
     def to_team_member(self, index: int = 0) -> TeamMember:
         """Convert to internal TeamMember.
@@ -359,7 +379,9 @@ class TeamMemberSpec:
             goal=self.goal,
             tool_budget=tool_budget,
             allowed_tools=self.allowed_tools,  # Pass through allowed_tools
+            agent_category=self.agent_category,
             is_manager=self.is_manager,
+            can_delegate=self.is_supervisor,
             priority=self.priority if self.priority else index,
             # Pass through all persona attributes
             backstory=self.backstory,
@@ -489,19 +511,18 @@ class AgentTeam:
         # Convert specs to TeamMembers
         team_members = [spec.to_team_member(index=i) for i, spec in enumerate(members)]
 
-        # For hierarchical, ensure we have a manager
+        # For hierarchical, ensure we have a supervisor.
         if normalized_formation == TeamFormation.HIERARCHICAL:
-            has_manager = any(m.is_manager for m in team_members)
-            if not has_manager and team_members:
-                # Make the first member the manager
-                team_members[0] = TeamMember(
-                    id=team_members[0].id,
-                    role=team_members[0].role,
-                    name=team_members[0].name,
-                    goal=team_members[0].goal,
-                    tool_budget=team_members[0].tool_budget,
+            has_supervisor = any(m.is_supervisor for m in team_members)
+            if not has_supervisor and team_members:
+                # Make the first member the supervisor without discarding its
+                # persona, memory, model, or provider settings.
+                team_members[0] = replace(
+                    team_members[0],
+                    agent_category=TeamAgentCategory.SUPERVISOR,
                     is_manager=True,
-                    priority=team_members[0].priority,
+                    can_delegate=True,
+                    max_delegation_depth=max(1, team_members[0].max_delegation_depth),
                 )
 
         # Create config

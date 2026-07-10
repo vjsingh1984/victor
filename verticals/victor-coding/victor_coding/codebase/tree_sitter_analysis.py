@@ -163,7 +163,8 @@ class TreeSitterAnalysisProvider:
         self, content: bytes, language: str, file_path: str
     ) -> Optional[List[Dict[str, Any]]]:
         """Source symbols from victor-codegraph (ADR-015). Returns None on failure so the
-        caller falls back to the tree-sitter path. Output matches the symbol-dict contract."""
+        caller falls back to the tree-sitter path. Output matches the symbol-dict contract.
+        """
         try:
             src = (
                 content.decode("utf-8", errors="replace") if isinstance(content, bytes) else content
@@ -286,7 +287,7 @@ class TreeSitterAnalysisProvider:
                         "file_path": file_path,
                         "line_start": start_line + 1,
                         "line_end": end_line,
-                        "ast_kind": node.parent.type if node.parent is not None else None,
+                        "ast_kind": (node.parent.type if node.parent is not None else None),
                     }
                 )
         return out

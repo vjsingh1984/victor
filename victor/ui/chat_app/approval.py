@@ -128,7 +128,11 @@ async def chainlit_approval_handler(request: ApprovalRequest) -> ApprovalResult:
             content=_format_prompt(request),
             actions=[
                 # Chainlit 2.x: payload (dict) replaced the 1.x `value` kwarg.
-                cl.Action(name="approve", payload={"value": _APPROVE_VALUE}, label="✅ Approve"),
+                cl.Action(
+                    name="approve",
+                    payload={"value": _APPROVE_VALUE},
+                    label="✅ Approve",
+                ),
                 cl.Action(name="reject", payload={"value": _REJECT_VALUE}, label="🚫 Reject"),
             ],
             timeout=request.timeout_seconds or 120,

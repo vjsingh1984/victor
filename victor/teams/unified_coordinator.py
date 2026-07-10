@@ -70,6 +70,7 @@ from victor.teams.types import (
     MemberResult,
     MessageType,
     TeamFormation,
+    TeamParticipant,
     TeamResult,
 )
 from victor.teams.workspace_isolation import (
@@ -126,7 +127,7 @@ class _CoordinatorExecutionState:
 
     members: List["ITeamMember"]
     formation: TeamFormation
-    manager: Optional["ITeamMember"]
+    supervisor: Optional["ITeamMember"]
     shared_context: Dict[str, Any]
     message_history: List[AgentMessage] = field(default_factory=list)
 
@@ -184,165 +185,6 @@ def _member_formation_role(member: Any) -> Optional[str]:
     return role
 
 
-class _TeamMemberAdapter:
-    """Adapter to bridge ITeamMember to formation strategy agent interface.
-
-    Formation strategies expect agents with execute(task, context) -> MemberResult
-    but ITeamMember uses execute_task(task, context) -> str.
-    """
-
-    def __init__(
-        self,
-        member: "ITeamMember",
-        coordinator_context: Dict[str, Any],
-        member_context: Optional[Dict[str, Any]] = None,
-    ):
-        self._member = member
-        self._context = coordinator_context
-        self._member_context = dict(member_context or {})
-        self.id = member.id
-
-    @property
-    def role(self):
-        """Expose role from underlying member for formation strategy detection."""
-        return getattr(self._member, "role", None)
-
-    async def execute(self, task: AgentMessage, context: TeamContext) -> MemberResult:
-        """Execute task using ITeamMember interface."""
-        start_time = time.time()
-
-        try:
-            # Merge TeamContext.shared_state into coordinator context
-            merged_context = {
-                **self._context,
-                **context.shared_state,
-                **self._member_context,
-            }
-
-            # Preserve caller-owned mutable context objects when present so
-            # external observers can track execution side effects without
-            # losing formation-managed shared-state overlays like
-            # ``previous_output``.
-            for key, value in self._context.items():
-                if (
-                    key in context.shared_state
-                    and context.shared_state[key] is not value
-                    and isinstance(value, (list, dict, set))
-                ):
-                    merged_context[key] = value
-
-            # Call ITeamMember's execute_task
-            raw_output = await self._member.execute_task(task.content, merged_context)
-
-            duration = time.time() - start_time
-            (
-                success,
-                output,
-                error,
-                metadata,
-                tool_calls_used,
-                discoveries,
-                duration_override,
-            ) = self._normalize_execution_result(raw_output)
-            metadata.setdefault("task", task.content)
-            if (
-                "worktree_assignment" in self._member_context
-                and "worktree_assignment" not in metadata
-            ):
-                metadata["worktree_assignment"] = self._member_context["worktree_assignment"]
-            if "claimed_paths" in self._member_context and "claimed_paths" not in metadata:
-                metadata["claimed_paths"] = list(self._member_context["claimed_paths"])
-            if "readonly_paths" in self._member_context and "readonly_paths" not in metadata:
-                metadata["readonly_paths"] = list(self._member_context["readonly_paths"])
-
-            return MemberResult(
-                member_id=self._member.id,
-                success=success,
-                output=output,
-                error=error,
-                duration_seconds=(duration_override if duration_override is not None else duration),
-                metadata=metadata,
-                tool_calls_used=tool_calls_used,
-                discoveries=discoveries,
-            )
-        except Exception as e:
-            duration = time.time() - start_time
-            return MemberResult(
-                member_id=self._member.id,
-                success=False,
-                output="",
-                error=str(e),
-                duration_seconds=duration,
-                metadata={"task": task.content},
-            )
-
-    @staticmethod
-    def _normalize_execution_result(
-        raw_output: Any,
-    ) -> tuple[bool, str, Optional[str], Dict[str, Any], int, List[str], Optional[float]]:
-        """Normalize string or mapping member outputs into MemberResult fields."""
-        if not isinstance(raw_output, Mapping):
-            return (
-                True,
-                "" if raw_output is None else str(raw_output),
-                None,
-                {},
-                0,
-                [],
-                None,
-            )
-
-        success = bool(raw_output.get("success", True))
-        output_value = (
-            raw_output.get("output")
-            or raw_output.get("final_output")
-            or raw_output.get("content")
-            or ""
-        )
-        error = str(raw_output.get("error")) if raw_output.get("error") is not None else None
-        metadata = dict(raw_output.get("metadata", {}) or {})
-        for key in (
-            "changed_files",
-            "files_touched",
-            "modified_files",
-            "claimed_paths",
-            "readonly_paths",
-            "task_summary",
-            "summary",
-            "result_summary",
-            "validation_run",
-            "validation_status",
-            "validation_summary",
-            "validation_command",
-            "test_command",
-        ):
-            if raw_output.get(key) is not None and key not in metadata:
-                metadata[key] = raw_output.get(key)
-
-        discoveries = list(raw_output.get("discoveries") or [])
-        tool_calls_raw = raw_output.get("tool_calls_used", raw_output.get("tool_calls", 0))
-        try:
-            tool_calls_used = int(tool_calls_raw or 0)
-        except (TypeError, ValueError):
-            tool_calls_used = 0
-
-        duration_raw = raw_output.get("duration_seconds")
-        try:
-            duration_override = float(duration_raw) if duration_raw is not None else None
-        except (TypeError, ValueError):
-            duration_override = None
-
-        return (
-            success,
-            str(output_value),
-            error,
-            metadata,
-            tool_calls_used,
-            discoveries,
-            duration_override,
-        )
-
-
 class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
     """Production-ready team coordinator implementing ITeamCoordinator.
 
@@ -361,7 +203,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         _orchestrator: Agent orchestrator (optional, for SubAgent spawning)
         _members: List of team members
         _formation: Current team formation
-        _manager: Manager member for HIERARCHICAL formation
+        _manager: Supervisor member for HIERARCHICAL formation
         _message_history: Log of inter-agent messages
         _shared_context: Shared context dictionary
     """
@@ -467,17 +309,21 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         return self
 
     def set_manager(self, manager: "ITeamMember") -> "UnifiedTeamCoordinator":
-        """Set the manager for HIERARCHICAL formation.
+        """Compatibility alias for set_supervisor()."""
+        return self.set_supervisor(manager)
+
+    def set_supervisor(self, supervisor: "ITeamMember") -> "UnifiedTeamCoordinator":
+        """Set the supervisor for HIERARCHICAL formation.
 
         Args:
-            manager: Manager member
+            supervisor: Supervisor member
 
         Returns:
             Self for fluent chaining
         """
-        self._manager = manager
-        if manager not in self._members:
-            self._members.insert(0, manager)
+        self._manager = supervisor
+        if supervisor not in self._members:
+            self._members.insert(0, supervisor)
         return self
 
     async def execute_task(self, task: str, context: Dict[str, Any]) -> Dict[str, Any]:
@@ -502,7 +348,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
             context=context,
             formation=self._formation,
             members=list(self._members),
-            manager=self._manager,
+            supervisor=self._manager,
             persist_execution_state=True,
         )
 
@@ -646,11 +492,15 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
             return state.formation
         return self._formation
 
-    def _active_manager(self) -> Optional["ITeamMember"]:
+    def _active_supervisor(self) -> Optional["ITeamMember"]:
         state = self._current_execution_state()
         if state is not None:
-            return state.manager
+            return state.supervisor
         return self._manager
+
+    def _active_manager(self) -> Optional["ITeamMember"]:
+        """Compatibility alias for _active_supervisor()."""
+        return self._active_supervisor()
 
     def _active_shared_context(self) -> Dict[str, Any]:
         state = self._current_execution_state()
@@ -715,16 +565,17 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
             delegate_reentry_contract=delegate_reentry_contract,
         )
 
-        # Wrap team members with adapters
-        shared_state_with_manager = self._active_shared_context()
+        # Wrap team members with participants
+        shared_state_with_supervisor = self._active_shared_context()
         context_shared_state = effective_context.get("shared_state")
         if isinstance(context_shared_state, Mapping):
-            shared_state_with_manager.update(context_shared_state)
-        active_manager = self._active_manager()
-        if active_manager is not None:
-            shared_state_with_manager["explicit_manager_id"] = active_manager.id
+            shared_state_with_supervisor.update(context_shared_state)
+        active_supervisor = self._active_supervisor()
+        if active_supervisor is not None:
+            shared_state_with_supervisor["explicit_supervisor_id"] = active_supervisor.id
+            shared_state_with_supervisor["explicit_manager_id"] = active_supervisor.id
 
-        max_workers = self._extract_max_workers(effective_context, shared_state_with_manager)
+        max_workers = self._extract_max_workers(effective_context, shared_state_with_supervisor)
         candidate_members = self._filter_execution_members(
             self._active_members(),
             member_ids=self._extract_delegate_reentry_member_ids(delegate_reentry_contract),
@@ -733,7 +584,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
             candidate_members,
             active_formation,
             max_workers,
-            manager=active_manager,
+            supervisor=active_supervisor,
         )
         member_context_overrides = self._extract_delegate_reentry_member_context_overrides(
             delegate_reentry_contract
@@ -766,8 +617,14 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
                 if worktree_overrides_source
                 else {}
             )
-        adapted_members = [
-            _TeamMemberAdapter(m, effective_context, member_context_overrides.get(m.id))
+        participants = [
+            TeamParticipant(
+                member=m,
+                executor=m.execute_task,
+                message_handler=m.receive_message,
+                base_context=effective_context,
+                context_overrides=member_context_overrides.get(m.id, {}),
+            )
             for m in execution_members
         ]
 
@@ -776,25 +633,25 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         # them generically — no-op for the other formations.
         context_agents = self._populate_context_agents(strategy, execution_members)
         if context_agents:
-            shared_state_with_manager.update(context_agents)
+            shared_state_with_supervisor.update(context_agents)
 
         # Create TeamContext
         if max_workers is not None:
-            shared_state_with_manager["max_workers"] = max_workers
-        shared_state_with_manager["effective_formation"] = active_formation.value
+            shared_state_with_supervisor["max_workers"] = max_workers
+        shared_state_with_supervisor["effective_formation"] = active_formation.value
         if worktree_plan is not None:
-            shared_state_with_manager["worktree_plan"] = worktree_plan.to_dict()
+            shared_state_with_supervisor["worktree_plan"] = worktree_plan.to_dict()
         if worktree_session is not None:
-            shared_state_with_manager["worktree_session"] = worktree_session.to_dict()
+            shared_state_with_supervisor["worktree_session"] = worktree_session.to_dict()
         if workspace_diagnostics:
-            shared_state_with_manager["workspace_isolation_diagnostics"] = list(
+            shared_state_with_supervisor["workspace_isolation_diagnostics"] = list(
                 workspace_diagnostics
             )
 
         team_context_id = (
             effective_context.get("team_id") or effective_context.get("team_name") or "UnifiedTeam"
         )
-        shared_state_with_manager["team_id"] = team_context_id
+        shared_state_with_supervisor["team_id"] = team_context_id
         team_context_metadata = dict(effective_context)
         for reserved_key in (
             "team_id",
@@ -808,7 +665,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         team_context = TeamContext(
             team_id=team_context_id,
             formation=active_formation.value,
-            shared_state=shared_state_with_manager,
+            shared_state=shared_state_with_supervisor,
             **team_context_metadata,
         )
 
@@ -823,7 +680,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         result_dict: Optional[Dict[str, Any]] = None
         try:
             # Execute using formation strategy
-            member_results_list = await strategy.execute(adapted_members, team_context, agent_task)
+            member_results_list = await strategy.execute(participants, team_context, agent_task)
 
             # Convert list of MemberResults to dict
             member_results: Dict[str, MemberResult] = {r.member_id: r for r in member_results_list}
@@ -853,7 +710,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
                 "formation": active_formation.value,
                 "total_tool_calls": total_tool_calls,
                 "communication_log": list(self._active_message_history()),
-                "shared_context": dict(shared_state_with_manager),
+                "shared_context": dict(shared_state_with_supervisor),
             }
 
             # Add consensus metadata if any member result has it
@@ -2715,16 +2572,16 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         formation: TeamFormation,
         max_workers: Optional[int],
         *,
-        manager: Optional["ITeamMember"] = None,
+        supervisor: Optional["ITeamMember"] = None,
     ) -> List["ITeamMember"]:
-        """Limit members for a single execution while preserving a hierarchical manager."""
+        """Limit members for a single execution while preserving a supervisor."""
         if max_workers is None or max_workers >= len(members):
             return list(members)
 
-        if formation == TeamFormation.HIERARCHICAL and manager in members:
-            selected: List["ITeamMember"] = [manager]
+        if formation == TeamFormation.HIERARCHICAL and supervisor in members:
+            selected: List["ITeamMember"] = [supervisor]
             for member in members:
-                if member is manager:
+                if member is supervisor:
                     continue
                 selected.append(member)
                 if len(selected) >= max_workers:
@@ -2761,7 +2618,12 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
 
     @property
     def manager(self) -> Optional["ITeamMember"]:
-        """Get team manager (for hierarchical formation)."""
+        """Compatibility alias for supervisor."""
+        return self.supervisor
+
+    @property
+    def supervisor(self) -> Optional["ITeamMember"]:
+        """Get team supervisor (for hierarchical formation)."""
         return self._manager
 
     # =========================================================================
@@ -2775,7 +2637,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         *,
         formation: TeamFormation,
         members: List["ITeamMember"],
-        manager: Optional["ITeamMember"] = None,
+        supervisor: Optional["ITeamMember"] = None,
         persist_execution_state: bool = False,
     ) -> Dict[str, Any]:
         """Execute a team run with per-call members/formation overrides.
@@ -2803,7 +2665,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         execution_state = _CoordinatorExecutionState(
             members=execution_members,
             formation=formation,
-            manager=manager,
+            supervisor=supervisor,
             shared_context=copy.deepcopy(dict(effective_context)),
         )
         token = self._execution_state.set(execution_state)
@@ -2944,7 +2806,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
                 "pre-built members via execute_team_config(config, members=...)."
             )
 
-        from victor.teams.types import TeamMemberAdapter
+        from victor.teams.types import TeamParticipant
         from victor.agent.subagents.orchestrator import SubAgentOrchestrator
 
         sub_orchestrator = SubAgentOrchestrator(self._orchestrator)
@@ -2971,7 +2833,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
 
             return executor
 
-        return [TeamMemberAdapter(member=m, executor=_make_executor(m)) for m in members]
+        return [TeamParticipant(member=m, executor=_make_executor(m)) for m in members]
 
     def _dict_result_to_team_result(
         self,

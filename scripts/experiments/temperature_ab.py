@@ -70,8 +70,8 @@ class TempResult:
             ),
             "mean_turns": statistics.mean(turns) if turns else 0.0,
             "turns_stdev": statistics.pstdev(turns) if len(turns) > 1 else 0.0,
-            "mean_tool_calls": statistics.mean(self._vals("tool_calls")) if self.runs else 0.0,
-            "mean_answer_len": statistics.mean(self._vals("answer_len")) if self.runs else 0.0,
+            "mean_tool_calls": (statistics.mean(self._vals("tool_calls")) if self.runs else 0.0),
+            "mean_answer_len": (statistics.mean(self._vals("answer_len")) if self.runs else 0.0),
         }
 
 

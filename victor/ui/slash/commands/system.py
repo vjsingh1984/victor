@@ -140,6 +140,9 @@ class ConfigCommand(BaseSlashCommand):
                 f"[bold]Semantic Selection:[/] {ctx.settings.tools.use_semantic_tool_selection}\n"
                 f"[bold]Embedding Model:[/] {ctx.settings.search.unified_embedding_model}\n"
                 f"[bold]Tool Budget:[/] {ctx.settings.tools.tool_call_budget}\n"
+                f"[bold]Budget Calibration:[/] "
+                f"{'on' if ctx.settings.tools.tool_budget_calibration_enabled else 'off'}"
+                f" (min_confidence={ctx.settings.tools.tool_budget_calibration_min_confidence})\n"
                 f"[bold]Config Dir:[/] {ctx.settings.get_config_dir()}",
                 title="Configuration",
                 border_style="blue",

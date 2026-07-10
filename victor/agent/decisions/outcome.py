@@ -148,6 +148,19 @@ def record_session_outcome(
             reward,
             credit_method,
         )
+
+        # FEP-0012 Phase 6: reward-weight-update the per-project classifier
+        # delta from this session's decisions (local-only, gated by the
+        # local_learning_enabled setting, best-effort — never raises). The
+        # decisions list was already read above; pass it through to avoid a
+        # second JSONL pass.
+        try:
+            from victor.agent.decisions.local_delta import update_delta_from_session
+
+            update_delta_from_session(session_id, reward=reward, decisions=decisions)
+        except Exception as exc:  # defensive — the delta must never break this path
+            logger.debug("local_classifier_delta update skipped: %s", exc)
+
         return len(rows)
     except Exception as exc:  # never break the benchmark/session
         logger.warning("record_session_outcome failed for %s: %s", session_id, exc)

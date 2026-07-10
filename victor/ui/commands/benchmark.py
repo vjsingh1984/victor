@@ -1698,6 +1698,7 @@ async def _run_benchmark_async(
                 total_timeout=timeout,
                 max_turns=max_turns,
                 min_turn_timeout=max(240, timeout // max(max_turns, 1)),
+                max_verify_retries=getattr(config, "max_verify_retries", 0),
                 prompt_binding=(
                     PromptOptimizationBinding(
                         section_name=config.prompt_section_name,
@@ -1863,10 +1864,14 @@ async def _run_benchmark_async(
                     # calls it only after the agent claims done (≤max_verify_retries
                     # times). Each call runs a full container lifecycle.
                     verify_fn = None
-                    if getattr(config, "eval_backend", None) == "docker" and getattr(
-                        benchmark_task, "repo", None
+                    if (
+                        getattr(config, "max_verify_retries", 0) > 0
+                        and getattr(config, "eval_backend", None) == "docker"
+                        and getattr(benchmark_task, "repo", None)
                     ):
-                        from victor.evaluation.benchmarks.swe_bench import SWEBenchRunner
+                        from victor.evaluation.benchmarks.swe_bench import (
+                            SWEBenchRunner,
+                        )
 
                         _verify_runner = SWEBenchRunner()
 

@@ -183,7 +183,10 @@ class AdapterConfig:
     # done; if they don't all pass, the failure output is fed back as the next
     # continuation message and the loop continues, up to this many verify
     # retries (then the partial result is accepted). 0 disables the gate.
-    max_verify_retries: int = 2
+    # DEFAULT OFF (0): validation showed 0 conversions for deepseek-chat at
+    # ~3 containers/failing-task cost — opt-in via --verify-retries for
+    # stronger models that can capitalize on a retry.
+    max_verify_retries: int = 0
 
     @property
     def timeout_per_turn(self) -> int:

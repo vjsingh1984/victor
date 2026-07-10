@@ -39,7 +39,9 @@ class FakeEvent:
 def test_tool_call_carries_call_id_from_metadata():
     action = map_event(
         FakeEvent(
-            "tool_call", tool_name="bash", metadata={"tool_call_id": "call_42", "arguments": {}}
+            "tool_call",
+            tool_name="bash",
+            metadata={"tool_call_id": "call_42", "arguments": {}},
         )
     )
     assert action.kind is RenderKind.TOOL_START

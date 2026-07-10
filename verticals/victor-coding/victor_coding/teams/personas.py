@@ -742,7 +742,9 @@ def list_personas() -> List[str]:
 # =============================================================================
 
 
-def _register_personas_with_framework(provider: PersonaRegistryProtocol | None = None) -> None:
+def _register_personas_with_framework(
+    provider: PersonaRegistryProtocol | None = None,
+) -> None:
     """Register all coding personas with FrameworkPersonaProvider.
 
     This function is called at module import time to automatically register

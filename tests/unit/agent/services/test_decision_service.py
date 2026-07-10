@@ -527,7 +527,11 @@ class TestDecisionLogging:
         with patch("victor.agent.decisions.chain.log_decision") as m:
             result = service.decide_sync(
                 DecisionType.TASK_COMPLETION,
-                context={"response_tail": "", "deliverable_count": 0, "signal_count": 0},
+                context={
+                    "response_tail": "",
+                    "deliverable_count": 0,
+                    "signal_count": 0,
+                },
                 heuristic_confidence=0.9,  # above threshold → heuristic fast path
             )
         assert result.source == "heuristic"
@@ -540,7 +544,11 @@ class TestDecisionLogging:
         with patch("victor.agent.decisions.chain.log_decision") as m:
             result = service.decide_sync(
                 DecisionType.TASK_COMPLETION,
-                context={"response_tail": "", "deliverable_count": 0, "signal_count": 0},
+                context={
+                    "response_tail": "",
+                    "deliverable_count": 0,
+                    "signal_count": 0,
+                },
                 heuristic_confidence=0.0,  # low → not fast-path; budget=0 → exhausted
             )
         assert result.source == "budget_exhausted"
@@ -551,7 +559,11 @@ class TestDecisionLogging:
         with patch("victor.agent.decisions.chain.log_decision") as m:
             result = await service.decide(
                 DecisionType.TASK_COMPLETION,
-                context={"response_tail": "", "deliverable_count": 0, "signal_count": 0},
+                context={
+                    "response_tail": "",
+                    "deliverable_count": 0,
+                    "signal_count": 0,
+                },
                 heuristic_confidence=0.9,
             )
         assert result.source == "heuristic"

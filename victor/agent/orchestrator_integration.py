@@ -665,7 +665,10 @@ class OrchestratorIntegration:
                 # quality score so every learner consumes a process-aware signal. No tools → no change.
                 segment_rewards: Optional[Dict[int, float]] = None
                 try:
-                    from victor.core.feature_flags import FeatureFlag, is_feature_enabled
+                    from victor.core.feature_flags import (
+                        FeatureFlag,
+                        is_feature_enabled,
+                    )
 
                     if is_feature_enabled(FeatureFlag.USE_LEARNING_FROM_EXECUTION):
                         from victor.framework.rl.trace_to_credit import (

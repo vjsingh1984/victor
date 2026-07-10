@@ -639,7 +639,10 @@ class PlateauDetector:
         # Productive turns flatten the score legitimately — don't nudge those.
         should_nudge = is_plateau and productive_count == 0
         return PlateauResult(
-            is_plateau=is_plateau, should_nudge=should_nudge, score=score, recent_scores=recent
+            is_plateau=is_plateau,
+            should_nudge=should_nudge,
+            score=score,
+            recent_scores=recent,
         )
 
     @property

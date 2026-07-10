@@ -79,7 +79,12 @@ class TestBashStyleFormatting:
     def test_multiple_edit_ops_shows_count(self):
         """Multiple edit ops show first + count."""
         result = format_tool_args_bash_style(
-            {"ops": [{"type": "edit", "path": "main.py"}, {"type": "insert", "path": "utils.py"}]}
+            {
+                "ops": [
+                    {"type": "edit", "path": "main.py"},
+                    {"type": "insert", "path": "utils.py"},
+                ]
+            }
         )
         assert "+1" in result  # Shows +1 for additional ops
 

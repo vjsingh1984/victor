@@ -16,7 +16,10 @@ def test_line_base_is_one():
 
 def test_parse_emits_1_based_lines():
     # The def is on the FIRST line → start_line must be 1 (not 0).
-    parsed = parse("def first():\n    return second()\n\n\ndef second():\n    return 1\n", file_path="m.py")
+    parsed = parse(
+        "def first():\n    return second()\n\n\ndef second():\n    return 1\n",
+        file_path="m.py",
+    )
     by_name = {s.simple_name: s for s in parsed.symbols}
     assert by_name["first"].location.start_line == 1
     assert by_name["second"].location.start_line == 5  # 1-based line of the 2nd def

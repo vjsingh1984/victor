@@ -75,7 +75,11 @@ def _fake_aiohttp(monkeypatch, *, me):
 
 def _make_request(rid):
     return HITLRequest(
-        request_id=rid, node_id="n", hitl_type=HITLNodeType.APPROVAL, prompt="Deploy?", timeout=300
+        request_id=rid,
+        node_id="n",
+        hitl_type=HITLNodeType.APPROVAL,
+        prompt="Deploy?",
+        timeout=300,
     )
 
 

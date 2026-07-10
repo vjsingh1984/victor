@@ -112,3 +112,50 @@ class TestSessionConfigValidation:
             ValueError, match="bayesian.complex_threshold must be in \\[0.0, 1.0\\]"
         ):
             SessionConfig.from_cli_flags(complex_threshold=-0.5)
+
+
+class TestSessionConfigApplyToolBudget:
+    """SessionConfig.tool_budget must actually land on settings.tools (TDD RED).
+
+    Prior to this fix, ``tool_budget`` was validated but never written by
+    ``apply_to_settings``; an explicit ``--tool-budget`` override was silently
+    dropped (verified: full method body lines 521-687 never reference
+    ``self.tool_budget``). This is also the prerequisite for the FEP-0002
+    calibration precedence test (explicit overrides must win).
+    """
+
+    def _make_settings(self):
+        from victor.config.settings import Settings
+
+        s = Settings()
+        # Sanity: canonical consumer field is populated from defaults.
+        assert s.tools is not None
+        return s
+
+    def test_tool_budget_none_leaves_baseline_untouched(self):
+        """No explicit override -> baseline tools.tool_call_budget unchanged."""
+        config = SessionConfig()  # tool_budget is None
+        settings = self._make_settings()
+        before = settings.tools.tool_call_budget
+        config.apply_to_settings(settings)
+        assert settings.tools.tool_call_budget == before
+
+    def test_tool_budget_applied_to_settings_tools(self):
+        """An explicit tool_budget must be written to settings.tools."""
+        config = SessionConfig(tool_budget=42)
+        settings = self._make_settings()
+        baseline = settings.tools.tool_call_budget
+        config.apply_to_settings(settings)
+        # The whole point: the override must take effect.
+        assert settings.tools.tool_call_budget == 42
+        assert settings.tools.tool_call_budget != baseline or baseline == 42
+
+    def test_tool_budget_applied_immutably(self):
+        """Override lands on settings.tools (consistent with existing
+        apply_to_settings writes, which use object.__setattr__ on the nested
+        group). The new-immutable-instance guarantee belongs to the
+        calibration seam, not SessionConfig."""
+        config = SessionConfig(tool_budget=7)
+        settings = self._make_settings()
+        config.apply_to_settings(settings)
+        assert settings.tools.tool_call_budget == 7

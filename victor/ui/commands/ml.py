@@ -156,7 +156,9 @@ def ml_mine(
         None, "--output", "-o", help="Write detailed training rows JSONL here."
     ),
     train: Optional[Path] = typer.Option(
-        None, "--train", help="Also train+save a classifier artifact (.npz) from the manifest."
+        None,
+        "--train",
+        help="Also train+save a classifier artifact (.npz) from the manifest.",
     ),
 ) -> None:
     """Project a benchmark manifest into reward-labeled training rows."""

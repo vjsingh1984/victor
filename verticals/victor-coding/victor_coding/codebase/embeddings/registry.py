@@ -17,7 +17,10 @@
 import logging
 from typing import Dict, List, Type
 
-from victor_coding.codebase.embeddings.base import BaseEmbeddingProvider, EmbeddingConfig
+from victor_coding.codebase.embeddings.base import (
+    BaseEmbeddingProvider,
+    EmbeddingConfig,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -30,10 +33,10 @@ class EmbeddingRegistry:
 
     Usage:
         # Register a provider
-        EmbeddingRegistry.register("chromadb", ChromaDBProvider)
+        EmbeddingRegistry.register("lancedb", LanceDBProvider)
 
         # Create a provider
-        config = EmbeddingConfig(vector_store="chromadb")
+        config = EmbeddingConfig(vector_store="lancedb")
         provider = EmbeddingRegistry.create(config)
     """
 
@@ -44,7 +47,7 @@ class EmbeddingRegistry:
         """Register an embedding provider.
 
         Args:
-            name: Provider name (e.g., "chromadb", "lancedb")
+            name: Provider name (e.g., "lancedb")
             provider_class: Provider class (must inherit from BaseEmbeddingProvider)
         """
         if not issubclass(provider_class, BaseEmbeddingProvider):
@@ -117,13 +120,6 @@ class EmbeddingRegistry:
 def _auto_register_providers() -> None:
     """Automatically discover and register embedding providers."""
     try:
-        from victor_coding.codebase.embeddings.chromadb_provider import ChromaDBProvider
-
-        EmbeddingRegistry.register("chromadb", ChromaDBProvider)
-    except ImportError:
-        pass  # ChromaDB not installed
-
-    try:
         from victor_coding.codebase.embeddings.lancedb_provider import LanceDBProvider
 
         EmbeddingRegistry.register("lancedb", LanceDBProvider)
@@ -131,7 +127,9 @@ def _auto_register_providers() -> None:
         pass  # LanceDB not installed
 
     try:
-        from victor_coding.codebase.embeddings.proximadb_provider import ProximaDBProvider
+        from victor_coding.codebase.embeddings.proximadb_provider import (
+            ProximaDBProvider,
+        )
 
         EmbeddingRegistry.register("proximadb", ProximaDBProvider)
     except ImportError:

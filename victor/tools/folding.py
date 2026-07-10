@@ -60,7 +60,8 @@ FOLDED_TOOLS: dict[str, ToolFold] = {
     ),
     "rag_list": ToolFold(target="rag", hint="Use rag list to list knowledge-base documents."),
     "rag_delete": ToolFold(
-        target="rag", hint="Use rag delete <doc_id> to remove a knowledge-base document."
+        target="rag",
+        hint="Use rag delete <doc_id> to remove a knowledge-base document.",
     ),
     "rag_stats": ToolFold(target="rag", hint="Use rag stats for knowledge-base statistics."),
     "rename": ToolFold(
@@ -74,7 +75,8 @@ FOLDED_TOOLS: dict[str, ToolFold] = {
         target="shell", hint="Use shell with standard tools or edit for extraction."
     ),
     "organize_imports": ToolFold(
-        target="shell", hint="Use shell with standard tools (isort, ruff) for organizing imports."
+        target="shell",
+        hint="Use shell with standard tools (isort, ruff) for organizing imports.",
     ),
     "scaffold": ToolFold(
         target="shell",
@@ -95,7 +97,8 @@ FOLDED_TOOLS: dict[str, ToolFold] = {
     ),
     # MCP folds
     "mcp": ToolFold(
-        target="mcp_bridge", hint="Use mcp_bridge to access Model Context Protocol specific tools."
+        target="mcp_bridge",
+        hint="Use mcp_bridge to access Model Context Protocol specific tools.",
     ),
     # Unified command-domain folds: granular primitives previously represented
     # by the fs/web/code bash-style surfaces. The fs domain has been REMOVED —

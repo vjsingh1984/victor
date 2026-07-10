@@ -61,7 +61,9 @@ def _default_confirm(prompt: str) -> bool:
         return False
 
 
-def make_console_approval_handler(confirm_fn: Optional[ConfirmFn] = None) -> ApprovalHandlerFn:
+def make_console_approval_handler(
+    confirm_fn: Optional[ConfirmFn] = None,
+) -> ApprovalHandlerFn:
     """Build an interactive console approval handler.
 
     Args:

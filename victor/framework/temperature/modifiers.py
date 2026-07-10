@@ -30,7 +30,10 @@ from victor.framework.temperature.defaults import (
     escalate_temperature,
     model_bounds,
 )
-from victor.framework.temperature.protocols import TemperatureContext, TemperatureRequest
+from victor.framework.temperature.protocols import (
+    TemperatureContext,
+    TemperatureRequest,
+)
 
 
 @dataclass
@@ -60,7 +63,10 @@ class SpinRatchetModifier:
         if steps <= 0:
             return value, "no ratchet (steps=0)"
         new_value = escalate_temperature(value, steps * self.step, cap=self.cap)
-        return new_value, f"ratchet +{new_value - value:.3f} (steps={steps}, cap={self.cap})"
+        return (
+            new_value,
+            f"ratchet +{new_value - value:.3f} (steps={steps}, cap={self.cap})",
+        )
 
 
 @dataclass
@@ -77,5 +83,8 @@ class ModelBoundsModifier:
         low, high = model_bounds(request.model_name)
         clamped = clamp(value, low, high)
         if clamped != value:
-            return clamped, f"clamped to [{low}, {high}] for {request.model_name or 'unknown'}"
+            return (
+                clamped,
+                f"clamped to [{low}, {high}] for {request.model_name or 'unknown'}",
+            )
         return value, f"within [{low}, {high}]"

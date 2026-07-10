@@ -38,7 +38,10 @@ from victor.core.tool_dependency_loader import (
     invalidate_provider_cache,
     _default_loader,
 )
-from victor.core.tool_dependency_base import BaseToolDependencyProvider, ToolDependencyConfig
+from victor.core.tool_dependency_base import (
+    BaseToolDependencyProvider,
+    ToolDependencyConfig,
+)
 from victor.core.tool_types import ToolDependency
 
 # =============================================================================
@@ -1122,7 +1125,9 @@ class TestCreateVerticalToolDependencyProvider:
     )
     def test_create_coding_provider(self):
         """Factory should create provider for coding vertical."""
-        from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
+        from victor.core.tool_dependency_loader import (
+            create_vertical_tool_dependency_provider,
+        )
 
         provider = create_vertical_tool_dependency_provider("coding")
 
@@ -1134,7 +1139,9 @@ class TestCreateVerticalToolDependencyProvider:
     )
     def test_create_devops_provider(self):
         """Factory should create provider for devops vertical."""
-        from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
+        from victor.core.tool_dependency_loader import (
+            create_vertical_tool_dependency_provider,
+        )
 
         provider = create_vertical_tool_dependency_provider("devops")
 
@@ -1146,7 +1153,9 @@ class TestCreateVerticalToolDependencyProvider:
     )
     def test_create_research_provider(self):
         """Factory should create provider for research vertical."""
-        from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
+        from victor.core.tool_dependency_loader import (
+            create_vertical_tool_dependency_provider,
+        )
 
         provider = create_vertical_tool_dependency_provider("research")
 
@@ -1156,7 +1165,9 @@ class TestCreateVerticalToolDependencyProvider:
     @pytest.mark.skip(reason="Vertical packages are now external - tests need victor-rag installed")
     def test_create_rag_provider(self):
         """Factory should create provider for rag vertical."""
-        from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
+        from victor.core.tool_dependency_loader import (
+            create_vertical_tool_dependency_provider,
+        )
 
         provider = create_vertical_tool_dependency_provider("rag")
 
@@ -1168,7 +1179,9 @@ class TestCreateVerticalToolDependencyProvider:
     )
     def test_create_dataanalysis_provider(self):
         """Factory should create provider for dataanalysis vertical."""
-        from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
+        from victor.core.tool_dependency_loader import (
+            create_vertical_tool_dependency_provider,
+        )
 
         provider = create_vertical_tool_dependency_provider("dataanalysis")
 
@@ -1177,7 +1190,9 @@ class TestCreateVerticalToolDependencyProvider:
 
     def test_unknown_vertical_returns_empty_provider(self):
         """Factory should return EmptyToolDependencyProvider for unknown vertical."""
-        from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
+        from victor.core.tool_dependency_loader import (
+            create_vertical_tool_dependency_provider,
+        )
         from victor.core.tool_types import EmptyToolDependencyProvider
 
         provider = create_vertical_tool_dependency_provider("unknown_vertical")
@@ -1188,7 +1203,9 @@ class TestCreateVerticalToolDependencyProvider:
 
     def test_unknown_vertical_provider_is_empty(self):
         """Empty provider should return minimal safe defaults."""
-        from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
+        from victor.core.tool_dependency_loader import (
+            create_vertical_tool_dependency_provider,
+        )
         from victor.core.tool_types import EmptyToolDependencyProvider
 
         provider = create_vertical_tool_dependency_provider("nonexistent_vertical")
@@ -1210,7 +1227,9 @@ class TestCreateVerticalToolDependencyProvider:
     )
     def test_explicit_canonicalize_true(self):
         """Factory should respect explicit canonicalize=True."""
-        from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
+        from victor.core.tool_dependency_loader import (
+            create_vertical_tool_dependency_provider,
+        )
 
         # DevOps defaults to canonicalize=False, but we override
         provider = create_vertical_tool_dependency_provider("devops", canonicalize=True)
@@ -1222,7 +1241,9 @@ class TestCreateVerticalToolDependencyProvider:
     )
     def test_explicit_canonicalize_false(self):
         """Factory should respect explicit canonicalize=False."""
-        from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
+        from victor.core.tool_dependency_loader import (
+            create_vertical_tool_dependency_provider,
+        )
 
         # Coding defaults to canonicalize=True, but we override
         provider = create_vertical_tool_dependency_provider("coding", canonicalize=False)
@@ -1234,7 +1255,9 @@ class TestCreateVerticalToolDependencyProvider:
     )
     def test_default_canonicalize_for_coding(self):
         """Coding vertical should default to canonicalize=True."""
-        from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
+        from victor.core.tool_dependency_loader import (
+            create_vertical_tool_dependency_provider,
+        )
 
         provider = create_vertical_tool_dependency_provider("coding")
 
@@ -1245,7 +1268,9 @@ class TestCreateVerticalToolDependencyProvider:
     )
     def test_default_canonicalize_for_devops(self):
         """DevOps vertical should default to canonicalize=False."""
-        from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
+        from victor.core.tool_dependency_loader import (
+            create_vertical_tool_dependency_provider,
+        )
 
         provider = create_vertical_tool_dependency_provider("devops")
 
@@ -1256,7 +1281,9 @@ class TestCreateVerticalToolDependencyProvider:
     )
     def test_provider_has_dependencies(self):
         """Created provider should have dependencies from YAML."""
-        from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
+        from victor.core.tool_dependency_loader import (
+            create_vertical_tool_dependency_provider,
+        )
 
         provider = create_vertical_tool_dependency_provider("coding")
         deps = provider.get_dependencies()
@@ -1268,7 +1295,9 @@ class TestCreateVerticalToolDependencyProvider:
     )
     def test_provider_has_sequences(self):
         """Created provider should have sequences from YAML."""
-        from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
+        from victor.core.tool_dependency_loader import (
+            create_vertical_tool_dependency_provider,
+        )
 
         provider = create_vertical_tool_dependency_provider("coding")
         sequences = provider.get_tool_sequences()
@@ -1280,7 +1309,9 @@ class TestCreateVerticalToolDependencyProvider:
     )
     def test_provider_has_required_tools(self):
         """Created provider should have required tools from YAML."""
-        from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
+        from victor.core.tool_dependency_loader import (
+            create_vertical_tool_dependency_provider,
+        )
 
         provider = create_vertical_tool_dependency_provider("coding")
         required = provider.get_required_tools()
@@ -1294,7 +1325,9 @@ class TestCreateVerticalToolDependencyProvider:
     def test_equivalent_to_wrapper_class(self):
         """Factory should produce equivalent results to wrapper classes."""
         import warnings
-        from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
+        from victor.core.tool_dependency_loader import (
+            create_vertical_tool_dependency_provider,
+        )
         from victor_coding.tool_dependencies import CodingToolDependencyProvider
 
         factory_provider = create_vertical_tool_dependency_provider("coding")

@@ -239,7 +239,7 @@ class MissingParameterHandler(ErrorRecoveryHandler):
 
         self._logger.debug(
             "Recovered payload missing required params: have=%s, need=%s",
-            list(recovered.keys()) if isinstance(recovered, dict) else type(recovered).__name__,
+            (list(recovered.keys()) if isinstance(recovered, dict) else type(recovered).__name__),
             missing_params,
         )
         return None

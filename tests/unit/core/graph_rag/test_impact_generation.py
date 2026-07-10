@@ -26,10 +26,18 @@ def test_impact_analysis_generation():
 
     # Mock nodes: a function and its test
     node_func = GraphNode(
-        node_id="func1", name="my_function", type="function", file="src/logic.py", line=10
+        node_id="func1",
+        name="my_function",
+        type="function",
+        file="src/logic.py",
+        line=10,
     )
     node_test = GraphNode(
-        node_id="test1", name="test_my_function", type="test", file="tests/test_logic.py", line=5
+        node_id="test1",
+        name="test_my_function",
+        type="test",
+        file="tests/test_logic.py",
+        line=5,
     )
 
     # Mock retrieval result

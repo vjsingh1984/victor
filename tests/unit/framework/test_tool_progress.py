@@ -21,7 +21,13 @@ def test_sink_receives_emissions():
 
     tp.emit_tool_progress(name="shell", stdout="line\n", progress=0.5)
     assert seen == [
-        {"name": "shell", "stdout": "line\n", "stderr": "", "progress": 0.5, "is_final": False}
+        {
+            "name": "shell",
+            "stdout": "line\n",
+            "stderr": "",
+            "progress": 0.5,
+            "is_final": False,
+        }
     ]
 
 

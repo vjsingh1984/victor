@@ -425,7 +425,10 @@ class DamageScopedShellSafetyPolicy:
         for pat in self._deny:
             if pat.search(cmd):
                 return self._deny_decision(
-                    "matched session deny pattern", "deny_pattern", invariant=None, risk=0.9
+                    "matched session deny pattern",
+                    "deny_pattern",
+                    invariant=None,
+                    risk=0.9,
                 )
 
         # Caller allow patterns short-circuit to ALLOW (trusted override).
@@ -521,11 +524,17 @@ class DamageScopedShellSafetyPolicy:
         if self._profile is ShellSafetyProfile.BENCHMARK:
             # Permissive: package install / fetch inside the task repo is expected.
             return ShellSafetyDecision(
-                SafetyVerdict.ALLOW, effective_readonly=False, category="network", risk_score=0.2
+                SafetyVerdict.ALLOW,
+                effective_readonly=False,
+                category="network",
+                risk_score=0.2,
             )
         if allow is True:
             return ShellSafetyDecision(
-                SafetyVerdict.ALLOW, effective_readonly=False, category="network", risk_score=0.2
+                SafetyVerdict.ALLOW,
+                effective_readonly=False,
+                category="network",
+                risk_score=0.2,
             )
         # STRICT / AUTONOMOUS / CUSTOM without explicit allow → ask.
         return ShellSafetyDecision(
@@ -569,7 +578,9 @@ class CompositeShellSafetyPolicy:
             return allow
         # Empty chain — default deny (fail closed).
         return ShellSafetyDecision(
-            SafetyVerdict.DENY, reason="no policy authorized the command", category="empty_chain"
+            SafetyVerdict.DENY,
+            reason="no policy authorized the command",
+            category="empty_chain",
         )
 
 
@@ -623,7 +634,9 @@ def get_shell_safety_policy() -> ShellSafetyPolicy:
     return _SESSION_POLICY.get()
 
 
-def set_shell_safety_policy(policy: ShellSafetyPolicy) -> contextvars.Token[ShellSafetyPolicy]:
+def set_shell_safety_policy(
+    policy: ShellSafetyPolicy,
+) -> contextvars.Token[ShellSafetyPolicy]:
     """Install ``policy`` for the current session context.
 
     Returns the contextvar token; pass it to :func:`reset_shell_safety_policy`

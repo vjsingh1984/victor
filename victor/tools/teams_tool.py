@@ -99,7 +99,9 @@ def _get_headers(access_token: str) -> Dict[str, str]:
     }
 
 
-async def _resolve_access_token(context: Optional[Dict[str, Any]] = None) -> Optional[str]:
+async def _resolve_access_token(
+    context: Optional[Dict[str, Any]] = None,
+) -> Optional[str]:
     """Resolve a Microsoft Graph token.
 
     Prefers a token supplied out-of-band via ``context["teams_access_token"]``;

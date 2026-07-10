@@ -740,7 +740,11 @@ def _limit_team_members(
         return list(members)
 
     if formation == TeamFormation.HIERARCHICAL:
-        selected = [member for member in members if getattr(member, "is_manager", False)]
+        selected = [
+            member
+            for member in members
+            if getattr(member, "is_supervisor", False) or getattr(member, "is_manager", False)
+        ]
         limited = selected[:1]
         for member in members:
             if member in limited:

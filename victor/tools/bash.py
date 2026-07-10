@@ -1298,6 +1298,103 @@ async def _stream_subprocess_output(process: Any, tool_name: str) -> tuple[bytes
     return bytes(out_buf), bytes(err_buf)
 
 
+# --- Shell git-commit attribution interceptor -------------------------------------------
+# Closes the bypass where an LLM issues ``git commit -m "..."`` via the raw
+# ``shell`` tool instead of the domain ``git`` tool (which already attributes).
+# BEST-EFFORT and deliberately conservative: it only rewrites a *plain, single*
+# ``git commit ... -m <constant>`` / ``--message=<constant>`` and bails (leaving
+# the command untouched) on any compound form that would make robust rewriting
+# fragile: chaining (&&, ||, |, ;), redirections, command substitution,
+# heredocs, message-file (-F), or amend/`-c`/`-C` flags. Idempotent and gated by
+# the same ``VICTOR_COMMIT_ATTRIBUTION`` env flag as the ``git`` tool path.
+# Optional but proactive-by-default, Claude-Code-style.
+_SHELL_ATTRIBUTION_BAIL_TOKENS = (
+    "&&",
+    "||",
+    "|",
+    ";",
+    ">",
+    "<",
+    "`",
+    "$(",
+    "<<",
+    "-F",
+    "--amend",
+    "-c ",
+    "-C",
+)
+
+
+def _attribution_disabled() -> bool:
+    """Return True if the user opted out of commit attribution via env."""
+    return os.getenv("VICTOR_COMMIT_ATTRIBUTION", "1").strip().lower() in {
+        "0",
+        "false",
+        "no",
+        "off",
+    }
+
+
+def _maybe_attribute_shell_git_commit(cmd: str) -> str:
+    """Best-effort: append the Victor co-author trailer to a plain ``git commit``.
+
+    Returns ``cmd`` unchanged whenever the command is not a *plain, single*
+    ``git commit`` with a constant ``-m``/``--message`` argument, or when
+    attribution is disabled. Never raises; never fails the command.
+    """
+    if not cmd or _attribution_disabled():
+        return cmd
+    stripped = cmd.strip()
+    # Bail on anything compound/dynamic that would make rewriting fragile.
+    if any(tok in stripped for tok in _SHELL_ATTRIBUTION_BAIL_TOKENS):
+        return cmd
+    try:
+        tokens = shlex.split(stripped, posix=True)
+    except ValueError:
+        # Unbalanced quotes / escapes: do not risk corrupting the command.
+        return cmd
+    if len(tokens) < 2 or tokens[0] != "git" or tokens[1] != "commit":
+        return cmd
+
+    # Locate the -m / --message constant value (support ``-m msg``, ``-m=msg``,
+    # ``--message msg``, ``--message=msg``). Only act on a literal string value.
+    msg_index = None
+    msg_value = None
+    combined = False  # True for ``-m=...`` / ``--message=...`` form
+    for i, tok in enumerate(tokens):
+        if tok in ("-m", "--message"):
+            if i + 1 < len(tokens):
+                msg_index = i + 1
+                msg_value = tokens[i + 1]
+            break
+        if tok.startswith("--message="):
+            msg_index, msg_value, combined = i, tok.split("--message=", 1)[1], True
+            break
+        if tok.startswith("-m="):
+            msg_index, msg_value, combined = i, tok.split("-m=", 1)[1], True
+            break
+    if msg_value is None or not msg_value:
+        return cmd
+
+    try:
+        from victor.core.attribution import append_victor_commit_attribution
+    except Exception:
+        return cmd
+    attributed = append_victor_commit_attribution(msg_value)
+    if attributed == msg_value:
+        return cmd  # nothing to add (already attributed)
+
+    # Rebuild the located message token. ``--message=v`` / ``-m=v`` keep the
+    # prefix; the separate-argument form replaces the value token in place.
+    quoted = shlex.quote(attributed)
+    if combined:
+        prefix = "--message=" if tokens[msg_index].startswith("--message=") else "-m="
+        tokens[msg_index] = f"{prefix}{quoted}"
+    else:
+        tokens[msg_index] = quoted
+    return " ".join(tokens)
+
+
 @tool(
     category="execution",
     priority=Priority.CRITICAL,  # Always available
@@ -1432,6 +1529,12 @@ async def shell(
 
     # Apply command optimizer pipeline (grep→rg, etc.)
     cmd = optimize_command(cmd)
+
+    # Best-effort agent-layer attribution for raw ``git commit -m "..."`` issued
+    # through the shell escape hatch (the domain ``git`` tool is attributed in its
+    # own module). Conservative: only touches a plain single git commit; leaves
+    # compound/dynamic commands untouched. Gated by VICTOR_COMMIT_ATTRIBUTION.
+    cmd = _maybe_attribute_shell_git_commit(cmd)
 
     # Guard against filesystem-wide searches (find / ...) that timeout.
     if re.match(r"^\s*find\s+/", cmd.strip()):

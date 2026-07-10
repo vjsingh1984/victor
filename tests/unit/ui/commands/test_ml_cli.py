@@ -72,7 +72,8 @@ def test_validate_no_data_exits_1(monkeypatch):
 
 def test_validate_ships_on_separable(monkeypatch):
     monkeypatch.setattr(
-        "victor.ml.parity_gate.load_outcome_samples", lambda dt=None: _separable_outcomes()
+        "victor.ml.parity_gate.load_outcome_samples",
+        lambda dt=None: _separable_outcomes(),
     )
     result = runner.invoke(ml_app, ["validate", "--min-samples", "5", "--min-coverage", "0.5"])
     assert result.exit_code == 0, result.stdout

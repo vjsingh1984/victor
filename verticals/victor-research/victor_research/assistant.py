@@ -5,7 +5,12 @@ Competitive positioning: Perplexity AI, Google Gemini Deep Research, ChatGPT Bro
 
 from typing import Any, Dict, List
 
-from victor_contracts import FileOperationsCapability, StageDefinition, ToolNames, VerticalBase
+from victor_contracts import (
+    FileOperationsCapability,
+    StageDefinition,
+    ToolNames,
+    VerticalBase,
+)
 from victor_contracts.verticals import register_vertical
 
 

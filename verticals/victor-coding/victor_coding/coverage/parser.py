@@ -290,7 +290,7 @@ class LcovParser(BaseCoverageParser):
                                         line_number=line_num,
                                         branch_id=f"{block_id}:{branch_id}",
                                         taken=taken,
-                                        hit_count=int(parts[3]) if parts[3] != "-" else 0,
+                                        hit_count=(int(parts[3]) if parts[3] != "-" else 0),
                                     )
                                 )
 

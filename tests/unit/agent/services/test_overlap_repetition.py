@@ -21,7 +21,9 @@ loop never reached the force-completion threshold.
 
 # The overlap-repetition helper moved to the shared turn_policy module (consolidated so the
 # headless and streaming loops share one content-repetition detector).
-from victor.agent.turn_policy import evaluate_overlap_repetition as _evaluate_overlap_repetition
+from victor.agent.turn_policy import (
+    evaluate_overlap_repetition as _evaluate_overlap_repetition,
+)
 
 
 def test_near_duplicate_forces_on_first_occurrence() -> None:

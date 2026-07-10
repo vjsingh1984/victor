@@ -311,7 +311,11 @@ class ASTAwareChunker:
         """Find the definition node that contains a name node."""
         # Definition node types by language
         definition_types = {
-            "python": {"function_definition", "class_definition", "decorated_definition"},
+            "python": {
+                "function_definition",
+                "class_definition",
+                "decorated_definition",
+            },
             "javascript": {
                 "function_declaration",
                 "class_declaration",
@@ -326,8 +330,18 @@ class ASTAwareChunker:
                 "lexical_declaration",
             },
             "go": {"function_declaration", "method_declaration", "type_declaration"},
-            "java": {"class_declaration", "interface_declaration", "method_declaration"},
-            "rust": {"function_item", "struct_item", "enum_item", "trait_item", "impl_item"},
+            "java": {
+                "class_declaration",
+                "interface_declaration",
+                "method_declaration",
+            },
+            "rust": {
+                "function_item",
+                "struct_item",
+                "enum_item",
+                "trait_item",
+                "impl_item",
+            },
             "cpp": {"function_definition", "class_specifier", "struct_specifier"},
         }
 
