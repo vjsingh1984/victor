@@ -202,3 +202,54 @@ class TestRunGroup:
         with pytest.raises(InitializationError) as exc_info:
             manager.run_group(orch, PhaseGroup.EARLY)
         assert exc_info.value.phase == "provider_runtime"
+
+
+class TestNoRawInitCallSites:
+    """FEP-0016 guard: every init phase is invoked via the manager's run_phase;
+    no raw ``orchestrator._initialize_*()`` call sites remain in the construction
+    path. This is the regression guard that prevents a phase from being silently
+    lost (the class of bug that hid credit_runtime until #464)."""
+
+    def test_no_raw_initialize_calls_in_construction_path(self):
+        import pathlib
+        import re
+
+        root = pathlib.Path(__file__).resolve().parents[3]
+        files = [
+            "victor/agent/orchestrator.py",
+            "victor/agent/runtime/component_assembler.py",
+            "victor/agent/runtime/bootstrapper.py",
+        ]
+        # A raw call = something like `x._initialize_<phase>(` (a dot before the
+        # name, so `def _initialize_x(` definitions are not matched).
+        pattern = re.compile(
+            r"\w+\._initialize_"
+            r"(provider|metrics|workflow|memory|resilience|coordination|interaction|credit)"
+            r"_runtime\s*\(|\w+\._initialize_services\s*\("
+        )
+        offenders = []
+        for rel in files:
+            for i, line in enumerate((root / rel).read_text().splitlines(), 1):
+                if pattern.search(line):
+                    offenders.append(f"{rel}:{i}: {line.strip()}")
+        assert not offenders, (
+            "raw _initialize_* call sites must go through _init_manager.run_phase "
+            "(FEP-0016):\n" + "\n".join(offenders)
+        )
+
+    def test_manager_covers_all_nine_phases(self):
+        from unittest.mock import MagicMock
+
+        manager = InitializationPhaseManager()
+        names = [s.name for s in manager._phase_specs(MagicMock())]
+        assert names == [
+            "provider_runtime",
+            "metrics_runtime",
+            "workflow_runtime",
+            "memory_runtime",
+            "resilience_runtime",
+            "coordination_runtime",
+            "interaction_runtime",
+            "services",
+            "credit_runtime",
+        ]
