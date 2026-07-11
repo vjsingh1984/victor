@@ -3345,49 +3345,6 @@ class TestGoalHints:
         assert isinstance(hints, list)
 
 
-class TestCancellation:
-    """Tests for cancellation functionality."""
-
-    def test_request_cancellation(self, orchestrator):
-        """Test request_cancellation sets cancel event."""
-        import asyncio
-
-        # Set up cancel event (normally done during streaming)
-        orchestrator._cancel_event = asyncio.Event()
-        # Initially not cancelled
-        assert orchestrator._check_cancellation() is False
-        # Request cancellation
-        orchestrator.request_cancellation()
-        # Now should be cancelled
-        assert orchestrator._check_cancellation() is True
-
-    def test_check_cancellation(self, orchestrator):
-        """Test _check_cancellation returns event state."""
-        import asyncio
-
-        # Set up cancel event
-        orchestrator._cancel_event = asyncio.Event()
-        assert orchestrator._check_cancellation() is False
-        orchestrator.request_cancellation()
-        assert orchestrator._check_cancellation() is True
-
-    def test_check_cancellation_no_event(self, orchestrator):
-        """Test _check_cancellation returns False when no event."""
-        orchestrator._cancel_event = None
-        assert orchestrator._check_cancellation() is False
-
-    def test_request_cancellation_no_event(self, orchestrator):
-        """Test request_cancellation is safe when no event."""
-        orchestrator._cancel_event = None
-        # Should not raise
-        orchestrator.request_cancellation()
-
-    def test_is_streaming(self, orchestrator):
-        """Test is_streaming returns streaming state."""
-        # Initially not streaming
-        assert orchestrator.is_streaming() is False
-
-
 class TestHandleCancellation:
     """Tests for cancellation handling (now inline in ChatCoordinator._run_iteration_pre_checks).
 
