@@ -194,6 +194,7 @@ jobs:
             --group=${{ matrix.shard }} \
             -v \
             --tb=short \
+            --durations=30 \
             $COV_FLAGS
 
       - name: Upload coverage to Codecov
