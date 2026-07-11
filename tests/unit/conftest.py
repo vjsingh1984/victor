@@ -155,8 +155,26 @@ def reset_embedding_singleton():
     if "victor.storage.embeddings.service" in sys.modules:
         from victor.storage.embeddings.service import EmbeddingService
 
-        if EmbeddingService._instance is not None:
-            EmbeddingService.reset_instance()
+        inst = EmbeddingService._instance
+        if inst is not None:
+            # Reuse a REAL loaded model across tests (no weight reload). But some
+            # tests patch sentence_transformers.SentenceTransformer with a MagicMock
+            # whose encode.return_value is a fixed array; if _ensure_model_loaded
+            # ran under that patch, self._model became that mock and leaks (every
+            # later encode returns the same array -> identical embeddings). So keep
+            # the model only when it is a real SentenceTransformer; otherwise drop
+            # it so the next call reloads a genuine model.
+            try:
+                from sentence_transformers import SentenceTransformer
+
+                is_real = isinstance(inst._model, SentenceTransformer)
+            except Exception:
+                is_real = False
+            if is_real:
+                inst._embedding_cache.clear()
+                inst._current_cache_memory_bytes = 0
+            else:
+                EmbeddingService.reset_instance()
 
     # Reset classifier singletons that cache the embedding service.
     for mod_name, cls_name in (
