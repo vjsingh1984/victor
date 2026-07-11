@@ -127,7 +127,10 @@ UNIVERSAL_EXCLUDE_PATTERNS = [
     "**/log/**",
     # PHP
     "**/vendor/**",
-    "**/storage/**",  # Laravel
+    "**/storage/app/**",  # Laravel (narrowed from **/storage/** — that glob matched any
+    "**/storage/framework/**",  # `storage/` dir, e.g. a Rust `src/storage/` source tree)
+    "**/storage/logs/**",
+    "**/storage/debugbar/**",
     "**/bootstrap/cache/**",
     # Swift / Objective-C
     "**/DerivedData/**",
