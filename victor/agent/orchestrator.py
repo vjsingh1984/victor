@@ -942,16 +942,10 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
             self.tool_calling_caps,
         ) = self._factory.create_provider_manager_with_adapter(provider, model, provider_name)
 
-        # Runtime init phases (FEP-0016): one InitializationPhaseManager drives the 9
-        # _initialize_* phases at their existing construction sites — owning the phase
-        # contract (order, criticality/fail-fast, dependency-skip, per-phase timing) and
-        # accumulating succeeded-phase state across the calls so cross-phase dependencies
-        # resolve. Phases are finely interleaved with construction, so they stay in place.
+        # FEP-0016: InitializationPhaseManager drives the 9 interleaved init phases in place.
         from victor.agent.runtime.initialization_manager import InitializationPhaseManager
 
         self._init_manager = InitializationPhaseManager()
-
-        # Provider runtime boundary: coordinator services are created lazily on first use.
         self._init_manager.run_phase(self, "provider_runtime")
 
         # Response sanitizer for cleaning model output (via factory - DI with fallback)
@@ -1071,7 +1065,6 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         # Debug logger for incremental output and conversation tracking (via factory)
         self.debug_logger = self._factory.create_debug_logger_configured()
 
-        # Metrics/analytics runtime boundary with lazy collector/coordinator loading.
         self._init_manager.run_phase(self, "metrics_runtime")
 
         # CallbackCoordinator: centralized callback delegation for tool/streaming events.
@@ -1089,7 +1082,6 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         self._shown_tool_errors: set = set()
         self._tool_context_cache: Optional[dict] = None
 
-        # Workflow runtime boundary (lazy registry + default workflow registration).
         self._init_manager.run_phase(self, "workflow_runtime")
 
         # Constraint activation service for unified constraint management
@@ -1101,7 +1093,6 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         # Conversation history (via factory) - MessageHistory for better encapsulation
         self.conversation = self._factory.create_message_history(self._system_prompt)
 
-        # Memory/session runtime boundary with embedding-store initialization.
         self._init_manager.run_phase(self, "memory_runtime")
 
         # Conversation state machine for intelligent stage detection
