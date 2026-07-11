@@ -213,6 +213,30 @@ class InitializationPhaseManager:
         self._run_specs(specs)
         return self._result
 
+    def run_phase(self, orchestrator: Any, name: str) -> InitializationResult:
+        """Run a single named init phase in place (FEP-0016 per-phase wiring).
+
+        The 9 phases are finely interleaved with orchestrator construction, so rather
+        than move them, the orchestrator calls ``run_phase`` at each phase's existing
+        site. The manager accumulates result / succeeded-phase state across the calls
+        (same instance), so a phase's declared dependencies resolve against the phases
+        that already ran earlier in construction, and it gains the phase contract's
+        criticality (fail-fast), dependency-skip, and per-phase timing.
+
+        Args:
+            orchestrator: The orchestrator being constructed.
+            name: The phase name (must match a spec in :meth:`_phase_specs`).
+
+        Raises:
+            KeyError: If ``name`` is not a declared phase.
+            InitializationError: If this phase is critical and fails or is skipped.
+        """
+        spec = next((s for s in self._phase_specs(orchestrator) if s.name == name), None)
+        if spec is None:
+            raise KeyError(f"unknown initialization phase: {name!r}")
+        self._run_specs([spec])
+        return self._result
+
     def run_all_phases(self, orchestrator: Any) -> InitializationResult:
         """Run all 9 phases in order in a single call, resetting state first.
 

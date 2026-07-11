@@ -145,8 +145,7 @@ def test_assemble_intelligence_creates_context_lifecycle_service():
         debug_logger=MagicMock(),
         settings=settings,
         memory_manager=MagicMock(),
-        _initialize_resilience_runtime=MagicMock(),
-        _initialize_coordination_runtime=MagicMock(),
+        _init_manager=MagicMock(),
         _get_model_context_window=MagicMock(return_value=64000),
     )
 
@@ -191,8 +190,7 @@ def test_assemble_intelligence_honors_llm_summary_flag_for_lifecycle_service():
         debug_logger=MagicMock(),
         settings=settings,
         memory_manager=MagicMock(),
-        _initialize_resilience_runtime=MagicMock(),
-        _initialize_coordination_runtime=MagicMock(),
+        _init_manager=MagicMock(),
         _get_model_context_window=MagicMock(return_value=64000),
     )
 

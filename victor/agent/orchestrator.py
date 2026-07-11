@@ -942,8 +942,11 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
             self.tool_calling_caps,
         ) = self._factory.create_provider_manager_with_adapter(provider, model, provider_name)
 
-        # Provider runtime boundary: coordinator services are created lazily on first use.
-        self._initialize_provider_runtime()
+        # FEP-0016: InitializationPhaseManager drives the 9 interleaved init phases in place.
+        from victor.agent.runtime.initialization_manager import InitializationPhaseManager
+
+        self._init_manager = InitializationPhaseManager()
+        self._init_manager.run_phase(self, "provider_runtime")
 
         # Response sanitizer for cleaning model output (via factory - DI with fallback)
         self.sanitizer = self._factory.create_sanitizer()
@@ -1062,8 +1065,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         # Debug logger for incremental output and conversation tracking (via factory)
         self.debug_logger = self._factory.create_debug_logger_configured()
 
-        # Metrics/analytics runtime boundary with lazy collector/coordinator loading.
-        self._initialize_metrics_runtime()
+        self._init_manager.run_phase(self, "metrics_runtime")
 
         # CallbackCoordinator: centralized callback delegation for tool/streaming events.
         self._callback_coordinator = self._build_callback_coordinator()
@@ -1080,8 +1082,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         self._shown_tool_errors: set = set()
         self._tool_context_cache: Optional[dict] = None
 
-        # Workflow runtime boundary (lazy registry + default workflow registration).
-        self._initialize_workflow_runtime()
+        self._init_manager.run_phase(self, "workflow_runtime")
 
         # Constraint activation service for unified constraint management
         from victor.agent.constraint_activation_service import get_constraint_activator
@@ -1092,8 +1093,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         # Conversation history (via factory) - MessageHistory for better encapsulation
         self.conversation = self._factory.create_message_history(self._system_prompt)
 
-        # Memory/session runtime boundary with embedding-store initialization.
-        self._initialize_memory_runtime()
+        self._init_manager.run_phase(self, "memory_runtime")
 
         # Conversation state machine for intelligent stage detection
         self.conversation_state = self._factory.create_conversation_state_machine()
