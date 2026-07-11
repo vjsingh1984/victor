@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
-class ValidationResult:
+class ToolCallValidationResult:
     """Result of tool call validation."""
 
     valid: bool = True
@@ -41,7 +41,7 @@ class ToolCallValidator:
     def __init__(self, tool_schemas: Optional[dict[str, dict]] = None):
         self._tool_schemas = tool_schemas or {}
 
-    def validate(self, tool_name: str, args: dict[str, Any]) -> ValidationResult:
+    def validate(self, tool_name: str, args: dict[str, Any]) -> ToolCallValidationResult:
         """Validate a tool call against its schema.
 
         Args:
@@ -49,9 +49,9 @@ class ToolCallValidator:
             args: Arguments to pass.
 
         Returns:
-            ValidationResult with errors if invalid.
+            ToolCallValidationResult with errors if invalid.
         """
-        result = ValidationResult()
+        result = ToolCallValidationResult()
 
         schema = self._tool_schemas.get(tool_name)
         if not schema:

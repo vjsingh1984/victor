@@ -209,6 +209,46 @@ class MetricsCollector:
         # Cost tracking
         self._cost_tracking = CostTracking()
 
+        # Ad-hoc metrics recorded via the MetricsCollectorProtocol adapter
+        # (``record_metric``). The typed ``record_*`` methods above cover the
+        # known agent metrics; this store backs generic, name/value observations.
+        self._adhoc_metrics: Dict[str, float] = {}
+
+    # =========================================================================
+    # MetricsCollectorProtocol adapter (FEP-0014)
+    # =========================================================================
+
+    def record_metric(self, name: str, value: float, **tags: str) -> None:
+        """Record a single generic metric observation (protocol adapter).
+
+        Complements the typed ``record_*`` methods with a name/value surface so
+        this collector satisfies ``MetricsCollectorProtocol``. Stores the value
+        under ``name`` (tag-qualified when tags are supplied).
+
+        Args:
+            name: Metric name.
+            value: Numeric value to record.
+            **tags: Optional string-valued dimensional tags, appended to the key.
+        """
+        key = name
+        if tags:
+            tag_suffix = ",".join(f"{k}={v}" for k, v in sorted(tags.items()))
+            key = f"{name}{{{tag_suffix}}}"
+        self._adhoc_metrics[key] = float(value)
+
+    def get_snapshot(self) -> Dict[str, Any]:
+        """Return a point-in-time snapshot of collected metrics (protocol adapter).
+
+        Merges the aggregated tool-usage view from :meth:`get_tool_usage_stats`
+        with any ad-hoc metrics recorded via :meth:`record_metric`.
+
+        Returns:
+            A mapping of the collector's current metric state.
+        """
+        snapshot: Dict[str, Any] = dict(self.get_tool_usage_stats())
+        snapshot["adhoc_metrics"] = dict(self._adhoc_metrics)
+        return snapshot
+
     # =========================================================================
     # Stream Metrics
     # =========================================================================

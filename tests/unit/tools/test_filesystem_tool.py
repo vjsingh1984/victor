@@ -206,14 +206,21 @@ async def test_write_file_overwrites_existing():
 
 @pytest.mark.asyncio
 async def test_write_file_exception_handling():
-    """Test exception handling in write_file (permission error)."""
+    """Test exception handling in write_file (permission error).
+
+    write() delegates to edit() when the enhanced editor (victor-coding) is
+    available; force the direct-write fallback path (which still uses
+    aiofiles.open) so the I/O error surfaces as an exception.
+    """
     from unittest.mock import patch
 
     with tempfile.TemporaryDirectory() as tmpdir:
         file_path = os.path.join(tmpdir, "test.txt")
 
-        # Mock aiofiles.open to raise an exception
-        with patch("aiofiles.open", side_effect=PermissionError("Write denied")):
+        with (
+            patch("victor.tools.filesystem._editor_available", return_value=False),
+            patch("aiofiles.open", side_effect=PermissionError("Write denied")),
+        ):
             with pytest.raises(PermissionError):
                 await write(path=file_path, content="test content")
 

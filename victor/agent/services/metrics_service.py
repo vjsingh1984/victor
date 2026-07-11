@@ -569,9 +569,8 @@ class AgentMetricsService:
 
     def get_provider_category(self, provider: Any) -> str:
         """Classify provider for tool-strategy metrics."""
-        from victor.providers.base import is_caching_provider
-
-        if is_caching_provider(provider):
+        supports_caching = getattr(provider, "supports_prompt_caching", None)
+        if callable(supports_caching) and supports_caching():
             return "caching"
 
         provider_name = self._normalize_provider_name(provider)

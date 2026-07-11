@@ -61,7 +61,7 @@ from .validation import (
     CodeSyntaxValidator,
     ConfigurationValidator,
     OutputFormatValidator,
-    ValidationResult,
+    CapabilityValidationResult,
     ValidationSeverity,
 )
 from .safety_rules import (
@@ -109,7 +109,7 @@ __all__ = [
     "CodeSyntaxValidator",
     "ConfigurationValidator",
     "OutputFormatValidator",
-    "ValidationResult",
+    "CapabilityValidationResult",
     "ValidationSeverity",
     "SafetyRulesCapabilityProvider",
     "SafetyRulesPresets",

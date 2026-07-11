@@ -937,6 +937,14 @@ async def test_service_streaming_runtime_does_not_charge_event_loop_stall_to_pro
     assert total_tokens == 1
     assert garbage_detected is False
     assert "local_runtime_stall" in [event["kind"] for event in ctx.provider_status_events]
+    # Restore global time.monotonic (and asyncio.wait_for) BEFORE the event loop
+    # teardown. monkeypatch.setattr(helpers_module.time, "monotonic", ...) patches
+    # the GLOBAL time module (helpers_module.time IS time), and the skewed value
+    # (590.0) propagates into asyncio's loop.time() -> the loop's timer scheduling
+    # breaks -> selector.select stalls indefinitely at teardown (no per-test timeout
+    # on CI -> the whole shard hangs at this test). monkeypatch.undo() here restores
+    # the real monotonic before pytest-asyncio finalizes the loop.
+    monkeypatch.undo()
 
 
 @pytest.mark.asyncio

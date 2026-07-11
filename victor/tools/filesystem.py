@@ -559,6 +559,119 @@ def is_file_cache_enabled() -> bool:
 
 
 # ============================================================================
+# READ-BEFORE-WRITE STATE TRACKING (P0 - overwrite safety)
+# ============================================================================
+# Tracks which files the agent has actually READ this session (with the mtime
+# observed at read time) so we can refuse to overwrite an existing file that
+# was never read — the inverse of Claude Code's "Overwriting an existing file
+# you haven't Read will fail". This is independent of FileContentCache because
+# the cache is disabled by default (_cache_enabled=False); the read-state
+# tracker is always on.
+
+
+class ReadStateTracker:
+    """Thread-safe record of files read this session, keyed by normalized path.
+
+    Stores the mtime observed at read time so a later external modification
+    (mtime changed) re-invalidates the read even within the same session.
+    """
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        # normalized absolute path -> mtime observed at read time
+        self._read_mtime: Dict[str, float] = {}
+
+    @staticmethod
+    def _normalize(path: str) -> str:
+        try:
+            return str(Path(path).expanduser().resolve())
+        except Exception:
+            return str(path)
+
+    def record(self, path: str) -> None:
+        """Mark a path as read, capturing its current mtime.
+
+        No-op if the file does not exist (stat failed) — only real reads count.
+        """
+        normalized = self._normalize(path)
+        try:
+            mtime = Path(normalized).stat().st_mtime
+        except OSError:
+            return
+        with self._lock:
+            self._read_mtime[normalized] = mtime
+
+    def is_current(self, path: str) -> bool:
+        """True iff path was read this session and has not changed since.
+
+        Returns False when the file was never read, was deleted, changed on
+        disk (mtime differs), or stat fails — i.e. the safe default is "unread".
+        """
+        normalized = self._normalize(path)
+        with self._lock:
+            recorded = self._read_mtime.get(normalized)
+        if recorded is None:
+            return False
+        try:
+            return Path(normalized).stat().st_mtime == recorded
+        except OSError:
+            return False
+
+    def clear(self) -> None:
+        with self._lock:
+            self._read_mtime.clear()
+
+
+_read_state_tracker: Optional[ReadStateTracker] = None
+
+
+def get_read_state() -> ReadStateTracker:
+    """Get or create the global read-state tracker (always-on, not cache-gated)."""
+    global _read_state_tracker
+    if _read_state_tracker is None:
+        _read_state_tracker = ReadStateTracker()
+    return _read_state_tracker
+
+
+def record_read(path: str) -> None:
+    """Record that a file was read this session. Called from read()."""
+    get_read_state().record(path)
+
+
+def _read_before_write_enabled() -> bool:
+    """Master switch for the read-before-overwrite guard.
+
+    Default ON. Set VICTOR_ENFORCE_READ_BEFORE_WRITE=0 (or false/no/off) to
+    disable for batch evals/benchmarks that legitimately overwrite unread files.
+    """
+    raw = os.environ.get("VICTOR_ENFORCE_READ_BEFORE_WRITE", "").strip().lower()
+    return raw not in ("0", "false", "no", "off")
+
+
+def enforce_read_before_write(file_path: Path, *, force: bool = False) -> None:
+    """Refuse to overwrite an existing file that was not read this session.
+
+    Creating a new file is always allowed. An explicit ``force=True`` opts out
+    (intentional full rewrite / generated output). Raises PermissionError when
+    the guard blocks the write so the caller surfaces a retryable error.
+    """
+    if force or not _read_before_write_enabled():
+        return
+    try:
+        if not file_path.exists():
+            return  # new file — always allowed
+    except OSError:
+        return  # cannot stat — don't block on an unrelated error
+    if get_read_state().is_current(str(file_path)):
+        return  # read this session and unchanged
+    raise PermissionError(
+        f"Refusing to overwrite existing file '{file_path}' that was not read "
+        f"in this session (or changed since read). Read it first, then edit, or "
+        f"pass force=True to acknowledge the overwrite."
+    )
+
+
+# ============================================================================
 # FILE TYPE DETECTION SYSTEM
 # ============================================================================
 # Extensible architecture for detecting file types via magic bytes and extensions.
@@ -1636,6 +1749,11 @@ async def read(
             except OSError:
                 pass  # Don't fail if we can't cache
 
+    # Record that this file was read this session (read-before-overwrite guard).
+    # Independent of the content cache (which is off by default) so the gate
+    # always has read-state to consult.
+    record_read(str(file_path))
+
     # Normalize parameters (handle non-int input from model)
     def _to_int(val, default: int) -> int:
         if isinstance(val, int):
@@ -1800,6 +1918,88 @@ async def read(
     return header + numbered_content
 
 
+# Extensions auto-eligible for LSP validate/format on write (see write()).
+_LSP_SUPPORTED_EXTENSIONS = frozenset(
+    {
+        ".py",
+        ".pyi",
+        ".pyx",  # Python
+        ".c",
+        ".h",
+        ".cpp",
+        ".hpp",
+        ".cc",
+        ".cxx",  # C/C++
+        ".rs",  # Rust
+        ".ts",
+        ".tsx",
+        ".js",
+        ".jsx",  # JavaScript/TypeScript
+        ".go",  # Go
+        ".java",  # Java
+        ".kt",
+        ".kts",  # Kotlin
+        ".swift",  # Swift
+        ".scala",  # Scala
+        ".cs",  # C#
+        ".php",  # PHP
+        ".rb",  # Ruby
+        ".lua",  # Lua
+        ".ex",
+        ".exs",  # Elixir
+        ".hs",  # Haskell
+        ".r",
+        ".R",  # R
+        ".json",
+        ".jsonc",  # JSON
+        ".yaml",
+        ".yml",  # YAML
+        ".toml",  # TOML
+        ".xml",  # XML
+        ".html",
+        ".htm",  # HTML
+        ".css",
+        ".scss",
+        ".less",  # CSS
+        ".sh",
+        ".bash",
+        ".zsh",  # Shell
+        ".sql",  # SQL
+        ".md",
+        ".markdown",  # Markdown
+    }
+)
+
+
+async def _delegate_write(path: str, content: str, force: bool) -> Dict[str, Any]:
+    """Delegate a full-content write to ``edit()`` — the single write path + gate.
+
+    Uses op type ``create`` for a new file and ``modify`` to overwrite an existing
+    one (FileEditor's ``create`` refuses existing files). Consolidating write()
+    onto edit() yields one write path and one read-before-overwrite gate; lazy
+    import avoids a filesystem ↔ file_editor_tool circular import at module load.
+    """
+    from victor.tools.file_editor_tool import edit as _edit
+
+    op_type = "modify" if Path(path).expanduser().exists() else "create"
+    return await _edit(ops=[{"type": op_type, "path": path, "content": content, "force": force}])
+
+
+def _editor_available() -> bool:
+    """True when the enhanced FileEditor (the optional ``victor-coding`` extra) is registered.
+
+    ``edit()`` requires victor-coding; ``write()`` must keep working without it,
+    so the facade checks this and falls back to a direct write when False.
+    """
+    try:
+        from victor.core.capability_registry import CapabilityRegistry
+        from victor.framework.vertical_protocols import EditorProtocol
+
+        return CapabilityRegistry.get_instance().is_enhanced(EditorProtocol)
+    except Exception:
+        return False
+
+
 @tool(
     category="filesystem",
     priority=Priority.CRITICAL,  # Always available for selection
@@ -1854,279 +2054,153 @@ async def write(
     validate: bool = False,
     format_code: bool = False,
     dry_run: bool = False,
+    force: bool = False,
 ) -> Union[str, Dict[str, Any]]:
-    """Write file with optional LSP enhancement.
+    """Write a file — thin facade over ``edit(create)``.
 
-    Creates parent directories automatically. Use edit tool for partial edits.
+    Consolidating write() onto edit() gives ONE write path and ONE
+    read-before-overwrite gate (see ``enforce_read_before_write``). Behavior is
+    preserved from the previous standalone implementation:
 
-    **Simple Mode** (default):
-    Returns a success message string. LSP auto-applied for supported file types.
+    * **Simple mode** (default): auto LSP validate/format for code files, then
+      create/overwrite. Returns a success message string.
+    * **Enhanced mode** (``validate`` / ``format_code`` / ``dry_run``): returns
+      a Dict with LSP diagnostics; ``dry_run`` writes nothing.
 
-    **Enhanced Mode** (when validate/format_code/dry_run used):
-    Returns detailed Dict with diagnostics, validation results, formatting info.
-
-    LSP Enhancement:
-    - Validates code syntax before writing
-    - Formats code using language-specific formatters
-    - Returns diagnostic information (errors, warnings, hints)
-
-    Supported languages: C/C++, Python, Rust, JavaScript/TypeScript, Go, Java, and 15+ more.
-
-    Args:
-        path: File path (creates dirs)
-        content: Full raw file content to write verbatim (overwrites)
-        validate: Validate with LSP before writing (default: False)
-        format_code: Format with language formatter (default: False)
-        dry_run: If True, validate/format without writing (default: False)
-
-    Returns:
-        Simple mode: Success message string
-        Enhanced mode: Dict with success, path, formatted, validated, diagnostics, etc.
-
-    Examples:
-        # Simple mode (auto LSP for code files)
-        await write("main.py", "def hello(): print('hi')")
-
-        # Enhanced mode (detailed diagnostics)
-        result = await write("main.py", code, validate=True, format_code=True)
-        if result["validated"]:
-            print(f"Diagnostics: {result['diagnostics']}")
-
-        # Enhanced mode (dry run - validate without writing)
-        result = await write("main.py", code, validate=True, dry_run=True)
-        if result["summary"]["errors"] == 0:
-            await write("main.py", code)  # Actually write
+    Safety: overwriting an existing file that was NOT read this session is
+    refused. Pass ``force=True`` to opt out (intentional full rewrite /
+    generated output).
 
     Note:
         In EXPLORE/PLAN modes, writes are restricted to .victor/sandbox/.
         Use /mode build to enable unrestricted file writes.
-        Falls back to regular write if LSP is not available for the file type.
+        Falls back to a regular write if LSP is not available for the file type.
     """
-    from victor.agent.change_tracker import ChangeType, get_change_tracker
-
     file_path = Path(path).expanduser().resolve()
 
-    # Enforce sandbox restrictions in EXPLORE/PLAN modes
+    # Enforce sandbox restrictions in EXPLORE/PLAN modes (fail fast, before any
+    # LSP work). edit() also enforces this per-op.
     enforce_sandbox_path(file_path)
 
     if file_path.exists() and file_path.is_dir():
         raise IsADirectoryError(f"Cannot write to directory: {path}")
 
-    # Determine if enhanced mode is requested
     enhanced_mode = validate or format_code or dry_run
 
-    # Enhanced mode: Return detailed Dict with diagnostics
-    if enhanced_mode:
-        from victor.tools.lsp_write_enhancer import write_with_lsp
+    # ------------------------------------------------------------------
+    # LSP enhance (validate/format). Runs write_with_lsp with write=False so it
+    # only RETURNS formatted content + diagnostics; the actual write is done by
+    # edit(create) below — single write path.
+    # ------------------------------------------------------------------
+    final_content = content
+    lsp_suffix = ""
+    run_lsp = file_path.suffix.lower() in _LSP_SUPPORTED_EXTENSIONS or enhanced_mode
 
+    if run_lsp:
         try:
+            from victor.tools.lsp_write_enhancer import write_with_lsp
+
             result = await write_with_lsp(
                 path=str(file_path),
                 content=content,
-                validate=validate,
-                format_code=format_code,
-                write=not dry_run,  # Only write if not dry_run
+                validate=True,
+                format_code=format_code or not enhanced_mode,
+                write=False,  # never write here — delegate to edit()
             )
 
-            # Track change if actually written
-            if not dry_run and result.success:
-                tracker = get_change_tracker()
-                original_content = None
-                change_type = ChangeType.CREATE
+            if result.written_content is not None:
+                final_content = result.written_content
 
-                if file_path.exists():
-                    change_type = ChangeType.MODIFY
-                    original_content = file_path.read_text()
+            # Enhanced mode: return diagnostics dict; write only when not dry_run
+            # and LSP found no errors (matches prior "has errors → not written").
+            if enhanced_mode:
+                if not dry_run and result.success:
+                    edit_res = await _delegate_write(path, final_content, force)
+                    if isinstance(edit_res, dict) and edit_res.get("success") is False:
+                        return edit_res
+                return result.to_dict()
 
-                tracker.begin_change_group("write_enhanced", f"Write to {path}")
-                tracker.record_change(
-                    file_path=str(file_path),
-                    change_type=change_type,
-                    original_content=original_content,
-                    new_content=result.written_content,
-                    tool_name="write",
-                    tool_args={
-                        "path": path,
-                        "validate": validate,
-                        "format_code": format_code,
-                        "dry_run": dry_run,
-                    },
-                )
-                tracker.commit_change_group()
+            # Simple mode: build the "(formatted ..., validation passed)" suffix.
+            lsp_info: List[str] = []
+            if result.formatted:
+                lsp_info.append(f"formatted with {result.formatter_used}")
+            if result.validated:
+                error_count = sum(1 for d in result.diagnostics if d.severity == "error")
+                warning_count = sum(1 for d in result.diagnostics if d.severity == "warning")
+                if error_count or warning_count:
+                    lsp_info.append(f"{error_count} errors, {warning_count} warnings")
+                else:
+                    lsp_info.append("validation passed")
+            lsp_suffix = f" ({', '.join(lsp_info)})" if lsp_info else ""
 
-                # Invalidate file content cache
-                if is_file_cache_enabled():
-                    cache = get_file_content_cache()
-                    cache.invalidate(str(file_path))
-
-            return result.to_dict()
-
-        except Exception as e:
-            # If LSP enhancement fails in enhanced mode, re-raise with context
+        except Exception as lsp_error:
+            logger.debug("LSP enhancement failed, falling back to plain write: %s", lsp_error)
             if enhanced_mode:
                 return {
                     "success": False,
                     "path": path,
-                    "error": f"LSP enhancement failed: {str(e)}",
+                    "error": f"LSP enhancement failed: {lsp_error}",
                     "validated": False,
                     "formatted": False,
                 }
+            lsp_suffix = " (LSP unavailable for this file type)"
 
-    # Simple mode: Auto LSP for supported file types
-    if not enhanced_mode:
-        # Check if language has LSP support by file extension
-        lsp_supported_extensions = {
-            # Programming languages
-            ".py",
-            ".pyi",
-            ".pyx",  # Python
-            ".c",
-            ".h",
-            ".cpp",
-            ".hpp",
-            ".cc",
-            ".cxx",  # C/C++
-            ".rs",  # Rust
-            ".ts",
-            ".tsx",
-            ".js",
-            ".jsx",  # JavaScript/TypeScript
-            ".go",  # Go
-            ".java",  # Java
-            ".kt",
-            ".kts",  # Kotlin
-            ".swift",  # Swift
-            ".scala",  # Scala
-            ".cs",  # C#
-            ".php",  # PHP
-            ".rb",  # Ruby
-            ".lua",  # Lua
-            ".ex",
-            ".exs",  # Elixir
-            ".hs",  # Haskell
-            ".r",
-            ".R",  # R
-            # Config files
-            ".json",
-            ".jsonc",  # JSON
-            ".yaml",
-            ".yml",  # YAML
-            ".toml",  # TOML
-            ".xml",  # XML
-            ".html",
-            ".htm",  # HTML
-            ".css",
-            ".scss",
-            ".less",  # CSS
-            ".sh",
-            ".bash",
-            ".zsh",  # Shell
-            ".sql",  # SQL
-            ".md",
-            ".markdown",  # Markdown
-        }
-
-        if file_path.suffix.lower() in lsp_supported_extensions:
-            try:
-                from victor.tools.lsp_write_enhancer import write_with_lsp
-
-                result = await write_with_lsp(
-                    path=str(file_path),
-                    content=content,
-                    validate=True,
-                    format_code=True,
-                    write=True,
-                )
-
-                if result.success:
-                    # Track the change
-                    tracker = get_change_tracker()
-                    original_content = None
-                    change_type = ChangeType.CREATE
-
-                    if file_path.exists():
-                        change_type = ChangeType.MODIFY
-                        original_content = file_path.read_text()
-
-                    tracker.begin_change_group("write_auto_lsp", f"Write to {path}")
-                    tracker.record_change(
-                        file_path=str(file_path),
-                        change_type=change_type,
-                        original_content=original_content,
-                        new_content=result.written_content,
-                        tool_name="write",
-                        tool_args={"path": path},
-                    )
-                    tracker.commit_change_group()
-
-                    # Invalidate file content cache
-                    if is_file_cache_enabled():
-                        cache = get_file_content_cache()
-                        cache.invalidate(str(file_path))
-
-                    # Build success message with LSP info
-                    action = "created" if result.original_content is None else "modified"
-                    lsp_info = []
-
-                    if result.formatted:
-                        lsp_info.append(f"formatted with {result.formatter_used}")
-
-                    if result.validated:
-                        error_count = sum(1 for d in result.diagnostics if d.severity == "error")
-                        warning_count = sum(
-                            1 for d in result.diagnostics if d.severity == "warning"
-                        )
-
-                        if error_count > 0 or warning_count > 0:
-                            lsp_info.append(f"{error_count} errors, {warning_count} warnings")
-                        else:
-                            lsp_info.append("validation passed")
-
-                    lsp_suffix = f" ({', '.join(lsp_info)})" if lsp_info else ""
-                    return f"Successfully {action} {path} ({len(content)} characters){lsp_suffix}. Use /undo to revert."
-
-            except Exception as lsp_error:
-                # LSP enhancement failed, fall back to regular write
-                logger.debug(f"LSP enhancement failed, falling back to regular write: {lsp_error}")
-
-    # Regular write (fallback when LSP not available)
-    # Track the change for undo/redo
-    tracker = get_change_tracker()
-    original_content = None
-    change_type = ChangeType.CREATE
-
-    if file_path.exists():
-        # File exists - this is a modification
-        change_type = ChangeType.MODIFY
-        async with aiofiles.open(file_path, "r", encoding="utf-8") as f:
-            original_content = await f.read()
-
+    # ------------------------------------------------------------------
+    # Write the file. Prefer the consolidated edit(create) path (single write
+    # path + single gate); fall back to a direct write when the enhanced editor
+    # (the optional victor-coding extra) is unavailable so write() keeps working
+    # standalone. The read-before-overwrite gate applies to BOTH paths.
+    # ------------------------------------------------------------------
+    existed_before = file_path.exists()
     file_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # Record the change
-    tracker.begin_change_group("write", f"Write to {path}")
-    tracker.record_change(
-        file_path=str(file_path),
-        change_type=change_type,
-        original_content=original_content,
-        new_content=content,
-        tool_name="write",
-        tool_args={"path": path},
+    if _editor_available():
+        edit_result = await _delegate_write(path, final_content, force)  # edit gates internally
+        if isinstance(edit_result, dict) and edit_result.get("success") is False:
+            # Surface structured failures (e.g. read-before-overwrite gate) verbatim.
+            return edit_result
+    else:
+        # Direct write fallback (victor-coding unavailable) — apply the gate here.
+        try:
+            enforce_read_before_write(file_path, force=force)
+        except PermissionError as pe:
+            return {"success": False, "path": path, "error": str(pe)}
+
+        from victor.agent.change_tracker import ChangeType, get_change_tracker
+
+        tracker = get_change_tracker()
+        change_type = ChangeType.MODIFY if existed_before else ChangeType.CREATE
+        tracker.begin_change_group("write", f"Write to {path}")
+        tracker.record_change(
+            file_path=str(file_path),
+            change_type=change_type,
+            original_content=original_or_none(file_path),
+            new_content=final_content,
+            tool_name="write",
+            tool_args={"path": path},
+        )
+        async with aiofiles.open(file_path, "w", encoding="utf-8") as f:
+            await f.write(final_content)
+        tracker.commit_change_group()
+
+        if is_file_cache_enabled():
+            get_file_content_cache().invalidate(str(file_path))
+
+    action = "modified" if existed_before else "created"
+    return (
+        f"Successfully {action} {path} ({len(final_content)} characters)"
+        f"{lsp_suffix}. Use /undo to revert."
     )
 
-    async with aiofiles.open(file_path, "w", encoding="utf-8") as f:
-        await f.write(content)
 
-    tracker.commit_change_group()
-
-    # Invalidate file content cache (ensures fresh reads after write)
-    if is_file_cache_enabled():
-        cache = get_file_content_cache()
-        cache.invalidate(str(file_path))
-
-    action = "created" if change_type == ChangeType.CREATE else "modified"
-    lsp_suffix = " (LSP unavailable for this file type)"
-    return f"Successfully {action} {path} ({len(content)} characters){lsp_suffix}. Use /undo to revert."
+def original_or_none(file_path: Path) -> Optional[str]:
+    """Read existing file content for undo tracking, or None if absent/unreadable."""
+    try:
+        if file_path.exists():
+            return file_path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return None
+    return None
 
 
 @tool(

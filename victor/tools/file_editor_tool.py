@@ -413,7 +413,7 @@ def _is_file_editor_available() -> bool:
 
 
 from victor.tools.decorators import tool
-from victor.tools.filesystem import enforce_sandbox_path
+from victor.tools.filesystem import enforce_read_before_write, enforce_sandbox_path
 
 
 @tool(
@@ -768,6 +768,15 @@ async def edit(
                     _all_failed_indices.add(_idx)
                     continue
             elif _otype == "modify":
+                # read-before-overwrite guard: modify targets an existing file,
+                # so it must have been read this session (unless force=True).
+                if _fp.exists():
+                    try:
+                        enforce_read_before_write(_fp, force=bool(_op.get("force", False)))
+                    except PermissionError as _pe:
+                        failed_files.append({"path": _path, "op_index": _idx, "error": str(_pe)})
+                        _all_failed_indices.add(_idx)
+                        continue
                 _content = _op.get("new_content")
                 if _content is None:
                     _content = _op.get("content")
@@ -798,15 +807,52 @@ async def edit(
                     )
                     _all_failed_indices.add(_idx)
                     continue
+                # read-before-overwrite guard: overwriting an existing file
+                # (mode != "new") requires it was read this session.
+                if _op_mode != "new" and _fp.exists():
+                    try:
+                        enforce_read_before_write(_fp, force=bool(_op.get("force", False)))
+                    except PermissionError as _pe:
+                        failed_files.append({"path": _path, "op_index": _idx, "error": str(_pe)})
+                        _all_failed_indices.add(_idx)
+                        continue
                 _working = _op.get("content", "")
             # delete / rename: no text content to validate at this stage
         _applicable_keys.add(_key)
 
     if failed_files:
-        # Per-op filtering: exclude only the SPECIFIC failed ops (not the whole
-        # file group). Correct ops in the same file still apply — the difference
-        # between 9/10 and 10/10 on a benchmark task.
-        ops = [op for i, op in enumerate(ops) if i not in _all_failed_indices]
+        # Per-file atomicity: a same-file batch of edits is a SEQUENCE of
+        # interdependent changes (each assumes the state left by the prior). If
+        # any op in a file's group fails validation, the whole group is rolled
+        # back — never apply a partial edit set that the model didn't intend as a
+        # final state. Ops in OTHER files (fully-valid groups) still apply, so one
+        # bad file can't discard a sibling file's valid edits.
+        _tainted_keys = {
+            _key
+            for _key, _group in _groups.items()
+            if any(_idx in _all_failed_indices for _idx, _ in _group)
+        }
+        _kept: List[Dict[str, Any]] = []
+        for _i, _op in enumerate(ops):
+            if _op_file_key(_op) in _tainted_keys:
+                # The failing op itself is already in failed_files; report any
+                # otherwise-valid sibling as rolled back so the model knows to
+                # re-read and retry the whole file.
+                if _i not in _all_failed_indices:
+                    failed_files.append(
+                        {
+                            "path": _op.get("path"),
+                            "op_index": _i,
+                            "error": (
+                                "skipped: a sibling edit to this file failed "
+                                "validation, so the entire file was rolled back. "
+                                "Re-read the file and retry all of its edits together."
+                            ),
+                        }
+                    )
+                continue
+            _kept.append(_op)
+        ops = _kept
 
     if not ops:
         # Nothing applicable — surface the first failure as the primary error
@@ -1170,8 +1216,9 @@ async def edit(
                 _bad = ", ".join(sorted({str(f["path"]) for f in failed_files}))
                 _msg = (
                     f"Applied {operations_queued} operation(s); skipped "
-                    f"{len(failed_files)} that failed validation ({_bad}). "
-                    "Other files were committed — retry only the failed ones."
+                    f"{len(failed_files)} in file(s) with a failed edit ({_bad}) "
+                    "— those file groups were rolled back atomically. "
+                    "Other files were committed; re-read and retry the failed ones."
                 )
             result = {
                 "success": True,

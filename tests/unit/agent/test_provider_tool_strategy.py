@@ -110,19 +110,6 @@ class TestSupportsPromptCaching:
         mock_provider = MagicMock(spec=BaseProvider)
         assert BaseProvider.supports_kv_prefix_caching(mock_provider) is False
 
-    def test_has_kv_prefix_caching_convenience(self):
-        from victor.providers.base import has_kv_prefix_caching
-
-        mock_kv = MagicMock()
-        mock_kv.supports_kv_prefix_caching.return_value = True
-        assert has_kv_prefix_caching(mock_kv) is True
-
-        mock_no_kv = MagicMock()
-        mock_no_kv.supports_kv_prefix_caching.return_value = False
-        assert has_kv_prefix_caching(mock_no_kv) is False
-
-        assert has_kv_prefix_caching(object()) is False
-
     def test_local_provider_has_kv_but_no_api_caching(self):
         """Local providers: KV=True, API=False (the two concepts are independent)."""
         from victor.providers.ollama_provider import OllamaProvider
@@ -138,23 +125,6 @@ class TestSupportsPromptCaching:
         provider = AnthropicProvider.__new__(AnthropicProvider)
         assert provider.supports_prompt_caching() is True
         assert provider.supports_kv_prefix_caching() is True
-
-    def test_is_caching_provider_convenience(self):
-        from victor.providers.base import is_caching_provider
-
-        mock_caching = MagicMock()
-        mock_caching.supports_prompt_caching.return_value = True
-        assert is_caching_provider(mock_caching) is True
-
-        mock_no_cache = MagicMock()
-        mock_no_cache.supports_prompt_caching.return_value = False
-        assert is_caching_provider(mock_no_cache) is False
-
-    def test_is_caching_provider_no_method(self):
-        from victor.providers.base import is_caching_provider
-
-        plain_obj = object()
-        assert is_caching_provider(plain_obj) is False
 
 
 # =====================================================================

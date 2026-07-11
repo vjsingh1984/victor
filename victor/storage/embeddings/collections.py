@@ -26,11 +26,18 @@ Simple pickle + numpy provides fast loading and searching.
 
 import hashlib
 import logging
-import pickle
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from victor.core.pickle_cache import (
+    CacheValidation,
+    delete_cache_file,
+    invalid,
+    load_validated_pickle,
+    save_pickle_with_metadata,
+    valid,
+)
 from victor.storage.embeddings.service import EmbeddingService, get_embedding_service
 
 logger = logging.getLogger(__name__)
@@ -156,12 +163,7 @@ class StaticEmbeddingCollection:
         Args:
             reason: Reason for deletion (for logging)
         """
-        try:
-            if self.cache_file.exists():
-                self.cache_file.unlink()
-                logger.info(f"Collection '{self.name}': deleted stale cache ({reason})")
-        except Exception as e:
-            logger.warning(f"Collection '{self.name}': failed to delete cache: {e}")
+        delete_cache_file(self.cache_file, reason, logger, label=f"Collection '{self.name}'")
 
     def _load_from_cache(self, items_hash: str) -> bool:
         """Load collection from cache if valid.
@@ -179,14 +181,8 @@ class StaticEmbeddingCollection:
         Returns:
             True if loaded successfully, False otherwise
         """
-        if not self.cache_file.exists():
-            logger.debug(f"Collection '{self.name}': no cache file found")
-            return False
 
-        try:
-            with open(self.cache_file, "rb") as f:
-                cache_data = pickle.load(f)
-
+        def _check_version(cache_data: Dict[str, Any]) -> CacheValidation:
             # 1. Check cache version (breaking changes to format)
             cached_version = cache_data.get("cache_version", 1)
             if cached_version != self.CACHE_VERSION:
@@ -194,14 +190,18 @@ class StaticEmbeddingCollection:
                     f"Collection '{self.name}': cache version mismatch "
                     f"(cached: v{cached_version}, current: v{self.CACHE_VERSION})"
                 )
-                self._delete_cache("version mismatch")
-                return False
+                return invalid(delete=True, reason="version mismatch")
+            return valid()
 
+        def _check_items_hash(cache_data: Dict[str, Any]) -> CacheValidation:
             # 2. Verify cache matches current items
             if cache_data.get("items_hash") != items_hash:
                 logger.info(f"Collection '{self.name}': items changed, cache invalidated")
-                return False
+                # Items-hash mismatch intentionally keeps the cache file (no delete).
+                return invalid(delete=False)
+            return valid()
 
+        def _check_model(cache_data: Dict[str, Any]) -> CacheValidation:
             # 3. Verify embedding model matches
             model_name = self.embedding_service.model_name
             if cache_data.get("model_name") != model_name:
@@ -209,23 +209,22 @@ class StaticEmbeddingCollection:
                     f"Collection '{self.name}': model changed "
                     f"(cached: {cache_data.get('model_name')}, current: {model_name})"
                 )
-                self._delete_cache("model mismatch")
-                return False
+                return invalid(delete=True, reason="model mismatch")
+            return valid()
 
+        def _check_embeddings(cache_data: Dict[str, Any]) -> CacheValidation:
             # 4. Validate embedding dimensions match current model
             embeddings = cache_data.get("embeddings")
             if embeddings is None:
                 logger.warning(f"Collection '{self.name}': cache missing embeddings array")
-                self._delete_cache("missing embeddings")
-                return False
+                return invalid(delete=True, reason="missing embeddings")
 
             expected_dim = self.embedding_service.dimension
             if len(embeddings.shape) != 2:
                 logger.warning(
                     f"Collection '{self.name}': embeddings have wrong shape: {embeddings.shape}"
                 )
-                self._delete_cache("invalid shape")
-                return False
+                return invalid(delete=True, reason="invalid shape")
 
             cached_dim = embeddings.shape[1]
             if cached_dim != expected_dim:
@@ -233,8 +232,7 @@ class StaticEmbeddingCollection:
                     f"Collection '{self.name}': embedding dimension mismatch "
                     f"(cached: {cached_dim}, expected: {expected_dim})"
                 )
-                self._delete_cache("dimension mismatch")
-                return False
+                return invalid(delete=True, reason="dimension mismatch")
 
             # 5. Validate item count matches embedding count
             items = cache_data.get("items", {})
@@ -244,32 +242,32 @@ class StaticEmbeddingCollection:
                     f"Collection '{self.name}': data integrity error - "
                     f"embeddings: {embeddings.shape[0]}, items: {len(items)}, ids: {len(item_ids)}"
                 )
-                self._delete_cache("integrity error")
-                return False
+                return invalid(delete=True, reason="integrity error")
 
             # 6. Check for NaN or Inf in embeddings (corruption detection)
             if not np.isfinite(embeddings).all():
                 logger.warning(f"Collection '{self.name}': embeddings contain NaN or Inf values")
-                self._delete_cache("corrupted embeddings")
-                return False
+                return invalid(delete=True, reason="corrupted embeddings")
+            return valid()
 
-            # All checks passed - load data
-            self._items = items
-            self._embeddings = embeddings
-            self._item_ids = item_ids
-            self._items_hash = items_hash
-
-            logger.debug(f"Collection '{self.name}': loaded {len(self._items)} items from cache")
-            return True
-
-        except (pickle.UnpicklingError, EOFError) as e:
-            logger.warning(f"Collection '{self.name}': cache file corrupted: {e}")
-            self._delete_cache("unpickling error")
+        cache_data = load_validated_pickle(
+            self.cache_file,
+            validators=[_check_version, _check_items_hash, _check_model, _check_embeddings],
+            logger=logger,
+            label=f"Collection '{self.name}'",
+            missing_message=f"Collection '{self.name}': no cache file found",
+        )
+        if cache_data is None:
             return False
-        except Exception as e:
-            logger.warning(f"Collection '{self.name}': failed to load cache: {e}")
-            self._delete_cache("load error")
-            return False
+
+        # All checks passed - load data
+        self._items = cache_data.get("items", {})
+        self._embeddings = cache_data.get("embeddings")
+        self._item_ids = cache_data.get("item_ids", [])
+        self._items_hash = items_hash
+
+        logger.debug(f"Collection '{self.name}': loaded {len(self._items)} items from cache")
+        return True
 
     def _save_to_cache(self, items_hash: str) -> None:
         """Save collection to cache with full metadata for robust validation.
@@ -277,31 +275,27 @@ class StaticEmbeddingCollection:
         Args:
             items_hash: Hash of items
         """
-        try:
-            cache_data = {
-                "cache_version": self.CACHE_VERSION,
-                "items_hash": items_hash,
-                "model_name": self.embedding_service.model_name,
-                "embedding_dimension": (
-                    self._embeddings.shape[1] if self._embeddings is not None else 0
-                ),
-                "item_count": len(self._items),
-                "items": self._items,
-                "embeddings": self._embeddings,
-                "item_ids": self._item_ids,
-            }
+        cache_data = {
+            "cache_version": self.CACHE_VERSION,
+            "items_hash": items_hash,
+            "model_name": self.embedding_service.model_name,
+            "embedding_dimension": (
+                self._embeddings.shape[1] if self._embeddings is not None else 0
+            ),
+            "item_count": len(self._items),
+            "items": self._items,
+            "embeddings": self._embeddings,
+            "item_ids": self._item_ids,
+        }
 
-            with open(self.cache_file, "wb") as f:
-                pickle.dump(cache_data, f)
-
+        if save_pickle_with_metadata(
+            self.cache_file, cache_data, logger=logger, label=f"Collection '{self.name}'"
+        ):
             cache_size = self.cache_file.stat().st_size / 1024
             logger.info(
                 f"Collection '{self.name}': saved {len(self._items)} items to cache "
                 f"({cache_size:.1f} KB)"
             )
-
-        except Exception as e:
-            logger.warning(f"Collection '{self.name}': failed to save cache: {e}")
 
     async def initialize(self, items: List[CollectionItem]) -> None:
         """Initialize collection with items.

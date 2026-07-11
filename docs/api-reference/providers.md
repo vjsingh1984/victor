@@ -236,130 +236,52 @@ def reset_circuit_breaker(self) -> None:
 
 ---
 
-## Provider Protocols
+## Provider Capabilities
 
-Victor uses Protocol classes (PEP 544) for Interface Segregation, allowing providers to optionally implement specific capabilities.
+Provider capabilities are a **single surface**: the `supports_*()` methods on
+`BaseProvider`. Each follows the Interface Segregation Principle — it defaults
+to `False`, and a provider opts in by overriding only what it supports. Because
+the methods live on the base class, every provider answers every query
+(Liskov), so callers use a plain method call — no `isinstance`, protocol, or
+helper-function layer is needed.
 
-**Import:**
 ```python
-from victor.providers.base import (
-    StreamingProvider,
-    ToolCallingProvider,
-    is_streaming_provider,
-    is_tool_calling_provider,
-)
+if provider.supports_streaming():
+    async for chunk in provider.stream(messages, model=model):
+        print(chunk.content)
+
+if provider.supports_tools():
+    response = await provider.chat(messages, model=model, tools=my_tools)
+
+if provider.supports_vision():
+    response = await provider.chat([image_message], model=model)
 ```
 
-### StreamingProvider
+The capability methods on `BaseProvider` (all default `False`):
 
-Protocol for providers that support streaming responses.
+| Method | Capability |
+| --- | --- |
+| `supports_tools()` | Tool / function calling |
+| `supports_streaming()` | Incremental streaming responses |
+| `supports_vision()` | Multimodal (image) input |
+| `supports_prompt_caching()` | API-level cached-token billing discount |
+| `supports_kv_prefix_caching()` | KV prefix reuse (latency, not billing) |
+| `supports_reasoning_effort(model)` | Per-model `reasoning_effort` parameter |
+
+To add a capability to a provider, override the method:
 
 ```python
-@runtime_checkable
-class StreamingProvider(Protocol):
-    """Protocol for providers that support streaming responses.
-
-    Providers implementing this protocol can stream chat completions
-    incrementally rather than returning the full response at once.
-
-    Example:
-        class MyProvider(BaseProvider):
-            def supports_streaming(self) -> bool:
-                return True
-
-            async def stream(self, messages, **kwargs) -> AsyncIterator[StreamChunk]:
-                # Implementation here
-                ...
-
-    Type checking:
-        if isinstance(provider, StreamingProvider):
-            async for chunk in provider.stream(messages, model=model):
-                print(chunk.content)
-    """
-
+class MyProvider(BaseProvider):
     def supports_streaming(self) -> bool:
-        """Whether the provider supports streaming responses."""
-        ...
-
-    async def stream(
-        self,
-        messages: List[Message],
-        *,
-        model: str,
-        temperature: float = 0.7,
-        max_tokens: int = 4096,
-        tools: Optional[List[ToolDefinition]] = None,
-        **kwargs: Any,
-    ) -> AsyncIterator[StreamChunk]:
-        """Stream a chat completion response."""
-        ...
-```
-
-### ToolCallingProvider
-
-Protocol for providers that support tool/function calling.
-
-```python
-@runtime_checkable
-class ToolCallingProvider(Protocol):
-    """Protocol for providers that support tool/function calling.
-
-    Providers implementing this protocol can receive tool definitions
-    and return structured tool calls in their responses.
-
-    Example:
-        class MyProvider(BaseProvider):
-            def supports_tools(self) -> bool:
-                return True
-
-            async def chat(self, messages, *, model, tools=None, **kwargs):
-                # Handle tools in implementation
-                ...
-
-    Type checking:
-        if isinstance(provider, ToolCallingProvider):
-            response = await provider.chat(
-                messages, model=model, tools=my_tools
-            )
-            if response.tool_calls:
-                # Process tool calls
-                ...
-    """
+        return True
 
     def supports_tools(self) -> bool:
-        """Whether the provider supports tool/function calling."""
-        ...
+        return True
 ```
 
-### Helper Functions
-
-```python
-def is_streaming_provider(provider: Any) -> bool:
-    """Check if a provider supports streaming.
-
-    This is a convenience function that checks both protocol implementation
-    and the supports_streaming() method result.
-
-    Args:
-        provider: Provider instance to check
-
-    Returns:
-        True if provider supports streaming responses
-    """
-
-def is_tool_calling_provider(provider: Any) -> bool:
-    """Check if a provider supports tool calling.
-
-    This is a convenience function that checks both protocol implementation
-    and the supports_tools() method result.
-
-    Args:
-        provider: Provider instance to check
-
-    Returns:
-        True if provider supports tool/function calling
-    """
-```
+`supports_reasoning_effort(model)` takes the model id because support can vary
+per model — expressiveness a boolean protocol conformance check cannot capture,
+which is why the capability surface is method-based rather than Protocol-based.
 
 ---
 

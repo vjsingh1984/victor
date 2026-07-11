@@ -132,6 +132,10 @@ class EmbeddingService:
         self.device = device
         self._model: Any = None  # SentenceTransformer, lazy loaded
         self._model_lock = threading.Lock()
+        # Serialize model.encode: sentence-transformers' tokenizer + forward are not
+        # guaranteed thread-safe, and embed_text/embed_batch run embed_*_sync via
+        # asyncio.to_thread -> concurrent unsynchronized encode on the shared model.
+        self._encode_lock = threading.Lock()
         self._dimension: Optional[int] = None
 
         # In-memory embedding cache for repeated texts (e.g., tool descriptions)
@@ -425,11 +429,12 @@ class EmbeddingService:
 
         try:
             start_time = time.perf_counter()
-            embedding = self._model.encode(
-                text,
-                convert_to_numpy=True,
-                show_progress_bar=False,
-            )
+            with self._encode_lock:
+                embedding = self._model.encode(
+                    text,
+                    convert_to_numpy=True,
+                    show_progress_bar=False,
+                )
             elapsed = time.perf_counter() - start_time
             chars_per_sec = len(text) / elapsed if elapsed > 0 else 0
 
@@ -524,12 +529,13 @@ class EmbeddingService:
             # Calculate optimal batch size based on text lengths
             batch_size = self._calculate_optimal_batch_size(texts)
 
-            embeddings = self._model.encode(
-                texts,
-                convert_to_numpy=True,
-                show_progress_bar=False,
-                batch_size=batch_size,
-            )
+            with self._encode_lock:
+                embeddings = self._model.encode(
+                    texts,
+                    convert_to_numpy=True,
+                    show_progress_bar=False,
+                    batch_size=batch_size,
+                )
 
             elapsed = time.perf_counter() - start_time
             embeddings_per_sec = len(texts) / elapsed if elapsed > 0 else 0

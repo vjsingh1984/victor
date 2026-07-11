@@ -187,6 +187,13 @@ class AgentRuntimeBootstrapper:
         # Service layer delegation (Strangler Fig pattern)
         orchestrator._initialize_services()
 
+        # Credit-assignment runtime (opt-in via settings.credit_assignment.enabled;
+        # no-op when disabled). Depends on the service layer + tool pipeline being
+        # ready, so it runs after _initialize_services(). Previously this phase was
+        # only registered on the (currently-unwired) InitializationPhaseManager, so
+        # it never ran in production — enabling the setting silently did nothing.
+        orchestrator._initialize_credit_runtime()
+
         # Capability registry
         orchestrator.__init_capability_registry__()
 

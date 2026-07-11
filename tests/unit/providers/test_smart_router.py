@@ -219,11 +219,14 @@ class TestRoutingDecisionEngine:
     @pytest.mark.asyncio
     async def test_score_resources_local_without_gpu(self, engine):
         """Test resource scoring for local provider without GPU."""
-        # Mock GPU unavailable
+        # Mock GPU unavailable with valid cache time so the injected cache is
+        # honored instead of re-probing the host (which has a GPU on some CI
+        # runners / dev machines and would otherwise flip this to 1.0).
         engine.detector._gpu_cache = GPUAvailability(
             available=False,
             reason="No GPU detected",
         )
+        engine.detector._gpu_cache_time = datetime.now()
 
         score = await engine._score_resources("ollama")
 

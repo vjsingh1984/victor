@@ -34,7 +34,7 @@ if not _LIGHT_IMPORT:
 
     # OBSOLETE: ConfigLoader moved to victor/agent/archive/obsolete/config_loader.py
     # Configuration is now loaded via Settings objects and composed by OrchestratorFactory
-    from victor.agent.config import UnifiedAgentConfig, AgentMode
+    from victor.agent.config import UnifiedAgentConfig, AgentLifecycleMode
     from victor.agent.tool_selection import get_critical_tools
     from victor.agent.message_history import MessageHistory
 
@@ -101,7 +101,7 @@ if not _LIGHT_IMPORT:
         "NormalizationStrategy",
         # "ConfigLoader",  # OBSOLETE - moved to archive/obsolete/
         "UnifiedAgentConfig",
-        "AgentMode",
+        "AgentLifecycleMode",
         "get_critical_tools",
         # Conversation
         "MessageHistory",

@@ -62,7 +62,7 @@ if TYPE_CHECKING:
 FrameworkCompatibleAgentConfig = Union["AgentConfig", "UnifiedAgentConfig"]
 
 
-class AgentMode(str, Enum):
+class AgentLifecycleMode(str, Enum):
     """Agent execution mode.
 
     Defines how the agent will be created and used:
@@ -148,7 +148,7 @@ class UnifiedAgentConfig:
     # Mode Selection
     # ==========================================================================
 
-    mode: AgentMode = AgentMode.FOREGROUND
+    mode: AgentLifecycleMode = AgentLifecycleMode.FOREGROUND
 
     # ==========================================================================
     # Common Configuration (All Modes)
@@ -497,7 +497,7 @@ def normalize_agent_config(
 
 __all__ = [
     "UnifiedAgentConfig",
-    "AgentMode",
+    "AgentLifecycleMode",
     "FrameworkCompatibleAgentConfig",
     "normalize_agent_config",
 ]

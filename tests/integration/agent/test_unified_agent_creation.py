@@ -22,7 +22,7 @@ Tests cover:
 
 import pytest
 
-from victor.agent.config import AgentMode, UnifiedAgentConfig, normalize_agent_config
+from victor.agent.config import AgentLifecycleMode, UnifiedAgentConfig, normalize_agent_config
 from victor.framework.config import AgentConfig
 
 # =============================================================================
@@ -270,24 +270,24 @@ class TestMigrationAndCompatibility:
 
 
 # =============================================================================
-# Test AgentMode Enum
+# Test AgentLifecycleMode Enum
 # =============================================================================
 
 
-class TestAgentMode:
-    """Test AgentMode enumeration."""
+class TestAgentLifecycleMode:
+    """Test AgentLifecycleMode enumeration."""
 
     def test_agent_mode_values(self):
-        """Test AgentMode enum has correct values."""
-        assert AgentMode.FOREGROUND.value == "foreground"
-        assert AgentMode.BACKGROUND.value == "background"
-        assert AgentMode.TEAM_MEMBER.value == "team_member"
+        """Test AgentLifecycleMode enum has correct values."""
+        assert AgentLifecycleMode.FOREGROUND.value == "foreground"
+        assert AgentLifecycleMode.BACKGROUND.value == "background"
+        assert AgentLifecycleMode.TEAM_MEMBER.value == "team_member"
 
     def test_agent_mode_comparison(self):
-        """Test AgentMode enum comparison."""
-        assert AgentMode.FOREGROUND == "foreground"
-        assert AgentMode.BACKGROUND == "background"
-        assert AgentMode.TEAM_MEMBER == "team_member"
+        """Test AgentLifecycleMode enum comparison."""
+        assert AgentLifecycleMode.FOREGROUND == "foreground"
+        assert AgentLifecycleMode.BACKGROUND == "background"
+        assert AgentLifecycleMode.TEAM_MEMBER == "team_member"
 
 
 if __name__ == "__main__":

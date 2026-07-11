@@ -60,7 +60,7 @@ logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from victor.framework.perception_integration import Perception
-    from victor.framework.requirement_validator import ValidationResult
+    from victor.framework.requirement_validator import RequirementResult
     from victor.framework.fulfillment import FulfillmentResult
     from victor.agent.task_analyzer import TaskComplexity
 
@@ -203,7 +203,7 @@ class CompletionScorer:
 
     def calculate_completion_score(
         self,
-        requirement_result: Optional[ValidationResult],
+        requirement_result: Optional[RequirementResult],
         fulfillment_result: Optional[Any],
         keyword_result: Optional[CompletionSignal],
         perception: Optional[Perception],
@@ -284,7 +284,7 @@ class CompletionScorer:
             breakdown=breakdown,
         )
 
-    def _extract_requirement_score(self, requirement_result: Optional[ValidationResult]) -> float:
+    def _extract_requirement_score(self, requirement_result: Optional[RequirementResult]) -> float:
         """Extract requirement satisfaction score."""
         if requirement_result is None:
             # No requirements available - neutral score

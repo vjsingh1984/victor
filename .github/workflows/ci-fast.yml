@@ -532,6 +532,39 @@ jobs:
       - name: Collect full test suite (no execution)
         run: pytest tests/ --collect-only -q
 
+  # Hotspot size ratchet (TD-14/TD-15): pins audited sizes of large files so
+  # they can only shrink. Catches formatting/feature growth of hotspots on
+  # develop BEFORE it blocks the develop->main full suite. The test itself is
+  # ~1.4s (it counts file lines); the job also installs victor so pytest can
+  # collect tests/unit/conftest.py.
+  hotspot-size-guard:
+    name: Hotspot Size Guard
+    runs-on: ubuntu-latest
+    # 10 min, not 2: the test is ~1.4s but the job does a full editable
+    # `pip install -e ".[dev]"` (needed so pytest can collect conftest, which
+    # imports victor). A cold pip cache routinely pushes that install past 2
+    # min, timing the job out -> "cancelled" -> the CI Success aggregate fails,
+    # intermittently blocking every PR (and develop's own CI).
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          # victor-contracts first (provides constants), then victor-ai.
+          # Needed because pytest collects tests/unit/conftest.py, which imports victor.
+          pip install -e ./victor-contracts
+          pip install -e ".[dev]"
+
+      - name: Run hotspot size guard
+        run: pytest tests/unit/runtime/test_hotspot_size_guard.py -q
+
   # Aggregate merge gate — mirrors ProximaDB's `CI Success` pattern (see
   # ../proximaDB/.github/workflows/ci.yml `ci-success`). A single required
   # status check that is green iff every core gate passed (or was path-skipped).
@@ -560,6 +593,7 @@ jobs:
       - definition-import-boundaries
       - version-sync
       - guards
+      - hotspot-size-guard
       - security-quick
       - quick-tests
       - collect-check
