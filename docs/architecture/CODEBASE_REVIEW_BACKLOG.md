@@ -125,7 +125,7 @@ can be resumed across sessions without re-deriving context.
 ## TIER 3 — Quick Wins
 
 ### F-009 · Root-level stray test/verify scripts — `ML`
-- **Status**: IN-PROGRESS (F-009a/b/c DONE; F-009d OPEN)
+- **Status**: DONE (F-009a/b/c done; F-009d done — dead verify script deleted)
 - **Evidence**:
   - Root files: `test_performance_improvements.py`, `test_planning_integration.py`, `test_shell_limits.py`, `verify_phase4_implementation.sh`, `verify_service_layer_default.py`.
   - `grep` across `Makefile`, `pyproject.toml`, `.github/`, `scripts/`, `mkdocs.yml` = **0 references**.
@@ -138,7 +138,7 @@ can be resumed across sessions without re-deriving context.
   - **F-009c (DONE)**: `test_shell_limits.py` had **unique coverage** (no canonical test checks `stdout_limit`/`stderr_limit`). Rewrote as `tests/unit/tools/test_shell_limits.py` — removed hardcoded `sys.path.insert(0, "/Users/vijaysingh/code/codingagent")` hack + `__main__` runner; split into 5 focused async tests. **5 passed in 1.41s.**
   - `test_performance_improvements.py` DELETED — timeout-config coverage already exists in `tests/unit/core/test_timeouts.py`; it also hardcoded `/Users/vijaysingh/code/codingagent` paths and used a `FileWatcherRegistry.get_instance()` singleton.
   - `test_planning_integration.py` DELETED — imported `from victor.agent.coordinators.planning_coordinator import PlanningCoordinator`, a **removed module** (`victor/agent/coordinators/planning_coordinator.py` does not exist); `PlanningConfig` now lives in `victor/config/groups/agent_config.py`. Dead-on-collection.
-- **Action remaining (F-009d, OPEN)**: Rewrite `scripts/verify_service_layer_default.py` to drop the removed `USE_SERVICE_LAYER_FOR_AGENT` flag reference (or delete it — services are now mandatory, no flag). Add `.gitignore` guard for root `test_*.py`/`verify_*`.
+- **F-009d (DONE)**: Deleted `scripts/verify_service_layer_default.py` — its sole purpose was verifying the `USE_SERVICE_LAYER_FOR_AGENT` flag, which no longer exists (service layer is now unconditional), so the script was dead and would crash on import. Only the backlog referenced it. The suggested `.gitignore` guard for root `test_*.py`/`verify_*` was declined: a broad root glob risks ignoring legitimate files, and the strays were already relocated (F-009a/b/c).
 - **Effort**: Low. **Impact**: Low-Medium.
 ### F-010 · 306 files carry legacy/deprecation markers — triage needed — `ML`
 - **Status**: OPEN
@@ -236,3 +236,5 @@ can be resumed across sessions without re-deriving context.
 - **F-012/F-013 acceptance + implementation (2026-07):** Both FEPs accepted (#452). FEP-0015 Phase 1 landed (#454); its Phase 2 (shim removal) is release-gated. FEP-0014 **fully implemented** across Phase 1 (#453) + Phase 2 (#457/#458/#459/#460, doc #462) — F-012 → DONE. Key course-correction during Phase 2: the four divergent `ValidationResult`s carry domain-specific fields, so they were **renamed to distinct types** (not lossy-merged into the canonical) — the accepted plan's "Tier A migrate" was revised to "rename" after ground-truthing (the F-011 lesson). Both guard-allowlist sets emptied; the guard now rejects any new duplicate. Also fixed a repo-wide CI flake mid-cascade: `hotspot-size-guard` had `timeout-minutes: 2` on a 2min+ cold-cache install → intermittent `cancelled` → false red (#455, raised to 10).
 
 - **F-002 execution (2026-07):** FEP-0016 accepted (#465) + implemented. Discovery: the `InitializationPhaseManager` that would centralize init was **dead code** (never wired), and `credit_runtime` (registered only on it) never ran in production — an opt-in RL feature silently broken; fixed by #464. Wired the manager to drive all 9 phases via `run_phase` at their existing sites (#466 readiness, #477 wiring), with a guard test so no phase can be lost again. Grouped design revised to per-phase in-place when implementation showed the phases are finely interleaved with construction; CI caught two real gaps (a bare test orchestrator; a hotspot-cap overrun) that local async-env noise had masked — both fixed before merge.
+
+- **F-009d execution (2026-07):** Deleted the dead `scripts/verify_service_layer_default.py` (verified only the removed `USE_SERVICE_LAYER_FOR_AGENT` flag → crashes on import; service layer is now unconditional). F-009 → DONE.
