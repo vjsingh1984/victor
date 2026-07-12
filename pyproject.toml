@@ -191,12 +191,17 @@ dev = [
     # Integration test dependencies
     "strawberry-graphql[fastapi]>=0.243",  # For GraphQL API integration tests
     "tomli>=2.0; python_version < '3.11'",
-    # Tree-sitter Python grammar. tests/integration/graph_rag/test_pipeline.py::
-    # test_ccg_construction calls build_ccg_for_file directly. CI's quick-tests
-    # job installs only .[dev] (no victor-coding enhanced builder), so the
-    # tree-sitter fallback must resolve a parser or the test gets 0 nodes.
-    # Mirrors the [dev] grammar install used by victor-codegraph's CI.
-    "tree-sitter-python>=0.23",
+    # All tree-sitter grammar wheels (self-referencing extra, same pattern as
+    # [all]). Two consumers:
+    # - tests/integration/graph_rag/test_pipeline.py::test_ccg_construction
+    #   calls build_ccg_for_file directly; CI's quick-tests job installs only
+    #   .[dev] (no victor-coding enhanced builder), so the tree-sitter
+    #   fallback must resolve a parser or the test gets 0 nodes.
+    # - tests/unit/core/graph_rag/test_language_handlers.py asserts every
+    #   victor-coding language plugin resolves an edge handler; in an env
+    #   with victor-coding installed but a grammar wheel missing (typical
+    #   local dev setup), those tests fail instead of skipping.
+    "victor-ai[lang-all]",
 ]
 
 # CI/CD dependencies - includes all testing, linting, and build tools
@@ -232,8 +237,9 @@ ci = [
     # Additional CI-specific tools
     "pytest-split>=0.8",
     "tomli>=2.0; python_version < '3.11'",
-    # Tree-sitter Python grammar for CCG integration tests (see [dev] note).
-    "tree-sitter-python>=0.23",
+    # All tree-sitter grammar wheels for CCG + language-handler tests
+    # (see [dev] note).
+    "victor-ai[lang-all]",
 
     # Build tools
     "build>=0.10",
