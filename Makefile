@@ -11,6 +11,14 @@
 
 PYTEST_TIMEOUT_ARG := $(shell pytest --help 2>/dev/null | grep -q -- "--timeout" && echo --timeout=120)
 
+# Parallel test execution via pytest-xdist (no-op if the plugin is absent).
+# --dist=loadfile keeps each test file on one worker in definition order: parts
+# of the suite (e.g. test_orchestrator_core.py) depend on in-file execution
+# order, which the default --dist=load scrambles.
+# Override with e.g. `make test PYTEST_JOBS=8` or PYTEST_JOBS=0 to disable.
+PYTEST_JOBS ?= 4
+PYTEST_XDIST_ARG := $(shell pytest --help 2>/dev/null | grep -q -- "--numprocesses" && test "$(PYTEST_JOBS)" != "0" && echo --numprocesses=$(PYTEST_JOBS) --dist=loadfile)
+
 # Default target
 help:
 	@echo "Victor Development Commands"
@@ -127,20 +135,20 @@ check-vertical-boundaries:
 	python scripts/ci/check_extracted_vertical_boundaries.py
 
 test:
-	pytest tests/unit -v --tb=short $(PYTEST_TIMEOUT_ARG)
+	pytest tests/unit -v --tb=short $(PYTEST_TIMEOUT_ARG) $(PYTEST_XDIST_ARG)
 
 test-definition-boundaries:
 	@echo "Definition import boundaries enforced by contract boundary tests"
 	pytest tests/unit/contracts -q
 
 test-all:
-	pytest -v --tb=short
+	pytest -v --tb=short $(PYTEST_XDIST_ARG)
 
 test-cov:
-	pytest tests/unit --cov=victor --cov-report=html --cov-report=term-missing
+	pytest tests/unit --cov=victor --cov-report=html --cov-report=term-missing $(PYTEST_XDIST_ARG)
 
 test-quick:
-	pytest tests/unit -v --tb=short -m "not slow"
+	pytest tests/unit -v --tb=short -m "not slow" $(PYTEST_XDIST_ARG)
 
 test-split:
 	pytest tests/unit --splits=4 --group=1 -v --tb=short

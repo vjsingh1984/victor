@@ -170,6 +170,7 @@ dev = [
     "pytest-json-report>=1.5.0",
     "pytest-benchmark>=5.0",  # For performance tests
     "pytest-timeout>=2.3",  # ci-fast quick-tests run with --timeout=120
+    "pytest-xdist>=3.5",  # Parallel test execution (make test runs with -n 4)
     "aiosqlite>=0.19",  # For SQLite async operations in tests
     "docker>=7.0",  # docker moved out of default deps; tests + collection need it
 
@@ -238,6 +239,7 @@ ci = [
     "pytest-json-report>=1.5.0",
     "pytest-benchmark>=5.0",
     "pytest-timeout>=2.3",  # ci-fast quick-tests run with --timeout=120
+    "pytest-xdist>=3.5",  # Parallel test execution (make test runs with -n 4)
     "respx>=0.21",
     "pandas>=2.0",
     "docker>=7.0",  # docker moved out of default deps; tests + collection need it
