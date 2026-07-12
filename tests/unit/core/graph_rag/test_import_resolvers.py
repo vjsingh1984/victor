@@ -411,3 +411,121 @@ class TestCppResolver:
 
         for lang in ("c", "cpp"):
             assert isinstance(ImportResolverRegistry.create(lang), CppImportResolver)
+
+
+def _make_jvm_project(root: Path) -> None:
+    """Maven multi-module + sbt mixed layout.
+
+    core/src/main/java/com/acme/core/Engine.java     (nested class Engine.Builder)
+    core/src/main/java/com/acme/core/util/Log.java
+    api/src/main/java/com/acme/api/Handler.java
+    api/src/main/scala/com/acme/api/Routes.scala
+    core/src/test/java/com/acme/core/EngineTest.java
+    Ambiguity trap: two Config.java in different packages.
+    """
+    for rel in (
+        "core/src/main/java/com/acme/core/Engine.java",
+        "core/src/main/java/com/acme/core/util/Log.java",
+        "core/src/main/java/com/acme/core/Config.java",
+        "core/src/test/java/com/acme/core/EngineTest.java",
+        "api/src/main/java/com/acme/api/Handler.java",
+        "api/src/main/java/com/acme/api/Config.java",
+    ):
+        path = root / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("class X {}\n")
+    scala = root / "api/src/main/scala/com/acme/api/Routes.scala"
+    scala.parent.mkdir(parents=True, exist_ok=True)
+    scala.write_text("class Routes\n")
+
+
+class TestJavaResolver:
+    def test_fqn_resolves_across_source_roots_and_modules(self, tmp_path: Path):
+        from victor.core.graph_rag.import_resolvers import JavaImportResolver
+
+        _make_jvm_project(tmp_path)
+        resolver = JavaImportResolver()
+        src = str(tmp_path / "api/src/main/java/com/acme/api/Handler.java")
+        # Cross-module import: api → core, source roots discovered by suffix.
+        assert resolver.parse("import com.acme.core.Engine;", src, tmp_path) == [
+            "core/src/main/java/com/acme/core/Engine.java"
+        ]
+        assert resolver.parse("import com.acme.core.util.Log;", src, tmp_path) == [
+            "core/src/main/java/com/acme/core/util/Log.java"
+        ]
+
+    def test_static_and_nested_imports_drop_to_declaring_class(self, tmp_path: Path):
+        from victor.core.graph_rag.import_resolvers import JavaImportResolver
+
+        _make_jvm_project(tmp_path)
+        resolver = JavaImportResolver()
+        src = str(tmp_path / "api/src/main/java/com/acme/api/Handler.java")
+        assert resolver.parse("import static com.acme.core.Engine.start;", src, tmp_path) == [
+            "core/src/main/java/com/acme/core/Engine.java"
+        ]
+        assert resolver.parse("import com.acme.core.Engine.Builder;", src, tmp_path) == [
+            "core/src/main/java/com/acme/core/Engine.java"
+        ]
+
+    def test_wildcards_externals_and_ambiguity_are_skipped(self, tmp_path: Path):
+        from victor.core.graph_rag.import_resolvers import JavaImportResolver
+
+        _make_jvm_project(tmp_path)
+        resolver = JavaImportResolver()
+        src = str(tmp_path / "api/src/main/java/com/acme/api/Handler.java")
+        assert resolver.parse("import com.acme.core.*;", src, tmp_path) == []
+        assert resolver.parse("import java.util.List;", src, tmp_path) == []
+        # Config.java exists in two packages — but the FQN disambiguates.
+        assert resolver.parse("import com.acme.api.Config;", src, tmp_path) == [
+            "api/src/main/java/com/acme/api/Config.java"
+        ]
+        # A same-suffix collision (hypothetical duplicate FQN) yields nothing:
+        dup = tmp_path / "other/src/main/java/com/acme/api/Config.java"
+        dup.parent.mkdir(parents=True)
+        dup.write_text("class X {}\n")
+        fresh = JavaImportResolver()  # new index
+        assert fresh.parse("import com.acme.api.Config;", src, tmp_path) == []
+
+
+class TestScalaResolver:
+    def test_selector_groups_renames_and_multi_imports(self, tmp_path: Path):
+        from victor.core.graph_rag.import_resolvers import ScalaImportResolver
+
+        _make_jvm_project(tmp_path)
+        resolver = ScalaImportResolver()
+        src = str(tmp_path / "api/src/main/scala/com/acme/api/Routes.scala")
+        # Selector group with rename; Scala imports Java classes too.
+        assert resolver.parse("import com.acme.core.{Engine => E, Config}", src, tmp_path) == [
+            "core/src/main/java/com/acme/core/Engine.java",
+            "core/src/main/java/com/acme/core/Config.java",
+        ]
+        # Multi-import clause.
+        assert resolver.parse(
+            "import com.acme.core.Engine, com.acme.api.Routes", src, tmp_path
+        ) == [
+            "core/src/main/java/com/acme/core/Engine.java",
+            "api/src/main/scala/com/acme/api/Routes.scala",
+        ]
+
+    def test_wildcards_hidden_members_and_externals_skipped(self, tmp_path: Path):
+        from victor.core.graph_rag.import_resolvers import ScalaImportResolver
+
+        _make_jvm_project(tmp_path)
+        resolver = ScalaImportResolver()
+        src = str(tmp_path / "api/src/main/scala/com/acme/api/Routes.scala")
+        assert resolver.parse("import com.acme.core._", src, tmp_path) == []
+        assert resolver.parse("import com.acme.core.*", src, tmp_path) == []
+        assert resolver.parse("import scala.collection.mutable.Map", src, tmp_path) == []
+        # `Engine => _` hides the member; only Config imports.
+        assert resolver.parse("import com.acme.core.{Engine => _, Config}", src, tmp_path) == [
+            "core/src/main/java/com/acme/core/Config.java"
+        ]
+
+    def test_registered_for_java_and_scala(self):
+        from victor.core.graph_rag.import_resolvers import (
+            JavaImportResolver,
+            ScalaImportResolver,
+        )
+
+        assert isinstance(ImportResolverRegistry.create("java"), JavaImportResolver)
+        assert isinstance(ImportResolverRegistry.create("scala"), ScalaImportResolver)

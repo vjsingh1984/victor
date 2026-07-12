@@ -466,6 +466,7 @@ _IMPORT_NODE_TYPES: Dict[str, frozenset] = {
     "go": frozenset({"import_declaration"}),
     "rust": frozenset({"use_declaration"}),
     "java": frozenset({"import_declaration"}),
+    "scala": frozenset({"import_declaration"}),
     "c": frozenset({"preproc_include"}),
     "cpp": frozenset({"preproc_include"}),
 }

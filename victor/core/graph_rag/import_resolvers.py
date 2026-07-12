@@ -29,9 +29,9 @@ and language-specific import semantics, mirroring the registry pattern in
   cache project-layout state (e.g. the Rust workspace crate map) on
   ``self`` without staleness across runs.
 
-Python, Rust, JS/TS, and C/C++ are implemented today. Go/Java need their
-own strategies (package paths) — register them here rather than adding
-language branches to ``indexing.py``.
+Python, Rust, JS/TS, C/C++, and Java/Scala are implemented today. Go needs
+its own strategy (module paths from go.mod) — register it here rather than
+adding language branches to ``indexing.py``.
 """
 
 from __future__ import annotations
@@ -792,6 +792,192 @@ class CppImportResolver:
         return index
 
 
+class JvmImportResolver:
+    """Shared machinery for JVM languages: dotted FQN → source file.
+
+    Source roots (src/main/java, src/test/scala, multi-module Maven
+    <module>/src/main/java, bare src/) live in build files we don't parse,
+    so the FQN's path form (``com/foo/bar/Baz.<ext>``) is suffix-matched
+    against a once-per-run index of project sources — the same
+    configuration-free approach as the C++ resolver. A UNIQUE match
+    resolves; ambiguity emits nothing.
+
+    Nested types and static members (``com.foo.Bar.Inner``,
+    ``import static com.foo.Bar.method``) resolve by progressively
+    dropping trailing segments until a file matches. External packages
+    (``java.util.List``, library FQNs) match nothing and fall out.
+    """
+
+    #: Source suffixes indexed for suffix matching (subclass-specific).
+    _SOURCE_SUFFIXES: frozenset = frozenset()
+
+    _PRUNE_DIR_NAMES = frozenset(
+        {"node_modules", "target", "third_party", "external", "__pycache__", "dist", "out", "bin"}
+    )
+    _PRUNE_DIR_PREFIXES = (".", "venv", "build", "cmake-build")
+
+    def __init__(self) -> None:
+        # filename → root-relative posix paths, built on first lookup.
+        self._source_index: Optional[Dict[str, List[str]]] = None
+
+    def resolve(self, module: str, root_path: Path) -> Optional[Path]:
+        if not module or ".." in PurePosixPath(module).parts:
+            return None
+        candidate = root_path / module
+        return candidate if candidate.is_file() else None
+
+    def _resolve_dotted(self, segments: List[str], root_resolved: Path) -> Optional[str]:
+        """Unique suffix match for a dotted FQN, dropping trailing segments
+        for nested types / static members. Requires at least one package
+        segment so bare class names don't bind on filename alone."""
+        index = self._source_index_for(root_resolved)
+        parts = list(segments)
+        while len(parts) >= 2:
+            rel_stem = "/".join(parts)
+            matches = [
+                path
+                for suffix in self._SOURCE_SUFFIXES
+                for path in index.get(parts[-1] + suffix, [])
+                if path == rel_stem + suffix or path.endswith("/" + rel_stem + suffix)
+            ]
+            if len(matches) == 1:
+                return matches[0]
+            if matches:
+                return None  # ambiguous — a wrong edge is worse than none
+            parts.pop()
+        return None
+
+    def _source_index_for(self, root_resolved: Path) -> Dict[str, List[str]]:
+        if self._source_index is not None:
+            return self._source_index
+        index: Dict[str, List[str]] = {}
+        for dirpath, dirnames, filenames in os.walk(root_resolved):
+            dirnames[:] = [
+                d
+                for d in dirnames
+                if d not in self._PRUNE_DIR_NAMES and not d.startswith(self._PRUNE_DIR_PREFIXES)
+            ]
+            for name in filenames:
+                if Path(name).suffix.lower() in self._SOURCE_SUFFIXES:
+                    rel = (Path(dirpath) / name).relative_to(root_resolved).as_posix()
+                    index.setdefault(name, []).append(rel)
+        self._source_index = index
+        return index
+
+    @staticmethod
+    def _valid_segments(segments: List[str]) -> bool:
+        return bool(segments) and all(seg.isidentifier() for seg in segments)
+
+
+class JavaImportResolver(JvmImportResolver):
+    """Resolve Java ``import`` declarations to project sources.
+
+    Handles ``import com.foo.Baz;``, ``import static com.foo.Bar.method;``
+    (static member drops to the declaring class), and nested types.
+    Wildcard imports (``import com.foo.*;``) are skipped — they name a
+    package, not a type, and fanning out to every file in the package
+    would re-introduce the multiplicity this metric series removed.
+    """
+
+    _SOURCE_SUFFIXES = frozenset({".java"})
+
+    def parse(self, raw: str, src_file: str, root_path: Path) -> List[str]:
+        text = raw.strip().removesuffix(";").strip()
+        if not text.startswith("import"):
+            return []
+        text = text[len("import") :].strip()
+        if text.startswith("static "):
+            text = text[len("static ") :].strip()
+        if not text or text.endswith(".*"):
+            return []
+        segments = [seg.strip() for seg in text.split(".")]
+        if not self._valid_segments(segments):
+            return []
+        resolved = self._resolve_dotted(segments, root_path.resolve())
+        return [resolved] if resolved else []
+
+
+class ScalaImportResolver(JvmImportResolver):
+    """Resolve Scala ``import`` clauses to project sources.
+
+    Handles multi-imports (``import a.B, c.D``), selector groups with
+    renames (``import a.{B, C => D}`` / Scala 3 ``C as D``), and drops
+    wildcards (``a._``, Scala 3 ``a.*``) and hidden members (``B => _``).
+    Scala files may define types whose names differ from the filename;
+    those simply miss the suffix match and stay unresolved (best effort,
+    conventional layouts resolve). The index includes ``.java`` too —
+    mixed sbt/Maven projects import Java classes from the same repo.
+    """
+
+    _SOURCE_SUFFIXES = frozenset({".scala", ".java"})
+
+    def parse(self, raw: str, src_file: str, root_path: Path) -> List[str]:
+        text = raw.strip().removesuffix(";").strip()
+        if not text.startswith("import"):
+            return []
+        text = text[len("import") :].strip()
+        if not text:
+            return []
+        root_resolved = root_path.resolve()
+
+        candidates: List[str] = []
+        seen: Set[str] = set()
+        for clause in self._split_top_level_commas(text):
+            for dotted in self._expand_clause(clause.strip()):
+                segments = [seg.strip() for seg in dotted.split(".")]
+                if not self._valid_segments(segments):
+                    continue
+                resolved = self._resolve_dotted(segments, root_resolved)
+                if resolved and resolved not in seen:
+                    seen.add(resolved)
+                    candidates.append(resolved)
+        return candidates
+
+    @staticmethod
+    def _split_top_level_commas(text: str) -> List[str]:
+        parts: List[str] = []
+        depth = 0
+        current: List[str] = []
+        for ch in text:
+            if ch == "{":
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+            elif ch == "," and depth == 0:
+                parts.append("".join(current))
+                current = []
+                continue
+            current.append(ch)
+        parts.append("".join(current))
+        return parts
+
+    @classmethod
+    def _expand_clause(cls, clause: str) -> List[str]:
+        """One import clause → dotted names (selector groups expanded)."""
+        brace = clause.find("{")
+        if brace == -1:
+            path = clause.strip()
+            if path.endswith("._") or path.endswith(".*"):
+                path = path[:-2]
+            return [path] if path else []
+        prefix = clause[:brace].strip().removesuffix(".")
+        close = clause.rfind("}")
+        if close < brace or not prefix:
+            return []
+        out: List[str] = []
+        for selector in clause[brace + 1 : close].split(","):
+            # `B => D` / Scala 3 `B as D`: the real member is the LHS;
+            # `B => _` hides a member; bare `_`/`*` are wildcards.
+            parts = re.split(r"=>|\bas\b", selector)
+            name = parts[0].strip()
+            if not name or name in ("_", "*"):
+                continue
+            if len(parts) > 1 and parts[1].strip() == "_":
+                continue  # hidden member, not an import
+            out.append(f"{prefix}.{name}")
+        return out
+
+
 ImportResolverRegistry.register("python", PythonImportResolver)
 ImportResolverRegistry.register("rust", RustImportResolver)
 ImportResolverRegistry.register("javascript", JsTsImportResolver)
@@ -800,13 +986,18 @@ ImportResolverRegistry.register("jsx", JsTsImportResolver)
 ImportResolverRegistry.register("tsx", JsTsImportResolver)
 ImportResolverRegistry.register("c", CppImportResolver)
 ImportResolverRegistry.register("cpp", CppImportResolver)
+ImportResolverRegistry.register("java", JavaImportResolver)
+ImportResolverRegistry.register("scala", ScalaImportResolver)
 
 
 __all__ = [
     "CppImportResolver",
     "ImportResolverRegistry",
+    "JavaImportResolver",
     "JsTsImportResolver",
+    "JvmImportResolver",
     "LanguageImportResolver",
     "PythonImportResolver",
     "RustImportResolver",
+    "ScalaImportResolver",
 ]
