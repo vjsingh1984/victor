@@ -8,7 +8,7 @@ def _tool(name: str, description: str = "") -> ToolDefinition:
 
 
 def test_cache_adapter_restores_tools_from_cached_payload():
-    from victor.agent.tool_selection_cache import SemanticToolSelectionCacheAdapter
+    from victor.agent.tool_selection.cache import SemanticToolSelectionCacheAdapter
 
     adapter = SemanticToolSelectionCacheAdapter()
     payload = {
@@ -26,7 +26,7 @@ def test_cache_adapter_restores_tools_from_cached_payload():
 
 
 def test_cache_adapter_returns_none_for_incomplete_payload():
-    from victor.agent.tool_selection_cache import SemanticToolSelectionCacheAdapter
+    from victor.agent.tool_selection.cache import SemanticToolSelectionCacheAdapter
 
     adapter = SemanticToolSelectionCacheAdapter()
 
@@ -42,7 +42,7 @@ def test_cache_adapter_returns_none_for_incomplete_payload():
 
 
 def test_cache_adapter_serializes_tools_for_storage():
-    from victor.agent.tool_selection_cache import SemanticToolSelectionCacheAdapter
+    from victor.agent.tool_selection.cache import SemanticToolSelectionCacheAdapter
 
     adapter = SemanticToolSelectionCacheAdapter()
     payload = adapter.serialize_tools([_tool("read"), _tool("search", "Search repo")])
@@ -61,7 +61,7 @@ def test_cache_adapter_serializes_tools_for_storage():
 
 
 def test_cache_adapter_loads_restored_tools_from_cache():
-    from victor.agent.tool_selection_cache import SemanticToolSelectionCacheAdapter
+    from victor.agent.tool_selection.cache import SemanticToolSelectionCacheAdapter
 
     class _FakeCache:
         def get(self, result_type, cache_key):
@@ -80,7 +80,7 @@ def test_cache_adapter_loads_restored_tools_from_cache():
 
 
 def test_cache_adapter_stores_serialized_tools_with_ttl():
-    from victor.agent.tool_selection_cache import SemanticToolSelectionCacheAdapter
+    from victor.agent.tool_selection.cache import SemanticToolSelectionCacheAdapter
 
     seen: dict[str, object] = {}
 

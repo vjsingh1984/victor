@@ -2,7 +2,7 @@ from victor.agent.tool_selection import ToolSelectionStats
 
 
 def test_selection_recorder_records_semantic_and_invokes_callback():
-    from victor.agent.tool_selection_recorder import ToolSelectionRecorder
+    from victor.agent.tool_selection.recorder import ToolSelectionRecorder
 
     stats = ToolSelectionStats()
     seen: list[tuple[str, int]] = []
@@ -20,7 +20,7 @@ def test_selection_recorder_records_semantic_and_invokes_callback():
 
 
 def test_selection_recorder_records_fallback_without_callback():
-    from victor.agent.tool_selection_recorder import ToolSelectionRecorder
+    from victor.agent.tool_selection.recorder import ToolSelectionRecorder
 
     stats = ToolSelectionStats()
     recorder = ToolSelectionRecorder(stats=stats)

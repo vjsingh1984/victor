@@ -7,7 +7,7 @@ def _tool(name: str) -> ToolDefinition:
 
 
 def test_stage_policy_prioritizes_stage_core_web_and_adjacent_tools():
-    from victor.agent.tool_selection_policy import (
+    from victor.agent.tool_selection.policy import (
         StageToolSelectionContext,
         ToolSelectionStagePolicy,
     )
@@ -50,7 +50,7 @@ def test_stage_policy_prioritizes_stage_core_web_and_adjacent_tools():
 
 
 def test_stage_policy_falls_back_to_core_and_vertical_tools():
-    from victor.agent.tool_selection_policy import (
+    from victor.agent.tool_selection.policy import (
         StageToolSelectionContext,
         ToolSelectionStagePolicy,
     )
@@ -77,7 +77,7 @@ def test_stage_policy_falls_back_to_core_and_vertical_tools():
 
 
 def test_stage_policy_uses_small_prefix_as_last_resort():
-    from victor.agent.tool_selection_policy import (
+    from victor.agent.tool_selection.policy import (
         StageToolSelectionContext,
         ToolSelectionStagePolicy,
     )
@@ -104,7 +104,7 @@ def test_stage_policy_uses_small_prefix_as_last_resort():
 
 
 def test_stage_policy_builds_semantic_fallback_with_core_first_and_dedupes():
-    from victor.agent.tool_selection_policy import ToolSelectionStagePolicy
+    from victor.agent.tool_selection.policy import ToolSelectionStagePolicy
 
     policy = ToolSelectionStagePolicy(fallback_max_tools=3)
     selected = policy.build_semantic_fallback_tools(

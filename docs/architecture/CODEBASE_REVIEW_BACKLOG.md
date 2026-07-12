@@ -53,7 +53,7 @@ can be resumed across sessions without re-deriving context.
 - **Effort**: Medium-High. **Impact**: High.
 
 ### F-004 · tool_selection split into 8 files but core still 2,878 LOC — `HM`
-- **Status**: OPEN
+- **Status**: DONE (package-ify scope; parent-extraction deferred) — scoping **corrected the premise**: the 6 satellites are *genuine, tested delegations* (each called at a real pipeline point, each with a dedicated unit test), **not** false splits — folding them back would create a ~3,300-LOC monolith. Instead (#484): moved the flat `tool_selection*.py` files into a `victor/agent/tool_selection/` package (parent → `selector.py`, git renames preserved) with an `__init__` re-export shim (public API unchanged), and added a hotspot ratchet on `selector.py` (2882) so it can't grow. The parent's big undelegated methods (`_filter_tools_for_stage` 336 LOC, `get_adaptive_threshold` 135 LOC) were **deliberately not extracted** — the file isn't hotspot-critical and works; ~25h of hot-path churn wasn't worth it.
 - **Evidence**:
   - `tool_selection.py` (2,878) + `tool_selection_assembler.py` (56), `_cache_key.py` (27), `_cache.py` (64), `_policy.py` (103), `_postprocessor.py` (144), `_recorder.py` (21), `tool_selector_factory.py` (351) = **3,747 LOC**.
 - **Rationale**: 7 satellites averaging <150 LOC are too-granular splits where the 2,878-line parent still owns the logic — worst of both worlds. Either commit to a `tool_selection/` package with coherent stages (policy → cache → selector → postprocess → record), or fold satellites back.
@@ -238,3 +238,4 @@ can be resumed across sessions without re-deriving context.
 - **F-002 execution (2026-07):** FEP-0016 accepted (#465) + implemented. Discovery: the `InitializationPhaseManager` that would centralize init was **dead code** (never wired), and `credit_runtime` (registered only on it) never ran in production — an opt-in RL feature silently broken; fixed by #464. Wired the manager to drive all 9 phases via `run_phase` at their existing sites (#466 readiness, #477 wiring), with a guard test so no phase can be lost again. Grouped design revised to per-phase in-place when implementation showed the phases are finely interleaved with construction; CI caught two real gaps (a bare test orchestrator; a hotspot-cap overrun) that local async-env noise had masked — both fixed before merge.
 
 - **F-009d execution (2026-07):** Deleted the dead `scripts/verify_service_layer_default.py` (verified only the removed `USE_SERVICE_LAYER_FOR_AGENT` flag → crashes on import; service layer is now unconditional). F-009 → DONE.
+- **F-004 execution (2026-07):** Package-ified tool_selection (#484); premise corrected (satellites are sound). Parent-method extraction deferred as low-ROI on non-hotspot working code.
