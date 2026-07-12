@@ -900,7 +900,6 @@ class Settings(BaseSettings):
             # Feature Flags Configuration
             "use_composition_over_inheritance": "feature_flags.use_composition_over_inheritance",
             "use_strategy_based_tool_registration": "feature_flags.use_strategy_based_tool_registration",
-            "use_provider_pooling": "feature_flags.use_provider_pooling",
             # Workflow Configuration
             "workflow_definition_cache_enabled": "workflow.workflow_definition_cache_enabled",
             "workflow_definition_cache_ttl": "workflow.workflow_definition_cache_ttl",

@@ -2829,15 +2829,6 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         Returns:
             Dictionary with shutdown status for each component
         """
-        # Shutdown provider pool if active
-        pool = getattr(getattr(self, "_provider_runtime", None), "pool", None)
-        if pool is not None:
-            try:
-                await pool.shutdown()
-                logger.info("ProviderPool shutdown complete")
-            except Exception as e:
-                logger.warning("ProviderPool shutdown error: %s", e)
-
         # Delegate to LifecycleManager for graceful shutdown
         return await self._lifecycle_manager.graceful_shutdown()
 
