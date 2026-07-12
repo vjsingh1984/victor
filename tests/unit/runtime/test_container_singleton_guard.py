@@ -32,7 +32,7 @@ ALLOWED_GET_CONTAINER_PREFIXES = (
     # Service infrastructure (self-configuration)
     "victor/agent/services/tiered_decision_service.py",  # Provider detection
     # Framework infrastructure (optional service lookups)
-    "victor/agent/tool_selection.py",  # Runtime intelligence lazy lookup
+    "victor/agent/tool_selection/selector.py",  # decision-service lazy lookup (F-004 move, #484)
     "victor/framework/agentic_loop.py",  # Decision service lookup
     "victor/framework/rl/learners/prompt_optimizer.py",  # Credit tracking service lookup
     "victor/storage/embeddings/intent_classifier.py",  # Tiered service lazy lookup

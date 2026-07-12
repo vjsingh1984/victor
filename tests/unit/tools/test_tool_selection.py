@@ -169,7 +169,7 @@ class TestToolSelectorRuntimeIntelligence:
 
         with (
             patch(
-                "victor.agent.tool_selection.get_container",
+                "victor.agent.tool_selection.selector.get_container",
                 side_effect=AssertionError("container path should not be used"),
             ),
             patch(
