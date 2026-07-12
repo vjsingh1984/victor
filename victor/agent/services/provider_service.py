@@ -78,16 +78,13 @@ class ProviderService:
     def __init__(
         self,
         registry: Any,
-        health_checker: Optional[Any] = None,
     ):
         """Initialize the provider service.
 
         Args:
             registry: Provider registry
-            health_checker: Optional health checker component
         """
         self._registry = registry
-        self._health_checker = health_checker
         self._provider_manager: Optional[Any] = None
         self._current_provider: Optional["BaseProvider"] = None
         self._current_info: Optional[ProviderInfoImpl] = None
@@ -146,13 +143,6 @@ class ProviderService:
         # Set model if specified
         if model:
             new_provider.set_model(model)
-
-        # Validate if requested
-        if validate:
-            if self._health_checker:
-                is_healthy = await self._health_checker.check(new_provider)
-                if not is_healthy:
-                    raise ValueError(f"Provider health check failed: {provider}")
 
         # Update current provider
         self._current_provider = new_provider
@@ -228,9 +218,6 @@ class ProviderService:
         if target_provider is None:
             return False
 
-        if self._health_checker:
-            return await self._health_checker.check(target_provider)
-
         # Default health check: try to get model
         try:
             return target_provider.get_model() is not None
@@ -245,8 +232,6 @@ class ProviderService:
             await self._provider_manager.start_health_monitoring()
         elif hasattr(self._registry, "start_health_monitoring"):
             await self._registry.start_health_monitoring()
-        elif self._health_checker and hasattr(self._health_checker, "start_monitoring"):
-            await self._health_checker.start_monitoring()
 
     async def stop_health_monitoring(self) -> None:
         """Stop background health monitoring."""
@@ -256,8 +241,6 @@ class ProviderService:
             await self._provider_manager.stop_health_monitoring()
         elif hasattr(self._registry, "stop_health_monitoring"):
             await self._registry.stop_health_monitoring()
-        elif self._health_checker and hasattr(self._health_checker, "stop_monitoring"):
-            await self._health_checker.stop_monitoring()
 
     def get_available_providers(self) -> List[str]:
         """Get list of available providers.

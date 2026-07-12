@@ -72,10 +72,8 @@ class TestServiceIntegration:
         )
 
         registry = Mock()
-        health_checker = Mock()
         provider_service = ProviderService(
             registry=registry,
-            health_checker=health_checker,
         )
 
         recovery_service = RecoveryService()
@@ -182,12 +180,8 @@ class TestServiceIntegration:
             side_effect=lambda p: provider1 if p == "anthropic" else provider2
         )
 
-        health_checker = Mock()
-        health_checker.check = AsyncMock(return_value=True)
-
         service = ProviderService(
             registry=registry,
-            health_checker=health_checker,
         )
 
         # Test: Switch to first provider
@@ -417,7 +411,6 @@ class TestServiceIntegration:
         registry = Mock()
         provider_service = ProviderService(
             registry=registry,
-            health_checker=Mock(),
         )
 
         recovery_service = RecoveryService()
@@ -513,7 +506,6 @@ class TestServiceIntegration:
         registry.get_provider = Mock(return_value=provider)
         provider_service = ProviderService(
             registry=registry,
-            health_checker=Mock(),
         )
 
         recovery_service = RecoveryService()
@@ -602,7 +594,6 @@ class TestServiceErrorScenarios:
 
         service = ProviderService(
             registry=registry,
-            health_checker=Mock(),
         )
 
         # Test: Switch to non-existent provider

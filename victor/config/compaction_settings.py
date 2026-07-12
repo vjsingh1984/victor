@@ -89,12 +89,6 @@ class CompactionSettings(BaseModel):
     - Hybrid: Combined approach with best of both worlds
     """
 
-    # Legacy compaction settings (backward compatibility)
-    compaction_enabled: bool = True
-    compaction_preserve_recent: int = 4
-    compaction_max_estimated_tokens: int = 10000
-    compaction_auto_compact: bool = False
-
     # Adaptive threshold settings
     adaptive_threshold: Optional[AdaptiveCompactionSettings] = Field(
         default=None,

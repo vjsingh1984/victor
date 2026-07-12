@@ -88,7 +88,7 @@ def test_create_provider_runtime_components_switch_coordinator_removed():
 def test_create_provider_runtime_components_accepts_legacy_get_provider_service_kwarg():
     """Older callers passing get_provider_service should not fail."""
     manager = MagicMock()
-    settings = SimpleNamespace(feature_flags=SimpleNamespace(use_provider_pooling=False))
+    settings = SimpleNamespace(feature_flags=SimpleNamespace())
 
     runtime = create_provider_runtime_components(
         settings=settings,
