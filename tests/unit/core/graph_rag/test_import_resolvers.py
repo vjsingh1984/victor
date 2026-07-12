@@ -323,3 +323,91 @@ class TestJsTsResolve:
         )
         # A .js specifier whose .js file exists binds as-is.
         assert resolver.resolve("src/legacy.js", tmp_path) == (tmp_path / "src" / "legacy.js")
+
+
+def _make_cpp_project(root: Path) -> None:
+    """CMake-style layout mirroring inferflux.
+
+    server/logging/logger.h + logger.cpp
+    runtime/engine.h + engine.cpp        (engine.cpp includes "engine.h" and
+                                          root-relative "server/logging/logger.h")
+    runtime/util/config.h                 \\ two config.h — basename-only
+    server/config.h                       // includes are ambiguous
+    """
+    (root / "server" / "logging").mkdir(parents=True)
+    (root / "runtime" / "util").mkdir(parents=True)
+    (root / "server" / "logging" / "logger.h").write_text("#pragma once\n")
+    (root / "server" / "logging" / "logger.cpp").write_text('#include "logger.h"\n')
+    (root / "runtime" / "engine.h").write_text("#pragma once\n")
+    (root / "runtime" / "engine.cpp").write_text('#include "engine.h"\n')
+    (root / "runtime" / "util" / "config.h").write_text("#pragma once\n")
+    (root / "server" / "config.h").write_text("#pragma once\n")
+
+
+class TestCppResolver:
+    def test_quoted_include_resolves_relative_to_source(self, tmp_path: Path):
+        from victor.core.graph_rag.import_resolvers import CppImportResolver
+
+        _make_cpp_project(tmp_path)
+        resolver = CppImportResolver()
+        src = str(tmp_path / "runtime" / "engine.cpp")
+        assert resolver.parse('#include "engine.h"', src, tmp_path) == ["runtime/engine.h"]
+
+    def test_root_relative_include_resolves(self, tmp_path: Path):
+        from victor.core.graph_rag.import_resolvers import CppImportResolver
+
+        _make_cpp_project(tmp_path)
+        resolver = CppImportResolver()
+        src = str(tmp_path / "runtime" / "engine.cpp")
+        # Both quote styles support the -I <root> convention.
+        assert resolver.parse('#include "server/logging/logger.h"', src, tmp_path) == [
+            "server/logging/logger.h"
+        ]
+        assert resolver.parse("#include <server/logging/logger.h>", src, tmp_path) == [
+            "server/logging/logger.h"
+        ]
+
+    def test_unique_suffix_match_resolves(self, tmp_path: Path):
+        from victor.core.graph_rag.import_resolvers import CppImportResolver
+
+        _make_cpp_project(tmp_path)
+        resolver = CppImportResolver()
+        # <logging/logger.h> — an -I server/ include dir we can't see;
+        # unique suffix match against the header index recovers it.
+        src = str(tmp_path / "runtime" / "engine.cpp")
+        assert resolver.parse("#include <logging/logger.h>", src, tmp_path) == [
+            "server/logging/logger.h"
+        ]
+
+    def test_ambiguous_and_system_includes_are_skipped(self, tmp_path: Path):
+        from victor.core.graph_rag.import_resolvers import CppImportResolver
+
+        _make_cpp_project(tmp_path)
+        resolver = CppImportResolver()
+        src = str(tmp_path / "runtime" / "engine.cpp")
+        # Two files named config.h: a wrong edge is worse than none.
+        assert resolver.parse("#include <config.h>", src, tmp_path) == []
+        # System headers never match the project index.
+        assert resolver.parse("#include <vector>", src, tmp_path) == []
+        assert resolver.parse("#include <sys/types.h>", src, tmp_path) == []
+        # Absolute and escaping paths are rejected.
+        assert resolver.parse('#include "/etc/passwd"', src, tmp_path) == []
+        assert resolver.parse('#include "../../../etc/passwd"', src, tmp_path) == []
+
+    def test_resolve_is_existence_check(self, tmp_path: Path):
+        from victor.core.graph_rag.import_resolvers import CppImportResolver
+
+        _make_cpp_project(tmp_path)
+        resolver = CppImportResolver()
+        assert resolver.resolve("server/logging/logger.h", tmp_path) == (
+            tmp_path / "server" / "logging" / "logger.h"
+        )
+        assert resolver.resolve("nope/missing.h", tmp_path) is None
+        assert resolver.resolve("..", tmp_path) is None
+        assert resolver.resolve("", tmp_path) is None
+
+    def test_registered_for_c_and_cpp(self):
+        from victor.core.graph_rag.import_resolvers import CppImportResolver
+
+        for lang in ("c", "cpp"):
+            assert isinstance(ImportResolverRegistry.create(lang), CppImportResolver)
