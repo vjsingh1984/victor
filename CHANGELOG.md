@@ -5,6 +5,49 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased] (develop)
 
+## [0.7.5] - 2026-07-12
+
+Maintenance + capability release: completes the Graph-RAG cross-language import
+resolver set, wires two latent-but-inert subsystems, and removes a large body of
+verified-dead code found by the F-016 call-graph audit.
+
+### Added
+- **Graph-RAG import resolution — full language set**: JS/TS (#485), C/C++
+  `#include` (#491), and Java/Scala (#496) resolvers, plus Rust `use` resolution
+  and Martin-coupling computed from `IMPORTS` edges (#481). Eager provider
+  warm-up on graph build (#485).
+
+### Changed
+- **FEP-0016 implemented**: `InitializationPhaseManager` now drives all 9
+  orchestrator `_initialize_*` phases via `run_phase`; a guard test prevents a
+  phase being silently lost (F-002, #477/#478).
+- **Credit-assignment feedback loop wired** (F-016f): `assign_turn_credit` now
+  fires at the universal per-turn teardown, so the online tool-guidance loop
+  actually runs when credit tracking is enabled (#505; lazy-bootstrap guard
+  #509). Off by default.
+- `tool_selection` promoted to a package with a size ratchet (F-004, #484).
+- Test suites run under 4 pytest-xdist workers; `lang-all` grammar wheels
+  included in dev/ci extras (#482, #483).
+
+### Fixed
+- Generic-result-cache flag wiring (read the nested value); dropped dead
+  `deduplication_strict_mode` + provider-optimization config (F-016e, #501).
+- Two cross-test state-pollution defects in sync/async + DB-path plumbing (#490).
+- Error-path log content truncation (TD-20 residual, #502).
+- `victor-coding` wheel now ships all nested subpackages (#495).
+- Narrowed the Laravel storage graph-exclude to specific subdirs (#479).
+
+### Removed
+- **F-016 call-graph audit — verified-dead code** (all independently
+  re-verified before deletion): orphaned hybrid-compaction subsystem
+  (~2,082 LOC, F-015 #487); `HybridDecisionService` + `ExtendedModelSelectorLearner`
+  cluster (~4,325 LOC, #493) and its `Extended*Learner` siblings (#500);
+  `WorkflowOptimizationComponents` bundle (#494); unwired team credit-attribution
+  mixins (#489); unregistered capability step-handlers (#492); orphaned
+  post-switch hooks subsystem (#503); the dead `create_step_aware_selector`
+  factory, inert provider pool, 8 unread config fields, and the never-supplied
+  `ProviderService.health_checker` (F-016j/k/l + h, #508).
+
 ## [0.7.3] - 2026-07-05
 
 Patch release: makes the public PyPI install actually work end-to-end.
