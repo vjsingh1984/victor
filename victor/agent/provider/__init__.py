@@ -24,11 +24,6 @@ Migration Note (2026-05-04):
 """
 
 from victor.agent.provider.health_monitor import ProviderHealthMonitor
-from victor.agent.provider.switch_contracts import (
-    HookPriority,
-    PostSwitchHook,
-    SwitchContext,
-)
 from victor.agent.provider.switcher import (
     ProviderSwitcher,
     ProviderSwitcherState,
@@ -37,10 +32,7 @@ from victor.agent.provider.tool_adapter_coordinator import ToolAdapterCoordinato
 
 __all__ = [
     "ProviderHealthMonitor",
-    "HookPriority",
-    "PostSwitchHook",
     "ProviderSwitcher",
     "ProviderSwitcherState",
-    "SwitchContext",
     "ToolAdapterCoordinator",
 ]
