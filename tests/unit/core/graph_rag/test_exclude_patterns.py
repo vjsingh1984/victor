@@ -320,3 +320,46 @@ class TestIsPathExcluded:
                 root_path,
                 patterns,
             )
+
+    def test_suffixed_venv_directories_are_excluded(self):
+        """Named virtualenvs (.venv-vllm, venv310) must be pruned — only the
+        exact `.venv`/`venv` names were matched before, letting 65k
+        site-packages files into a real project's index."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root_path = Path(tmpdir)
+            patterns = UNIVERSAL_EXCLUDE_PATTERNS
+            for venv_dir in (".venv-vllm", ".venv-sglang", "venv310", "venv-py312"):
+                assert is_path_excluded(
+                    root_path / venv_dir / "lib" / "python3.12" / "site-packages" / "x.py",
+                    root_path,
+                    patterns,
+                ), venv_dir
+
+    def test_third_party_is_excluded_but_external_is_not_universal(self):
+        """third_party/ is unambiguous vendoring; external/ can hold
+        first-party integration code, so it is only excluded for CMake
+        projects (LANGUAGE_CONFIG_MAP)."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root_path = Path(tmpdir)
+            patterns = UNIVERSAL_EXCLUDE_PATTERNS
+            assert is_path_excluded(
+                root_path / "third_party" / "lib" / "code.py", root_path, patterns
+            )
+            assert not is_path_excluded(
+                root_path / "external" / "integrations.py", root_path, patterns
+            )
+
+    def test_cmake_projects_exclude_build_flavors_and_external(self):
+        """CMake out-of-source builds (build-cuda/, build_common/) and
+        FetchContent vendoring (external/) are excluded when CMakeLists.txt
+        is present."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root_path = Path(tmpdir)
+            (root_path / "CMakeLists.txt").write_text("project(x)\n")
+            patterns = get_exclusion_patterns(root_path, respect_gitignore=False)
+            for path in (
+                root_path / "build-cuda" / "gen.cpp",
+                root_path / "build_common" / "gen.cpp",
+                root_path / "external" / "llama.cpp" / "ggml.c",
+            ):
+                assert is_path_excluded(path, root_path, patterns), path
