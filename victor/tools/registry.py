@@ -153,7 +153,6 @@ class ToolRegistry(BaseRegistry[str, _ToolType]):
                     priority_order=tool_settings.deduplication_priority_order,
                     whitelist=tool_settings.deduplication_whitelist,
                     blacklist=tool_settings.deduplication_blacklist,
-                    strict_mode=tool_settings.deduplication_strict_mode,
                     naming_enforcement=tool_settings.deduplication_naming_enforcement,
                     semantic_similarity_threshold=tool_settings.deduplication_semantic_threshold,
                 )

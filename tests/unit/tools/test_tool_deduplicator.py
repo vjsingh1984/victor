@@ -62,7 +62,6 @@ class TestDeduplicationConfig:
         assert config.priority_order == ["native", "langchain", "mcp", "plugin"]
         assert config.whitelist == []
         assert config.blacklist == []
-        assert config.strict_mode is False
         assert config.naming_enforcement is True
         assert config.semantic_similarity_threshold == 0.85
 
@@ -73,7 +72,6 @@ class TestDeduplicationConfig:
             priority_order=["plugin", "mcp", "langchain", "native"],
             whitelist=["tool1", "tool2"],
             blacklist=["tool3"],
-            strict_mode=True,
             naming_enforcement=False,
             semantic_similarity_threshold=0.9,
         )
@@ -81,7 +79,6 @@ class TestDeduplicationConfig:
         assert config.priority_order == ["plugin", "mcp", "langchain", "native"]
         assert config.whitelist == ["tool1", "tool2"]
         assert config.blacklist == ["tool3"]
-        assert config.strict_mode is True
         assert config.naming_enforcement is False
         assert config.semantic_similarity_threshold == 0.9
 
