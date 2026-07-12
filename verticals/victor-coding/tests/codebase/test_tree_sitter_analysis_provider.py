@@ -146,6 +146,25 @@ from typing import List, Dict
         # The provider should return [] rather than raise.
         assert provider.extract_imports(b"echo hi", "bash") == []
 
+    def test_typescript_imports_include_reexports_not_plain_exports(self, provider):
+        source = b"""
+import { graph } from './utils/graph';
+export * from './components';
+export { Button } from './Button';
+export class Widget { render() { return 1; } }
+export const N = 42;
+""".lstrip()
+        imports = provider.extract_imports(source, "typescript", file_path="a.ts")
+        joined = " ".join(imports)
+        # Real imports and re-exports are captured...
+        assert "./utils/graph" in joined
+        assert "./components" in joined
+        assert "./Button" in joined
+        # ...plain export declarations are not (they'd dump whole bodies
+        # into the raw-import buffer).
+        assert "Widget" not in joined
+        assert "N = 42" not in joined
+
 
 class TestBuildChunkContext:
     def test_returns_object_with_root_node_and_content(self, provider):
