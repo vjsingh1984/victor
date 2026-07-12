@@ -146,6 +146,19 @@ from typing import List, Dict
         # The provider should return [] rather than raise.
         assert provider.extract_imports(b"echo hi", "bash") == []
 
+    def test_scala_imports_extracted(self, provider):
+        source = b"""
+import com.acme.core.Engine
+import com.acme.core.{Config, Log => L}
+
+class Routes
+""".lstrip()
+        imports = provider.extract_imports(source, "scala", file_path="Routes.scala")
+        joined = " ".join(imports)
+        assert "com.acme.core.Engine" in joined
+        assert "Config" in joined
+        assert "class Routes" not in joined
+
     def test_typescript_imports_include_reexports_not_plain_exports(self, provider):
         source = b"""
 import { graph } from './utils/graph';
