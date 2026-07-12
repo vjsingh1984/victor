@@ -88,7 +88,25 @@ def test_instruction_files_are_scanned():
     # therefore mirrors that conditional contract: it asserts the file appears
     # in the scan set *iff* it exists on disk. This keeps the drift guard
     # active locally without producing an environment-fragile CI failure.
+    # Membership in the declared scan set is unconditional, so this test is
+    # never fully vacuous even where the files themselves are absent.
+    assert {"CLAUDE.md", "AGENTS.md", ".victor/init.md"} <= set(mod.EXTRA_FILES)
     scanned = {str(p.relative_to(mod.ROOT)) for p in mod._doc_files()}
     assert "CLAUDE.md" in scanned or not (mod.ROOT / "CLAUDE.md").exists()
     assert ".victor/init.md" in scanned or not (mod.ROOT / ".victor/init.md").exists()
     assert "AGENTS.md" in scanned or not (mod.ROOT / "AGENTS.md").exists()
+
+
+def test_instruction_files_scanned_when_present(tmp_path, monkeypatch):
+    # Positive direction (runs everywhere, incl. CI where the real files are
+    # absent): with instruction files present under ROOT, they enter the scan.
+    (tmp_path / "docs").mkdir(exist_ok=True)
+    (tmp_path / "CLAUDE.md").write_text("24 LLM providers\n")
+    (tmp_path / ".victor").mkdir(exist_ok=True)  # autouse fixtures may pre-create it
+    (tmp_path / ".victor" / "init.md").write_text("34 tool modules\n")
+    monkeypatch.setattr(mod, "ROOT", tmp_path)
+
+    scanned = {str(p.relative_to(tmp_path)) for p in mod._doc_files()}
+
+    assert "CLAUDE.md" in scanned
+    assert ".victor/init.md" in scanned
