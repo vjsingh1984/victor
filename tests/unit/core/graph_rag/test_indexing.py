@@ -1338,11 +1338,12 @@ async def test_resolve_cross_file_relationships_drops_self_loops(
 
 
 def test_parse_python_imports_handles_all_forms(tmp_path: Path) -> None:
-    pipeline = _make_pipeline(tmp_path)
+    from victor.core.graph_rag.import_resolvers import PythonImportResolver
+
     src = tmp_path / "pkg" / "sub" / "mod.py"
     src.parent.mkdir(parents=True)
     src.write_text("")
-    parse = pipeline._parse_python_imports
+    parse = PythonImportResolver().parse
     # Plain imports
     assert parse("import os", str(src), tmp_path) == ["os"]
     assert parse("import os.path", str(src), tmp_path) == ["os.path"]
@@ -1379,7 +1380,12 @@ def test_parse_python_imports_handles_all_forms(tmp_path: Path) -> None:
 
 
 def test_resolve_module_to_path_prefers_module_over_package(tmp_path: Path) -> None:
-    pipeline = _make_pipeline(tmp_path)
+    from victor.core.graph_rag.import_resolvers import (
+        ImportResolverRegistry,
+        PythonImportResolver,
+    )
+
+    resolver = PythonImportResolver()
     (tmp_path / "pkg").mkdir()
     (tmp_path / "pkg" / "__init__.py").write_text("")
     (tmp_path / "pkg" / "child.py").write_text("")
@@ -1387,18 +1393,17 @@ def test_resolve_module_to_path_prefers_module_over_package(tmp_path: Path) -> N
     (tmp_path / "pkg" / "child_pkg" / "__init__.py").write_text("")
 
     # Module file wins when both shapes could match.
-    assert pipeline._resolve_module_to_path("pkg.child", "python", tmp_path) == (
-        tmp_path / "pkg" / "child.py"
-    )
+    assert resolver.resolve("pkg.child", tmp_path) == (tmp_path / "pkg" / "child.py")
     # Falls back to __init__.py when only the package directory exists.
-    assert pipeline._resolve_module_to_path("pkg.child_pkg", "python", tmp_path) == (
+    assert resolver.resolve("pkg.child_pkg", tmp_path) == (
         tmp_path / "pkg" / "child_pkg" / "__init__.py"
     )
     # Unknown module: stdlib / third-party / typo — must return None so the
     # resolver can count it as "external" and skip rather than crash.
-    assert pipeline._resolve_module_to_path("definitely.not.here", "python", tmp_path) is None
-    # Non-Python languages return None today (documented limitation).
-    assert pipeline._resolve_module_to_path("pkg.child", "typescript", tmp_path) is None
+    assert resolver.resolve("definitely.not.here", tmp_path) is None
+    # Languages without a registered strategy have no resolver (documented
+    # limitation — the pipeline counts their records as unsupported).
+    assert ImportResolverRegistry.create("typescript") is None
 
 
 class _FakeIndexedFilesDb:
@@ -1558,6 +1563,63 @@ async def test_resolve_imports_non_python_languages_are_skipped(
     emitted = await pipeline._resolve_imports(tmp_path)
     assert emitted == 0
     assert captured == []
+
+
+@pytest.mark.asyncio
+async def test_resolve_imports_rust_use_declarations(monkeypatch, tmp_path: Path) -> None:
+    """Rust ``use`` declarations must produce module-level IMPORTS edges —
+    both intra-crate (``crate::``) and across workspace crates. These edges
+    are what Martin Ca/Ce are computed from, so without them Rust coupling
+    metrics fall back to noisy CALLS fan-in.
+    """
+    pipeline = _make_pipeline(tmp_path)
+    (tmp_path / "Cargo.toml").write_text(
+        '[package]\nname = "mainapp"\nversion = "0.1.0"\n\n'
+        '[workspace]\nmembers = ["crates/catalog"]\n'
+    )
+    (tmp_path / "src" / "services").mkdir(parents=True)
+    (tmp_path / "src" / "storage").mkdir()
+    src = tmp_path / "src" / "services" / "observer.rs"
+    src.write_text("")
+    storage_mod = tmp_path / "src" / "storage" / "mod.rs"
+    storage_mod.write_text("")
+    catalog = tmp_path / "crates" / "catalog"
+    (catalog / "src").mkdir(parents=True)
+    (catalog / "Cargo.toml").write_text('[package]\nname = "proxi-catalog"\nversion = "0.1.0"\n')
+    catalog_lib = catalog / "src" / "lib.rs"
+    catalog_lib.write_text("")
+
+    monkeypatch.setattr(
+        "victor.core.database.ProjectDatabaseManager",
+        _FakeIndexedFilesDb(
+            [
+                pipeline._canonical_file_str(src),
+                pipeline._canonical_file_str(storage_mod),
+                pipeline._canonical_file_str(catalog_lib),
+            ]
+        ),
+    )
+    pipeline._pending_import_records = [
+        (str(src), "use crate::storage::StorageEngine;", "rust"),
+        (str(src), "use proxi_catalog::CatalogManager;", "rust"),
+    ]
+
+    captured: list[GraphEdge] = []
+
+    async def _capture(edges):
+        captured.extend(edges)
+
+    pipeline.graph_store.upsert_edges = _capture  # type: ignore[assignment]
+
+    emitted = await pipeline._resolve_imports(tmp_path)
+    assert emitted == 2
+    from victor.core.graph_rag.indexing import _module_node_id
+
+    src_id = _module_node_id(pipeline._canonical_file_str(src))
+    assert {(e.src, e.dst, e.type) for e in captured} == {
+        (src_id, _module_node_id(pipeline._canonical_file_str(storage_mod)), "IMPORTS"),
+        (src_id, _module_node_id(pipeline._canonical_file_str(catalog_lib)), "IMPORTS"),
+    }
 
 
 @pytest.mark.asyncio
