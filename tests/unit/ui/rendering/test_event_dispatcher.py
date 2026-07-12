@@ -443,6 +443,7 @@ class TestEventDispatcherEdgeCases:
     def test_tool_progress_noop_when_no_on_progress(self, content_filter, normalizer):
         """Tool progress should be a no-op if renderer has no on_tool_progress."""
         renderer = _RecorderRenderer()
+
         # Create a renderer without on_tool_progress
         class _NoProgressRenderer:
             def __getattr__(self, name):

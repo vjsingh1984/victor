@@ -97,9 +97,7 @@ class LiveManager:
         blocks that contain tool calls).
         """
         if self._pause_count <= 0:
-            logger.debug(
-                "LiveManager: resume() called with no matching pause — ignoring"
-            )
+            logger.debug("LiveManager: resume() called with no matching pause — ignoring")
             return
         self._pause_count -= 1
         if self._pause_count == 0 and self._is_paused:
@@ -141,9 +139,7 @@ class LiveManager:
             text: Content text to append
         """
         if len(self._content_buffer) + len(text) > self.MAX_CONTENT_BUFFER_SIZE:
-            excess = (
-                len(self._content_buffer) + len(text) - self.MAX_CONTENT_BUFFER_SIZE
-            )
+            excess = len(self._content_buffer) + len(text) - self.MAX_CONTENT_BUFFER_SIZE
             self._content_buffer = self._content_buffer[excess:]
         self._content_buffer += text
 
@@ -192,9 +188,7 @@ class LiveManager:
         split = find_safe_split(visible)
         head_source = visible[:split]
         if head_source != self._rendered_head_source:
-            self._rendered_head = (
-                render_markdown_with_hooks(head_source) if head_source else None
-            )
+            self._rendered_head = render_markdown_with_hooks(head_source) if head_source else None
             self._rendered_head_source = head_source
 
         tail_render = render_markdown_with_hooks(visible[split:])

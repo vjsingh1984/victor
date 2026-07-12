@@ -192,7 +192,9 @@ class TestContentBuffer:
         manager._content_buffer = "A" * 9
         manager.append_content("B" * 5)
         assert len(manager._content_buffer) == 10
-        assert manager._content_buffer == "A" * 5 + "B" * 5  # excess=4 trimmed from front, leaving 5 As
+        assert (
+            manager._content_buffer == "A" * 5 + "B" * 5
+        )  # excess=4 trimmed from front, leaving 5 As
 
     def test_buffer_cap_exact_fit(self, manager: LiveManager) -> None:
         manager.MAX_CONTENT_BUFFER_SIZE = 10
