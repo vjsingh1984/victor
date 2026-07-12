@@ -35,6 +35,7 @@ from victor.providers.base import (
     StreamChunk,
     ToolDefinition,
 )
+from victor.core.utils.log_helpers import truncate_for_log
 from victor.providers.logging import ProviderLogger
 from victor.providers.runtime_capabilities import ProviderRuntimeCapabilities
 
@@ -715,7 +716,9 @@ class OllamaProvider(BaseProvider):
                     error_body = await response.aread()
                     error_text = error_body.decode()
                     lowered = error_text.lower()
-                    self._provider_logger.logger.debug(f"Ollama error response (400): {error_text}")
+                    self._provider_logger.logger.debug(
+                        f"Ollama error response (400): {truncate_for_log(error_text)}"
+                    )
 
                     # Model rejected think mode → disable it for this model and retry.
                     # The rebuilt payload omits `think` (model now cached as unsupported).
@@ -759,7 +762,8 @@ class OllamaProvider(BaseProvider):
                 if response.status_code >= 400:
                     error_body = await response.aread()
                     self._provider_logger.logger.error(
-                        f"Ollama error response ({response.status_code}): {error_body.decode()}"
+                        f"Ollama error response ({response.status_code}): "
+                        f"{truncate_for_log(error_body.decode())}"
                     )
                 response.raise_for_status()
 
@@ -822,7 +826,7 @@ class OllamaProvider(BaseProvider):
             else:
                 # Other HTTP errors
                 self._provider_logger.logger.error(
-                    f"Ollama streaming HTTP error {status_code}: {error_body}"
+                    f"Ollama streaming HTTP error {status_code}: {truncate_for_log(error_body)}"
                 )
                 raise ProviderError(
                     message=f"HTTP error {status_code}: {error_body}",

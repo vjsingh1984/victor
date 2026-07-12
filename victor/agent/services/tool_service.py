@@ -939,7 +939,7 @@ class ToolService:
             return selected
 
         except Exception as e:
-            self._logger.error(f"Tool selection failed: {e}")
+            self._logger.error(f"Tool selection failed: {str(e)[:500]}")
             # Return empty list on failure for resilience
             return []
 
@@ -998,7 +998,7 @@ class ToolService:
             return result
 
         except Exception as e:
-            self._logger.error(f"Tool execution failed: {tool_name}: {e}")
+            self._logger.error(f"Tool execution failed: {tool_name}: {str(e)[:500]}")
             self._track_tool_usage(tool_name, success=False)
             raise
 
@@ -1883,7 +1883,7 @@ class ToolService:
             if tool and hasattr(tool, "get_schema"):
                 return tool.get_schema()
         except Exception as e:
-            self._logger.warning(f"Failed to get schema for {tool_name}: {e}")
+            self._logger.warning(f"Failed to get schema for {tool_name}: {str(e)[:500]}")
 
         return None
 
