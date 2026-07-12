@@ -191,8 +191,9 @@ dev = [
     # Integration test dependencies
     "strawberry-graphql[fastapi]>=0.243",  # For GraphQL API integration tests
     "tomli>=2.0; python_version < '3.11'",
-    # All tree-sitter grammar wheels (self-referencing extra, same pattern as
-    # [all]). Two consumers:
+    # All tree-sitter grammar wheels, inlined (repo hygiene forbids
+    # victor-ai[lang-all] self-references in dev/ci — nested extras do not
+    # resolve reliably in CI). Keep in sync with [lang-all]. Two consumers:
     # - tests/integration/graph_rag/test_pipeline.py::test_ccg_construction
     #   calls build_ccg_for_file directly; CI's quick-tests job installs only
     #   .[dev] (no victor-coding enhanced builder), so the tree-sitter
@@ -201,7 +202,24 @@ dev = [
     #   victor-coding language plugin resolves an edge handler; in an env
     #   with victor-coding installed but a grammar wheel missing (typical
     #   local dev setup), those tests fail instead of skipping.
-    "victor-ai[lang-all]",
+    "tree-sitter-python>=0.23",
+    "tree-sitter-javascript>=0.23",
+    "tree-sitter-typescript>=0.23",
+    "tree-sitter-go>=0.23",
+    "tree-sitter-rust>=0.23",
+    "tree-sitter-java>=0.23",
+    "tree-sitter-cpp>=0.23",
+    "tree-sitter-c>=0.23",
+    "tree-sitter-c-sharp>=0.23",
+    "tree-sitter-ruby>=0.23",
+    "tree-sitter-php>=0.24",
+    "tree-sitter-swift>=0.0.1",
+    "tree-sitter-scala>=0.23",
+    "tree-sitter-kotlin>=1.0",
+    "tree-sitter-bash>=0.23",
+    "tree-sitter-lua>=0.2",
+    "tree-sitter-elixir>=0.3",
+    "tree-sitter-haskell>=0.23",
 ]
 
 # CI/CD dependencies - includes all testing, linting, and build tools
@@ -237,9 +255,26 @@ ci = [
     # Additional CI-specific tools
     "pytest-split>=0.8",
     "tomli>=2.0; python_version < '3.11'",
-    # All tree-sitter grammar wheels for CCG + language-handler tests
-    # (see [dev] note).
-    "victor-ai[lang-all]",
+    # All tree-sitter grammar wheels for CCG + language-handler tests,
+    # inlined (see [dev] note; keep in sync with [lang-all]).
+    "tree-sitter-python>=0.23",
+    "tree-sitter-javascript>=0.23",
+    "tree-sitter-typescript>=0.23",
+    "tree-sitter-go>=0.23",
+    "tree-sitter-rust>=0.23",
+    "tree-sitter-java>=0.23",
+    "tree-sitter-cpp>=0.23",
+    "tree-sitter-c>=0.23",
+    "tree-sitter-c-sharp>=0.23",
+    "tree-sitter-ruby>=0.23",
+    "tree-sitter-php>=0.24",
+    "tree-sitter-swift>=0.0.1",
+    "tree-sitter-scala>=0.23",
+    "tree-sitter-kotlin>=1.0",
+    "tree-sitter-bash>=0.23",
+    "tree-sitter-lua>=0.2",
+    "tree-sitter-elixir>=0.3",
+    "tree-sitter-haskell>=0.23",
 
     # Build tools
     "build>=0.10",
