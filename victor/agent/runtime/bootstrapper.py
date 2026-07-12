@@ -151,13 +151,6 @@ class AgentRuntimeBootstrapper:
         # Checkpoint manager for time-travel debugging
         orchestrator._checkpoint_manager = orchestrator._factory.create_checkpoint_manager()
 
-        # Workflow optimization components
-        orchestrator._workflow_optimization = (
-            orchestrator._factory.create_workflow_optimization_components(
-                timeout_seconds=getattr(settings, "execution_timeout", None)
-            )
-        )
-
         # Wire component dependencies
         orchestrator._factory.wire_component_dependencies(
             recovery_handler=None,

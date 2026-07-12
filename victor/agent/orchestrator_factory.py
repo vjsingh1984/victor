@@ -94,12 +94,6 @@ if TYPE_CHECKING:
     from victor.storage.embeddings.intent_classifier import IntentClassifier
     from victor.agent.debug_logger import DebugLogger
     from victor.agent.tool_access_controller import ToolAccessController
-    from victor.agent.budget_manager import BudgetManager, ModeCompletionCriteria
-    from victor.agent.task_completion import TaskCompletionDetector
-    from victor.agent.read_cache import ReadResultCache
-    from victor.agent.time_aware_executor import TimeAwareExecutor
-    from victor.agent.thinking_detector import ThinkingPatternDetector
-    from victor.agent.resource_manager import ResourceManager
     from victor.agent.session_ledger import SessionLedger
     from victor.agent.compaction_summarizer import LedgerAwareCompactionSummarizer
     from victor.agent.tool_result_deduplicator import ToolResultDeduplicator
@@ -234,27 +228,6 @@ class RecoveryComponents:
 
 
 @dataclass
-class WorkflowOptimizationComponents:
-    """Components for workflow optimizations.
-
-    These components address MODE workflow issues:
-    - TaskCompletionDetector: Detects when task objectives are met
-    - ReadResultCache: Caches file reads to prevent redundant operations
-    - TimeAwareExecutor: Manages execution with time budget awareness
-    - ThinkingPatternDetector: Detects and breaks thinking loops
-    - ResourceManager: Centralized resource lifecycle management
-    - ModeCompletionCriteria: Mode-specific early exit detection
-    """
-
-    task_completion_detector: Optional["TaskCompletionDetector"] = None
-    read_cache: Optional["ReadResultCache"] = None
-    time_aware_executor: Optional["TimeAwareExecutor"] = None
-    thinking_detector: Optional["ThinkingPatternDetector"] = None
-    resource_manager: Optional["ResourceManager"] = None
-    mode_completion_criteria: Optional["ModeCompletionCriteria"] = None
-
-
-@dataclass
 class OrchestratorComponents:
     """All components needed to construct an AgentOrchestrator.
 
@@ -289,11 +262,6 @@ class OrchestratorComponents:
 
     # Tool output formatter
     tool_output_formatter: Optional["ToolOutputFormatter"] = None
-
-    # Workflow optimizations
-    workflow_optimization: WorkflowOptimizationComponents = field(
-        default_factory=WorkflowOptimizationComponents
-    )
 
 
 # =========================================================================
@@ -597,26 +565,6 @@ class OrchestratorFactory(
             get_context_window=get_context_window,
             credit_tracking_service=credit_tracking_service,
             tool_pipeline=tool_pipeline,
-        )
-
-    def create_workflow_optimization_components(
-        self, timeout_seconds: Optional[float] = None
-    ) -> WorkflowOptimizationComponents:
-        """Create all workflow optimization components.
-
-        Args:
-            timeout_seconds: Execution timeout for time-aware executor
-
-        Returns:
-            WorkflowOptimizationComponents with all optimization components
-        """
-        return WorkflowOptimizationComponents(
-            task_completion_detector=self.create_task_completion_detector(),
-            read_cache=self.create_read_cache(),
-            time_aware_executor=self.create_time_aware_executor(timeout_seconds),
-            thinking_detector=self.create_thinking_detector(),
-            resource_manager=self.create_resource_manager(),
-            mode_completion_criteria=self.create_mode_completion_criteria(),
         )
 
     # -----------------------------------------------------------------
