@@ -1403,7 +1403,7 @@ def test_resolve_module_to_path_prefers_module_over_package(tmp_path: Path) -> N
     assert resolver.resolve("definitely.not.here", tmp_path) is None
     # Languages without a registered strategy have no resolver (documented
     # limitation — the pipeline counts their records as unsupported).
-    assert ImportResolverRegistry.create("typescript") is None
+    assert ImportResolverRegistry.create("go") is None
 
 
 class _FakeIndexedFilesDb:
@@ -1540,19 +1540,19 @@ async def test_resolve_imports_deduplicates_repeated_pairs(monkeypatch, tmp_path
 
 
 @pytest.mark.asyncio
-async def test_resolve_imports_non_python_languages_are_skipped(
+async def test_resolve_imports_unsupported_languages_are_skipped(
     monkeypatch, tmp_path: Path
 ) -> None:
-    """Until per-language resolvers exist, non-Python imports are counted
-    as ``unsupported-language`` and produce no edges (instead of crashing)."""
+    """Languages without a registered resolver strategy are counted as
+    ``unsupported-language`` and produce no edges (instead of crashing)."""
     pipeline = _make_pipeline(tmp_path)
-    src = tmp_path / "a.ts"
+    src = tmp_path / "a.go"
     src.write_text("")
     monkeypatch.setattr(
         "victor.core.database.ProjectDatabaseManager",
         _FakeIndexedFilesDb([pipeline._canonical_file_str(src)]),
     )
-    pipeline._pending_import_records = [(str(src), "import x from './b'", "typescript")]
+    pipeline._pending_import_records = [(str(src), 'import "fmt"', "go")]
 
     captured: list[GraphEdge] = []
 
@@ -1619,6 +1619,100 @@ async def test_resolve_imports_rust_use_declarations(monkeypatch, tmp_path: Path
     assert {(e.src, e.dst, e.type) for e in captured} == {
         (src_id, _module_node_id(pipeline._canonical_file_str(storage_mod)), "IMPORTS"),
         (src_id, _module_node_id(pipeline._canonical_file_str(catalog_lib)), "IMPORTS"),
+    }
+
+
+def test_index_repository_resolves_provider_before_parse_burst(
+    tmp_path: Path,
+) -> None:
+    """The analysis provider must be resolved on the event-loop thread
+    BEFORE any file is parsed. Lazy resolution inside worker threads races
+    plugin discovery: files parsed while discovery is importing grammars
+    see supports_language() == False and silently lose their raw imports
+    (observed: 51/92 vscode-victor files had no IMPORTS edges).
+
+    Sync test with an explicit asyncio.run so the ordering assertion is
+    not affected by the shared pytest-asyncio loop fixtures.
+    """
+    import asyncio
+
+    (tmp_path / "a.py").write_text("import os\n")
+    pipeline = _make_pipeline(tmp_path)
+
+    events: list[str] = []
+    orig_resolve = pipeline._get_analysis_provider
+    orig_discover = pipeline._discover_files
+
+    def spy_resolve():
+        events.append("resolve")
+        return orig_resolve()
+
+    async def spy_discover(root):
+        events.append("discover")
+        return await orig_discover(root)
+
+    pipeline._get_analysis_provider = spy_resolve  # type: ignore[method-assign]
+    pipeline._discover_files = spy_discover  # type: ignore[method-assign]
+
+    asyncio.run(pipeline.index_repository(root_path=tmp_path))
+
+    # Discovery precedes all parsing, so resolve-before-discover guarantees
+    # no worker thread can observe a half-initialized provider.
+    assert "resolve" in events and "discover" in events
+    assert events.index("resolve") < events.index("discover")
+
+
+@pytest.mark.asyncio
+async def test_resolve_imports_typescript_imports(monkeypatch, tmp_path: Path) -> None:
+    """TypeScript imports (relative, tsconfig alias, barrel re-export) must
+    produce module-level IMPORTS edges for Martin Ca/Ce."""
+    pipeline = _make_pipeline(tmp_path)
+    (tmp_path / "tsconfig.json").write_text(
+        '{"compilerOptions": {"baseUrl": ".", "paths": {"@/*": ["src/*"]}}}'
+    )
+    (tmp_path / "src" / "utils").mkdir(parents=True)
+    (tmp_path / "src" / "components").mkdir()
+    src = tmp_path / "src" / "main.ts"
+    src.write_text("")
+    graph_util = tmp_path / "src" / "utils" / "graph.ts"
+    graph_util.write_text("")
+    barrel = tmp_path / "src" / "components" / "index.ts"
+    barrel.write_text("")
+    button = tmp_path / "src" / "components" / "Button.tsx"
+    button.write_text("")
+
+    monkeypatch.setattr(
+        "victor.core.database.ProjectDatabaseManager",
+        _FakeIndexedFilesDb(
+            [pipeline._canonical_file_str(p) for p in (src, graph_util, barrel, button)]
+        ),
+    )
+    pipeline._pending_import_records = [
+        (str(src), "import { graph } from './utils/graph'", "typescript"),
+        (str(src), "import { Button } from './components'", "typescript"),
+        (str(barrel), "export * from './Button'", "typescript"),
+        (str(src), "import Button from '@/components/Button'", "typescript"),
+        (str(src), "import React from 'react'", "typescript"),
+    ]
+
+    captured: list[GraphEdge] = []
+
+    async def _capture(edges):
+        captured.extend(edges)
+
+    pipeline.graph_store.upsert_edges = _capture  # type: ignore[assignment]
+
+    emitted = await pipeline._resolve_imports(tmp_path)
+    assert emitted == 4
+    from victor.core.graph_rag.indexing import _module_node_id
+
+    src_id = _module_node_id(pipeline._canonical_file_str(src))
+    barrel_id = _module_node_id(pipeline._canonical_file_str(barrel))
+    assert {(e.src, e.dst) for e in captured} == {
+        (src_id, _module_node_id(pipeline._canonical_file_str(graph_util))),
+        (src_id, barrel_id),
+        (barrel_id, _module_node_id(pipeline._canonical_file_str(button))),
+        (src_id, _module_node_id(pipeline._canonical_file_str(button))),
     }
 
 

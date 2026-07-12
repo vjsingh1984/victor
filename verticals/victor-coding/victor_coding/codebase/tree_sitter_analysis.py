@@ -403,6 +403,14 @@ class TreeSitterAnalysisProvider:
         while stack:
             node = stack.pop()
             if node.type in wanted:
+                # export_statement only acts as an import when it re-exports
+                # from a source (`export * from './x'`). Plain export
+                # declarations would dump entire class/function bodies into
+                # the raw-import buffer.
+                if node.type == "export_statement" and not any(
+                    child.type == "string" for child in node.children
+                ):
+                    continue
                 text = node.text.decode("utf-8", errors="ignore").strip()
                 if text:
                     out.append(text)
@@ -450,9 +458,11 @@ class TreeSitterAnalysisProvider:
 # nothing for the common cases; extend per plugin as needed.
 _IMPORT_NODE_TYPES: Dict[str, frozenset] = {
     "python": frozenset({"import_statement", "import_from_statement"}),
-    "javascript": frozenset({"import_statement"}),
-    "typescript": frozenset({"import_statement"}),
-    "tsx": frozenset({"import_statement"}),
+    # export_statement covers barrel-file re-exports (`export * from './x'`);
+    # _imports_from_parsed keeps only export statements with a string source.
+    "javascript": frozenset({"import_statement", "export_statement"}),
+    "typescript": frozenset({"import_statement", "export_statement"}),
+    "tsx": frozenset({"import_statement", "export_statement"}),
     "go": frozenset({"import_declaration"}),
     "rust": frozenset({"use_declaration"}),
     "java": frozenset({"import_declaration"}),

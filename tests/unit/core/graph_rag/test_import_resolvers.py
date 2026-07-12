@@ -9,6 +9,7 @@ from pathlib import Path
 
 from victor.core.graph_rag.import_resolvers import (
     ImportResolverRegistry,
+    JsTsImportResolver,
     PythonImportResolver,
     RustImportResolver,
 )
@@ -56,7 +57,9 @@ class TestRegistry:
     def test_known_languages_have_strategies(self):
         assert isinstance(ImportResolverRegistry.create("python"), PythonImportResolver)
         assert isinstance(ImportResolverRegistry.create("rust"), RustImportResolver)
-        assert ImportResolverRegistry.create("typescript") is None
+        for lang in ("javascript", "typescript", "jsx", "tsx"):
+            assert isinstance(ImportResolverRegistry.create(lang), JsTsImportResolver)
+        assert ImportResolverRegistry.create("go") is None
 
     def test_create_returns_fresh_instances(self):
         # Per-run caches (Rust crate map) must not leak across runs.
@@ -203,3 +206,120 @@ class TestPythonResolver:
         assert candidates == ["pkg", "pkg.util"]
         assert resolver.resolve("pkg.util", tmp_path) == tmp_path / "pkg" / "util.py"
         assert resolver.resolve("os", tmp_path) is None
+
+
+def _make_ts_project(root: Path) -> None:
+    """Vite/tsconfig-style UI project.
+
+    tsconfig.json         baseUrl "." + paths {"@/*": ["src/*"]}
+    src/main.ts
+    src/utils/graph.ts
+    src/components/Button.tsx
+    src/components/index.ts   (barrel)
+    src/legacy.js
+    """
+    (root / "tsconfig.json").write_text(
+        "{\n"
+        "  // JSONC: comments and trailing commas are the norm\n"
+        '  "compilerOptions": {\n'
+        '    "baseUrl": ".",\n'
+        '    "paths": {\n'
+        '      "@/*": ["src/*"],\n'
+        "    },\n"
+        "  },\n"
+        "}\n"
+    )
+    (root / "src" / "utils").mkdir(parents=True)
+    (root / "src" / "components").mkdir()
+    (root / "src" / "main.ts").write_text("")
+    (root / "src" / "utils" / "graph.ts").write_text("")
+    (root / "src" / "components" / "Button.tsx").write_text("")
+    (root / "src" / "components" / "index.ts").write_text("")
+    (root / "src" / "legacy.js").write_text("")
+
+
+class TestJsTsParse:
+    def test_relative_import_forms(self, tmp_path: Path):
+        _make_ts_project(tmp_path)
+        resolver = JsTsImportResolver()
+        src = str(tmp_path / "src" / "main.ts")
+        assert resolver.parse("import { graph } from './utils/graph'", src, tmp_path) == [
+            "src/utils/graph"
+        ]
+        assert resolver.parse("import './setup'", src, tmp_path) == ["src/setup"]
+        assert resolver.parse("export * from './components'", src, tmp_path) == ["src/components"]
+        assert resolver.parse("const x = require('./legacy')", src, tmp_path) == ["src/legacy"]
+        assert resolver.parse("const m = await import('./utils/graph')", src, tmp_path) == [
+            "src/utils/graph"
+        ]
+
+    def test_parent_relative_and_escape(self, tmp_path: Path):
+        _make_ts_project(tmp_path)
+        resolver = JsTsImportResolver()
+        src = str(tmp_path / "src" / "components" / "Button.tsx")
+        assert resolver.parse("import { graph } from '../utils/graph'", src, tmp_path) == [
+            "src/utils/graph"
+        ]
+        # Escaping the project tree yields nothing rather than a bad path.
+        assert resolver.parse("import x from '../../../outside'", src, tmp_path) == []
+
+    def test_tsconfig_alias_and_baseurl(self, tmp_path: Path):
+        _make_ts_project(tmp_path)
+        resolver = JsTsImportResolver()
+        src = str(tmp_path / "src" / "main.ts")
+        # "@/*" alias from tsconfig paths.
+        assert resolver.parse("import Button from '@/components/Button'", src, tmp_path) == [
+            "src/components/Button"
+        ]
+        # Bare specifier probing under baseUrl.
+        assert resolver.parse("import { g } from 'src/utils/graph'", src, tmp_path) == [
+            "src/utils/graph"
+        ]
+
+    def test_bare_package_names_are_external(self, tmp_path: Path):
+        _make_ts_project(tmp_path)
+        resolver = JsTsImportResolver()
+        src = str(tmp_path / "src" / "main.ts")
+        # baseUrl candidates for real packages don't exist on disk, so they
+        # fail resolution — parse may emit them, resolve must return None.
+        for raw in ("import React from 'react'", "import { z } from '@scope/pkg'"):
+            for candidate in resolver.parse(raw, src, tmp_path):
+                assert resolver.resolve(candidate, tmp_path) is None
+
+    def test_bundler_query_suffix_stripped(self, tmp_path: Path):
+        _make_ts_project(tmp_path)
+        resolver = JsTsImportResolver()
+        src = str(tmp_path / "src" / "main.ts")
+        assert resolver.parse("import g from './utils/graph?raw'", src, tmp_path) == [
+            "src/utils/graph"
+        ]
+
+
+class TestJsTsResolve:
+    def test_extension_and_index_probing(self, tmp_path: Path):
+        _make_ts_project(tmp_path)
+        resolver = JsTsImportResolver()
+        assert resolver.resolve("src/utils/graph", tmp_path) == (
+            tmp_path / "src" / "utils" / "graph.ts"
+        )
+        assert resolver.resolve("src/components/Button", tmp_path) == (
+            tmp_path / "src" / "components" / "Button.tsx"
+        )
+        # Directory import binds to the barrel index.
+        assert resolver.resolve("src/components", tmp_path) == (
+            tmp_path / "src" / "components" / "index.ts"
+        )
+        assert resolver.resolve("src/legacy", tmp_path) == (tmp_path / "src" / "legacy.js")
+        assert resolver.resolve("src/nonexistent", tmp_path) is None
+        assert resolver.resolve("", tmp_path) is None
+        assert resolver.resolve("../etc", tmp_path) is None
+
+    def test_esm_js_specifier_binds_to_ts_source(self, tmp_path: Path):
+        _make_ts_project(tmp_path)
+        resolver = JsTsImportResolver()
+        # NodeNext projects write `import './graph.js'` for a graph.ts source.
+        assert resolver.resolve("src/utils/graph.js", tmp_path) == (
+            tmp_path / "src" / "utils" / "graph.ts"
+        )
+        # A .js specifier whose .js file exists binds as-is.
+        assert resolver.resolve("src/legacy.js", tmp_path) == (tmp_path / "src" / "legacy.js")

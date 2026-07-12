@@ -29,17 +29,18 @@ and language-specific import semantics, mirroring the registry pattern in
   cache project-layout state (e.g. the Rust workspace crate map) on
   ``self`` without staleness across runs.
 
-Python and Rust are implemented today. TS/JS/Go need their own strategies
-(path-string imports, package names) — register them here rather than
-adding language branches to ``indexing.py``.
+Python, Rust, and JS/TS are implemented today. Go/Java need their own
+strategies (package paths) — register them here rather than adding
+language branches to ``indexing.py``.
 """
 
 from __future__ import annotations
 
 import logging
+import os
 import re
-from pathlib import Path
-from typing import Callable, Dict, List, Optional, Protocol, Set
+from pathlib import Path, PurePosixPath
+from typing import Callable, Dict, List, Optional, Protocol, Set, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -450,12 +451,234 @@ class RustImportResolver:
         return crate_map
 
 
+class JsTsImportResolver:
+    """Resolve JavaScript/TypeScript import specifiers to project modules.
+
+    Parses the specifier out of ESM imports (``import x from './y'``),
+    side-effect imports (``import './y'``), re-exports
+    (``export * from './y'``), and ``require('./y')`` / dynamic
+    ``import('./y')`` should those raw strings arrive. Specifier classes:
+
+    - Relative (``./x``, ``../x``): resolved against the importing file.
+    - tsconfig path aliases (``@/components/Button``): mapped through the
+      nearest ``tsconfig.json``/``jsconfig.json`` ``compilerOptions.paths``
+      + ``baseUrl`` (walk-up, memoized; ``extends`` chains are not
+      followed). Bare specifiers also probe under ``baseUrl`` when set.
+    - Bare package names (``react``, ``@scope/pkg``): external — skipped.
+
+    Candidate encoding: root-relative POSIX path without extension
+    (``vscode-victor/src/utils/graph``); ``resolve`` applies Node/TS
+    extension and ``index.*`` probing, including the ESM ``./x.js`` →
+    ``x.ts`` rewrite.
+
+    Instances memoize tsconfig lookups; create one per resolution run
+    (``ImportResolverRegistry.create`` does exactly that).
+    """
+
+    _FROM_RE = re.compile(r"""\bfrom\s+['"]([^'"]+)['"]""")
+    _SIDE_EFFECT_RE = re.compile(r"""^\s*import\s+['"]([^'"]+)['"]""")
+    _CALL_RE = re.compile(r"""\b(?:require|import)\s*\(\s*['"]([^'"]+)['"]""")
+
+    #: Extensions probed during resolution, TypeScript first so ``./x`` in a
+    #: mixed tree binds to ``x.ts`` over a stale compiled ``x.js``.
+    _EXTENSIONS = (".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs")
+    #: Compiled-JS suffixes that TS sources may reference (``./x.js`` → x.ts).
+    _JS_TO_TS = {
+        ".js": (".ts", ".tsx"),
+        ".mjs": (".mts",),
+        ".cjs": (".cts",),
+        ".jsx": (".tsx",),
+    }
+
+    def __init__(self) -> None:
+        # Source dir → (baseUrl dir, paths mapping) from the nearest
+        # tsconfig.json/jsconfig.json, or None when none exists.
+        self._tsconfig_cache: Dict[str, Optional[Tuple[Path, Dict[str, List[str]]]]] = {}
+
+    def parse(self, raw: str, src_file: str, root_path: Path) -> List[str]:
+        try:
+            src_path = Path(src_file).resolve()
+            src_path.relative_to(root_path.resolve())
+        except (OSError, ValueError):
+            return []
+
+        specs: List[str] = []
+        for pattern in (self._FROM_RE, self._SIDE_EFFECT_RE, self._CALL_RE):
+            specs.extend(pattern.findall(raw))
+
+        candidates: List[str] = []
+        seen: Set[str] = set()
+        for spec in specs:
+            # Bundler suffixes (Vite ``?raw``, webpack loaders) aren't part
+            # of the module path.
+            spec = spec.split("?")[0].split("#")[0].strip()
+            if not spec:
+                continue
+            for candidate in self._spec_to_candidates(spec, src_path, root_path):
+                if candidate not in seen:
+                    seen.add(candidate)
+                    candidates.append(candidate)
+        return candidates
+
+    def resolve(self, module: str, root_path: Path) -> Optional[Path]:
+        if not module:
+            return None
+        if ".." in PurePosixPath(module).parts:
+            return None
+        base = root_path / module
+        suffix = base.suffix
+        # Specifier carried a source extension and the file exists as-is.
+        if suffix in self._EXTENSIONS and base.is_file():
+            return base
+        # ESM-style ``./x.js`` written from TypeScript: the on-disk source
+        # is ``x.ts``.
+        for ts_ext in self._JS_TO_TS.get(suffix, ()):
+            ts_candidate = base.with_suffix(ts_ext)
+            if ts_candidate.is_file():
+                return ts_candidate
+        # Extensionless specifier: probe extensions, then directory index.
+        for ext in self._EXTENSIONS:
+            candidate = base.parent / f"{base.name}{ext}"
+            if candidate.is_file():
+                return candidate
+        for ext in self._EXTENSIONS:
+            candidate = base / f"index{ext}"
+            if candidate.is_file():
+                return candidate
+        return None
+
+    # ------------------------------------------------------------------ #
+    # Internals
+    # ------------------------------------------------------------------ #
+
+    def _spec_to_candidates(self, spec: str, src_path: Path, root_path: Path) -> List[str]:
+        """Map one specifier to root-relative candidate paths."""
+        root_resolved = root_path.resolve()
+        if spec.startswith("."):
+            target = Path(os.path.normpath(src_path.parent / PurePosixPath(spec)))
+            try:
+                return [target.relative_to(root_resolved).as_posix()]
+            except ValueError:
+                return []  # walked out of the project tree
+
+        # Non-relative: tsconfig path alias, then baseUrl probing. A bare
+        # specifier with no tsconfig mapping is an external package.
+        config = self._nearest_tsconfig(src_path.parent, root_resolved)
+        if config is None:
+            return []
+        base_dir, paths = config
+        out: List[str] = []
+        for pattern, targets in self._matching_alias_patterns(spec, paths):
+            star_match = self._star_capture(pattern, spec)
+            for target in targets:
+                mapped = target.replace("*", star_match) if star_match is not None else target
+                candidate = Path(os.path.normpath(base_dir / PurePosixPath(mapped)))
+                try:
+                    out.append(candidate.relative_to(root_resolved).as_posix())
+                except ValueError:
+                    continue
+        if not out:
+            # baseUrl makes bare paths root-anchored (``import 'src/utils'``).
+            candidate = Path(os.path.normpath(base_dir / PurePosixPath(spec)))
+            try:
+                out.append(candidate.relative_to(root_resolved).as_posix())
+            except ValueError:
+                pass
+        return out
+
+    @staticmethod
+    def _matching_alias_patterns(
+        spec: str, paths: Dict[str, List[str]]
+    ) -> List[Tuple[str, List[str]]]:
+        """tsconfig ``paths`` patterns matching ``spec``, longest prefix first."""
+        matches: List[Tuple[str, List[str]]] = []
+        for pattern, targets in paths.items():
+            if "*" in pattern:
+                prefix, _, tail = pattern.partition("*")
+                if spec.startswith(prefix) and spec.endswith(tail):
+                    matches.append((pattern, targets))
+            elif pattern == spec:
+                matches.append((pattern, targets))
+        matches.sort(key=lambda item: len(item[0]), reverse=True)
+        return matches
+
+    @staticmethod
+    def _star_capture(pattern: str, spec: str) -> Optional[str]:
+        """The substring the ``*`` wildcard captured, or None for exact patterns."""
+        if "*" not in pattern:
+            return None
+        prefix, _, tail = pattern.partition("*")
+        return spec[len(prefix) : len(spec) - len(tail)] if tail else spec[len(prefix) :]
+
+    def _nearest_tsconfig(
+        self, start_dir: Path, root_resolved: Path
+    ) -> Optional[Tuple[Path, Dict[str, List[str]]]]:
+        """Find and parse the nearest tsconfig.json/jsconfig.json walking up.
+
+        Returns (baseUrl dir, paths mapping); ``extends`` chains are not
+        followed — only the local ``compilerOptions`` are read.
+        """
+        key = str(start_dir)
+        if key in self._tsconfig_cache:
+            return self._tsconfig_cache[key]
+        result: Optional[Tuple[Path, Dict[str, List[str]]]] = None
+        d = start_dir
+        while True:
+            for name in ("tsconfig.json", "jsconfig.json"):
+                config_path = d / name
+                if config_path.is_file():
+                    result = self._parse_tsconfig(config_path)
+                    break
+            if result is not None or d == root_resolved or d == d.parent:
+                break
+            d = d.parent
+        self._tsconfig_cache[key] = result
+        return result
+
+    @staticmethod
+    def _parse_tsconfig(config_path: Path) -> Optional[Tuple[Path, Dict[str, List[str]]]]:
+        """Extract (baseUrl dir, paths) from a JSONC tsconfig, or None."""
+        import json
+
+        try:
+            text = config_path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            return None
+        # Tolerate JSONC: strip comments and trailing commas.
+        text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
+        text = re.sub(r"^\s*//.*$", "", text, flags=re.M)
+        text = re.sub(r",\s*([}\]])", r"\1", text)
+        try:
+            data = json.loads(text)
+        except (json.JSONDecodeError, ValueError):
+            return None
+        options = data.get("compilerOptions", {}) if isinstance(data, dict) else {}
+        if not isinstance(options, dict):
+            return None
+        base_url = options.get("baseUrl")
+        paths_raw = options.get("paths")
+        if base_url is None and not paths_raw:
+            return None
+        base_dir = config_path.parent / (base_url or ".")
+        paths: Dict[str, List[str]] = {}
+        if isinstance(paths_raw, dict):
+            for pattern, targets in paths_raw.items():
+                if isinstance(pattern, str) and isinstance(targets, list):
+                    paths[pattern] = [t for t in targets if isinstance(t, str)]
+        return (base_dir, paths)
+
+
 ImportResolverRegistry.register("python", PythonImportResolver)
 ImportResolverRegistry.register("rust", RustImportResolver)
+ImportResolverRegistry.register("javascript", JsTsImportResolver)
+ImportResolverRegistry.register("typescript", JsTsImportResolver)
+ImportResolverRegistry.register("jsx", JsTsImportResolver)
+ImportResolverRegistry.register("tsx", JsTsImportResolver)
 
 
 __all__ = [
     "ImportResolverRegistry",
+    "JsTsImportResolver",
     "LanguageImportResolver",
     "PythonImportResolver",
     "RustImportResolver",

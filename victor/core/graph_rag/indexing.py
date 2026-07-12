@@ -442,6 +442,17 @@ class GraphIndexingPipeline:
         self._pending_relationship_records.clear()
         self._pending_import_records.clear()
 
+        # Resolve the analysis provider — and let it finish language-plugin
+        # discovery — BEFORE the parallel parse burst. Resolution is lazy and
+        # discovery imports ~30 grammar wheels; when the first resolution
+        # happens inside a worker thread, every file parsed while discovery
+        # is still importing sees supports_language() == False and silently
+        # degrades to the legacy extraction path (no raw imports, poorer
+        # symbols). Observed: 51/92 vscode-victor files lost their IMPORTS
+        # edges to this race.
+        _status("Resolving analysis provider…")
+        self._get_analysis_provider()
+
         # Force mode: clear all existing data before rebuilding
         if not self.config.incremental:
             logger.info("Force rebuild: clearing all existing graph data")
