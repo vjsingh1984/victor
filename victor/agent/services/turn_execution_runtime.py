@@ -837,6 +837,12 @@ class TurnExecutor:
                 if new_stage:
                     logger.debug(f"[TurnExecutor] Stage transitioned to {new_stage.name}")
 
+            # F-016f: turn boundary — drain this turn's accumulated tool signals
+            # into credit assignment so the online tool-guidance feedback loop
+            # (generate_tool_guidance, wired live into the prompt pipeline) can
+            # actually fire. No-op unless credit tracking is enabled.
+            self._maybe_assign_turn_credit(_orch)
+
             return TurnResult(
                 response=response,
                 tool_results=tool_results,
@@ -848,6 +854,32 @@ class TurnExecutor:
             )
         finally:
             self._restore_runtime_context_overrides(runtime_snapshot)
+
+    def _maybe_assign_turn_credit(self, orchestrator: Any) -> None:
+        """Drain the current turn's tool signals into credit assignment.
+
+        Wires the live recording half (``ToolPipeline.record_tool_result``) to
+        the scoring half (``CreditTrackingService.assign_turn_credit``). Without
+        this call the service's ``_turn_count`` never advances and its credit
+        summary stays empty, so ``generate_tool_guidance()`` — wired live into
+        the prompt pipeline — is permanently gated off (F-016f).
+
+        Fully gated and best-effort: a no-op unless credit tracking is enabled
+        (the service is ``None`` otherwise) and
+        ``settings.credit_assignment.auto_assign_at_turn_boundary`` is set. The
+        per-signal agent/team/session ids captured at record time take
+        precedence inside ``assign_turn_credit``, so the default call is correct.
+        """
+        service = getattr(orchestrator, "_credit_tracking_service", None)
+        if service is None:
+            return
+        ca_settings = getattr(getattr(orchestrator, "settings", None), "credit_assignment", None)
+        if ca_settings is None or not getattr(ca_settings, "auto_assign_at_turn_boundary", False):
+            return
+        try:
+            service.assign_turn_credit()
+        except Exception:  # credit assignment is non-critical
+            logger.debug("Turn-boundary credit assignment failed", exc_info=True)
 
     async def _maybe_execute_deterministic_tool_turn(
         self,

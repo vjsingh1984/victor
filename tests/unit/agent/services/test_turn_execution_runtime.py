@@ -1535,3 +1535,62 @@ def test_iteration_budget_override_does_not_mutate_settings():
     assert executor._chat_context.settings.chat_max_iterations == 9
     # and chat_max_iterations is no longer snapshotted for restore.
     assert "chat_max_iterations" not in (snapshot or {})
+
+
+class TestMaybeAssignTurnCredit:
+    """F-016f: the turn-boundary wire that drains tool signals into credit.
+
+    Without this call CreditTrackingService.assign_turn_credit() has zero
+    production callers, so _turn_count never advances and the credit summary
+    stays empty — leaving generate_tool_guidance() (live in the prompt
+    pipeline) permanently gated off.
+    """
+
+    @staticmethod
+    def _orch(*, service, flag):
+        ca = SimpleNamespace(auto_assign_at_turn_boundary=flag)
+        return SimpleNamespace(
+            _credit_tracking_service=service,
+            settings=SimpleNamespace(credit_assignment=ca),
+        )
+
+    def test_drains_credit_when_enabled_and_flag_set(self):
+        executor = _make_executor()
+        service = MagicMock()
+        orch = self._orch(service=service, flag=True)
+
+        executor._maybe_assign_turn_credit(orch)
+
+        service.assign_turn_credit.assert_called_once_with()
+
+    def test_no_drain_when_flag_disabled(self):
+        executor = _make_executor()
+        service = MagicMock()
+        orch = self._orch(service=service, flag=False)
+
+        executor._maybe_assign_turn_credit(orch)
+
+        service.assign_turn_credit.assert_not_called()
+
+    def test_no_op_when_credit_tracking_disabled(self):
+        # Service is None (credit_assignment.enabled was False at construction).
+        executor = _make_executor()
+        orch = self._orch(service=None, flag=True)
+
+        # Must not raise.
+        executor._maybe_assign_turn_credit(orch)
+
+    def test_no_op_when_orchestrator_is_none(self):
+        executor = _make_executor()
+        # Must not raise even without an orchestrator owner.
+        executor._maybe_assign_turn_credit(None)
+
+    def test_assignment_errors_are_swallowed(self):
+        executor = _make_executor()
+        service = MagicMock()
+        service.assign_turn_credit.side_effect = RuntimeError("boom")
+        orch = self._orch(service=service, flag=True)
+
+        # Credit assignment is non-critical: an error must not break the turn.
+        executor._maybe_assign_turn_credit(orch)
+        service.assign_turn_credit.assert_called_once_with()
