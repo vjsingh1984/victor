@@ -21,7 +21,10 @@ analytics scoped to ``src/network``) resolved to a fresh empty
 as "unavailable" and littered stray ``.victor/`` directories through the tree.
 """
 
+import tempfile
 from pathlib import Path
+
+import pytest
 
 from victor.core.database import (
     _normalize_project_database_paths,
@@ -107,6 +110,43 @@ def test_walk_up_stops_at_git_boundary(tmp_path: Path) -> None:
 
     # Must not cross the inner .git boundary up into ``outer``.
     assert project_root == sub
+
+
+def test_walk_up_never_adopts_temp_root_project_db(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A stray ``.victor`` at the world-writable system temp root is poison.
+
+    Once any process leaves (or plants) ``<tempdir>/.victor/project.db``, every
+    resolution starting under the temp dir — including every pytest ``tmp_path``,
+    which has no ``.git`` bound — would adopt that one shared database. The walk
+    must stop at the temp root instead.
+    """
+    fake_temp_root = _fresh_dir(tmp_path, "faketmp")
+    (fake_temp_root / ".victor").mkdir()
+    (fake_temp_root / ".victor" / "project.db").write_text("")
+    monkeypatch.setattr(tempfile, "gettempdir", lambda: str(fake_temp_root))
+
+    case_dir = fake_temp_root / "pytest-of-user" / "pytest-1" / "case0"
+    case_dir.mkdir(parents=True)
+
+    project_root, _project_dir, db_path = _normalize_project_database_paths(case_dir)
+
+    assert project_root == case_dir
+    assert db_path == case_dir / ".victor" / "project.db"
+
+
+def test_temp_root_itself_still_resolves_in_place(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Resolving the temp root directly keeps its own DB via the in-place fallback."""
+    fake_temp_root = _fresh_dir(tmp_path, "faketmp")
+    monkeypatch.setattr(tempfile, "gettempdir", lambda: str(fake_temp_root))
+
+    project_root, _project_dir, db_path = _normalize_project_database_paths(fake_temp_root)
+
+    assert project_root == fake_temp_root
+    assert db_path == fake_temp_root / ".victor" / "project.db"
 
 
 def test_explicit_db_path_is_respected(tmp_path: Path) -> None:

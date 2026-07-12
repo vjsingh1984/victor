@@ -77,6 +77,7 @@ import logging
 import queue
 import shutil
 import sqlite3
+import tempfile
 import threading
 from contextlib import contextmanager
 from datetime import datetime
@@ -451,7 +452,11 @@ def _find_existing_project_dir(start: Path) -> Optional[Path]:
     Only an *existing* ``project.db`` is matched, so a brand-new project still
     initializes in place. The search is bounded at the git repository root: it
     never ascends past a directory that contains ``.git`` without first finding
-    a project database there.
+    a project database there. It is also bounded at the system temp root: the
+    temp dir is world-writable, so a stray ``/tmp/.victor`` — planted by
+    another user, or left behind by a past process — must never own every
+    resolution under it (pytest tmp dirs have no ``.git`` bound and would all
+    silently share that one polluted database).
 
     Args:
         start: Directory to begin the upward search from (already resolved).
@@ -460,7 +465,14 @@ def _find_existing_project_dir(start: Path) -> Optional[Path]:
         The ``.victor`` directory of the owning project, or ``None`` if no
         existing project database is found within the bound.
     """
+    temp_root = Path(tempfile.gettempdir()).resolve()
     for ancestor in (start, *start.parents):
+        # Temp-root boundary before the adoption check: a ``.victor`` sitting
+        # directly in the shared temp dir is never a legitimate ancestor
+        # project. (start == temp root still resolves there via the caller's
+        # in-place fallback, so direct use of the temp dir is unaffected.)
+        if ancestor == temp_root:
+            break
         victor_dir = ancestor / ".victor"
         if (victor_dir / "project.db").exists():
             return victor_dir

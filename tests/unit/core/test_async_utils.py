@@ -30,6 +30,29 @@ def test_run_sync_executes_coroutine_from_sync_context():
     assert run_sync(_sample_value()) == "ok"
 
 
+def test_run_sync_preserves_current_event_loop_binding():
+    """run_sync must not unbind the caller's current event loop.
+
+    asyncio.run() clears the thread's current-loop slot on exit
+    (``set_event_loop(None)``). When a sync library path used run_sync —
+    e.g. a security-audit event fired during fixture setup — it silently
+    destroyed the pytest-asyncio loop, failing every async test scheduled
+    after it with "There is no current event loop".
+    """
+    try:
+        previous = asyncio.get_event_loop()
+    except RuntimeError:
+        previous = None
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        assert run_sync(_sample_value()) == "ok"
+        assert asyncio.get_event_loop() is loop
+    finally:
+        loop.close()
+        asyncio.set_event_loop(previous)
+
+
 @pytest.mark.asyncio
 async def test_run_sync_raises_from_async_context():
     """run_sync must reject nested event-loop usage."""
