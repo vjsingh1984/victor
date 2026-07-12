@@ -213,11 +213,6 @@ class WorkflowFacadeProtocol(Protocol):
         ...
 
     @property
-    def workflow_optimization(self) -> Optional[Any]:
-        """Optional workflow optimization surface."""
-        ...
-
-    @property
     def coordination_advisor(self) -> Optional[Any]:
         """Canonical framework-facing coordination advisor."""
         ...

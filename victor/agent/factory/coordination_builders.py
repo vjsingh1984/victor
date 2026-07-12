@@ -50,12 +50,6 @@ if TYPE_CHECKING:
     from victor.agent.orchestrator_recovery import OrchestratorRecoveryIntegration
     from victor.agent.middleware_chain import MiddlewareChain
     from victor.agent.conversation.state_machine import ConversationStateMachine
-    from victor.agent.task_completion import TaskCompletionDetector
-    from victor.agent.read_cache import ReadResultCache
-    from victor.agent.time_aware_executor import TimeAwareExecutor
-    from victor.agent.thinking_detector import ThinkingPatternDetector
-    from victor.agent.resource_manager import ResourceManager
-    from victor.agent.budget_manager import ModeCompletionCriteria
     from victor.agent.conversation.assembler import TurnBoundaryContextAssembler
     from victor.agent.referential_intent_resolver import ReferentialIntentResolver
     from victor.agent.session_ledger import SessionLedger
@@ -811,108 +805,6 @@ class CoordinationBuildersMixin:
         if observability and conversation_state:
             observability.wire_state_machine(conversation_state)
             logger.debug("Observability integration wired with ConversationStateMachine")
-
-    # =========================================================================
-    # Workflow Optimization Components
-    # =========================================================================
-
-    def create_task_completion_detector(self) -> "TaskCompletionDetector":
-        """Create TaskCompletionDetector for detecting task completion.
-
-        Returns:
-            TaskCompletionDetector instance
-        """
-        from victor.agent.task_completion import create_task_completion_detector
-
-        detector = create_task_completion_detector(
-            runtime_intelligence=self._get_runtime_intelligence_service()
-        )
-        logger.debug("TaskCompletionDetector created")
-        return detector
-
-    def create_read_cache(self) -> "ReadResultCache":
-        """Create ReadResultCache for file read deduplication.
-
-        Returns:
-            ReadResultCache instance with settings-derived configuration
-        """
-        from victor.agent.read_cache import create_read_cache
-
-        ttl_seconds = getattr(self.settings, "read_cache_ttl", 300.0)
-        max_entries = getattr(self.settings, "read_cache_max_entries", 100)
-
-        cache = create_read_cache(ttl_seconds=ttl_seconds, max_entries=max_entries)
-        logger.debug(f"ReadResultCache created (ttl={ttl_seconds}s, max={max_entries})")
-        return cache
-
-    def create_time_aware_executor(
-        self, timeout_seconds: Optional[float] = None
-    ) -> "TimeAwareExecutor":
-        """Create TimeAwareExecutor for time-aware execution management.
-
-        Args:
-            timeout_seconds: Execution time budget (None for unlimited)
-
-        Returns:
-            TimeAwareExecutor instance
-        """
-        from victor.agent.time_aware_executor import create_time_aware_executor
-
-        if timeout_seconds is None:
-            timeout_seconds = getattr(self.settings, "execution_timeout", None)
-
-        executor = create_time_aware_executor(timeout_seconds=timeout_seconds)
-        if timeout_seconds:
-            logger.debug(f"TimeAwareExecutor created with {timeout_seconds}s budget")
-        else:
-            logger.debug("TimeAwareExecutor created (no timeout)")
-        return executor
-
-    def create_thinking_detector(self) -> "ThinkingPatternDetector":
-        """Create ThinkingPatternDetector for detecting thinking loops.
-
-        Returns:
-            ThinkingPatternDetector instance
-        """
-        from victor.agent.thinking_detector import create_thinking_detector
-
-        repetition_threshold = getattr(self.settings, "thinking_repetition_threshold", 3)
-        similarity_threshold = getattr(self.settings, "thinking_similarity_threshold", 0.65)
-
-        detector = create_thinking_detector(
-            repetition_threshold=repetition_threshold,
-            similarity_threshold=similarity_threshold,
-            runtime_intelligence=self._get_runtime_intelligence_service(),
-        )
-        logger.debug(
-            f"ThinkingPatternDetector created "
-            f"(repetition={repetition_threshold}, similarity={similarity_threshold})"
-        )
-        return detector
-
-    def create_resource_manager(self) -> "ResourceManager":
-        """Get ResourceManager for resource lifecycle management.
-
-        Returns:
-            ResourceManager singleton instance
-        """
-        from victor.agent.resource_manager import get_resource_manager
-
-        manager = get_resource_manager()
-        logger.debug("ResourceManager retrieved (singleton)")
-        return manager
-
-    def create_mode_completion_criteria(self) -> "ModeCompletionCriteria":
-        """Create ModeCompletionCriteria for mode-specific early exit.
-
-        Returns:
-            ModeCompletionCriteria instance
-        """
-        from victor.agent.budget_manager import create_mode_completion_criteria
-
-        criteria = create_mode_completion_criteria()
-        logger.debug("ModeCompletionCriteria created")
-        return criteria
 
     def create_context_assembler(
         self,

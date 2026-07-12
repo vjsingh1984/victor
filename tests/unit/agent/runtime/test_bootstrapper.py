@@ -226,7 +226,7 @@ class TestAgentRuntimeBootstrapper:
             mock_protocol.assert_called_once_with(orch)
             mock_session.assert_called_once_with(orch)
 
-    def test_prepare_components_creates_checkpoint_and_workflow(self):
+    def test_prepare_components_creates_checkpoint_and_wires_dependencies(self):
         orch = self._make_mock_orchestrator()
         # MagicMock doesn't auto-create dunder-named methods
         orch.__init_capability_registry__ = MagicMock()
@@ -235,7 +235,6 @@ class TestAgentRuntimeBootstrapper:
 
         # Verify factory methods were called
         orch._factory.create_checkpoint_manager.assert_called_once()
-        orch._factory.create_workflow_optimization_components.assert_called_once()
         orch._factory.wire_component_dependencies.assert_called_once()
 
         # Runtime boundaries are driven by the init manager (FEP-0016): the
