@@ -3389,7 +3389,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
             self._constraint_activator.deactivate_constraints()
 
         # Close the credit-assignment feedback loop (universal per-turn teardown).
-        if self._credit_tracking_service is not None:
+        if getattr(self, "_credit_tracking_service", None) is not None:
             self._credit_tracking_service.assign_turn_credit_at_boundary()
 
     async def _handle_context_and_iteration_limits(
