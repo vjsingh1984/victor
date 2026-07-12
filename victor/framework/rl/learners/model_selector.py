@@ -524,7 +524,7 @@ class ModelSelectorLearner(BaseLearner):
         return self.strategy
 
     # ------------------------------------------------------------------
-    # Priority 4 Phase 2: Learned confidence thresholds for HybridDecisionService
+    # Priority 4 Phase 2: Learned confidence thresholds for decision routing
     # ------------------------------------------------------------------
 
     def learn_confidence_threshold(
