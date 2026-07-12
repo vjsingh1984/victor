@@ -199,20 +199,45 @@ class ModuleAnalyzer:
     def _load_module_graph(
         self,
     ) -> tuple[set[str], dict[str, set[str]], dict[str, set[str]]]:
-        """Load module-level adjacency from graph_edge/graph_node tables."""
+        """Load module-level dependency adjacency from graph_edge/graph_node.
+
+        Martin coupling (Ca/Ce), PageRank, and betweenness are module-level
+        *dependency* metrics, so the adjacency uses IMPORTS edges only.
+        CALLS (and CFG/CDG/DDG) edges are deliberately excluded: cross-file
+        CALLS are resolved by leaf name with heuristic fanout and were
+        observed inflating Ca 10-18x over real use-statement fan-in.
+        Projects with no IMPORTS edges at all (language without an import
+        resolver yet) fall back to the legacy all-edges adjacency so their
+        metrics don't vanish.
+
+        The module universe is every indexed file (graph_node.file), not
+        just edge endpoints — modules with no import relationships get
+        honest zero-coupling rows, which also overwrites stale inflated
+        values persisted by earlier runs.
+        """
         db = self._get_db()
         conn = db.connection if hasattr(db, "connection") else db._get_raw_connection()
-        try:
-            rows = conn.execute("""SELECT DISTINCT n1.file, n2.file
+        edge_query = """SELECT DISTINCT n1.file, n2.file
                    FROM graph_edge e
                    JOIN graph_node n1 ON e.src = n1.node_id
                    JOIN graph_node n2 ON e.dst = n2.node_id
                    WHERE n1.file IS NOT NULL AND n2.file IS NOT NULL
-                     AND n1.file != n2.file""").fetchall()
+                     AND n1.file != n2.file"""
+        try:
+            module_rows = conn.execute(
+                "SELECT DISTINCT file FROM graph_node WHERE file IS NOT NULL"
+            ).fetchall()
+            rows = conn.execute(edge_query + " AND e.type = 'IMPORTS'").fetchall()
+            if not rows:
+                logger.debug(
+                    "No IMPORTS edges in graph — falling back to all-edge "
+                    "adjacency for module metrics"
+                )
+                rows = conn.execute(edge_query).fetchall()
         except Exception:
             return set(), {}, {}
 
-        modules: set[str] = set()
+        modules: set[str] = {row[0] for row in module_rows}
         adj_out: dict[str, set[str]] = {}
         adj_in: dict[str, set[str]] = {}
         for src_file, dst_file in rows:
