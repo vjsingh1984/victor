@@ -39,21 +39,21 @@ from victor.core.yaml_utils import safe_load as yaml_safe_load
 from victor.core import get_container
 
 from victor.agent.conversation.state_machine import ConversationStage
-from victor.agent.tool_selection_assembler import (
+from victor.agent.tool_selection.assembler import (
     SemanticToolSelectionAssembler,
     SemanticToolSelectionAssemblyContext,
 )
-from victor.agent.tool_selection_cache import SemanticToolSelectionCacheAdapter
-from victor.agent.tool_selection_cache_key import SemanticToolSelectionCacheKeyBuilder
-from victor.agent.tool_selection_policy import (
+from victor.agent.tool_selection.cache import SemanticToolSelectionCacheAdapter
+from victor.agent.tool_selection.cache_key import SemanticToolSelectionCacheKeyBuilder
+from victor.agent.tool_selection.policy import (
     StageToolSelectionContext,
     ToolSelectionStagePolicy,
 )
-from victor.agent.tool_selection_postprocessor import (
+from victor.agent.tool_selection.postprocessor import (
     ToolSelectionPostProcessContext,
     ToolSelectionPostProcessor,
 )
-from victor.agent.tool_selection_recorder import ToolSelectionRecorder
+from victor.agent.tool_selection.recorder import ToolSelectionRecorder
 from victor.tools.enums import SchemaLevel
 from victor.protocols.mode_aware import ModeAwareMixin
 from victor.tools.base import AccessMode, ExecutionCategory
