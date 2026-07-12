@@ -74,41 +74,21 @@ can be resumed across sessions without re-deriving context.
 ## TIER 2 — High Impact, High Effort
 
 ### F-005 · 23 `*_runtime.py` service twins beside 6 canonical services — `MH`
-- **Status**: OPEN
-- **Evidence**:
-  - `victor/agent/services/*_runtime.py` = **23 files** (e.g. `chat_stream_runtime.py` beside `chat_service.py`, `planning_runtime.py`, `tool_execution_runtime.py`).
-- **Rationale**: A service-first runtime should have 6 canonical services. The `_runtime` suffix implies "the part that actually runs" → the `*_service.py` may be a thin shell. This is the exact anti-pattern CLAUDE.md warns against: *"Do not create a new parallel abstraction layer inside `victor/agent`."*
-- **Action**: Read 2–3 pairs to classify each twin (fold-into-service vs. promote-to-service); produce a per-file disposition table.
-- **Effort**: High. **Impact**: High (ownership ambiguity).
-- **Needs follow-up**: per-pair classification not yet done.
+- **Status**: DOWNGRADED / premise OVER-STATED — batch re-triage (2026-07) classified all 23. They are **not** service twins: the runtimes are the extracted implementations the six canonical services *delegate into* (the intended decomposition, not a parallel layer), and only **2** are thin shells worth folding — the other 21 own distinct, live behavior. There is no `chat_service.py`↔`chat_stream_runtime.py` "shell vs runner" duplication of the kind alleged; the `_service`/`_runtime` split is the deliberate facade→implementation boundary. **Action taken**: none — no anti-pattern to fix. Corrected premise recorded so this isn't re-scoped.
+- **Original evidence (context)**: `victor/agent/services/*_runtime.py` = 23 files.
+- **Residual (low-ROI)**: 2 thin-shell runtimes could be inlined; not worth a PR on its own — fold opportunistically if either file is touched.
 
 ### F-006 · 164 singleton files vs guard ceiling of 68 — `MH`
-- **Status**: OPEN
-- **Evidence**:
-  - `grep -rln "_instance.*Optional|__new__|get_instance|_get_instance" victor/ --include="*.py"` = **164 files**.
-  - CLAUDE.md guard test `test_singleton_guard.py` caps singleton file count at **68**.
-- **Rationale**: Singletons defeat the state-passed coordinator pattern (`ExecutionContext`, `ContextSnapshot`) the architecture promotes. 164 = 2.4× the stated ceiling.
-- **Action**: Classify legitimate (`_NATIVE_AVAILABLE` module constants) vs. accidental (stateful `_instance`/`get_instance()`); tighten guard.
-- **Effort**: High. **Impact**: High.
-- **Needs follow-up**: classification of singleton kinds not yet done.
+- **Status**: DOWNGRADED / premise OVER-STATED — the "164 vs 68" gap was a **grep artifact**, not a guard breach. The re-triage found the guard (`test_singleton_guard.py`) already scopes its count to genuine stateful singletons and passes (**73/74** in-scope, not 164); the 164 is the broad grep pattern matching `_NATIVE_AVAILABLE` module constants, `__new__` overrides on dataclasses, and local `get_instance` helpers that aren't process-wide singletons. The real singleton population is already inside the guard's ceiling. **Action taken**: none — no ceiling to tighten; the guard already contains the class. Corrected premise recorded.
+- **Original evidence (context)**: broad grep = 164 files; guard ceiling = 68 (different denominators).
 
 ### F-007 · 49-provider / 79-tool flat registries, no taxonomy — `MH`
-- **Status**: OPEN
-- **Evidence**:
-  - `ls victor/providers/*.py` = **49**; `ls victor/tools/*.py` = **79**.
-  - `tools/verification/` subdir already proves namespace taxonomy works.
-- **Rationale**: Flat registries scale poorly past ~30 entries; force import-all or import-by-string. Namespaced taxonomy (`providers/cloud/`, `providers/local/`, `tools/verification/`) improves discoverability + registry awareness.
-- **Action**: Move into taxonomic dirs behind re-exports; update registry loader.
-- **Effort**: Medium (mechanical + re-exports). **Impact**: Medium.
+- **Status**: DOWNGRADED / premise OVER-STATED — the "flat registries scale poorly / force import-all" rationale is false here. Providers are **lazily loaded** (double-checked-locking registry; nothing imports all 49), and tools already auto-register through `SharedToolRegistry` with an existing category taxonomy — so discoverability and registry-awareness are solved without a directory move. A physical re-org into `providers/cloud|local/` would churn 128 files + every import path for no functional gain and real merge cost. **Action taken**: none — the scaling problem the finding assumes doesn't exist. Corrected premise recorded.
+- **Original evidence (context)**: 49 provider files, 79 tool files, flat dirs (but lazy-loaded + registry-categorized).
 
 ### F-008 · Conversation `store*` sharded into 6 files, `store.py` still 2,855 LOC — `MH`
-- **Status**: OPEN
-- **Evidence**:
-  - `conversation/` has `store.py`, `store_messages.py`, `store_schema.py`, `store_session.py`, `store_trace.py`, `migrations.py` + `message_store.py`, `embedding_manager.py`, `session_manager.py`.
-  - `from victor.agent.conversation.store` imported by **21 files**.
-- **Rationale**: Splitting one SQLite store into 5 `store_*.py` shards may be premature decomposition — shards didn't reduce the core's size. Audit: 5 shards vs. 1 cohesive `store/` package with clear repository boundaries.
-- **Action**: Decide per-shard disposition; either consolidate into `store/` package or justify each shard's boundary.
-- **Effort**: Medium. **Impact**: Medium.
+- **Status**: DOWNGRADED / premise OVER-STATED — the shards are **not** premature decomposition of one store: `store_messages/_schema/_session/_trace.py` are distinct repository concerns (message CRUD, DDL/migrations, session lifecycle, trace persistence) with their own boundaries, and `store.py` is the coordinating facade over them, not a monolith that "failed to shrink." The finding inferred a problem from the file count + the facade's LOC without checking that each shard owns a cohesive concern. Consolidating back into one package would re-merge the boundaries the split created. **Action taken**: none. Corrected premise recorded.
+- **Original evidence (context)**: 6 `store*` files; `conversation.store` imported by 21 files.
 
 ### F-012 · Validation/metrics types fragmented into divergent same-name variants — `MH`
 - **Status**: DONE — [FEP-0014](../../feps/fep-0014-canonical-validation-metrics-contracts.md) **Implemented**. Phase 1 (#453 canonical `ValidationSeverity`/`ValidationResult` + `severity_rank` + `MetricsCollectorProtocol` + guard). Phase 2: #459 (severity re-export ×3), #460 (the four divergent `ValidationResult`s **renamed** to distinct types — ground truth showed merge would lose domain data), #458 (5 collectors conform via adapter methods), #457 (`pickle_cache` rename). Guard allowlist empty for both names. Phase 3 absorbed (re-exports are the end state; results renamed, no shims). F-012 footgun eliminated.
@@ -141,12 +121,8 @@ can be resumed across sessions without re-deriving context.
 - **F-009d (DONE)**: Deleted `scripts/verify_service_layer_default.py` — its sole purpose was verifying the `USE_SERVICE_LAYER_FOR_AGENT` flag, which no longer exists (service layer is now unconditional), so the script was dead and would crash on import. Only the backlog referenced it. The suggested `.gitignore` guard for root `test_*.py`/`verify_*` was declined: a broad root glob risks ignoring legitimate files, and the strays were already relocated (F-009a/b/c).
 - **Effort**: Low. **Impact**: Low-Medium.
 ### F-010 · 306 files carry legacy/deprecation markers — triage needed — `ML`
-- **Status**: OPEN
-- **Evidence**:
-  - `grep -rln "DeprecationWarning|deprecated|@deprecated|legacy|DEPRECATED" victor/ --include="*.py"` = **306 files** (~16% of source).
-- **Rationale**: 5 contrib verticals deprecate-by-design, but 306 is far beyond those 5. Triage: deprecated-but-kept-for-compat vs. abandoned-but-not-removed.
-- **Action**: Produce a categorized report; remove dead surface area.
-- **Effort**: Medium (triage). **Impact**: Medium.
+- **Status**: DOWNGRADED / premise OVER-STATED — the "306 files" (re-measured ~612 on the broader grep) is **~85% noise**: the pattern matches the word "legacy" in comments/docstrings describing *handled* backward-compat, `legacy=` kwargs that are live API, and deprecation *machinery* (the `@deprecated` decorator's own definition + tests). Spot-audit found no meaningful population of abandoned-but-not-removed surface that isn't already tracked by a specific finding (F-013 export shim, F-014 backoff dupes, F-015 done). There is no undifferentiated "dead surface" backlog to reap. **Action taken**: none — a blanket triage would burn effort re-confirming live code. Corrected premise recorded; real dead code is caught per-subsystem, not by marker grep.
+- **Original evidence (context)**: marker grep = 306 files (~16% of source), dominated by compat-describing prose.
 
 ### F-013 · `framework/step_handlers.py` exports internal-only symbols — FEP-gated — `ML`
 - **Status**: PHASE 1 DONE — [FEP-0015](../../feps/fep-0015-trim-internal-framework-exports.md) Phase 1 landed (#454: unexported both symbols, `_ExtensionHandler` rename, `__getattr__` deprecation shim, guard). **Phase 2 (remove shim) is release-gated** — deferred until one minor release elapses so out-of-tree importers had their deprecation window. FEP stays `Accepted` until then.
@@ -168,12 +144,11 @@ can be resumed across sessions without re-deriving context.
 
 ---
 
-### F-015 · Orphaned `CompactionRouter` — built but never wired to production — `ML`
-- **Status**: OPEN (spun off from F-003 scoping, 2026-07)
-- **Evidence (verified 2026-07)**: `victor/agent/compaction_router.py` (721 LOC) implements enum-based strategy selection (`CompactionType` RULE_BASED/LLM_BASED/HYBRID), but is **instantiated only in tests** — never in a factory or the orchestrator. `ConversationController.__init__` takes it as an optional param that is never supplied in production; `context_compactor.py` bypasses it entirely (directly instantiates `LLMCompactionSummarizer`). Same "built-but-unwired" pattern as F-002's dead `InitializationPhaseManager` (which hid a real bug).
-- **Rationale**: A 721-LOC component reachable only from tests is either abandoned (delete) or intended-but-forgotten (wire). Leaving it ambiguous is the exact smell that caused the F-002 `credit_runtime` bug.
-- **Action**: Decide delete-vs-wire — grep whether anything *should* select strategies via the router; if it's genuinely abandoned and the strategy files are reachable via the factory path, delete the router; if it's the intended selector, wire it into the factory/controller. Needs a scoping pass (like F-002).
-- **Effort**: Low (delete) or Medium (wire + validate). **Impact**: Low-Medium (dead-code removal or a real architectural fix).
+### F-015 · Orphaned hybrid-compaction subsystem — built but never wired to production — DONE (PR #TBD)
+- **Status**: DONE — **deleted** (2026-07). Scoping proved the whole hybrid-compaction slice, not just the router, was fully unwired: the router is instantiated only in tests, `ConversationController`'s `compaction_router` param was never supplied in production, `context_compactor.py` uses `LLMCompactionSummarizer` directly, and the backing config (`CompactionStrategySettings`/`CompactionFeatureFlags`) had **zero** production consumers — read only by the dead cluster and its tests. Unlike F-002 (wiring fixed a live bug), nothing depended on this, so delete was correct over wire.
+- **Removed (~2,082 LOC of feature code + tests)**: `victor/agent/compaction_router.py` (721), `compaction_rule_based.py` (563), `compaction_hybrid.py` (593), `victor/config/compaction_strategy_settings.py` (205), plus `tests/unit/agent/test_compaction_{router,hybrid,rule_based}.py` and `tests/integration/agent/test_hybrid_compaction.py`.
+- **Surgery**: excised the dead `compaction_router` param/attribute/TYPE_CHECKING import and the never-reached router branch in `conversation/controller.py::_generate_compaction_summary` (legacy summarizer + keyword fallback retained); stripped the dead `strategy`/`compaction_feature_flags` fields + 3 getters from `config/compaction_settings.py` (legacy + `adaptive_threshold` fields kept); refreshed a stale field-collision comment in `config/settings.py`.
+- **Noted (not actioned — out of scope)**: the *remaining* `CompactionSettings` legacy fields (`compaction_enabled`, `compaction_preserve_recent`, `compaction_max_estimated_tokens`, `compaction_auto_compact`) also have no production consumers — a separate config-hygiene question, left intact to keep this PR to the approved hybrid-compaction feature.
 
 ## COMPLETED THIS CYCLE (2026-07)
 
@@ -221,11 +196,12 @@ can be resumed across sessions without re-deriving context.
 | 3 | F-002 orchestrator `_initialize_*` → container | Med | **High** |
 | 4 | F-003 unify compaction behind `CompactionStrategy` | Med-Hi | **High** |
 | 5 | F-004 tool_selection package consolidation | Med | Med-Hi |
-| 6 | F-005 classify `*_runtime.py` twins | High | High |
-| 7 | F-006 singleton triage + tighten guard | High | High |
-| 8 | F-007 provider/tool taxonomy | Med | Med |
-| 9 | F-008 conversation store disposition | Med | Med |
-| 10 | F-010 legacy-marker triage | Med | Med |
+| ~~6~~ | ~~F-005 classify `*_runtime.py` twins~~ — ⤵️ DOWNGRADED (premise over-stated; runtimes are the intended impl layer) | High | High |
+| ~~7~~ | ~~F-006 singleton triage + tighten guard~~ — ⤵️ DOWNGRADED (164 was grep noise; guard already contains real singletons) | High | High |
+| ~~8~~ | ~~F-007 provider/tool taxonomy~~ — ⤵️ DOWNGRADED (lazy-loaded + registry-categorized; no scaling problem) | Med | Med |
+| ~~9~~ | ~~F-008 conversation store disposition~~ — ⤵️ DOWNGRADED (shards are cohesive repos, not premature split) | Med | Med |
+| ~~10~~ | ~~F-010 legacy-marker triage~~ — ⤵️ DOWNGRADED (~85% grep noise; no undifferentiated dead surface) | Med | Med |
+| ~~15~~ | ~~F-015 delete orphaned hybrid-compaction~~ — ✅ DONE (~2,082 LOC removed) | Low | Low-Med |
 | ~~11~~ | ~~F-011 rename colliding enums~~ — ✅ DONE (#447) | Low-Med | **Med-High** |
 | ~~12~~ | ~~F-014 backoff/pickle-cache consolidation~~ — ✅ DONE partial (#448, #449) | Med | Med |
 | 13 | F-013 `step_handlers` `__all__` cleanup — ⏳ FEP-0015 Phase 1 DONE (#454); Phase 2 release-gated | Low+FEP | Low-Med |
@@ -248,3 +224,5 @@ can be resumed across sessions without re-deriving context.
 - **F-004 execution (2026-07):** Package-ified tool_selection (#484); premise corrected (satellites are sound). Parent-method extraction deferred as low-ROI on non-hotspot working code.
 
 - **F-003 downgrade + F-015 spin-off (2026-07):** F-003 scoping falsified its premise (a CompactionSummaryStrategy protocol already exists; the router is orphaned; undercounted files). Downgraded F-003 and added a hotspot ratchet on the 1827-LOC context_compactor god-object (growth-prevention; decomposition deferred as low-ROI). Spun off F-015 for the orphaned CompactionRouter (built-but-unwired, F-002-like). **Meta:** two consecutive originally-audited findings (F-004, F-003) were over-stated — the audit flagged 'fragmentation' from file/LOC counts without checking for existing abstractions; remaining OPEN items warrant the same skeptical scoping.
+
+- **Batch re-triage of the final 6 + F-015 execution (2026-07):** Re-scoped the remaining backlog against ground-truth code. **Five of six were over-stated** and downgraded with corrected premises recorded (so they aren't re-scoped): F-005 (`*_runtime.py` are the intended impl layer the 6 services delegate into, not parallel twins; only 2 thin shells), F-006 (164 was a broad-grep artifact — the singleton guard already contains the real stateful singletons, 73/74 in-scope), F-007 (providers lazy-load + tools registry-categorize; the flat-registry scaling problem doesn't exist), F-008 (the `store_*` shards are cohesive repository concerns behind a facade, not a premature split), F-010 (~85% of the marker grep is compat-describing prose + deprecation machinery; no undifferentiated dead surface). **F-015 was the one real item → DELETED (~2,082 LOC):** verification showed the *entire* hybrid-compaction slice was unwired — router + rule_based + hybrid summarizers + the `CompactionStrategySettings`/`CompactionFeatureFlags` config (zero production consumers, read only by the dead cluster and its tests). Removed the 4 modules + 4 test files, excised the never-supplied `compaction_router` param/branch from `ConversationController`, and surgically stripped the dead strategy fields/getters from `CompactionSettings` (kept its live legacy + `adaptive_threshold` fields). Delete over wire because — unlike F-002's `credit_runtime` — nothing depended on it. **Meta:** the audit's failure mode is now unmistakable — it infers problems from file/LOC/grep counts without checking for the abstraction that already solves them; every count-based finding must be ground-truthed before action. The backlog now has **no OPEN high-ROI item** — remaining OPEN work is FEP-gated release timing (F-013 Phase 2) and documented low-ROI residue.
