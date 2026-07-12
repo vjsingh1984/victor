@@ -45,7 +45,7 @@ can be resumed across sessions without re-deriving context.
 - **Effort**: Medium. **Impact**: High (testability, merge-conflict reduction).
 
 ### F-003 · Compaction logic fragmented across 7 files, no unified strategy protocol — `HM`
-- **Status**: OPEN
+- **Status**: DOWNGRADED / largely INVALID — scoping (2026-07) **falsified the premise**. A `CompactionSummaryStrategy` Protocol **already exists** (`victor/agent/compaction_summarizer.py:32`) and every summarizer (rule_based/hybrid/llm/keyword/ledger-aware) implements it — so "no unified strategy protocol" is false. The finding also undercounted (actually **9 files / ~5,718 LOC**; the "strategies" `adaptive_compaction`/`emergency_compaction`/`continuation_bonus`/`hierarchy` are helpers, not strategies). `context_compactor.py` (1,827 LOC) IS a real god-object but is a *separate* subsystem from the router, works, and isn't a proven bottleneck. **Action taken**: added a hotspot ratchet on `context_compactor.py` (1827) to prevent further god-object growth; decomposition deferred as low-ROI. The one real spun-off finding → **F-015** (orphaned router). No FEP.
 - **Evidence**:
   - `context_compactor.py` (1,827), `compaction_router.py` (721), `compaction_hybrid.py` (593), `compaction_rule_based.py` (563), `compaction_summarizer.py` (148), `compaction_continuation_bonus.py` (187), `compaction_hierarchy.py` (168) — **4,207 LOC total**.
 - **Rationale**: `router` + `hybrid` + `rule_based` + `summarizer` strongly implies a strategy pattern never unified behind one `CompactionStrategy` interface. Each new strategy added a file rather than a class. Compaction is a hot latency path.
@@ -168,6 +168,13 @@ can be resumed across sessions without re-deriving context.
 
 ---
 
+### F-015 · Orphaned `CompactionRouter` — built but never wired to production — `ML`
+- **Status**: OPEN (spun off from F-003 scoping, 2026-07)
+- **Evidence (verified 2026-07)**: `victor/agent/compaction_router.py` (721 LOC) implements enum-based strategy selection (`CompactionType` RULE_BASED/LLM_BASED/HYBRID), but is **instantiated only in tests** — never in a factory or the orchestrator. `ConversationController.__init__` takes it as an optional param that is never supplied in production; `context_compactor.py` bypasses it entirely (directly instantiates `LLMCompactionSummarizer`). Same "built-but-unwired" pattern as F-002's dead `InitializationPhaseManager` (which hid a real bug).
+- **Rationale**: A 721-LOC component reachable only from tests is either abandoned (delete) or intended-but-forgotten (wire). Leaving it ambiguous is the exact smell that caused the F-002 `credit_runtime` bug.
+- **Action**: Decide delete-vs-wire — grep whether anything *should* select strategies via the router; if it's genuinely abandoned and the strategy files are reachable via the factory path, delete the router; if it's the intended selector, wire it into the factory/controller. Needs a scoping pass (like F-002).
+- **Effort**: Low (delete) or Medium (wire + validate). **Impact**: Low-Medium (dead-code removal or a real architectural fix).
+
 ## COMPLETED THIS CYCLE (2026-07)
 
 ### F-C1 · Provider capability surface collapsed to `supports_*()` methods — DONE (PR #442)
@@ -239,3 +246,5 @@ can be resumed across sessions without re-deriving context.
 
 - **F-009d execution (2026-07):** Deleted the dead `scripts/verify_service_layer_default.py` (verified only the removed `USE_SERVICE_LAYER_FOR_AGENT` flag → crashes on import; service layer is now unconditional). F-009 → DONE.
 - **F-004 execution (2026-07):** Package-ified tool_selection (#484); premise corrected (satellites are sound). Parent-method extraction deferred as low-ROI on non-hotspot working code.
+
+- **F-003 downgrade + F-015 spin-off (2026-07):** F-003 scoping falsified its premise (a CompactionSummaryStrategy protocol already exists; the router is orphaned; undercounted files). Downgraded F-003 and added a hotspot ratchet on the 1827-LOC context_compactor god-object (growth-prevention; decomposition deferred as low-ROI). Spun off F-015 for the orphaned CompactionRouter (built-but-unwired, F-002-like). **Meta:** two consecutive originally-audited findings (F-004, F-003) were over-stated — the audit flagged 'fragmentation' from file/LOC counts without checking for existing abstractions; remaining OPEN items warrant the same skeptical scoping.
