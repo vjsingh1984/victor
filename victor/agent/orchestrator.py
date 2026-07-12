@@ -3388,6 +3388,10 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         if constraints:
             self._constraint_activator.deactivate_constraints()
 
+        # Close the credit-assignment feedback loop (universal per-turn teardown).
+        if self._credit_tracking_service is not None:
+            self._credit_tracking_service.assign_turn_credit_at_boundary()
+
     async def _handle_context_and_iteration_limits(
         self,
         user_message: str,
@@ -3597,13 +3601,9 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         "good evening",
     )
 
-    # Bare continuation/affirmation messages from a user mid-task. These are short
-    # (< 15 chars) and carry no tool-signal keyword, so the length gate below would
-    # otherwise short-circuit to "skip" and drop the working tool set. A bare
-    # "continue" / "proceed" / "go" typed as a NEW user turn should preserve the
-    # read-only core (so the model can still reason over the in-progress work)
-    # rather than going tool-less. Matches the 3-valued return contract of
-    # _tool_skip_mode (skip / read_core / tools).
+    # Bare continuation/affirmation user turns (< 15 chars, no tool keyword) would trip
+    # the length gate below and drop the working tool set; keep the read-only core so
+    # the model can still reason over in-progress work (_tool_skip_mode: read_core).
     _CONTINUATION_TOKENS = frozenset(
         {
             "continue",
