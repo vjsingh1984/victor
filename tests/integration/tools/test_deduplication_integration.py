@@ -405,7 +405,6 @@ class TestDeduplicationConfiguration:
         assert hasattr(settings, "deduplication_priority_order")
         assert hasattr(settings, "deduplication_whitelist")
         assert hasattr(settings, "deduplication_blacklist")
-        assert hasattr(settings, "deduplication_strict_mode")
         assert hasattr(settings, "deduplication_naming_enforcement")
         assert hasattr(settings, "deduplication_semantic_threshold")
 

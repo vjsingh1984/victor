@@ -100,6 +100,14 @@ class ToolBuildersMixin:
             return nested_value
         return self._resolve_setting_value(self.settings, name, default)
 
+    def _cache_setting(self, name: str, default: Any) -> Any:
+        """Resolve a cache setting from nested CacheConfig or legacy flat settings."""
+        cache_settings = self._resolve_setting_value(self.settings, "cache", None)
+        nested_value = self._resolve_setting_value(cache_settings, name, _MISSING)
+        if nested_value is not _MISSING:
+            return nested_value
+        return self._resolve_setting_value(self.settings, name, default)
+
     def create_tool_registry(self) -> "ToolRegistry":
         """Create tool registry for managing available tools.
 
@@ -173,34 +181,28 @@ class ToolBuildersMixin:
             max_content_length=getattr(self.settings, "max_content_length", 5000),
             batch_concurrency=getattr(self.settings, "batch_concurrency", 5),
             batch_max_files=getattr(self.settings, "batch_max_files", 100),
-            generic_result_cache_enabled=getattr(
-                self.settings,
+            generic_result_cache_enabled=self._tool_setting(
                 "generic_result_cache_enabled",
                 False,
             ),
-            generic_result_cache_ttl=getattr(self.settings, "generic_result_cache_ttl", 300),
-            http_connection_pool_enabled=getattr(
-                self.settings,
+            generic_result_cache_ttl=self._tool_setting("generic_result_cache_ttl", 300),
+            http_connection_pool_enabled=self._cache_setting(
                 "http_connection_pool_enabled",
                 False,
             ),
-            http_connection_pool_max_connections=getattr(
-                self.settings,
+            http_connection_pool_max_connections=self._cache_setting(
                 "http_connection_pool_max_connections",
                 100,
             ),
-            http_connection_pool_max_connections_per_host=getattr(
-                self.settings,
+            http_connection_pool_max_connections_per_host=self._cache_setting(
                 "http_connection_pool_max_connections_per_host",
                 10,
             ),
-            http_connection_pool_connection_timeout=getattr(
-                self.settings,
+            http_connection_pool_connection_timeout=self._cache_setting(
                 "http_connection_pool_connection_timeout",
                 30,
             ),
-            http_connection_pool_total_timeout=getattr(
-                self.settings,
+            http_connection_pool_total_timeout=self._cache_setting(
                 "http_connection_pool_total_timeout",
                 60,
             ),
