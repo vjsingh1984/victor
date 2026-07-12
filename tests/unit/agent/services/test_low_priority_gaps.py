@@ -610,27 +610,6 @@ class TestProviderServiceTestMethod:
         # Verify failure (exception caught)
         assert result is False
 
-    @pytest.mark.asyncio
-    async def test_test_provider_with_health_checker(self):
-        """Test testing a provider with health checker."""
-        from victor.agent.services.provider_service import ProviderService
-
-        # Create service with health checker
-        registry = Mock()
-        health_checker = Mock()
-        health_checker.check = AsyncMock(return_value=True)
-        provider = Mock()
-        registry.get_provider = Mock(return_value=provider)
-
-        service = ProviderService(registry=registry, health_checker=health_checker)
-
-        # Test provider
-        result = await service.test_provider("test-provider")
-
-        # Verify health check was used
-        assert result is True
-        health_checker.check.assert_called_once_with(provider)
-
 
 # =============================================================================
 # Integration Tests

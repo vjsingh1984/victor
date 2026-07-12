@@ -2,7 +2,7 @@
 fep: "0016"
 title: "Wire the initialization phase manager (centralize orchestrator runtime init)"
 type: Standards Track
-status: Accepted
+status: Implemented
 created: 2026-07-10
 modified: 2026-07-10
 authors:
@@ -227,17 +227,31 @@ No `victor/framework/` or public `AgentOrchestrator` API changes.
 - [ ] Unit-test the manager directly (order, fail-fast, skip, timing) — it currently has tests that mock the orchestrator; extend them for `run_group`.
 - [ ] No orchestrator changes yet. **Deliverable**: manager is invocable and tested; still not wired.
 
-### Phase 2: Wire SERVICE group (1 PR) — lowest interleaving risk (all 3 phases already adjacent in `prepare_components`)
-- [ ] Replace the raw `interaction`/`services`/`credit` calls at `bootstrapper.py:185–195` with `run_group(SERVICE)`; remove #464's raw credit call. Validate full construction + the bootstrapper test.
+### Phase 2 (DONE, PR #477) — **revised from grouped to per-phase in-place**
 
-### Phase 3: Wire EARLY group (1 PR)
-- [ ] Replace the 4 raw calls in `__init__` with `run_group(EARLY)`. Validate.
+Implementation revealed the grouped design was infeasible: (a) the 4 EARLY phases are
+**scattered across ~120 lines of `__init__`** with real construction (sanitizer, prompt
+builder, prompt pipeline, runtime-intelligence) between them — they can't consolidate into
+one `run_group(EARLY)` without proving/moving those prerequisites; and (b) incremental
+grouped wiring hits a **cross-group dependency-accumulation** problem (wiring SERVICE first
+would skip its critical `interaction` phase because `provider`/`coordination` ran raw).
+Approved pivot to **per-phase in-place wiring**:
+- [x] Add `run_phase(orchestrator, name)` to the manager.
+- [x] Create `self._init_manager` once in `__init__`; replace each of the 9 raw
+  `_initialize_*` calls with `run_phase("X")` **at its existing site** (nothing moves →
+  behavior-preserving; the manager accumulates succeeded-phase state across the calls in
+  construction order, so dependencies resolve).
+- [x] Guard test: no raw `_initialize_*` call sites remain in the construction path; the
+  contract covers all 9 phases.
+- [x] Behavior parity verified (clean develop and the branch show the identical 44
+  pre-existing async-env local failures; CI ran the async tests properly and passed).
+  CI additionally caught two real gaps (a `SimpleNamespace` test orchestrator missing
+  `_init_manager`; `orchestrator.py` briefly 9 lines over its hotspot cap) — both fixed.
 
-### Phase 4: Wire ASSEMBLY group (1 PR) — highest care (`context_compactor` timing)
-- [ ] Replace the 2 raw calls in `assemble_intelligence` with `run_group(ASSEMBLY)`, reading `_context_compactor` from the orchestrator at call time. Validate.
-
-### Phase 5: Cleanup (1 PR)
-- [ ] Remove now-unused raw-call comments; add a guard test asserting no raw `orchestrator._initialize_*(` call sites remain outside the manager.
+### Phase 3 (optional follow-up)
+- [ ] Prune the now-unused `run_group` + `PhaseGroup` + `_PhaseSpec.group` (built in Phase 1
+  for the abandoned grouped design; `run_phase` is the production path). Low value — the
+  manager is now actively used, so these are stray methods, not a dead subsystem.
 
 ### Testing Strategy
 - Each wiring PR runs the full `tests/unit/agent/` orchestrator-construction set + a

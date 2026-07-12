@@ -125,6 +125,36 @@ class TestCreditTrackingService:
             assert signal.metadata.turn_index == 1
             assert signal.metadata.tool_name is not None
 
+    def test_assign_turn_credit_at_boundary_advances_turn(self):
+        # The runtime turn-boundary wrapper closes the feedback loop: it advances
+        # turn_count so generate_tool_guidance() can eventually clear its guard.
+        service = CreditTrackingService()
+        service.record_tool_result("read_file", True, 50.0)
+        service.record_tool_result("edit_file", True, 100.0)
+
+        service.assign_turn_credit_at_boundary()
+
+        assert service.turn_count == 1
+        assert service.pending_signals == 0
+
+    def test_assign_turn_credit_at_boundary_respects_disabled_flag(self):
+        # auto_assign_at_turn_boundary=False => the wrapper must not assign, so the
+        # turn does not advance (a user opting into recording-only).
+        service = CreditTrackingService(auto_assign_at_turn_boundary=False)
+        service.record_tool_result("read_file", True, 50.0)
+
+        service.assign_turn_credit_at_boundary()
+
+        assert service.turn_count == 0
+        assert service.pending_signals == 1  # left intact, not consumed
+
+    def test_assign_turn_credit_at_boundary_swallows_errors(self):
+        # A credit-assignment failure must never break the turn.
+        service = CreditTrackingService()
+        service.record_tool_result("read_file", True, 50.0)
+        with patch.object(service, "assign_turn_credit", side_effect=RuntimeError("boom")):
+            service.assign_turn_credit_at_boundary()  # must not raise
+
     def test_assign_turn_credit_preserves_per_signal_agent_ids(self):
         service = CreditTrackingService()
 

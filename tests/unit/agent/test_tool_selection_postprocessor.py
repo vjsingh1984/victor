@@ -6,7 +6,7 @@ def _tool(name: str) -> ToolDefinition:
 
 
 def test_postprocessor_applies_edge_filter_then_caps_tools():
-    from victor.agent.tool_selection_postprocessor import (
+    from victor.agent.tool_selection.postprocessor import (
         ToolSelectionPostProcessContext,
         ToolSelectionPostProcessor,
     )
@@ -38,7 +38,7 @@ def test_postprocessor_applies_edge_filter_then_caps_tools():
 
 
 def test_postprocessor_applies_promotion_before_budget():
-    from victor.agent.tool_selection_postprocessor import (
+    from victor.agent.tool_selection.postprocessor import (
         ToolSelectionPostProcessContext,
         ToolSelectionPostProcessor,
     )
@@ -73,7 +73,7 @@ def test_postprocessor_applies_promotion_before_budget():
 
 def test_truncation_preserves_selected_web_tool():
     """A selected web tool ranked below the cap must survive the order-blind truncation."""
-    from victor.agent.tool_selection_postprocessor import (
+    from victor.agent.tool_selection.postprocessor import (
         ToolSelectionPostProcessContext,
         ToolSelectionPostProcessor,
     )
@@ -118,7 +118,7 @@ def test_truncation_preserves_selected_web_tool():
 
 def test_truncation_without_web_protection_unchanged():
     """Without web_tools, behavior is the plain order-blind cap (no regression)."""
-    from victor.agent.tool_selection_postprocessor import (
+    from victor.agent.tool_selection.postprocessor import (
         ToolSelectionPostProcessContext,
         ToolSelectionPostProcessor,
     )
@@ -147,7 +147,7 @@ def test_truncation_without_web_protection_unchanged():
 
 def test_edge_filter_reattaches_dropped_web_tool():
     """A web tool dropped by the relevance edge filter is re-attached and survives."""
-    from victor.agent.tool_selection_postprocessor import (
+    from victor.agent.tool_selection.postprocessor import (
         ToolSelectionPostProcessContext,
         ToolSelectionPostProcessor,
     )
@@ -177,7 +177,7 @@ def test_edge_filter_reattaches_dropped_web_tool():
 
 
 def test_postprocessor_skips_optional_transforms_when_disabled():
-    from victor.agent.tool_selection_postprocessor import (
+    from victor.agent.tool_selection.postprocessor import (
         ToolSelectionPostProcessContext,
         ToolSelectionPostProcessor,
     )
@@ -207,7 +207,7 @@ def test_postprocessor_skips_optional_transforms_when_disabled():
 
 
 def _ctx(**over):
-    from victor.agent.tool_selection_postprocessor import (
+    from victor.agent.tool_selection.postprocessor import (
         ToolSelectionPostProcessContext,
     )
 
@@ -224,7 +224,7 @@ def _ctx(**over):
 
 
 def test_cap_stub_demotes_tail_not_drops():
-    from victor.agent.tool_selection_postprocessor import ToolSelectionPostProcessor
+    from victor.agent.tool_selection.postprocessor import ToolSelectionPostProcessor
 
     tools = [_tool(f"t{i}") for i in range(10)]
     result = ToolSelectionPostProcessor().apply(
@@ -241,7 +241,7 @@ def test_cap_stub_demotes_tail_not_drops():
 
 
 def test_cap_none_keeps_all_full():
-    from victor.agent.tool_selection_postprocessor import ToolSelectionPostProcessor
+    from victor.agent.tool_selection.postprocessor import ToolSelectionPostProcessor
 
     tools = [_tool(f"t{i}") for i in range(10)]
     result = ToolSelectionPostProcessor().apply(
@@ -255,7 +255,7 @@ def test_cap_none_keeps_all_full():
 
 
 def test_cap_hard_drops_tail():
-    from victor.agent.tool_selection_postprocessor import ToolSelectionPostProcessor
+    from victor.agent.tool_selection.postprocessor import ToolSelectionPostProcessor
 
     tools = [_tool(f"t{i}") for i in range(10)]
     result = ToolSelectionPostProcessor().apply(
@@ -268,7 +268,7 @@ def test_cap_hard_drops_tail():
 
 
 def test_cap_stub_keeps_web_tool_full():
-    from victor.agent.tool_selection_postprocessor import ToolSelectionPostProcessor
+    from victor.agent.tool_selection.postprocessor import ToolSelectionPostProcessor
 
     # web_search ranked just past the cap: in stub mode it must be kept at full schema
     # (web-preserving), and nothing is dropped.

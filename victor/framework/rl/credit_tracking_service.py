@@ -123,6 +123,7 @@ class CreditTrackingService:
         observability_bus: Optional[Any] = None,
         emit_events: bool = True,
         persist: bool = False,
+        auto_assign_at_turn_boundary: bool = True,
     ):
         """Initialize the credit tracking service.
 
@@ -132,12 +133,15 @@ class CreditTrackingService:
             observability_bus: ObservabilityBus for event emission
             emit_events: Whether to emit credit.* events
             persist: Whether to persist credit data to SQLite
+            auto_assign_at_turn_boundary: Whether the runtime should call
+                :meth:`assign_turn_credit_at_boundary` automatically each turn
         """
         self._methodology = methodology
         self._config = config or CreditAssignmentConfig(methodology=methodology)
         self._observability_bus = observability_bus
         self._emit_events = emit_events
         self._persist = persist
+        self._auto_assign_at_turn_boundary = auto_assign_at_turn_boundary
 
         # Per-turn accumulator
         self._current_turn_signals: List[ToolRewardSignal] = []
@@ -192,6 +196,7 @@ class CreditTrackingService:
             observability_bus=observability_bus,
             emit_events=ca_settings.emit_observability_events,
             persist=ca_settings.persist_to_db,
+            auto_assign_at_turn_boundary=ca_settings.auto_assign_at_turn_boundary,
         )
 
     # ----------------------------------------------------------------
@@ -341,6 +346,22 @@ class CreditTrackingService:
         )
 
         return credit_signals
+
+    def assign_turn_credit_at_boundary(self) -> None:
+        """Run per-turn credit assignment from the runtime turn boundary.
+
+        Thin, exception-safe wrapper the orchestrator calls once per completed turn
+        (streaming, non-streaming, and planning alike). Respects the
+        ``auto_assign_at_turn_boundary`` setting and never propagates failures — a
+        credit-assignment error must not break the turn. :meth:`assign_turn_credit`
+        itself no-ops when no tools ran this turn.
+        """
+        if not self._auto_assign_at_turn_boundary:
+            return
+        try:
+            self.assign_turn_credit()
+        except Exception:  # pragma: no cover - feedback loop must never break a turn
+            logger.debug("assign_turn_credit at turn boundary failed", exc_info=True)
 
     # ----------------------------------------------------------------
     # GEPA enrichment interface

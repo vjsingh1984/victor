@@ -900,7 +900,6 @@ class Settings(BaseSettings):
             # Feature Flags Configuration
             "use_composition_over_inheritance": "feature_flags.use_composition_over_inheritance",
             "use_strategy_based_tool_registration": "feature_flags.use_strategy_based_tool_registration",
-            "use_provider_pooling": "feature_flags.use_provider_pooling",
             # Workflow Configuration
             "workflow_definition_cache_enabled": "workflow.workflow_definition_cache_enabled",
             "workflow_definition_cache_ttl": "workflow.workflow_definition_cache_ttl",
@@ -1888,9 +1887,9 @@ class Settings(BaseSettings):
                 settings_fields = type(self).model_fields
                 for field_name in model_cls.model_fields:
                     # Only copy flat Settings fields — skip other nested group names to
-                    # prevent type-mismatch when two models share a field name (e.g.
-                    # Settings.feature_flags: FeatureFlagSettings vs
-                    # CompactionSettings.feature_flags: CompactionFeatureFlags).
+                    # prevent type-mismatch when a nested model and a nested group share a
+                    # field name (e.g. a nested model's ``feature_flags`` field vs the
+                    # ``feature_flags`` group whose type is FeatureFlagSettings).
                     if field_name in settings_fields and field_name not in nested_group_names:
                         data[field_name] = getattr(self, field_name)
                 object.__setattr__(self, group_name, model_cls(**data))

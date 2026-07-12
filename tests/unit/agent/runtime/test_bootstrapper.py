@@ -226,7 +226,7 @@ class TestAgentRuntimeBootstrapper:
             mock_protocol.assert_called_once_with(orch)
             mock_session.assert_called_once_with(orch)
 
-    def test_prepare_components_creates_checkpoint_and_workflow(self):
+    def test_prepare_components_creates_checkpoint_and_wires_dependencies(self):
         orch = self._make_mock_orchestrator()
         # MagicMock doesn't auto-create dunder-named methods
         orch.__init_capability_registry__ = MagicMock()
@@ -235,16 +235,17 @@ class TestAgentRuntimeBootstrapper:
 
         # Verify factory methods were called
         orch._factory.create_checkpoint_manager.assert_called_once()
-        orch._factory.create_workflow_optimization_components.assert_called_once()
         orch._factory.wire_component_dependencies.assert_called_once()
 
-        # Verify runtime boundaries were initialized
-        orch._initialize_interaction_runtime.assert_called_once()
-        orch._initialize_services.assert_called_once()
+        # Runtime boundaries are driven by the init manager (FEP-0016): the
+        # bootstrapper calls run_phase(orch, name) at each site rather than the raw
+        # _initialize_* methods.
+        orch._init_manager.run_phase.assert_any_call(orch, "interaction_runtime")
+        orch._init_manager.run_phase.assert_any_call(orch, "services")
         # Credit-assignment runtime must run in production (regression guard: it
         # was previously only registered on the unwired InitializationPhaseManager,
         # so the opt-in feature silently never initialized).
-        orch._initialize_credit_runtime.assert_called_once()
+        orch._init_manager.run_phase.assert_any_call(orch, "credit_runtime")
         orch.__init_capability_registry__.assert_called_once()
 
         # Verify lazy placeholders are None

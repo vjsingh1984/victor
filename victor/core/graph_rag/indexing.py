@@ -442,6 +442,17 @@ class GraphIndexingPipeline:
         self._pending_relationship_records.clear()
         self._pending_import_records.clear()
 
+        # Resolve the analysis provider — and let it finish language-plugin
+        # discovery — BEFORE the parallel parse burst. Resolution is lazy and
+        # discovery imports ~30 grammar wheels; when the first resolution
+        # happens inside a worker thread, every file parsed while discovery
+        # is still importing sees supports_language() == False and silently
+        # degrades to the legacy extraction path (no raw imports, poorer
+        # symbols). Observed: 51/92 vscode-victor files lost their IMPORTS
+        # edges to this race.
+        _status("Resolving analysis provider…")
+        self._get_analysis_provider()
+
         # Force mode: clear all existing data before rebuilding
         if not self.config.incremental:
             logger.info("Force rebuild: clearing all existing graph data")
@@ -794,11 +805,13 @@ class GraphIndexingPipeline:
         """Resolve buffered import records into IMPORTS edges between modules.
 
         Pipeline:
-          1. Parse each raw import string into one or more dotted module names
-             (per-language; only Python is implemented today, others log and
-             skip).
-          2. Resolve each module name to a project file (``foo.bar.baz`` →
-             ``foo/bar/baz.py`` or ``foo/bar/baz/__init__.py``). Names that
+          1. Parse each raw import string into one or more module names via
+             the language's :class:`LanguageImportResolver` strategy
+             (``import_resolvers.py``; languages without a registered
+             strategy log and skip).
+          2. Resolve each module name to a project file through the same
+             strategy (e.g. Python ``foo.bar.baz`` → ``foo/bar/baz.py``,
+             Rust ``<src-dir>::foo::bar`` → ``foo/bar.rs``). Names that
              don't resolve to a project file are stdlib/third-party and get
              skipped — we only graph intra-project edges.
           3. Compute synthetic module node ids on both sides and emit
@@ -810,6 +823,16 @@ class GraphIndexingPipeline:
         """
         if not self._pending_import_records:
             return 0
+
+        from victor.core.graph_rag.import_resolvers import (
+            ImportResolverRegistry,
+            LanguageImportResolver,
+        )
+
+        # One strategy instance per language per run — strategies may cache
+        # project-layout state (e.g. the Rust workspace crate map) for the
+        # duration of the run.
+        resolvers: Dict[str, Optional[LanguageImportResolver]] = {}
 
         # Cache resolutions across the batch so the filesystem isn't hit
         # repeatedly for popular imports (``victor.core.database`` shows up
@@ -852,16 +875,19 @@ class GraphIndexingPipeline:
                 # Source vanished between extraction and resolution — skip
                 # to keep the IMPORTS endpoints anchored at real nodes.
                 continue
-            module_names = self._parse_imports_for_language(raw, src_file, language, root_path)
-            if module_names is None:
+            if language not in resolvers:
+                resolvers[language] = ImportResolverRegistry.create(language)
+            resolver = resolvers[language]
+            if resolver is None:
                 unsupported += 1
                 continue
+            module_names = resolver.parse(raw, src_file, root_path)
             for mod in module_names:
                 key = (mod, language)
                 if key in resolution_cache:
                     target_path = resolution_cache[key]
                 else:
-                    target_path = self._resolve_module_to_path(mod, language, root_path)
+                    target_path = resolver.resolve(mod, root_path)
                     resolution_cache[key] = target_path
                 if target_path is None:
                     unresolved += 1
@@ -902,118 +928,6 @@ class GraphIndexingPipeline:
             unindexed_target,
         )
         return n
-
-    def _parse_imports_for_language(
-        self,
-        raw: str,
-        src_file: str,
-        language: str,
-        root_path: Path,
-    ) -> Optional[List[str]]:
-        """Parse one import statement into dotted module names.
-
-        Returns ``None`` for unsupported languages (caller treats as
-        "skip and count"), or a possibly-empty list of module names. Today
-        only Python is supported — TS/JS/Rust grammars use very different
-        import syntaxes (path strings, ``use`` paths, package names) and
-        each needs its own resolver to be useful.
-        """
-        if language != "python":
-            return None
-        return self._parse_python_imports(raw, src_file, root_path)
-
-    @staticmethod
-    def _parse_python_imports(raw: str, src_file: str, root_path: Path) -> List[str]:
-        """Extract candidate dotted module names from a Python import.
-
-        Handles: ``import a``, ``import a as x``, ``import a, b``,
-        ``import a.b.c``, ``from a.b import x``, ``from a.b import x, y``,
-        ``from .rel import x`` (resolved against ``src_file``'s package),
-        and dotted relative imports (``from ..pkg import x``).
-
-        ``from X import Y`` is genuinely ambiguous: ``Y`` could be a symbol
-        defined in ``X/__init__.py`` *or* a sibling module ``X/Y.py``. We
-        emit both candidates (``X`` and ``X.Y``) and let
-        ``_resolve_module_to_path`` decide which one actually exists. The
-        downstream resolver dedupes edges by (src, dst) pair so emitting
-        both is cheap and prevents losing legitimate submodule imports.
-        """
-        text = raw.strip()
-        if text.startswith("import "):
-            tail = text[len("import ") :].strip()
-            modules: List[str] = []
-            for piece in tail.split(","):
-                name = piece.strip().split(" as ")[0].strip()
-                if name:
-                    modules.append(name)
-            return modules
-        if text.startswith("from "):
-            tail = text[len("from ") :].strip()
-            if " import " not in tail:
-                return []
-            module_part, names_part = tail.split(" import ", 1)
-            module_part = module_part.strip()
-            # Compute the base module path (absolute or resolved-relative).
-            base: Optional[str]
-            if module_part.startswith("."):
-                dots = 0
-                while dots < len(module_part) and module_part[dots] == ".":
-                    dots += 1
-                rest = module_part[dots:]
-                try:
-                    rel = Path(src_file).resolve().relative_to(root_path.resolve())
-                except ValueError:
-                    return []
-                pkg_parts = list(rel.parts[:-1])
-                for _ in range(dots - 1):
-                    if not pkg_parts:
-                        return []
-                    pkg_parts.pop()
-                if rest:
-                    base = ".".join([*pkg_parts, rest])
-                else:
-                    base = ".".join(pkg_parts) if pkg_parts else None
-            else:
-                base = module_part
-
-            candidates: List[str] = []
-            if base:
-                candidates.append(base)
-            # Also emit base.<name> for each imported name so submodule
-            # imports (``from pkg import submodule``) get an edge to the
-            # submodule itself, not just the parent package. Strip aliases
-            # and wildcard form.
-            for piece in names_part.split(","):
-                name = piece.strip().split(" as ")[0].strip().rstrip(")").lstrip("(")
-                if not name or name == "*":
-                    continue
-                if base:
-                    candidates.append(f"{base}.{name}")
-                else:
-                    candidates.append(name)
-            return candidates
-        return []
-
-    @staticmethod
-    def _resolve_module_to_path(module: str, language: str, root_path: Path) -> Optional[Path]:
-        """Resolve a dotted module name to a project file path.
-
-        Python: prefers ``foo/bar/baz.py``, falls back to
-        ``foo/bar/baz/__init__.py``. Returns None for stdlib/third-party
-        modules (anything not under ``root_path``).
-        """
-        if language != "python":
-            return None
-        if not module:
-            return None
-        parts = module.split(".")
-        file_candidate = root_path.joinpath(*parts).with_suffix(".py")
-        if file_candidate.is_file():
-            return file_candidate
-        init_candidate = root_path.joinpath(*parts) / "__init__.py"
-        if init_candidate.is_file():
-            return init_candidate
-        return None
 
     def _refresh_module_metrics(self, root_path: Path) -> int:
         """Refresh module-level graph metrics after graph writes."""

@@ -6,7 +6,7 @@ def _tool(name: str) -> ToolDefinition:
 
 
 def test_assembler_blends_keywords_with_bounded_growth():
-    from victor.agent.tool_selection_assembler import (
+    from victor.agent.tool_selection.assembler import (
         SemanticToolSelectionAssembler,
         SemanticToolSelectionAssemblyContext,
     )
@@ -39,7 +39,7 @@ def test_assembler_blends_keywords_with_bounded_growth():
 
 
 def test_assembler_injects_explicit_web_tools_without_duplicates():
-    from victor.agent.tool_selection_assembler import (
+    from victor.agent.tool_selection.assembler import (
         SemanticToolSelectionAssembler,
         SemanticToolSelectionAssemblyContext,
     )
@@ -65,7 +65,7 @@ def test_assembler_injects_explicit_web_tools_without_duplicates():
 
 
 def test_assembler_dedupes_stably_by_tool_name():
-    from victor.agent.tool_selection_assembler import (
+    from victor.agent.tool_selection.assembler import (
         SemanticToolSelectionAssembler,
         SemanticToolSelectionAssemblyContext,
     )

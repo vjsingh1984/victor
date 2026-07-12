@@ -27,10 +27,6 @@ class GraphSettings(BaseModel):
         query_cache_max_entries: Maximum number of query results to cache (PH4-005)
         query_cache_ttl: TTL for query cache entries in seconds (PH4-005)
         query_cache_normalize: Whether to normalize queries for better cache hits (PH4-005)
-        enable_profiling: Whether to enable performance profiling for graph operations (PH4-008)
-        profiling_track_memory: Whether to track memory usage during profiling (PH4-008)
-        profiling_report_threshold_ms: Minimum time to include in reports (PH4-008)
-        profiling_max_operations: Maximum number of operations to track (PH4-008)
     """
 
     enable_ccg: bool = True
@@ -63,11 +59,6 @@ class GraphSettings(BaseModel):
     parallel_max_workers: int = 4
     parallel_min_batch_size: int = 3
     parallel_neighbor_threshold: int = 5
-    # PH4-008: Profiling and optimization settings
-    enable_profiling: bool = False  # Disabled by default for production
-    profiling_track_memory: bool = False
-    profiling_report_threshold_ms: float = 10.0
-    profiling_max_operations: int = 100
 
 
 class SearchSettings(BaseModel):

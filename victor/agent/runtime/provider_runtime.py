@@ -107,21 +107,6 @@ def create_provider_runtime_components(
             "create_provider_runtime_components()"
         )
 
-    # Feature-flagged provider pooling
-    resolved_pool = pool
-    if resolved_pool is None:
-        use_pooling = getattr(
-            getattr(settings, "feature_flags", None), "use_provider_pooling", False
-        )
-        if use_pooling:
-            try:
-                from victor.providers.factory import ProviderPool
-
-                resolved_pool = ProviderPool()
-                logger.info("ProviderPool enabled via feature flag")
-            except ImportError:
-                logger.debug("ProviderPool not available")
-
     return ProviderRuntimeComponents(
-        pool=resolved_pool,
+        pool=pool,
     )

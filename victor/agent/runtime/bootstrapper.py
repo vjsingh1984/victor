@@ -151,13 +151,6 @@ class AgentRuntimeBootstrapper:
         # Checkpoint manager for time-travel debugging
         orchestrator._checkpoint_manager = orchestrator._factory.create_checkpoint_manager()
 
-        # Workflow optimization components
-        orchestrator._workflow_optimization = (
-            orchestrator._factory.create_workflow_optimization_components(
-                timeout_seconds=getattr(settings, "execution_timeout", None)
-            )
-        )
-
         # Wire component dependencies
         orchestrator._factory.wire_component_dependencies(
             recovery_handler=None,
@@ -181,18 +174,12 @@ class AgentRuntimeBootstrapper:
         # TurnExecutor and the streaming executor. None disables (default).
         orchestrator._message_policy_gate = None
 
-        # Interaction runtime boundary
-        orchestrator._initialize_interaction_runtime()
-
-        # Service layer delegation (Strangler Fig pattern)
-        orchestrator._initialize_services()
-
-        # Credit-assignment runtime (opt-in via settings.credit_assignment.enabled;
-        # no-op when disabled). Depends on the service layer + tool pipeline being
-        # ready, so it runs after _initialize_services(). Previously this phase was
-        # only registered on the (currently-unwired) InitializationPhaseManager, so
-        # it never ran in production — enabling the setting silently did nothing.
-        orchestrator._initialize_credit_runtime()
+        # Interaction / service-layer / credit runtime boundaries (FEP-0016: driven by
+        # the init manager at their existing sites). Credit is opt-in
+        # (settings.credit_assignment.enabled) and a no-op when disabled.
+        orchestrator._init_manager.run_phase(orchestrator, "interaction_runtime")
+        orchestrator._init_manager.run_phase(orchestrator, "services")
+        orchestrator._init_manager.run_phase(orchestrator, "credit_runtime")
 
         # Capability registry
         orchestrator.__init_capability_registry__()

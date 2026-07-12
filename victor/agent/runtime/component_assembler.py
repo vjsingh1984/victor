@@ -385,11 +385,11 @@ class ComponentAssembler:
             orchestrator._context_compactor
         )
 
-        # Resilience and coordination runtime boundaries
-        orchestrator._initialize_resilience_runtime(
-            context_compactor=orchestrator._context_compactor
-        )
-        orchestrator._initialize_coordination_runtime()
+        # Resilience and coordination runtime boundaries (FEP-0016: driven by the
+        # init manager at this site; the resilience phase reads _context_compactor,
+        # which exists here).
+        orchestrator._init_manager.run_phase(orchestrator, "resilience_runtime")
+        orchestrator._init_manager.run_phase(orchestrator, "coordination_runtime")
 
         # Observability
         orchestrator._observability = factory.create_observability()

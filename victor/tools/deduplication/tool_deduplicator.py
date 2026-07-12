@@ -63,10 +63,6 @@ class DeduplicationConfig(BaseModel):
         default_factory=list,
         description="Tools to always skip (force deduplication)",
     )
-    strict_mode: bool = Field(
-        default=False,
-        description="If True, fail on conflicts instead of logging and skipping",
-    )
     naming_enforcement: bool = Field(
         default=True,
         description="Enforce naming conventions (lgc_*, mcp_*, plg_*)",

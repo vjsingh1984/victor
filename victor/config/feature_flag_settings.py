@@ -33,7 +33,6 @@ class FeatureFlagSettings(BaseModel):
     # Architecture flags still guarding live behavior
     use_composition_over_inheritance: bool = False
     use_strategy_based_tool_registration: bool = False
-    use_provider_pooling: bool = False
 
     # Priority 1: Hybrid Decision Service (Phase 7)
     enable_hybrid_decisions: bool = Field(

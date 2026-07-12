@@ -40,6 +40,7 @@ if TYPE_CHECKING:
     from victor.agent.tool_pipeline import ToolPipeline
     from victor.storage.cache.tool_cache import ToolCache
 
+from victor.core.utils.log_helpers import truncate_for_log
 from victor.tools.core_tool_aliases import canonicalize_core_tool_name
 from victor.tools.tool_names import ToolNames, get_canonical_name
 
@@ -211,7 +212,8 @@ class ToolRetryExecutor:
                     ]
                     if any(err in error_msg for err in non_retryable_errors):
                         logger.debug(
-                            f"Tool '{tool_name}' failed with non-retryable error: {error_msg}"
+                            f"Tool '{tool_name}' failed with non-retryable error: "
+                            f"{truncate_for_log(error_msg)}"
                         )
                         return result, False, error_msg
 
@@ -221,12 +223,13 @@ class ToolRetryExecutor:
                         delay = min(base_delay * (2**attempt), max_delay)
                         logger.warning(
                             f"Tool '{tool_name}' failed (attempt {attempt + 1}/{max_attempts}): "
-                            f"{error_msg}. Retrying in {delay:.1f}s..."
+                            f"{truncate_for_log(error_msg)}. Retrying in {delay:.1f}s..."
                         )
                         await asyncio.sleep(delay)
                     else:
                         logger.error(
-                            f"Tool '{tool_name}' failed after {max_attempts} attempts: {error_msg}"
+                            f"Tool '{tool_name}' failed after {max_attempts} attempts: "
+                            f"{truncate_for_log(error_msg)}"
                         )
                         return result, False, error_msg
 
@@ -235,7 +238,7 @@ class ToolRetryExecutor:
                 from victor.core.errors import ToolNotFoundError, ToolValidationError
 
                 if isinstance(e, (ToolNotFoundError, ToolValidationError, PermissionError)):
-                    logger.error(f"Tool '{tool_name}' permanent failure: {e}")
+                    logger.error(f"Tool '{tool_name}' permanent failure: {truncate_for_log(e)}")
                     return None, False, str(e)
 
                 # Retryable transient errors
@@ -244,12 +247,15 @@ class ToolRetryExecutor:
                     delay = min(base_delay * (2**attempt), max_delay)
                     logger.warning(
                         f"Tool '{tool_name}' transient error "
-                        f"(attempt {attempt + 1}/{max_attempts}): {e}. "
+                        f"(attempt {attempt + 1}/{max_attempts}): {truncate_for_log(e)}. "
                         f"Retrying in {delay:.1f}s..."
                     )
                     await asyncio.sleep(delay)
                 else:
-                    logger.error(f"Tool '{tool_name}' failed after {max_attempts} attempts: {e}")
+                    logger.error(
+                        f"Tool '{tool_name}' failed after {max_attempts} attempts: "
+                        f"{truncate_for_log(e)}"
+                    )
                     return None, False, last_error
 
         # Should not reach here, but handle it anyway

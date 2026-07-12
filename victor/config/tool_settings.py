@@ -307,10 +307,6 @@ class ToolSettings(BaseModel):
         default_factory=list,
         description="Tools to always skip (force deduplication) (default: [])",
     )
-    deduplication_strict_mode: bool = Field(
-        default=False,
-        description="If True, fail on conflicts instead of logging and skipping (default: False)",
-    )
     deduplication_naming_enforcement: bool = Field(
         default=True,
         description="Enforce naming conventions (lgc_*, mcp_*, plg_*) (default: True)",
@@ -323,10 +319,6 @@ class ToolSettings(BaseModel):
     )
 
     # Provider-specific tool broadcasting optimization
-    enable_provider_optimization: bool = Field(
-        default=True,
-        description="Enable provider-specific tool broadcasting optimization (default: True)",
-    )
     cloud_core_tool_set: str = Field(
         default="default",
         description="Cloud provider core tool set: default, expanded, or minimal (default: default)",

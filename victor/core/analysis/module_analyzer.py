@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 import subprocess
+from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
@@ -43,9 +44,19 @@ class ModuleAnalyzer:
     #: for trend/hotspot analysis.
     _HISTORY_RETENTION_PER_MODULE = 50
 
+    #: Pure-Python Brandes betweenness is O(V·E) with per-source bookkeeping;
+    #: past this module count it runs for hours (observed: a 59k-module
+    #: vendored tree burned 99 CPU-minutes before being killed). The native
+    #: backend handles large graphs; without it betweenness is skipped so the
+    #: rest of the metric refresh still completes.
+    _BETWEENNESS_PYTHON_MAX_MODULES = 5000
+
     def __init__(self, db=None, project_path: Optional[Path] = None):
         self._db = db
         self._project_path = project_path or Path.cwd()
+        # Parsed coverage data (path -> fraction), built lazily once per
+        # analyzer instead of re-reading coverage.json for every module.
+        self._coverage_index: Optional[dict[str, float]] = None
 
     def _get_db(self):
         """Get or create database connection."""
@@ -67,9 +78,7 @@ class ModuleAnalyzer:
 
         results = []
         # Normalize change frequencies for hotspot calc
-        change_freqs = {}
-        for mod in modules:
-            change_freqs[mod] = self._get_change_frequency(mod)
+        change_freqs = self._get_change_frequencies(modules)
         max_change = max(change_freqs.values()) if change_freqs else 1
         if max_change == 0:
             max_change = 1
@@ -199,20 +208,45 @@ class ModuleAnalyzer:
     def _load_module_graph(
         self,
     ) -> tuple[set[str], dict[str, set[str]], dict[str, set[str]]]:
-        """Load module-level adjacency from graph_edge/graph_node tables."""
+        """Load module-level dependency adjacency from graph_edge/graph_node.
+
+        Martin coupling (Ca/Ce), PageRank, and betweenness are module-level
+        *dependency* metrics, so the adjacency uses IMPORTS edges only.
+        CALLS (and CFG/CDG/DDG) edges are deliberately excluded: cross-file
+        CALLS are resolved by leaf name with heuristic fanout and were
+        observed inflating Ca 10-18x over real use-statement fan-in.
+        Projects with no IMPORTS edges at all (language without an import
+        resolver yet) fall back to the legacy all-edges adjacency so their
+        metrics don't vanish.
+
+        The module universe is every indexed file (graph_node.file), not
+        just edge endpoints — modules with no import relationships get
+        honest zero-coupling rows, which also overwrites stale inflated
+        values persisted by earlier runs.
+        """
         db = self._get_db()
         conn = db.connection if hasattr(db, "connection") else db._get_raw_connection()
-        try:
-            rows = conn.execute("""SELECT DISTINCT n1.file, n2.file
+        edge_query = """SELECT DISTINCT n1.file, n2.file
                    FROM graph_edge e
                    JOIN graph_node n1 ON e.src = n1.node_id
                    JOIN graph_node n2 ON e.dst = n2.node_id
                    WHERE n1.file IS NOT NULL AND n2.file IS NOT NULL
-                     AND n1.file != n2.file""").fetchall()
+                     AND n1.file != n2.file"""
+        try:
+            module_rows = conn.execute(
+                "SELECT DISTINCT file FROM graph_node WHERE file IS NOT NULL"
+            ).fetchall()
+            rows = conn.execute(edge_query + " AND e.type = 'IMPORTS'").fetchall()
+            if not rows:
+                logger.debug(
+                    "No IMPORTS edges in graph — falling back to all-edge "
+                    "adjacency for module metrics"
+                )
+                rows = conn.execute(edge_query).fetchall()
         except Exception:
             return set(), {}, {}
 
-        modules: set[str] = set()
+        modules: set[str] = {row[0] for row in module_rows}
         adj_out: dict[str, set[str]] = {}
         adj_in: dict[str, set[str]] = {}
         for src_file, dst_file in rows:
@@ -264,6 +298,15 @@ class ModuleAnalyzer:
         )
         return abstract_count / len(type_nodes)
 
+    @staticmethod
+    def _to_list_adjacency(modules: set[str], adj: dict[str, set[str]]) -> dict[str, list[str]]:
+        """Set adjacency → list adjacency covering every module (loader interface)."""
+        adj_dict = {k: list(v) for k, v in adj.items()}
+        for m in modules:
+            if m not in adj_dict:
+                adj_dict[m] = []
+        return adj_dict
+
     def _compute_pagerank(
         self,
         modules: set[str],
@@ -271,103 +314,44 @@ class ModuleAnalyzer:
         damping: float = 0.85,
         iterations: int = 100,
     ) -> dict[str, float]:
-        """Compute PageRank, delegating to Rust when available."""
+        """Compute PageRank via the graph-algo loader (Rust or pure Python).
+
+        The loader import always succeeds — it falls back to
+        victor.native.python.graph_algo internally — so no inline
+        re-implementation is kept here. The Python PageRank is edge-based
+        power iteration with a convergence early-exit, fine at any module
+        count this analyzer sees.
+        """
         if not modules:
             return {}
-        # Try Rust backend for large graphs
-        try:
-            from victor.native.graph_algo_loader import pagerank as native_pagerank
+        from victor.native.graph_algo_loader import pagerank
 
-            # Convert set adjacency to list adjacency for the native interface
-            adj_dict = {k: list(v) for k, v in adj.items()}
-            # Add modules with no outgoing edges
-            for m in modules:
-                if m not in adj_dict:
-                    adj_dict[m] = []
-            return native_pagerank(adj_dict, damping, iterations)
-        except ImportError:
-            pass
-
-        # Pure Python fallback (power iteration)
-        n = len(modules)
-        if n == 0:
-            return {}
-        mod_list = sorted(modules)
-        scores = dict.fromkeys(mod_list, 1.0 / n)
-
-        for _ in range(iterations):
-            new_scores: dict[str, float] = {}
-            for m in mod_list:
-                rank = (1.0 - damping) / n
-                for src in mod_list:
-                    if m in adj.get(src, set()):
-                        out_deg = len(adj.get(src, set()))
-                        if out_deg > 0:
-                            rank += damping * scores[src] / out_deg
-                new_scores[m] = rank
-            scores = new_scores
-
-        return scores
+        return pagerank(self._to_list_adjacency(modules, adj), damping, iterations)
 
     def _compute_betweenness(self, modules: set[str], adj: dict[str, set[str]]) -> dict[str, float]:
-        """Compute betweenness centrality (Brandes algorithm)."""
+        """Compute betweenness centrality via the graph-algo loader.
+
+        Brandes is O(V·E) regardless of backend; the pure-Python
+        implementation additionally allocates per-source bookkeeping, so
+        above _BETWEENNESS_PYTHON_MAX_MODULES it is skipped (zeroes) rather
+        than stalling the whole metric refresh.
+        """
         if not modules:
             return {}
-        try:
-            from victor.native.graph_algo_loader import betweenness_centrality
+        from victor.native.graph_algo_loader import (
+            GRAPH_ALGO_BACKEND,
+            betweenness_centrality,
+        )
 
-            adj_dict = {k: list(v) for k, v in adj.items()}
-            for m in modules:
-                if m not in adj_dict:
-                    adj_dict[m] = []
-            return betweenness_centrality(adj_dict)
-        except ImportError:
-            pass
-
-        # Pure Python Brandes
-        from collections import deque
-
-        mod_list = sorted(modules)
-        cb: dict[str, float] = dict.fromkeys(mod_list, 0.0)
-
-        for s in mod_list:
-            stack: list[str] = []
-            pred: dict[str, list[str]] = {m: [] for m in mod_list}
-            sigma: dict[str, int] = dict.fromkeys(mod_list, 0)
-            sigma[s] = 1
-            dist: dict[str, int] = dict.fromkeys(mod_list, -1)
-            dist[s] = 0
-            queue: deque[str] = deque([s])
-
-            while queue:
-                v = queue.popleft()
-                stack.append(v)
-                for w in adj.get(v, set()):
-                    if w not in dist:
-                        continue
-                    if dist[w] < 0:
-                        queue.append(w)
-                        dist[w] = dist[v] + 1
-                    if dist[w] == dist[v] + 1:
-                        sigma[w] += sigma[v]
-                        pred[w].append(v)
-
-            delta: dict[str, float] = dict.fromkeys(mod_list, 0.0)
-            while stack:
-                w = stack.pop()
-                for v in pred[w]:
-                    if sigma[w] > 0:
-                        delta[v] += (sigma[v] / sigma[w]) * (1.0 + delta[w])
-                if w != s:
-                    cb[w] += delta[w]
-
-        # Normalize
-        n = len(mod_list)
-        if n > 2:
-            norm = 1.0 / ((n - 1) * (n - 2))
-            cb = {m: v * norm for m, v in cb.items()}
-
-        return cb
+        if GRAPH_ALGO_BACKEND != "rust" and len(modules) > self._BETWEENNESS_PYTHON_MAX_MODULES:
+            logger.info(
+                "Skipping betweenness centrality for %d modules (pure-Python cap %d; "
+                "build the victor_native extension to compute it on large graphs)",
+                len(modules),
+                self._BETWEENNESS_PYTHON_MAX_MODULES,
+            )
+            return dict.fromkeys(modules, 0.0)
+        return betweenness_centrality(self._to_list_adjacency(modules, adj))
 
     def _compute_cohesion(self, module: str, module_to_nodes: dict) -> float:
         """Compute LCOM4 cohesion (0=low cohesion, 1=high cohesion)."""
@@ -379,21 +363,29 @@ class ModuleAnalyzer:
         # For now, use 1/symbol_count as a simple heuristic
         return min(1.0, 1.0 / max(1, len(nodes) - 1))
 
-    def _get_change_frequency(self, module: str) -> int:
-        """Get git change frequency for a module (last 90 days)."""
+    def _get_change_frequencies(self, modules: set[str]) -> dict[str, int]:
+        """Git change frequency per module (last 90 days), in ONE git pass.
+
+        The previous implementation spawned one ``git log -- <path>``
+        subprocess per module — ~20-50ms each, so a 4k-module repo paid
+        minutes and a 59k-module tree effectively never finished. A single
+        ``--name-only`` log emits every touched path once per commit;
+        counting those gives the same per-file commit counts.
+        """
+        counts: Counter[str] = Counter()
         try:
             result = subprocess.run(
-                ["git", "log", "--oneline", "--since=90 days ago", "--", module],
+                ["git", "log", "--since=90 days ago", "--name-only", "--pretty=format:"],
                 capture_output=True,
                 text=True,
                 cwd=str(self._project_path),
-                timeout=5,
+                timeout=120,
             )
             if result.returncode == 0:
-                return len(result.stdout.strip().split("\n")) if result.stdout.strip() else 0
+                counts.update(line.strip() for line in result.stdout.splitlines() if line.strip())
         except Exception:
             pass
-        return 0
+        return {mod: counts.get(mod, 0) for mod in modules}
 
     def _compute_hotspot(self, m: ModuleMetrics, max_change: int) -> float:
         """Compute hotspot score: 0.4*pagerank + 0.3*coupling_ratio + 0.3*change_freq_norm."""
@@ -418,35 +410,42 @@ class ModuleAnalyzer:
         )
 
     def _get_test_coverage(self, module: str) -> float:
-        """Read test coverage for a module from .coverage or coverage.json."""
-        # Try coverage.json first
+        """Look up test coverage for a module from the parsed coverage index.
+
+        The index is built once per analyzer — previously coverage.json was
+        re-read and re-parsed for every module (O(modules × file size)).
+        """
+        if self._coverage_index is None:
+            self._coverage_index = self._load_coverage_index()
+        for path, covered in self._coverage_index.items():
+            if module in path:
+                return covered
+        return 0.0
+
+    def _load_coverage_index(self) -> dict[str, float]:
+        """Parse coverage.json (preferred) or htmlcov/status.json once."""
+        import json
+
         coverage_json = self._project_path / "coverage.json"
         if coverage_json.exists():
             try:
-                import json
-
                 data = json.loads(coverage_json.read_text())
-                files = data.get("files", {})
-                for path, info in files.items():
-                    if module in path:
-                        summary = info.get("summary", {})
-                        return summary.get("percent_covered", 0.0) / 100.0
+                return {
+                    path: info.get("summary", {}).get("percent_covered", 0.0) / 100.0
+                    for path, info in data.get("files", {}).items()
+                }
             except Exception:
                 pass
 
-        # Try htmlcov/status.json
         status_json = self._project_path / "htmlcov" / "status.json"
         if status_json.exists():
             try:
-                import json
-
                 data = json.loads(status_json.read_text())
-                files = data.get("files", {})
-                for path, info in files.items():
-                    if module in path:
-                        return info.get("index", {}).get("pc_covered", 0.0) / 100.0
+                return {
+                    path: info.get("index", {}).get("pc_covered", 0.0) / 100.0
+                    for path, info in data.get("files", {}).items()
+                }
             except Exception:
                 pass
 
-        # Default: no coverage data available, assume 0
-        return 0.0
+        return {}

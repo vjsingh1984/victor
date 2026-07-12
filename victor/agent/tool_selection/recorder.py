@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Callable
 
 if TYPE_CHECKING:
-    from victor.agent.tool_selection import ToolSelectionStats
+    from victor.agent.tool_selection.selector import ToolSelectionStats
 
 
 @dataclass

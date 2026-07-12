@@ -80,7 +80,11 @@ class FakeDB:
 
 
 def _seed_graph(conn, modules, edges):
-    """Seed graph_node and graph_edge tables."""
+    """Seed graph_node and graph_edge tables.
+
+    ``edges`` items are (src_module, dst_module) pairs, defaulting to CALLS
+    edges, or (src_module, dst_module, edge_type) triples.
+    """
     node_id = 0
     for mod, symbols in modules.items():
         for sym_name, sym_type in symbols:
@@ -89,7 +93,9 @@ def _seed_graph(conn, modules, edges):
                 (f"n{node_id}", sym_type, sym_name, mod),
             )
             node_id += 1
-    for src_mod, dst_mod in edges:
+    for edge in edges:
+        src_mod, dst_mod = edge[0], edge[1]
+        edge_type = edge[2] if len(edge) > 2 else "CALLS"
         # Find a node in each module
         src_node = conn.execute(
             "SELECT node_id FROM graph_node WHERE file = ? LIMIT 1", (src_mod,)
@@ -99,8 +105,8 @@ def _seed_graph(conn, modules, edges):
         ).fetchone()
         if src_node and dst_node:
             conn.execute(
-                "INSERT OR IGNORE INTO graph_edge (src, dst, type, weight) VALUES (?, ?, 'CALLS', 1.0)",
-                (src_node[0], dst_node[0]),
+                "INSERT OR IGNORE INTO graph_edge (src, dst, type, weight) VALUES (?, ?, ?, 1.0)",
+                (src_node[0], dst_node[0], edge_type),
             )
     conn.commit()
 
@@ -296,3 +302,147 @@ class TestModuleAnalyzer:
         analyzer = ModuleAnalyzer(db=FakeDB(in_memory_db))
         metrics = analyzer.compute_all()
         assert metrics == []
+
+
+class TestModuleGraphAdjacency:
+    """Martin/PageRank adjacency must come from IMPORTS edges, not CALLS.
+
+    Cross-file CALLS edges are name-resolved with heuristic fanout and were
+    observed inflating afferent coupling 10-18x over real use-statement
+    fan-in (proximaDB: catalog Ca=838 vs 47 actual importers).
+    """
+
+    def test_imports_edges_only_when_present(self, in_memory_db):
+        _seed_graph(
+            in_memory_db,
+            {
+                "a.rs": [("fa", "function")],
+                "b.rs": [("fb", "function")],
+                "c.rs": [("fc", "function")],
+            },
+            [
+                ("a.rs", "b.rs", "IMPORTS"),
+                # Noisy name-resolved CALLS must not contribute to coupling.
+                ("c.rs", "b.rs", "CALLS"),
+                ("a.rs", "c.rs", "CALLS"),
+            ],
+        )
+        analyzer = ModuleAnalyzer(db=FakeDB(in_memory_db))
+        modules, adj_out, adj_in = analyzer._load_module_graph()
+        assert adj_out == {"a.rs": {"b.rs"}}
+        assert adj_in == {"b.rs": {"a.rs"}}
+        # The universe still covers every indexed file so call-only modules
+        # get honest zero-coupling rows (overwriting stale inflated values).
+        assert modules == {"a.rs", "b.rs", "c.rs"}
+
+    def test_falls_back_to_all_edges_without_imports(self, in_memory_db):
+        """Languages without an import resolver keep their legacy metrics."""
+        _seed_graph(
+            in_memory_db,
+            {"a.ts": [("fa", "function")], "b.ts": [("fb", "function")]},
+            [("a.ts", "b.ts", "CALLS")],
+        )
+        analyzer = ModuleAnalyzer(db=FakeDB(in_memory_db))
+        modules, adj_out, adj_in = analyzer._load_module_graph()
+        assert adj_out == {"a.ts": {"b.ts"}}
+        assert adj_in == {"b.ts": {"a.ts"}}
+
+    def test_afferent_coupling_matches_importer_count(self, in_memory_db):
+        """End-to-end: Ca counts distinct importing modules only."""
+        _seed_graph(
+            in_memory_db,
+            {
+                "lib.rs": [("Catalog", "class")],
+                "user1.rs": [("f1", "function")],
+                "user2.rs": [("f2", "function")],
+                "caller1.rs": [("g1", "function")],
+                "caller2.rs": [("g2", "function")],
+                "caller3.rs": [("g3", "function")],
+            },
+            [
+                ("user1.rs", "lib.rs", "IMPORTS"),
+                ("user2.rs", "lib.rs", "IMPORTS"),
+                # Heuristic CALLS fan-in that used to inflate Ca.
+                ("caller1.rs", "lib.rs", "CALLS"),
+                ("caller2.rs", "lib.rs", "CALLS"),
+                ("caller3.rs", "lib.rs", "CALLS"),
+            ],
+        )
+        analyzer = ModuleAnalyzer(db=FakeDB(in_memory_db))
+        metrics = {m.module_path: m for m in analyzer.compute_all()}
+        assert metrics["lib.rs"].afferent_coupling == 2  # not 5
+        assert metrics["caller1.rs"].efferent_coupling == 0
+        assert metrics["user1.rs"].efferent_coupling == 1
+
+
+class TestScaling:
+    """Metric refresh must not do per-module subprocess/file work."""
+
+    def test_change_frequencies_use_one_git_pass(self, in_memory_db, tmp_path, monkeypatch):
+        import subprocess as sp
+
+        # Real tiny repo: a.py touched twice, b.py once, c.py never.
+        def git(*args):
+            sp.run(["git", *args], cwd=tmp_path, check=True, capture_output=True)
+
+        git("init", "-q")
+        git("config", "user.email", "t@t")
+        git("config", "user.name", "t")
+        (tmp_path / "a.py").write_text("1")
+        (tmp_path / "b.py").write_text("1")
+        git("add", ".")
+        git("commit", "-qm", "one")
+        (tmp_path / "a.py").write_text("2")
+        git("add", ".")
+        git("commit", "-qm", "two")
+
+        analyzer = ModuleAnalyzer(db=FakeDB(in_memory_db), project_path=tmp_path)
+        calls = []
+        orig_run = sp.run
+
+        def counting_run(*args, **kwargs):
+            calls.append(args[0])
+            return orig_run(*args, **kwargs)
+
+        monkeypatch.setattr("victor.core.analysis.module_analyzer.subprocess.run", counting_run)
+        freqs = analyzer._get_change_frequencies({"a.py", "b.py", "c.py"})
+        assert freqs == {"a.py": 2, "b.py": 1, "c.py": 0}
+        assert len(calls) == 1  # ONE git pass, not one per module
+
+    def test_coverage_json_parsed_once(self, in_memory_db, tmp_path):
+        import json
+
+        (tmp_path / "coverage.json").write_text(
+            json.dumps(
+                {
+                    "files": {
+                        "pkg/a.py": {"summary": {"percent_covered": 80.0}},
+                        "pkg/b.py": {"summary": {"percent_covered": 40.0}},
+                    }
+                }
+            )
+        )
+        analyzer = ModuleAnalyzer(db=FakeDB(in_memory_db), project_path=tmp_path)
+        assert analyzer._get_test_coverage("pkg/a.py") == 0.8
+        # Delete the file: cached index must keep answering (no re-read).
+        (tmp_path / "coverage.json").unlink()
+        assert analyzer._get_test_coverage("pkg/b.py") == 0.4
+        assert analyzer._get_test_coverage("pkg/missing.py") == 0.0
+
+    def test_betweenness_skipped_above_python_cap(self, in_memory_db, monkeypatch):
+        from victor.native import graph_algo_loader
+
+        analyzer = ModuleAnalyzer(db=FakeDB(in_memory_db))
+        monkeypatch.setattr(analyzer.__class__, "_BETWEENNESS_PYTHON_MAX_MODULES", 2)
+        monkeypatch.setattr(graph_algo_loader, "GRAPH_ALGO_BACKEND", "python")
+        modules = {"a.py", "b.py", "c.py"}
+        adj = {"a.py": {"b.py"}, "b.py": {"c.py"}}
+        result = analyzer._compute_betweenness(modules, adj)
+        assert result == {"a.py": 0.0, "b.py": 0.0, "c.py": 0.0}
+
+    def test_betweenness_computed_below_cap(self, in_memory_db):
+        analyzer = ModuleAnalyzer(db=FakeDB(in_memory_db))
+        modules = {"a.py", "b.py", "c.py"}
+        adj = {"a.py": {"b.py"}, "b.py": {"c.py"}}
+        result = analyzer._compute_betweenness(modules, adj)
+        assert result["b.py"] > 0.0  # chain midpoint carries the shortest path

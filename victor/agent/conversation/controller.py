@@ -42,7 +42,6 @@ if TYPE_CHECKING:
     from victor.agent.compaction_summarizer import CompactionSummaryStrategy
     from victor.agent.context_reminder import ContextReminderManager
     from victor.agent.compaction_hierarchy import HierarchicalCompactionManager
-    from victor.agent.compaction_router import CompactionRouter
 
 
 class CompactionStrategy(Enum):
@@ -176,7 +175,6 @@ class ConversationController:
         compaction_summarizer: Optional["CompactionSummaryStrategy"] = None,
         context_reminder_manager: Optional["ContextReminderManager"] = None,
         hierarchical_manager: Optional["HierarchicalCompactionManager"] = None,
-        compaction_router: Optional["CompactionRouter"] = None,
     ):
         self.config = config or ConversationConfig()
         self._history = message_history or MessageHistory()
@@ -188,7 +186,6 @@ class ConversationController:
         self._system_added = False
         self._context_callbacks: List[Callable[[ContextMetrics], None]] = []
         self._compaction_summarizer = compaction_summarizer
-        self._compaction_router = compaction_router  # NEW: Hybrid compaction router
         self._compaction_summaries: List[str] = []
         self._current_plan: Optional[Any] = None
         self._context_reminder_manager = context_reminder_manager
@@ -974,8 +971,7 @@ class ConversationController:
     ) -> str:
         """Generate a summary of removed messages for context preservation.
 
-        Delegates to CompactionRouter if available (hybrid system),
-        otherwise uses legacy compaction summarizer strategy,
+        Uses the legacy compaction summarizer strategy if available,
         otherwise falls back to keyword-based extraction.
 
         Args:
@@ -987,79 +983,6 @@ class ConversationController:
         """
         if not removed_messages:
             return ""
-
-        # NEW: Use CompactionRouter if available (hybrid compaction system)
-        if self._compaction_router:
-            try:
-                import asyncio
-
-                # Try to run async router in sync context
-                try:
-                    loop = asyncio.get_running_loop()
-                except RuntimeError:
-                    loop = None
-
-                if loop and loop.is_running():
-                    # We're in an async context, need to run in thread
-                    import concurrent.futures
-
-                    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-                        future = pool.submit(
-                            asyncio.run,
-                            self._compaction_router.compact(
-                                removed_messages,
-                                current_query=current_query,
-                                session_id=self._session_id,
-                            ),
-                        )
-                        result = future.result(timeout=10.0)
-                else:
-                    # No async context, run directly
-                    result = asyncio.run(
-                        self._compaction_router.compact(
-                            removed_messages,
-                            current_query=current_query,
-                            session_id=self._session_id,
-                        )
-                    )
-
-                # Store enhanced summary in conversation store if available
-                if self._conversation_store and self._session_id:
-                    try:
-                        # Check if store has the enhanced method
-                        if hasattr(
-                            self._conversation_store,
-                            "store_compaction_summary_enhanced",
-                        ):
-                            # Store with dual formats
-                            self._conversation_store.store_compaction_summary_enhanced(
-                                session_id=self._session_id,
-                                summary_xml=(
-                                    result.summary if "<summary>" in result.summary else None
-                                ),
-                                summary_text=(
-                                    result.summary if "<summary>" not in result.summary else None
-                                ),
-                                summary_json={"strategy": result.strategy_used.value},
-                                messages_summarized=[
-                                    f"msg_{i}" for i in range(len(removed_messages))
-                                ],
-                                strategy_used=result.strategy_used.value,
-                                complexity_score=result.complexity_score,
-                                tokens_saved=result.tokens_saved,
-                                duration_ms=result.duration_ms,
-                                llm_provider=None,  # Could be extracted from result
-                                llm_model=None,  # Could be extracted from result
-                                success=result.success,
-                                error_message=result.error_message,
-                            )
-                    except Exception as e:
-                        logger.debug(f"Failed to store enhanced summary: {e}")
-
-                return result.summary
-
-            except Exception as e:
-                logger.warning(f"Compaction router failed, using fallback: {e}")
 
         # Legacy: Delegate to strategy if available
         if self._compaction_summarizer:

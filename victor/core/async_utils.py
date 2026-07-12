@@ -100,7 +100,16 @@ def run_sync(coro: Awaitable[T]) -> T:
                 "Cannot use run_sync() from within an async context. Use 'await' instead."
             )
 
-        return asyncio.run(coro)
+        # Run on a private loop WITHOUT touching the thread's current-loop
+        # binding. asyncio.run() would call set_event_loop(None) on exit,
+        # silently unbinding whatever loop the caller had set — e.g. the
+        # pytest-asyncio test loop, killing every async test that runs after
+        # a sync path emits a security-audit event. Passing an explicit
+        # loop_factory makes Runner skip current-loop management while
+        # keeping asyncio.run()'s cleanup semantics (cancel pending tasks,
+        # shutdown asyncgens and the default executor).
+        with asyncio.Runner(loop_factory=asyncio.new_event_loop) as runner:
+            return runner.run(coro)
 
     except Exception as e:
         # Re-raise runtime errors as they are likely configuration/logic issues

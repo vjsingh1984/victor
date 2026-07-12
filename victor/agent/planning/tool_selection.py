@@ -27,7 +27,6 @@ for the current step, reducing token usage and improving focus.
 from __future__ import annotations
 
 import logging
-import time
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set
 
@@ -61,99 +60,12 @@ except ImportError:
     ToolPreloader = None  # type: ignore
 
 
-def create_step_aware_selector(
-    tool_selector: ToolSelector,
-    settings: Optional[Any] = None,
-) -> StepAwareToolSelector:
-    """Create StepAwareToolSelector with predictive features based on settings.
-
-    This factory function creates a StepAwareToolSelector with predictive
-    features enabled according to the feature flags in settings.
-
-    Args:
-        tool_selector: Base tool selector for tool registry access
-        settings: Optional Settings object with feature flags
-
-    Returns:
-        Configured StepAwareToolSelector instance
-
-    Example:
-        from victor.config.settings import Settings
-        from victor.agent.tool_selection import ToolSelector
-
-        settings = Settings()
-        tool_selector = ToolSelector()
-
-        selector = create_step_aware_selector(
-            tool_selector=tool_selector,
-            settings=settings,
-        )
-    """
-    # Check if predictive features should be enabled
-    enable_predictive = False
-
-    if settings is not None:
-        feature_flags = settings.feature_flags
-        if feature_flags is not None:
-            # Check master switch and rollout percentage
-            if feature_flags.enable_predictive_tools:
-                # Check if this request should use predictive features
-                # Use consistent hash based on session or random hash
-                import hashlib
-
-                request_hash = int(hashlib.md5(str(time.time()).encode()).hexdigest(), 16) % 100
-
-                if feature_flags.should_use_predictive_for_request(request_hash):
-                    enable_predictive = True
-                    logger.info(
-                        f"Predictive tool selection enabled (rollout={feature_flags.predictive_rollout_percentage}%)"
-                    )
-
-    # Initialize predictor if enabled
-    tool_predictor = None
-    cooccurrence_tracker = None
-    tool_preloader = None
-
-    if enable_predictive and PREDICTIVE_COMPONENTS_AVAILABLE:
-        # Initialize co-occurrence tracker if enabled
-        if (
-            settings
-            and settings.feature_flags
-            and settings.feature_flags.enable_cooccurrence_tracking
-        ):
-            cooccurrence_tracker = CooccurrenceTracker()
-
-        # Initialize tool predictor
-        tool_predictor = ToolPredictor(cooccurrence_tracker=cooccurrence_tracker)
-
-        # Initialize preloader if enabled
-        if settings and settings.feature_flags and settings.feature_flags.enable_tool_preloading:
-            tool_preloader = ToolPreloader(
-                tool_predictor=tool_predictor,
-                tool_registry=tool_selector.tools if tool_selector else None,
-            )
-
-        logger.info(
-            f"Created StepAwareToolSelector with predictive features (predictor={tool_predictor is not None}, "
-            f"tracker={cooccurrence_tracker is not None}, preloader={tool_preloader is not None})"
-        )
-
-    return StepAwareToolSelector(
-        tool_selector=tool_selector,
-        enable_predictive=enable_predictive,
-        tool_predictor=tool_predictor,
-        cooccurrence_tracker=cooccurrence_tracker,
-        tool_preloader=tool_preloader,
-    )
-
-
 # Re-export constants for backward compatibility
 __all__ = [
     "STEP_TOOL_MAPPING",
     "COMPLEXITY_TOOL_LIMITS",
     "STEP_TO_TASK_TYPE",
     "StepAwareToolSelector",
-    "create_step_aware_selector",
     "get_step_tool_sets",
     "get_complexity_limits",
 ]

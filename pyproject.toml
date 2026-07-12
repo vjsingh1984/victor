@@ -18,7 +18,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "victor-ai"
-version = "0.7.4"
+version = "0.7.5"
 description = "Open-source agentic AI framework with multi-provider support, workflow orchestration, and extensible tool system"
 readme = "README.md"
 license = {text = "Apache-2.0"}
@@ -170,6 +170,7 @@ dev = [
     "pytest-json-report>=1.5.0",
     "pytest-benchmark>=5.0",  # For performance tests
     "pytest-timeout>=2.3",  # ci-fast quick-tests run with --timeout=120
+    "pytest-xdist>=3.5",  # Parallel test execution (make test runs with -n 4)
     "aiosqlite>=0.19",  # For SQLite async operations in tests
     "docker>=7.0",  # docker moved out of default deps; tests + collection need it
 
@@ -191,12 +192,35 @@ dev = [
     # Integration test dependencies
     "strawberry-graphql[fastapi]>=0.243",  # For GraphQL API integration tests
     "tomli>=2.0; python_version < '3.11'",
-    # Tree-sitter Python grammar. tests/integration/graph_rag/test_pipeline.py::
-    # test_ccg_construction calls build_ccg_for_file directly. CI's quick-tests
-    # job installs only .[dev] (no victor-coding enhanced builder), so the
-    # tree-sitter fallback must resolve a parser or the test gets 0 nodes.
-    # Mirrors the [dev] grammar install used by victor-codegraph's CI.
+    # All tree-sitter grammar wheels, inlined (repo hygiene forbids
+    # victor-ai[lang-all] self-references in dev/ci — nested extras do not
+    # resolve reliably in CI). Keep in sync with [lang-all]. Two consumers:
+    # - tests/integration/graph_rag/test_pipeline.py::test_ccg_construction
+    #   calls build_ccg_for_file directly; CI's quick-tests job installs only
+    #   .[dev] (no victor-coding enhanced builder), so the tree-sitter
+    #   fallback must resolve a parser or the test gets 0 nodes.
+    # - tests/unit/core/graph_rag/test_language_handlers.py asserts every
+    #   victor-coding language plugin resolves an edge handler; in an env
+    #   with victor-coding installed but a grammar wheel missing (typical
+    #   local dev setup), those tests fail instead of skipping.
     "tree-sitter-python>=0.23",
+    "tree-sitter-javascript>=0.23",
+    "tree-sitter-typescript>=0.23",
+    "tree-sitter-go>=0.23",
+    "tree-sitter-rust>=0.23",
+    "tree-sitter-java>=0.23",
+    "tree-sitter-cpp>=0.23",
+    "tree-sitter-c>=0.23",
+    "tree-sitter-c-sharp>=0.23",
+    "tree-sitter-ruby>=0.23",
+    "tree-sitter-php>=0.24",
+    "tree-sitter-swift>=0.0.1",
+    "tree-sitter-scala>=0.23",
+    "tree-sitter-kotlin>=1.0",
+    "tree-sitter-bash>=0.23",
+    "tree-sitter-lua>=0.2",
+    "tree-sitter-elixir>=0.3",
+    "tree-sitter-haskell>=0.23",
 ]
 
 # CI/CD dependencies - includes all testing, linting, and build tools
@@ -215,6 +239,7 @@ ci = [
     "pytest-json-report>=1.5.0",
     "pytest-benchmark>=5.0",
     "pytest-timeout>=2.3",  # ci-fast quick-tests run with --timeout=120
+    "pytest-xdist>=3.5",  # Parallel test execution (make test runs with -n 4)
     "respx>=0.21",
     "pandas>=2.0",
     "docker>=7.0",  # docker moved out of default deps; tests + collection need it
@@ -232,8 +257,26 @@ ci = [
     # Additional CI-specific tools
     "pytest-split>=0.8",
     "tomli>=2.0; python_version < '3.11'",
-    # Tree-sitter Python grammar for CCG integration tests (see [dev] note).
+    # All tree-sitter grammar wheels for CCG + language-handler tests,
+    # inlined (see [dev] note; keep in sync with [lang-all]).
     "tree-sitter-python>=0.23",
+    "tree-sitter-javascript>=0.23",
+    "tree-sitter-typescript>=0.23",
+    "tree-sitter-go>=0.23",
+    "tree-sitter-rust>=0.23",
+    "tree-sitter-java>=0.23",
+    "tree-sitter-cpp>=0.23",
+    "tree-sitter-c>=0.23",
+    "tree-sitter-c-sharp>=0.23",
+    "tree-sitter-ruby>=0.23",
+    "tree-sitter-php>=0.24",
+    "tree-sitter-swift>=0.0.1",
+    "tree-sitter-scala>=0.23",
+    "tree-sitter-kotlin>=1.0",
+    "tree-sitter-bash>=0.23",
+    "tree-sitter-lua>=0.2",
+    "tree-sitter-elixir>=0.3",
+    "tree-sitter-haskell>=0.23",
 
     # Build tools
     "build>=0.10",
