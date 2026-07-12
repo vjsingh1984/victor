@@ -29,6 +29,9 @@ HOTSPOT_LINE_CAPS = {
     # F-004: package-ified tool_selection; parent capped at current size
     # (extraction deferred — this ratchet only prevents further growth).
     "victor/agent/tool_selection/selector.py": 2882,
+    # F-003: context_compactor is a 1827-LOC god-object; decomposition deferred as
+    # low-ROI (works, not a proven bottleneck). Ratchet prevents further growth.
+    "victor/agent/context_compactor.py": 1827,
 }
 
 
