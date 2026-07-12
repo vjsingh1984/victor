@@ -404,9 +404,7 @@ class TestScaling:
             calls.append(args[0])
             return orig_run(*args, **kwargs)
 
-        monkeypatch.setattr(
-            "victor.core.analysis.module_analyzer.subprocess.run", counting_run
-        )
+        monkeypatch.setattr("victor.core.analysis.module_analyzer.subprocess.run", counting_run)
         freqs = analyzer._get_change_frequencies({"a.py", "b.py", "c.py"})
         assert freqs == {"a.py": 2, "b.py": 1, "c.py": 0}
         assert len(calls) == 1  # ONE git pass, not one per module
