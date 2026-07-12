@@ -62,8 +62,12 @@ UNIVERSAL_EXCLUDE_PATTERNS = [
     "**/*.egg-info/**",
     "**/dist/**",
     "**/build/**",
-    "**/.venv/**",
-    "**/venv/**",
+    # venv* / .venv* cover suffixed environments too (.venv-vllm, venv310, …)
+    # — observed 65k site-packages files indexed because only the exact
+    # ".venv"/"venv" names were excluded. A source dir starting with "venv"
+    # is effectively unheard of; a virtualenv is never source.
+    "**/.venv*/**",
+    "**/venv*/**",
     "**/.virtualenv/**",
     "**/.env/**",
     "**/pip-wheel-metadata/**",
@@ -120,6 +124,11 @@ UNIVERSAL_EXCLUDE_PATTERNS = [
     "**/CMakeCache.txt",
     "**/cmake_install.cmake",
     "**/Makefile**",
+    # Vendored source trees (Chromium/Bazel/CMake conventions). Kept to the
+    # unambiguous name — `external/` is NOT excluded globally because some
+    # projects keep first-party integration code there; CMake projects get
+    # it via LANGUAGE_CONFIG_MAP instead.
+    "**/third_party/**",
     # Ruby
     "**/vendor/bundle/**",
     "**/.bundle/**",
@@ -232,7 +241,10 @@ LANGUAGE_CONFIG_MAP = {
     "composer.json": ["vendor/"],  # PHP
     "pubspec.yaml": ["build/", ".dart_tool/"],  # Dart
     "mix.exs": ["_build/", "deps/"],  # Elixir
-    "CMakeLists.txt": ["build/", "cmake-build-*/"],  # C/C++
+    # C/C++: out-of-source builds are conventionally build-<flavor>/ siblings
+    # (build-cuda, build-debug, …); external/ is the common vendoring dir for
+    # CMake FetchContent/submodule trees (e.g. external/llama.cpp).
+    "CMakeLists.txt": ["build/", "build-*/", "build_*/", "cmake-build-*/", "external/"],
     "Makefile": ["build/", "out/"],  # C/C++
     "setup.go": [],  # Go
     "Package.swift": [".build/", "build/"],  # Swift
