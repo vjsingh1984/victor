@@ -29,8 +29,8 @@ and language-specific import semantics, mirroring the registry pattern in
   cache project-layout state (e.g. the Rust workspace crate map) on
   ``self`` without staleness across runs.
 
-Python, Rust, and JS/TS are implemented today. Go/Java need their own
-strategies (package paths) — register them here rather than adding
+Python, Rust, JS/TS, and C/C++ are implemented today. Go/Java need their
+own strategies (package paths) — register them here rather than adding
 language branches to ``indexing.py``.
 """
 
@@ -668,15 +668,142 @@ class JsTsImportResolver:
         return (base_dir, paths)
 
 
+class CppImportResolver:
+    """Resolve C/C++ ``#include`` directives to project headers.
+
+    Include search paths (-I flags) live in build systems we don't parse,
+    so resolution is filesystem-driven instead:
+
+    1. Quoted includes try the including file's directory first (the
+       standard preprocessor behavior).
+    2. Any include (quoted or angle) is tried as a root-relative path
+       (``#include "server/logging/logger.h"`` with ``-I <root>`` is the
+       dominant project convention).
+    3. Otherwise the include path is suffix-matched against a
+       once-per-run index of every project header; a UNIQUE match resolves,
+       an ambiguous one is dropped — a wrong edge is worse than a missing
+       one (this session's recurring lesson).
+
+    System headers (``<vector>``, ``<sys/types.h>``) match nothing in the
+    project index and fall out as external. Candidates are emitted as
+    root-relative paths, so ``resolve`` is a bare existence check.
+    """
+
+    _INCLUDE_RE = re.compile(r'#\s*include\s*["<]([^">]+)[">]')
+    _QUOTED_RE = re.compile(r'#\s*include\s*"')
+
+    #: Files an #include can meaningfully target (headers plus the odd
+    #: unity-build source include).
+    _INCLUDABLE_SUFFIXES = frozenset(
+        {
+            ".h",
+            ".hpp",
+            ".hh",
+            ".hxx",
+            ".inl",
+            ".inc",
+            ".ipp",
+            ".tcc",
+            ".cuh",
+            ".c",
+            ".cc",
+            ".cpp",
+            ".cxx",
+            ".cu",
+        }
+    )
+    #: Directory names never worth scanning for project headers.
+    _PRUNE_DIR_NAMES = frozenset(
+        {"node_modules", "target", "third_party", "external", "__pycache__", "dist", "out"}
+    )
+    _PRUNE_DIR_PREFIXES = (".", "venv", "build", "cmake-build")
+
+    def __init__(self) -> None:
+        # basename → root-relative posix paths of project headers, built on
+        # first suffix-match lookup (once per resolution run).
+        self._header_index: Optional[Dict[str, List[str]]] = None
+
+    def parse(self, raw: str, src_file: str, root_path: Path) -> List[str]:
+        match = self._INCLUDE_RE.search(raw)
+        if not match:
+            return []
+        include = match.group(1).strip().replace("\\", "/")
+        if not include or include.startswith("/"):
+            return []
+        is_quoted = self._QUOTED_RE.search(raw) is not None
+        root_resolved = root_path.resolve()
+
+        try:
+            src_path = Path(src_file).resolve()
+            src_path.relative_to(root_resolved)
+        except (OSError, ValueError):
+            return []
+
+        # 1. Quoted: relative to the including file's directory.
+        if is_quoted:
+            candidate = Path(os.path.normpath(src_path.parent / PurePosixPath(include)))
+            if candidate.is_file():
+                try:
+                    return [candidate.relative_to(root_resolved).as_posix()]
+                except ValueError:
+                    return []  # resolved above the project root
+
+        # 2. Root-relative as written (-I <root> convention).
+        if ".." not in PurePosixPath(include).parts:
+            candidate = root_resolved / include
+            if candidate.is_file():
+                return [include]
+
+        # 3. Unique suffix match against the project header index.
+        index = self._project_header_index(root_resolved)
+        basename = include.rsplit("/", 1)[-1]
+        matches = [
+            path
+            for path in index.get(basename, [])
+            if path == include or path.endswith("/" + include)
+        ]
+        if len(matches) == 1:
+            return matches
+        return []
+
+    def resolve(self, module: str, root_path: Path) -> Optional[Path]:
+        if not module or ".." in PurePosixPath(module).parts:
+            return None
+        candidate = root_path / module
+        return candidate if candidate.is_file() else None
+
+    def _project_header_index(self, root_resolved: Path) -> Dict[str, List[str]]:
+        """Index every includable project file by basename, pruning junk dirs."""
+        if self._header_index is not None:
+            return self._header_index
+        index: Dict[str, List[str]] = {}
+        for dirpath, dirnames, filenames in os.walk(root_resolved):
+            dirnames[:] = [
+                d
+                for d in dirnames
+                if d not in self._PRUNE_DIR_NAMES and not d.startswith(self._PRUNE_DIR_PREFIXES)
+            ]
+            for name in filenames:
+                if Path(name).suffix.lower() not in self._INCLUDABLE_SUFFIXES:
+                    continue
+                rel = (Path(dirpath) / name).relative_to(root_resolved).as_posix()
+                index.setdefault(name, []).append(rel)
+        self._header_index = index
+        return index
+
+
 ImportResolverRegistry.register("python", PythonImportResolver)
 ImportResolverRegistry.register("rust", RustImportResolver)
 ImportResolverRegistry.register("javascript", JsTsImportResolver)
 ImportResolverRegistry.register("typescript", JsTsImportResolver)
 ImportResolverRegistry.register("jsx", JsTsImportResolver)
 ImportResolverRegistry.register("tsx", JsTsImportResolver)
+ImportResolverRegistry.register("c", CppImportResolver)
+ImportResolverRegistry.register("cpp", CppImportResolver)
 
 
 __all__ = [
+    "CppImportResolver",
     "ImportResolverRegistry",
     "JsTsImportResolver",
     "LanguageImportResolver",

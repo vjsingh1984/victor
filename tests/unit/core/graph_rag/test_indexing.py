@@ -1663,6 +1663,48 @@ def test_index_repository_resolves_provider_before_parse_burst(
 
 
 @pytest.mark.asyncio
+async def test_resolve_imports_cpp_includes(monkeypatch, tmp_path: Path) -> None:
+    """C/C++ #include directives (quoted-relative and root-relative) must
+    produce module-level IMPORTS edges; system headers must not."""
+    pipeline = _make_pipeline(tmp_path)
+    (tmp_path / "server" / "logging").mkdir(parents=True)
+    (tmp_path / "runtime").mkdir()
+    src = tmp_path / "runtime" / "engine.cpp"
+    src.write_text("")
+    header = tmp_path / "runtime" / "engine.h"
+    header.write_text("")
+    logger_h = tmp_path / "server" / "logging" / "logger.h"
+    logger_h.write_text("")
+
+    monkeypatch.setattr(
+        "victor.core.database.ProjectDatabaseManager",
+        _FakeIndexedFilesDb([pipeline._canonical_file_str(p) for p in (src, header, logger_h)]),
+    )
+    pipeline._pending_import_records = [
+        (str(src), '#include "engine.h"', "cpp"),
+        (str(src), '#include "server/logging/logger.h"', "cpp"),
+        (str(src), "#include <vector>", "cpp"),
+    ]
+
+    captured: list[GraphEdge] = []
+
+    async def _capture(edges):
+        captured.extend(edges)
+
+    pipeline.graph_store.upsert_edges = _capture  # type: ignore[assignment]
+
+    emitted = await pipeline._resolve_imports(tmp_path)
+    assert emitted == 2
+    from victor.core.graph_rag.indexing import _module_node_id
+
+    src_id = _module_node_id(pipeline._canonical_file_str(src))
+    assert {(e.src, e.dst) for e in captured} == {
+        (src_id, _module_node_id(pipeline._canonical_file_str(header))),
+        (src_id, _module_node_id(pipeline._canonical_file_str(logger_h))),
+    }
+
+
+@pytest.mark.asyncio
 async def test_resolve_imports_typescript_imports(monkeypatch, tmp_path: Path) -> None:
     """TypeScript imports (relative, tsconfig alias, barrel re-export) must
     produce module-level IMPORTS edges for Martin Ca/Ce."""
