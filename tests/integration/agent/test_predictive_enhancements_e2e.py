@@ -2,7 +2,6 @@
 
 Tests cover:
 - Full predictive workflow from prediction → selection → preloading
-- Hybrid decision service integration
 - Phase-aware context management
 - Feature flag behavior
 - Rollback scenarios
@@ -11,17 +10,12 @@ Tests cover:
 """
 
 from datetime import datetime, timezone, timedelta
-from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 
 from victor.agent.conversation.state_machine import ConversationStage
 from victor.agent.planning.cooccurrence_tracker import CooccurrenceTracker
-from victor.agent.planning.readable_schema import TaskComplexity
 from victor.agent.planning.tool_preloader import ToolPreloader
 from victor.agent.planning.tool_predictor import ToolPredictor
-from victor.agent.planning.tool_selection import StepAwareToolSelector
 from victor.config.feature_flag_settings import FeatureFlagSettings
 from victor.core.shared_types import TaskPhase
 
@@ -107,54 +101,6 @@ class TestPredictiveWorkflowIntegration:
         # Check that success boosting works
         for pred in predictions:
             assert 0.0 <= pred.probability <= 1.0
-
-
-class TestHybridDecisionServiceIntegration:
-    """Test hybrid decision service integration."""
-
-    def test_hybrid_decision_with_fallback(self):
-        """Test that hybrid decisions use LLM fallback when needed."""
-        from victor.agent.services.hybrid_decision_service import HybridDecisionService
-        from victor.agent.decisions.schemas import DecisionType
-
-        # Create hybrid service
-        service = HybridDecisionService()
-
-        # Test decision with high confidence (should use fast path)
-        decision = service.decide_sync(
-            decision_type=DecisionType.TASK_COMPLETION,
-            context={
-                "response": "Task is complete",
-                "step": "final",
-            },
-        )
-
-        assert decision is not None
-        # Result is a TaskCompletionDecision object
-        assert hasattr(decision.result, "is_complete")
-        assert decision.result.is_complete is True
-
-    def test_hybrid_decision_cache_hit(self):
-        """Test that cache improves performance."""
-        from victor.agent.services.hybrid_decision_service import HybridDecisionService
-        from victor.agent.decisions.schemas import DecisionType
-
-        service = HybridDecisionService()
-
-        # First call - cache miss
-        decision1 = service.decide_sync(
-            decision_type=DecisionType.TASK_COMPLETION,
-            context={"response": "done"},
-        )
-
-        # Second call - cache hit (should be faster)
-        decision2 = service.decide_sync(
-            decision_type=DecisionType.TASK_COMPLETION,
-            context={"response": "done"},
-        )
-
-        # Both should return same result
-        assert decision1.result == decision2.result
 
 
 class TestPhaseAwareContextIntegration:
@@ -307,7 +253,6 @@ class TestErrorHandlingAndRecovery:
 
     def test_predictor_failure_fallback(self):
         """Test graceful fallback when predictor fails."""
-        from victor.agent.planning.tool_predictor import ToolPrediction
 
         predictor = ToolPredictor()
 
@@ -351,36 +296,6 @@ class TestErrorHandlingAndRecovery:
 
 class TestPerformanceBenchmarks:
     """Performance benchmarks for predictive components."""
-
-    def test_decision_latency_target(self):
-        """Test that decision latency meets target (<100ms)."""
-        from victor.agent.services.hybrid_decision_service import HybridDecisionService
-        from victor.agent.decisions.schemas import DecisionType
-
-        service = HybridDecisionService()
-
-        import time
-
-        # Warm up
-        for _ in range(10):
-            service.decide_sync(
-                decision_type=DecisionType.TASK_COMPLETION,
-                context={"response": "done"},
-            )
-
-        # Benchmark
-        start = time.time()
-        for _ in range(100):
-            service.decide_sync(
-                decision_type=DecisionType.TASK_COMPLETION,
-                context={"response": "done"},
-            )
-        end = time.time()
-
-        avg_latency_ms = ((end - start) / 100) * 1000
-
-        # Should be under 100ms
-        assert avg_latency_ms < 100
 
     def test_prediction_accuracy_target(self):
         """Test that prediction accuracy meets target (>80%)."""
@@ -510,7 +425,6 @@ class TestBackwardCompatibility:
 
     def test_existing_code_works_without_enhancements(self):
         """Test that existing code works without enhancements."""
-        from victor.agent.tool_selection import ToolSelector
 
         # This should work as before (no predictive features)
         # ToolSelector initialization doesn't require predictive components

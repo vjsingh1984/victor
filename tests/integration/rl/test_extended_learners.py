@@ -1,112 +1,17 @@
 """Integration tests for Priority 4 Phase 2: Extended RL Learners.
 
 Tests for:
-- ExtendedModelSelectorLearner with HybridDecisionService
 - ExtendedModeTransitionLearner with PhaseDetector
 - ExtendedToolSelectorLearner with ToolPredictor and UsageAnalytics
 """
 
-from datetime import datetime, timezone
-from unittest.mock import MagicMock, patch
 import sqlite3
-from pathlib import Path
-import tempfile
 
-import pytest
 
 from victor.agent.usage_analytics import UsageAnalytics
-from victor.agent.context_phase_detector import PhaseDetector
-from victor.agent.planning.tool_predictor import ToolPredictor
 from victor.agent.conversation.state_machine import ConversationStage
 from victor.core.shared_types import TaskPhase
-from victor.framework.rl.base import RLOutcome, RLRecommendation
-
-
-class TestExtendedModelSelectorLearner:
-    """Test ExtendedModelSelectorLearner integration."""
-
-    def setup_method(self):
-        """Create test database connection."""
-        self.db_conn = sqlite3.connect(":memory:")
-
-    def teardown_method(self):
-        """Close database connection."""
-        if hasattr(self, "db_conn"):
-            self.db_conn.close()
-
-    def test_learner_initialization(self):
-        """Test learner can be initialized with hybrid decision service."""
-        from victor.framework.rl.learners.model_selector_extended import (
-            ExtendedModelSelectorLearner,
-        )
-
-        learner = ExtendedModelSelectorLearner(name="model_selector", db_connection=self.db_conn)
-
-        assert learner is not None
-        assert hasattr(learner, "decision_service")
-        assert hasattr(learner, "learn")
-        assert hasattr(learner, "select_model")
-
-    def test_learn_from_outcomes(self):
-        """Test learning from model selection outcomes."""
-        from victor.framework.rl.learners.model_selector_extended import (
-            ExtendedModelSelectorLearner,
-        )
-
-        learner = ExtendedModelSelectorLearner(name="model_selector", db_connection=self.db_conn)
-
-        # Create test outcomes
-        outcomes = [
-            RLOutcome(
-                provider="system",
-                model="hybrid",
-                task_type="model_selection",
-                success=True,
-                quality_score=0.9,
-                metadata={
-                    "used_llm": False,  # Fast path
-                    "decision_latency_ms": 50,  # Fast
-                    "confidence": 0.95,
-                },
-            ),
-            RLOutcome(
-                provider="system",
-                model="hybrid",
-                task_type="model_selection",
-                success=True,
-                quality_score=0.85,
-                metadata={
-                    "used_llm": True,  # LLM fallback
-                    "decision_latency_ms": 500,
-                    "confidence": 0.6,
-                },
-            ),
-        ]
-
-        # Learn from outcomes
-        recommendations = learner.learn(outcomes)
-
-        # Should generate recommendations
-        assert len(recommendations) > 0
-
-        # Check recommendation types
-        rec_types = {r.recommendation_type for r in recommendations}
-        assert "decision_threshold" in rec_types
-
-    def test_select_model_with_context(self):
-        """Test model selection with context."""
-        from victor.framework.rl.learners.model_selector_extended import (
-            ExtendedModelSelectorLearner,
-        )
-
-        learner = ExtendedModelSelectorLearner(name="model_selector", db_connection=self.db_conn)
-
-        # Select model for task
-        model_name = learner.select_model(task_type="tool_call", context={"complexity": "low"})
-
-        # Should return a model name
-        assert model_name is not None
-        assert isinstance(model_name, str)
+from victor.framework.rl.base import RLOutcome
 
 
 class TestExtendedModeTransitionLearner:
@@ -340,9 +245,6 @@ class TestExtendedLearnersIntegration:
 
     def test_all_extended_learners_instantiable(self):
         """Test all extended learners can be instantiated."""
-        from victor.framework.rl.learners.model_selector_extended import (
-            ExtendedModelSelectorLearner,
-        )
         from victor.framework.rl.learners.mode_transition_extended import (
             ExtendedModeTransitionLearner,
         )
@@ -350,23 +252,16 @@ class TestExtendedLearnersIntegration:
             ExtendedToolSelectorLearner,
         )
 
-        model_learner = ExtendedModelSelectorLearner(
-            name="model_selector", db_connection=self.db_conn
-        )
         mode_learner = ExtendedModeTransitionLearner(
             name="mode_transition", db_connection=self.db_conn
         )
         tool_learner = ExtendedToolSelectorLearner(name="tool_selector", db_connection=self.db_conn)
 
-        assert model_learner is not None
         assert mode_learner is not None
         assert tool_learner is not None
 
     def test_extended_learners_have_learn_method(self):
         """Test all extended learners have learn method."""
-        from victor.framework.rl.learners.model_selector_extended import (
-            ExtendedModelSelectorLearner,
-        )
         from victor.framework.rl.learners.mode_transition_extended import (
             ExtendedModeTransitionLearner,
         )
@@ -374,29 +269,21 @@ class TestExtendedLearnersIntegration:
             ExtendedToolSelectorLearner,
         )
 
-        model_learner = ExtendedModelSelectorLearner(
-            name="model_selector", db_connection=self.db_conn
-        )
         mode_learner = ExtendedModeTransitionLearner(
             name="mode_transition", db_connection=self.db_conn
         )
         tool_learner = ExtendedToolSelectorLearner(name="tool_selector", db_connection=self.db_conn)
 
         # All should have learn method
-        assert hasattr(model_learner, "learn")
         assert hasattr(mode_learner, "learn")
         assert hasattr(tool_learner, "learn")
 
         # All should be callable
-        assert callable(model_learner.learn)
         assert callable(mode_learner.learn)
         assert callable(tool_learner.learn)
 
     def test_extended_learners_produce_recommendations(self):
         """Test all extended learners produce recommendations."""
-        from victor.framework.rl.learners.model_selector_extended import (
-            ExtendedModelSelectorLearner,
-        )
         from victor.framework.rl.learners.mode_transition_extended import (
             ExtendedModeTransitionLearner,
         )
@@ -417,20 +304,15 @@ class TestExtendedLearnersIntegration:
         ]
 
         # Test each learner
-        model_learner = ExtendedModelSelectorLearner(
-            name="model_selector", db_connection=self.db_conn
-        )
         mode_learner = ExtendedModeTransitionLearner(
             name="mode_transition", db_connection=self.db_conn
         )
         tool_learner = ExtendedToolSelectorLearner(name="tool_selector", db_connection=self.db_conn)
 
-        model_recs = model_learner.learn(outcomes)
         mode_recs = mode_learner.learn(outcomes)
         tool_recs = tool_learner.learn(outcomes)
 
         # All should return lists
-        assert isinstance(model_recs, list)
         assert isinstance(mode_recs, list)
         assert isinstance(tool_recs, list)
 

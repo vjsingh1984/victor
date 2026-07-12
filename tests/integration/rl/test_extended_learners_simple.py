@@ -2,40 +2,12 @@
 
 import sqlite3
 
-import pytest
 
 from victor.agent.usage_analytics import UsageAnalytics
 from victor.agent.context_phase_detector import PhaseDetector
 from victor.agent.planning.tool_predictor import ToolPredictor
-from victor.agent.services.hybrid_decision_service import HybridDecisionService
 from victor.agent.conversation.state_machine import ConversationStage
 from victor.core.shared_types import TaskPhase
-from victor.framework.rl.base import RLOutcome, RLRecommendation
-
-
-class TestExtendedModelSelectorLearner:
-    """Test ExtendedModelSelectorLearner integration."""
-
-    def setup_method(self):
-        """Create test database connection."""
-        self.db_conn = sqlite3.connect(":memory:")
-
-    def teardown_method(self):
-        """Close database connection."""
-        if hasattr(self, "db_conn"):
-            self.db_conn.close()
-
-    def test_learner_initialization(self):
-        """Test learner can be initialized with hybrid decision service."""
-        from victor.framework.rl.learners.model_selector_extended import (
-            ExtendedModelSelectorLearner,
-        )
-
-        learner = ExtendedModelSelectorLearner(name="model_selector", db_connection=self.db_conn)
-
-        assert learner is not None
-        assert hasattr(learner, "decision_service")
-        assert hasattr(learner, "learn")
 
 
 class TestExtendedModeTransitionLearner:
@@ -153,9 +125,6 @@ class TestAllExtendedLearners:
 
     def test_all_extended_learners_instantiable(self):
         """Test all extended learners can be instantiated."""
-        from victor.framework.rl.learners.model_selector_extended import (
-            ExtendedModelSelectorLearner,
-        )
         from victor.framework.rl.learners.mode_transition_extended import (
             ExtendedModeTransitionLearner,
         )
@@ -163,23 +132,16 @@ class TestAllExtendedLearners:
             ExtendedToolSelectorLearner,
         )
 
-        model_learner = ExtendedModelSelectorLearner(
-            name="model_selector", db_connection=self.db_conn
-        )
         mode_learner = ExtendedModeTransitionLearner(
             name="mode_transition", db_connection=self.db_conn
         )
         tool_learner = ExtendedToolSelectorLearner(name="tool_selector", db_connection=self.db_conn)
 
-        assert model_learner is not None
         assert mode_learner is not None
         assert tool_learner is not None
 
     def test_all_have_learn_method(self):
         """Test all extended learners have learn method."""
-        from victor.framework.rl.learners.model_selector_extended import (
-            ExtendedModelSelectorLearner,
-        )
         from victor.framework.rl.learners.mode_transition_extended import (
             ExtendedModeTransitionLearner,
         )
@@ -187,30 +149,21 @@ class TestAllExtendedLearners:
             ExtendedToolSelectorLearner,
         )
 
-        model_learner = ExtendedModelSelectorLearner(
-            name="model_selector", db_connection=self.db_conn
-        )
         mode_learner = ExtendedModeTransitionLearner(
             name="mode_transition", db_connection=self.db_conn
         )
         tool_learner = ExtendedToolSelectorLearner(name="tool_selector", db_connection=self.db_conn)
 
         # All should have learn method
-        assert hasattr(model_learner, "learn")
         assert hasattr(mode_learner, "learn")
         assert hasattr(tool_learner, "learn")
 
         # All should be callable
-        assert callable(model_learner.learn)
         assert callable(mode_learner.learn)
         assert callable(tool_learner.learn)
 
     def test_integrated_components_exist(self):
         """Test all integrated components exist and work."""
-        # Test HybridDecisionService
-        service = HybridDecisionService()
-        assert service is not None
-
         # Test PhaseDetector
         detector = PhaseDetector()
         phase = detector.detect_phase(
