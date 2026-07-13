@@ -83,47 +83,13 @@ edge_model:
 
 ---
 
-#### `use_semantic_tool_selection`
-
-**Purpose**: Use embeddings instead of keywords for tool selection
-
-**Default**: `true`
-
-**Configuration**:
-```yaml
-tool_settings:
-  use_semantic_tool_selection: true
-```
-
-**Environment Variable**: `VICTOR_USE_SEMANTIC_TOOL_SELECTION=true`
-
-**Impact**:
-- Better tool matching for vague requests
-- Requires sentence-transformers embeddings
-- Adds ~100ms latency per tool selection
-
-**Migration**: Disable via environment variable if embeddings unavailable
+> **Note**: `use_semantic_tool_selection` and `use_provider_pooling` are **Settings** keys
+> (`tool_settings.use_semantic_tool_selection`, `providers.pooling_enabled`), not
+> `FeatureFlag` enum members. See [Configuration Guide](../reference/configuration-options.md).
 
 ---
 
 ### Architecture & Refactoring
-
-#### `use_provider_pooling`
-
-**Purpose**: Enable connection pooling for LLM provider requests
-
-**Default**: `false`
-
-**Environment Variable**: `VICTOR_USE_PROVIDER_POOLING=true`
-
-**Impact**:
-- Reduces connection overhead for repeated requests
-- Better resource utilization under high load
-- Experimental — may have stability issues
-
-**Migration**: Safe to enable for testing; report any connection issues
-
----
 
 #### `use_composition_over_inheritance`
 
@@ -187,59 +153,15 @@ service bundle automatically.
 
 ---
 
+> **Note**: `use_emojis` and `use_mcp_tools` are **Settings** keys (`ui.use_emojis`,
+> `mcp.enabled`), not `FeatureFlag` enum members.
+> See [Configuration Guide](../reference/configuration-options.md).
+
+---
+
 ### UI & Output
 
-#### `use_emojis`
-
-**Purpose**: Enable emoji indicators in output (✓, ✗, etc.)
-
-**Default**: `true` (auto-disabled in CI)
-
-**Configuration**:
-```yaml
-ui:
-  use_emojis: true
-```
-
-**Environment Variable**: `VICTOR_USE_EMOJIS=false` (or set `CI=true`)
-
-**Impact**:
-- Visual indicators in CLI output
-- Automatically disabled in CI environments
-- No functional impact
-
-**Migration**: Disable for plain text output
-
----
-
 ### Integration
-
-#### `use_mcp_tools`
-
-**Purpose**: Enable MCP (Model Context Protocol) tool support
-
-**Default**: `false`
-
-**Configuration**:
-```yaml
-mcp:
-  enabled: true
-  command: "python mcp_server.py"
-  prefix: "mcp"
-```
-
-**Environment Variable**: `VICTOR_USE_MCP_TOOLS=true`
-
-**Status**: 🔄 Experimental
-
-**Impact**:
-- Enables external tool servers via MCP
-- Adds complexity to tool execution
-- Requires MCP server configuration
-
-**Migration**: See [MCP Integration Guide](./MCP_INTEGRATION.md)
-
----
 
 ## Feature Flag Lifecycle
 
@@ -376,5 +298,5 @@ else:
 
 - Feature flag implementation: `victor/core/feature_flags.py` (no dedicated ADR exists; graduation policy is tracked as TD-17 in the [tech-debt register](../tech-stack.md#technical-debt-register))
 - [Edge Model Guide](./EDGE_MODEL.md)
-- [Configuration Guide](../users/reference/config.md)
+- [Configuration Guide](../reference/configuration-options.md)
 - [Architecture Decision Records](../architecture/adr/)
