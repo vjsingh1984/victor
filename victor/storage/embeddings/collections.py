@@ -186,7 +186,7 @@ class StaticEmbeddingCollection:
             # 1. Check cache version (breaking changes to format)
             cached_version = cache_data.get("cache_version", 1)
             if cached_version != self.CACHE_VERSION:
-                logger.info(
+                logger.debug(
                     f"Collection '{self.name}': cache version mismatch "
                     f"(cached: v{cached_version}, current: v{self.CACHE_VERSION})"
                 )
@@ -196,7 +196,7 @@ class StaticEmbeddingCollection:
         def _check_items_hash(cache_data: Dict[str, Any]) -> CacheValidation:
             # 2. Verify cache matches current items
             if cache_data.get("items_hash") != items_hash:
-                logger.info(f"Collection '{self.name}': items changed, cache invalidated")
+                logger.debug(f"Collection '{self.name}': items changed, cache invalidated")
                 # Items-hash mismatch intentionally keeps the cache file (no delete).
                 return invalid(delete=False)
             return valid()
@@ -205,7 +205,7 @@ class StaticEmbeddingCollection:
             # 3. Verify embedding model matches
             model_name = self.embedding_service.model_name
             if cache_data.get("model_name") != model_name:
-                logger.info(
+                logger.debug(
                     f"Collection '{self.name}': model changed "
                     f"(cached: {cache_data.get('model_name')}, current: {model_name})"
                 )
@@ -228,7 +228,7 @@ class StaticEmbeddingCollection:
 
             cached_dim = embeddings.shape[1]
             if cached_dim != expected_dim:
-                logger.info(
+                logger.debug(
                     f"Collection '{self.name}': embedding dimension mismatch "
                     f"(cached: {cached_dim}, expected: {expected_dim})"
                 )
@@ -292,7 +292,7 @@ class StaticEmbeddingCollection:
             self.cache_file, cache_data, logger=logger, label=f"Collection '{self.name}'"
         ):
             cache_size = self.cache_file.stat().st_size / 1024
-            logger.info(
+            logger.debug(
                 f"Collection '{self.name}': saved {len(self._items)} items to cache "
                 f"({cache_size:.1f} KB)"
             )
@@ -320,7 +320,7 @@ class StaticEmbeddingCollection:
             return
 
         # Cache miss - compute embeddings
-        logger.info(f"Collection '{self.name}': computing embeddings for {len(items)} items")
+        logger.debug(f"Collection '{self.name}': computing embeddings for {len(items)} items")
 
         # Store items
         self._items = {item.id: item for item in items}
@@ -334,7 +334,7 @@ class StaticEmbeddingCollection:
         # Save to cache
         self._save_to_cache(items_hash)
 
-        logger.info(f"Collection '{self.name}': initialized with {len(items)} items")
+        logger.debug(f"Collection '{self.name}': initialized with {len(items)} items")
 
     def initialize_sync(self, items: List[CollectionItem]) -> None:
         """Initialize collection with items (sync version).
@@ -357,7 +357,7 @@ class StaticEmbeddingCollection:
             return
 
         # Cache miss - compute embeddings
-        logger.info(f"Collection '{self.name}': computing embeddings for {len(items)} items")
+        logger.debug(f"Collection '{self.name}': computing embeddings for {len(items)} items")
 
         # Store items
         self._items = {item.id: item for item in items}
@@ -371,7 +371,7 @@ class StaticEmbeddingCollection:
         # Save to cache
         self._save_to_cache(items_hash)
 
-        logger.info(f"Collection '{self.name}': initialized with {len(items)} items")
+        logger.debug(f"Collection '{self.name}': initialized with {len(items)} items")
 
     async def search(
         self,
@@ -496,4 +496,4 @@ class StaticEmbeddingCollection:
         """Clear the cache file."""
         if self.cache_file.exists():
             self.cache_file.unlink()
-            logger.info(f"Collection '{self.name}': cache cleared")
+            logger.debug(f"Collection '{self.name}': cache cleared")

@@ -554,7 +554,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
             {"model": self.model, "provider": self.provider.__class__.__name__},
         )
         if self.streaming_metrics_collector:
-            logger.info("StreamingMetricsCollector initialized via runtime boundary")
+            logger.debug("StreamingMetricsCollector initialized via runtime boundary")
 
     def _initialize_workflow_runtime(self) -> None:
         """Initialize workflow runtime boundaries with lazy registry loading."""
@@ -667,7 +667,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
                 ServiceLifetime.SINGLETON,
             )
 
-            logger.info("Credit tracking service initialized")
+            logger.debug("Credit tracking service initialized")
         except Exception as e:
             logger.warning("Failed to initialize credit tracking: %s", e)
 
@@ -780,7 +780,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         # No additional binding is required. The _recovery_coordinator attribute is now
         # the RecoveryService instance created by factory.create_recovery_coordinator().
 
-        logger.info(
+        logger.debug(
             "Service layer initialized: chat=%s, tool=%s, session=%s, "
             "context=%s, provider=%s, recovery=%s",
             self._chat_service is not None,
@@ -1015,7 +1015,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
             self._system_prompt = self._get_prompt_builder_runtime().compose_system_prompt(
                 base_system_prompt
             )
-            logger.info(f"Loaded project context from {self.project_context.context_file}")
+            logger.debug(f"Loaded project context from {self.project_context.context_file}")
         else:
             self._system_prompt = base_system_prompt
 
@@ -1052,7 +1052,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         self._task_completion_detector = TaskCompletionDetector(
             runtime_intelligence=self._runtime_intelligence
         )
-        logger.info("TaskCompletionDetector initialized (signal-based completion)")
+        logger.debug("TaskCompletionDetector initialized (signal-based completion)")
 
         # Context reminder manager for intelligent system message injection (via factory, DI)
         # Reduces token waste by consolidating reminders and only injecting when context changes
@@ -1434,7 +1434,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
 
         # Update global project root
         set_project_root(workspace_dir)
-        logger.info(f"Project root set to: {workspace_dir}")
+        logger.debug(f"Project root set to: {workspace_dir}")
 
         # Create new project context for this workspace
         self.project_context = ProjectContext(root_path=str(workspace_dir))
@@ -1467,7 +1467,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
             self._system_prompt = self._get_prompt_builder_runtime().compose_system_prompt(
                 base_prompt
             )
-            logger.info(f"Loaded project context from {self.project_context.context_file}")
+            logger.debug(f"Loaded project context from {self.project_context.context_file}")
         else:
             self._system_prompt = base_prompt
 
@@ -2022,7 +2022,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
                 ]
                 if locked_tools:
                     self._session_tools = locked_tools
-                    logger.info(
+                    logger.debug(
                         "[cache] Session tools locked: %d tools (prefix-stable)",
                         len(locked_tools),
                     )
@@ -2063,7 +2063,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
             if len(messages) < len(self.messages):
                 total_original = sum(len(m.content) for m in self.messages)
                 total_assembled = sum(len(m.content) for m in messages)
-                logger.info(
+                logger.debug(
                     "[context] Assembled %d/%d messages (%dK/%dK chars, budget=%dK)",
                     len(messages),
                     len(self.messages),
@@ -2088,7 +2088,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
             else:
                 logger.debug("Dropping non-Message item from assembled messages: %s", type(m))
         if len(normalized) != len(messages):
-            logger.info(
+            logger.debug(
                 "[context] Normalized %d/%d non-Message items in assembled messages",
                 len(messages) - len(normalized),
                 len(messages),
@@ -2475,11 +2475,11 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
             return
 
         try:
-            logger.info("Starting background embedding preload...")
+            logger.debug("Starting background embedding preload...")
             await self.semantic_selector.initialize_tool_embeddings(self.tools)
             # Mark initialization complete in ToolSelector (single source of truth)
             self.tool_selector._embeddings_initialized = True
-            logger.info(
+            logger.debug(
                 f"{self._presentation.icon('success')} Tool embeddings preloaded successfully in background"
             )
         except Exception as e:
@@ -2572,7 +2572,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
             stats = await preload_manager.preload_parallel()
         else:
             stats = await preload_manager.preload_all()
-        logger.info(
+        logger.debug(
             "Runtime preload completed: %s/%s tasks in %.2fs",
             stats.completed_tasks,
             stats.total_tasks,
@@ -2596,7 +2596,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
             task = self._create_background_task(self._run_runtime_preload(), name="runtime_preload")
             if task:
                 self._runtime_preload_task = task
-                logger.info("Started runtime preload task")
+                logger.debug("Started runtime preload task")
             return
 
         # Only preload embeddings if explicitly requested (default: deferred)
@@ -2609,7 +2609,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         task = self._create_background_task(self._preload_embeddings(), name="embedding_preload")
         if task:
             self._embedding_preload_task = task
-            logger.info("Started background task for embedding preload")
+            logger.debug("Started background task for embedding preload")
 
     def _record_tool_selection(self, method: str, num_tools: int) -> None:
         """Record tool selection statistics.
@@ -3211,7 +3211,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
                 break
 
         if role == "tool":
-            logger.info(
+            logger.debug(
                 "add_message(role=tool): name=%s tool_call_id=%s content_len=%d",
                 kwargs.get("name"),
                 kwargs.get("tool_call_id"),
@@ -3706,7 +3706,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
             requires = decision.result.get("requires_tools", True)
             conf = decision.result.get("confidence", 0.5)
             if not requires and conf >= 0.6:
-                logger.info(
+                logger.debug(
                     "TOOL_NECESSITY: skipping tools for Q&A turn " "(confidence=%.2f, source=%s)",
                     conf,
                     decision.source,
@@ -4397,7 +4397,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
                 await event_bus.disconnect()
             except Exception as e:
                 logger.debug("Observability event bus shutdown skipped: %s", e)
-        logger.info("AgentOrchestrator shutdown complete")
+        logger.debug("AgentOrchestrator shutdown complete")
 
     async def close(self) -> None:
         """Compatibility alias for shutdown."""
@@ -4582,7 +4582,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
                 tiered_config = self._get_vertical_tiered_config()
             if tiered_config is not None:
                 self.tool_selector.set_tiered_config(tiered_config)
-                logger.info(
+                logger.debug(
                     f"Tiered config propagated to selector: "
                     f"mandatory={sorted(tiered_config.mandatory)}, "
                     f"vertical_core={sorted(tiered_config.vertical_core)}"

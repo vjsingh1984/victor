@@ -245,7 +245,7 @@ class CascadingInvalidator:
                 logger.debug(f"Invalidated {count} cache entries for node {nid}")
 
         if total > 0:
-            logger.info(
+            logger.debug(
                 f"Cascade invalidation from '{node_id}': "
                 f"{len(to_invalidate)} nodes, {total} entries"
             )
@@ -358,7 +358,7 @@ class WorkflowCache:
                 maxsize=self.config.max_entries,
                 ttl=self.config.ttl_seconds,
             )
-            logger.info(
+            logger.debug(
                 f"Workflow cache initialized: max_entries={self.config.max_entries}, "
                 f"ttl={self.config.ttl_seconds}s"
             )
@@ -492,7 +492,7 @@ class WorkflowCache:
                     pass
 
             if count > 0:
-                logger.info(f"Invalidated {count} cache entries for node: {node_id}")
+                logger.debug(f"Invalidated {count} cache entries for node: {node_id}")
 
             return count
 
@@ -541,7 +541,7 @@ class WorkflowCache:
         with self._lock:
             count = len(self._cache)
             self._cache.clear()
-            logger.info(f"Cleared {count} workflow cache entries")
+            logger.debug(f"Cleared {count} workflow cache entries")
             return count
 
     def get_stats(self) -> Dict[str, Any]:
@@ -789,7 +789,7 @@ class WorkflowDefinitionCache:
                 maxsize=self._config.max_entries,
                 ttl=self._config.ttl_seconds,
             )
-            logger.info(
+            logger.debug(
                 f"Workflow definition cache initialized: max_entries={self._config.max_entries}, "
                 f"ttl={self._config.ttl_seconds}s"
             )
@@ -907,7 +907,7 @@ class WorkflowDefinitionCache:
             count = len(keys_to_delete)
             if count > 0:
                 self._stats["invalidations"] += count
-                logger.info(f"Invalidated {count} definition cache entries for: {path}")
+                logger.debug(f"Invalidated {count} definition cache entries for: {path}")
 
             return count
 
@@ -923,7 +923,7 @@ class WorkflowDefinitionCache:
         with self._lock:
             count = len(self._cache)
             self._cache.clear()
-            logger.info(f"Cleared {count} definition cache entries")
+            logger.debug(f"Cleared {count} definition cache entries")
             return count
 
     def get_stats(self) -> Dict[str, Any]:
@@ -961,7 +961,7 @@ def configure_workflow_definition_cache(config: DefinitionCacheConfig) -> None:
     """
     global _global_definition_cache
     _global_definition_cache = WorkflowDefinitionCache(config)
-    logger.info(f"Workflow definition cache configured: enabled={config.enabled}")
+    logger.debug(f"Workflow definition cache configured: enabled={config.enabled}")
 
 
 # Global cache manager instance
@@ -988,7 +988,7 @@ def configure_workflow_cache(config: WorkflowCacheConfig) -> None:
     """
     global _global_cache_manager
     _global_cache_manager = WorkflowCacheManager(config)
-    logger.info(f"Workflow cache configured: enabled={config.enabled}")
+    logger.debug(f"Workflow cache configured: enabled={config.enabled}")
 
 
 __all__ = [

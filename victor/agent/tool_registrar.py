@@ -400,7 +400,7 @@ class ToolRegistrar:
         # Calculate totals
         self._stats.total_tools = len(self.tools.list_tools())
 
-        logger.info(
+        logger.debug(
             f"Tool registration complete: {self._stats.total_tools} tools "
             f"(dynamic: {self._stats.dynamic_tools}, plugins: {self._stats.plugin_tools}, "
             f"MCP: {self._stats.mcp_tools})"
@@ -501,7 +501,7 @@ class ToolRegistrar:
         catalog_loader = self._get_catalog_loader()
         result = catalog_loader.load_bootstrap()
         self._stats.dynamic_tools += result.tools_loaded
-        logger.info("Tool bootstrap registration complete: %s tools", result.tools_loaded)
+        logger.debug("Tool bootstrap registration complete: %s tools", result.tools_loaded)
         return result.tools_loaded
 
     def ensure_tool_registered(self, tool_name: str) -> bool:
@@ -514,7 +514,7 @@ class ToolRegistrar:
         catalog_loader = self._get_catalog_loader()
         result = catalog_loader.ensure_tools([tool_name])
         if result.tools_loaded:
-            logger.info("Lazy-registered tool on demand: %s", tool_name)
+            logger.debug("Lazy-registered tool on demand: %s", tool_name)
             return self.tools.get(tool_name) is not None
 
         if not self._tools_loaded and not self.config.lazy_startup:
@@ -536,7 +536,7 @@ class ToolRegistrar:
         catalog_loader = self._get_catalog_loader()
         result = catalog_loader.ensure_tools(needed)
         if result.tools_loaded:
-            logger.info("Lazy-registered demand tools: %s", needed)
+            logger.debug("Lazy-registered demand tools: %s", needed)
         return result.tools_loaded
 
     def _load_tool_configurations(self) -> None:
@@ -651,11 +651,11 @@ class ToolRegistrar:
                 name for name, enabled in self.tools.get_tool_states().items() if not enabled
             ]
             if disabled_tools:
-                logger.info(f"Disabled tools: {', '.join(sorted(disabled_tools))}")
+                logger.debug(f"Disabled tools: {', '.join(sorted(disabled_tools))}")
 
             # Log enabled tool count
             enabled_count = sum(1 for enabled in self.tools.get_tool_states().values() if enabled)
-            logger.info(f"Enabled tools: {enabled_count}/{len(registered_tools)}")
+            logger.debug(f"Enabled tools: {enabled_count}/{len(registered_tools)}")
 
         except Exception as e:
             logger.warning(f"Failed to load tool configurations: {e}")
@@ -717,7 +717,7 @@ class ToolRegistrar:
 
             # Start registry and connect to servers in background
             if self.mcp_registry.list_servers():
-                logger.info(
+                logger.debug(
                     f"MCP Registry initialized with {len(self.mcp_registry.list_servers())} server(s)"
                 )
                 self._create_task(self._start_mcp_registry(), "mcp_registry_start")
@@ -763,7 +763,7 @@ class ToolRegistrar:
                 # Update available tools from MCP
                 mcp_tools = self.mcp_registry.get_all_tools()
                 if mcp_tools:
-                    logger.info(f"Discovered {len(mcp_tools)} MCP tools")
+                    logger.debug(f"Discovered {len(mcp_tools)} MCP tools")
         except Exception as e:
             logger.warning(f"Failed to start MCP registry: {e}")
 
@@ -1013,7 +1013,7 @@ class ToolRegistrar:
             # At application startup
             registrar = ToolRegistrar(tools, settings, provider, model)
             result = await registrar.prewarm()
-            logger.info(f"Prewarmed {result.tools_loaded} tools in {result.duration_ms}ms")
+            logger.debug(f"Prewarmed {result.tools_loaded} tools in {result.duration_ms}ms")
         """
         import time
 
@@ -1078,7 +1078,7 @@ class ToolRegistrar:
             logger.warning(f"Prewarm failed: {e}")
 
         result.duration_ms = (time.monotonic() - start_time) * 1000
-        logger.info(
+        logger.debug(
             f"Prewarm complete: {result.tools_loaded} tools, "
             f"{result.plugins_loaded} plugins in {result.duration_ms:.1f}ms"
         )

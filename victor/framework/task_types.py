@@ -1034,7 +1034,7 @@ class TaskTypeRegistry:
             except Exception as e:
                 logger.warning(f"TaskTypeRegistry: Hook failed: {e}")
 
-        logger.info(f"TaskTypeRegistry: Initialized with {len(self._core_types)} core types")
+        logger.debug(f"TaskTypeRegistry: Initialized with {len(self._core_types)} core types")
 
 
 # =================================================================
@@ -1491,6 +1491,6 @@ def setup_vertical_task_types() -> None:
     register_coding_task_types(registry)
     register_research_task_types(registry)
 
-    logger.info(
+    logger.debug(
         f"TaskTypeRegistry: Set up vertical task types. " f"Verticals: {registry.list_verticals()}"
     )

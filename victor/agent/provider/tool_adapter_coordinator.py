@@ -96,7 +96,7 @@ class ToolAdapterCoordinator(IToolAdapterCoordinator):
         self._adapter = adapter
         self._capabilities = capabilities
 
-        logger.info(
+        logger.debug(
             f"Tool adapter initialized for {provider_name.provider_name}:{model}: "
             f"native={capabilities.native_tool_calls}, "
             f"format={capabilities.tool_call_format.value}"

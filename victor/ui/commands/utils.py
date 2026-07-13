@@ -165,6 +165,7 @@ def setup_logging(
     session_id: Optional[str] = None,
     repo_path: Optional[str] = None,
     cli_debug_modules: Optional[str] = None,
+    cli_file_level: Optional[str] = None,
 ) -> "LoggingConfig":
     """Convenience function to load config and configure logging in one call.
 
@@ -173,10 +174,14 @@ def setup_logging(
 
     Args:
         command: Command name for command-specific overrides (e.g., "chat", "benchmark")
-        cli_log_level: CLI-provided log level (highest priority, applies to console)
+        cli_log_level: CLI-provided log level (highest priority, applies to console only;
+            the persistent file level stays at its configured value so one verbose
+            session does not flood ~/.victor/logs/victor.log)
         stream: Stream for console output (default stderr)
         session_id: Optional session identifier for log context
         repo_path: Optional repo path for log context
+        cli_file_level: Explicit file log level override. Callers that genuinely
+            want verbose file logs must pass this (or set VICTOR_LOG_FILE_LEVEL).
 
     Returns:
         The LoggingConfig that was applied (for inspection if needed)
@@ -191,7 +196,7 @@ def setup_logging(
     config = get_logging_config(
         command=command,
         cli_console_level=cli_log_level,
-        cli_file_level=cli_log_level,  # CLI flag controls both console and file
+        cli_file_level=cli_file_level,
         cli_debug_modules=cli_debug_modules,
     )
     configure_logging_from_config(
