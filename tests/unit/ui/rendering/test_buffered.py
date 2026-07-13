@@ -189,9 +189,7 @@ class TestFinalize:
         renderer.finalize()
         assert renderer.finalize() == "Hello"
 
-    def test_finalize_with_user_message(
-        self, renderer_with_user_msg: BufferedRenderer
-    ) -> None:
+    def test_finalize_with_user_message(self, renderer_with_user_msg: BufferedRenderer) -> None:
         renderer_with_user_msg.on_content("The answer is 4")
         result = renderer_with_user_msg.finalize()
         assert "4" in result
@@ -229,9 +227,7 @@ class TestFlush:
             "victor.ui.rendering.buffered.format_tool_display_name",
             return_value="Search",
         ):
-            with patch(
-                "victor.ui.rendering.buffered.format_duration", return_value="1.5s"
-            ):
+            with patch("victor.ui.rendering.buffered.format_duration", return_value="1.5s"):
                 with patch(
                     "victor.ui.rendering.buffered.format_tool_args",
                     return_value="q=test",
@@ -251,9 +247,7 @@ class TestFlush:
         pending_calls = [c for c in console.print.call_args_list if "pending" in str(c)]
         assert len(pending_calls) >= 1
 
-    def test_flush_with_reasoning(
-        self, renderer_with_reasoning: BufferedRenderer
-    ) -> None:
+    def test_flush_with_reasoning(self, renderer_with_reasoning: BufferedRenderer) -> None:
         console = MagicMock()
         renderer_with_reasoning.on_thinking_content("step 1")
         renderer_with_reasoning.flush(console)
@@ -278,9 +272,7 @@ class TestEdgeCases:
         renderer.on_content("Hello")
         assert renderer.finalize() == "Hello"
 
-    def test_multiple_tool_calls_mixed_results(
-        self, renderer: BufferedRenderer
-    ) -> None:
+    def test_multiple_tool_calls_mixed_results(self, renderer: BufferedRenderer) -> None:
         renderer.on_tool_start("search", {"q": "1"})
         renderer.on_tool_start("read", {"path": "f.py"})
         renderer.on_tool_result("search", True, 0.1, {"q": "1"}, result="found")
