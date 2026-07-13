@@ -228,7 +228,7 @@ class ArgumentNormalizer:
             if tool_name not in self._alias_stats["by_tool"]:
                 self._alias_stats["by_tool"][tool_name] = 0
             self._alias_stats["by_tool"][tool_name] += 1
-            logger.info(
+            logger.debug(
                 f"[{self.provider_name}] Normalized parameter aliases for {tool_name}: "
                 f"{list(set(arguments.keys()) - set(normalized.keys()))} -> "
                 f"{list(set(normalized.keys()) - set(arguments.keys()))}"
@@ -407,7 +407,7 @@ class ArgumentNormalizer:
                                 result.get(field, "")
                             ):
                                 result.update(tolerant)
-                                logger.info(
+                                logger.debug(
                                     "Tolerant extractor upgraded result: "
                                     "%s grew from %d to %d chars",
                                     field,
@@ -712,7 +712,7 @@ class ArgumentNormalizer:
                 if not (isinstance(_strict, dict) and {"path", "content"} <= set(_strict)):
                     _greedy = self.extract_write_payload_greedy(payload)
                     if _greedy:
-                        logger.info(
+                        logger.debug(
                             "[%s] Greedy recovery of write value envelope " "(content_len=%d)",
                             self.provider_name,
                             len(_greedy["content"]),
@@ -722,7 +722,7 @@ class ArgumentNormalizer:
             # Check for common LLM error patterns
             payload_size = len(payload)
             if payload_size > 10000:
-                logger.info(
+                logger.debug(
                     "[%s] Large value envelope detected (%d chars) for tool '%s' - using enhanced parsing",
                     self.provider_name,
                     payload_size,
@@ -799,7 +799,7 @@ class ArgumentNormalizer:
                     content_field = tolerant_extract.get("content") or tolerant_extract.get(
                         "cmd", ""
                     )
-                    logger.info(
+                    logger.debug(
                         "[%s] Tolerant extraction recovered %s payload for "
                         "tool '%s' (content_len=%d, params=%s)",
                         self.provider_name,
@@ -814,7 +814,7 @@ class ArgumentNormalizer:
                 if canonical_tool_name == "write" and payload_size > 50:
                     salvaged = self._extract_by_schema(payload, ["path", "content"])
                     if salvaged:
-                        logger.info(
+                        logger.debug(
                             "[%s] Schema recovery: write payload from malformed envelope",
                             self.provider_name,
                         )
@@ -823,7 +823,7 @@ class ArgumentNormalizer:
                 if canonical_tool_name == "shell" and payload_size > 50:
                     salvaged = self._extract_by_schema(payload, ["cmd"])
                     if salvaged:
-                        logger.info(
+                        logger.debug(
                             "[%s] Schema recovery: shell command (%d chars) from malformed payload",
                             self.provider_name,
                             len(str(salvaged.get("cmd", ""))),
@@ -848,7 +848,7 @@ class ArgumentNormalizer:
             }
             required_params = envelope_param_map.get(canonical_tool_name)
             if required_params and required_params.issubset(aliased_payload.keys()):
-                logger.info(
+                logger.debug(
                     "[%s] Recovered wrapped %s payload from value envelope with keys: %s",
                     self.provider_name,
                     canonical_tool_name,
@@ -867,13 +867,13 @@ class ArgumentNormalizer:
                 return arguments
 
             if "ops" in aliased_payload or "operations" in aliased_payload:
-                logger.info(
+                logger.debug(
                     "[%s] Recovered wrapped edit payload from value envelope",
                     self.provider_name,
                 )
                 return aliased_payload
             if self._looks_like_edit_operation(aliased_payload):
-                logger.info(
+                logger.debug(
                     "[%s] Recovered single wrapped edit operation from value envelope",
                     self.provider_name,
                 )
@@ -883,7 +883,7 @@ class ArgumentNormalizer:
             return arguments
 
         if isinstance(payload, list):
-            logger.info(
+            logger.debug(
                 "[%s] Recovered wrapped edit payload from value envelope",
                 self.provider_name,
             )
@@ -1014,7 +1014,7 @@ class ArgumentNormalizer:
                     if is_valid:
                         self.stats.normalizations[NormalizationStrategy.PYTHON_AST.value] += 1
                         self.stats.by_tool[tool_name].normalizations += 1
-                        logger.info(
+                        logger.debug(
                             f"[{self.provider_name}] Preemptively normalized {tool_name} arguments via AST"
                         )
                         return normalized, NormalizationStrategy.PYTHON_AST
@@ -1047,7 +1047,7 @@ class ArgumentNormalizer:
                 normalized = self._normalize_via_ast(arguments, tool_name)
                 if self._is_valid_json_dict(normalized):
                     self.stats.normalizations[NormalizationStrategy.PYTHON_AST.value] += 1
-                    logger.info(
+                    logger.debug(
                         f"[{self.provider_name}] Normalized {tool_name} arguments via AST conversion"
                     )
                     return normalized, NormalizationStrategy.PYTHON_AST
@@ -1059,7 +1059,7 @@ class ArgumentNormalizer:
             normalized = self._normalize_via_regex(arguments, tool_name)
             if self._is_valid_json_dict(normalized):
                 self.stats.normalizations[NormalizationStrategy.REGEX_QUOTES.value] += 1
-                logger.info(f"[{self.provider_name}] Normalized {tool_name} arguments via regex")
+                logger.debug(f"[{self.provider_name}] Normalized {tool_name} arguments via regex")
                 return normalized, NormalizationStrategy.REGEX_QUOTES
         except Exception as e:
             logger.debug(f"Regex normalization failed for {tool_name}: {e}")
@@ -1069,7 +1069,7 @@ class ArgumentNormalizer:
             normalized = self._normalize_via_manual_repair(arguments, tool_name)
             if self._is_valid_json_dict(normalized):
                 self.stats.normalizations[NormalizationStrategy.MANUAL_REPAIR.value] += 1
-                logger.info(
+                logger.debug(
                     f"[{self.provider_name}] Normalized {tool_name} arguments via manual repair"
                 )
                 return normalized, NormalizationStrategy.MANUAL_REPAIR
@@ -1413,7 +1413,7 @@ class ArgumentNormalizer:
                 coerced[key] = value
 
         if any_coerced:
-            logger.info(
+            logger.debug(
                 f"[{self.provider_name}] Coerced primitive types for {tool_name}: "
                 f"{[k for k in arguments if coerced.get(k) is not arguments.get(k)]}"
             )
@@ -1524,4 +1524,4 @@ class ArgumentNormalizer:
     def log_stats(self) -> None:
         """Log current statistics."""
         stats = self.get_stats()
-        logger.info(f"Argument normalization stats: {stats}")
+        logger.debug(f"Argument normalization stats: {stats}")

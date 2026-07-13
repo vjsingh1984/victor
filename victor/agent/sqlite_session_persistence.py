@@ -149,7 +149,7 @@ class SQLiteSessionPersistence:
             self._db.execute(Schema.CONV_SESSION)
             # Create messages table
             self._db.execute(Schema.CONV_MESSAGE)
-            logger.info("Initialized sessions and messages tables")
+            logger.debug("Initialized sessions and messages tables")
         except Exception as e:
             logger.error(f"Failed to initialize tables: {e}")
 
@@ -331,7 +331,7 @@ class SQLiteSessionPersistence:
                     ),
                 )
 
-            logger.info(f"Saved session {session_id} to SQLite ({message_count} messages)")
+            logger.debug(f"Saved session {session_id} to SQLite ({message_count} messages)")
             return session_id
 
         except Exception as e:
@@ -399,7 +399,7 @@ class SQLiteSessionPersistence:
                 "compaction_hierarchy": None,
             }
 
-            logger.info(f"Loaded session {session_id} from SQLite")
+            logger.debug(f"Loaded session {session_id} from SQLite")
             return session_data
 
         except Exception as e:

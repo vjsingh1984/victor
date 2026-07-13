@@ -196,7 +196,7 @@ class LifecycleManager:
         else:
             results["session_ended"] = True
 
-        logger.info(f"Graceful shutdown complete: {results}")
+        logger.debug(f"Graceful shutdown complete: {results}")
         return results
 
     async def shutdown(self) -> None:
@@ -210,7 +210,7 @@ class LifecycleManager:
         - Semantic selector resources
         - HTTP clients
         """
-        logger.info("Shutting down LifecycleManager...")
+        logger.debug("Shutting down LifecycleManager...")
 
         # Cancel all background tasks first
         if self._background_tasks:
@@ -297,7 +297,7 @@ class LifecycleManager:
         except Exception as e:
             logger.debug(f"Error closing EmbeddingRegistry: {e}")
 
-        logger.info("LifecycleManager shutdown complete")
+        logger.debug("LifecycleManager shutdown complete")
 
     def get_session_stats(self) -> Dict[str, Any]:
         """Get statistics for current session.

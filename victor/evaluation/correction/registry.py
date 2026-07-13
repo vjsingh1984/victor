@@ -174,7 +174,7 @@ class CodeValidatorRegistry:
                             validator = attr()
                             self.register(validator)
                             count += 1
-                            logger.info(
+                            logger.debug(
                                 f"Discovered validator: {attr.__name__} "
                                 f"for {[lang.name for lang in validator.supported_languages]}"
                             )
@@ -185,7 +185,7 @@ class CodeValidatorRegistry:
                 logger.warning(f"Failed to import validator module {module_name}: {e}")
 
         self._discovered = True
-        logger.info(f"Discovered {count} validators")
+        logger.debug(f"Discovered {count} validators")
         return count
 
     def _create_fallback(self) -> "BaseCodeValidator":

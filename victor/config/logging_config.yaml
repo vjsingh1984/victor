@@ -96,3 +96,13 @@ logging:
     victor.agent.adaptive_mode_controller: WARNING
     victor.agent.model_switcher: WARNING
     victor.agent.provider_manager: WARNING
+
+    # DEBUG-flood guards: these emit thousands of per-instance DEBUG lines
+    # (DI registrations, singleton resets, classifier scoring). Pin to INFO so
+    # even a DEBUG file session doesn't flood victor.log; re-enable per-module
+    # with --debug-modules when actually debugging them.
+    victor.core.registry.base: INFO
+    victor.core.container: INFO
+    victor.classification.nudge_engine: INFO
+    victor.tools.registration.strategies.strategies: INFO
+    victor.agent.unified_classifier: INFO
