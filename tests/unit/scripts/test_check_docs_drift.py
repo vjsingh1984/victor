@@ -81,8 +81,13 @@ def test_repo_docs_currently_pass():
 def test_instruction_files_are_scanned():
     # F-001: root instruction files (CLAUDE.md, .victor/init.md, AGENTS.md) carry
     # canon counts and must be in the scan set so a future drift there is caught.
+    # Static check (holds in every environment): the scan config must list them.
+    for f in ("CLAUDE.md", ".victor/init.md", "AGENTS.md"):
+        assert f in mod.EXTRA_FILES, f"{f} missing from EXTRA_FILES"
+    # Runtime check: each is scanned WHEN present. These files are gitignored and
+    # local-only, so they exist on developer machines (drift caught there) but
+    # not in CI's fresh checkout — do not fail CI for files that aren't checked out.
     scanned = {str(p.relative_to(mod.ROOT)) for p in mod._doc_files()}
-    assert "CLAUDE.md" in scanned
-    assert ".victor/init.md" in scanned
-    # AGENTS.md is optional (may not exist) but must be scanned when present.
-    assert "AGENTS.md" in scanned or not (mod.ROOT / "AGENTS.md").exists()
+    for f in ("CLAUDE.md", ".victor/init.md", "AGENTS.md"):
+        if (mod.ROOT / f).exists():
+            assert f in scanned, f"{f} exists on disk but was not scanned"
