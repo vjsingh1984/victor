@@ -1,10 +1,20 @@
+%% Tool execution: validate request -> pipeline -> tool -> result -> LLM.
 sequenceDiagram
-    participant User
-    participant Orchestrator
-    participant ToolPipeline
-    participant Tool
-    participant FileSystem
-    participant Provider
+    autonumber
+    box rgb(239,246,255) User
+        participant User
+    end
+    box rgb(240,253,244) Runtime
+        participant Orchestrator
+    end
+    box rgb(248,250,252) Tool pipeline
+        participant ToolPipeline
+        participant Tool
+        participant FileSystem
+    end
+    box rgb(255,251,235) Provider
+        participant Provider
+    end
 
     %% Tool Execution Flow
     User->>Orchestrator: Execute task: "Read auth.py"
