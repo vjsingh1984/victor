@@ -1,0 +1,50 @@
+%% Victor 0.7 layered architecture (simplified, release-facing).
+flowchart TB
+  classDef surface fill:#ecfeff,stroke:#0891b2,color:#0f172a
+  classDef framework fill:#f0fdf4,stroke:#16a34a,color:#052e16
+  classDef service fill:#fffbeb,stroke:#d97706,color:#451a03
+  classDef storage fill:#f8fafc,stroke:#475569,color:#0f172a
+  classDef ext fill:#f5f3ff,stroke:#7c3aed,color:#1e1b4b
+
+  subgraph Surf["Surfaces — compose, never re-implement"]
+    CLI["CLI / TUI / slash commands"]:::surface
+    API["HTTP API"]:::surface
+    MCP["MCP server + client"]:::surface
+    PY["Python API\nvictor.framework"]:::surface
+  end
+
+  subgraph FW["Framework layer — stable public contract"]
+    AGENT["Agent facade\nrun / stream / chat\nrun_workflow / run_team"]:::framework
+    SG["StateGraph engine"]:::framework
+    WE["WorkflowEngine\n+ YAML DSL"]:::framework
+    TR["Tool registry + presets"]:::framework
+    EV["Structured events"]:::framework
+  end
+
+  subgraph RT["Runtime — service-first"]
+    ORC["AgentOrchestrator\n(composition root)"]:::framework
+    SVC["6 services:\nChat - Tool - Session\nContext - Provider - Recovery"]:::service
+    LOOP["AgenticLoop\nPERCEIVE-PLAN-ACT-EVALUATE-DECIDE"]:::service
+  end
+
+  subgraph DATA["Core, storage, code intelligence"]
+    GDB["Global DB\n~/.victor/victor.db\nsettings - keys - RL - profiles"]:::storage
+    PDB["Project DB\n./.victor/project.db\ngraph - edges - conversations"]:::storage
+    GPH["Code graph + tree-sitter"]:::storage
+    VEC["Vectors / LanceDB"]:::storage
+  end
+
+  subgraph PLUG["Plugin / vertical ecosystem"]
+    SDK["victor-contracts\n(definition layer)"]:::ext
+    VERT["victor-coding / devops / rag\nresearch / dataanalysis / invest"]:::ext
+  end
+
+  Surf --> FW
+  FW --> RT
+  AGENT --> ORC
+  ORC --> SVC
+  SVC --> LOOP
+  SVC --> DATA
+  GPH --> VEC
+  SDK --> VERT
+  VERT -.->|"tools + workflows"| TR

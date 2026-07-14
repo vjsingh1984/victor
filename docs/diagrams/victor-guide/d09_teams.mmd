@@ -1,0 +1,22 @@
+%% Teams are formations inside StateGraph — not a separate graph engine.
+flowchart TB
+  classDef node fill:#ecfeff,stroke:#0891b2,color:#0f172a
+  classDef team fill:#fffbeb,stroke:#d97706,color:#451a03
+  classDef mem fill:#f0fdf4,stroke:#16a34a,color:#052e16
+
+  START(("START")) --> ENTRY["entry node"]:::node
+  ENTRY --> TEAM["research_team\nUnifiedTeamCoordinator"]:::team
+
+  subgraph TEAM_DETAIL["Inside the team node (a formation)"]
+    direction LR
+    M1["researcher\nprovider: anthropic"]:::mem
+    M2["planner\nprovider: openai"]:::mem
+    M3["executor\nprovider: ollama (local)"]:::mem
+    M1 --> M2 --> M3
+  end
+  TEAM --- TEAM_DETAIL
+
+  TEAM --> VALID["validate findings"]:::node
+  VALID --> EN(("END"))
+
+  LEGEND["Formation options:\nSEQUENTIAL - PARALLEL - HIERARCHICAL\nPIPELINE - CONSENSUS - REFLECTION"]:::team

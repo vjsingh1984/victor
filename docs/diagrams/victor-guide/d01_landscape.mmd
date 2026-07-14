@@ -1,0 +1,28 @@
+%% Where Victor sits in the agentic-AI landscape.
+flowchart LR
+  classDef thin fill:#eff6ff,stroke:#1d4ed8,color:#0f172a
+  classDef orch fill:#ecfeff,stroke:#0891b2,color:#0f172a
+  classDef full fill:#f0fdf4,stroke:#16a34a,color:#052e16,stroke-width:3px
+  classDef closed fill:#fff1f2,stroke:#e11d48,color:#4c0519,stroke-dasharray:4 3
+
+  subgraph T["Thin wrappers / single-purpose"]
+    A1["Aider\n(pair-programming CLI)"]:::thin
+    A2["Continue\n(IDE completion)"]:::thin
+  end
+
+  subgraph O["Orchestration frameworks\n(bring your own model + tools)"]
+    O1["LangGraph\n(graph + state)"]:::orch
+    O2["CrewAI\n(role-based teams)"]:::orch
+    O3["AutoGen\n(conversational agents)"]:::orch
+  end
+
+  subgraph F["Full agentic runtimes\n(model layer + tools + memory + evals)"]
+    V["Victor\n24 providers - 64+ tools\ncode graph + vectors - evals\nlocal + cloud - Apache-2.0"]:::full
+    OH["OpenHands\n(open agentic runtime)"]:::orch
+    DV["Devin\n(closed, commercial)"]:::closed
+  end
+
+  T -->|"compose"| O
+  O -->|"orchestrate inside"| V
+  V -.->|"comparable scope"| OH
+  V -.->|"open alternative to"| DV

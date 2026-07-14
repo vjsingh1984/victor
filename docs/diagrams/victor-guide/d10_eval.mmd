@@ -1,0 +1,18 @@
+%% Evaluation pipeline — evals as a first-class citizen.
+flowchart LR
+  classDef phase fill:#ecfeff,stroke:#0891b2,color:#0f172a
+  classDef gate fill:#fffbeb,stroke:#d97706,color:#451a03
+  classDef metric fill:#f0fdf4,stroke:#16a34a,color:#052e16
+
+  L["LOAD\nSWE-bench / HumanEval / MBPP"]:::phase --> ENV["ENV SETUP\nofficial per-instance\nDocker image"]:::phase
+  ENV --> BASE["BASELINE\nretrieval baseline\n(FTS5 / vector / hybrid)"]:::phase
+  BASE --> RUN["AGENT EXECUTE\nChatService path\nreal_run_runner"]:::phase
+  RUN --> VAL{"VALIDATE"}:::gate
+  VAL -->|"objective"| V1["patch applies\n+ tests pass\n+ file edits"]:::metric
+  VAL -->|"trajectory"| V2["4-axis score\nplanning / tool-grounding\nrecovery / refusal"]:::metric
+  VAL -->|"judge"| V3["LLM rubric judge\n(gated: kappa/alpha >= 0.7)"]:::gate
+  V1 --> COR["CORRELATE\npass@k\ncode-intel vs non"]:::metric
+  V2 --> COR
+  V3 --> COR
+  COR --> REP["REPORT\n+ A/B rollout decision"]:::phase
+  REP -.->|"traces"| OPT["Prompt optimization\n(GEPA / MiPROv2 / CoT)"]:::metric

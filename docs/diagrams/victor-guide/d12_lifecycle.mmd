@@ -1,0 +1,26 @@
+%% End-to-end request lifecycle.
+flowchart TB
+  classDef user fill:#eff6ff,stroke:#1d4ed8,color:#0f172a
+  classDef fw fill:#f0fdf4,stroke:#16a34a,color:#052e16
+  classDef svc fill:#fffbeb,stroke:#d97706,color:#451a03
+  classDef ext fill:#f5f3ff,stroke:#7c3aed,color:#1e1b4b
+
+  U["User / Client"]:::user --> CLI["CLI / VictorClient\n/ HTTP API / MCP"]:::user
+  CLI --> AGENT["Agent facade"]:::fw
+  AGENT --> CHAT["ChatService"]:::svc
+  CHAT --> LOOP["AgenticLoop"]:::svc
+
+  subgraph TURN["Per turn"]
+    LOOP --> CTX["ContextService\nassemble + prune\n(graph-RAG context)"]:::svc
+    LOOP --> PLAN["PLAN: tool necessity + selection"]:::svc
+    PLAN --> TOOLS{"tool needed?"}:::svc
+    TOOLS -->|"yes"| TS["ToolService -> ToolPipeline -> Tool"]:::svc
+    TS --> PROV1["ProviderService\n-> LLM (24 providers)"]:::svc
+    TOOLS -->|"no"| PROV1
+  end
+
+  PROV1 -->|"events"| EV["Event stream\nTHINKING / TOOL_CALL\nTOOL_RESULT / CONTENT"]:::fw
+  EV -.->|"telemetry"| OBS["Observability\n+ traces"]:::ext
+  EV --> CLI
+  OBS -.->|"learn"| RL["RL + prompt optimization"]:::ext
+  RL -.->|"feedback"| LOOP

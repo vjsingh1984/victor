@@ -1,0 +1,19 @@
+<style>
+/* Print / slide-deck: each chapter (h2) starts on a new page */
+@media print {
+  h1, h2 { page-break-before: always; }
+  h2 { page-break-after: avoid; }
+  h3, h4 { page-break-after: avoid; }
+  pre, table, .imageblock { page-break-inside: avoid; }
+}
+body { font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; max-width: 1100px; margin: 0 auto; line-height: 1.5; }
+#content { margin: 1rem; }
+.imageblock { text-align: center; margin: 1.5em 0; }
+.imageblock img { max-width: 100%; height: auto; border: 1px solid #e5e7eb; border-radius: 6px; padding: 8px; background: #fff; }
+h1, h2, h3 { color: #0f172a; }
+h2 { border-bottom: 2px solid #16a34a; padding-bottom: 0.2em; margin-top: 1.5em; }
+table { border-collapse: collapse; }
+code, pre { font-family: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace; }
+.exampleblock { background: #f0fdf4; border-left: 4px solid #16a34a; padding: 0.5em 1em; border-radius: 4px; }
+.colist td { color: #16a34a; font-weight: bold; }
+</style>

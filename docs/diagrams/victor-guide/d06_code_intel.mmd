@@ -1,0 +1,27 @@
+%% Code intelligence: graph + vectors vs grep vs whole-context.
+flowchart TB
+  classDef bad fill:#fff1f2,stroke:#e11d48,color:#4c0519
+  classDef mid fill:#fffbeb,stroke:#d97706,color:#451a03
+  classDef good fill:#f0fdf4,stroke:#16a34a,color:#052e16,stroke-width:3px
+
+  subgraph G["Feed whole repo to LLM"]
+    G1["token explosion\n100k+ tokens / query"]:::bad
+    G2["no structure\nmisses dependencies"]:::bad
+    G3["cost + latency prohibitive"]:::bad
+  end
+
+  subgraph R["Grep / keyword only"]
+    R1["exact-match blind spots\nrename, alias, callers"]:::bad
+    R2["no semantic recall\n'where do we validate JWTs?'"]:::bad
+    R3["single-hop\nno impact traversal"]:::mid
+  end
+
+  subgraph V["Victor: code graph + vectors"]
+    V1["semantic seed\nvector similarity"]:::good
+    V2["structural edges\nCALLS / REFS / IMPORTS / DDG"]:::good
+    V3["multi-hop traversal\nwho-calls-what, impact"]:::good
+    V4["skeleton extraction\n~90% token cut"]:::good
+  end
+
+  G -.->|"unscalable"| R
+  R -.->|"too shallow"| V
