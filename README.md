@@ -27,7 +27,7 @@ It is designed for teams that need agent systems to be testable, extensible, obs
 | **StateGraph workflows** | Build typed graph workflows and use teams as graph nodes without inventing a separate multi-agent graph abstraction. |
 | **Local and cloud models** | Use cloud providers for capability, local providers for privacy/cost, and provider-specific caching strategies for performance. |
 | **Tool-rich execution** | Compose filesystem, git, shell, code search, graph, verification, Docker, web, testing, and refactoring tools. |
-| **contract-first plugins** | Put domain behavior in sibling `victor-*` packages through `victor-contracts` and public framework extension contracts. |
+| **Contract-first plugins** | Put domain behavior in sibling `victor-*` packages through `victor-contracts` and public framework extension contracts. |
 | **Project code intelligence** | Keep graph indexes, semantic search, conversations, and project memory in project-local state. |
 
 ## Quick Start
@@ -189,7 +189,7 @@ cd rust && cargo test
 
 ## Contributing
 
-Start with [CONTRIBUTING.md](CONTRIBUTING.md), [AGENTS.md](AGENTS.md), and the architecture constraints in [CLAUDE.md](CLAUDE.md) or [GEMINI.md](GEMINI.md). Keep changes scoped, prefer public framework/SDK contracts over internal imports, and update docs/tests when public behavior changes.
+Start with [CONTRIBUTING.md](CONTRIBUTING.md) and the [architecture overview](docs/architecture.md); see the [development docs](docs/development/) for setup, code style, and the PR workflow. Keep changes scoped, prefer public framework/SDK contracts over internal imports, and update docs/tests when public behavior changes.
 
 ## License
 
