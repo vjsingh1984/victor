@@ -1,7 +1,7 @@
 # Victor Roadmap
 
-> **Canonical roadmap.** Referenced by `roadmap.md` (root), `ARCHITECTURE.md`, `docs/index.md`,
-> and `docs/README.md`. Restored to version control 2026-07-02 — the previous `docs/roadmap.md`
+> **Canonical roadmap.** Referenced by `docs/index.md`, `docs/README.md`, and the root
+> `README.md`. Restored to version control 2026-07-02 — the previous `docs/roadmap.md`
 > existed only as an untracked local file and was lost.
 >
 > Companion documents: [Vision](../VISION.md) · [Tech-debt register](tech-stack.md#technical-debt-register) ·

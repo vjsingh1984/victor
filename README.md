@@ -2,7 +2,7 @@
 
 # Victor
 
-**An contract-first agentic AI framework for building reliable agents across local and cloud models.**
+**A contract-first agentic AI framework for building reliable agents across local and cloud models.**
 
 [![PyPI version](https://badge.fury.io/py/victor-ai.svg)](https://pypi.org/project/victor-ai/)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
@@ -15,7 +15,7 @@
 
 ---
 
-Victor gives you a typed Python framework, a service-first agent runtime, and an contract-first plugin ecosystem for building agents that can reason, call tools, run workflows, coordinate teams, and operate against project-local code intelligence.
+Victor gives you a typed Python framework, a service-first agent runtime, and a contract-first plugin ecosystem for building agents that can reason, call tools, run workflows, coordinate teams, and operate against project-local code intelligence.
 
 It is designed for teams that need agent systems to be testable, extensible, observable, and portable across Anthropic, OpenAI-compatible providers, Gemini, Bedrock, local models, and air-gapped environments.
 
@@ -111,7 +111,7 @@ Victor 0.7 makes the framework/plugin split explicit:
 
 Detailed references:
 
-- [Architecture overview](ARCHITECTURE.md)
+- [Architecture overview](docs/architecture.md)
 - [Internal architecture diagram](docs/diagrams/architecture/victor_0_7_architecture.mmd)
 - [contracts boundary](docs/architecture/CONTRACTS_BOUNDARY.md)
 - [State-passed architecture](docs/architecture/state-passed-architecture.md)
@@ -183,10 +183,9 @@ cd rust && cargo test
 - [Durable Code Memory with ProximaDB](docs/quickstart-proximadb-memory.md)
 - [Guides](docs/guides/)
 - [Reference](docs/reference/)
-- [Operations](docs/operations/)
 - [Development](docs/development/)
-- [Architecture](ARCHITECTURE.md)
-- [Roadmap](roadmap.md)
+- [Architecture](docs/architecture.md)
+- [Roadmap](docs/roadmap.md)
 
 ## Contributing
 
