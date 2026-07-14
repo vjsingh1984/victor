@@ -1,0 +1,24 @@
+%% Two-database architecture: global (user) vs project (repo).
+flowchart TB
+  classDef glob fill:#eff6ff,stroke:#1d4ed8,color:#0f172a
+  classDef proj fill:#f0fdf4,stroke:#16a34a,color:#052e16
+  classDef store fill:#f8fafc,stroke:#475569,color:#0f172a
+
+  subgraph GL["Global database  —  ~/.victor/victor.db"]
+    G1["User settings + profiles"]:::glob
+    G2["API keys / provider accounts"]:::glob
+    G3["RL outcomes + Q-values\n(tool / model preferences)"]:::glob
+    G4["Cross-project patterns\nfailed signatures (loop guard)"]:::glob
+    G5["TUI session persistence"]:::glob
+  end
+
+  subgraph PR["Project database  —  ./.victor/project.db"]
+    P1["graph_node + graph_edge\n(symbols, refs, defs)"]:::proj
+    P2["Vector index (.victor/embeddings/)"]:::proj
+    P3["Conversations + messages"]:::proj
+    P4["Project sessions + entity memory"]:::proj
+    P5["Change tracking + file metadata"]:::proj
+  end
+
+  BE["Pluggable backend\nSQLite + LanceDB (default)\nProximaDB (opt-in, multi-model)"]:::store
+  PR --> BE

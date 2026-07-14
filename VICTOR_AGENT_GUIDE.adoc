@@ -1,0 +1,760 @@
+= Victor: A Ground-Up Guide to Building Agents
+v0.7.5 · Open-source agentic AI framework · Apache-2.0
+:toc: left
+:toclevels: 3
+:sectnums:
+:sectnumlevels: 3
+:icons: font
+:imagesdir: docs/diagrams/victor-guide
+:data-uri:
+:docinfo:
+:source-language: python
+// Diagram format: SVG for HTML (crisp + scalable), PNG for PDF (prawn-safe).
+// High-DPI PNGs are rendered from the same .mmd sources; see the build runbook.
+ifdef::backend-pdf[:diagram-ext: png]
+ifndef::backend-pdf[:diagram-ext: svg]
+:figure-caption!:
+
+[abstract]
+--
+This guide presents **Victor** the way you would teach it to an engineering team: from the problem it solves, through the design it uses, to a live, runnable demo of every major capability. It is organized so each chapter is also a *slide module* — open the rendered HTML/PDF full-screen, and you can present from it. Every section ends with a **Demo** callout you can run live.
+
+Victor is a typed, async-first Python framework and runtime for building reliable agents across local and cloud models. It provides high-level and low-level APIs, a tool-rich execution pipeline, StateGraph workflows, multi-agent teams, project-local code intelligence (code graph + vectors), runtime prompt optimization, and evaluation treated as a first-class citizen.
+
+What this guide covers: the agent landscape and how Victor compares; the layered, service-first architecture; the high-level and low-level APIs; the agentic loop; tools; workflows; teams; providers and provider sovereignty; **code intelligence — graph + vectors vs grep vs whole-context** (the deep dive); the two-database model; prompt optimization; evaluation; observability and resilience; and a cohesive end-to-end demo with a runbook.
+--
+
+// ============================================================
+== The agent landscape: why a framework
+
+Building an LLM "agent" is easy to prototype and hard to make reliable. The moment a model needs to *do things* — read files, search code, call APIs, recover from failure, coordinate other agents — three classes of problem dominate:
+
+[cols="1,3", options="header"]
+|===
+|Failure class |What goes wrong
+|**Context** |The repo, conversation, and tool history don't fit the model's window. You either starve it (grep misses the relevant code) or drown it (paste everything, blow the token budget).
+|**Control** |Single LLM calls are not enough. You need loops, branches, retries, human-in-the-loop, and multi-step state — *deterministically*.
+|**Feedback** |You can't improve what you can't measure. Without evaluation, traces, and learning, every prompt change is a guess.
+|===
+
+Different tools answer different subsets:
+
+image::d01_landscape.{diagram-ext}[Landscape of agentic AI tooling]
+
+* **Thin wrappers / single-purpose** (Aider, Continue): excellent at one thing — pair programming, IDE completion. They are not runtimes you build *on*.
+* **Orchestration frameworks** (LangGraph, CrewAI, AutoGen): you bring the model, the tools, the memory, and the evals. They give you control flow and team patterns.
+* **Full agentic runtimes** (Victor, OpenHands, Devin): the model layer, tools, memory, evaluation, and learning are integrated. Victor is the *open* entry in this band — local-capable, Apache-2.0, no closed dependency.
+
+<<<
+== Victor at a glance
+
+Five abstractions, one runtime:
+
+[cols="1,3", options="header"]
+|===
+|Abstraction |What it is
+|**Agent** |Single entry point: `run()` (one turn), `stream()` (live events), `chat()` (multi-turn), `run_workflow()`, `run_team()`.
+|**Task** |A unit of work and its structured result (`TaskResult`).
+|**Tools** |Capabilities the agent can call, organized as a registry with presets (`ToolSet.default()`, `.coding()`, ...).
+|**State** |Observable conversation state (`Stage` enum, tool budget, usage).
+|**Event** |The stream of observations (`EventType`: THINKING, TOOL_CALL, TOOL_RESULT, CONTENT, ERROR, STREAM_END).
+|===
+
+**Design principles (what makes Victor, Victor):**
+
+* **Service-first runtime** — effectful behavior (chat, tools, sessions, context, provider routing, recovery) lives in six focused services, not a monolithic orchestrator.
+* **StateGraph is the engine, always** — workflows *and* teams are nodes in the same graph. There is no separate "multi-agent graph."
+* **Provider sovereignty** — 24 adapters; run fully local and air-gapped, or on cloud. Provider-specific caching is first-class.
+* **Project-local code intelligence** — a rebuildable code graph + vector index per repository, kept out of the user-wide database.
+* **Evals as a first-class citizen** — harnesses, SWE-bench, judge calibration, pass@k, trajectory scoring.
+* **Contract-first plugins** — domain behavior lives in sibling `victor-*` packages through `victor-contracts`, not inside the core.
+
+[cols="1,2", options="header"]
+|===
+|Capability |Scale
+|LLM providers |24 (cloud + local)
+|Tool functions |64+ across 16 categories
+|Team formations |5 core (+ reflection)
+|Code graph (real repo) |~1.26M nodes, ~2.97M edges, ~78K embeddings
+|Python |3.10+
+|===
+
+<<<
+== How Victor compares
+
+Weighted scorecard (cross-validated against the verified competitive analysis; 1–10):
+
+[cols="2,1,1,1,1,1,1", options="header"]
+|===
+|Dimension (weight) |Victor |LangGraph |CrewAI |Aider |OpenHands |Devin
+|Orchestration & state (20%) |9 |9 |6 |4 |5 |6
+|Multi-agent coordination (15%) |9 |7 |8 |3 |4 |7
+|Tool integration (25%) |10 |6 |5 |7 |6 |8
+|Type safety & DX (15%) |9 |7 |5 |8 |6 |5
+|Production maturity (25%) |6 |9 |7 |8 |7 |7
+|*Weighted average* |*8.6* |*7.6* |*6.2* |*6.0* |*5.6* |*6.6*
+|===
+
+**Victor's moat:** provider sovereignty (24 providers incl. fully local), runtime prompt optimization (GEPA), tool density (64+ functions), and project-local code intelligence.
+**Honest gaps:** production maturity — a browser-based observability UI and full 300-task SWE-bench submission are still in flight.
+
+When to reach for Victor: you want one open stack that runs locally *and* in the cloud, treats evaluation seriously, and gives you low-level control (graph, state, tools) behind a clean high-level API. When not: if you only want a 50-line CLI pair-programmer (use Aider), or a closed turnkey product (use Devin).
+
+<<<
+== Architecture: the layering
+
+The cardinal rule: *surfaces compose framework APIs; framework APIs delegate to the service-first runtime; domain packages plug in through SDK/public contracts.*
+
+image::d02_architecture.{diagram-ext}[Victor 0.7 layered architecture]
+
+* **Surfaces** (CLI, TUI, HTTP API, MCP, Python API) must enter through `VictorClient` / `Agent.create()` / `SessionConfig` — never import the orchestrator directly.
+* **Framework layer** (`victor.framework`) is the stable public contract: `Agent`, `StateGraph`, `WorkflowEngine`, tool registry, events.
+* **Runtime** (`victor.agent`) is the internal implementation. The `AgentOrchestrator` is a composition root that delegates to six canonical services.
+* **Storage / code intelligence** uses a two-database model (global user DB vs. project DB) with an optional ProximaDB backend.
+* **Plugins** (`victor-contracts` + sibling `victor-*` repos) own domain behavior — coding, devops, RAG, research, data analysis, investment.
+
+.Demo — inspect the layers from the shell
+====
+[source,bash]
+----
+# Surfaces
+ls victor/ui/commands | head
+
+# Framework public contract
+sed -n '1,40p' victor/framework/__init__.py
+
+# The six runtime services
+ls victor/agent/services/
+
+# Storage + code intelligence
+ls victor/storage/graph/ victor/storage/vector_stores/
+----
+====
+
+<<<
+== The high-level API: the golden path
+
+Ninety percent of users never leave this altitude. Three entry points, in order of simplicity:
+
+image::d03_api_levels.{diagram-ext}[High-level vs low-level API altitude]
+
+.Create an agent, run a task, stream events
+[source,python]
+----
+from victor.framework import Agent, EventType, ToolSet
+
+agent = await Agent.create(
+    provider="anthropic",          # or "ollama", "openai", "zai", ...
+    tools=ToolSet.default(),       # core + filesystem + git
+)
+
+result = await agent.run("Explain the architecture of this codebase")
+print(result.content)
+
+async for event in agent.stream("Review the changed files"):
+    if event.type == EventType.CONTENT:
+        print(event.content, end="")
+----
+
+**`Agent.create(...)`** is the simplest entry point. **`VictorClient`** is what UI layers (CLI/TUI/web) use, configured with an immutable **`SessionConfig`** for runtime overrides — the single mutation point so `Settings` is never mutated directly.
+
+[cols="2,1,4", options="header"]
+|===
+|Method |Returns |When to use
+|`agent.run(prompt)` |`TaskResult` (full result) |You want the complete answer.
+|`agent.stream(prompt)` |`AsyncIterator[Event]` |Live UI, logs, partial rendering.
+|`agent.chat(prompt)` |`ChatSession` |Multi-turn conversation.
+|`agent.run_workflow(name)` |`dict` |Run a declared YAML/StateGraph workflow.
+|`agent.run_team(name, goal)` |`dict` |Run a pre-configured multi-agent team.
+|===
+
+.Demo — run an agent against this very repo
+====
+[source,bash]
+----
+# Cloud
+export ANTHROPIC_API_KEY=...
+victor chat "Summarize the orchestrator decomposition"
+
+# Or fully local + private
+ollama pull qwen2.5-coder:7b
+victor chat --provider ollama "Where do we validate JWTs?"
+----
+====
+
+<<<
+== The low-level API: StateGraph
+
+When you need deterministic control flow, you drop to `StateGraph` — a LangGraph-inspired engine for typed, stateful, possibly cyclic graphs. *This same engine runs workflows and teams.*
+
+.Define typed state, nodes, edges, conditional edges, cycles, and checkpointing
+[source,python]
+----
+from typing import TypedDict
+from victor.framework import StateGraph, END, MemoryCheckpointer
+
+class ReviewState(TypedDict):
+    query: str
+    findings: list[str]
+    attempts: int
+
+async def inspect(state: ReviewState) -> ReviewState:
+    return {**state, "findings": state["findings"] + ["example finding"]}
+
+def route(state: ReviewState) -> str:           # conditional edge
+    return "done" if state["attempts"] >= 2 else "retry"
+
+g = StateGraph(ReviewState)
+g.add_node("inspect", inspect)
+g.add_conditional_edge("inspect", route, {"retry": "inspect", "done": END})
+g.set_entry_point("inspect")
+
+app = g.compile(checkpointer=MemoryCheckpointer(), strict_edges=True)
+result = await app.invoke({"query": "review this", "findings": [], "attempts": 0},
+                          thread_id="session-1")
+----
+
+**Supported features:** typed state (TypedDict or Pydantic), conditional edges, cyclic graphs (loops, retries), copy-on-write state, checkpointing + replay (`get_state_history`, `replay_from`), subgraphs, and **human-in-the-loop interrupts**.
+
+.Demo — a graph with a retry cycle + checkpoint replay
+====
+[source,bash]
+----
+cat examples/stategraph_retry_demo.py 2>/dev/null || echo "(write the snippet above into a file and run it)"
+python -c "import asyncio; from victor.framework import StateGraph; print('StateGraph OK')"
+----
+====
+
+<<<
+== The agentic loop: what runs a turn
+
+The `AgenticLoop` is the canonical authority for chat. It runs the *perceive → plan → act → evaluate → decide* cycle, delegating each *single turn* (one LLM call + tool execution) to the `ExecutionCoordinator` primitive.
+
+image::d04_agentic_loop.{diagram-ext}[The agentic loop: PERCEIVE-PLAN-ACT-EVALUATE-DECIDE]
+
+* **PERCEIVE** — parse intent and extract requirements (with calibrated confidence).
+* **PLAN** — decide tool necessity and select tools.
+* **ACT** — one LLM call plus tool execution via the tool pipeline.
+* **EVALUATE** — progress tracking, fulfillment detection (9 task-type strategies), spin/loop detection.
+* **DECIDE** — continue, retry, recover (via `RecoveryService`), or complete.
+
+The loop is wired above the six runtime services; chat services call `TurnExecutor.execute_agentic_loop()` directly. An optional StateGraph-backed inner executor (`USE_STATEGRAPH_AGENTIC_LOOP`) can swap the inner turn driver, but the loop itself runs unconditionally — no legacy fallback path.
+
+<<<
+== Tools: author, organize, execute
+
+Tools are the agent's hands. Victor ships 64+ tool functions across 16 categories, with presets that bundle sensible sets per task.
+
+image::d05_tools.{diagram-ext}[Tools: authoring, registry, presets, execution pipeline]
+
+[cols="1,3", options="header"]
+|===
+|Preset |Contains
+|`ToolSet.minimal()` |core only (read, write, edit, shell, search, code_search, ls)
+|`ToolSet.default()` |core + filesystem + git — recommended starting point
+|`ToolSet.coding()` |+ testing, refactoring, verification, notebook
+|`ToolSet.research()` |+ web (search, fetch, http)
+|`ToolSet.airgapped()` |core + filesystem + git + analysis, **no network**
+|`ToolSet.full()` |all 16 categories
+|===
+
+.Author a custom tool — one decorator
+[source,python]
+----
+from typing import Any, Dict
+from victor.tools import tool
+from victor.tools.enums import AccessMode, DangerLevel, Priority
+
+@tool(
+    category="analysis",
+    priority=Priority.HIGH,
+    access_mode=AccessMode.READONLY,
+    danger_level=DangerLevel.SAFE,
+    keywords=["analyze", "inspect"],
+    task_types=["analysis"],
+    signature_params=["target"],     # what counts as "progress" for loop detection
+)
+async def complexity(target: str, _exec_ctx: Dict[str, Any] = None) -> Dict[str, Any]:
+    """Analyze cyclomatic complexity of `target` (file or dir).
+
+    Args:
+        target: Path to analyze.
+    Returns:
+        Per-file complexity metrics.
+    """
+    ...                                   # your implementation
+    return {"target": target, "metrics": {...}}
+----
+
+Every tool call flows through the **ToolPipeline**: access/safety policy → cache (idempotent + cross-turn) → parallel batching for safe tools → retry/timeout → execute → emit a `TOOL_RESULT` event. Results land in observability and traces, which feed prompt optimization (a closed feedback loop).
+
+.Demo — add a tool and watch the pipeline
+====
+[source,bash]
+----
+# Browse the 16 categories and which tools belong to each
+sed -n '1,120p' victor/config/tool_categories.yaml
+
+# See a real tool definition
+sed -n '1,60p' victor/tools/filesystem.py
+
+# External tools are first-class: MCP and LangChain bridges
+ls victor/tools/*adapter*.py
+----
+====
+
+<<<
+== Workflows: declare with YAML, run as graphs
+
+The `WorkflowEngine` compiles declarative YAML into `StateGraph` nodes and edges. Node types: **agent** (LLM step), **compute** (pure Python, no LLM), **handler** (custom function), **passthrough**, **parallel** (fan-out/join), **condition** (branch), and **hitl** (human-in-the-loop).
+
+.A research workflow in YAML (abridged)
+[source,yaml]
+----
+workflows:
+  deep_research:
+    nodes:
+      - id: understand_query
+        type: agent
+        role: researcher
+        tool_budget: 10
+        llm_config: { temperature: 0.3 }
+        next: [parallel_search]
+
+      - id: parallel_search
+        type: parallel
+        parallel_nodes: [web_search, academic_search, code_search]
+        join_strategy: all
+        next: [validate_sources]
+
+      - id: check_coverage
+        type: condition
+        condition: "coverage_score >= 0.7"
+        branches: { "true": synthesize, "false": gap_analysis }
+
+      - id: generate_citations
+        type: compute            # no LLM, deterministic
+        handler: citation_formatter
+----
+
+Run it from Python or the CLI; stream node events (`NODE_START`, `AGENT_CONTENT`, `WORKFLOW_COMPLETE`) for live UIs. Human-in-the-loop nodes pause for approval or input with a timeout and fallback.
+
+.Demo — run a workflow
+====
+[source,bash]
+----
+# Find shipped workflow definitions
+find victor verticals -name "*.yaml" -path "*workflow*"
+
+# Execute + stream from Python
+python -c "import asyncio; from victor.framework import WorkflowEngine; print(WorkflowEngine)"
+----
+====
+
+<<<
+== Multi-agent teams: formations, not new graphs
+
+This is the single most important architectural idea in Victor's team model: **a team is a formation that runs *inside* a `StateGraph` node — it is not a separate graph engine.** `StateGraph` owns the workflow; `UnifiedTeamCoordinator` owns intra-team collaboration.
+
+image::d09_teams.{diagram-ext}[Teams are nodes inside StateGraph]
+
+.Team as a graph node
+[source,python]
+----
+from victor.framework.graph import END, StateGraph
+from victor.teams import UnifiedTeamCoordinator, TeamFormation
+
+coord = UnifiedTeamCoordinator()
+coord.add_member(researcher).add_member(planner).add_member(executor)
+coord.set_formation(TeamFormation.PIPELINE)   # output of one feeds the next
+
+g = StateGraph(ResearchState)
+g.add_node("research_team", coord)     # the whole team is ONE node
+g.add_edge("research_team", END)
+g.set_entry_point("research_team")
+result = await g.compile().invoke({"task": "Map the auth flow"})
+----
+
+.Formations
+[cols="2,3", options="header"]
+|===
+|Formation |Behavior
+|SEQUENTIAL |Members run one after another, context chaining.
+|PARALLEL |Members run simultaneously on independent work.
+|HIERARCHICAL |A supervisor delegates to specialists and synthesizes.
+|PIPELINE |One member's output feeds the next.
+|CONSENSUS |Members must agree (multiple rounds if needed).
+|REFLECTION |Generator → critic → refine, early-exit on satisfaction.
+|===
+
+**Heterogeneous teams** let each member use its own provider, model, temperature, and reasoning effort — e.g., Claude for research, a local Ollama model for execution, GPT for review.
+
+.Demo — run a team
+====
+[source,bash]
+----
+cat examples/teams/state_graph_team_coordinator.py
+python examples/teams/state_graph_team_coordinator.py
+----
+====
+
+<<<
+== Providers and provider sovereignty
+
+Victor speaks to 24 backends through a uniform `BaseProvider` interface (`chat()`, `stream_chat()`, `supports_tools()`), each wrapped with a circuit breaker, retry with exponential backoff + jitter, and rate-limit suppression.
+
+[cols="2,3", options="header"]
+|===
+|Class |Providers
+|Cloud frontier |anthropic, openai, azure, google, vertex, bedrock, xai
+|Specialty / regional |zai, qwen, deepseek, moonshot, groqcloud, mistral, cerebras, fireworks, together, openrouter, huggingface, replicate
+|Local / sovereign |ollama, lmstudio, llamacpp, mlx, vllm
+|===
+
+**Two independent caching capabilities** — and the distinction matters:
+
+[cols="2,3,3", options="header"]
+|===
+|Capability |Method |Effect
+|API prompt caching |`supports_prompt_caching()` |Billing discount on cached tokens (e.g., Anthropic ~90%).
+|KV prefix caching |`supports_kv_prefix_caching()` |Latency win by reusing the KV cache for a stable prompt prefix (works on local servers too).
+|===
+
+Victor uses this to place prompt content *disciplined-ly*: stable system prefix (identity, safety, core tool guidance) is frozen and tools are sorted deterministically so the prefix matches; dynamic, per-turn content is injected into the *user* message so it never busts the cache. `Agent.warm_up()` primes the KV cache with a one-token request.
+
+**Provider sovereignty** means the `airgapped()` tool preset plus a local provider (Ollama / llama.cpp / MLX / vLLM) gives you a fully offline, private agent with zero external calls.
+
+.Demo — switch the provider, keep everything else
+====
+[source,bash]
+----
+# Cloud capability
+victor chat --provider anthropic "Plan this refactor"
+
+# Fully local, private, offline-capable
+victor chat --provider ollama --tools airgapped "Plan this refactor"
+
+# Compare caching capability of two providers
+python -c "from victor.providers import AnthropicProvider, VLLMProvider as V; \
+print('anthropic api-cache:', AnthropicProvider().supports_prompt_caching()); \
+print('vllm kv-cache:', V().supports_kv_prefix_caching())"
+----
+====
+
+<<<
+== Code intelligence: graph + vectors vs grep vs whole-context
+
+This is the core technical bet, and where Victor earns its keep on large repositories. There are three ways to give an agent context about a codebase. Only one scales.
+
+image::d06_code_intel.{diagram-ext}[Graph + vectors vs grep vs whole-context]
+
+[cols="2,2,2,2", options="header"]
+|===
+|Approach |Token cost |Precision |Capability
+|**Feed whole repo** |Explodes (100k+) |Low (irrelevant noise) |No structure, expensive, slow
+|**Grep / keyword** |Low |Exact-match only |No semantic recall, single-hop, blind to renames/callers
+|**Victor: graph + vectors** |Tiny (skeletons) |High (semantic + structural) |Multi-hop dependency traversal, impact analysis
+|===
+
+=== How Victor's code intelligence works
+
+**1. A code graph (tree-sitter).** Symbols become nodes; relationships become typed edges — `CALLS`, `REFERENCES`, `CONTAINS`, `INHERITS`, `IMPLEMENTS`, `IMPORTS`, `INSTANTIATES`, plus fine-grained CFG / CDG / DDG data-flow edges. This lives in the project database:
+
+[source,sql]
+----
+CREATE TABLE graph_node (              -- a symbol: function, class, file, ...
+  node_id TEXT PRIMARY KEY, type TEXT, name TEXT, file TEXT,
+  line INTEGER, end_line INTEGER, lang TEXT,
+  signature TEXT, docstring TEXT, parent_id TEXT, ...
+);
+CREATE TABLE graph_edge (              -- typed relationship
+  src TEXT, dst TEXT, type TEXT, weight REAL, file TEXT,
+  PRIMARY KEY (src, dst, type)
+);
+CREATE TABLE graph_file_mtime (        -- incremental re-indexing
+  file TEXT PRIMARY KEY, mtime REAL, indexed_at REAL
+);
+----
+
+**2. Vectors (semantic search).** Embeddings (local `sentence-transformers`, default `BAAI/bge-small-en-v1.5`, 384-dim) persist in LanceDB under `.victor/embeddings/`. This gives you *semantic recall* — "where do we validate JWTs?" finds the function even if it's named `verify_token`, not `validate_jwt`.
+
+**3. Graph-RAG retrieval.** Vector search seeds relevant symbols; the graph expands them multi-hop; results are pruned and ranked by distance decay.
+
+image::d07_graph_rag.{diagram-ext}[Graph-RAG retrieval vs single-hop grep]
+
+**4. Skeleton extraction.** Instead of feeding whole files, Victor extracts signatures + docstrings (function/class *skeletons*), cutting context tokens by roughly an order of magnitude — the model sees the *shape* of the code, then pulls full bodies on demand.
+
+=== Why it wins (empirically)
+
+The graph + vector approach is grounded in published results — GraphCoder (+6% code match), CodexGraph (47.99% on SWE-bench Lite), GraphCodeAgent (+43.81% on DevEval) — and measured inside Victor: the benchmark reports `code_intelligence_pass_rate` *vs* `non_code_intelligence_pass_rate`, isolating the effect of structured retrieval. A real repo indexes to ~1.26M nodes / ~2.97M edges / ~78K embeddings; ProximaDB is an optional multi-model backend for the largest repos.
+
+.Demo — build the index and query the graph
+====
+[source,bash]
+----
+# One-time index (tree-sitter graph + LanceDB vectors)
+victor index .                           # builds ./.victor/project.db + embeddings/
+
+# Inspect what was built
+sqlite3 .victor/project.db "select type, count(*) from graph_node group by type order by 2 desc limit 8;"
+sqlite3 .victor/project.db "select type, count(*) from graph_edge group by type order by 2 desc limit 8;"
+
+# Ask a structural question the model answers via the graph tool
+victor chat --provider ollama "Who calls parse_jwt, and what breaks if I rename it?"
+----
+====
+
+<<<
+== The two-database model
+
+Victor keeps *user-wide* and *project-specific* data rigorously separate — so project state (graph, conversations) is rebuildable and shareable, while user state (keys, learning, preferences) stays private and cross-project.
+
+image::d08_two_db.{diagram-ext}[Two-database architecture]
+
+[cols="2,4", options="header"]
+|===
+|Global DB `~/.victor/victor.db` |Settings, API keys/provider accounts, profiles, RL outcomes + Q-values (tool/model preferences), team stats, TUI persistence, cross-project patterns, failed signatures (loop prevention)
+|Project DB `./.victor/project.db` |Graph nodes/edges, vector index, conversations + messages, project sessions, entity memory, change tracking, file metadata
+|===
+
+**Why:** user preferences/RL never leak into the project graph; a `project.db` can be shared across a team, deleted, or migrated independently. Project code intelligence is *derived, rebuildable state* — it must never become a source-of-truth release artifact. The backend is pluggable: SQLite + LanceDB by default, ProximaDB (vector + graph + document) opt-in.
+
+<<<
+== Prompt optimization: the runtime that improves itself
+
+Victor evolves its own system prompt from execution traces — three strategies, all pipeline-owned so they run for *every* provider:
+
+* **GEPA** (default) — Genetic evolution with Thompson Sampling (explore/exploit) and a Pareto frontier over cost / quality / latency.
+* **MiPROv2** — mines few-shot demonstrations from successful traces.
+* **CoT distillation** — extracts reasoning patterns across providers.
+
+image::d11_prompt_opt.{diagram-ext}[Prompt optimization loop]
+
+The optimizer evolves **five prompt sections**: tool-effectiveness guidance, grounding rules, completion guidance, few-shot examples, and init-synthesis rules. It is enhanced by eight paper-derived techniques: a 13-category failure taxonomy, semantic trace zones (success/failure/recovery), capability-gap analysis, and active trace-quality filtering (MemReader-inspired). Traces are collected from *both* JSONL usage logs and the ConversationStore SQLite, merged and de-duplicated by session.
+
+Critically, this is **controlled by settings, not feature flags** — `settings.prompt_optimization.enabled`, `.default_strategies`, per-section overrides — and promotions are gated by an A/B statistical gate before a winner goes live.
+
+.Demo — evolve prompts from traces
+====
+[source,bash]
+----
+# Run a benchmark, then approve a candidate via the A/B gate
+victor benchmark run swe-bench-lite --max-tasks 20
+victor ab status <experiment_id>     # kappa/alpha + p-value + effect size
+----
+====
+
+<<<
+== Evaluation: a first-class citizen
+
+You cannot improve an agent you cannot score. Victor treats evaluation as an equal partner to execution, with a dual-harness design rooted in an empirical finding: *adding tools to pure code-generation benchmarks causes tool hallucination and distorts measurement by 20–40%*. So the two are measured separately.
+
+image::d10_eval.{diagram-ext}[Evaluation pipeline]
+
+[cols="2,3", options="header"]
+|===
+|Harness |Measures
+|`code_generation_harness` |Pure model capability — HumanEval, MBPP (provider-only, no tools).
+|`agentic_harness` |Real tasks with tools — SWE-bench, Aider Polyglot; validates patch-applies, tests-pass, file-edits, tool usage.
+|`trajectory_eval` |Four orthogonal axes — planning, tool-grounding, recovery, refusal — with confidence intervals.
+|===
+
+**SWE-bench, done right.** Each task runs in its *correct* official per-instance Docker image (`--eval-backend docker`) with host fallback. `FAIL_TO_PASS`/`PASS_TO_PASS` test lists are JSON-stringified in the dataset and are normalized, not exploded to characters.
+
+**Judges are calibrated, not trusted.** An LLM rubric judge is only enabled after calibration against human labels — Cohen's κ / Krippendorff's α must reach ≥ 0.7. `pass@k` uses the unbiased estimator.
+
+**Reported results (documented, subset):**
+
+[cols="3,1,3", options="header"]
+|===
+|Run |Pass rate |Note
+|SWE-bench, DeepSeek baseline |64% (32/50) |On the un-starved subset; aggregate is invalid under rate-limiting.
+|SWE-bench, GPT-5-class, 20-task subset |80% |Best; full 300-task submission pending.
+|HumanEval, capable coder model |90%+ |Provider-only mode.
+|===
+
+.Demo — run a containerized eval slice
+====
+[source,bash]
+----
+victor benchmark setup swe-bench --max-tasks 5     # clone repos, build index
+victor benchmark run swe-bench --max-tasks 5 --eval-backend docker
+
+# Read the *signal*: un-starved subset + code-intelligence delta
+# (aggregate pass rate is invalid when the provider rate-limits)
+----
+====
+
+<<<
+== Observability, resilience, and safety
+
+* **Events everywhere** — structured `EventType` stream with correlation IDs is the single spine; it powers UIs, logs, and the observability bus.
+* **Resilience** — circuit breakers (CLOSED → OPEN → HALF_OPEN), retry with backoff + jitter, fallback provider chains, and structured recovery handlers for shell, graph-DB, provider, and tool failures (`RecoveryService`).
+* **Explicit context passing** — `ExecutionContext`, `CacheRegistry` (category-scoped invalidation), and `TraceContext` (contextvar-based correlation) replace global singletons.
+* **Safety** — tools declare `access_mode` / `danger_level`; a damage-scoped `ShellSafetyPolicy` gates destructive shell (L0 catastrophic, L1 workspace-containment, L2 per-profile); sandbox isolation (bwrap/seatbelt) is opt-in and fail-open.
+* **Native acceleration** — optional Rust (PyO3) hot paths for tokenizer, vector similarity, context fitting, each with a Python fallback so the framework always runs without native extensions.
+
+.Demo — watch an event stream and trace correlation
+====
+[source,bash]
+----
+victor chat "Refactor utils.py" --show-events      # THINKING/TOOL_CALL/TOOL_RESULT
+# Correlation IDs propagate across services for cross-boundary debugging.
+----
+====
+
+<<<
+== Putting it together: build a coding agent, ground-up
+
+This is the cohesive demo. Each step composes the chapter before it — the whole stack in one place.
+
+image::d12_lifecycle.{diagram-ext}[End-to-end request lifecycle]
+
+.Step 1 — Index the repo (code intelligence)
+[source,bash]
+----
+victor index .                       # graph + vectors into ./.victor/project.db
+----
+
+.Step 2 — Create the agent (high-level API + tool preset + local provider)
+[source,python]
+----
+from victor.framework import Agent, ToolSet
+
+agent = await Agent.create(
+    provider="ollama",               # sovereign: runs locally
+    tools=ToolSet.coding(),          # core+fs+git+testing+refactor+verify+graph
+)
+----
+
+.Step 3 — Run it as a workflow (low-level StateGraph, with a team node)
+[source,python]
+----
+from victor.framework.graph import END, StateGraph
+from victor.teams import UnifiedTeamCoordinator, TeamFormation
+
+coord = UnifiedTeamCoordinator()
+coord.add_member(researcher)         # uses the graph + vector tools to locate code
+coord.add_member(editor)             # edits via filesystem + refactoring tools
+coord.set_formation(TeamFormation.PIPELINE)
+
+g = StateGraph(TaskState)
+g.add_node("implement", coord)       # team = one node
+g.add_node("verify", verify_fn)      # run tests / codebase_verify
+g.add_edge("implement", "verify")
+g.add_edge("verify", END)
+await g.compile().invoke({"task": "Add input validation to the auth endpoint"})
+----
+
+.Step 4 — Evaluate the change (evals)
+[source,bash]
+----
+victor benchmark run swe-bench-lite --max-tasks 20 --eval-backend docker
+----
+
+.Step 5 — Let it learn (prompt optimization)
+[source,bash]
+----
+victor ab status <exp>               # statistically-gated promotion of prompt sections
+----
+
+The lifecycle in one loop: a user request flows CLI → `Agent` → `ChatService` → `AgenticLoop` → (context assembly via graph-RAG → plan → tool selection) → `ToolService`/`ToolPipeline` → tool or `ProviderService` → LLM → events stream back to the user *and* into observability, which feeds RL and prompt optimization, which feeds the next turn. That closed loop — *execute, observe, evaluate, improve* — is Victor's reason for existing.
+
+<<<
+== Use cases, and when to choose Victor
+
+**Strong fits:**
+
+* **Coding agents (local or cloud)** that inspect files, search the graph, run tests, and produce review findings — across a private codebase, fully air-gapped.
+* **Workflow agents** with typed StateGraph nodes, deterministic handoffs, human-in-the-loop, and resumable execution.
+* **Tool-using assistants** exposed through CLI, TUI, HTTP API, MCP, or embedded Python — same runtime, multiple surfaces.
+* **Multi-agent systems** with heterogeneous providers per member and formations as graph nodes.
+* **Domain platforms** built as sibling `victor-*` packages (coding, devops, RAG, research, data analysis, investment) without forking framework internals.
+
+**Where something else may fit better:** a one-file CLI pair-programmer (Aider); a pure orchestration layer where you supply all tools/memory/evals (LangGraph); a closed turnkey product (Devin).
+
+[cols="2,4", options="header"]
+|===
+|Strength |Detail
+|Provider sovereignty |24 adapters; fully local + air-gapped; provider-specific caching.
+|Code intelligence |Code graph + vectors + skeleton extraction → precise, cheap context.
+|Tool density |64+ tools, 16 categories, MCP + LangChain bridges.
+|Evaluated & self-improving |Dual harnesses, SWE-bench, calibrated judges, GEPA prompt evolution.
+|Typed, layered, service-first |Clean high-level API over a low-level graph/runtime; stable contract boundary.
+|===
+
+<<<
+== Demo runbook
+
+A presenter can run this sequence end-to-end in ~10 minutes.
+
+[source,bash]
+----
+# 0. Install (editable, contracts first so the in-repo SDK resolves)
+pip install -e ./victor-contracts -e ".[dev]"
+
+# 1. Local model (sovereign / offline-capable)
+ollama pull qwen2.5-coder:7b
+
+# 2. Index this repo's code intelligence
+victor index .
+sqlite3 .victor/project.db "select count(*) from graph_node;"
+
+# 3. High-level: chat against the graph
+victor chat --provider ollama "Who calls parse_jwt?"
+
+# 4. Low-level: a StateGraph with a retry cycle + checkpoint
+python examples/stategraph_retry_demo.py     # (create from the snippet in §6)
+
+# 5. Teams: a formation as a graph node
+python examples/teams/state_graph_team_coordinator.py
+
+# 6. Evals: a containerized SWE-bench slice
+victor benchmark setup swe-bench --max-tasks 5
+victor benchmark run swe-bench --max-tasks 5 --eval-backend docker
+
+# 7. Render this guide (HTML now, PDF with one gem install)
+asciidoctor VICTOR_AGENT_GUIDE.adoc               # -> VICTOR_AGENT_GUIDE.html
+gem install asciidoctor-pdf                        # one-time
+asciidoctor-pdf VICTOR_AGENT_GUIDE.adoc            # -> VICTOR_AGENT_GUIDE.pdf
+----
+
+<<<
+== How to render and extend this guide
+
+This guide is a single AsciiDoc source (`VICTOR_AGENT_GUIDE.adoc`) plus twelve Mermaid diagrams in `docs/diagrams/victor-guide/`. Each diagram ships in *two* formats: `.svg` (crisp + scalable, used by the HTML backend) and `.png` at 2x (raster, used by the PDF backend, because `asciidoctor-pdf`/prawn renders PNG far more reliably than complex Mermaid SVG). A backend-conditional attribute selects the right one automatically:
+
+[source,adoc]
+----
+ifdef::backend-pdf[:diagram-ext: png]
+ifndef::backend-pdf[:diagram-ext: svg]
+image::d02_architecture.{diagram-ext}[alt]    // resolves per backend
+----
+
+Slide-deck styling (per-chapter page breaks, image framing) comes from the docinfo file `VICTOR_AGENT_GUIDE-docinfo.html`, loaded automatically because `:docinfo:` is set.
+
+.Render to HTML (works now — `asciidoctor` is installed)
+[source,bash]
+----
+asciidoctor VICTOR_AGENT_GUIDE.adoc
+open VICTOR_AGENT_GUIDE.html
+----
+
+.Render to PDF (one-time gem install)
+[source,bash]
+----
+gem install asciidoctor-pdf
+asciidoctor-pdf VICTOR_AGENT_GUIDE.adoc
+----
+
+.Edit a diagram, then re-render both formats
+[source,bash]
+----
+$EDITOR docs/diagrams/victor-guide/d07_graph_rag.mmd
+mmdc -i docs/diagrams/victor-guide/d07_graph_rag.mmd \
+     -o docs/diagrams/victor-guide/d07_graph_rag.svg -b transparent -w 1400   # HTML
+mmdc -i docs/diagrams/victor-guide/d07_graph_rag.mmd \
+     -o docs/diagrams/victor-guide/d07_graph_rag.png -b white -s 2 -w 1400      # PDF
+----
+
+Each `<<<` directive in the source forces a page break, so in the PDF (and when printing the HTML) every chapter starts on a fresh page — the guide doubles as a slide deck.

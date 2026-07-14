@@ -1,0 +1,16 @@
+%% Prompt optimization loop (GEPA) — runtime self-improvement.
+flowchart LR
+  classDef src fill:#ecfeff,stroke:#0891b2,color:#0f172a
+  classDef zone fill:#eff6ff,stroke:#1d4ed8,color:#0f172a
+  classDef llm fill:#fff7ed,stroke:#f97316,color:#431407
+  classDef select fill:#fffbeb,stroke:#d97706,color:#451a03
+  classDef out fill:#f0fdf4,stroke:#16a34a,color:#052e16
+
+  SRC["Trace sources\nJSONL usage logs\n+ ConversationStore SQLite"]:::src
+  SRC --> ZONE["Classify semantic zones\nSUCCESS / FAILURE / RECOVERY\n+ failure taxonomy (13 cats)"]:::zone
+  ZONE --> QUAL["Quality filter\n(MemReader-inspired)"]:::zone
+  QUAL --> REF["REFLECT\nLLM names concrete\nfailure patterns"]:::llm
+  REF --> MUT["MUTATE 5 sections\nASI tool guidance / grounding\ncompletion / few-shot / init synthesis"]:::llm
+  MUT --> SEL["Thompson Sampling\nexplore vs exploit\n+ Pareto (cost/quality/latency)"]:::select
+  SEL --> AB["A/B rollout\nstatistical gate\n-> safe promotion"]:::out
+  AB -.->|"frozen prompts"| RUN["Runtime\nmain agent system prompt"]:::src
