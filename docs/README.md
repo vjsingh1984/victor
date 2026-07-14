@@ -24,7 +24,7 @@ docs/
 ├── development/                  ← Contributor/developer guides
 ├── api-reference/                ← API documentation
 ├── reference/                    ← Reference tables and lookup docs
-├── diagrams/                     ← Diagram index (consolidated from scattered files)
+├── diagrams/                     ← Editable .mmd sources (canonical diagrams inline in master docs)
 ├── architecture/                 ← Detailed architecture docs (ADR, decomposition)
 ├── feps/                         ← Framework Enhancement Proposals
 └── README.md                     ← This file
@@ -35,10 +35,10 @@ docs/
 | Purpose | File | Notes |
 |---------|------|-------|
 | Landing | `docs/index.md` | Documentation map with links to all sections |
-| Architecture | `docs/architecture.md` | Supersedes root `ARCHITECTURE.md` and `docs/architecture/overview.md` |
-| Roadmap | `docs/roadmap.md` | Supersedes root `roadmap.md` |
+| Architecture | `docs/architecture.md` | Canonical system architecture (single source of truth) |
+| Roadmap | `docs/roadmap.md` | Canonical roadmap and tech-debt register |
 | Features | `docs/features.md` | Grounded feature catalog |
-| Diagrams | `docs/diagrams/index.md` | Consolidated diagram registry |
+| Diagrams | `docs/diagrams/README.md` | Editable `.mmd` sources; canonical diagrams inline in master docs |
 
 ## Formatting Standards
 

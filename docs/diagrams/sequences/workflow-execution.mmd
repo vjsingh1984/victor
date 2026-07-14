@@ -1,12 +1,24 @@
+%% Workflow execution: load graph -> walk nodes (agent/compute/transform) -> final state.
 sequenceDiagram
-    participant User
-    participant Executor as Workflow Executor
-    participant Graph as Workflow Graph
-    participant Node1 as Node: Analyze
-    participant Node2 as Node: Test
-    participant Node3 as Node: Report
-    participant Provider as LLM Provider
-    participant Tool as Tool Executor
+    autonumber
+    box rgb(239,246,255) User
+        participant User
+    end
+    box rgb(240,253,244) Runtime
+        participant Executor as Workflow Executor
+        participant Graph as Workflow Graph
+    end
+    box rgb(245,243,255) Workflow nodes
+        participant Node1 as Node: Analyze
+        participant Node2 as Node: Test
+        participant Node3 as Node: Report
+    end
+    box rgb(255,251,235) Provider
+        participant Provider as LLM Provider
+    end
+    box rgb(248,250,252) Tool
+        participant Tool as Tool Executor
+    end
 
     %% Workflow Execution Flow
     User->>Executor: Run workflow "code-review"

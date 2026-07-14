@@ -146,7 +146,8 @@ STALE_VERTICAL_CONTRACT_PATTERNS = {
 }
 
 ARCHIVED_DOC_BANNERS = {
-    Path("docs/COMPREHENSIVE_IMPROVEMENT_ROADMAP.md"): "Archived planning document",
+    # Known archived planning docs that must advertise their non-canonical status.
+    # docs/COMPREHENSIVE_IMPROVEMENT_ROADMAP.md was removed during doc consolidation.
 }
 
 LEGACY_PATHS_THAT_MUST_STAY_REMOVED = {
@@ -160,9 +161,9 @@ ROADMAP_LINK_RE = re.compile(r"\[[^\]]+\]\(([^)]*ROADMAP\.md(?:#[^)]+)?)\)")
 
 # Canonical pointer docs: files whose whole job is to route readers to other
 # docs. Every relative markdown/asset link inside them must resolve (TD-18).
+# Root ARCHITECTURE.md / roadmap.md redirect stubs were removed during doc
+# consolidation; docs/architecture.md and docs/roadmap.md are now the single sources.
 CANONICAL_POINTER_DOCS = (
-    Path("roadmap.md"),
-    Path("ARCHITECTURE.md"),
     Path("docs/roadmap.md"),
     Path("docs/architecture/adr/README.md"),
 )
