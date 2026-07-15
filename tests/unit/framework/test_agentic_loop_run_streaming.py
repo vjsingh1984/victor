@@ -450,3 +450,49 @@ async def test_run_streaming_emits_prompt_reward_on_exhaustion(monkeypatch):
     [c async for c in loop.run_streaming("q")]
 
     assert captured == [0.5]  # final evaluation score (not the mid-loop 0.3), once
+
+
+async def test_run_streaming_verify_gate_fires_and_reenters():
+    """FEP-0018: when a verifier is set and the agent claims COMPLETE, the loop
+    verifies; on failure it injects feedback + re-enters. On the next COMPLETE,
+    verify passes -> exits."""
+    from victor.framework.verification import VerificationResult
+
+    port = _fake_port([["hello"], ["fixed"]])
+    loop = _loop(
+        port,
+        evaluations=[
+            EvaluationResult(decision=EvaluationDecision.COMPLETE, score=1.0, reason="done"),
+            EvaluationResult(decision=EvaluationDecision.COMPLETE, score=1.0, reason="done"),
+        ],
+    )
+
+    call_count = [0]
+
+    class _MockVerifier:
+        async def verify(self, **kwargs):
+            call_count[0] += 1
+            if call_count[0] == 1:
+                return VerificationResult(
+                    passed=9,
+                    total=10,
+                    raw_output="test_x failed",
+                    feedback="9/10 - fix test_x",
+                )
+            return VerificationResult(
+                passed=10,
+                total=10,
+                raw_output="all passed",
+            )
+
+    loop._verifier = _MockVerifier()
+    loop._max_verify_retries = 2
+    loop._verify_retries = 0
+    loop.turn_executor = SimpleNamespace(
+        _chat_context=SimpleNamespace(add_message=lambda **kw: None)
+    )
+
+    chunks = [c async for c in loop.run_streaming("q")]
+
+    assert [c.content for c in chunks] == ["hello", "fixed"]  # both turns ran
+    assert call_count[0] == 2  # verify called twice (fail -> re-enter -> pass)

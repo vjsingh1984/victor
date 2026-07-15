@@ -182,6 +182,7 @@ if TYPE_CHECKING:
     from victor.storage.memory.unified import UnifiedMemoryCoordinator
     from victor.agent.services.planning_runtime import PlanningCoordinator
     from victor.framework.agent import Agent
+    from victor.framework.verification import VerificationResult
 
 
 @dataclass
@@ -575,6 +576,8 @@ class AgenticLoop:
         config: "Union[AgenticLoopConfig, Dict[str, Any], None]" = None,
         streaming_act_port: Optional["StreamingActProvider"] = None,
         rubric_complete_fn: Optional[Callable[[str], Awaitable[str]]] = None,
+        verifier: Optional[Any] = None,
+        max_verify_retries: int = 0,
     ):
         """Initialize agentic loop.
 
@@ -600,6 +603,11 @@ class AgenticLoop:
         # FEP-0007 Addendum A: the streaming ACT seam run_streaming() drives. None until
         # wired at cutover, at which point run_streaming becomes the live UI loop body.
         self.streaming_act_port = streaming_act_port
+        # FEP-0018: framework verification hook. When set, the loop verifies the
+        # agent's work after COMPLETE and re-enters on failure (bounded retries).
+        self._verifier = verifier
+        self._max_verify_retries = max_verify_retries
+        self._verify_retries = 0
         self.max_iterations = max_iterations
         self.enable_fulfillment_check = enable_fulfillment_check
         self.enable_adaptive_iterations = enable_adaptive_iterations
@@ -781,6 +789,7 @@ class AgenticLoop:
         iterations: List[LoopIteration] = []
         state: Dict[str, Any] = {"query": query, **(context or {})}
         self._progress_scores = []
+        self._verify_retries = 0  # FEP-0018: reset per run
         self.turn_evaluation_controller.reset()  # resets spin_detector + content-repetition + plateau
         self.criteria_builder.reset()
         effective_max = self.max_iterations
@@ -1254,6 +1263,27 @@ class AgenticLoop:
                 # be considered done yet.
                 if evaluation.decision == EvaluationDecision.COMPLETE:
                     evaluation = self._apply_backslide_guard(evaluation)
+                    # FEP-0018: framework verification hook — verify before accepting.
+                    if (
+                        evaluation.decision == EvaluationDecision.COMPLETE
+                        and getattr(self, "_verifier", None) is not None
+                        and getattr(self, "_verify_retries", 0)
+                        < getattr(self, "_max_verify_retries", 0)
+                    ):
+                        vr = await self._run_verification(state)
+                        logger.info(
+                            "Turn %d verify: %d/%d (%s) retries=%d/%d",
+                            i,
+                            vr.passed,
+                            vr.total,
+                            "VERIFIED" if vr.is_verified else "failed",
+                            self._verify_retries + 1,
+                            self._max_verify_retries,
+                        )
+                        if not vr.is_verified:
+                            self._inject_verify_feedback(vr)
+                            self._verify_retries += 1
+                            continue  # re-enter the loop (skip break)
                 if evaluation.decision == EvaluationDecision.COMPLETE:
                     logger.info("Task complete - exiting loop")
                     break
@@ -1416,6 +1446,44 @@ class AgenticLoop:
                 ),
             )
 
+    async def _run_verification(self, state: Dict[str, Any]) -> "VerificationResult":
+        """Run the framework verification hook (FEP-0018).
+
+        Called after the agent claims COMPLETE. If the verifier is set, it
+        checks the agent's work (tests, lint, etc.) and returns a result. The
+        caller (the DECIDE gate) injects the feedback and re-enters on failure.
+        """
+        from victor.framework.verification import VerificationResult
+
+        try:
+            workspace = state.get("workspace") or state.get("working_dir")
+            return await self._verifier.verify(workspace=workspace, state=state)
+        except Exception as exc:
+            logger.warning("Verification raised: %s", exc)
+            return VerificationResult(
+                passed=-1,
+                total=-1,
+                raw_output=str(exc),
+                feedback=f"Verification error: {exc}",
+            )
+
+    def _inject_verify_feedback(self, result: "VerificationResult") -> None:
+        """Inject the verifier's feedback as a user message for the retry turn."""
+        feedback = result.feedback or (
+            f"Verification: {result.passed}/{result.total} checks passed.\n"
+            f"{result.raw_output[:2000]}"
+        )
+        try:
+            chat_ctx = getattr(self.turn_executor, "_chat_context", None)
+            if chat_ctx and hasattr(chat_ctx, "add_message"):
+                chat_ctx.add_message(
+                    role="user",
+                    content=feedback,
+                    metadata={"source": "verification"},
+                )
+        except Exception:
+            logger.debug("Failed to inject verify feedback", exc_info=True)
+
     def _emit_prompt_reward_outcome(
         self,
         evaluation: Optional[EvaluationResult],
@@ -1489,6 +1557,7 @@ class AgenticLoop:
 
         state: Dict[str, Any] = {"query": query, **(context or {})}
         self._progress_scores = []
+        self._verify_retries = 0  # FEP-0018: reset per run
         # Resets the shared spin detector + content-repetition + plateau (same as run()).
         self.turn_evaluation_controller.reset()
         self.criteria_builder.reset()
@@ -1538,6 +1607,27 @@ class AgenticLoop:
             # DECIDE — terminal decisions end the stream; non-terminal nudge + continue.
             if evaluation.decision == EvaluationDecision.COMPLETE:
                 evaluation = self._apply_backslide_guard(evaluation)
+                # FEP-0018: framework verification hook — verify before accepting.
+                if (
+                    evaluation.decision == EvaluationDecision.COMPLETE
+                    and getattr(self, "_verifier", None) is not None
+                    and getattr(self, "_verify_retries", 0)
+                    < getattr(self, "_max_verify_retries", 0)
+                ):
+                    vr = await self._run_verification(state)
+                    logger.info(
+                        "Turn %d verify (streaming): %d/%d (%s) retries=%d/%d",
+                        i,
+                        vr.passed,
+                        vr.total,
+                        "VERIFIED" if vr.is_verified else "failed",
+                        self._verify_retries + 1,
+                        self._max_verify_retries,
+                    )
+                    if not vr.is_verified:
+                        self._inject_verify_feedback(vr)
+                        self._verify_retries += 1
+                        continue  # re-enter (skip return)
             if evaluation.decision in (
                 EvaluationDecision.COMPLETE,
                 EvaluationDecision.FAIL,
