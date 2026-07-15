@@ -1701,6 +1701,27 @@ class PromptOptimizerLearner(BaseLearner):
         """Return one exact prompt candidate for targeted evaluation/runtime binding."""
         return self._find_candidate(section_name, provider, text_hash)
 
+    def find_candidate_any_provider(
+        self,
+        *,
+        section_name: str,
+        text_hash: str,
+    ) -> Optional[PromptCandidate]:
+        """Find a candidate by section+hash across ALL providers.
+
+        Fallback for binding lookups where the requested provider doesn't match
+        the candidate's stored provider (e.g. a default-profile run binding a
+        zai-scoped candidate). Used only after the provider-specific lookup misses.
+        """
+        prefix = f"{section_name}::"
+        for key, candidates in self._candidates.items():
+            if not key.startswith(prefix):
+                continue
+            for candidate in candidates:
+                if candidate.text_hash == text_hash:
+                    return candidate
+        return None
+
     def get_candidates(
         self,
         *,
