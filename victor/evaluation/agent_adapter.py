@@ -36,6 +36,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING
 
 from victor.config.settings import load_settings
+from victor.framework.workspace import workspace_git_diff
 
 # Use TYPE_CHECKING to avoid circular import at runtime
 # Chain: orchestrator → code_correction_middleware → evaluation → agent_adapter → orchestrator
@@ -58,47 +59,6 @@ from victor.evaluation.protocol import BenchmarkTask
 from victor.providers.registry import ProviderRegistry
 
 logger = logging.getLogger(__name__)
-
-
-async def workspace_git_diff(workspace: Path, timeout: int = 30) -> str:
-    """Capture the agent's file changes as a unified diff from the workspace's
-    git state — the ground truth.
-
-    Stages all changes (``git add -A``) then diffs staged vs HEAD
-    (``git diff --cached HEAD``), capturing modified, new, AND deleted files.
-    This is more reliable than the adapter's edit-capture tracking (which misses
-    shell-based edits, stale snapshots, and some new files).
-
-    Returns:
-        Unified diff string, or ``""`` if the workspace is not a git repo /
-        git is unavailable.
-    """
-    try:
-        add_proc = await asyncio.create_subprocess_exec(
-            "git",
-            "-C",
-            str(workspace),
-            "add",
-            "-A",
-            stdout=asyncio.subprocess.DEVNULL,
-            stderr=asyncio.subprocess.DEVNULL,
-        )
-        await asyncio.wait_for(add_proc.communicate(), timeout=timeout)
-
-        diff_proc = await asyncio.create_subprocess_exec(
-            "git",
-            "-C",
-            str(workspace),
-            "diff",
-            "--cached",
-            "HEAD",
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        out, _err = await asyncio.wait_for(diff_proc.communicate(), timeout=timeout)
-        return out.decode("utf-8", "replace")
-    except Exception:
-        return ""
 
 
 # Tools a benchmark session must have enabled. The `fs` domain has been

@@ -1967,7 +1967,7 @@ async def _run_benchmark_async(
                             # Snapshot the agent's current edits as a patch —
                             # from the GROUND TRUTH (git diff), shared with the
                             # adapter's final patch via workspace_git_diff.
-                            from victor.evaluation.agent_adapter import (
+                            from victor.framework.workspace import (
                                 workspace_git_diff,
                             )
 

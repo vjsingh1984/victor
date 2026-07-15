@@ -689,7 +689,7 @@ async def test_workspace_git_diff_captures_modifications_and_new_files(tmp_path)
     only the adapter's edit-capture was used."""
     import subprocess
 
-    from victor.evaluation.agent_adapter import workspace_git_diff
+    from victor.framework.workspace import workspace_git_diff
 
     subprocess.run(["git", "init"], cwd=tmp_path, capture_output=True)
     subprocess.run(["git", "config", "user.email", "t@t"], cwd=tmp_path, capture_output=True)
@@ -709,6 +709,6 @@ async def test_workspace_git_diff_captures_modifications_and_new_files(tmp_path)
 @pytest.mark.asyncio
 async def test_workspace_git_diff_returns_empty_for_non_git_dir(tmp_path):
     """Non-git directory → empty string (no exception, graceful fallback)."""
-    from victor.evaluation.agent_adapter import workspace_git_diff
+    from victor.framework.workspace import workspace_git_diff
 
     assert await workspace_git_diff(tmp_path) == ""
