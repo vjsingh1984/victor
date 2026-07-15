@@ -18,12 +18,31 @@ from typing import Any, Iterable, Optional
 
 logger = logging.getLogger(__name__)
 
+# A turn counts as a positive prompt-quality outcome when its completion score
+# is at least this. Derived from the SCORE, deliberately NOT from the agentic
+# loop's COMPLETE flag: a mid-task CONTINUE turn is not a prompt failure, and
+# scoring COMPLETE-only would bias the Thompson posterior toward turn position
+# rather than prompt quality (every non-terminal turn would otherwise penalize
+# the served candidate). See FEP-0017.
+REWARD_SUCCESS_THRESHOLD = 0.5
+
+
+def reward_success_from_score(completion_score: float) -> bool:
+    """Derive the per-turn prompt-quality success from the completion score.
+
+    Returns True when the turn made at-least-mediocre progress. Centralized so
+    the agentic loop and tests share one success policy.
+    """
+    try:
+        return float(completion_score) >= REWARD_SUCCESS_THRESHOLD
+    except (TypeError, ValueError):
+        return False
+
 
 def emit_prompt_candidate_outcome(
     identities: Iterable[Any],
     *,
     completion_score: float,
-    success: bool,
     provider: str = "",
     model: str = "",
     task_type: str = "default",
@@ -36,17 +55,21 @@ def emit_prompt_candidate_outcome(
     posterior (alpha/beta/sample_count). Non-blocking — mirrors the existing RL
     emission pattern (response_quality). No-op when no identity is supplied.
 
+    Success is derived from ``completion_score`` (via ``reward_success_from_score``),
+    NOT from whether the agentic loop reached COMPLETE — see
+    ``REWARD_SUCCESS_THRESHOLD`` for the rationale.
+
     Args:
         identities: Served ``PromptOptimizationIdentity`` objects for the turn
             (only those carrying a ``prompt_candidate_hash`` are rewardable).
         completion_score: The turn's final completion score in [0, 1].
-        success: Whether the turn completed successfully.
     """
     rewardable = [
         identity for identity in identities if getattr(identity, "prompt_candidate_hash", None)
     ]
     if not rewardable:
         return
+    success = reward_success_from_score(completion_score)
     try:
         from victor.framework.rl.hooks import RLEvent, RLEventType, get_rl_hooks
 

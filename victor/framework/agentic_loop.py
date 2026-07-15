@@ -1274,6 +1274,11 @@ class AgenticLoop:
             # served, so their Thompson posteriors update (closes the
             # prompt-optimization reward loop — FEP-0017). Non-blocking; no-op
             # when no candidate was served this turn. Fires once per run().
+            #
+            # Success is derived from the completion SCORE inside the emitter,
+            # not from this loop's COMPLETE flag: a mid-task CONTINUE turn with
+            # good progress should reward (not penalize) the served candidate —
+            # using COMPLETE would bias the posterior toward turn position.
             try:
                 from victor.agent.services.prompt_optimization_reward import (
                     emit_prompt_candidate_outcome,
@@ -1288,7 +1293,6 @@ class AgenticLoop:
                 emit_prompt_candidate_outcome(
                     getattr(self.runtime_intelligence, "_last_served_prompt_identities", []) or [],
                     completion_score=_prompt_score,
-                    success=bool(success),
                     task_type=str(state.get("task_type") or "default"),
                     session_id=state.get("session_id"),
                 )
