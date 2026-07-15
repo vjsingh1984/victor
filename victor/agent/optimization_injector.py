@@ -564,13 +564,26 @@ class OptimizationInjector:
                 task_type,
                 section_name=section_name,
             )
-            if rec and rec.confidence > 0.6 and not rec.is_baseline:
+            from victor.framework.rl.learners.prompt_optimizer import (
+                should_serve_candidate,
+            )
+
+            if should_serve_candidate(
+                rec,
+                exploration_enabled=getattr(po, "exploration_enabled", True),
+                exploration_epsilon=getattr(po, "exploration_epsilon", 0.1),
+            ):
                 rec_metadata = dict(getattr(rec, "metadata", {}) or {})
                 resolved_provider = str(rec_metadata.get("provider") or provider or "")
                 resolved_section = str(
                     rec_metadata.get("section_name")
                     or rec_metadata.get("prompt_section_name")
                     or section_name
+                )
+                learner.record_served(
+                    resolved_section,
+                    resolved_provider,
+                    str(rec_metadata.get("prompt_candidate_hash") or ""),
                 )
                 logger.info(
                     "[OptimizationInjector] Using evolved '%s' (gen=%s, conf=%.2f)",

@@ -2790,6 +2790,13 @@ class RuntimeIntelligenceService:
         )
         experiment_guidance = self._build_experiment_prompt_guidance(experiment_memory_hints)
 
+        # Cache the identities actually served this turn so the agentic loop can
+        # attribute the turn's outcome to them at turn-evaluation time. Only
+        # identities carrying a candidate hash are rewardable.
+        self._last_served_prompt_identities = [
+            identity for identity in identities if identity.prompt_candidate_hash
+        ]
+
         return PromptOptimizationBundle(
             evolved_sections=list(evolved_sections or []),
             few_shots=few_shots,
