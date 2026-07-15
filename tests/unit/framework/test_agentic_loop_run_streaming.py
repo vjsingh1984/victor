@@ -386,3 +386,67 @@ def test_is_terminal_answer_meta_deliberation_not_terminal():
         "loop and just execute. Making the call. (Done.) No more deliberation."
     )
     assert loop._is_terminal_answer(_turn(narration)) is False
+
+
+async def test_run_streaming_emits_prompt_reward_on_completion(monkeypatch):
+    """run_streaming attributes the terminal turn's outcome to served prompt
+    candidates — streaming parity with run() (FEP-0017)."""
+    port = _fake_port([["hello"]])
+    loop = _loop(
+        port,
+        evaluations=[
+            EvaluationResult(decision=EvaluationDecision.COMPLETE, score=0.9, reason="done")
+        ],
+    )
+    loop.runtime_intelligence = SimpleNamespace(
+        _last_served_prompt_identities=[
+            SimpleNamespace(
+                provider="zai",
+                prompt_candidate_hash="h1",
+                section_name="GROUNDING_RULES",
+                prompt_section_name="GROUNDING_RULES",
+            )
+        ]
+    )
+    captured: list = []
+    monkeypatch.setattr(
+        "victor.agent.services.prompt_optimization_reward.emit_prompt_candidate_outcome",
+        lambda identities, *, completion_score, **kw: captured.append(completion_score),
+    )
+
+    [c async for c in loop.run_streaming("q")]
+
+    assert captured == [0.9]  # terminal evaluation score, once
+
+
+async def test_run_streaming_emits_prompt_reward_on_exhaustion(monkeypatch):
+    """Loop exhausting without a terminal decision still attributes the final
+    turn's evaluation (mirrors run()'s epilogue)."""
+    port = _fake_port([["a"], ["b"]])
+    loop = _loop(
+        port,
+        evaluations=[
+            EvaluationResult(decision=EvaluationDecision.CONTINUE, score=0.3, reason="more"),
+            EvaluationResult(decision=EvaluationDecision.CONTINUE, score=0.5, reason="more"),
+        ],
+    )
+    loop.max_iterations = 2  # exhaust after two CONTINUE turns (no terminal return)
+    loop.runtime_intelligence = SimpleNamespace(
+        _last_served_prompt_identities=[
+            SimpleNamespace(
+                provider="zai",
+                prompt_candidate_hash="h1",
+                section_name="GROUNDING_RULES",
+                prompt_section_name="GROUNDING_RULES",
+            )
+        ]
+    )
+    captured: list = []
+    monkeypatch.setattr(
+        "victor.agent.services.prompt_optimization_reward.emit_prompt_candidate_outcome",
+        lambda identities, *, completion_score, **kw: captured.append(completion_score),
+    )
+
+    [c async for c in loop.run_streaming("q")]
+
+    assert captured == [0.5]  # final evaluation score (not the mid-loop 0.3), once
