@@ -269,6 +269,46 @@ class TestVerifyPatchInContainer:
         # Whole test file from the test patch — NOT the fail_to_pass node-ID.
         assert captured["test_files"] == ["tests/test_x.py"]
 
+    @pytest.mark.asyncio
+    async def test_verify_reuses_supplied_persistent_container(self, tmp_path, monkeypatch):
+        """A pre-started container is reused: no start()/stop() (caller owns the
+        lifecycle), only exec() — this is what makes verify-and-retry cheap
+        (one container per task, not N+1)."""
+        self._install_fakes(monkeypatch, "=== 5 passed in 1.0s ===")
+
+        class _Persistent:
+            name = "persist-1"
+
+            def __init__(self):
+                self.start_calls = 0
+                self.stop_calls = 0
+                self.exec_calls = 0
+
+            async def start(self):
+                self.start_calls += 1
+
+            async def stop(self):
+                self.stop_calls += 1
+
+            async def exec(self, command, *, cwd=None, timeout=600, env=None):
+                self.exec_calls += 1
+                cmd = " ".join(command)
+                if "checkout" in cmd or "clean" in cmd or ".agent_patch" in cmd:
+                    return 0, "", ""
+                return 0, "=== 5 passed in 1.0s ===", ""
+
+        persist = _Persistent()
+        runner = SWEBenchRunner()
+        config = EvaluationConfig(benchmark=BenchmarkType.SWE_BENCH, model="test", max_tasks=1)
+        vr = await runner._verify_patch_in_container(
+            self._make_task(), "PATCH", tmp_path, config, container=persist
+        )
+        assert vr.status == "passed"
+        assert (vr.passed, vr.total) == (5, 5)
+        assert persist.start_calls == 0  # caller owns lifecycle — not re-started
+        assert persist.stop_calls == 0  # NOT stopped — left running for reuse
+        assert persist.exec_calls > 0  # tests ran inside the supplied container
+
 
 class TestFailToPassNormalization:
     """Regression: FAIL_TO_PASS is a JSON-stringified list in the dataset.
