@@ -1106,3 +1106,51 @@ class MBPPRunner(BaseBenchmarkRunner):
             await env.cleanup()
 
         return result
+
+
+class ContainerTestVerifier:
+    """Verifier (FEP-0018) that runs FAIL_TO_PASS tests in an official SWE-bench container.
+
+    Wraps ``_verify_patch_in_container`` as a framework-level ``Verifier`` so the
+    agentic loop's DECIDE gate can verify the agent's work — not just the
+    adapter's eval-specific gate. Uses ``workspace_git_diff`` (ground truth) to
+    snapshot the agent's edits.
+    """
+
+    def __init__(self, task, cached_repo, config, container=None):
+        self._task = task
+        self._cached_repo = Path(cached_repo)
+        self._config = config
+        self._container = container
+        self._runner = SWEBenchRunner()
+
+    async def verify(self, *, workspace=None, state=None):
+        """Run the FAIL_TO_PASS tests in-container. Returns VerificationResult."""
+        from victor.framework.verification import VerificationResult
+        from victor.framework.workspace import workspace_git_diff
+
+        repo = workspace or self._cached_repo
+        patch = await workspace_git_diff(repo)
+        if not patch.strip():
+            return VerificationResult(0, 0, "", "no edits to verify")
+        try:
+            vr = await self._runner._verify_patch_in_container(
+                self._task,
+                patch,
+                self._cached_repo,
+                self._config,
+                container=self._container,
+            )
+            return VerificationResult(
+                passed=vr.passed,
+                total=vr.total,
+                raw_output=vr.raw_output,
+                feedback=f"Verification: {vr.passed}/{vr.total} tests passed.",
+            )
+        except Exception as exc:
+            return VerificationResult(
+                passed=-1,
+                total=-1,
+                raw_output=str(exc),
+                feedback=f"Verification error: {exc}",
+            )

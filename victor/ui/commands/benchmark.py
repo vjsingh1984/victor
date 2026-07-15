@@ -1896,13 +1896,9 @@ async def _run_benchmark_async(
                 original_cwd = os.getcwd()
                 os.chdir(work_dir)
                 try:
-                    # Closed-loop verify_fn (PR2): for docker SWE-bench tasks,
-                    # let the agent loop verify its in-progress edits against the
-                    # real FAIL_TO_PASS tests and re-enter on failure. The
-                    # closure captures this task's repo + config; the adapter
-                    # calls it only after the agent claims done (≤max_verify_retries
-                    # times). Each call runs a full container lifecycle.
-                    verify_fn = None
+                    # FEP-0018 Phase 2: the framework verification hook on the
+                    # agentic loop replaces the adapter's eval-specific verify_fn.
+                    # The loop's DECIDE gate now handles verify-and-retry.
                     _persistent_container = None
                     if (
                         getattr(config, "max_verify_retries", 0) > 0
@@ -1910,32 +1906,25 @@ async def _run_benchmark_async(
                         and getattr(benchmark_task, "repo", None)
                     ):
                         from victor.evaluation.benchmarks.swe_bench import (
+                            ContainerTestVerifier,
                             SWEBenchRunner,
                         )
                         from victor.evaluation.container_eval import (
                             EvalContainer,
+                            cleanup_stale_eval_containers,
                             resolve_swebench_image_exact,
                         )
 
-                        _verify_runner = SWEBenchRunner()
                         # Sweep orphaned eval containers from prior crashed runs
-                        # BEFORE starting the persistent one (so it isn't swept).
-                        # Mark the flag so _verify_patch_in_container skips cleanup
-                        # (which would otherwise remove the persistent container).
+                        # BEFORE starting the persistent one.
                         if not getattr(SWEBenchRunner, "_stale_containers_cleaned", False):
                             SWEBenchRunner._stale_containers_cleaned = True
                             try:
-                                from victor.evaluation.container_eval import (
-                                    cleanup_stale_eval_containers,
-                                )
-
                                 await cleanup_stale_eval_containers()
                             except Exception:
                                 pass
-                        # Start ONE persistent container for this task and reuse it
-                        # across all verify-and-retry calls — avoids N full
-                        # start→exec→stop lifecycles. Falls back to per-call
-                        # creation if the image can't be resolved/started.
+
+                        # Start ONE persistent container for this task.
                         try:
                             _image = await resolve_swebench_image_exact(benchmark_task, config)
                             logger.info(
@@ -1958,34 +1947,28 @@ async def _run_benchmark_async(
                             )
                             _persistent_container = None
 
-                        async def verify_fn(
-                            _task=benchmark_task,
-                            _work=work_dir,
-                            _cfg=config,
-                            _c=_persistent_container,
-                        ):
-                            # Snapshot the agent's current edits as a patch —
-                            # from the GROUND TRUTH (git diff), shared with the
-                            # adapter's final patch via workspace_git_diff.
-                            from victor.framework.workspace import (
-                                workspace_git_diff,
+                        # FEP-0018: set the verifier on the turn_executor —
+                        # the loop's DECIDE gate handles verify-and-retry.
+                        _turn_exec = getattr(adapter.orchestrator, "turn_executor", None)
+                        if _turn_exec is not None:
+                            _turn_exec._verifier = ContainerTestVerifier(
+                                benchmark_task,
+                                work_dir,
+                                config,
+                                container=_persistent_container,
                             )
-
-                            patch = await workspace_git_diff(_work)
-                            if not patch.strip():
-                                return (
-                                    0,
-                                    0,
-                                    "verify: no edits to verify (git diff empty)",
-                                )
-                            vr = await _verify_runner._verify_patch_in_container(
-                                _task, patch, _work, _cfg, container=_c
+                            _turn_exec._max_verify_retries = getattr(
+                                config, "max_verify_retries", 0
                             )
-                            return (vr.passed, vr.total, vr.raw_output)
 
                     trace = await adapter.execute_task(
-                        benchmark_task, work_dir, verify_fn=verify_fn
+                        benchmark_task, work_dir, verify_fn=None  # loop handles verification
                     )
+
+                    # Unset the verifier after the task (avoid leaking to next task)
+                    _turn_exec = getattr(adapter.orchestrator, "turn_executor", None)
+                    if _turn_exec is not None:
+                        _turn_exec._verifier = None
                 except asyncio.CancelledError:
                     partial = adapter.get_partial_trace()
                     logger.info(

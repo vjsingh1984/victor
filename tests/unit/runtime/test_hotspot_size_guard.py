@@ -25,7 +25,8 @@ HOTSPOT_LINE_CAPS = {
     "victor/agent/services/tool_service.py": 3085,
     "victor/agent/services/runtime_intelligence.py": 2864,
     "victor/framework/vertical_integration.py": 2631,
-    "victor/agent/services/turn_execution_runtime.py": 2388,
+    # +2 lines: FEP-0018 verifier wiring at the AgenticLoop construction site.
+    "victor/agent/services/turn_execution_runtime.py": 2390,
     # F-004: package-ified tool_selection; parent capped at current size
     # (extraction deferred — this ratchet only prevents further growth).
     "victor/agent/tool_selection/selector.py": 2882,
