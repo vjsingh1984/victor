@@ -94,6 +94,16 @@ before falling back to active / `sample_count > 0`. This unblocks a brand-new
 candidate. The posterior update (`candidate.update(success)` → α/β/sample_count,
 plus the EMA `completion_score`) is unchanged.
 
+**Success is derived from the completion score, not the agentic-loop COMPLETE
+flag.** `emit_prompt_candidate_outcome` computes
+`success = reward_success_from_score(completion_score)` (`>= 0.5`). A mid-task
+`CONTINUE` turn is not a prompt failure: scoring `COMPLETE`-only would make every
+non-terminal turn penalize (`beta++`) the served candidate, biasing the posterior
+toward *turn position* rather than prompt quality. Using the continuous score
+removes that bias. (Deeper limitation — per-turn progress is still a confounded
+proxy for prompt quality; session-level attribution remains the principled
+longer-term signal, see Unresolved Questions.)
+
 ### Lifecycle (closed loop)
 
 ```
