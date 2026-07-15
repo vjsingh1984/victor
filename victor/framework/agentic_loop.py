@@ -1269,6 +1269,27 @@ class AgenticLoop:
 
             # Determine success
             success = self._determine_success(iterations)
+
+            # Attribute this turn's outcome to the prompt candidates that were
+            # served, so their Thompson posteriors update (closes the
+            # prompt-optimization reward loop — FEP-0017). Non-blocking; no-op
+            # when no candidate was served this turn. Fires once per run().
+            try:
+                _final_eval = iterations[-1].evaluation if iterations else None
+                _prompt_score = (
+                    float(getattr(_final_eval, "score", 0.0) or 0.0)
+                    if _final_eval is not None
+                    else 0.0
+                )
+                self.runtime_intelligence.record_prompt_candidate_outcome(
+                    completion_score=_prompt_score,
+                    success=bool(success),
+                    task_type=str(state.get("task_type") or "default"),
+                    session_id=state.get("session_id"),
+                )
+            except Exception as exc:
+                logger.debug("Prompt candidate outcome attribution skipped: %s", exc)
+
             self._record_provider_degradation_event(
                 state,
                 total_iterations=len(iterations),

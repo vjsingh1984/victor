@@ -733,6 +733,45 @@ class GEPAStrategy:
 MIN_TRACES_FOR_EVOLUTION = 5
 MIN_SAMPLES_FOR_CONFIDENCE = 3
 
+# Confidence floor + non-baseline requirement that historically gated live
+# serving of an evolved candidate. Exposed as a constant so the serve decision
+# and its tests share one source of truth.
+SERVE_CONFIDENCE_FLOOR = 0.6
+
+
+def should_serve_candidate(
+    rec: Optional["RLRecommendation"],
+    *,
+    exploration_enabled: bool,
+    exploration_epsilon: float,
+    rng: Optional[random.Random] = None,
+) -> bool:
+    """Decide whether to serve an evolved recommendation this turn.
+
+    Serve when the candidate is:
+      - **proven** (live confidence above the floor with enough samples), or
+      - **benchmark-approved** (validated by a suite, even at sample_count=0), or
+      - **explored** — with probability ``exploration_epsilon`` when exploration
+        is enabled, so a fresh candidate can bootstrap its Thompson posterior.
+
+    The exploration path is bounded upstream by the persist structural gate
+    (growth_exceeded/repeated_trigrams), so explored candidates are never
+    corrupt — at worst mediocre, which the reward signal then corrects.
+    """
+    if rec is None:
+        return False
+    proven = rec.confidence > SERVE_CONFIDENCE_FLOOR and not rec.is_baseline
+    approved = bool((getattr(rec, "metadata", None) or {}).get("benchmark_passed"))
+    if proven or approved:
+        return True
+    if exploration_enabled and exploration_epsilon > 0.0:
+        draw = rng if rng is not None else _SERVE_RNG
+        return draw.random() < exploration_epsilon
+    return False
+
+
+_SERVE_RNG = random.Random()
+
 _DEFAULT_EVOLVABLE_SECTIONS = [
     "ASI_TOOL_EFFECTIVENESS_GUIDANCE",
     "GROUNDING_RULES",
@@ -793,6 +832,11 @@ class PromptOptimizerLearner(BaseLearner):
         self._extra_strategies: Dict[str, List["PromptOptimizationStrategy"]] = {}
         # Section-specific strategy overrides (e.g., FEW_SHOT_EXAMPLES → MIPROv2)
         self._candidates: Dict[str, List[PromptCandidate]] = {}
+        # Last candidate actually injected into the live prompt per
+        # (section, provider) — lets record_outcome attribute an outcome to a
+        # brand-new candidate (is_active=False, sample_count=0) so it can earn
+        # its first reward. Set by record_served() at injection time.
+        self._last_served: Dict[str, str] = {}
         self._use_pareto = use_pareto
         self._max_prompt_chars = max_prompt_chars
         self._pareto_frontiers: Dict[str, Any] = {}  # section → ParetoFrontier
@@ -1160,36 +1204,88 @@ class PromptOptimizerLearner(BaseLearner):
         ]
 
     def record_outcome(self, outcome: RLOutcome) -> None:
-        """Update posteriors for the active candidate."""
+        """Update posteriors for the candidate that was served.
+
+        A freshly-evolved candidate has ``is_active=False`` and
+        ``sample_count=0``, so a pure active/sample_count lookup could never
+        find it (chicken-and-egg: unrewardable until already rewarded). We
+        therefore resolve the served candidate by hash first — from the
+        outcome metadata, then the last-served ledger — before falling back to
+        active / sample_count>0.
+        """
         section = outcome.metadata.get("prompt_section")
         if not section:
             return
 
         provider = outcome.provider or "default"
+        served_hash = outcome.metadata.get("prompt_candidate_hash")
+
         # Try provider-specific first, then default
         for key in [
             self._candidate_key(section, provider),
             self._candidate_key(section, "default"),
         ]:
-            candidates = self._candidates.get(key, [])
-            active = [c for c in candidates if c.is_active] or [
-                c for c in candidates if c.sample_count > 0
-            ]
-            if active:
-                candidate = active[-1]
-                success = outcome.success and outcome.quality_score >= 0.5
-                candidate.update(success)
-                candidate.scores["completion_score"] = (
-                    candidate.scores.get("completion_score", 0.0) * 0.9
-                    + outcome.quality_score * 0.1
-                )
-                self._record_pareto_outcome(
-                    key=key,
-                    candidate=candidate,
-                    outcome=outcome,
-                )
-                self._save_candidate(candidate)
-                return
+            candidate = self._resolve_reward_candidate(key, served_hash)
+            if candidate is None:
+                continue
+            success = outcome.success and outcome.quality_score >= 0.5
+            candidate.update(success)
+            candidate.scores["completion_score"] = (
+                candidate.scores.get("completion_score", 0.0) * 0.9 + outcome.quality_score * 0.1
+            )
+            self._record_pareto_outcome(
+                key=key,
+                candidate=candidate,
+                outcome=outcome,
+            )
+            self._save_candidate(candidate)
+            return
+
+    def _resolve_reward_candidate(
+        self,
+        key: str,
+        served_hash: Optional[str],
+    ) -> Optional[PromptCandidate]:
+        """Find the candidate to reward for a (section, provider) key.
+
+        Preference order:
+          1. exact hash match — from the outcome metadata or the last-served
+             ledger; this unblocks a brand-new ``sample_count=0`` candidate;
+          2. the active candidate;
+          3. the most-recently rewarded candidate (``sample_count > 0``).
+        """
+        candidates = self._candidates.get(key, [])
+        if not candidates:
+            return None
+        wanted = served_hash or self._last_served.get(key)
+        if wanted:
+            for candidate in candidates:
+                if candidate.text_hash == wanted:
+                    return candidate
+        active = [c for c in candidates if c.is_active]
+        if active:
+            return active[-1]
+        sampled = [c for c in candidates if c.sample_count > 0]
+        if sampled:
+            return sampled[-1]
+        return None
+
+    def record_served(
+        self,
+        section_name: str,
+        provider: str,
+        text_hash: str,
+    ) -> None:
+        """Record the candidate most recently served for a (section, provider).
+
+        Called by the optimization injector when a candidate is actually
+        injected into the live prompt, so a subsequent ``record_outcome`` can
+        attribute the turn's outcome to it even before it has any rewards
+        (``sample_count=0``).
+        """
+        if not text_hash:
+            return
+        self._last_served[self._candidate_key(section_name, provider or "default")] = text_hash
 
     def get_recommendation(
         self,
@@ -1282,6 +1378,7 @@ class PromptOptimizerLearner(BaseLearner):
                 "prompt_candidate_hash": best.text_hash,
                 "section_name": best.section_name,
                 "prompt_section_name": best.section_name,
+                "benchmark_passed": bool(best.benchmark_passed),
             },
         )
 

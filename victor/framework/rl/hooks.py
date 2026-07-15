@@ -136,6 +136,12 @@ class RLEventType(str, Enum):
     GEPA_EVOLUTION = "gepa_evolution"
     """GEPA prompt evolution cycle completed. Triggers: prompt_optimizer"""
 
+    PROMPT_CANDIDATE_USED = "prompt_candidate_used"
+    """An evolved prompt candidate was served for a turn and its outcome is known.
+    Carries the served candidate identity (prompt_section, prompt_candidate_hash)
+    + the turn's completion score, so prompt_optimizer can update the candidate's
+    Thompson posterior. Triggers: prompt_optimizer"""
+
 
 # Register domain event mapping with canonical EventType taxonomy
 def _register_rl_event_taxonomy() -> None:
@@ -155,6 +161,7 @@ def _register_rl_event_taxonomy() -> None:
                 RLEventType.WORKFLOW_COMPLETED: EventType.STREAM_END,
                 RLEventType.TEAM_COMPLETED: EventType.MILESTONE,
                 RLEventType.GEPA_EVOLUTION: EventType.MILESTONE,
+                RLEventType.PROMPT_CANDIDATE_USED: EventType.PROGRESS,
             },
         )
     except ImportError:
@@ -225,6 +232,7 @@ EVENT_TO_LEARNER: Dict[RLEventType, List[str]] = {
     RLEventType.MODEL_SELECTED: ["model_selector"],
     RLEventType.VERTICAL_SWITCH: ["cross_vertical"],
     RLEventType.PROMPT_USED: ["prompt_template"],
+    RLEventType.PROMPT_CANDIDATE_USED: ["prompt_optimizer"],
 }
 
 
