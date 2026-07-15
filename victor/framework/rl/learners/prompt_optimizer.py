@@ -1384,16 +1384,27 @@ class PromptOptimizerLearner(BaseLearner):
             )
             return None
 
-        # Final hygiene gate (fence-wrap, duplicate-lines, similarity) applied
-        # uniformly to every strategy path so degraded candidates are never stored.
+        # Persist hygiene gate: enforce only STRUCTURAL degradation signals
+        # (runaway growth, repetitive trigrams) — mirroring the GEPA-service
+        # strategy gate (gepa_service.py). Seed-similarity and unsupported-
+        # addition violations are intentionally NOT enforced here: a mutation
+        # is by definition a rewrite, which legitimately rephrases seed lines
+        # (→ unsupported_additions) and, for few-shot / distillation strategies,
+        # has low seed overlap (→ seed_similarity_too_low). Strategy layers that
+        # care about additive constraints (PrefPO) apply their own
+        # allowed_additions gate (prefpo_strategy.py); this net catches only
+        # corruption. Garbage collapses (e.g. 44-char output) are already
+        # rejected upstream in gepa_service.mutate() before reaching here.
         from victor.framework.rl.prompt_hygiene import evaluate_prompt_candidate
 
         report = evaluate_prompt_candidate(current_text, new_text)
-        if not report.accepted:
+        structural = {"growth_exceeded", "repeated_trigrams"}
+        triggered = structural & set(report.violations)
+        if triggered:
             logger.info(
                 "GEPA rejected '%s' candidate at persist gate: %s",
                 section_name,
-                ",".join(report.violations),
+                ",".join(sorted(triggered)),
             )
             return None
 

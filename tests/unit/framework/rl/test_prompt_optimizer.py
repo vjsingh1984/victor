@@ -1125,6 +1125,98 @@ class TestPromptOptimizerLearner:
         assert "Verify file paths with ls()" in candidate.text
         enrich_mock.assert_called_once()
 
+    def test_evolve_stores_rewrite_with_unsupported_additions(self, db):
+        """Regression: a rewrite carrying unsupported_additions but no
+        structural violations must be stored.
+
+        Previously the persist gate rejected on ``report.accepted`` (i.e. any
+        violation), and ``_find_unsupported_additions`` does exact-line
+        matching against the seed — so every genuine rewrite (any rephrased or
+        appended line) was rejected. After the fix the persist gate enforces
+        only structural violations, mirroring gepa_service.mutate().
+        """
+        settings = SimpleNamespace(
+            prompt_optimization=PromptOptimizationSettings(
+                enabled=True,
+                default_strategies=[],
+                section_strategies={"GROUNDING_RULES": ["gepa"]},
+            )
+        )
+        traces = [
+            ExecutionTrace(
+                session_id=f"s{i}",
+                task_type="action",
+                provider="zai",
+                model="glm-5.2",
+                tool_calls=3,
+                tool_failures={},
+                success=True,
+                completion_score=0.8,
+                tokens_used=500,
+            )
+            for i in range(5)
+        ]
+        seed = "Base responses on tool output only."
+        # New guidance line is NOT in the seed ⇒ unsupported_additions under
+        # the old policy; small growth, no repeated trigrams.
+        rewrite = seed + "\n- Always verify file paths with ls() before reading."
+
+        with patch("victor.config.settings.get_settings", return_value=settings):
+            learner = PromptOptimizerLearner(name="test", db_connection=db)
+
+        with patch.object(learner, "_collect_learning_traces", return_value=traces):
+            with patch.object(learner, "_enrich_traces_with_credit"):
+                with patch.object(learner, "_apply_section_strategies", return_value=rewrite):
+                    candidate = learner.evolve("GROUNDING_RULES", seed, provider="zai")
+
+        assert candidate is not None
+        assert candidate.text == rewrite
+        # Persisted via the real persist path, not just the in-memory dict.
+        row = db.execute(
+            "SELECT text FROM agent_prompt_candidate WHERE section_name = ?",
+            ("GROUNDING_RULES",),
+        ).fetchone()
+        assert row is not None
+        assert row[0] == rewrite
+
+    def test_evolve_rejects_structural_violation_at_persist_gate(self, db):
+        """A rewrite with repeated trigrams is still rejected at the persist
+        gate — structural safety is preserved after the gate fix."""
+        settings = SimpleNamespace(
+            prompt_optimization=PromptOptimizationSettings(
+                enabled=True,
+                default_strategies=[],
+                section_strategies={"GROUNDING_RULES": ["gepa"]},
+            )
+        )
+        traces = [
+            ExecutionTrace(
+                session_id=f"s{i}",
+                task_type="action",
+                provider="zai",
+                model="glm-5.2",
+                tool_calls=3,
+                tool_failures={},
+                success=True,
+                completion_score=0.8,
+                tokens_used=500,
+            )
+            for i in range(5)
+        ]
+        seed = "Base responses on tool output only."
+        # Repeated trigram phrase ⇒ repeated_trigrams (a structural violation).
+        rewrite = seed + "\nrepeat this phrase repeat this phrase repeat this phrase"
+
+        with patch("victor.config.settings.get_settings", return_value=settings):
+            learner = PromptOptimizerLearner(name="test", db_connection=db)
+
+        with patch.object(learner, "_collect_learning_traces", return_value=traces):
+            with patch.object(learner, "_enrich_traces_with_credit"):
+                with patch.object(learner, "_apply_section_strategies", return_value=rewrite):
+                    candidate = learner.evolve("GROUNDING_RULES", seed, provider="zai")
+
+        assert candidate is None
+
     def test_evolve_falls_back_to_pareto_merge_when_mutation_noops(self, db):
         learner = PromptOptimizerLearner(name="test", db_connection=db, use_pareto=True)
         key = learner._candidate_key("TEST", "ollama")
