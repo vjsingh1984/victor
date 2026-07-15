@@ -1964,28 +1964,19 @@ async def _run_benchmark_async(
                             _cfg=config,
                             _c=_persistent_container,
                         ):
-                            # Snapshot the agent's current edits as a patch.
-                            proc = await asyncio.create_subprocess_exec(
-                                "git",
-                                "-C",
-                                str(_work),
-                                "diff",
-                                "HEAD",
-                                stdout=asyncio.subprocess.PIPE,
-                                stderr=asyncio.subprocess.PIPE,
+                            # Snapshot the agent's current edits as a patch —
+                            # from the GROUND TRUTH (git diff), shared with the
+                            # adapter's final patch via workspace_git_diff.
+                            from victor.framework.workspace import (
+                                workspace_git_diff,
                             )
-                            try:
-                                out, _err = await asyncio.wait_for(proc.communicate(), timeout=30)
-                            except asyncio.TimeoutError:
-                                proc.kill()
-                                await proc.wait()
-                                return (0, 0, "verify: git diff timed out")
-                            patch = out.decode("utf-8", "replace")
+
+                            patch = await workspace_git_diff(_work)
                             if not patch.strip():
                                 return (
                                     0,
                                     0,
-                                    "verify: no edits to verify (git diff HEAD is empty)",
+                                    "verify: no edits to verify (git diff empty)",
                                 )
                             vr = await _verify_runner._verify_patch_in_container(
                                 _task, patch, _work, _cfg, container=_c

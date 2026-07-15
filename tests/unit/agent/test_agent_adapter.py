@@ -680,3 +680,35 @@ def test_capture_file_edit_skips_non_repo_paths(tmp_path):
     assert "/tmp/scratch_test.py" not in paths
     assert "../escape.py" not in paths
     assert all(not p.startswith("/") for p in paths), paths
+
+
+@pytest.mark.asyncio
+async def test_workspace_git_diff_captures_modifications_and_new_files(tmp_path):
+    """workspace_git_diff (the ground-truth patch source) captures BOTH modified
+    tracked files AND new untracked files — the gap that lost 20% of patches when
+    only the adapter's edit-capture was used."""
+    import subprocess
+
+    from victor.framework.workspace import workspace_git_diff
+
+    subprocess.run(["git", "init"], cwd=tmp_path, capture_output=True)
+    subprocess.run(["git", "config", "user.email", "t@t"], cwd=tmp_path, capture_output=True)
+    subprocess.run(["git", "config", "user.name", "t"], cwd=tmp_path, capture_output=True)
+    (tmp_path / "existing.py").write_text("x = 1\n")
+    subprocess.run(["git", "add", "-A"], cwd=tmp_path, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "init"], cwd=tmp_path, capture_output=True)
+    (tmp_path / "existing.py").write_text("x = 2\n")
+    (tmp_path / "new_module.py").write_text("y = 3\n")
+
+    diff = await workspace_git_diff(tmp_path)
+
+    assert "existing.py" in diff
+    assert "new_module.py" in diff
+
+
+@pytest.mark.asyncio
+async def test_workspace_git_diff_returns_empty_for_non_git_dir(tmp_path):
+    """Non-git directory → empty string (no exception, graceful fallback)."""
+    from victor.framework.workspace import workspace_git_diff
+
+    assert await workspace_git_diff(tmp_path) == ""

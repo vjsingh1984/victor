@@ -36,6 +36,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING
 
 from victor.config.settings import load_settings
+from victor.framework.workspace import workspace_git_diff
 
 # Use TYPE_CHECKING to avoid circular import at runtime
 # Chain: orchestrator → code_correction_middleware → evaluation → agent_adapter → orchestrator
@@ -58,6 +59,7 @@ from victor.evaluation.protocol import BenchmarkTask
 from victor.providers.registry import ProviderRegistry
 
 logger = logging.getLogger(__name__)
+
 
 # Tools a benchmark session must have enabled. The `fs` domain has been
 # removed — `read`/`edit`/`write` are now first-class tools with named
@@ -1391,8 +1393,15 @@ class VictorAgentAdapter:
             f"[AgentAdapter] Trace populated: {len(self._tool_calls)} tool calls, {self._turns} turns"
         )
 
-        # Generate combined patch from file edits
-        trace.generated_patch = self._generate_combined_patch()
+        # Generate the patch from the GROUND TRUTH (git diff) — not the
+        # adapter's fallible edit-capture. Stages all changes (including new
+        # files) then diffs staged vs HEAD. Falls back to the edit-capture
+        # (_generate_combined_patch) only if git is unavailable (non-git workspace).
+        if self.config.working_dir:
+            git_patch = await workspace_git_diff(Path(self.config.working_dir))
+            trace.generated_patch = git_patch or self._generate_combined_patch()
+        else:
+            trace.generated_patch = self._generate_combined_patch()
 
         # Populate correction metrics if tracking is enabled
         if self._metrics_collector:
