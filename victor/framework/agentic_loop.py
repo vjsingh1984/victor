@@ -1270,34 +1270,14 @@ class AgenticLoop:
             # Determine success
             success = self._determine_success(iterations)
 
-            # Attribute this turn's outcome to the prompt candidates that were
-            # served, so their Thompson posteriors update (closes the
-            # prompt-optimization reward loop — FEP-0017). Non-blocking; no-op
-            # when no candidate was served this turn. Fires once per run().
-            #
-            # Success is derived from the completion SCORE inside the emitter,
-            # not from this loop's COMPLETE flag: a mid-task CONTINUE turn with
-            # good progress should reward (not penalize) the served candidate —
-            # using COMPLETE would bias the posterior toward turn position.
-            try:
-                from victor.agent.services.prompt_optimization_reward import (
-                    emit_prompt_candidate_outcome,
-                )
-
-                _final_eval = iterations[-1].evaluation if iterations else None
-                _prompt_score = (
-                    float(getattr(_final_eval, "score", 0.0) or 0.0)
-                    if _final_eval is not None
-                    else 0.0
-                )
-                emit_prompt_candidate_outcome(
-                    getattr(self.runtime_intelligence, "_last_served_prompt_identities", []) or [],
-                    completion_score=_prompt_score,
-                    task_type=str(state.get("task_type") or "default"),
-                    session_id=state.get("session_id"),
-                )
-            except Exception as exc:
-                logger.debug("Prompt candidate outcome attribution skipped: %s", exc)
+            # Attribute this turn's outcome to the served prompt candidates so
+            # their Thompson posteriors update (closes the prompt-optimization
+            # reward loop — FEP-0017). Shared with run_streaming() so buffered
+            # and streaming chat train the learner identically; success is
+            # derived from the completion SCORE, not the COMPLETE flag.
+            self._emit_prompt_reward_outcome(
+                iterations[-1].evaluation if iterations else None, state
+            )
 
             self._record_provider_degradation_event(
                 state,
@@ -1436,6 +1416,36 @@ class AgenticLoop:
                 ),
             )
 
+    def _emit_prompt_reward_outcome(
+        self,
+        evaluation: Optional[EvaluationResult],
+        state: Dict[str, Any],
+    ) -> None:
+        """Attribute a turn's outcome to the prompt candidates served this turn.
+
+        Shared by ``run()`` and ``run_streaming()`` so buffered and streaming
+        chat update the ``prompt_optimizer`` learner identically (FEP-0017
+        streaming parity). Non-blocking; no-op when no candidate was served or
+        no evaluation exists. Success is derived from the completion score
+        inside the emitter, not the COMPLETE flag — a mid-task CONTINUE turn with
+        good progress should reward (not penalize) the served candidate.
+        """
+        if evaluation is None:
+            return
+        try:
+            from victor.agent.services.prompt_optimization_reward import (
+                emit_prompt_candidate_outcome,
+            )
+
+            emit_prompt_candidate_outcome(
+                getattr(self.runtime_intelligence, "_last_served_prompt_identities", []) or [],
+                completion_score=float(getattr(evaluation, "score", 0.0) or 0.0),
+                task_type=str(state.get("task_type") or "default"),
+                session_id=state.get("session_id"),
+            )
+        except Exception as exc:
+            logger.debug("Prompt candidate outcome attribution skipped: %s", exc)
+
     async def run_streaming(
         self,
         query: str,
@@ -1483,6 +1493,7 @@ class AgenticLoop:
         self.turn_evaluation_controller.reset()
         self.criteria_builder.reset()
         effective_max = self.max_iterations
+        evaluation: Optional[EvaluationResult] = None  # bound per turn; None if loop never runs
 
         for i in range(1, effective_max + 1):
             # PERCEIVE (shared, non-yielding)
@@ -1531,8 +1542,15 @@ class AgenticLoop:
                 EvaluationDecision.COMPLETE,
                 EvaluationDecision.FAIL,
             ):
+                # Streaming parity: attribute the turn outcome to served prompt
+                # candidates before ending the stream (FEP-0017; mirrors run()).
+                self._emit_prompt_reward_outcome(evaluation, state)
                 return
             self._inject_decide_nudges(evaluation, i, effective_max)
+
+        # Loop exhausted without a terminal decision — attribute the final turn's
+        # evaluation too (FEP-0017 streaming parity; mirrors run()'s epilogue).
+        self._emit_prompt_reward_outcome(evaluation, state)
 
     async def stream(
         self,
