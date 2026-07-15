@@ -59,6 +59,48 @@ from victor.providers.registry import ProviderRegistry
 
 logger = logging.getLogger(__name__)
 
+
+async def workspace_git_diff(workspace: Path, timeout: int = 30) -> str:
+    """Capture the agent's file changes as a unified diff from the workspace's
+    git state — the ground truth.
+
+    Stages all changes (``git add -A``) then diffs staged vs HEAD
+    (``git diff --cached HEAD``), capturing modified, new, AND deleted files.
+    This is more reliable than the adapter's edit-capture tracking (which misses
+    shell-based edits, stale snapshots, and some new files).
+
+    Returns:
+        Unified diff string, or ``""`` if the workspace is not a git repo /
+        git is unavailable.
+    """
+    try:
+        add_proc = await asyncio.create_subprocess_exec(
+            "git",
+            "-C",
+            str(workspace),
+            "add",
+            "-A",
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.DEVNULL,
+        )
+        await asyncio.wait_for(add_proc.communicate(), timeout=timeout)
+
+        diff_proc = await asyncio.create_subprocess_exec(
+            "git",
+            "-C",
+            str(workspace),
+            "diff",
+            "--cached",
+            "HEAD",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        out, _err = await asyncio.wait_for(diff_proc.communicate(), timeout=timeout)
+        return out.decode("utf-8", "replace")
+    except Exception:
+        return ""
+
+
 # Tools a benchmark session must have enabled. The `fs` domain has been
 # removed — `read`/`edit`/`write` are now first-class tools with named
 # parameters. `ls`/`find` route to `shell`. The ``code`` tool subsumes code
@@ -1391,8 +1433,15 @@ class VictorAgentAdapter:
             f"[AgentAdapter] Trace populated: {len(self._tool_calls)} tool calls, {self._turns} turns"
         )
 
-        # Generate combined patch from file edits
-        trace.generated_patch = self._generate_combined_patch()
+        # Generate the patch from the GROUND TRUTH (git diff) — not the
+        # adapter's fallible edit-capture. Stages all changes (including new
+        # files) then diffs staged vs HEAD. Falls back to the edit-capture
+        # (_generate_combined_patch) only if git is unavailable (non-git workspace).
+        if self.config.working_dir:
+            git_patch = await workspace_git_diff(Path(self.config.working_dir))
+            trace.generated_patch = git_patch or self._generate_combined_patch()
+        else:
+            trace.generated_patch = self._generate_combined_patch()
 
         # Populate correction metrics if tracking is enabled
         if self._metrics_collector:
