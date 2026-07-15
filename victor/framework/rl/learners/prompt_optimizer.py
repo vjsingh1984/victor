@@ -982,6 +982,11 @@ class PromptOptimizerLearner(BaseLearner):
         conv_traces = self._collect_traces_from_conversations(limit=limit)
         traces = self._merge_traces(jsonl_traces, conv_traces)
 
+        # Ground the synthetic completion_score/task_type in real linked outcomes
+        # (quality_weights response-quality, prompt_optimizer completion) so
+        # reflection and the live reward share one signal.
+        self._apply_real_outcomes(traces)
+
         if conv_traces:
             logger.info(
                 "Unified traces: %d from JSONL + %d from conversations = %d unique",
@@ -993,6 +998,50 @@ class PromptOptimizerLearner(BaseLearner):
         if ttl > 0:
             self._traces_cache = (limit, traces, time.monotonic() + ttl)
         return traces
+
+    def _apply_real_outcomes(self, traces: List[ExecutionTrace]) -> None:
+        """Override synthetic completion_score/success/task_type with real outcomes.
+
+        A trace's ``completion_score`` is otherwise the ``1 - 1.5*failure_rate``
+        proxy and ``task_type`` is ``'default'``. Where the RL correlation spine
+        linked genuine outcomes to the session — ``quality_weights``
+        response-quality scores and ``prompt_optimizer`` completion scores, both
+        carrying a real ``quality_score`` + ``task_type`` + ``session_id`` — use
+        them so reflection sees the same signal the live reward trains on.
+        Silently falls back to the proxy when no outcome is linked.
+        """
+        if not traces:
+            return
+        try:
+            from collections import Counter
+
+            from victor.core.schema import Tables
+
+            table = Tables.RL_OUTCOME
+        except Exception:
+            return
+        for trace in traces:
+            if not trace.session_id:
+                continue
+            try:
+                rows = self.db.execute(
+                    f"SELECT quality_score, task_type FROM {table} "
+                    f"WHERE session_id = ? "
+                    f"AND learner_id IN ('quality_weights', 'prompt_optimizer') "
+                    f"AND quality_score IS NOT NULL",
+                    (trace.session_id,),
+                ).fetchall()
+            except Exception:
+                continue
+            if not rows:
+                continue
+            scores = [row[0] for row in rows if row[0] is not None]
+            if scores:
+                trace.completion_score = sum(scores) / len(scores)
+                trace.success = trace.completion_score >= 0.5
+            tasks = [row[1] for row in rows if row[1]]
+            if tasks:
+                trace.task_type = Counter(tasks).most_common(1)[0][0]
 
     def _apply_section_strategies(
         self,
@@ -2409,9 +2458,12 @@ class PromptOptimizerLearner(BaseLearner):
                                     "tokens": 0,
                                 }
 
-                            if etype == "tool_call":
+                            if etype == "tool_result":
+                                # tool_result is the event actually emitted per
+                                # tool invocation (a paired tool_call event is
+                                # rarely/never logged); count the call here so
+                                # sessions aren't all dropped by the <2-calls filter.
                                 sessions[sid]["tool_calls"] += 1
-                            elif etype == "tool_result":
                                 if not data.get("success", True):
                                     error = str(
                                         data.get("error") or data.get("result", {}).get("error", "")
@@ -2577,8 +2629,9 @@ class PromptOptimizerLearner(BaseLearner):
                                 }
 
                             if etype == "tool_call":
-                                sessions[sid]["tool_calls"] += 1
-                                # v2: capture detail
+                                # Create a pending detail (reasoning enrichment).
+                                # Counting happens on tool_result (the reliably-
+                                # emitted event) to avoid double-counting.
                                 detail = ToolCallTrace(
                                     tool_name=data.get("tool_name", ""),
                                     arguments_summary=str(data.get("arguments_sanitized", ""))[
@@ -2592,14 +2645,33 @@ class PromptOptimizerLearner(BaseLearner):
 
                             elif etype == "tool_result":
                                 success = data.get("success", True)
-                                # Update the last detail entry
+                                sessions[sid]["tool_calls"] += 1
+                                # Fill a pending tool_call detail if one is open;
+                                # otherwise build one from the result (the emitter
+                                # logs tool_result directly, with no paired tool_call).
                                 details = sessions[sid]["details"]
-                                if details:
+                                if details and not (
+                                    getattr(details[-1], "result_summary", "")
+                                    or getattr(details[-1], "error_detail", "")
+                                ):
                                     last = details[-1]
-                                    last.success = success
-                                    last.duration_ms = data.get("duration_ms", 0)
-                                    last.result_summary = str(data.get("result_summary", ""))[:500]
-                                    last.error_detail = str(data.get("error_detail", ""))[:500]
+                                else:
+                                    last = ToolCallTrace(
+                                        tool_name=data.get("tool_name", ""),
+                                        arguments_summary="",
+                                        reasoning_before="",
+                                    )
+                                    details.append(last)
+                                last.success = success
+                                last.duration_ms = data.get("duration_ms", 0)
+                                last.result_summary = str(
+                                    data.get("result_summary") or data.get("result") or ""
+                                )[:500]
+                                last.error_detail = str(
+                                    data.get("error_detail") or data.get("error") or ""
+                                )[:500]
+                                if not last.tool_name and data.get("tool_name"):
+                                    last.tool_name = data.get("tool_name", "")
 
                                 if not success:
                                     error = str(
