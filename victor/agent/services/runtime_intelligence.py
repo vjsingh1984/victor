@@ -2806,54 +2806,6 @@ class RuntimeIntelligenceService:
             experiment_memory_hints=experiment_memory_hints,
         )
 
-    def record_prompt_candidate_outcome(
-        self,
-        completion_score: float,
-        success: bool,
-        *,
-        provider: str = "",
-        model: str = "",
-        task_type: str = "default",
-        session_id: Optional[str] = None,
-    ) -> None:
-        """Attribute a turn's outcome to the prompt candidates served this turn.
-
-        Emits one PROMPT_CANDIDATE_USED RL event per served candidate identity so
-        the prompt_optimizer learner can update each candidate's Thompson
-        posterior (alpha/beta/sample_count). Non-blocking — mirrors the existing
-        RL emission pattern (response_quality). No-op when no candidate was
-        served this turn.
-        """
-        identities = getattr(self, "_last_served_prompt_identities", None) or []
-        if not identities:
-            return
-        try:
-            from victor.framework.rl.hooks import RLEvent, RLEventType, get_rl_hooks
-
-            hooks = get_rl_hooks()
-        except Exception:
-            return
-        if hooks is None:
-            return
-        for identity in identities:
-            try:
-                event = RLEvent(
-                    type=RLEventType.PROMPT_CANDIDATE_USED,
-                    provider=identity.provider or provider or "",
-                    model=model or "",
-                    task_type=task_type,
-                    success=success,
-                    quality_score=completion_score,
-                    metadata={
-                        "prompt_section": identity.prompt_section_name or identity.section_name,
-                        "prompt_candidate_hash": identity.prompt_candidate_hash,
-                        "session_id": session_id,
-                    },
-                )
-                hooks.emit(event)
-            except Exception as exc:
-                logger.debug("prompt candidate outcome emission failed: %s", exc)
-
     @staticmethod
     def _build_experiment_prompt_guidance(hints: Optional[Dict[str, Any]]) -> List[str]:
         """Convert experiment-memory routing hints into prompt-ready planning guidance."""

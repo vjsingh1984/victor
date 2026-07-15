@@ -1275,13 +1275,18 @@ class AgenticLoop:
             # prompt-optimization reward loop — FEP-0017). Non-blocking; no-op
             # when no candidate was served this turn. Fires once per run().
             try:
+                from victor.agent.services.prompt_optimization_reward import (
+                    emit_prompt_candidate_outcome,
+                )
+
                 _final_eval = iterations[-1].evaluation if iterations else None
                 _prompt_score = (
                     float(getattr(_final_eval, "score", 0.0) or 0.0)
                     if _final_eval is not None
                     else 0.0
                 )
-                self.runtime_intelligence.record_prompt_candidate_outcome(
+                emit_prompt_candidate_outcome(
+                    getattr(self.runtime_intelligence, "_last_served_prompt_identities", []) or [],
                     completion_score=_prompt_score,
                     success=bool(success),
                     task_type=str(state.get("task_type") or "default"),
