@@ -1116,11 +1116,13 @@ class TurnExecutor:
             orchestrator=None,
             turn_executor=self,
             max_iterations=iteration_budget,
-            enable_fulfillment_check=True,  # Auto-derived criteria via FulfillmentCriteriaBuilder
+            enable_fulfillment_check=True,
             enable_adaptive_iterations=True,
             exploration_settings=getattr(self._chat_context.settings, "exploration", None),
             config={"completion_strategy": _strategy},
             rubric_complete_fn=_rubric_fn,
+            verifier=getattr(self, "_verifier", None),
+            max_verify_retries=getattr(self, "_max_verify_retries", 0),
         )
 
         # Inject task classification into state for execute_turn()
