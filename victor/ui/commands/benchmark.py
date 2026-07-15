@@ -1918,20 +1918,42 @@ async def _run_benchmark_async(
                         )
 
                         _verify_runner = SWEBenchRunner()
+                        # Sweep orphaned eval containers from prior crashed runs
+                        # BEFORE starting the persistent one (so it isn't swept).
+                        # Mark the flag so _verify_patch_in_container skips cleanup
+                        # (which would otherwise remove the persistent container).
+                        if not getattr(SWEBenchRunner, "_stale_containers_cleaned", False):
+                            SWEBenchRunner._stale_containers_cleaned = True
+                            try:
+                                from victor.evaluation.container_eval import (
+                                    cleanup_stale_eval_containers,
+                                )
+
+                                await cleanup_stale_eval_containers()
+                            except Exception:
+                                pass
                         # Start ONE persistent container for this task and reuse it
                         # across all verify-and-retry calls — avoids N full
                         # start→exec→stop lifecycles. Falls back to per-call
                         # creation if the image can't be resolved/started.
                         try:
                             _image = await resolve_swebench_image_exact(benchmark_task, config)
+                            logger.info(
+                                "Starting persistent verify container: image=%s",
+                                _image,
+                            )
                             _persistent_container = EvalContainer(
                                 image=_image, workspace_host_path=str(work_dir)
                             )
                             await _persistent_container.start()
+                            logger.info(
+                                "Persistent verify container started: %s",
+                                _persistent_container.name,
+                            )
                         except Exception as exc:
-                            logger.debug(
-                                "persistent verify container unavailable "
-                                "(per-call fallback): %s",
+                            logger.warning(
+                                "Persistent verify container unavailable "
+                                "(falling back to per-call creation): %s",
                                 exc,
                             )
                             _persistent_container = None
