@@ -598,7 +598,18 @@ class VictorAgentAdapter:
         if not self.config.working_dir:
             return
 
+        # Only capture repo-relative files. Scratch files the agent writes
+        # outside the workspace (e.g. /tmp test scripts) must not appear in the
+        # patch — SWE-bench's ``git apply`` rejects them with "invalid path".
+        rel = Path(path)
+        if rel.is_absolute() or ".." in rel.parts:
+            return
         full_path = self.config.working_dir / path
+        try:
+            full_path.resolve().relative_to(self.config.working_dir.resolve())
+        except (ValueError, OSError):
+            return
+
         before_content = self._file_snapshots.get(path, "")
         after_content = ""
 

@@ -145,3 +145,25 @@ class TestEnsureProjectImportableFastPath:
                 result = await ensure_project_importable(nonexistent, fake_root, install_deps=True)
         # Not installed (PackageNotFoundError) → must attempt install
         assert mock_exec.called, "pip install should have been attempted"
+
+
+@pytest.mark.asyncio
+async def test_cleans_up_partial_install_on_failure(tmp_path):
+    """A failed editable install must best-effort uninstall the partial/shadow
+    so it doesn't poison later tasks' imports (SWE-bench venv pollution)."""
+    (tmp_path / "setup.py").write_text("from setuptools import setup\nsetup()")
+
+    with patch("victor.context.workspace_setup.asyncio.create_subprocess_exec") as mock_exec:
+        mock_proc = AsyncMock()
+        mock_proc.returncode = 1
+        mock_proc.communicate = AsyncMock(return_value=(b"", b"build failed"))
+        mock_exec.return_value = mock_proc
+
+        result = await ensure_project_importable("nonexistent_pkg_xyz", tmp_path)
+
+    assert result is False
+    # install attempt + cleanup uninstall == 2 subprocess calls
+    assert mock_exec.call_count == 2
+    cleanup_args = mock_exec.call_args_list[1][0]
+    assert "uninstall" in cleanup_args
+    assert "nonexistent_pkg_xyz" in cleanup_args

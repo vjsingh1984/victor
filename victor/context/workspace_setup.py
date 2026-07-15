@@ -116,22 +116,46 @@ async def ensure_project_importable(
         if proc.returncode == 0:
             logger.info("Installed %s successfully", project_name)
             return True
-        else:
-            logger.warning(
-                "Failed to install %s (exit %d): %s",
-                project_name,
-                proc.returncode,
-                stderr.decode()[:300],
-            )
-            return False
+        logger.warning(
+            "Failed to install %s (exit %d): %s",
+            project_name,
+            proc.returncode,
+            stderr.decode()[:300],
+        )
+        await _uninstall_partial(project_name)
+        return False
 
     except asyncio.TimeoutError:
         proc.kill()
         logger.warning("Installation of %s timed out after %ds", project_name, timeout)
+        await _uninstall_partial(project_name)
         return False
     except Exception as e:
         logger.warning("Installation of %s failed: %s", project_name, e)
+        await _uninstall_partial(project_name)
         return False
+
+
+async def _uninstall_partial(project_name: str) -> None:
+    """Best-effort uninstall of a partial/failed editable install.
+
+    A failed ``pip install -e .`` (e.g. C-extension build failure) can leave a
+    broken namespace shadow in site-packages (``import`` succeeds but
+    ``__file__`` is None / ``__version__`` missing), which then breaks
+    subsequent tasks' imports. Removing it keeps one failed task from poisoning
+    the rest of a benchmark run.
+    """
+    cmd = [sys.executable, "-m", "pip", "uninstall", "-y", project_name, "--quiet"]
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.DEVNULL,
+        )
+        await asyncio.wait_for(proc.communicate(), timeout=60)
+        logger.info("Cleaned up partial install of %s", project_name)
+    except Exception as e:
+        logger.debug("Best-effort uninstall of %s skipped: %s", project_name, e)
 
 
 def detect_project_name(project_root: Path) -> Optional[str]:

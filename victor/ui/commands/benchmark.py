@@ -1252,6 +1252,12 @@ def run_prompt_suite(
         "--candidate-hash",
         help="Prompt candidate hash to evaluate. Repeat once per candidate.",
     ),
+    include_baseline: bool = typer.Option(
+        False,
+        "--include-baseline",
+        help="Also run the section's SEED (baseline) prompt so the suite measures "
+        "evolved-vs-seed. Auto-enabled when --create-rollout is set.",
+    ),
     max_tasks: Optional[int] = typer.Option(
         None, "--max-tasks", "-n", help="Maximum number of tasks to run"
     ),
@@ -1405,6 +1411,8 @@ def run_prompt_suite(
 
     from victor.evaluation import EvaluationConfig, PromptCandidateEvaluationSpec
 
+    from victor.agent.optimization_injector import BASELINE_CANDIDATE_HASH
+
     _metadata, bench_type, runner = _resolve_benchmark_target(benchmark, dataset_path)
     provider, model, resolved_account = _resolve_account_selection(account, provider, model)
     effective_model = _resolve_effective_model(profile, model)
@@ -1440,14 +1448,27 @@ def run_prompt_suite(
         console.print(f"  - {candidate_hash}")
     console.print()
 
-    candidate_specs = [
+    candidate_specs = []
+    # Baseline (seed) arm: auto-included with --create-rollout (a rollout without
+    # a measured baseline is meaningless) or when --include-baseline is set.
+    # Resolved by the injector to the section's seed text (no stored candidate).
+    if include_baseline or create_rollout:
+        candidate_specs.append(
+            PromptCandidateEvaluationSpec(
+                section_name=prompt_section,
+                prompt_candidate_hash=BASELINE_CANDIDATE_HASH,
+                provider=provider,
+                label=f"{prompt_section}:baseline (seed)",
+            )
+        )
+    candidate_specs.extend(
         PromptCandidateEvaluationSpec(
             section_name=prompt_section,
             prompt_candidate_hash=candidate_hash,
             provider=provider,
         )
         for candidate_hash in candidate_hashes
-    ]
+    )
 
     suite = run_sync(
         _run_prompt_candidate_suite_async(
