@@ -53,6 +53,9 @@ async def workspace_git_diff(workspace: Path, timeout: int = 30) -> str:
             str(workspace),
             "add",
             "-A",
+            "--",
+            ".",
+            ":!.victor",
             stdout=asyncio.subprocess.DEVNULL,
             stderr=asyncio.subprocess.DEVNULL,
         )
