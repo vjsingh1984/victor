@@ -298,12 +298,6 @@ class VictorAgentAdapter:
         # bias escalation branch and the test-pass force-complete.
         self._made_edit_tool_call: bool = False
 
-        # Closed-loop verify-and-retry gate (PR2). verify_fn is set per-task in
-        # execute_task; retries/feedback reset each task in reset().
-        self._verify_fn: Optional[Callable[[], "Any"]] = None
-        self._verify_retries: int = 0
-        self._verify_feedback: Optional[str] = None
-
         # Correlation spine for this task. Set in execute_task and stamped on
         # every decision (log_decision reads get_session_id()) so the per-task
         # execution manifest can join decisions to the task outcome (reward).
@@ -790,9 +784,6 @@ class VictorAgentAdapter:
         self._task_session_id = ""
         self._exploration_calls = 0
         self._made_edit_tool_call = False
-        self._verify_fn = None
-        self._verify_retries = 0
-        self._verify_feedback = None
         # Reset circuit breaker for new task
         self._tool_failures = {}
         self._tool_failure_counts = {}
@@ -857,7 +848,6 @@ class VictorAgentAdapter:
         self,
         task: BenchmarkTask,
         workspace_dir: Path,
-        verify_fn: Optional[Callable[[], "Any"]] = None,
     ) -> AgenticExecutionTrace:
         """Execute an agentic task and return execution trace.
 
@@ -868,24 +858,12 @@ class VictorAgentAdapter:
         Args:
             task: The benchmark task to execute
             workspace_dir: Directory where task files are located
-            verify_fn: Optional closed-loop verifier — an async callable taking
-                no args and returning ``(passed, total, raw_output)``. When
-                supplied, after the agent claims done the loop runs it; if the
-                FAIL_TO_PASS tests don't all pass (and retries remain), the
-                failing output is fed back as the next continuation message and
-                the loop continues. See ``AdapterConfig.max_verify_retries``.
 
         Returns:
             AgenticExecutionTrace with tool calls, file edits, and messages
         """
         self.reset()
         self.config.working_dir = workspace_dir
-        # Per-task verify-and-retry gate state (PR2). verify_fn is constructed
-        # per-task by the benchmark harness (it closes over the cached_repo +
-        # container verifier); retries/feedback reset each task.
-        self._verify_fn = verify_fn
-        self._verify_retries = 0
-        self._verify_feedback: Optional[str] = None
 
         # Stamp a per-task session_id on the correlation spine. log_decision()
         # (called during the agent loop) reads get_session_id() and writes it on
@@ -1149,11 +1127,6 @@ class VictorAgentAdapter:
                 # primary lever against the over-exploration failure mode.
                 if self._turns == 1:
                     current_message = prompt
-                elif self._verify_feedback:
-                    # Closed-loop verify gate injected the failing test output —
-                    # feed it back so the agent fixes the remaining failures.
-                    current_message = self._verify_feedback
-                    self._verify_feedback = None
                 elif self._made_edit_tool_call:
                     current_message = "Continue."
                 else:
@@ -1299,43 +1272,6 @@ class VictorAgentAdapter:
                         self._turns,
                     )
                     complete = True
-
-                # Closed-loop verify-and-retry gate (PR2): when the agent claims
-                # done after editing, DON'T trust the self-report — run the real
-                # FAIL_TO_PASS tests. If they don't all pass and retries remain,
-                # inject the failing output as the next turn's continuation
-                # message and keep iterating. This converts near-miss partials
-                # (8/9, 56/57) into full passes. Bounded by max_verify_retries.
-                if (
-                    complete
-                    and self._verify_fn is not None
-                    and self._made_edit_tool_call
-                    and self._verify_retries < self.config.max_verify_retries
-                ):
-                    try:
-                        vr_passed, vr_total, vr_raw = await self._verify_fn()
-                    except Exception as exc:  # noqa: BLE001 — verify must never break the run
-                        logger.warning("[AgentAdapter] verify_fn raised: %s", exc)
-                        vr_passed, vr_total, vr_raw = -1, -1, str(exc)
-                    vr_verified = vr_total > 0 and vr_passed == vr_total
-                    logger.info(
-                        "[AgentAdapter] Turn %d verify: %s/%s (%s) retries=%d/%d",
-                        self._turns,
-                        vr_passed,
-                        vr_total,
-                        "VERIFIED" if vr_verified else "failed",
-                        self._verify_retries,
-                        self.config.max_verify_retries,
-                    )
-                    if not vr_verified and vr_passed != -1:
-                        self._verify_retries += 1
-                        self._verify_feedback = (
-                            f"VERIFICATION FAILED: {vr_passed}/{vr_total} of the "
-                            "FAIL_TO_PASS tests pass — your fix is incomplete. "
-                            "Here is the test output; fix the remaining failures "
-                            f"and the task will re-verify:\n\n{vr_raw[-1000:]}"
-                        )
-                        complete = False  # re-enter the loop with the feedback
 
                 logger.info(
                     "[AgentAdapter] Turn %d complete=%s (deliverables=%d, signals=%d, "

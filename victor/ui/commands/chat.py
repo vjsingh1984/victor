@@ -218,6 +218,7 @@ def _build_session_config(
     observability_logging: Optional[bool] = None,
     auto_skill_enabled: Optional[bool] = None,
     one_shot_mode: Optional[bool] = None,
+    verify_mode: str = "none",
     provider: Optional[str] = None,
     model: Optional[str] = None,
     endpoint: Optional[str] = None,
@@ -253,6 +254,7 @@ def _build_session_config(
         observability_logging=observability_logging,
         auto_skill_enabled=auto_skill_enabled,
         one_shot_mode=one_shot_mode,
+        verify_mode=verify_mode,
         provider=provider,
         model=model,
         endpoint=endpoint,
@@ -880,6 +882,14 @@ def chat(
         "--vertical",
         "-V",
         help=f"Vertical template to use ({', '.join(list_verticals()) or 'coding, research, devops'}).",
+        rich_help_panel="Advanced Agent Behavior",
+    ),
+    verify_mode: str = typer.Option(
+        "none",
+        "--verify",
+        help="Verify the agent's work after it claims done and retry on failure (FEP-0018). "
+        "'pytest' runs python -m pytest in the workspace; 'lint' runs ruff check; "
+        "'none' disables verification (default).",
         rich_help_panel="Advanced Agent Behavior",
     ),
     auto_skill: Optional[bool] = typer.Option(

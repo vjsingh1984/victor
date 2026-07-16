@@ -1962,7 +1962,7 @@ async def _run_benchmark_async(
                             )
 
                     trace = await adapter.execute_task(
-                        benchmark_task, work_dir, verify_fn=None  # loop handles verification
+                        benchmark_task, work_dir  # loop handles verification (FEP-0018)
                     )
 
                     # Unset the verifier after the task (avoid leaking to next task)
