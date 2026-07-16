@@ -323,6 +323,7 @@ class SessionConfig:
     one_shot_mode: Optional[bool] = None
     headless_mode: bool = False
     verify_mode: str = "none"
+    lsp_feedback: str = "errors"
 
     # Composed sub-configs (for structured access)
     compaction: CompactionConfig = field(default_factory=CompactionConfig)
@@ -388,6 +389,7 @@ class SessionConfig:
         one_shot_mode: Optional[bool] = None,
         headless_mode: bool = False,
         verify_mode: str = "none",
+        lsp_feedback: str = "errors",
         provider: Optional[str] = None,
         model: Optional[str] = None,
         endpoint: Optional[str] = None,
@@ -468,6 +470,7 @@ class SessionConfig:
             one_shot_mode=one_shot_mode,
             headless_mode=headless_mode,
             verify_mode=verify_mode,
+            lsp_feedback=lsp_feedback,
             compaction=CompactionConfig(
                 threshold=compaction_threshold,
                 adaptive=adaptive_threshold,

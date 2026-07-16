@@ -1285,12 +1285,14 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
     def set_lsp(self, lsp_capability: Any) -> None:
         """Set the LSP capability (LSPServiceProtocol/LSPPoolProtocol).
 
-        This enables framework-level language intelligence for all verticals.
-
-        Args:
-            lsp_capability: LSPCapability instance
+        When a capability is provided, the LSP diagnostics middleware
+        (FEP-0019) auto-activates on the tool middleware chain.
         """
         self._lsp = lsp_capability
+        if lsp_capability is not None and getattr(self, "_middleware_chain", None):
+            from victor.framework.lsp_middleware import register_lsp_on_chain
+
+            register_lsp_on_chain(self, self._middleware_chain)
         logger.debug("LSP capability registered with orchestrator")
 
     def get_team_suggestions(
@@ -1773,6 +1775,11 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
     def set_middleware_chain(self, chain: Any) -> None:
         """Store middleware chain via public runtime port."""
         self._middleware_chain = chain
+        # If LSP was set before the chain existed, register its middleware now.
+        if getattr(self, "_lsp", None) is not None:
+            from victor.framework.lsp_middleware import register_lsp_on_chain
+
+            register_lsp_on_chain(self, chain)
 
     # =========================================================================
     # Internal Storage Setters (DIP Compliance)

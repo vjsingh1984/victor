@@ -24,9 +24,10 @@ import asyncio
 import logging
 import re
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from victor.framework.verification import VerificationResult
+from victor.framework.workspace import workspace_files_modified
 
 logger = logging.getLogger(__name__)
 
@@ -152,6 +153,65 @@ class LintVerifier:
             )
         logger.info("LintVerifier: %d issue(s) (rc=%d)", errors, rc)
         return VerificationResult(passed, total, raw[-4000:], feedback)
+
+
+class LSPVerifier:
+    """Verifier that checks LSP diagnostics on edited files.
+
+    Uses the orchestrator's LSP capability (``orchestrator.lsp``) to fetch
+    diagnostics — zero command execution, instant, multi-language (Python,
+    TypeScript, Rust, Go, etc. via pyright/rust-analyzer/gopls). Catches
+    type errors, undefined references, and syntax issues that tests may not
+    cover. Gracefully degrades when LSP is unavailable (victor-coding not
+    installed → vacuous pass).
+    """
+
+    def __init__(self, lsp_capability: Any = None, include_warnings: bool = False):
+        self._lsp = lsp_capability
+        self._include_warnings = include_warnings
+
+    async def verify(
+        self,
+        *,
+        workspace: Optional[Path] = None,
+        state: Optional[dict] = None,
+    ) -> VerificationResult:
+        """Check LSP diagnostics on edited files."""
+        if self._lsp is None:
+            return VerificationResult(0, 0, "", "LSP not available")
+
+        # Get edited files from the workspace's git state.
+        edited_files = []
+        if workspace is not None:
+            edited_files = await workspace_files_modified(workspace)
+
+        if not edited_files:
+            return VerificationResult(0, 0, "", "no edited files to check")
+
+        all_errors: list[str] = []
+        total_errors = 0
+        for file_path in edited_files:
+            try:
+                diagnostics = self._lsp.get_diagnostics(str(file_path))
+            except Exception:
+                continue
+            for diag in diagnostics:
+                severity = getattr(diag, "severity", 1)
+                if severity == 1 or (self._include_warnings and severity <= 2):
+                    total_errors += 1
+                    line = getattr(getattr(diag, "range", None), "start", None)
+                    line_num = getattr(line, "line", "?") if line else "?"
+                    all_errors.append(f"  {file_path}:{line_num} — {diag.message}")
+
+        total = total_errors if total_errors > 0 else 1
+        passed = 0 if total_errors > 0 else 1
+        raw = "\n".join(all_errors)
+        if passed == total:
+            feedback = "VERIFIED: no LSP errors in edited files."
+        else:
+            feedback = f"VERIFICATION FAILED: {total_errors} LSP error(s).\n\n{raw}"
+        logger.info("LSPVerifier: %d error(s) in %d files", total_errors, len(edited_files))
+        return VerificationResult(passed, total, raw, feedback)
 
 
 async def _run_command_async(

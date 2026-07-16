@@ -52,8 +52,8 @@ from victor.framework.tools import ToolSet, ToolsInput
 from victor.runtime.context import resolve_execution_context
 
 
-def _build_verifier(mode: str):
-    """Construct a Verifier from a verify_mode string (FEP-0018).
+def _build_verifier(mode: str, orchestrator: Any = None):
+    """Construct a Verifier from a verify_mode string (FEP-0018/0019).
 
     Returns None for unknown/unsupported modes.
     """
@@ -61,12 +61,15 @@ def _build_verifier(mode: str):
     if mode == "none":
         return None
     try:
-        from victor.framework.verifiers import LocalTestVerifier, LintVerifier
+        from victor.framework.verifiers import LintVerifier, LocalTestVerifier, LSPVerifier
 
         if mode == "pytest" or mode == "test":
             return LocalTestVerifier()
         if mode == "lint" or mode == "ruff":
             return LintVerifier()
+        if mode == "lsp":
+            lsp_cap = getattr(orchestrator, "lsp", None) if orchestrator else None
+            return LSPVerifier(lsp_capability=lsp_cap)
     except ImportError:
         pass
     return None
@@ -345,10 +348,18 @@ class Agent:
             if _verify_mode and _verify_mode != "none":
                 _te = getattr(orchestrator, "turn_executor", None)
                 if _te is not None:
-                    _verifier = _build_verifier(_verify_mode)
+                    _verifier = _build_verifier(_verify_mode, orchestrator)
                     if _verifier is not None:
                         _te._verifier = _verifier
                         _te._max_verify_retries = 2
+
+            # FEP-0019: propagate the LSP diagnostics feedback mode to the
+            # orchestrator so the auto-activated middleware honors it.
+            _lsp_feedback = getattr(session_config, "lsp_feedback", "errors")
+            if _lsp_feedback:
+                from victor.framework.lsp_middleware import set_lsp_feedback_mode
+
+                set_lsp_feedback_mode(orchestrator, _lsp_feedback)
 
             resolved_provider = (
                 provider
