@@ -52,33 +52,24 @@ DEFAULT_FEATURE_FLAGS = {
     "use_strategy_based_tool_registration": False,
     "use_llm_decision_service": False,
     "use_edge_model": False,
-    # Fuzzy matching (enabled by default for better UX)
-    "use_fuzzy_matching": True,
     # Optimization flags (opt-in, disabled by default)
     "use_semantic_response_cache": False,
-    "use_context_temperature": False,
-    "use_confidence_monitor": False,
-    "tool_strategy_v2": False,
     # Smart routing (disabled by default)
     "use_smart_routing": False,
     # Learning from execution (enabled by default)
     "use_learning_from_execution": True,
+    # Tool broadcasting optimization (opt-in)
+    "tool_strategy_v2": False,
     # Agentic rollout flags (opt-in, disabled by default)
-    "use_agentic_bench_gates": False,
     "use_calibrated_completion": False,
-    "use_agentic_retrieval_repair": False,
-    "use_utility_retrieval": False,
     "use_prompt_completeness_guard": False,
     "use_prompt_dictionary_compression": False,
     "use_prime_memory_evolution": False,
-    "use_external_agentic_benchmarks": False,
     # Rich formatting (disabled by default)
     "use_rich_formatting": False,
     # Graph-based enhancements (disabled by default)
-    "use_graph_rag": False,
     "use_ccg": False,
     "use_graph_query_tool": False,
-    "use_multi_hop_retrieval": False,
     "use_graph_enhanced_context": False,
     # Architecture consolidation (opt-in for safety)
     "use_stategraph_agentic_loop": False,
