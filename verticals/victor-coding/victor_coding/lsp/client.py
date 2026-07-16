@@ -35,6 +35,7 @@ from victor_contracts.lsp_runtime import (
     CompletionItem,
     Hover,
     DocumentSymbol,
+    SymbolKind,
 )
 
 __all__ = [
@@ -245,6 +246,18 @@ class LSPClient:
         }
         self._write_message(message)
 
+    def _send_response(self, request_id: Any, result: Any) -> None:
+        """Respond to a server->client request (e.g. workspace/configuration).
+
+        Servers like pyright block on these (they won't publish diagnostics or
+        serve requests until configuration is answered); returning ``null``
+        unblocks them.
+        """
+        if not self.is_running:
+            return
+
+        self._write_message({"jsonrpc": "2.0", "id": request_id, "result": result})
+
     def _write_message(self, message: Dict[str, Any]) -> None:
         """Write a message to the server."""
         if not self._process or not self._process.stdin:
@@ -268,9 +281,16 @@ class LSPClient:
         buffer = b""
         while self.is_running:
             try:
-                # Read in a non-blocking way
+                # os.read is a single POSIX read() — it returns as soon as ANY
+                # bytes are available (up to 65536), not after 65536. The prior
+                # ``stdout.read(4096)`` (on the bufsize=0 raw FileIO) looped until
+                # 4096 bytes or EOF, so every sub-4096-byte LSP response hung and
+                # live language servers never delivered diagnostics/symbols — only
+                # mock tests passed. The buffer + _parse_message below reassemble
+                # partial messages across os.read chunks. fileno() works on both
+                # raw FileIO and buffered streams.
                 chunk = await asyncio.get_event_loop().run_in_executor(
-                    None, self._process.stdout.read, 4096
+                    None, os.read, self._process.stdout.fileno(), 65536
                 )
                 if not chunk:
                     break
@@ -328,11 +348,25 @@ class LSPClient:
 
     async def _handle_message(self, message: Dict[str, Any]) -> None:
         """Handle a message from the server."""
+        # Server->client request (has both id and method, e.g.
+        # workspace/configuration). Respond so the server doesn't stall waiting
+        # (pyright blocks analysis/diagnostics until configuration is answered).
+        if "id" in message and "method" in message:
+            self._send_response(message["id"], None)
+            return
+
         if "id" in message:
             # Response to a request
             request_id = message["id"]
             if request_id in self._pending_requests:
                 future = self._pending_requests.pop(request_id)
+                # A late or duplicate response can arrive after the future was
+                # already resolved/cancelled (e.g. wait_for timed out and a
+                # subsequent chunk re-delivered it). Guard so the reader task
+                # doesn't crash with InvalidStateError and drop all later
+                # responses/diagnostics.
+                if future.done():
+                    return
                 if "error" in message:
                     future.set_exception(
                         RuntimeError(message["error"].get("message", "Unknown error"))
@@ -570,7 +604,27 @@ class LSPClient:
             result = await self._send_request("textDocument/documentSymbol", params)
             if not result:
                 return []
-            return [DocumentSymbol.from_dict(item) for item in result]
+            # Servers may return either hierarchical DocumentSymbol
+            # (``range`` + ``selectionRange``) or flat SymbolInformation
+            # (``location.range``) depending on the client capabilities sent at
+            # initialize. Normalize both to DocumentSymbol so downstream code
+            # (the FEP-0019 symbol-context adapter) sees one shape.
+            symbols: List[DocumentSymbol] = []
+            for item in result:
+                if isinstance(item, dict) and "location" in item and "range" not in item:
+                    loc = item.get("location") or {}
+                    rng = Range.from_dict(loc.get("range") or {})
+                    symbols.append(
+                        DocumentSymbol(
+                            name=str(item.get("name", "")),
+                            kind=SymbolKind(item.get("kind", 0)),
+                            range=rng,
+                            selection_range=rng,
+                        )
+                    )
+                else:
+                    symbols.append(DocumentSymbol.from_dict(item))
+            return symbols
         except Exception as e:
             logger.error(f"Document symbols error: {e}")
             return []
