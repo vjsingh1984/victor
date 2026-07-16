@@ -5,21 +5,27 @@
 
 """Tests for the framework LSP adapter (victor-coding → FEP-0019 activation).
 
-The adapter bridges victor-coding's ``LSPConnectionPool`` (which returns
-``victor.framework.lsp`` types and display dicts) to the framework's
-``LSPServiceProtocol`` ``LSP*`` types, so the FEP-0019 diagnostic middleware +
-symbol context provider activate. Uses a mock pool (no live language server).
+The adapter bridges victor-coding's ``LSPConnectionPool`` (display dicts +
+``victor_contracts`` types) to the LSP shape the FEP-0019 framework runtime
+duck-types, so the diagnostic middleware + symbol context provider activate.
+Uses a mock pool (no live language server).
 """
 
 from __future__ import annotations
 
 from types import SimpleNamespace
-from typing import Any, List
+from typing import List
 
 import pytest
 
-from victor.framework.lsp import DocumentSymbol, Position, Range, SymbolKind
-from victor.framework.lsp_protocols import LSPDiagnostic, LSPSymbol
+from victor_contracts.lsp_runtime import (
+    Diagnostic,
+    DiagnosticSeverity,
+    DocumentSymbol,
+    Position,
+    Range,
+    SymbolKind,
+)
 
 
 def _ds(name: str, kind: SymbolKind, children=None, detail=None) -> DocumentSymbol:
@@ -38,8 +44,7 @@ def _ds(name: str, kind: SymbolKind, children=None, detail=None) -> DocumentSymb
 class _MockPool:
     """Stand-in for LSPConnectionPool returning controlled data."""
 
-    def __init__(self, diagnostics=None, symbols=None):
-        self._diags = diagnostics or []
+    def __init__(self, symbols=None):
         self._symbols = symbols or []
         self.calls: List[tuple] = []
 
@@ -87,19 +92,21 @@ def _adapter(pool=None):
 
 
 class TestDiagnosticsConversion:
-    def test_severity_string_to_int_and_line_zero_indexed(self):
+    def test_severity_name_to_enum_and_line_zero_indexed(self):
         adapter = _adapter()
         diags = adapter.get_diagnostics("a.py")
         assert len(diags) == 2
-        assert all(isinstance(d, LSPDiagnostic) for d in diags)
-        # "error" -> 1, line 41 (1-indexed) -> 40
-        assert diags[0].severity == 1
+        assert all(isinstance(d, Diagnostic) for d in diags)
+        # "error" -> ERROR(1), line 41 (1-indexed) -> 40
+        assert diags[0].severity == DiagnosticSeverity.ERROR
+        assert int(diags[0].severity) == 1
         assert diags[0].range.start.line == 40
         assert diags[0].range.start.character == 5
         assert diags[0].message == "undefined name 'foo'"
         assert diags[0].source == "pyright"
-        # "warning" -> 2
-        assert diags[1].severity == 2
+        # "warning" -> WARNING(2)
+        assert diags[1].severity == DiagnosticSeverity.WARNING
+        assert int(diags[1].severity) == 2
         assert diags[1].code == "F401"
 
     def test_unknown_severity_defaults_to_error(self):
@@ -108,12 +115,12 @@ class TestDiagnosticsConversion:
             {"line": 1, "character": 0, "message": "x", "severity": "bogus"}
         ]
         diags = _adapter(pool).get_diagnostics("a.py")
-        assert diags[0].severity == 1
+        assert diags[0].severity == DiagnosticSeverity.ERROR
 
 
-class TestDocumentSymbolsConversion:
+class TestDocumentSymbols:
     @pytest.mark.asyncio
-    async def test_symbols_convert_with_kind_and_children(self):
+    async def test_symbols_returned_as_contracts_types(self):
         pool = _MockPool(
             symbols=[
                 _ds(
@@ -130,13 +137,13 @@ class TestDocumentSymbolsConversion:
         )
         symbols = await _adapter(pool).get_document_symbols("a.py")
         assert len(symbols) == 2
-        assert all(isinstance(s, LSPSymbol) for s in symbols)
+        assert all(isinstance(s, DocumentSymbol) for s in symbols)
+        # kind is an IntEnum — the framework reads it as int.
         assert symbols[0].name == "SessionManager"
-        assert symbols[0].kind == int(SymbolKind.CLASS)
+        assert int(symbols[0].kind) == int(SymbolKind.CLASS)
         assert symbols[0].detail == "(store)"
         assert len(symbols[0].children) == 2
-        assert symbols[0].children[0].kind == int(SymbolKind.CONSTRUCTOR)
-        assert symbols[1].kind == int(SymbolKind.CONSTANT)
+        assert int(symbols[0].children[0].kind) == int(SymbolKind.CONSTRUCTOR)
 
     @pytest.mark.asyncio
     async def test_empty_symbols(self):
@@ -157,25 +164,22 @@ class TestPassthrough:
 
 
 class TestGetLspWiring:
-    def test_coding_assistant_get_lsp_returns_capability_with_adapter(self):
-        from victor.framework.capabilities.lsp import LSPCapability
-
+    def test_coding_assistant_get_lsp_returns_adapter(self):
         from victor_coding.assistant import CodingAssistant
         from victor_coding.lsp.framework_adapter import FrameworkLSPAdapter
 
         cap = CodingAssistant.get_lsp()
-        assert isinstance(cap, LSPCapability)
-        assert isinstance(cap._impl, FrameworkLSPAdapter)
+        assert isinstance(cap, FrameworkLSPAdapter)
 
 
 class TestEndToEndActivation:
     """The real CodingAssistant flows through the framework's apply_lsp."""
 
     def test_apply_lsp_wires_coding_assistant_capability(self):
-        from victor.framework.capabilities.lsp import LSPCapability
         from victor.framework.step_handlers import FrameworkStepHandler
 
         from victor_coding.assistant import CodingAssistant
+        from victor_coding.lsp.framework_adapter import FrameworkLSPAdapter
 
         class _Recorder:
             def __init__(self) -> None:
@@ -191,6 +195,4 @@ class TestEndToEndActivation:
         FrameworkStepHandler().apply_lsp(orch, CodingAssistant, context, result)
 
         assert len(orch.set_calls) == 1
-        assert isinstance(orch.set_calls[0], LSPCapability)
-        # And the capability's diagnostics path is wired (not a vacuous stub).
-        assert orch.set_calls[0]._impl is not None
+        assert isinstance(orch.set_calls[0], FrameworkLSPAdapter)

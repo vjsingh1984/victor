@@ -5,21 +5,22 @@
 
 """Framework LSP adapter — activates FEP-0019 in victor-coding.
 
-Bridges victor-coding's :class:`LSPConnectionPool` (which returns
-``victor.framework.lsp`` types and display-oriented dicts) to the framework's
-``LSPServiceProtocol`` ``LSP*`` types, so the FEP-0019 chain activates:
+Bridges victor-coding's :class:`LSPConnectionPool` to the LSP shape the FEP-0019
+framework runtime consumes (``open_document`` / ``update_document`` /
+``get_diagnostics`` / ``get_document_symbols``). The framework duck-types
+``orchestrator.lsp`` (its tests use plain namespaces), so this adapter returns
+``victor_contracts.lsp_runtime`` types — the same types victor-coding already
+uses — and is returned directly from :meth:`CodingAssistant.get_lsp`. No
+``victor.framework`` imports: verticals depend on ``victor_contracts`` only
+(the monorepo extractability boundary).
 
+Activates:
 * Phase 1 — ``LSPVerifier`` (post-COMPLETE diagnostics gate)
 * Phase 2 — ``LSPDiagnosticMiddleware`` (same-turn post-edit diagnostics)
 * Phase 3 — ``LSPContextProvider`` (proactive document-symbol context)
 
-Only the methods the framework runtime actually calls are implemented; the
-position-based ones (hover/completions/definition/references) gracefully
-degrade (``LSPCapability`` returns ``None``/``[]`` via its ``hasattr`` check)
-until a cursor feature needs them.
-
-Exposed via :meth:`CodingAssistant.get_lsp`, which the framework's
-``FrameworkStepHandler.apply_lsp`` routes to ``orchestrator.set_lsp``.
+The framework's ``FrameworkStepHandler.apply_lsp`` routes the object returned by
+``get_lsp`` to ``orchestrator.set_lsp`` during integration.
 """
 
 from __future__ import annotations
@@ -27,28 +28,28 @@ from __future__ import annotations
 import logging
 from typing import Any, List, Optional
 
-from victor.framework.lsp import DocumentSymbol
-from victor.framework.lsp_protocols import (
-    LSPDiagnostic,
-    LSPPosition,
-    LSPRange,
-    LSPSymbol,
+from victor_contracts.lsp_runtime import (
+    Diagnostic,
+    DiagnosticSeverity,
+    DocumentSymbol,
+    Position,
+    Range,
 )
 
 logger = logging.getLogger(__name__)
 
-# The pool renders severity as a display name; map back to LSP severity ints.
+# The pool renders severity as a display name; map back to LSP severity enums.
 # https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#diagnosticSeverity
-_SEVERITY_NAME_TO_INT = {
-    "error": 1,
-    "warning": 2,
-    "info": 3,
-    "hint": 4,
+_SEVERITY_NAME_TO_ENUM = {
+    "error": DiagnosticSeverity.ERROR,
+    "warning": DiagnosticSeverity.WARNING,
+    "info": DiagnosticSeverity.INFORMATION,
+    "hint": DiagnosticSeverity.HINT,
 }
 
 
 class FrameworkLSPAdapter:
-    """Adapt ``LSPConnectionPool`` to the framework's ``LSPServiceProtocol``.
+    """Adapt ``LSPConnectionPool`` to the FEP-0019 LSP runtime contract.
 
     Implements the methods the FEP-0019 runtime consumes:
     ``open_document``, ``update_document``, ``close_document``,
@@ -82,32 +83,34 @@ class FrameworkLSPAdapter:
 
     # --- diagnostics (Phase 1 + 2) ------------------------------------------
 
-    def get_diagnostics(self, file_path: str) -> List[LSPDiagnostic]:
-        """Convert the pool's display dicts to ``LSPDiagnostic``.
+    def get_diagnostics(self, file_path: str) -> List[Diagnostic]:
+        """Convert the pool's display dicts to ``Diagnostic`` objects.
 
         The pool returns ``[{line (1-indexed), character, message, severity
-        (name), source, code}]``; the framework wants 0-indexed ranges + int
-        severity.
+        (name), source, code}]``; the framework reads ``severity`` (int-like),
+        ``message`` and ``range.start.line`` (0-indexed).
         """
         try:
             raw = self._pool.get_diagnostics(file_path) or []
         except Exception:
             logger.debug("LSP get_diagnostics failed for %s", file_path, exc_info=True)
             return []
-        out: List[LSPDiagnostic] = []
+        out: List[Diagnostic] = []
         for d in raw:
             line = max(0, int(d.get("line") or 1) - 1)  # pool is 1-indexed
             character = int(d.get("character") or 0)
-            rng = LSPRange(
-                start=LSPPosition(line=line, character=character),
-                end=LSPPosition(line=line, character=character),
+            rng = Range(
+                start=Position(line=line, character=character),
+                end=Position(line=line, character=character),
             )
             code = d.get("code")
             out.append(
-                LSPDiagnostic(
+                Diagnostic(
                     range=rng,
                     message=str(d.get("message") or ""),
-                    severity=_SEVERITY_NAME_TO_INT.get(str(d.get("severity")).lower(), 1),
+                    severity=_SEVERITY_NAME_TO_ENUM.get(
+                        str(d.get("severity")).lower(), DiagnosticSeverity.ERROR
+                    ),
                     source=d.get("source"),
                     code=None if code is None else str(code),
                 )
@@ -116,38 +119,16 @@ class FrameworkLSPAdapter:
 
     # --- document symbols (Phase 3) ----------------------------------------
 
-    async def get_document_symbols(self, file_path: str) -> List[LSPSymbol]:
+    async def get_document_symbols(self, file_path: str) -> List[DocumentSymbol]:
+        """Return the pool's document-symbol tree as-is (victor_contracts types).
+
+        The framework reads ``name`` / ``kind`` (int-like) / ``range`` /
+        ``children`` / ``detail`` via duck-typing, all present on
+        ``DocumentSymbol``.
+        """
         try:
             symbols = await self._pool.get_document_symbols(file_path)
         except Exception:
             logger.debug("LSP get_document_symbols failed for %s", file_path, exc_info=True)
             return []
-        return [_convert_symbol(s) for s in (symbols or [])]
-
-
-def _convert_range(rng: Any) -> LSPRange:
-    start = getattr(rng, "start", None)
-    end = getattr(rng, "end", None) or start
-    return LSPRange(
-        start=LSPPosition(
-            line=int(getattr(start, "line", 0)),
-            character=int(getattr(start, "character", 0)),
-        ),
-        end=LSPPosition(
-            line=int(getattr(end, "line", 0)),
-            character=int(getattr(end, "character", 0)),
-        ),
-    )
-
-
-def _convert_symbol(symbol: Any) -> LSPSymbol:
-    children = getattr(symbol, "children", None) or []
-    return LSPSymbol(
-        name=getattr(symbol, "name", ""),
-        kind=int(getattr(symbol, "kind", 0)),
-        range=_convert_range(getattr(symbol, "range", None)),
-        selection_range=_convert_range(getattr(symbol, "selection_range", None)),
-        detail=getattr(symbol, "detail", None),
-        children=[_convert_symbol(c) for c in children] or None,
-        deprecated=bool(getattr(symbol, "deprecated", False)),
-    )
+        return list(symbols or [])

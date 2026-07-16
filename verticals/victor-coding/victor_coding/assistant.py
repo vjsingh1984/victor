@@ -113,18 +113,18 @@ class CodingAssistant(VerticalBase):
     def get_lsp(cls):
         """Expose victor-coding's LSP capability to the framework (FEP-0019).
 
-        Returns an ``LSPCapability`` wrapping an adapter over the shared
-        ``LSPConnectionPool``. The framework's ``FrameworkStepHandler.apply_lsp``
-        routes this to ``orchestrator.set_lsp`` during integration, activating
-        the diagnostic middleware (Phases 1+2) and the symbol-context provider
-        (Phase 3). Returns ``None`` if the pool/adapter cannot be built.
+        Returns a ``FrameworkLSPAdapter`` over the shared ``LSPConnectionPool``.
+        The framework duck-types ``orchestrator.lsp``, and
+        ``FrameworkStepHandler.apply_lsp`` routes this object to
+        ``orchestrator.set_lsp`` during integration, activating the diagnostic
+        middleware (Phases 1+2) and the symbol-context provider (Phase 3).
+        Returns ``None`` if the pool/adapter cannot be built.
         """
         try:
-            from victor.framework.capabilities.lsp import LSPCapability
             from victor_coding.lsp.framework_adapter import FrameworkLSPAdapter
             from victor_coding.lsp.manager import get_lsp_manager
 
-            return LSPCapability(implementation=FrameworkLSPAdapter(get_lsp_manager()))
+            return FrameworkLSPAdapter(get_lsp_manager())
         except Exception:
             import logging
 
