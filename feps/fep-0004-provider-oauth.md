@@ -10,7 +10,7 @@ authors:
     email: singhvjd@gmail.com
     github: vjsingh1984
 reviewers: []
-discussion: https://github.com/vjsingh1984/victor/discussions/TBD
+discussion: https://github.com/anvai-labs/victor/discussions/TBD
 ---
 
 # FEP-0004: Provider OAuth Authentication

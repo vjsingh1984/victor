@@ -140,8 +140,8 @@ After getting started:
 
 - **Troubleshooting**: [Troubleshooting Guide](../user-guide/troubleshooting.md)
 - **Documentation**: [Full docs](../README.md)
-- **Community**: [GitHub Discussions](https://github.com/vjsingh1984/victor/discussions)
-- **Issues**: [Report bugs](https://github.com/vjsingh1984/victor/issues)
+- **Community**: [GitHub Discussions](https://github.com/anvai-labs/victor/discussions)
+- **Issues**: [Report bugs](https://github.com/anvai-labs/victor/issues)
 
 ---
 

@@ -115,4 +115,4 @@ Apache License 2.0 - see [LICENSE](LICENSE) for details.
 
 - **Victor AI**: https://github.com/vijay-singh/codingagent
 - **Documentation**: https://docs.victor.dev/verticals/devops
-- **Victor Registry**: https://github.com/vjsingh1984/victor-registry
+- **Victor Registry**: https://github.com/anvai-labs/victor-registry

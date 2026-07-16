@@ -10,7 +10,7 @@ authors:
     email: singhvjd@gmail.com
     github: vjsingh1984
 reviewers: []
-discussion: https://github.com/vjsingh1984/victor/discussions
+discussion: https://github.com/anvai-labs/victor/discussions
 ---
 
 # FEP-0009: SDK Tool Contract — promote tool metadata/traits into victor-contracts

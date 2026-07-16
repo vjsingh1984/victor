@@ -23,7 +23,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           # Clone and install main victor framework from develop branch FIRST
-          git clone --branch develop https://github.com/vjsingh1984/victor.git /tmp/victor-framework
+          git clone --branch develop https://github.com/anvai-labs/victor.git /tmp/victor-framework
           # Install victor-contracts first (required by victor-ai and verticals)
           pip install -e "/tmp/victor-framework/victor-contracts[yaml]"
           # Install victor-ai framework

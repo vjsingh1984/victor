@@ -17,7 +17,7 @@ FEPs are intended for **framework-level changes**, not every feature. See [When 
 ### 1. Pre-Submission Discussion
 
 Before writing a FEP:
-1. Discuss your idea informally in [GitHub Discussions](https://github.com/vjsingh1984/victor/discussions)
+1. Discuss your idea informally in [GitHub Discussions](https://github.com/anvai-labs/victor/discussions)
 2. Check for existing FEPs addressing similar issues
 3. Gather preliminary feedback from the community
 4. Ensure the change is at the framework level (not vertical-specific)
@@ -163,8 +163,8 @@ authors:
 reviewers:
   - "maintainer-1"
   - "community-expert-1"
-discussion: "https://github.com/vjsingh1984/victor/discussions/1"
-implementation: "https://github.com/vjsingh1984/victor/pull/2"
+discussion: "https://github.com/anvai-labs/victor/discussions/1"
+implementation: "https://github.com/anvai-labs/victor/pull/2"
 ---
 ```
 
@@ -229,7 +229,7 @@ See [CONTRIBUTING.md](../CONTRIBUTING.md) for general contribution guidelines.
 
 ## Questions?
 
-- Open a discussion in [GitHub Discussions](https://github.com/vjsingh1984/victor/discussions)
+- Open a discussion in [GitHub Discussions](https://github.com/anvai-labs/victor/discussions)
 - Ask in the `#feps` channel (if Discord/Slack exists)
 - Attend a community meeting (if scheduled)
 
@@ -237,5 +237,5 @@ See [CONTRIBUTING.md](../CONTRIBUTING.md) for general contribution guidelines.
 
 - [FEP Template](./fep-0000-template.md)
 - [Victor Documentation](../docs/)
-- [GitHub Issues](https://github.com/vjsingh1984/victor/issues)
-- [GitHub Discussions](https://github.com/vjsingh1984/victor/discussions)
+- [GitHub Issues](https://github.com/anvai-labs/victor/issues)
+- [GitHub Discussions](https://github.com/anvai-labs/victor/discussions)

@@ -154,8 +154,8 @@ prompt_toolkit==3.0.52
 propcache==0.4.1
 proto-plus==1.26.1
 protobuf==6.33.5
--e git+ssh://git@github.com/vjsingh1984/proximaDB.git@f2df18818ae808524920c99d6bd617990786acef#egg=proximadb
--e git+ssh://git@github.com/vjsingh1984/proximaDB.git@f2df18818ae808524920c99d6bd617990786acef#egg=proximadb_python&subdirectory=clients/python
+-e git+ssh://git@github.com/anvai-labs/proximaDB.git@f2df18818ae808524920c99d6bd617990786acef#egg=proximadb
+-e git+ssh://git@github.com/anvai-labs/proximaDB.git@f2df18818ae808524920c99d6bd617990786acef#egg=proximadb_python&subdirectory=clients/python
 psycopg2-binary==2.9.11
 py-serializable==2.1.0
 pyarrow==23.0.1
@@ -275,8 +275,8 @@ usearch==2.21.0
 uvicorn==0.38.0
 uvloop==0.22.1
 validators==0.35.0
--e git+ssh://git@github.com/vjsingh1984/victor.git@312ad82212a01efd550a697907d6bfcbc129472a#egg=victor
--e git+ssh://git@github.com/vjsingh1984/victor.git@312ad82212a01efd550a697907d6bfcbc129472a#egg=victor_native&subdirectory=rust
+-e git+ssh://git@github.com/anvai-labs/victor.git@312ad82212a01efd550a697907d6bfcbc129472a#egg=victor
+-e git+ssh://git@github.com/anvai-labs/victor.git@312ad82212a01efd550a697907d6bfcbc129472a#egg=victor_native&subdirectory=rust
 watchfiles==1.1.1
 wcwidth==0.2.14
 websocket-client==1.9.0

@@ -710,4 +710,4 @@ victor keys --set anthropic --keyring
 
 ---
 
-**Need help?** See [Troubleshooting](../user-guide/troubleshooting.md) or [open an issue](https://github.com/vjsingh1984/victor/issues).
+**Need help?** See [Troubleshooting](../user-guide/troubleshooting.md) or [open an issue](https://github.com/anvai-labs/victor/issues).

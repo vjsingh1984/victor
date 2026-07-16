@@ -10,7 +10,7 @@ authors:
     email: your.email@example.com
     github: yourusername
 reviewers: []
-discussion: https://github.com/vjsingh1984/victor/discussions/XXXX
+discussion: https://github.com/anvai-labs/victor/discussions/XXXX
 ---
 
 # FEP-XXXX: Template FEP

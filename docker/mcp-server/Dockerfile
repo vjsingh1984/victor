@@ -21,8 +21,8 @@ FROM python:3.12-slim
 LABEL maintainer="Vijaykumar Singh <singhvjd@gmail.com>"
 LABEL description="Victor MCP Server - Exposes Victor's tools via Model Context Protocol"
 LABEL version="1.0.0"
-LABEL org.opencontainers.image.source="https://github.com/vjsingh1984/victor"
-LABEL org.opencontainers.image.documentation="https://github.com/vjsingh1984/victor/blob/main/docs/guides/VICTOR_AS_MCP_SERVER.md"
+LABEL org.opencontainers.image.source="https://github.com/anvai-labs/victor"
+LABEL org.opencontainers.image.documentation="https://github.com/anvai-labs/victor/blob/main/docs/guides/VICTOR_AS_MCP_SERVER.md"
 
 # Install system dependencies
 # - git: for git tools

@@ -10,7 +10,7 @@ authors:
     email: singhvjd@gmail.com
     github: vjsingh1984
 reviewers: []
-discussion: https://github.com/vjsingh1984/victor/discussions/0013
+discussion: https://github.com/anvai-labs/victor/discussions/0013
 ---
 
 # FEP-0013: Damage-scoped ShellSafetyPolicy

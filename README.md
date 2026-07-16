@@ -6,8 +6,8 @@
 
 [![PyPI version](https://badge.fury.io/py/victor-ai.svg)](https://pypi.org/project/victor-ai/)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![Fast Checks](https://github.com/vjsingh1984/victor/actions/workflows/ci-fast.yml/badge.svg)](https://github.com/vjsingh1984/victor/actions/workflows/ci-fast.yml)
-[![Tests](https://github.com/vjsingh1984/victor/actions/workflows/ci-test.yml/badge.svg)](https://github.com/vjsingh1984/victor/actions/workflows/ci-test.yml)
+[![Fast Checks](https://github.com/anvai-labs/victor/actions/workflows/ci-fast.yml/badge.svg)](https://github.com/anvai-labs/victor/actions/workflows/ci-fast.yml)
+[![Tests](https://github.com/anvai-labs/victor/actions/workflows/ci-test.yml/badge.svg)](https://github.com/anvai-labs/victor/actions/workflows/ci-test.yml)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Docker](https://img.shields.io/badge/docker-ghcr.io-blue.svg)](https://ghcr.io/vjsingh1984/victor)
 
@@ -41,7 +41,7 @@ It is designed for teams that need agent systems to be testable, extensible, obs
 
 ## Give Your Agent Durable Memory
 
-Victor pairs with [ProximaDB](https://github.com/vjsingh1984/proximaDB) — a multi-model
+Victor pairs with [ProximaDB](https://github.com/anvai-labs/proximaDB) — a multi-model
 (vector + graph + document) context database by the same author — as its durable memory
 layer. Index any repository with the shared [`victor-codegraph`](victor-codegraph/)
 chunker and get semantic recall ("where do we validate JWTs?") plus call-graph queries

@@ -596,7 +596,7 @@ async function autoStartServer(serverManager: ServerManager): Promise<void> {
                     vscode.commands.executeCommand('victor.startServer');
                 } else if (action === 'Install Help') {
                     vscode.env.openExternal(
-                        vscode.Uri.parse('https://github.com/vjsingh1984/victor#quick-start')
+                        vscode.Uri.parse('https://github.com/anvai-labs/victor#quick-start')
                     );
                 }
             }

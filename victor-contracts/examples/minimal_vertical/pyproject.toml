@@ -25,8 +25,8 @@ runtime = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/vjsingh1984/victor"
-Repository = "https://github.com/vjsingh1984/victor"
+Homepage = "https://github.com/anvai-labs/victor"
+Repository = "https://github.com/anvai-labs/victor"
 Documentation = "https://docs.victor.dev/sdk"
 
 [tool.setuptools]

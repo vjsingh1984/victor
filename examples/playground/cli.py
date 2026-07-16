@@ -154,7 +154,7 @@ An interactive learning environment for the Victor AI Framework.
   [cyan]anthropic[/cyan] - Anthropic (Claude)
   [cyan]ollama[/cyan]     - Local models (no API key)
 
-For more information, visit: https://github.com/vjsingh1984/victor
+For more information, visit: https://github.com/anvai-labs/victor
 """
 
     console.print(info_text)
