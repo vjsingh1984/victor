@@ -34,6 +34,7 @@ from victor_contracts.lsp_runtime import (
     Diagnostic,
     CompletionItem,
     Hover,
+    DocumentSymbol,
 )
 
 __all__ = [
@@ -44,6 +45,7 @@ __all__ = [
     "Diagnostic",
     "CompletionItem",
     "Hover",
+    "DocumentSymbol",
 ]
 
 logger = logging.getLogger(__name__)
@@ -548,6 +550,30 @@ class LSPClient:
             List of diagnostics
         """
         return self._diagnostics.get(uri, [])
+
+    async def get_document_symbols(self, uri: str) -> List[DocumentSymbol]:
+        """Get the document symbol outline (classes/functions/etc.).
+
+        Used by the FEP-0019 symbol-context provider. The server advertised
+        ``documentSymbol`` in the initialize handshake (see ``_initialize``).
+
+        Args:
+            uri: Document URI
+
+        Returns:
+            List of top-level ``DocumentSymbol`` (each may carry children).
+        """
+        if not self._initialized:
+            return []
+        params = {"textDocument": {"uri": uri}}
+        try:
+            result = await self._send_request("textDocument/documentSymbol", params)
+            if not result:
+                return []
+            return [DocumentSymbol.from_dict(item) for item in result]
+        except Exception as e:
+            logger.error(f"Document symbols error: {e}")
+            return []
 
     def register_notification_handler(self, method: str, handler: Callable) -> None:
         """Register a handler for server notifications.

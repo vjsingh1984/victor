@@ -26,6 +26,7 @@ from victor_coding.lsp.client import (
     CompletionItem,
     Hover,
     Position,
+    DocumentSymbol,
 )
 from victor_coding.lsp.config import (
     LANGUAGE_SERVERS,
@@ -394,6 +395,25 @@ class LSPConnectionPool:
             }
             for d in diagnostics
         ]
+
+    async def get_document_symbols(self, file_path: str) -> List[DocumentSymbol]:
+        """Get the document symbol outline for a file (FEP-0019 Phase 3).
+
+        Returns the raw ``DocumentSymbol`` tree (name/kind/range/children) so the
+        framework adapter can render the live API surface for generation guidance.
+
+        Args:
+            file_path: Path to the file
+
+        Returns:
+            List of top-level symbols (each may carry children), or [] if no
+            server is available for the file.
+        """
+        client = await self._ensure_client_for_file(file_path)
+        if not client:
+            return []
+        uri = self._path_to_uri(file_path)
+        return await client.get_document_symbols(uri)
 
     def get_status(self) -> Dict[str, LSPStatus]:
         """Get status of all servers.
