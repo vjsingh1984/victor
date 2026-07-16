@@ -68,8 +68,10 @@ DEFAULT_FEATURE_FLAGS = {
     # Rich formatting (disabled by default)
     "use_rich_formatting": False,
     # Graph-based enhancements (disabled by default)
+    "use_graph_rag": False,
     "use_ccg": False,
     "use_graph_query_tool": False,
+    "use_multi_hop_retrieval": False,
     "use_graph_enhanced_context": False,
     # Architecture consolidation (opt-in for safety)
     "use_stategraph_agentic_loop": False,

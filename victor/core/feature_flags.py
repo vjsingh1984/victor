@@ -125,9 +125,15 @@ class FeatureFlag(Enum):
     USE_RICH_FORMATTING = "use_rich_formatting"
 
     # Phase 14 - Graph-Based Enhancements (unified graph schema, CCG, Graph RAG)
-    # These flags enable the new graph-based code intelligence features
+    # These flags enable the new graph-based code intelligence features.
+    # NOTE: USE_GRAPH_RAG + USE_MULTI_HOP_RETRIEVAL are read by victor-coding's
+    # code_search_tool (and documented as VICTOR_USE_GRAPH_RAG /
+    # VICTOR_USE_MULTI_HOP_RETRIEVAL env vars) — do NOT remove without checking
+    # verticals/. They were wrongly classified dead by a root-only audit (#539).
+    USE_GRAPH_RAG = "use_graph_rag"
     USE_CCG = "use_ccg"
     USE_GRAPH_QUERY_TOOL = "use_graph_query_tool"
+    USE_MULTI_HOP_RETRIEVAL = "use_multi_hop_retrieval"
     USE_GRAPH_ENHANCED_CONTEXT = "use_graph_enhanced_context"
 
     # Phase 15 - Architecture Consolidation (Framework Primitives)
