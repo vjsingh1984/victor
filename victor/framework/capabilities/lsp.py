@@ -32,6 +32,7 @@ from victor.framework.lsp_protocols import (
     LSPLocation,
     LSPPoolProtocol,
     LSPServiceProtocol,
+    LSPSymbol,
 )
 
 
@@ -96,6 +97,11 @@ class LSPCapability(LSPServiceProtocol, LSPPoolProtocol):
     def get_diagnostics(self, file_path: str) -> List[LSPDiagnostic]:
         if self._impl and hasattr(self._impl, "get_diagnostics"):
             return self._impl.get_diagnostics(file_path)
+        return []
+
+    async def get_document_symbols(self, file_path: str) -> List[LSPSymbol]:
+        if self._impl and hasattr(self._impl, "get_document_symbols"):
+            return await self._impl.get_document_symbols(file_path)
         return []
 
     # --- LSPPoolProtocol implementation ---

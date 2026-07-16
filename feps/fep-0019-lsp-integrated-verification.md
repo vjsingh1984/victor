@@ -4,7 +4,7 @@ title: "LSP-integrated verification + real-time code feedback"
 type: Standards Track
 status: Draft
 created: 2026-07-15
-modified: 2026-07-15
+modified: 2026-07-16
 authors:
   - name: Vijaykumar Singh
     email: singhvjd@gmail.com
@@ -113,11 +113,52 @@ before or after the chain is built (the `set_middleware_chain` path handles the
 reverse ordering). `set_lsp_feedback_mode(mode)` propagates
 `SessionConfig.lsp_feedback` to the middleware.
 
-### Phase 3 — LSP-guided generation (exploration, deferred)
+### Phase 3 — LSP-guided generation (proactive symbol/error context)
 
-Deeper integration: LSP completions / hover / go-to-definition injected into the
-perception/planning phase. Requires changes to perception layers, not just
-tool/middleware layers — a follow-up design.
+**Status: implemented** (Phase 3 PR). Phases 1+2 are *reactive* (diagnostics
+after an edit, or verification after COMPLETE). Phase 3 is *proactive*: before
+the agent generates/edits code, inject the **live document symbols
+(signatures/types/API surface) + current diagnostics** of the file(s) it is
+editing, so code matches the existing codebase on the *first* try — fewer
+edit→diagnose→fix cycles.
+
+**Position-free design.** LSP hover/completions need a cursor (file + line +
+char), which Victor does not track. `get_diagnostics` and document symbols are
+file-level, so Phase 3 sidesteps the cursor problem entirely. Target files are
+resolved via the existing `workspace_files_modified()` (git diff vs HEAD), capped
+to the most-recently-modified source files.
+
+**Components:**
+- **`get_document_symbols`** (`victor/framework/lsp_protocols.py` +
+  `capabilities/lsp.py`): completes a half-built capability — the `LSPSymbol`
+  dataclass existed but no method returned symbols. `LSPCapability` returns `[]`
+  until an impl (victor-coding) wires `documentSymbol`.
+- **`LSPContextProvider`** (`victor/framework/lsp_context.py`, new): pure
+  `build_context(lsp, workspace, *, max_files, char_budget, last_signature)`
+  resolves files, pulls symbols + severity-1 diagnostics, renders a compact
+  budgeted block, and throttles via a content signature (skip when unchanged).
+- **Loop injection** (`victor/framework/agentic_loop.py`):
+  `_maybe_inject_lsp_context(state)` mirrors the FEP-0018 `_inject_verify_feedback`
+  seam — injects the block as a per-turn `user` message (tagged
+  `interactive_history=False` via `build_internal_history_metadata`) right after
+  PERCEIVE, before PLAN, in both `run()` and `run_streaming()`. A 3-level
+  `_resolve_workspace` resolves the workspace the loop lacks.
+- **Activation**: `SessionConfig.lsp_perception: bool = False` (opt-in,
+  experimental) → `Agent.create` sets `turn_executor._lsp_context_enabled = True`
+  → the loop reads it in `__init__` (same path as the verifier; no construction-
+  site changes). CLI: `--lsp-perception/--no-lsp-perception`.
+
+**Synergy with Phases 1+2** (not duplication): Phase 2 catches the immediate
+error from the latest edit; Phase 3 keeps the full live API surface fresh each
+turn so the *next* edit is correct first try.
+
+**Graceful degradation**: opt-in flag off (default), no LSP capability, no
+modified source files, or an unchanged signature → no injection, zero behavior
+change. The root repo is forward-compatible — it degrades to a no-op until a
+vertical (victor-coding) wires `documentSymbol` and calls `set_lsp`.
+
+**Position-dependent LSP** (hover/completions/go-to-definition) remains a future
+follow-up: it requires a cursor concept Victor does not yet have.
 
 ## Benefits
 
@@ -156,17 +197,21 @@ tool/middleware layers — a follow-up design.
 - **Diagnostic staleness**: push-based diagnostics depend on the server having
   analyzed the document. The `update_document` + debounce mitigates this; the
   Phase-1 `LSPVerifier` re-checks at COMPLETE as a backstop.
-- **Phase 3 scope**: where exactly in perception/planning to inject hover /
-  completion / definition — deferred to a follow-up design.
+- **Phase 3 scope (resolved)**: proactive injection lands at the perceive→plan
+  seam via position-free document symbols + diagnostics (no cursor needed).
+  Position-dependent LSP (hover/completion/definition) remains a future item —
+  it requires a cursor concept Victor does not yet have.
 
 ## Implementation Plan
 
-- **Phase 1 (this PR)**: `LSPVerifier` + `_build_verifier("lsp")` + `--verify lsp`
+- **Phase 1 (PR #532)**: `LSPVerifier` + `_build_verifier("lsp")` + `--verify lsp`
   + `SessionConfig.lsp_feedback` + `from_cli_flags` plumbing.
-- **Phase 2 (this PR)**: `LSPDiagnosticMiddleware` + auto-registration in
+- **Phase 2 (PR #532)**: `LSPDiagnosticMiddleware` + auto-registration in
   `AgentOrchestrator.set_lsp()` / `set_middleware_chain()` +
   `set_lsp_feedback_mode()` + `Agent.create` propagation.
-- **Phase 3 (follow-up)**: LSP-guided generation in the perception phase.
+- **Phase 3 (this PR)**: proactive LSP-guided generation — `get_document_symbols`
+  + `LSPContextProvider` (`lsp_context.py`) + `_maybe_inject_lsp_context` in the
+  loop + `SessionConfig.lsp_perception` / `--lsp-perception`.
 
 ## Migration Path
 

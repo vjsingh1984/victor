@@ -219,6 +219,7 @@ def _build_session_config(
     auto_skill_enabled: Optional[bool] = None,
     one_shot_mode: Optional[bool] = None,
     verify_mode: str = "none",
+    lsp_perception: bool = False,
     provider: Optional[str] = None,
     model: Optional[str] = None,
     endpoint: Optional[str] = None,
@@ -255,6 +256,7 @@ def _build_session_config(
         auto_skill_enabled=auto_skill_enabled,
         one_shot_mode=one_shot_mode,
         verify_mode=verify_mode,
+        lsp_perception=lsp_perception,
         provider=provider,
         model=model,
         endpoint=endpoint,
@@ -893,6 +895,13 @@ def chat(
         "needs victor-coding); 'none' disables verification (default).",
         rich_help_panel="Advanced Agent Behavior",
     ),
+    lsp_perception: bool = typer.Option(
+        False,
+        "--lsp-perception/--no-lsp-perception",
+        help="Inject live LSP symbols + errors each turn so generated code matches the "
+        "codebase on the first try (FEP-0019 Phase 3, experimental; needs victor-coding).",
+        rich_help_panel="Advanced Agent Behavior",
+    ),
     auto_skill: Optional[bool] = typer.Option(
         None,
         "--auto-skill/--no-auto-skill",
@@ -1390,6 +1399,8 @@ victor chat --sessionid abc123            # Resume session
                 enable_voi=enable_voi,
                 enable_correlation=enable_correlation,
                 min_agents_for_bayesian=min_agents_for_bayesian,
+                verify_mode=verify_mode,
+                lsp_perception=lsp_perception,
             )
         except ValueError as exc:
             console.print(f"[bold red]Error:[/] {exc}")
