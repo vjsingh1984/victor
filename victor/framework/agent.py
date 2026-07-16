@@ -361,6 +361,14 @@ class Agent:
 
                 set_lsp_feedback_mode(orchestrator, _lsp_feedback)
 
+            # FEP-0019 Phase 3: enable proactive LSP context injection. The flag
+            # is read off the turn_executor by AgenticLoop.__init__ — same path
+            # as the verifier above; no loop-construction-site changes needed.
+            if getattr(session_config, "lsp_perception", False):
+                _te = getattr(orchestrator, "turn_executor", None)
+                if _te is not None:
+                    _te._lsp_context_enabled = True
+
             resolved_provider = (
                 provider
                 or getattr(orchestrator, "provider_name", None)

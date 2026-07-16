@@ -217,6 +217,23 @@ class LSPServiceProtocol(Protocol):
         """
         ...
 
+    async def get_document_symbols(self, file_path: str) -> List[LSPSymbol]:
+        """Get the document symbol tree (outline) for a file.
+
+        File-level (no cursor needed). Returns signatures/classes/functions with
+        their kinds and ranges — the live API surface of the file. Used by the
+        FEP-0019 Phase 3 LSP context provider to guide generation.
+
+        Args:
+            file_path: Path to the file
+
+        Returns:
+            List of top-level symbols (each may carry nested ``children``), or
+            an empty list when the server has no symbols / the capability is
+            unavailable.
+        """
+        ...
+
 
 @runtime_checkable
 class LSPPoolProtocol(Protocol):

@@ -61,6 +61,7 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
+from pathlib import Path
 from typing import (
     Any,
     AsyncIterator,
@@ -608,6 +609,11 @@ class AgenticLoop:
         self._verifier = verifier
         self._max_verify_retries = max_verify_retries
         self._verify_retries = 0
+        # FEP-0019 Phase 3: proactive LSP context injection. The flag is read off
+        # the turn_executor (set by Agent.create from SessionConfig.lsp_perception)
+        # so neither AgenticLoop construction site needs a new param.
+        self._lsp_context_enabled = bool(getattr(turn_executor, "_lsp_context_enabled", False))
+        self._last_lsp_signature: Optional[str] = None
         self.max_iterations = max_iterations
         self.enable_fulfillment_check = enable_fulfillment_check
         self.enable_adaptive_iterations = enable_adaptive_iterations
@@ -790,6 +796,7 @@ class AgenticLoop:
         state: Dict[str, Any] = {"query": query, **(context or {})}
         self._progress_scores = []
         self._verify_retries = 0  # FEP-0018: reset per run
+        self._last_lsp_signature = None  # FEP-0019 Phase 3: reset per run
         self.turn_evaluation_controller.reset()  # resets spin_detector + content-repetition + plateau
         self.criteria_builder.reset()
         effective_max = self.max_iterations
@@ -988,6 +995,10 @@ class AgenticLoop:
                 state["iteration"] = i
                 if hasattr(perception, "task_analysis") and perception.task_analysis:
                     state["task_type"] = getattr(perception.task_analysis, "task_type", "unknown")
+
+                # FEP-0019 Phase 3: proactively inject live LSP symbols + errors for
+                # the files being edited, so generation matches the codebase first try.
+                await self._maybe_inject_lsp_context(state)
 
                 # RESEARCH TASK PROGRESS REPORTING
                 # Report progress every 10 iterations for research tasks
@@ -1484,6 +1495,68 @@ class AgenticLoop:
         except Exception:
             logger.debug("Failed to inject verify feedback", exc_info=True)
 
+    def _resolve_workspace(self, state: Dict[str, Any]) -> Optional[Path]:
+        """Resolve the workspace root via a 3-level fallback (FEP-0019 Phase 3).
+
+        The loop itself has no reliable workspace; check the state, then the
+        orchestrator's project context, then the configured project paths.
+        """
+        ws = state.get("workspace") or state.get("working_dir")
+        if ws:
+            return Path(ws)
+        pc = getattr(self.orchestrator, "project_context", None)
+        root = getattr(pc, "root_path", None) if pc is not None else None
+        if root:
+            return root if isinstance(root, Path) else Path(root)
+        try:
+            from victor.config.settings import get_project_paths
+
+            return get_project_paths().project_root
+        except Exception:
+            return None
+
+    async def _maybe_inject_lsp_context(self, state: Dict[str, Any]) -> None:
+        """Inject live LSP symbols + errors for the files being edited (FEP-0019 Phase 3).
+
+        Position-free: pulls document symbols + diagnostics for the most-recently
+        modified source files and adds them as a per-turn user message, so the
+        agent's next generation matches the codebase. Throttled by a content
+        signature so identical context is not re-injected. No-op unless
+        ``SessionConfig.lsp_perception`` opted in and an LSP capability is set.
+        """
+        if not getattr(self, "_lsp_context_enabled", False):
+            return
+        lsp = getattr(self.orchestrator, "lsp", None) if self.orchestrator else None
+        workspace = self._resolve_workspace(state)
+        if lsp is None or workspace is None:
+            return
+        try:
+            from victor.agent.conversation.history_metadata import build_internal_history_metadata
+            from victor.agent.conversation.types import MessageSource
+            from victor.framework.lsp_context import build_context
+
+            block, signature = await build_context(
+                lsp, workspace, last_signature=self._last_lsp_signature
+            )
+            if block is None:
+                # Nothing new to inject; still remember the signature so a later
+                # change re-triggers injection.
+                if signature is not None:
+                    self._last_lsp_signature = signature
+                return
+            chat_ctx = getattr(self.turn_executor, "_chat_context", None)
+            if chat_ctx and hasattr(chat_ctx, "add_message"):
+                chat_ctx.add_message(
+                    role="user",
+                    content=block,
+                    metadata=build_internal_history_metadata(
+                        "lsp_context", source=MessageSource.AGENT_GROUNDING
+                    ),
+                )
+                self._last_lsp_signature = signature
+        except Exception:
+            logger.debug("LSP context injection skipped", exc_info=True)
+
     def _emit_prompt_reward_outcome(
         self,
         evaluation: Optional[EvaluationResult],
@@ -1558,6 +1631,7 @@ class AgenticLoop:
         state: Dict[str, Any] = {"query": query, **(context or {})}
         self._progress_scores = []
         self._verify_retries = 0  # FEP-0018: reset per run
+        self._last_lsp_signature = None  # FEP-0019 Phase 3: reset per run
         # Resets the shared spin detector + content-repetition + plateau (same as run()).
         self.turn_evaluation_controller.reset()
         self.criteria_builder.reset()
@@ -1574,6 +1648,10 @@ class AgenticLoop:
             state["perception"] = (
                 perception.to_dict() if hasattr(perception, "to_dict") else perception
             )
+
+            # FEP-0019 Phase 3: proactively inject live LSP symbols + errors for the
+            # files being edited (mirrors run()'s perceive→plan injection point).
+            await self._maybe_inject_lsp_context(state)
 
             # PLAN (shared, non-yielding) — planned once, reused across turns like run().
             plan = state.get("plan")

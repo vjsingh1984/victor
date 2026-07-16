@@ -324,6 +324,7 @@ class SessionConfig:
     headless_mode: bool = False
     verify_mode: str = "none"
     lsp_feedback: str = "errors"
+    lsp_perception: bool = False
 
     # Composed sub-configs (for structured access)
     compaction: CompactionConfig = field(default_factory=CompactionConfig)
@@ -390,6 +391,7 @@ class SessionConfig:
         headless_mode: bool = False,
         verify_mode: str = "none",
         lsp_feedback: str = "errors",
+        lsp_perception: bool = False,
         provider: Optional[str] = None,
         model: Optional[str] = None,
         endpoint: Optional[str] = None,
@@ -471,6 +473,7 @@ class SessionConfig:
             headless_mode=headless_mode,
             verify_mode=verify_mode,
             lsp_feedback=lsp_feedback,
+            lsp_perception=lsp_perception,
             compaction=CompactionConfig(
                 threshold=compaction_threshold,
                 adaptive=adaptive_threshold,
