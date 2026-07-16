@@ -305,6 +305,25 @@ qwen:
 - **Minimum Python**: 3.10
 - **New dependencies**: None (aiohttp already a dependency)
 
+## Migration Path
+
+Existing API-key configurations remain the default and require no changes. Users
+who opt into subscription OAuth set `auth_mode: oauth` for one provider and run
+that provider's login flow once CLI support is available. Token files are written
+with user-only permissions, and reverting to `auth_mode: api_key` immediately
+restores the existing authentication path without converting stored credentials.
+
+## Unresolved Questions
+
+- Which providers will formally permit third-party clients to use subscription
+  OAuth tokens, and what scopes will they support?
+- Should headless environments use device authorization, an out-of-band browser
+  callback, or remain API-key-only?
+- What token revocation and reauthentication behavior should the CLI expose when
+  a provider changes scopes or invalidates a refresh token?
+- Should OAuth token storage support an operating-system keychain backend before
+  the feature advances beyond draft status?
+
 ## References
 
 - [OpenAI Codex Auth Docs](https://developers.openai.com/codex/auth/)
