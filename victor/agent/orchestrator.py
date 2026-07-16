@@ -1285,60 +1285,15 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
     def set_lsp(self, lsp_capability: Any) -> None:
         """Set the LSP capability (LSPServiceProtocol/LSPPoolProtocol).
 
-        This enables framework-level language intelligence for all verticals.
         When a capability is provided, the LSP diagnostics middleware
-        (FEP-0019) auto-activates on the tool middleware chain — file edits
-        get real-time type/syntax feedback without further wiring.
-
-        Args:
-            lsp_capability: LSPCapability instance
+        (FEP-0019) auto-activates on the tool middleware chain.
         """
         self._lsp = lsp_capability
-        if lsp_capability is not None:
-            chain = getattr(self, "_middleware_chain", None)
-            if chain is not None:
-                self._register_lsp_middleware(chain)
+        if lsp_capability is not None and getattr(self, "_middleware_chain", None):
+            from victor.framework.lsp_middleware import register_lsp_on_chain
+
+            register_lsp_on_chain(self, self._middleware_chain)
         logger.debug("LSP capability registered with orchestrator")
-
-    def _register_lsp_middleware(self, chain: Any) -> None:
-        """Register the LSP diagnostic middleware once, binding the capability.
-
-        Lazily creates the middleware (so it exists even if ``set_lsp`` ran
-        before the chain) and re-binds the capability on every call. Safe to
-        invoke repeatedly — never double-registers.
-
-        Args:
-            chain: The tool ``MiddlewareChain`` (must expose ``add``).
-        """
-        try:
-            from victor.framework.lsp_middleware import LSPDiagnosticMiddleware
-
-            middleware = getattr(self, "_lsp_middleware", None)
-            if middleware is None:
-                middleware = LSPDiagnosticMiddleware(
-                    mode=getattr(self, "_lsp_feedback_mode", "errors")
-                )
-                self._lsp_middleware = middleware
-                chain.add(middleware)
-            middleware.lsp = self._lsp
-        except Exception:
-            logger.debug("LSP middleware registration deferred", exc_info=True)
-
-    def set_lsp_feedback_mode(self, mode: str) -> None:
-        """Set the LSP diagnostics feedback mode (FEP-0019).
-
-        ``"errors"`` (default) reports only severity-1 diagnostics; ``"all"``
-        includes warnings; ``"none"`` disables the middleware's feedback.
-        Applied to an existing middleware immediately and remembered for any
-        later (re)registration.
-
-        Args:
-            mode: One of ``"errors"``, ``"all"``, ``"none"``.
-        """
-        self._lsp_feedback_mode = mode
-        middleware = getattr(self, "_lsp_middleware", None)
-        if middleware is not None:
-            middleware._mode = mode
 
     def get_team_suggestions(
         self,
@@ -1822,7 +1777,9 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         self._middleware_chain = chain
         # If LSP was set before the chain existed, register its middleware now.
         if getattr(self, "_lsp", None) is not None:
-            self._register_lsp_middleware(chain)
+            from victor.framework.lsp_middleware import register_lsp_on_chain
+
+            register_lsp_on_chain(self, chain)
 
     # =========================================================================
     # Internal Storage Setters (DIP Compliance)

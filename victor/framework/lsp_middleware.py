@@ -37,6 +37,48 @@ _FILE_MODIFYING_TOOLS: Set[str] = frozenset(
 )
 
 
+def register_lsp_on_chain(owner: Any, chain: Any) -> None:
+    """Register the LSP diagnostic middleware on ``chain``, binding ``owner._lsp``.
+
+    Idempotent: creates the middleware once (stored on ``owner._lsp_middleware``)
+    and re-binds the capability on every call. Reads ``owner._lsp_feedback_mode``
+    for the ``mode`` and syncs an existing middleware to it. Safe to call from
+    either ``set_lsp`` or ``set_middleware_chain`` — in either order — so the
+    orchestrator itself stays a thin delegator (FEP-0019).
+
+    Args:
+        owner: The orchestrator-like object (needs ``_lsp`` and, optionally,
+            ``_lsp_feedback_mode`` / ``_lsp_middleware`` attributes).
+        chain: The tool ``MiddlewareChain`` (must expose ``add``).
+    """
+    try:
+        mode = getattr(owner, "_lsp_feedback_mode", "errors")
+        middleware = getattr(owner, "_lsp_middleware", None)
+        if middleware is None:
+            middleware = LSPDiagnosticMiddleware(mode=mode)
+            owner._lsp_middleware = middleware
+            chain.add(middleware)
+        else:
+            middleware._mode = mode
+        middleware.lsp = getattr(owner, "_lsp", None)
+    except Exception:
+        logger.debug("LSP middleware registration deferred", exc_info=True)
+
+
+def set_lsp_feedback_mode(owner: Any, mode: str) -> None:
+    """Set the LSP diagnostics feedback mode on ``owner`` (FEP-0019).
+
+    ``"errors"`` (default) reports only severity-1 diagnostics; ``"all"``
+    includes warnings; ``"none"`` disables feedback. Stored on the owner and
+    applied to an already-registered middleware immediately; remembered for any
+    later (re)registration.
+    """
+    owner._lsp_feedback_mode = mode
+    middleware = getattr(owner, "_lsp_middleware", None)
+    if middleware is not None:
+        middleware._mode = mode
+
+
 class LSPDiagnosticMiddleware:
     """Inject LSP diagnostics after file-modifying tool calls.
 

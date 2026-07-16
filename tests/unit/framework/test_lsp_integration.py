@@ -342,6 +342,11 @@ def test_orchestrator_set_lsp_feedback_mode_propagates():
     """set_lsp_feedback_mode updates the registered middleware + remembers it."""
     from victor.agent.orchestrator import AgentOrchestrator
 
+    from victor.framework.lsp_middleware import (
+        register_lsp_on_chain,
+        set_lsp_feedback_mode,
+    )
+
     orch = AgentOrchestrator.__new__(AgentOrchestrator)
     chain = _FakeChain()
     orch._middleware_chain = chain
@@ -349,11 +354,11 @@ def test_orchestrator_set_lsp_feedback_mode_propagates():
     mw = chain.added[0]
     assert mw._mode == "errors"
 
-    orch.set_lsp_feedback_mode("all")
+    set_lsp_feedback_mode(orch, "all")
     assert mw._mode == "all"
 
     # A later re-registration honors the remembered mode.
     orch._lsp_middleware = None
     chain.added.clear()
-    orch._register_lsp_middleware(chain)
+    register_lsp_on_chain(orch, chain)
     assert chain.added[0]._mode == "all"

@@ -356,8 +356,10 @@ class Agent:
             # FEP-0019: propagate the LSP diagnostics feedback mode to the
             # orchestrator so the auto-activated middleware honors it.
             _lsp_feedback = getattr(session_config, "lsp_feedback", "errors")
-            if _lsp_feedback and hasattr(orchestrator, "set_lsp_feedback_mode"):
-                orchestrator.set_lsp_feedback_mode(_lsp_feedback)
+            if _lsp_feedback:
+                from victor.framework.lsp_middleware import set_lsp_feedback_mode
+
+                set_lsp_feedback_mode(orchestrator, _lsp_feedback)
 
             resolved_provider = (
                 provider
