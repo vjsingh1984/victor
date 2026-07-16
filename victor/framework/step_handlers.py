@@ -1227,6 +1227,9 @@ class FrameworkStepHandler(BaseStepHandler):
         )
         # Phase 1: Gap fix - Wire capability provider to framework
         self.apply_capability_provider(orchestrator, vertical, context, result)
+        # FEP-0019: Wire a vertical's LSP capability (get_lsp) to the orchestrator
+        # so the diagnostic middleware + symbol context provider activate.
+        self.apply_lsp(orchestrator, vertical, context, result)
         # Phase 1: Gap fix - Register tool graphs with global registry
         self.apply_tool_graphs(
             orchestrator,
@@ -1727,6 +1730,51 @@ class FrameworkStepHandler(BaseStepHandler):
         except Exception as e:
             result.add_warning(f"Could not wire capability provider: {e}")
             logger.debug(f"Capability provider error: {e}", exc_info=True)
+
+    def apply_lsp(
+        self,
+        orchestrator: Any,
+        vertical: Type["VerticalBase"],
+        context: "MutableVerticalContextProtocol",
+        result: "IntegrationResult",
+    ) -> None:
+        """Wire a vertical's LSP capability to the orchestrator (FEP-0019).
+
+        ``VerticalBase.get_lsp()`` lets a vertical declare a live LSP
+        implementation (servers live in victor-coding). Before this, the hook
+        existed but nothing read it, so the LSP capability never reached the
+        orchestrator and the whole FEP-0019 chain (diagnostic middleware +
+        symbol context provider) stayed dormant. Routing it through
+        ``orchestrator.set_lsp()`` auto-registers the middleware and binds the
+        capability for the context provider.
+
+        Args:
+            orchestrator: Orchestrator instance (needs ``set_lsp``).
+            vertical: Vertical class with an optional ``get_lsp`` hook.
+            context: Vertical context.
+            result: Result to update.
+        """
+        get_lsp = getattr(vertical, "get_lsp", None)
+        try:
+            lsp = get_lsp() if callable(get_lsp) else None
+        except Exception as e:
+            logger.debug(f"get_lsp failed for vertical={vertical.name}: {e}", exc_info=True)
+            return
+        if lsp is None:
+            return
+
+        # Capability-first, ``set_lsp`` fallback — mirrors ``apply_middleware``.
+        # The "lsp" capability name maps to ``set_lsp`` via CAPABILITY_METHOD_MAPPINGS.
+        if _check_capability(orchestrator, "lsp"):
+            _invoke_capability(orchestrator, "lsp", lsp)
+        elif hasattr(orchestrator, "set_lsp"):
+            orchestrator.set_lsp(lsp)
+        else:
+            result.add_warning("Cannot wire LSP: orchestrator lacks set_lsp()")
+            return
+
+        result.add_info("Wired LSP capability from vertical")
+        logger.debug(f"Applied LSP capability from vertical={vertical.name}")
 
     def apply_tool_graphs(
         self,

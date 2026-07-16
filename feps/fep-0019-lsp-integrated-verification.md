@@ -155,7 +155,8 @@ turn so the *next* edit is correct first try.
 **Graceful degradation**: opt-in flag off (default), no LSP capability, no
 modified source files, or an unchanged signature → no injection, zero behavior
 change. The root repo is forward-compatible — it degrades to a no-op until a
-vertical (victor-coding) wires `documentSymbol` and calls `set_lsp`.
+vertical (victor-coding) wires `documentSymbol` and exposes the capability via
+`get_lsp()` (the framework auto-routes it to `set_lsp` during integration).
 
 **Position-dependent LSP** (hover/completions/go-to-definition) remains a future
 follow-up: it requires a cursor concept Victor does not yet have.
@@ -190,10 +191,14 @@ follow-up: it requires a cursor concept Victor does not yet have.
 
 ## Unresolved Questions
 
-- **End-to-end activation from victor-coding**: the root repo defines the
-  framework integration; the victor-coding vertical must call
-  `orchestrator.set_lsp(LSPCapability(impl=...))` (or register it via the
-  capability system) to activate. Follow-up in victor-coding.
+- **End-to-end activation from victor-coding (resolved on the framework side)**:
+  a vertical now just overrides `VerticalBase.get_lsp()` to return its
+  `LSPCapability(impl=...)`; `FrameworkStepHandler.apply_lsp` reads it during
+  integration and routes it to `orchestrator.set_lsp()` (capability-first,
+  `set_lsp` fallback — mirrors `apply_middleware`), activating the full FEP-0019
+  chain. Remaining victor-coding follow-up: implement `get_document_symbols`
+  (`documentSymbol`) in its LSP servers and return the capability from
+  `get_lsp()`. Pinned by `tests/unit/framework/test_lsp_capability_wiring.py`.
 - **Diagnostic staleness**: push-based diagnostics depend on the server having
   analyzed the document. The `update_document` + debounce mitigates this; the
   Phase-1 `LSPVerifier` re-checks at COMPLETE as a backstop.
