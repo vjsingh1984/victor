@@ -51,6 +51,27 @@ from victor.framework.task import TaskResult
 from victor.framework.tools import ToolSet, ToolsInput
 from victor.runtime.context import resolve_execution_context
 
+
+def _build_verifier(mode: str):
+    """Construct a Verifier from a verify_mode string (FEP-0018).
+
+    Returns None for unknown/unsupported modes.
+    """
+    mode = (mode or "none").strip().lower()
+    if mode == "none":
+        return None
+    try:
+        from victor.framework.verifiers import LocalTestVerifier, LintVerifier
+
+        if mode == "pytest" or mode == "test":
+            return LocalTestVerifier()
+        if mode == "lint" or mode == "ruff":
+            return LintVerifier()
+    except ImportError:
+        pass
+    return None
+
+
 if TYPE_CHECKING:
     from victor.core.protocols import OrchestratorProtocol as AgentOrchestrator
     from victor.teams import TeamFormation
@@ -316,6 +337,19 @@ class Agent:
                 profile_overrides=profile_overrides,
             )
             orchestrator = await factory.create()
+
+            # FEP-0018: wire the verifier from session_config to the
+            # turn_executor → AgenticLoop. Framework-owned path; the UI
+            # never reaches into the orchestrator directly.
+            _verify_mode = getattr(session_config, "verify_mode", "none")
+            if _verify_mode and _verify_mode != "none":
+                _te = getattr(orchestrator, "turn_executor", None)
+                if _te is not None:
+                    _verifier = _build_verifier(_verify_mode)
+                    if _verifier is not None:
+                        _te._verifier = _verifier
+                        _te._max_verify_retries = 2
+
             resolved_provider = (
                 provider
                 or getattr(orchestrator, "provider_name", None)

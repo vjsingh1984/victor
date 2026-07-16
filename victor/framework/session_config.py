@@ -322,6 +322,7 @@ class SessionConfig:
     auto_skill_enabled: Optional[bool] = None
     one_shot_mode: Optional[bool] = None
     headless_mode: bool = False
+    verify_mode: str = "none"
 
     # Composed sub-configs (for structured access)
     compaction: CompactionConfig = field(default_factory=CompactionConfig)
@@ -386,6 +387,7 @@ class SessionConfig:
         auto_skill_enabled: Optional[bool] = None,
         one_shot_mode: Optional[bool] = None,
         headless_mode: bool = False,
+        verify_mode: str = "none",
         provider: Optional[str] = None,
         model: Optional[str] = None,
         endpoint: Optional[str] = None,
@@ -465,6 +467,7 @@ class SessionConfig:
             auto_skill_enabled=auto_skill_enabled,
             one_shot_mode=one_shot_mode,
             headless_mode=headless_mode,
+            verify_mode=verify_mode,
             compaction=CompactionConfig(
                 threshold=compaction_threshold,
                 adaptive=adaptive_threshold,
