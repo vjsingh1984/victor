@@ -1230,6 +1230,9 @@ class FrameworkStepHandler(BaseStepHandler):
         # FEP-0019: Wire a vertical's LSP capability (get_lsp) to the orchestrator
         # so the diagnostic middleware + symbol context provider activate.
         self.apply_lsp(orchestrator, vertical, context, result)
+        # Load the vertical's declared skills (get_skills) into the shared registry
+        # so SkillMatcher can auto-select them at runtime.
+        self.apply_skills(orchestrator, vertical, context, result)
         # Phase 1: Gap fix - Register tool graphs with global registry
         self.apply_tool_graphs(
             orchestrator,
@@ -1775,6 +1778,49 @@ class FrameworkStepHandler(BaseStepHandler):
 
         result.add_info("Wired LSP capability from vertical")
         logger.debug(f"Applied LSP capability from vertical={vertical.name}")
+
+    def apply_skills(
+        self,
+        orchestrator: Any,
+        vertical: Type["VerticalBase"],
+        context: "MutableVerticalContextProtocol",
+        result: "IntegrationResult",
+    ) -> None:
+        """Load a vertical's declared skills into the shared SkillRegistry.
+
+        ``VerticalBase.get_skills()`` lets a vertical declare reusable skills.
+        Before this, only the deprecated FrameworkShim populated the registry, so
+        the modern ``AgentFactory`` → ``SkillMatcher`` path had an empty catalog
+        and auto-skill-selection silently did nothing. Routing the vertical's
+        skills through the shared ``get_skill_registry()`` singleton makes them
+        available to the matcher at runtime.
+
+        No-op when the vertical declares no skills (``from_vertical`` registers
+        nothing). ``SkillRegistry.register`` dedups by name, so re-integration
+        is safe.
+
+        Args:
+            orchestrator: Orchestrator instance (unused; kept for handler signature).
+            vertical: Vertical class with an optional ``get_skills`` hook.
+            context: Vertical context.
+            result: Result to update.
+        """
+        from victor.framework.skills import get_skill_registry
+
+        registry = get_skill_registry()
+        before = len(registry.list_all())
+        try:
+            registry.from_vertical(vertical)
+        except Exception as e:
+            logger.debug(
+                f"from_vertical skills failed for vertical={vertical.name}: {e}",
+                exc_info=True,
+            )
+            return
+        added = len(registry.list_all()) - before
+        if added:
+            result.add_info(f"Loaded {added} skill(s) from vertical")
+            logger.debug(f"Applied {added} skill(s) from vertical={vertical.name}")
 
     def apply_tool_graphs(
         self,

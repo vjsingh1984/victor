@@ -347,14 +347,30 @@ class AgentFactory:
             logger.debug(f"Observability wiring failed: {e}")
 
     async def _initialize_skill_matcher(self) -> None:
-        """Initialize skill auto-selection."""
+        """Initialize skill auto-selection.
+
+        Populates the shared ``SkillRegistry`` (vertical skills are loaded by
+        ``FrameworkStepHandler.apply_skills`` during integration; entry-point +
+        user skills are loaded here once) and passes it to the matcher.
+        Previously this passed the orchestrator, which has no ``list_all()`` —
+        so the matcher silently failed to load any skills.
+        """
         if not self._orchestrator:
             return
         try:
-            from victor.framework.skills import SkillMatcher
+            from victor.framework.skill_matcher import SkillMatcher
+            from victor.framework.skills import get_skill_registry
+
+            registry = get_skill_registry()
+            # apply_skills (step handler) covers the integrated vertical; load
+            # the external sources once so they're available to the matcher.
+            if not getattr(registry, "_external_loaded", False):
+                registry.from_entry_points()
+                registry.from_user_skills()
+                registry._external_loaded = True
 
             matcher = SkillMatcher()
-            await matcher.initialize(self._orchestrator)
+            await matcher.initialize(registry)
             self._orchestrator._skill_matcher = matcher
         except Exception as e:
             logger.debug(f"Skill matcher initialization skipped: {e}")
