@@ -889,7 +889,8 @@ def chat(
         "--verify",
         help="Verify the agent's work after it claims done and retry on failure (FEP-0018). "
         "'pytest' runs python -m pytest in the workspace; 'lint' runs ruff check; "
-        "'none' disables verification (default).",
+        "'lsp' checks LSP diagnostics on edited files (FEP-0019, multi-language, "
+        "needs victor-coding); 'none' disables verification (default).",
         rich_help_panel="Advanced Agent Behavior",
     ),
     auto_skill: Optional[bool] = typer.Option(
