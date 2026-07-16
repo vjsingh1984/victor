@@ -10,7 +10,7 @@ authors:
     email: singhvjd@gmail.com
     github: vjsingh1984
 reviewers: []
-discussion: https://github.com/vjsingh1984/victor/discussions/0015
+discussion: https://github.com/anvai-labs/victor/discussions/0015
 ---
 
 # FEP-0015: Trim internal-only symbols from the framework public API

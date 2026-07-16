@@ -6,7 +6,7 @@
 
 ```bash
 # Clone and install
-git clone https://github.com/vjsingh1984/victor.git
+git clone https://github.com/anvai-labs/victor.git
 cd victor
 python -m venv .venv
 source .venv/bin/activate

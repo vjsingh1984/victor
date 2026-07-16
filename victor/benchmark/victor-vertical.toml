@@ -7,10 +7,10 @@ license = "Apache-2.0"
 requires_victor = ">=0.5.0"
 
 python_package = "victor-ai"
-homepage = "https://github.com/vjsingh1984/victor"
-repository = "https://github.com/vjsingh1984/victor"
+homepage = "https://github.com/anvai-labs/victor"
+repository = "https://github.com/anvai-labs/victor"
 documentation = "https://docs.victor.dev"
-issues = "https://github.com/vjsingh1984/victor/issues"
+issues = "https://github.com/anvai-labs/victor/issues"
 
 category = "evaluation"
 tags = ["benchmark", "swe-bench", "humaneval", "evaluation", "testing"]

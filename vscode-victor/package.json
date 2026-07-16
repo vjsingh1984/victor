@@ -8,7 +8,7 @@
   "icon": "resources/icon.png",
   "repository": {
     "type": "git",
-    "url": "https://github.com/vjsingh1984/victor"
+    "url": "https://github.com/anvai-labs/victor"
   },
   "engines": {
     "vscode": "^1.85.0",

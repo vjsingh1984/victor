@@ -240,7 +240,7 @@ import warnings
 warnings.warn(
     "victor-coding package is deprecated. "
     "Install 'victor-ai[full]' for all verticals. "
-    "See: https://github.com/vjsingh1984/victor/migration-guide",
+    "See: https://github.com/anvai-labs/victor/migration-guide",
     DeprecationWarning,
     stacklevel=2
 )

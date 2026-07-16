@@ -10,7 +10,7 @@ authors:
     email: singhvjd@gmail.com
     github: vjsingh1984
 reviewers: []
-discussion: https://github.com/vjsingh1984/victor/discussions/1
+discussion: https://github.com/anvai-labs/victor/discussions/1
 ---
 
 # FEP-0001: Framework Enhancement Proposal Process

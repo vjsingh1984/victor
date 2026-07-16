@@ -113,7 +113,7 @@ For contributors or those who want to modify Victor:
 
 ```bash
 # Clone the repository
-git clone https://github.com/vjsingh1984/victor.git
+git clone https://github.com/anvai-labs/victor.git
 cd victor
 
 # Create virtual environment
@@ -456,4 +456,4 @@ After installation:
 
 ---
 
-**Having issues?** See the [Troubleshooting Guide](../user-guide/troubleshooting.md) or [open an issue](https://github.com/vjsingh1984/victor/issues).
+**Having issues?** See the [Troubleshooting Guide](../user-guide/troubleshooting.md) or [open an issue](https://github.com/anvai-labs/victor/issues).
