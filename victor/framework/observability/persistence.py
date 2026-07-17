@@ -30,7 +30,7 @@ Example:
 
 from __future__ import annotations
 
-import json
+from victor.core.json_utils import json_dumps, json_loads
 import sqlite3
 import time
 from abc import ABC, abstractmethod
@@ -247,7 +247,7 @@ class SQLiteMetricsStore(MetricsStore):
                 metrics.total_reasoning_tokens,
                 metrics.state_transitions,
                 metrics.current_state,
-                json.dumps(metrics.errors),
+                json_dumps(metrics.errors),
             ),
         )
 
@@ -426,7 +426,7 @@ class SQLiteMetricsStore(MetricsStore):
                 llm_calls=llm_calls,
                 state_transitions=row["state_transitions"],
                 current_state=row["current_state"],
-                errors=json.loads(row["errors"]) if row["errors"] else [],
+                errors=json_loads(row["errors"]) if row["errors"] else [],
             )
 
             results.append(metrics)

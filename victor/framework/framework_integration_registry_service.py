@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import copy
 import hashlib
-import json
+from victor.core.json_utils import json_dumps
 from dataclasses import dataclass
 from threading import RLock
 from typing import Any, Callable, Dict, Optional, Sequence
@@ -392,7 +392,7 @@ class FrameworkIntegrationRegistryService:
     def _fingerprint_value(self, value: Any) -> str:
         """Create a stable fingerprint for dedupe comparisons."""
         normalized = self._normalize_for_fingerprint(value)
-        payload = json.dumps(
+        payload = json_dumps(
             normalized,
             sort_keys=True,
             separators=(",", ":"),

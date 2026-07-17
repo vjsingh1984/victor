@@ -20,7 +20,7 @@ implementing the ConversationHistoryProtocol.
 
 from __future__ import annotations
 
-import json
+from victor.core.json_utils import json_dumps
 import logging
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -197,7 +197,7 @@ class ConversationExporter:
                 for turn in history.turns
             ],
         }
-        return json.dumps(data, indent=2)
+        return json_dumps(data, indent=2)
 
     @staticmethod
     def to_markdown(

@@ -46,7 +46,7 @@ Usage:
     summary = exporter.get_summary()
 """
 
-import json
+from victor.core.json_utils import json_dumps
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -143,7 +143,7 @@ class DashboardReport:
 
     def to_json(self, indent: int = 2) -> str:
         """Export as JSON string."""
-        return json.dumps(self.to_dict(), indent=indent)
+        return json_dumps(self.to_dict(), indent=indent)
 
 
 class ResilienceMetricsExporter:

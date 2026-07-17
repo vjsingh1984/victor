@@ -32,7 +32,7 @@ from __future__ import annotations
 
 import asyncio
 import ast
-import json
+from victor.core.json_utils import json_dumps
 import logging
 import os
 from pathlib import Path
@@ -534,7 +534,7 @@ def _build_skip_result(
 def _format_tool_command_value(value: Any) -> str:
     """Serialize a tool argument value for compact follow-up guidance."""
     if isinstance(value, str):
-        return json.dumps(value)
+        return json_dumps(value)
     return repr(value)
 
 
@@ -1227,7 +1227,7 @@ class ToolPipeline:
 
         # Pure Python fallback
         try:
-            args_str = json.dumps(args, sort_keys=True, default=str)
+            args_str = json_dumps(args, sort_keys=True, default=str)
         except Exception:
             args_str = str(args)
         return f"{tool_name}:{args_str}"
@@ -3098,7 +3098,7 @@ class ToolPipeline:
         logger.debug(
             "[ToolCall→LLM] Executing tool=%s args=%s",
             tool_name,
-            json.dumps(normalized_args, default=str)[:500],
+            json_dumps(normalized_args, default=str)[:500],
         )
         start_time = time.monotonic()
         try:

@@ -24,7 +24,7 @@ Manages the gradual rollout of predictive features with:
 from __future__ import annotations
 
 import hashlib
-import json
+from victor.core.json_utils import json_dumps, json_loads
 import logging
 import time
 from dataclasses import dataclass, field
@@ -392,7 +392,7 @@ class RolloutManager:
         try:
             with open(self.metrics_path, "r") as f:
                 for line in f:
-                    data = json.loads(line.strip())
+                    data = json_loads(line.strip())
                     session_id = data.get("session_id")
                     if session_id:
                         self._metrics[session_id] = RolloutMetrics(**data)
@@ -417,7 +417,7 @@ class RolloutManager:
                         "latency_ms": metrics.latency_ms,
                         "last_updated": metrics.last_updated.isoformat(),
                     }
-                    f.write(json.dumps(data) + "\n")
+                    f.write(json_dumps(data) + "\n")
 
         except Exception as e:
             logger.warning(f"Failed to save metrics: {e}")

@@ -32,7 +32,7 @@ Target: 2-3x token reduction with < 5% quality degradation.
 from __future__ import annotations
 
 import hashlib
-import json
+from victor.core.json_utils import json_dumps
 import logging
 import time
 from dataclasses import dataclass, field
@@ -194,7 +194,7 @@ class PromptSectionBudgetAllocator:
             for k, v in sorted(context.items())
             if k not in ["timestamp", "request_id"]
         }
-        context_str = json.dumps(normalized, sort_keys=True, default=str)
+        context_str = json_dumps(normalized, sort_keys=True, default=str)
         return hashlib.md5(context_str.encode()).hexdigest()
 
     def _estimate_tokens(self, text: str) -> int:

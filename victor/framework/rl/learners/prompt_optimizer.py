@@ -41,6 +41,8 @@ Usage:
 import gzip
 import hashlib
 import json
+from victor.core.json_utils import json_dumps, json_loads
+from json import JSONDecodeError
 import logging
 import random
 import re
@@ -1156,7 +1158,7 @@ class PromptOptimizerLearner(BaseLearner):
             )
             for row in cursor.fetchall():
                 try:
-                    instance_scores = json.loads(row[12] or "{}")
+                    instance_scores = json_loads(row[12] or "{}")
                 except Exception:
                     instance_scores = {}
                 candidate = PromptCandidate(
@@ -1666,7 +1668,7 @@ class PromptOptimizerLearner(BaseLearner):
                     candidate.alpha,
                     candidate.beta_val,
                     candidate.sample_count,
-                    json.dumps(candidate.instance_scores or {}),
+                    json_dumps(candidate.instance_scores or {}),
                     candidate.coverage_count,
                     int(candidate.is_on_frontier),
                     candidate.char_length or len(candidate.text),
@@ -2469,7 +2471,7 @@ class PromptOptimizerLearner(BaseLearner):
                 with opener(jsonl_path, mode) as f:
                     for line in f:
                         try:
-                            event = json.loads(line.strip())
+                            event = json_loads(line.strip())
                             sid = event.get("session_id", "")
                             etype = event.get("event_type", "")
                             data = event.get("data", {})
@@ -2500,7 +2502,7 @@ class PromptOptimizerLearner(BaseLearner):
                                     )
                             elif etype == "task_classification":
                                 sessions[sid]["task_type"] = data.get("task_type", "default")
-                        except (json.JSONDecodeError, KeyError):
+                        except (JSONDecodeError, KeyError):
                             continue
             except Exception:
                 continue
@@ -2638,7 +2640,7 @@ class PromptOptimizerLearner(BaseLearner):
                 with opener(jsonl_path, mode) as f:
                     for line in f:
                         try:
-                            event = json.loads(line.strip())
+                            event = json_loads(line.strip())
                             sid = event.get("session_id", "")
                             etype = event.get("event_type", "")
                             data = event.get("data", {})
@@ -2712,7 +2714,7 @@ class PromptOptimizerLearner(BaseLearner):
 
                             elif etype == "task_classification":
                                 sessions[sid]["task_type"] = data.get("task_type", "default")
-                        except (json.JSONDecodeError, KeyError):
+                        except (JSONDecodeError, KeyError):
                             continue
             except Exception:
                 continue

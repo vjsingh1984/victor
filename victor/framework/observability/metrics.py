@@ -28,7 +28,7 @@ Phase 4: Enhance Observability with Unified Dashboard
 from __future__ import annotations
 
 import csv
-import json
+from victor.core.json_utils import json_dumps
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
@@ -1113,7 +1113,7 @@ class AgentMetrics:
         Returns:
             JSON string representation
         """
-        return json.dumps(self.to_dict(), indent=indent, default=str)
+        return json_dumps(self.to_dict(), indent=indent, default=str)
 
 
 # =====================================================================
@@ -1330,7 +1330,7 @@ class MetricsExporter:
         Returns:
             JSON string
         """
-        return json.dumps(
+        return json_dumps(
             [_metric_to_dict(m) for m in metrics],
             indent=indent,
             default=str,

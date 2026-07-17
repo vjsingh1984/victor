@@ -36,7 +36,8 @@ References:
 - https://docs.mistral.ai/capabilities/function_calling/
 """
 
-import json
+from victor.core.json_utils import json_dumps, json_loads
+from json import JSONDecodeError
 import logging
 from typing import Any, AsyncIterator, Dict, List, Optional
 
@@ -353,10 +354,10 @@ class MistralProvider(BaseProvider):
                             break
 
                         try:
-                            chunk_data = json.loads(data_str)
+                            chunk_data = json_loads(data_str)
                             chunk = self._parse_stream_chunk(chunk_data, accumulated_tool_calls)
                             yield chunk
-                        except json.JSONDecodeError:
+                        except JSONDecodeError:
                             logger.warning(f"Mistral JSON decode error: {line[:100]}")
 
         except httpx.TimeoutException as e:
@@ -423,7 +424,7 @@ class MistralProvider(BaseProvider):
                         "function": {
                             "name": tc.get("name", ""),
                             "arguments": (
-                                json.dumps(tc.get("arguments", {}))
+                                json_dumps(tc.get("arguments", {}))
                                 if isinstance(tc.get("arguments"), dict)
                                 else tc.get("arguments", "{}")
                             ),
@@ -519,8 +520,8 @@ class MistralProvider(BaseProvider):
 
                 if isinstance(arguments, str):
                     try:
-                        arguments = json.loads(arguments)
-                    except json.JSONDecodeError:
+                        arguments = json_loads(arguments)
+                    except JSONDecodeError:
                         arguments = {}
 
                 if name:
@@ -583,8 +584,8 @@ class MistralProvider(BaseProvider):
                 if tc.get("name"):
                     args = tc.get("arguments", "{}")
                     try:
-                        parsed_args = json.loads(args) if isinstance(args, str) else args
-                    except json.JSONDecodeError:
+                        parsed_args = json_loads(args) if isinstance(args, str) else args
+                    except JSONDecodeError:
                         parsed_args = {}
                     final_tool_calls.append(
                         {

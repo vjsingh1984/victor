@@ -33,7 +33,8 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import importlib
-import json
+from victor.core.json_utils import json_dumps, json_loads
+from json import JSONDecodeError
 import logging
 from dataclasses import dataclass
 from pathlib import Path
@@ -205,8 +206,8 @@ def read_codebase_index_manifest(persist_directory: Path) -> Optional[dict[str, 
         return None
 
     try:
-        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
+        payload = json_loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, JSONDecodeError) as exc:
         logger.warning("Failed to read code_search manifest from %s: %s", manifest_path, exc)
         return None
     if isinstance(payload, dict):
@@ -220,7 +221,7 @@ def write_codebase_index_manifest(persist_directory: Path, manifest: Mapping[str
     persist_directory.mkdir(parents=True, exist_ok=True)
     manifest_path = persist_directory / CODEBASE_INDEX_MANIFEST_NAME
     temp_path = manifest_path.with_suffix(".tmp")
-    temp_path.write_text(json.dumps(dict(manifest), sort_keys=True, indent=2), encoding="utf-8")
+    temp_path.write_text(json_dumps(dict(manifest), sort_keys=True, indent=2), encoding="utf-8")
     temp_path.replace(manifest_path)
 
 

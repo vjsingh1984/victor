@@ -41,6 +41,8 @@ Phase 1: Promote Generic Capabilities to Framework
 
 from __future__ import annotations
 
+from victor.core.json_utils import json_loads
+from json import JSONDecodeError
 import os
 import re
 from abc import ABC, abstractmethod
@@ -332,9 +334,9 @@ class CodeSyntaxValidator(Validator):
         try:
             import json
 
-            json.loads(code)
+            json_loads(code)
             return CapabilityValidationResult.success()
-        except json.JSONDecodeError as e:
+        except JSONDecodeError as e:
             return CapabilityValidationResult.failure(
                 f"JSON syntax error at line {e.lineno}, column {e.colno}: {e.msg}",
                 details={"line": e.lineno, "column": e.colno},

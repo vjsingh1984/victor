@@ -35,7 +35,8 @@ References:
 - https://docs.aws.amazon.com/bedrock/latest/userguide/models-supported.html
 """
 
-import json
+from victor.core.json_utils import json_loads
+from json import JSONDecodeError
 import logging
 import os
 from typing import Any, AsyncIterator, Dict, List, Optional
@@ -643,8 +644,8 @@ class BedrockProvider(BaseProvider):
                         # Parse accumulated JSON arguments
                         args = current_tool_use.get("arguments", "{}")
                         try:
-                            args = json.loads(args) if isinstance(args, str) else args
-                        except json.JSONDecodeError:
+                            args = json_loads(args) if isinstance(args, str) else args
+                        except JSONDecodeError:
                             args = {}
                         accumulated_tool_calls.append(
                             {

@@ -34,7 +34,7 @@ Provider-Specific Limits:
 
 from __future__ import annotations
 
-import json
+from victor.core.json_utils import json_dumps
 import logging
 from dataclasses import dataclass
 from enum import Enum
@@ -255,7 +255,7 @@ class ProviderPayloadLimiter:
 
         for msg in messages:
             msg_dict = self._message_to_dict(msg)
-            msg_str = json.dumps(msg_dict, ensure_ascii=False)
+            msg_str = json_dumps(msg_dict, ensure_ascii=False)
             msg_bytes = len(msg_str.encode("utf-8"))
             messages_data.append(msg_dict)
 
@@ -270,19 +270,19 @@ class ProviderPayloadLimiter:
             elif role == "tool":
                 tool_result_bytes += msg_bytes
 
-        messages_bytes = len(json.dumps(messages_data, ensure_ascii=False).encode("utf-8"))
+        messages_bytes = len(json_dumps(messages_data, ensure_ascii=False).encode("utf-8"))
 
         # Estimate tools size
         tools_bytes = 0
         if tools:
             tools_data = [self._tool_to_dict(t) for t in tools]
-            tools_bytes = len(json.dumps(tools_data, ensure_ascii=False).encode("utf-8"))
+            tools_bytes = len(json_dumps(tools_data, ensure_ascii=False).encode("utf-8"))
 
         # Estimate overhead (model name, params, etc.)
         overhead_bytes = 200  # Base overhead for typical params
         for key, value in kwargs.items():
             if value is not None:
-                overhead_bytes += len(json.dumps({key: value}, ensure_ascii=False).encode("utf-8"))
+                overhead_bytes += len(json_dumps({key: value}, ensure_ascii=False).encode("utf-8"))
 
         total_bytes = messages_bytes + tools_bytes + overhead_bytes
 

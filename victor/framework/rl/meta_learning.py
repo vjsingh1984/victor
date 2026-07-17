@@ -25,7 +25,8 @@ Usage:
     trends = coord.detect_long_term_trends(repo_id="my-project", days=30)
 """
 
-import json
+from victor.core.json_utils import json_loads
+from json import JSONDecodeError
 import logging
 from typing import Any, Dict, List, Optional
 
@@ -121,8 +122,8 @@ class MetaLearningCoordinator(RLCoordinator):
             raw = row[0] if isinstance(row, (list, tuple)) else row["session_summary"]
             if raw:
                 try:
-                    summaries.append(json.loads(raw))
-                except (json.JSONDecodeError, TypeError):
+                    summaries.append(json_loads(raw))
+                except (JSONDecodeError, TypeError):
                     pass
 
         if len(summaries) < 2:

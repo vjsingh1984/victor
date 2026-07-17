@@ -11,7 +11,7 @@ them after production stability is confirmed.
 
 from __future__ import annotations
 
-import json
+from victor.core.json_utils import json_dumps, json_loads
 import logging
 import sqlite3
 from typing import Callable
@@ -176,7 +176,7 @@ class RLTableMigrator:
                         to_mode,
                         action_key,
                         reward,
-                        json.dumps(meta),
+                        json_dumps(meta),
                     )
                 )
             conn.executemany(
@@ -282,7 +282,7 @@ class RLTableMigrator:
                 extra = {}
                 if meta:
                     try:
-                        extra = json.loads(meta)
+                        extra = json_loads(meta)
                     except Exception:
                         pass
                 extra.update({"success": success, "quality_score": quality})
@@ -293,7 +293,7 @@ class RLTableMigrator:
                         tool_name,
                         "execute",
                         reward,
-                        json.dumps(extra),
+                        json_dumps(extra),
                     )
                 )
             conn.executemany(
@@ -366,7 +366,7 @@ class RLTableMigrator:
                     r[1],
                     r[2],
                     r[3],
-                    json.dumps({"hit_after": r[4]}),
+                    json_dumps({"hit_after": r[4]}),
                 )
                 for r in rows
             ]
@@ -741,7 +741,7 @@ class RLTableMigrator:
                     None,
                     None,
                     r[2],
-                    json.dumps({"dimension_scores": r[1], "weights_used": r[3]}),
+                    json_dumps({"dimension_scores": r[1], "weights_used": r[3]}),
                 )
                 for r in rows
             ]
@@ -833,7 +833,7 @@ class RLTableMigrator:
                     None,
                     r[0],
                     None,
-                    json.dumps(
+                    json_dumps(
                         {
                             "success": r[2],
                             "duration": r[3],
@@ -958,7 +958,7 @@ class RLTableMigrator:
                     None,
                     r[3],
                     None,
-                    json.dumps({"provider": r[1], "model": r[2], "success": r[4]}),
+                    json_dumps({"provider": r[1], "model": r[2], "success": r[4]}),
                 )
                 for r in rows
             ]

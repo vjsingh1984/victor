@@ -56,7 +56,7 @@ Usage:
 
 from __future__ import annotations
 
-import json
+from victor.core.json_utils import json_dumps
 import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional
@@ -285,7 +285,7 @@ class WorkflowExecutionLearner(BaseLearner):
                 task_type,
                 workflow_name,
                 reward,
-                json.dumps(
+                json_dumps(
                     {
                         "success": success,
                         "duration": duration_seconds,

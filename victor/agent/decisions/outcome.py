@@ -32,7 +32,8 @@ Design notes
 
 from __future__ import annotations
 
-import json
+from victor.core.json_utils import json_loads
+from json import JSONDecodeError
 import logging
 from pathlib import Path
 from typing import Any, Optional
@@ -59,8 +60,8 @@ def _decisions_for_session(session_id: str) -> list[dict[str, Any]]:
                 if not line:
                     continue
                 try:
-                    rec = json.loads(line)
-                except json.JSONDecodeError:
+                    rec = json_loads(line)
+                except JSONDecodeError:
                     continue
                 if rec.get("session_id") == session_id:
                     out.append(rec)

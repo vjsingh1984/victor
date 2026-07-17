@@ -29,7 +29,8 @@ References:
 - https://lmstudio.ai/docs/advanced/tool-use
 """
 
-import json
+from victor.core.json_utils import json_loads
+from json import JSONDecodeError
 import logging
 import re
 from typing import Any, AsyncIterator, Dict, List, Optional, Tuple, Union
@@ -833,7 +834,7 @@ class LMStudioProvider(BaseProvider):
                             break
 
                         try:
-                            chunk_data = json.loads(data_str)
+                            chunk_data = json_loads(data_str)
                             chunk = self._parse_stream_chunk(
                                 chunk_data, accumulated_tool_calls, model
                             )
@@ -841,7 +842,7 @@ class LMStudioProvider(BaseProvider):
                                 accumulated_content += chunk.content
                             yield chunk
 
-                        except json.JSONDecodeError:
+                        except JSONDecodeError:
                             self._provider_logger.logger.warning(
                                 f"LMStudio JSON decode error on line: {line[:100]}"
                             )
@@ -1020,8 +1021,8 @@ class LMStudioProvider(BaseProvider):
                 # Parse arguments if string (LMStudio returns JSON string)
                 if isinstance(arguments, str):
                     try:
-                        arguments = json.loads(arguments)
-                    except json.JSONDecodeError:
+                        arguments = json_loads(arguments)
+                    except JSONDecodeError:
                         arguments = {}
 
                 if name:
@@ -1064,7 +1065,7 @@ class LMStudioProvider(BaseProvider):
             tool_calls = []
             for match in matches:
                 try:
-                    data = json.loads(match.strip())
+                    data = json_loads(match.strip())
                     name = data.get("name", "")
                     arguments = data.get("arguments") or data.get("parameters", {})
                     # Only treat as tool call if arguments is a dict
@@ -1073,14 +1074,14 @@ class LMStudioProvider(BaseProvider):
                         planning_keywords = {"complexity", "steps", "desc", "duration"}
                         if not any(key in arguments for key in planning_keywords):
                             tool_calls.append({"name": name, "arguments": arguments})
-                except json.JSONDecodeError:
+                except JSONDecodeError:
                     continue
             if tool_calls:
                 return tool_calls
 
         # Try to parse as direct JSON
         try:
-            data = json.loads(content.strip())
+            data = json_loads(content.strip())
 
             # Check if it looks like a tool call
             # Must have "name" AND ("arguments" OR "parameters")
@@ -1098,7 +1099,7 @@ class LMStudioProvider(BaseProvider):
                     if not any(key in arguments for key in planning_keywords):
                         # Convert to normalized format
                         return [{"name": data.get("name"), "arguments": arguments}]
-        except (json.JSONDecodeError, ValueError):
+        except (JSONDecodeError, ValueError):
             pass
 
         return None
@@ -1220,8 +1221,8 @@ class LMStudioProvider(BaseProvider):
                 if tc.get("name"):
                     args = tc.get("arguments", "{}")
                     try:
-                        parsed_args = json.loads(args) if isinstance(args, str) else args
-                    except json.JSONDecodeError:
+                        parsed_args = json_loads(args) if isinstance(args, str) else args
+                    except JSONDecodeError:
                         parsed_args = {}
                     final_tool_calls.append({"name": tc["name"], "arguments": parsed_args})
 

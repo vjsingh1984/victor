@@ -44,7 +44,8 @@ Usage:
 
 from __future__ import annotations
 
-import json
+from victor.core.json_utils import json_loads
+from json import JSONDecodeError
 import logging
 from abc import abstractmethod
 from typing import Any, AsyncIterator, Dict, List, Optional
@@ -414,9 +415,9 @@ class HttpxOpenAICompatProvider(BaseProvider):
                     args_str = tc.get("arguments", "{}")
                     try:
                         parsed_args = (
-                            json.loads(args_str) if isinstance(args_str, str) else args_str
+                            json_loads(args_str) if isinstance(args_str, str) else args_str
                         )
-                    except json.JSONDecodeError:
+                    except JSONDecodeError:
                         parsed_args = {}
                     final_tool_calls.append(
                         {
@@ -530,13 +531,13 @@ class HttpxOpenAICompatProvider(BaseProvider):
                         break
 
                     try:
-                        chunk_data = json.loads(data_str)
+                        chunk_data = json_loads(data_str)
                         chunk = self._parse_stream_chunk(chunk_data, accumulated_tool_calls)
                         if chunk:
                             if chunk.is_final:
                                 has_sent_final = True
                             yield chunk
-                    except json.JSONDecodeError:
+                    except JSONDecodeError:
                         self._provider_logger.logger.warning(
                             "%s JSON decode error on SSE line: %s",
                             self.name,

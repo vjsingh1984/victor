@@ -62,7 +62,7 @@ Usage:
 """
 
 import hashlib
-import json
+from victor.core.json_utils import json_dumps
 import logging
 import math
 import random
@@ -339,7 +339,7 @@ class QLearningStore:
                 to_mode.value,
                 action_key,
                 reward,
-                json.dumps(
+                json_dumps(
                     {
                         "trigger": trigger.value,
                         "state_key": state_key,

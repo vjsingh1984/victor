@@ -27,7 +27,8 @@ Security:
 - Resolution order: env var > keychain > error
 """
 
-import json
+from victor.core.json_utils import json_loads
+from json import JSONDecodeError
 import logging
 import os
 import getpass
@@ -335,8 +336,8 @@ def _load_claude_code_keychain_credentials() -> Optional[Dict[str, Any]]:
         return None
 
     try:
-        data = json.loads(result.stdout.strip())
-    except json.JSONDecodeError:
+        data = json_loads(result.stdout.strip())
+    except JSONDecodeError:
         return None
     return data if isinstance(data, dict) else None
 
@@ -545,8 +546,8 @@ class OAuthTokenManager:
             return None
 
         try:
-            data = json.loads(self._codex_auth_path.read_text())
-        except (json.JSONDecodeError, OSError):
+            data = json_loads(self._codex_auth_path.read_text())
+        except (JSONDecodeError, OSError):
             logger.warning("Failed to load Codex OAuth tokens")
             return None
 
@@ -588,8 +589,8 @@ class OAuthTokenManager:
             return None
 
         try:
-            data = json.loads(self._claude_credentials_path.read_text())
-        except (json.JSONDecodeError, OSError):
+            data = json_loads(self._claude_credentials_path.read_text())
+        except (JSONDecodeError, OSError):
             logger.warning("Failed to load Claude Code OAuth credentials")
             return None
 

@@ -25,7 +25,8 @@ References:
 - https://github.com/MoonshotAI/Kimi-K2
 """
 
-import json
+from victor.core.json_utils import json_loads
+from json import JSONDecodeError
 from typing import Any, AsyncIterator, Dict, List, Optional
 
 import httpx
@@ -298,7 +299,7 @@ class MoonshotProvider(BaseProvider):
                             break
 
                         try:
-                            chunk_data = json.loads(data_str)
+                            chunk_data = json_loads(data_str)
                             chunk = self._parse_stream_chunk(
                                 chunk_data,
                                 accumulated_tool_calls,
@@ -311,7 +312,7 @@ class MoonshotProvider(BaseProvider):
                                 accumulated_reasoning = chunk.metadata["reasoning_content"]
                             yield chunk
 
-                        except json.JSONDecodeError:
+                        except JSONDecodeError:
                             pass  # Skip invalid JSON chunks
 
         except httpx.TimeoutException as e:
@@ -427,8 +428,8 @@ class MoonshotProvider(BaseProvider):
 
                 if isinstance(arguments, str):
                     try:
-                        arguments = json.loads(arguments)
-                    except json.JSONDecodeError:
+                        arguments = json_loads(arguments)
+                    except JSONDecodeError:
                         arguments = {}
 
                 if name:
@@ -545,8 +546,8 @@ class MoonshotProvider(BaseProvider):
                 if tc.get("name"):
                     args = tc.get("arguments", "{}")
                     try:
-                        parsed_args = json.loads(args) if isinstance(args, str) else args
-                    except json.JSONDecodeError:
+                        parsed_args = json_loads(args) if isinstance(args, str) else args
+                    except JSONDecodeError:
                         parsed_args = {}
                     final_tool_calls.append({"name": tc["name"], "arguments": parsed_args})
 

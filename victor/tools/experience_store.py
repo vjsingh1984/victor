@@ -15,7 +15,7 @@ Related research:
 
 from __future__ import annotations
 
-import json
+from victor.core.json_utils import json_dumps, json_loads
 import logging
 import time
 from collections import defaultdict
@@ -292,7 +292,7 @@ class ToolExperienceStore:
                 "known_tools": sorted(self._all_known_tools),
             }
             self._persist_path.parent.mkdir(parents=True, exist_ok=True)
-            self._persist_path.write_text(json.dumps(data, indent=2))
+            self._persist_path.write_text(json_dumps(data, indent=2))
         except Exception as e:
             logger.warning("Failed to persist experience store: %s", e)
 
@@ -301,7 +301,7 @@ class ToolExperienceStore:
         if not self._persist_path or not self._persist_path.exists():
             return
         try:
-            data = json.loads(self._persist_path.read_text())
+            data = json_loads(self._persist_path.read_text())
             for raw in data.get("experiences", []):
                 exp_type = ExperienceType(raw.pop("experience_type"))
                 exp = ToolExperience(**raw, experience_type=exp_type)

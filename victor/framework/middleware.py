@@ -50,9 +50,9 @@ Example usage:
     class JsonValidator:
         def validate(self, content, context=None):
             try:
-                json.loads(content)
+                json_loads(content)
                 return ContentValidationResult(is_valid=True)
-            except json.JSONDecodeError as e:
+            except JSONDecodeError as e:
                 return ContentValidationResult(
                     is_valid=False,
                     issues=[ValidationIssue(message=str(e))]
@@ -67,6 +67,8 @@ Example usage:
 
 from __future__ import annotations
 
+from victor.core.json_utils import json_loads
+from json import JSONDecodeError
 import logging
 import time
 from abc import ABC, abstractmethod
@@ -1013,9 +1015,9 @@ class OutputValidationMiddleware(MiddlewareProtocol):
             def validate(self, content, context=None):
                 import json
                 try:
-                    json.loads(content)
+                    json_loads(content)
                     return ContentValidationResult(is_valid=True)
-                except json.JSONDecodeError as e:
+                except JSONDecodeError as e:
                     return ContentValidationResult(
                         is_valid=False,
                         issues=[ValidationIssue(
