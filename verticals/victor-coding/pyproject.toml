@@ -7,7 +7,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "victor-coding"
-version = "0.7.1"
+version = "0.7.2"
 description = "Coding vertical for Victor AI - Software development, debugging, and code generation"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -43,7 +43,7 @@ dependencies = [
 
 [project.optional-dependencies]
 runtime = [
-    "victor-ai>=0.6.0,<1.0",  # Runtime support - optional, contract-first architecture
+    "victor-ai>=0.7.6,<1.0",  # Runtime support - optional, contract-first architecture
 ]
 native = [
     # Native extensions are handled by maturin
