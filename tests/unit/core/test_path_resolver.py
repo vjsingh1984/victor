@@ -436,10 +436,12 @@ class TestPathResolverSuggestSimilar:
 
         suggestions = resolver.suggest_similar("Cargo.toml", limit=5)
 
-        assert suggestions[:2] == [
+        # Order depends on filesystem walk order (platform-dependent); assert
+        # both are present in the top 2 without requiring a specific order.
+        assert set(suggestions[:2]) == {
             "rust/Cargo.toml",
             "rust/crates/core/Cargo.toml",
-        ]
+        }
         assert "Cargo.toml" not in suggestions
 
     def test_resolves_human_root_prefixed_manifest(self, tmp_path):
