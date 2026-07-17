@@ -152,10 +152,20 @@ jobs:
           - os: macos-latest
             target: aarch64-apple-darwin
             maturin_args: "--release --out dist"
+          # macOS x86_64 (Intel) — cross-compile from ARM64 runner.
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            maturin_args: "--release --out dist --target x86_64-apple-darwin -i python3.12"
+            rust_target: x86_64-apple-darwin
           # Windows x64 — runs natively; build for the active setup-python (3.12).
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             maturin_args: "--release --out dist"
+          # Windows ARM64 — cross-compile from x64 runner.
+          - os: windows-latest
+            target: aarch64-pc-windows-msvc
+            maturin_args: "--release --out dist --target aarch64-pc-windows-msvc"
+            rust_target: aarch64-pc-windows-msvc
 
     steps:
       - uses: actions/checkout@v4
@@ -168,7 +178,7 @@ jobs:
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.target }}
+          targets: ${{ matrix.target }}${{ matrix.rust_target != '' && format(', {0}', matrix.rust_target) || '' }}
 
       - name: Update rustup to stable
         run: |
@@ -488,6 +498,38 @@ jobs:
           verbose: true
 
   # ==========================================================================
+  # Publish native wheels (Rust extensions) to PyPI as victor_native
+  # These provide 2-50x speedups for tokenization, similarity, JSON repair,
+  # pattern matching, context fitting, and more. Users install via:
+  #   pip install victor-ai[native]
+  # ==========================================================================
+  publish-native-pypi:
+    name: Publish Native Wheels to PyPI
+    needs: [build-native, create-release]
+    if: "!contains(github.ref, 'alpha') && !contains(github.ref, 'beta') && !contains(github.ref, 'rc')"
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/victor-native/
+    permissions:
+      id-token: write
+
+    steps:
+      - name: Download all native wheel artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: native-wheels-*
+          merge-multiple: true
+          path: dist/
+
+      - name: Publish victor_native to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/
+          verbose: true
+          skip-existing: true
+
+  # ==========================================================================
   # Publish Docker image to Docker Hub
   # IMPORTANT: This runs LAST after all builds pass and release is created
   # ==========================================================================
@@ -560,7 +602,7 @@ jobs:
 
   generate-checksums:
     name: Generate Checksums
-    needs: [build-python]
+    needs: [build-python, build-native]
     runs-on: ubuntu-latest
     steps:
       - name: Download all artifacts
@@ -662,6 +704,7 @@ jobs:
           files: |
             artifacts/python-package/*
             artifacts/binary-*/*
+            artifacts/native-wheels-*/*
             artifacts/checksums/checksums.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
