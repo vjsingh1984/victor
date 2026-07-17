@@ -341,7 +341,7 @@ class OllamaProvider(BaseProvider):
                 with httpx.Client(base_url=url, timeout=httpx.Timeout(2)) as client:
                     resp = client.get("/api/tags")
                     resp.raise_for_status()
-                    self._provider_logger.logger.info(f"Ollama base URL selected: {url}")
+                    self._provider_logger.logger.debug(f"Ollama base URL selected: {url}")
                     return url
             except Exception as exc:
                 self._provider_logger.logger.warning(
@@ -399,7 +399,7 @@ class OllamaProvider(BaseProvider):
                 async with httpx.AsyncClient(base_url=url, timeout=httpx.Timeout(2)) as client:
                     resp = await client.get("/api/tags")
                     resp.raise_for_status()
-                    provider_logger.info(f"Ollama base URL selected (async): {url}")
+                    provider_logger.debug(f"Ollama base URL selected (async): {url}")
                     return url
             except Exception as exc:
                 provider_logger.warning(
@@ -963,9 +963,9 @@ class OllamaProvider(BaseProvider):
                 }
                 for tool in tools
             ]
-            # INFO log of the serialized tool payload (first-principles debugging).
+            # DEBUG log of the serialized tool payload (first-principles debugging).
             _tool_names = ", ".join(t["function"]["name"] for t in payload["tools"])
-            logger.info(
+            logger.debug(
                 "[ToolSchemas→LLM] Ollama payload: %d tools: %s",
                 len(payload["tools"]),
                 _tool_names,

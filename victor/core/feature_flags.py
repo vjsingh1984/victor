@@ -90,16 +90,8 @@ class FeatureFlag(Enum):
     # Phase 8 - Edge Model for micro-decisions
     USE_EDGE_MODEL = "use_edge_model"
 
-    # Phase 14 - Fuzzy Matching for robust classification
-    # Enables Levenshtein-based fuzzy matching across all classification systems
-    # to handle typos and spelling variations while maintaining high precision.
-    # Default: True (enabled by default for better UX)
-    USE_FUZZY_MATCHING = "use_fuzzy_matching"
-
     # Optimization flags (default: False — opt-in only)
     USE_SEMANTIC_RESPONSE_CACHE = "use_semantic_response_cache"
-    USE_CONTEXT_TEMPERATURE = "use_context_temperature"
-    USE_CONFIDENCE_MONITOR = "use_confidence_monitor"
 
     # Phase 11 - Smart Model Routing (automatic local→cloud fallback)
     USE_SMART_ROUTING = "use_smart_routing"
@@ -108,18 +100,16 @@ class FeatureFlag(Enum):
     # Default: enabled. Roll back with VICTOR_USE_LEARNING_FROM_EXECUTION=false.
     USE_LEARNING_FROM_EXECUTION = "use_learning_from_execution"
 
-    # Tool Broadcasting Optimization (context-aware, economy-first)
+    # Tool Broadcasting Optimization (context-aware, economy-first).
+    # Read by string in orchestrator._is_tool_strategy_v2_enabled(); the former
+    # settings field duplicate was removed in #324 (this flag is the real gate).
     TOOL_STRATEGY_V2 = "tool_strategy_v2"
 
     # Phase 13 - Agentic rollout controls (default: False — opt-in only)
-    USE_AGENTIC_BENCH_GATES = "use_agentic_bench_gates"
     USE_CALIBRATED_COMPLETION = "use_calibrated_completion"
-    USE_AGENTIC_RETRIEVAL_REPAIR = "use_agentic_retrieval_repair"
-    USE_UTILITY_RETRIEVAL = "use_utility_retrieval"
     USE_PROMPT_COMPLETENESS_GUARD = "use_prompt_completeness_guard"
     USE_PROMPT_DICTIONARY_COMPRESSION = "use_prompt_dictionary_compression"
     USE_PRIME_MEMORY_EVOLUTION = "use_prime_memory_evolution"
-    USE_EXTERNAL_AGENTIC_BENCHMARKS = "use_external_agentic_benchmarks"
 
     # Phase 9 - Prompt Optimization (controlled via settings.prompt_optimization)
     # USE_PROMPT_OPTIMIZER → settings.prompt_optimization.enabled
@@ -135,7 +125,11 @@ class FeatureFlag(Enum):
     USE_RICH_FORMATTING = "use_rich_formatting"
 
     # Phase 14 - Graph-Based Enhancements (unified graph schema, CCG, Graph RAG)
-    # These flags enable the new graph-based code intelligence features
+    # These flags enable the new graph-based code intelligence features.
+    # NOTE: USE_GRAPH_RAG + USE_MULTI_HOP_RETRIEVAL are read by victor-coding's
+    # code_search_tool (and documented as VICTOR_USE_GRAPH_RAG /
+    # VICTOR_USE_MULTI_HOP_RETRIEVAL env vars) — do NOT remove without checking
+    # verticals/. They were wrongly classified dead by a root-only audit (#539).
     USE_GRAPH_RAG = "use_graph_rag"
     USE_CCG = "use_ccg"
     USE_GRAPH_QUERY_TOOL = "use_graph_query_tool"
@@ -206,17 +200,11 @@ class FeatureFlag(Enum):
         """Whether the flag should stay disabled unless explicitly enabled."""
         return self in {
             FeatureFlag.USE_SEMANTIC_RESPONSE_CACHE,
-            FeatureFlag.USE_CONTEXT_TEMPERATURE,
-            FeatureFlag.USE_CONFIDENCE_MONITOR,
             FeatureFlag.TOOL_STRATEGY_V2,
-            FeatureFlag.USE_AGENTIC_BENCH_GATES,
             FeatureFlag.USE_CALIBRATED_COMPLETION,
-            FeatureFlag.USE_AGENTIC_RETRIEVAL_REPAIR,
-            FeatureFlag.USE_UTILITY_RETRIEVAL,
             FeatureFlag.USE_PROMPT_COMPLETENESS_GUARD,
             FeatureFlag.USE_PROMPT_DICTIONARY_COMPRESSION,
             FeatureFlag.USE_PRIME_MEMORY_EVOLUTION,
-            FeatureFlag.USE_EXTERNAL_AGENTIC_BENCHMARKS,
             # Phase 15: Architecture Consolidation (opt-in for safety)
             FeatureFlag.USE_STATEGRAPH_AGENTIC_LOOP,
             # Phase 16: Stage Transition Coordination (opt-in for gradual rollout)

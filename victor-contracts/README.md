@@ -225,5 +225,5 @@ and manifest fields.
 
 ## Links
 
-- Repository: https://github.com/vjsingh1984/victor
-- Issues: https://github.com/vjsingh1984/victor/issues
+- Repository: https://github.com/anvai-labs/victor
+- Issues: https://github.com/anvai-labs/victor/issues

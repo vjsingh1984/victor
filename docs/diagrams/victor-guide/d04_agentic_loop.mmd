@@ -1,0 +1,14 @@
+%% The AgenticLoop — canonical chat iteration authority.
+flowchart LR
+  classDef phase fill:#ecfeff,stroke:#0891b2,color:#0f172a
+  classDef decide fill:#fffbeb,stroke:#d97706,color:#451a03
+  classDef term fill:#f0fdf4,stroke:#16a34a,color:#052e16
+
+  P["PERCEIVE\nparse intent + requirements"]:::phase --> PL["PLAN\nchoose tools + approach"]:::phase
+  PL --> A["ACT\nExecutionCoordinator\nsingle LLM call + tool exec"]:::phase
+  A --> E["EVALUATE\nprogress + fulfillment + spin detect"]:::phase
+  E --> D{"DECIDE\ncontinue / retry / complete"}:::decide
+  D -->|"not done"| P
+  D -->|"fulfilled"| DONE["Task complete"]:::term
+  D -->|"stuck"| REC["Recovery\nRecoveryService"]:::phase
+  REC --> P

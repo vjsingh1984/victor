@@ -51,6 +51,30 @@ from victor.framework.task import TaskResult
 from victor.framework.tools import ToolSet, ToolsInput
 from victor.runtime.context import resolve_execution_context
 
+
+def _build_verifier(mode: str, orchestrator: Any = None):
+    """Construct a Verifier from a verify_mode string (FEP-0018/0019).
+
+    Returns None for unknown/unsupported modes.
+    """
+    mode = (mode or "none").strip().lower()
+    if mode == "none":
+        return None
+    try:
+        from victor.framework.verifiers import LintVerifier, LocalTestVerifier, LSPVerifier
+
+        if mode == "pytest" or mode == "test":
+            return LocalTestVerifier()
+        if mode == "lint" or mode == "ruff":
+            return LintVerifier()
+        if mode == "lsp":
+            lsp_cap = getattr(orchestrator, "lsp", None) if orchestrator else None
+            return LSPVerifier(lsp_capability=lsp_cap)
+    except ImportError:
+        pass
+    return None
+
+
 if TYPE_CHECKING:
     from victor.core.protocols import OrchestratorProtocol as AgentOrchestrator
     from victor.teams import TeamFormation
@@ -316,6 +340,35 @@ class Agent:
                 profile_overrides=profile_overrides,
             )
             orchestrator = await factory.create()
+
+            # FEP-0018: wire the verifier from session_config to the
+            # turn_executor → AgenticLoop. Framework-owned path; the UI
+            # never reaches into the orchestrator directly.
+            _verify_mode = getattr(session_config, "verify_mode", "none")
+            if _verify_mode and _verify_mode != "none":
+                _te = getattr(orchestrator, "turn_executor", None)
+                if _te is not None:
+                    _verifier = _build_verifier(_verify_mode, orchestrator)
+                    if _verifier is not None:
+                        _te._verifier = _verifier
+                        _te._max_verify_retries = 2
+
+            # FEP-0019: propagate the LSP diagnostics feedback mode to the
+            # orchestrator so the auto-activated middleware honors it.
+            _lsp_feedback = getattr(session_config, "lsp_feedback", "errors")
+            if _lsp_feedback:
+                from victor.framework.lsp_middleware import set_lsp_feedback_mode
+
+                set_lsp_feedback_mode(orchestrator, _lsp_feedback)
+
+            # FEP-0019 Phase 3: enable proactive LSP context injection. The flag
+            # is read off the turn_executor by AgenticLoop.__init__ — same path
+            # as the verifier above; no loop-construction-site changes needed.
+            if getattr(session_config, "lsp_perception", False):
+                _te = getattr(orchestrator, "turn_executor", None)
+                if _te is not None:
+                    _te._lsp_context_enabled = True
+
             resolved_provider = (
                 provider
                 or getattr(orchestrator, "provider_name", None)

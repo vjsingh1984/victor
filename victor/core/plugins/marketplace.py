@@ -127,7 +127,7 @@ _FALLBACK_ENTRIES: List[Dict[str, str]] = [
     {
         "name": "victor-invest",
         "description": "Investment analysis vertical with SEC fundamentals and technical analysis",
-        "source": "https://github.com/vjsingh1984/victor-invest.git",
+        "source": "https://github.com/anvai-labs/victor-invest.git",
         "source_type": "pip",
         "install_cmd": "pip install victor-invest",
         "category": "finance",

@@ -36,6 +36,12 @@ from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
+# Sentinel hash for binding a section's SEED (baseline) prompt in a candidate
+# suite — lets ``run-prompt-suite`` measure evolved-vs-seed without storing the
+# seed as a real candidate (no Thompson pollution). Resolved to the registry
+# default text by ``_resolve_bound_candidate_payload``.
+BASELINE_CANDIDATE_HASH = "__baseline__"
+
 _DEFAULT_TURN_PREFIX_EVOLVABLE_SECTIONS = (
     "ASI_TOOL_EFFECTIVENESS_GUIDANCE",
     "GROUNDING_RULES",
@@ -564,13 +570,26 @@ class OptimizationInjector:
                 task_type,
                 section_name=section_name,
             )
-            if rec and rec.confidence > 0.6 and not rec.is_baseline:
+            from victor.framework.rl.learners.prompt_optimizer import (
+                should_serve_candidate,
+            )
+
+            if should_serve_candidate(
+                rec,
+                exploration_enabled=getattr(po, "exploration_enabled", True),
+                exploration_epsilon=getattr(po, "exploration_epsilon", 0.1),
+            ):
                 rec_metadata = dict(getattr(rec, "metadata", {}) or {})
                 resolved_provider = str(rec_metadata.get("provider") or provider or "")
                 resolved_section = str(
                     rec_metadata.get("section_name")
                     or rec_metadata.get("prompt_section_name")
                     or section_name
+                )
+                learner.record_served(
+                    resolved_section,
+                    resolved_provider,
+                    str(rec_metadata.get("prompt_candidate_hash") or ""),
                 )
                 logger.info(
                     "[OptimizationInjector] Using evolved '%s' (gen=%s, conf=%.2f)",
@@ -607,6 +626,29 @@ class OptimizationInjector:
         prompt_candidate_hash = str(binding.get("prompt_candidate_hash") or "").strip()
         strict = bool(binding.get("strict", True))
 
+        # Baseline sentinel: serve the section's seed text (no stored candidate,
+        # no Thompson pollution) so a suite can measure evolved-vs-seed.
+        if prompt_candidate_hash == BASELINE_CANDIDATE_HASH:
+            seed = self._section_seed_text(section_name)
+            if seed is None:
+                if strict:
+                    raise ValueError(f"baseline seed not found for section {section_name}")
+                return None
+            logger.info(
+                "[OptimizationInjector] Using bound BASELINE (seed) for %s",
+                section_name,
+            )
+            return {
+                "text": seed,
+                "provider": resolved_provider,
+                "prompt_candidate_hash": BASELINE_CANDIDATE_HASH,
+                "section_name": section_name,
+                "prompt_section_name": section_name,
+                "strategy_name": "baseline",
+                "strategy_chain": "baseline",
+                "source": "baseline",
+            }
+
         try:
             from victor.agent.services.rl_runtime import get_rl_coordinator
 
@@ -622,6 +664,14 @@ class OptimizationInjector:
                 provider=resolved_provider,
                 text_hash=prompt_candidate_hash,
             )
+            # Provider fallback: a default-profile run (e.g. ollama) may bind a
+            # candidate stored under a different provider (e.g. zai). Search all
+            # providers for the section+hash before giving up.
+            if candidate is None and hasattr(learner, "find_candidate_any_provider"):
+                candidate = learner.find_candidate_any_provider(
+                    section_name=section_name,
+                    text_hash=prompt_candidate_hash,
+                )
             if candidate is None:
                 raise ValueError(
                     f"bound prompt candidate not found for {section_name}/{resolved_provider}: "
@@ -632,7 +682,7 @@ class OptimizationInjector:
                 "[OptimizationInjector] Using bound '%s' candidate %s for %s",
                 section_name,
                 prompt_candidate_hash,
-                resolved_provider or "default",
+                candidate.provider or resolved_provider or "default",
             )
             return {
                 "text": candidate.text,
@@ -648,3 +698,16 @@ class OptimizationInjector:
             if strict:
                 raise
             return None
+
+    @staticmethod
+    def _section_seed_text(section_name: str) -> Optional[str]:
+        """Return the registry default (seed) text for a prompt section."""
+        try:
+            from victor.agent.prompt_section_registry import get_section_registry
+
+            for section in get_section_registry().get_all():
+                if section.name == section_name:
+                    return section.default_text
+        except Exception:
+            return None
+        return None

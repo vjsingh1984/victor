@@ -2136,7 +2136,21 @@ class InitSynthesizer:
                 "init_synthesis",
                 section_name="INIT_SYNTHESIS_RULES",
             )
-            if rec and rec.confidence > 0.6 and not rec.is_baseline:
+            from victor.framework.rl.learners.prompt_optimizer import (
+                should_serve_candidate,
+            )
+
+            if should_serve_candidate(
+                rec,
+                exploration_enabled=getattr(po, "exploration_enabled", True),
+                exploration_epsilon=getattr(po, "exploration_epsilon", 0.1),
+            ):
+                rec_metadata = dict(getattr(rec, "metadata", {}) or {})
+                learner.record_served(
+                    "INIT_SYNTHESIS_RULES",
+                    provider or "default",
+                    str(rec_metadata.get("prompt_candidate_hash") or ""),
+                )
                 logger.info(
                     "Using GEPA-evolved init rules " "(gen=%s, confidence=%.2f, %d chars)",
                     rec.reason,

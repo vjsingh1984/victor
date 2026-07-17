@@ -114,6 +114,6 @@ Apache License 2.0 - see [LICENSE](LICENSE) for details.
 
 ## Links
 
-- **Victor AI**: https://github.com/vjsingh1984/victor
+- **Victor AI**: https://github.com/anvai-labs/victor
 - **Documentation**: https://docs.victor.dev/verticals/rag
-- **Victor Registry**: https://github.com/vjsingh1984/victor-registry
+- **Victor Registry**: https://github.com/anvai-labs/victor-registry

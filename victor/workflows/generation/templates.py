@@ -188,7 +188,7 @@ class TemplateLibrary:
     def __init__(self) -> None:
         """Initialize the template library."""
         self._templates = self._load_builtin_templates()
-        logger.info(f"Loaded {len(self._templates)} workflow templates")
+        logger.debug(f"Loaded {len(self._templates)} workflow templates")
 
     def match_template(
         self,
@@ -216,7 +216,7 @@ class TemplateLibrary:
                 best_template = template
 
         if best_score >= min_score:
-            logger.info(f"Template '{best_template.name}' matched with score {best_score:.2f}")
+            logger.debug(f"Template '{best_template.name}' matched with score {best_score:.2f}")
             return best_template
 
         logger.warning(f"No template matched minimum score {min_score}")
@@ -239,7 +239,7 @@ class TemplateLibrary:
         Raises:
             ValueError: If instantiation fails
         """
-        logger.info(f"Instantiating template: {template.name}")
+        logger.debug(f"Instantiating template: {template.name}")
 
         # Start with template schema
         schema = copy.deepcopy(template.schema)

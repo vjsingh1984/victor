@@ -1107,8 +1107,8 @@ logging:
 ## When to Open an Issue
 
 **Before opening an issue**:
-1. Check existing issues: https://github.com/vjsingh1984/victor/issues
-2. Search discussions: https://github.com/vjsingh1984/victor/discussions
+1. Check existing issues: https://github.com/anvai-labs/victor/issues
+2. Search discussions: https://github.com/anvai-labs/victor/discussions
 3. Try troubleshooting steps above
 4. Collect logs and error messages
 
@@ -1166,8 +1166,8 @@ logging:
 
 ### Community
 
-- **GitHub Issues**: [Report bugs](https://github.com/vjsingh1984/victor/issues)
-- **GitHub Discussions**: [Ask questions](https://github.com/vjsingh1984/victor/discussions)
+- **GitHub Issues**: [Report bugs](https://github.com/anvai-labs/victor/issues)
+- **GitHub Discussions**: [Ask questions](https://github.com/anvai-labs/victor/discussions)
 - **Discord**: [Join Discord](https://discord.gg/...)
 - **Stack Overflow**: Tag with `victor-ai`
 
@@ -1241,6 +1241,6 @@ CLAUDE.md                   # AI instructions
 
 ---
 
-**Still stuck?** [Open an issue →](https://github.com/vjsingh1984/victor/issues/new)
+**Still stuck?** [Open an issue →](https://github.com/anvai-labs/victor/issues/new)
 
 **Next**: [User Guide](/user-guide/index.md) | [Provider Reference](/user-guide/providers.md) | [Configuration Options](/reference/configuration-options.md)

@@ -10,7 +10,7 @@ authors:
     email: singhvjd@gmail.com
     github: vjsingh1984
 reviewers: []
-discussion: https://github.com/vjsingh1984/victor/discussions/3
+discussion: https://github.com/anvai-labs/victor/discussions/3
 ---
 
 # FEP-0003: Progressive Tool Loading with Cost-Based Selection
@@ -1007,8 +1007,8 @@ registry.register(MyTool())  # DeprecationWarning: Use register(name, tool_class
 ## References
 
 - [Related FEP-0001: FEP Process](./fep-0001-fep-process.md)
-- [GitHub Issue #156: Slow startup time](https://github.com/vjsingh1984/victor/issues/156)
-- [GitHub Issue #203: Unexpected API costs](https://github.com/vjsingh1984/victor/issues/203)
+- [GitHub Issue #156: Slow startup time](https://github.com/anvai-labs/victor/issues/156)
+- [GitHub Issue #203: Unexpected API costs](https://github.com/anvai-labs/victor/issues/203)
 - [Existing: LazyToolRunnable](../victor/tools/composition/lazy.py)
 - [Existing: ProgressiveToolsRegistry](../victor/tools/progressive_registry.py)
 - [Existing: CostTier enum](../victor/tools/enums.py)
@@ -1029,7 +1029,7 @@ registry.register(MyTool())  # DeprecationWarning: Use register(name, tool_class
 
 - **Initial review period**: 14 days minimum (2025-01-09 to 2025-01-23)
 - **Reviewers assigned**: (To be assigned)
-- **Discussion thread**: [GitHub Discussion #3](https://github.com/vjsingh1984/victor/discussions/3)
+- **Discussion thread**: [GitHub Discussion #3](https://github.com/anvai-labs/victor/discussions/3)
 
 ### Review Checklist
 

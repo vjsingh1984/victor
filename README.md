@@ -2,12 +2,12 @@
 
 # Victor
 
-**An contract-first agentic AI framework for building reliable agents across local and cloud models.**
+**A contract-first agentic AI framework for building reliable agents across local and cloud models.**
 
 [![PyPI version](https://badge.fury.io/py/victor-ai.svg)](https://pypi.org/project/victor-ai/)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![Fast Checks](https://github.com/vjsingh1984/victor/actions/workflows/ci-fast.yml/badge.svg)](https://github.com/vjsingh1984/victor/actions/workflows/ci-fast.yml)
-[![Tests](https://github.com/vjsingh1984/victor/actions/workflows/ci-test.yml/badge.svg)](https://github.com/vjsingh1984/victor/actions/workflows/ci-test.yml)
+[![Fast Checks](https://github.com/anvai-labs/victor/actions/workflows/ci-fast.yml/badge.svg)](https://github.com/anvai-labs/victor/actions/workflows/ci-fast.yml)
+[![Tests](https://github.com/anvai-labs/victor/actions/workflows/ci-test.yml/badge.svg)](https://github.com/anvai-labs/victor/actions/workflows/ci-test.yml)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Docker](https://img.shields.io/badge/docker-ghcr.io-blue.svg)](https://ghcr.io/vjsingh1984/victor)
 
@@ -15,7 +15,7 @@
 
 ---
 
-Victor gives you a typed Python framework, a service-first agent runtime, and an contract-first plugin ecosystem for building agents that can reason, call tools, run workflows, coordinate teams, and operate against project-local code intelligence.
+Victor gives you a typed Python framework, a service-first agent runtime, and a contract-first plugin ecosystem for building agents that can reason, call tools, run workflows, coordinate teams, and operate against project-local code intelligence.
 
 It is designed for teams that need agent systems to be testable, extensible, observable, and portable across Anthropic, OpenAI-compatible providers, Gemini, Bedrock, local models, and air-gapped environments.
 
@@ -27,7 +27,7 @@ It is designed for teams that need agent systems to be testable, extensible, obs
 | **StateGraph workflows** | Build typed graph workflows and use teams as graph nodes without inventing a separate multi-agent graph abstraction. |
 | **Local and cloud models** | Use cloud providers for capability, local providers for privacy/cost, and provider-specific caching strategies for performance. |
 | **Tool-rich execution** | Compose filesystem, git, shell, code search, graph, verification, Docker, web, testing, and refactoring tools. |
-| **contract-first plugins** | Put domain behavior in sibling `victor-*` packages through `victor-contracts` and public framework extension contracts. |
+| **Contract-first plugins** | Put domain behavior in sibling `victor-*` packages through `victor-contracts` and public framework extension contracts. |
 | **Project code intelligence** | Keep graph indexes, semantic search, conversations, and project memory in project-local state. |
 
 ## Quick Start
@@ -41,7 +41,7 @@ It is designed for teams that need agent systems to be testable, extensible, obs
 
 ## Give Your Agent Durable Memory
 
-Victor pairs with [ProximaDB](https://github.com/vjsingh1984/proximaDB) — a multi-model
+Victor pairs with [ProximaDB](https://github.com/anvai-labs/proximaDB) — a multi-model
 (vector + graph + document) context database by the same author — as its durable memory
 layer. Index any repository with the shared [`victor-codegraph`](victor-codegraph/)
 chunker and get semantic recall ("where do we validate JWTs?") plus call-graph queries
@@ -111,7 +111,7 @@ Victor 0.7 makes the framework/plugin split explicit:
 
 Detailed references:
 
-- [Architecture overview](ARCHITECTURE.md)
+- [Architecture overview](docs/architecture.md)
 - [Internal architecture diagram](docs/diagrams/architecture/victor_0_7_architecture.mmd)
 - [contracts boundary](docs/architecture/CONTRACTS_BOUNDARY.md)
 - [State-passed architecture](docs/architecture/state-passed-architecture.md)
@@ -183,14 +183,13 @@ cd rust && cargo test
 - [Durable Code Memory with ProximaDB](docs/quickstart-proximadb-memory.md)
 - [Guides](docs/guides/)
 - [Reference](docs/reference/)
-- [Operations](docs/operations/)
 - [Development](docs/development/)
-- [Architecture](ARCHITECTURE.md)
-- [Roadmap](roadmap.md)
+- [Architecture](docs/architecture.md)
+- [Roadmap](docs/roadmap.md)
 
 ## Contributing
 
-Start with [CONTRIBUTING.md](CONTRIBUTING.md), [AGENTS.md](AGENTS.md), and the architecture constraints in [CLAUDE.md](CLAUDE.md) or [GEMINI.md](GEMINI.md). Keep changes scoped, prefer public framework/SDK contracts over internal imports, and update docs/tests when public behavior changes.
+Start with [CONTRIBUTING.md](CONTRIBUTING.md) and the [architecture overview](docs/architecture.md); see the [development docs](docs/development/) for setup, code style, and the PR workflow. Keep changes scoped, prefer public framework/SDK contracts over internal imports, and update docs/tests when public behavior changes.
 
 ## License
 

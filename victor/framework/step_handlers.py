@@ -1227,6 +1227,12 @@ class FrameworkStepHandler(BaseStepHandler):
         )
         # Phase 1: Gap fix - Wire capability provider to framework
         self.apply_capability_provider(orchestrator, vertical, context, result)
+        # FEP-0019: Wire a vertical's LSP capability (get_lsp) to the orchestrator
+        # so the diagnostic middleware + symbol context provider activate.
+        self.apply_lsp(orchestrator, vertical, context, result)
+        # Load the vertical's declared skills (get_skills) into the shared registry
+        # so SkillMatcher can auto-select them at runtime.
+        self.apply_skills(orchestrator, vertical, context, result)
         # Phase 1: Gap fix - Register tool graphs with global registry
         self.apply_tool_graphs(
             orchestrator,
@@ -1727,6 +1733,94 @@ class FrameworkStepHandler(BaseStepHandler):
         except Exception as e:
             result.add_warning(f"Could not wire capability provider: {e}")
             logger.debug(f"Capability provider error: {e}", exc_info=True)
+
+    def apply_lsp(
+        self,
+        orchestrator: Any,
+        vertical: Type["VerticalBase"],
+        context: "MutableVerticalContextProtocol",
+        result: "IntegrationResult",
+    ) -> None:
+        """Wire a vertical's LSP capability to the orchestrator (FEP-0019).
+
+        ``VerticalBase.get_lsp()`` lets a vertical declare a live LSP
+        implementation (servers live in victor-coding). Before this, the hook
+        existed but nothing read it, so the LSP capability never reached the
+        orchestrator and the whole FEP-0019 chain (diagnostic middleware +
+        symbol context provider) stayed dormant. Routing it through
+        ``orchestrator.set_lsp()`` auto-registers the middleware and binds the
+        capability for the context provider.
+
+        Args:
+            orchestrator: Orchestrator instance (needs ``set_lsp``).
+            vertical: Vertical class with an optional ``get_lsp`` hook.
+            context: Vertical context.
+            result: Result to update.
+        """
+        get_lsp = getattr(vertical, "get_lsp", None)
+        try:
+            lsp = get_lsp() if callable(get_lsp) else None
+        except Exception as e:
+            logger.debug(f"get_lsp failed for vertical={vertical.name}: {e}", exc_info=True)
+            return
+        if lsp is None:
+            return
+
+        # Capability-first, ``set_lsp`` fallback — mirrors ``apply_middleware``.
+        # The "lsp" capability name maps to ``set_lsp`` via CAPABILITY_METHOD_MAPPINGS.
+        if _check_capability(orchestrator, "lsp"):
+            _invoke_capability(orchestrator, "lsp", lsp)
+        elif hasattr(orchestrator, "set_lsp"):
+            orchestrator.set_lsp(lsp)
+        else:
+            result.add_warning("Cannot wire LSP: orchestrator lacks set_lsp()")
+            return
+
+        result.add_info("Wired LSP capability from vertical")
+        logger.debug(f"Applied LSP capability from vertical={vertical.name}")
+
+    def apply_skills(
+        self,
+        orchestrator: Any,
+        vertical: Type["VerticalBase"],
+        context: "MutableVerticalContextProtocol",
+        result: "IntegrationResult",
+    ) -> None:
+        """Load a vertical's declared skills into the shared SkillRegistry.
+
+        ``VerticalBase.get_skills()`` lets a vertical declare reusable skills.
+        Before this, only the deprecated FrameworkShim populated the registry, so
+        the modern ``AgentFactory`` → ``SkillMatcher`` path had an empty catalog
+        and auto-skill-selection silently did nothing. Routing the vertical's
+        skills through the shared ``get_skill_registry()`` singleton makes them
+        available to the matcher at runtime.
+
+        No-op when the vertical declares no skills (``from_vertical`` registers
+        nothing). ``SkillRegistry.register`` dedups by name, so re-integration
+        is safe.
+
+        Args:
+            orchestrator: Orchestrator instance (unused; kept for handler signature).
+            vertical: Vertical class with an optional ``get_skills`` hook.
+            context: Vertical context.
+            result: Result to update.
+        """
+        from victor.framework.skills import get_skill_registry
+
+        registry = get_skill_registry()
+        before = len(registry.list_all())
+        try:
+            registry.from_vertical(vertical)
+        except Exception as e:
+            logger.debug(
+                f"from_vertical skills failed for vertical={vertical.name}: {e}",
+                exc_info=True,
+            )
+            return
+        added = len(registry.list_all()) - before
+        if added:
+            result.add_info(f"Loaded {added} skill(s) from vertical")
+            logger.debug(f"Applied {added} skill(s) from vertical={vertical.name}")
 
     def apply_tool_graphs(
         self,

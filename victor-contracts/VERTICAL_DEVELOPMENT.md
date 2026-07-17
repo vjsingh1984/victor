@@ -744,7 +744,7 @@ pytest tests/ --cov=my_vertical --cov-report=html
 - **Migration Guide**: See `MIGRATION_GUIDE.md`
 - **Examples**: Check `victor-contracts/examples/`
 - **Repository external package example**: See `../examples/external_vertical/README.md`
-- **Issues**: https://github.com/vjsingh1984/victor/issues
+- **Issues**: https://github.com/anvai-labs/victor/issues
 
 ---
 

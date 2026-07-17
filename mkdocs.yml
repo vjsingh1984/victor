@@ -2,8 +2,8 @@
 site_name: Victor
 site_description: Contract-first agentic AI framework supporting 24 LLM providers with 34 tool modules across 9 verticals (5 domain + 4 utility)
 site_author: Vijaykumar Singh
-site_url: https://vjsingh1984.github.io/victor/
-repo_url: https://github.com/vjsingh1984/victor
+site_url: https://anvai-labs.github.io/victor/
+repo_url: https://github.com/anvai-labs/victor
 copyright: Copyright &copy; 2025 Vijaykumar Singh
 
 theme:
@@ -125,7 +125,7 @@ extra_javascript:
 extra:
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/vjsingh1984/victor
+      link: https://github.com/anvai-labs/victor
       name: Victor on GitHub
     - icon: fontawesome/brands/python
       link: https://pypi.org/project/victor-ai/

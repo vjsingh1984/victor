@@ -10,7 +10,7 @@ authors:
     email: singhvjd@gmail.com
     github: vjsingh1984
 reviewers: []
-discussion: https://github.com/vjsingh1984/victor/discussions/1
+discussion: https://github.com/anvai-labs/victor/discussions/1
 ---
 
 # FEP-0001: Framework Enhancement Proposal Process
@@ -419,7 +419,7 @@ FEPs only affect framework-level changes. Vertical-specific changes do not requi
 - [Rust RFC Process](https://rust-lang.github.io/rfcs/0002-rfc-process.html)
 - [Angular Improvement Proposals](https://github.com/angular/angular/tree/main/aio)
 - [Kubernetes Enhancement Proposals](https://www.kubernetes.dev/resources/rfc/)
-- [Related: Victor Roadmap](../roadmap.md)
+- [Related: Victor Roadmap](../docs/roadmap.md)
 - [Related: CLAUDE.md](../CLAUDE.md)
 
 ## Copyright

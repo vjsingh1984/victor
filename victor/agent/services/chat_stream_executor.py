@@ -1589,6 +1589,8 @@ class StreamingChatExecutor:
             streaming_act_port=adapter,
             config={"completion_strategy": _strategy},
             rubric_complete_fn=_rubric_fn,
+            verifier=getattr(_te, "_verifier", None),
+            max_verify_retries=getattr(_te, "_max_verify_retries", 0),
         )
 
         conversation_history = self._get_conversation_history(runtime_owner, orch, user_message)

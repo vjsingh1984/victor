@@ -9,8 +9,8 @@ tags = ["security", "audit", "compliance", "vulnerability"]
 requires_victor = ">=0.6.0"
 license = "Apache-2.0"
 authors = [{name = "Victor Community", email = "community@victor.dev"}]
-homepage = "https://github.com/vjsingh1984/victor"
-repository = "https://github.com/vjsingh1984/victor"
+homepage = "https://github.com/anvai-labs/victor"
+repository = "https://github.com/anvai-labs/victor"
 
 [vertical.class]
 module = "victor_security.assistant"

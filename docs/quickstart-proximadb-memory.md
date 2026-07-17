@@ -1,7 +1,7 @@
 # Quickstart: Durable Code Memory with ProximaDB
 
 Give an agent a memory of your codebase that survives the session: index a repository
-into [ProximaDB](https://github.com/vjsingh1984/proximaDB) (a multi-model vector + graph +
+into [ProximaDB](https://github.com/anvai-labs/proximaDB) (a multi-model vector + graph +
 document database, by the same author as Victor) and query it two ways —
 
 - **Semantic recall** — "where do we validate JWT bearer tokens?"

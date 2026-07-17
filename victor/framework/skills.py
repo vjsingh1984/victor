@@ -20,6 +20,32 @@ logger = logging.getLogger(__name__)
 SKILLS_ENTRY_POINT_GROUP = "victor.skills"
 USER_SKILLS_DIR = os.path.join(Path.home(), ".victor", "skills")
 
+# Module-level singleton so the integration pipeline (FrameworkStepHandler.apply_skills)
+# and the runtime consumer (AgentFactory._initialize_skill_matcher) share one registry.
+# Mirrors the get_handler_registry() / team_registry singleton pattern.
+_skill_registry_instance: Optional["SkillRegistry"] = None
+
+
+def get_skill_registry() -> "SkillRegistry":
+    """Return the shared ``SkillRegistry`` singleton (created lazily).
+
+    Population is explicit: ``FrameworkStepHandler.apply_skills`` loads a
+    vertical's skills (``from_vertical``) during integration, and
+    ``AgentFactory._initialize_skill_matcher`` loads entry-point + user skills
+    once. This bridges the step-handler pipeline to the runtime ``SkillMatcher``,
+    which previously received an unpopulated orchestrator.
+    """
+    global _skill_registry_instance
+    if _skill_registry_instance is None:
+        _skill_registry_instance = SkillRegistry()
+    return _skill_registry_instance
+
+
+def reset_skill_registry() -> None:
+    """Clear the shared registry singleton (for test isolation)."""
+    global _skill_registry_instance
+    _skill_registry_instance = None
+
 
 class SkillRegistry:
     """Registry for skill definitions.

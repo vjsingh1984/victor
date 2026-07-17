@@ -66,7 +66,7 @@ git commit -m "feat: add your feature"
 git push origin feature/your-feature-name
 
 # 6. Create pull request
-# Visit https://github.com/vjsingh1984/victor/pulls
+# Visit https://github.com/anvai-labs/victor/pulls
 ```
 
 **IMPORTANT**: Victor uses a strict PR-based workflow with CI/CD validation. All changes must go through pull requests, and all status checks must pass before merging to main.
@@ -84,7 +84,7 @@ Victor accepts several types of contributions. Choose the one that best matches 
 Found a bug? We'd love to know about it!
 
 **Before creating a bug report:**
-- Check [existing issues](https://github.com/vjsingh1984/victor/issues) to avoid duplicates
+- Check [existing issues](https://github.com/anvai-labs/victor/issues) to avoid duplicates
 - Verify it's not already fixed in the latest version
 - Prepare a minimal reproduction case
 
@@ -102,7 +102,7 @@ Found a bug? We'd love to know about it!
 Have an idea for improving Victor?
 
 **Before requesting a feature:**
-- Discuss in [GitHub Discussions](https://github.com/vjsingh1984/victor/discussions) first
+- Discuss in [GitHub Discussions](https://github.com/anvai-labs/victor/discussions) first
 - Check if it fits Victor's scope and roadmap
 - Consider if it should be a framework change (needs FEP) or vertical-specific
 
@@ -145,7 +145,7 @@ You do NOT need a FEP for:
 1. **Pre-Discussion**
    ```bash
    # Start with a discussion
-   # Visit: https://github.com/vjsingh1984/victor/discussions
+   # Visit: https://github.com/anvai-labs/victor/discussions
    ```
    - Discuss your idea informally
    - Check for existing FEPs addressing similar issues
@@ -861,7 +861,7 @@ git push origin feature/your-feature-name
 # Create PR via GitHub CLI
 gh pr create --title "feat: add your feature" --body "Description..."
 
-# Or visit: https://github.com/vjsingh1984/victor/pulls
+# Or visit: https://github.com/anvai-labs/victor/pulls
 ```
 
 ### PR Template
@@ -961,8 +961,8 @@ All PRs must pass:
 
 ### Getting Help
 
-- **Bugs/Features**: [GitHub Issues](https://github.com/vjsingh1984/victor/issues)
-- **Questions**: [GitHub Discussions](https://github.com/vjsingh1984/victor/discussions)
+- **Bugs/Features**: [GitHub Issues](https://github.com/anvai-labs/victor/issues)
+- **Questions**: [GitHub Discussions](https://github.com/anvai-labs/victor/discussions)
 - **FEP Process**: [feps/README.md](feps/README.md)
 - **Vertical Contributions**: See [Vertical Contributions](#vertical-contributions) above
 

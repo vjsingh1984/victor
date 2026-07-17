@@ -6,6 +6,7 @@
 """Tests for GEPA-inspired prompt optimizer."""
 
 import json
+import random
 import sqlite3
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -14,7 +15,7 @@ import pytest
 
 from victor.config.prompt_optimization_settings import PromptOptimizationSettings
 from victor.core.container import ServiceContainer, reset_container, set_container
-from victor.framework.rl.base import RLOutcome
+from victor.framework.rl.base import RLOutcome, RLRecommendation
 from victor.framework.rl.credit_tracking_service import CreditTrackingService
 from victor.framework.rl.experiment_coordinator import (
     ExperimentCoordinator,
@@ -27,6 +28,7 @@ from victor.framework.rl.learners.prompt_optimizer import (
     GEPAStrategy,
     PromptCandidate,
     PromptOptimizerLearner,
+    should_serve_candidate,
 )
 
 
@@ -1125,6 +1127,98 @@ class TestPromptOptimizerLearner:
         assert "Verify file paths with ls()" in candidate.text
         enrich_mock.assert_called_once()
 
+    def test_evolve_stores_rewrite_with_unsupported_additions(self, db):
+        """Regression: a rewrite carrying unsupported_additions but no
+        structural violations must be stored.
+
+        Previously the persist gate rejected on ``report.accepted`` (i.e. any
+        violation), and ``_find_unsupported_additions`` does exact-line
+        matching against the seed — so every genuine rewrite (any rephrased or
+        appended line) was rejected. After the fix the persist gate enforces
+        only structural violations, mirroring gepa_service.mutate().
+        """
+        settings = SimpleNamespace(
+            prompt_optimization=PromptOptimizationSettings(
+                enabled=True,
+                default_strategies=[],
+                section_strategies={"GROUNDING_RULES": ["gepa"]},
+            )
+        )
+        traces = [
+            ExecutionTrace(
+                session_id=f"s{i}",
+                task_type="action",
+                provider="zai",
+                model="glm-5.2",
+                tool_calls=3,
+                tool_failures={},
+                success=True,
+                completion_score=0.8,
+                tokens_used=500,
+            )
+            for i in range(5)
+        ]
+        seed = "Base responses on tool output only."
+        # New guidance line is NOT in the seed ⇒ unsupported_additions under
+        # the old policy; small growth, no repeated trigrams.
+        rewrite = seed + "\n- Always verify file paths with ls() before reading."
+
+        with patch("victor.config.settings.get_settings", return_value=settings):
+            learner = PromptOptimizerLearner(name="test", db_connection=db)
+
+        with patch.object(learner, "_collect_learning_traces", return_value=traces):
+            with patch.object(learner, "_enrich_traces_with_credit"):
+                with patch.object(learner, "_apply_section_strategies", return_value=rewrite):
+                    candidate = learner.evolve("GROUNDING_RULES", seed, provider="zai")
+
+        assert candidate is not None
+        assert candidate.text == rewrite
+        # Persisted via the real persist path, not just the in-memory dict.
+        row = db.execute(
+            "SELECT text FROM agent_prompt_candidate WHERE section_name = ?",
+            ("GROUNDING_RULES",),
+        ).fetchone()
+        assert row is not None
+        assert row[0] == rewrite
+
+    def test_evolve_rejects_structural_violation_at_persist_gate(self, db):
+        """A rewrite with repeated trigrams is still rejected at the persist
+        gate — structural safety is preserved after the gate fix."""
+        settings = SimpleNamespace(
+            prompt_optimization=PromptOptimizationSettings(
+                enabled=True,
+                default_strategies=[],
+                section_strategies={"GROUNDING_RULES": ["gepa"]},
+            )
+        )
+        traces = [
+            ExecutionTrace(
+                session_id=f"s{i}",
+                task_type="action",
+                provider="zai",
+                model="glm-5.2",
+                tool_calls=3,
+                tool_failures={},
+                success=True,
+                completion_score=0.8,
+                tokens_used=500,
+            )
+            for i in range(5)
+        ]
+        seed = "Base responses on tool output only."
+        # Repeated trigram phrase ⇒ repeated_trigrams (a structural violation).
+        rewrite = seed + "\nrepeat this phrase repeat this phrase repeat this phrase"
+
+        with patch("victor.config.settings.get_settings", return_value=settings):
+            learner = PromptOptimizerLearner(name="test", db_connection=db)
+
+        with patch.object(learner, "_collect_learning_traces", return_value=traces):
+            with patch.object(learner, "_enrich_traces_with_credit"):
+                with patch.object(learner, "_apply_section_strategies", return_value=rewrite):
+                    candidate = learner.evolve("GROUNDING_RULES", seed, provider="zai")
+
+        assert candidate is None
+
     def test_evolve_falls_back_to_pareto_merge_when_mutation_noops(self, db):
         learner = PromptOptimizerLearner(name="test", db_connection=db, use_pareto=True)
         key = learner._candidate_key("TEST", "ollama")
@@ -1527,3 +1621,141 @@ class TestPromptOptimizerLearner:
         )
 
         assert reflection == ""
+
+
+class TestPromptRewardLoop:
+    """Closing the prompt-optimization reward loop (FEP-0017)."""
+
+    def test_should_serve_proven_candidate(self):
+        rec = RLRecommendation(
+            value="x", confidence=0.9, reason="r", sample_size=5, is_baseline=False
+        )
+        assert should_serve_candidate(rec, exploration_enabled=True, exploration_epsilon=0.1)
+
+    def test_should_serve_benchmark_approved_even_unproven(self):
+        # sample_count=0 → is_baseline; suite-validated must still be served.
+        rec = RLRecommendation(
+            value="x",
+            confidence=0.0,
+            reason="r",
+            sample_size=0,
+            is_baseline=True,
+            metadata={"benchmark_passed": True},
+        )
+        assert should_serve_candidate(rec, exploration_enabled=False, exploration_epsilon=0.0)
+
+    def test_should_explore_fresh_candidate_when_enabled(self):
+        rec = RLRecommendation(
+            value="x", confidence=0.0, reason="r", sample_size=0, is_baseline=True
+        )
+        rng = random.Random(0)
+        # epsilon=1.0 → always explore
+        assert should_serve_candidate(
+            rec, exploration_enabled=True, exploration_epsilon=1.0, rng=rng
+        )
+
+    def test_should_not_serve_when_explore_off_and_unproven(self):
+        rec = RLRecommendation(
+            value="x", confidence=0.0, reason="r", sample_size=0, is_baseline=True
+        )
+        assert not should_serve_candidate(rec, exploration_enabled=False, exploration_epsilon=0.0)
+
+    def test_should_not_serve_none_rec(self):
+        assert not should_serve_candidate(None, exploration_enabled=True, exploration_epsilon=1.0)
+
+    def test_record_outcome_rewards_fresh_candidate_via_served_hash(self, db):
+        """A sample_count=0 / is_active=False candidate earns its first reward
+        when the outcome carries the served candidate hash (chicken-and-egg fix).
+        """
+        learner = PromptOptimizerLearner(name="test", db_connection=db)
+        candidate = PromptCandidate(
+            section_name="GROUNDING_RULES",
+            text="t",
+            text_hash="h1",
+            generation=1,
+            parent_hash="p",
+            provider="zai",
+        )  # sample_count=0, is_active=False, alpha=beta=1.0
+        key = learner._candidate_key("GROUNDING_RULES", "zai")
+        learner._candidates[key] = [candidate]
+        learner._save_candidate(candidate)
+
+        outcome = RLOutcome(
+            provider="zai",
+            model="glm-5.2",
+            task_type="action",
+            success=True,
+            quality_score=0.9,
+            metadata={
+                "prompt_section": "GROUNDING_RULES",
+                "prompt_candidate_hash": "h1",
+            },
+        )
+        learner.record_outcome(outcome)
+
+        assert candidate.sample_count == 1
+        assert candidate.alpha == 2.0  # success → alpha++
+        assert candidate.scores["completion_score"] > 0.0
+
+    def test_record_outcome_falls_back_to_last_served_ledger(self, db):
+        """Without a hash on the outcome, record_outcome uses the last-served
+        ledger set by record_served()."""
+        learner = PromptOptimizerLearner(name="test", db_connection=db)
+        candidate = PromptCandidate(
+            section_name="GROUNDING_RULES",
+            text="t",
+            text_hash="h1",
+            generation=1,
+            parent_hash="p",
+            provider="zai",
+        )
+        key = learner._candidate_key("GROUNDING_RULES", "zai")
+        learner._candidates[key] = [candidate]
+        learner._save_candidate(candidate)
+        learner.record_served("GROUNDING_RULES", "zai", "h1")
+
+        outcome = RLOutcome(
+            provider="zai",
+            model="glm-5.2",
+            task_type="action",
+            success=False,
+            quality_score=0.2,
+            metadata={"prompt_section": "GROUNDING_RULES"},  # no hash
+        )
+        learner.record_outcome(outcome)
+
+        assert candidate.sample_count == 1
+        assert candidate.beta_val == 2.0  # failure → beta++
+
+    def test_record_outcome_no_reward_for_unserved_fresh_candidate(self, db):
+        """The legacy chicken-and-egg: a fresh candidate with no served hash and
+        no active/sampled sibling cannot be rewarded."""
+        learner = PromptOptimizerLearner(name="test", db_connection=db)
+        candidate = PromptCandidate(
+            section_name="GROUNDING_RULES",
+            text="t",
+            text_hash="h1",
+            generation=1,
+            parent_hash="p",
+            provider="zai",
+        )
+        key = learner._candidate_key("GROUNDING_RULES", "zai")
+        learner._candidates[key] = [candidate]
+
+        outcome = RLOutcome(
+            provider="zai",
+            model="glm-5.2",
+            task_type="action",
+            success=True,
+            quality_score=0.9,
+            metadata={"prompt_section": "GROUNDING_RULES"},
+        )
+        learner.record_outcome(outcome)
+
+        assert candidate.sample_count == 0  # no attribution signal
+
+    def test_prompt_candidate_used_routes_to_prompt_optimizer(self):
+        """EVENT_TO_LEARNER wires PROMPT_CANDIDATE_USED to prompt_optimizer."""
+        from victor.framework.rl.hooks import EVENT_TO_LEARNER, RLEventType
+
+        assert EVENT_TO_LEARNER[RLEventType.PROMPT_CANDIDATE_USED] == ["prompt_optimizer"]

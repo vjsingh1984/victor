@@ -10,7 +10,7 @@ authors:
     email: singhvjd@gmail.com
     github: vjsingh1984
 reviewers: []
-discussion: https://github.com/vjsingh1984/victor/discussions/0016
+discussion: https://github.com/anvai-labs/victor/discussions/0016
 ---
 
 # FEP-0016: Wire the initialization phase manager

@@ -1,0 +1,31 @@
+%% Tools system — authoring, registry, presets, execution pipeline.
+flowchart TB
+  classDef author fill:#eff6ff,stroke:#1d4ed8,color:#0f172a
+  classDef reg fill:#ecfeff,stroke:#0891b2,color:#0f172a
+  classDef pipe fill:#fffbeb,stroke:#d97706,color:#451a03
+
+  subgraph AU["Author a tool"]
+    T1["@tool decorator\n+ JSON-schema params"]:::author
+    T2["BaseTool subclass\nfull control"]:::author
+    T3["MCPAdapterTool\n/ LangChainAdapterTool"]:::author
+  end
+
+  subgraph RG["Registry"]
+    R1["ToolMetadataRegistry\nkeywords - cost - danger - stages"]:::reg
+    R2["ToolCategory\n16 categories"]:::reg
+    R3["Presets\nminimal - default - coding\nresearch - full - airgapped"]:::reg
+  end
+
+  subgraph EX["ToolPipeline (per call)"]
+    P1["1. access policy + safety"]:::pipe
+    P2["2. cache (idempotent + cross-turn)"]:::pipe
+    P3["3. parallel batch (safe tools)"]:::pipe
+    P4["4. retry + timeout"]:::pipe
+    P5["5. execute -> ToolResult"]:::pipe
+  end
+
+  AU --> R1
+  R1 --> R2 --> R3
+  R3 -->|"LLM selects"| EX
+  P1 --> P2 --> P3 --> P4 --> P5
+  P5 -->|"TOOL_RESULT event"| OUT["Observability + traces\n(feed prompt optimization)"]:::reg

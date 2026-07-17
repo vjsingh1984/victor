@@ -109,6 +109,16 @@ class PromptOptimizationSettings(BaseModel):
     # Missing key = use default_strategies.
     section_strategies: Dict[str, List[str]] = Field(default_factory=dict)
 
+    # Reward-loop bootstrap: a freshly-evolved candidate starts at sample_count=0,
+    # so the live-confidence serve gate (confidence>0.6 and not is_baseline) would
+    # never serve it and it could never earn a reward. exploration_enabled lets a
+    # structurally-valid fresh (or benchmark-approved) candidate be served with
+    # probability exploration_epsilon when no proven candidate exists, so the
+    # Thompson posterior can start accumulating evidence. Bounded by the persist
+    # structural gate (growth_exceeded/repeated_trigrams).
+    exploration_enabled: bool = True
+    exploration_epsilon: float = 0.1
+
     # Strategy-specific configurations (nested)
     gepa: GEPASettings = Field(default_factory=GEPASettings)
     miprov2: MIPROv2Settings = Field(default_factory=MIPROv2Settings)

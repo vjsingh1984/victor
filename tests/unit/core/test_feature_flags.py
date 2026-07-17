@@ -68,9 +68,7 @@ class TestFeatureFlagEnum:
         config = FeatureFlagConfig(default_enabled=True)
         manager = FeatureFlagManager(config)
 
-        assert not manager.is_enabled(FeatureFlag.USE_AGENTIC_BENCH_GATES)
         assert not manager.is_enabled(FeatureFlag.USE_CALIBRATED_COMPLETION)
-        assert not manager.is_enabled(FeatureFlag.USE_AGENTIC_RETRIEVAL_REPAIR)
         assert not manager.is_enabled(FeatureFlag.USE_PROMPT_DICTIONARY_COMPRESSION)
 
 
@@ -153,8 +151,8 @@ class TestFeatureFlagManager:
         enabled = manager.get_enabled_flags()
         assert enabled[FeatureFlag.USE_SEMANTIC_RESPONSE_CACHE] is True
         assert enabled[FeatureFlag.USE_SMART_ROUTING] is True
-        # Opt-in flags are disabled by default
-        assert enabled[FeatureFlag.USE_FUZZY_MATCHING] is False
+        # Non-opt-in flags fall back to default_enabled (False here)
+        assert enabled[FeatureFlag.USE_LEARNING_FROM_EXECUTION] is False
 
     def test_set_convenience_method(self):
         """Test the set() convenience method."""
@@ -234,7 +232,7 @@ class TestYamlConfiguration:
             assert manager.is_enabled(FeatureFlag.USE_SEMANTIC_RESPONSE_CACHE)
             assert not manager.is_enabled(FeatureFlag.USE_SMART_ROUTING)
             # Flags not in YAML fall back to default_enabled (False)
-            assert manager.is_enabled(FeatureFlag.USE_FUZZY_MATCHING)
+            assert manager.is_enabled(FeatureFlag.USE_LEARNING_FROM_EXECUTION)
         finally:
             config_path.unlink()
 
@@ -375,7 +373,7 @@ class TestFeatureConfigModule:
         # Should return all expected flags
         assert "use_semantic_response_cache" in flags
         assert "use_smart_routing" in flags
-        assert "use_fuzzy_matching" in flags
+        assert "use_learning_from_execution" in flags
 
     def test_load_from_yaml_config(self):
         """Test loading from YAML configuration file."""
@@ -407,7 +405,7 @@ class TestFeatureConfigModule:
             flags = {
                 "use_semantic_response_cache": True,
                 "use_smart_routing": False,
-                "use_fuzzy_matching": True,
+                "use_learning_from_execution": True,
             }
 
             save_feature_flags_to_yaml(flags, config_path)
@@ -421,7 +419,7 @@ class TestFeatureConfigModule:
 
             assert data["features"]["use_semantic_response_cache"] is True
             assert data["features"]["use_smart_routing"] is False
-            assert data["features"]["use_fuzzy_matching"] is True
+            assert data["features"]["use_learning_from_execution"] is True
 
     def test_validate_valid_flags(self):
         """Test validation of valid flags."""

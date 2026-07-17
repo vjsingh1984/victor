@@ -1,9 +1,17 @@
+%% Provider switching preserves conversation context across LLM backends.
 sequenceDiagram
-    participant User
-    participant Orchestrator
-    participant ConversationController
-    participant ProviderA as Provider A<br/>(Anthropic)
-    participant ProviderB as Provider B<br/>(OpenAI)
+    autonumber
+    box rgb(239,246,255) User
+        participant User
+    end
+    box rgb(240,253,244) Runtime
+        participant Orchestrator
+        participant ConversationController
+    end
+    box rgb(255,251,235) Providers
+        participant ProviderA as Provider A<br/>(Anthropic)
+        participant ProviderB as Provider B<br/>(OpenAI)
+    end
 
     %% Initial Context
     User->>Orchestrator: Start conversation with Provider A

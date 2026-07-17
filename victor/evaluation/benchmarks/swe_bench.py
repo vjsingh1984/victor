@@ -24,7 +24,10 @@ to avoid code duplication. This module focuses on task execution.
 import asyncio
 import logging
 from pathlib import Path
-from typing import NamedTuple, Optional
+from typing import TYPE_CHECKING, NamedTuple, Optional
+
+if TYPE_CHECKING:
+    from victor.evaluation.container_eval import EvalContainer
 
 from victor.evaluation.harness import BaseBenchmarkRunner, TaskEnvironment
 from victor.evaluation.protocol import (
@@ -508,14 +511,16 @@ class SWEBenchRunner(BaseBenchmarkRunner):
         patch: str,
         cached_repo: Path,
         config: EvaluationConfig,
+        container: Optional["EvalContainer"] = None,
     ) -> "_ContainerVerifyResult":
-        """Apply ``patch`` to ``/testbed`` in a fresh official SWE-bench
-        container and run the FAIL_TO_PASS tests.
+        """Apply ``patch`` to ``/testbed`` in an official SWE-bench container
+        and run the FAIL_TO_PASS tests.
 
-        Full container lifecycle per call (start → exec×N → stop) so it is
-        stateless and reusable — by the post-loop eval (via
-        :meth:`_run_tests_in_container`) AND by the closed-loop verify-and-retry
-        gate mid-loop. Raises
+        By default runs a full container lifecycle (start → exec×N → stop) so it
+        is stateless. Pass a pre-started ``container`` to reuse a persistent
+        per-task container across verify-and-retry calls (and the final eval):
+        the caller owns start/stop; this method only resets /testbed, applies the
+        patch, runs tests, and returns WITHOUT stopping it. Raises
         :class:`victor.evaluation.container_eval.DockerUnavailable` (propagated
         to the caller for host fallback) if Docker or the image can't be used.
         """
@@ -532,7 +537,9 @@ class SWEBenchRunner(BaseBenchmarkRunner):
 
         # One-shot: sweep orphaned eval containers from prior crashed runs
         # (process death before stop() → containers accumulate → Docker strain).
-        if not getattr(SWEBenchRunner, "_stale_containers_cleaned", False):
+        # Skip when a persistent container is supplied — it's already running and
+        # would match the cleanup pattern (victor-eval-*) → "No such container".
+        if container is None and not getattr(SWEBenchRunner, "_stale_containers_cleaned", False):
             SWEBenchRunner._stale_containers_cleaned = True
             await cleanup_stale_eval_containers()
 
@@ -541,7 +548,9 @@ class SWEBenchRunner(BaseBenchmarkRunner):
             if getattr(task, "repo", None)
             else resolve_runtime(task, config).base_image
         )
-        container = EvalContainer(image=image, workspace_host_path=str(cached_repo))
+        _owns_container = container is None
+        if _owns_container:
+            container = EvalContainer(image=image, workspace_host_path=str(cached_repo))
         ws = EVAL_WORKSPACE_MOUNT  # "/workspace" — cached_repo mount (patch files)
         # The official image ships the repo EDITABLE-INSTALLED at /testbed (its
         # PWD): apply patches there and run tests — NO mount-and-reinstall.
@@ -550,7 +559,8 @@ class SWEBenchRunner(BaseBenchmarkRunner):
         raw = ""
         status = "error"
         try:
-            await container.start()  # raises DockerUnavailable if unusable
+            if _owns_container:
+                await container.start()  # raises DockerUnavailable if unusable
 
             # Write the agent + test patches into the mounted cached_repo (host
             # side) so the container can read them from /workspace.
@@ -643,10 +653,13 @@ class SWEBenchRunner(BaseBenchmarkRunner):
                         raw[-1500:],
                     )
         finally:
-            # Clean up patch files on the host mount; tear down the container.
+            # Clean up patch files on the host mount; tear down the container
+            # (only if we created it — a caller-supplied persistent container
+            # is left running for reuse by the next verify call / final eval).
             for f in (".agent_patch.diff", ".test_patch.diff"):
                 (cached_repo / f).unlink(missing_ok=True)
-            await container.stop()
+            if _owns_container:
+                await container.stop()
 
         return _ContainerVerifyResult(
             passed=passed,
@@ -1093,3 +1106,51 @@ class MBPPRunner(BaseBenchmarkRunner):
             await env.cleanup()
 
         return result
+
+
+class ContainerTestVerifier:
+    """Verifier (FEP-0018) that runs FAIL_TO_PASS tests in an official SWE-bench container.
+
+    Wraps ``_verify_patch_in_container`` as a framework-level ``Verifier`` so the
+    agentic loop's DECIDE gate can verify the agent's work — not just the
+    adapter's eval-specific gate. Uses ``workspace_git_diff`` (ground truth) to
+    snapshot the agent's edits.
+    """
+
+    def __init__(self, task, cached_repo, config, container=None):
+        self._task = task
+        self._cached_repo = Path(cached_repo)
+        self._config = config
+        self._container = container
+        self._runner = SWEBenchRunner()
+
+    async def verify(self, *, workspace=None, state=None):
+        """Run the FAIL_TO_PASS tests in-container. Returns VerificationResult."""
+        from victor.framework.verification import VerificationResult
+        from victor.framework.workspace import workspace_git_diff
+
+        repo = workspace or self._cached_repo
+        patch = await workspace_git_diff(repo)
+        if not patch.strip():
+            return VerificationResult(0, 0, "", "no edits to verify")
+        try:
+            vr = await self._runner._verify_patch_in_container(
+                self._task,
+                patch,
+                self._cached_repo,
+                self._config,
+                container=self._container,
+            )
+            return VerificationResult(
+                passed=vr.passed,
+                total=vr.total,
+                raw_output=vr.raw_output,
+                feedback=f"Verification: {vr.passed}/{vr.total} tests passed.",
+            )
+        except Exception as exc:
+            return VerificationResult(
+                passed=-1,
+                total=-1,
+                raw_output=str(exc),
+                feedback=f"Verification error: {exc}",
+            )

@@ -1,0 +1,16 @@
+%% Graph-RAG retrieval vs single-hop grep.
+flowchart LR
+  classDef seed fill:#ecfeff,stroke:#0891b2,color:#0f172a
+  classDef hop fill:#eff6ff,stroke:#1d4ed8,color:#0f172a
+  classDef rank fill:#fffbeb,stroke:#d97706,color:#451a03
+  classDef out fill:#f0fdf4,stroke:#16a34a,color:#052e16
+
+  Q["Natural-language query\n'who validates JWTs?'"]:::seed
+  Q --> S["1. Dense vector seed\nembed query -> top-k symbols"]:::seed
+  S --> H["2. Multi-hop BFS\nexpand CALLS / REFS / IMPORTS"]:::hop
+  H --> PR["3. Relevance prune\nkeep high-signal nodes"]:::hop
+  PR --> RK["4. Rank with distance decay\n(hop distance weights)"]:::rank
+  RK --> CTX["5. Build context\nsignatures + skeletons\n(fits token budget)"]:::out
+  CTX --> LLM["Feed LLM\nprecise, minimal context"]:::out
+
+  Q -.->|"baseline: grep"| GRP["single-hop keyword match\nno dependencies\nno semantic recall"]:::hop

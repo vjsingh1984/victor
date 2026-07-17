@@ -322,11 +322,11 @@ victor chat --provider anthropic
 | Resource | URL |
 |----------|-----|
 | **Full Documentation** | https://victor-ai.readthedocs.io |
-| **GitHub Repository** | https://github.com/vjsingh1984/victor |
+| **GitHub Repository** | https://github.com/anvai-labs/victor |
 | **PyPI Package** | https://pypi.org/project/victor-ai |
 | **Docker Image** | https://ghcr.io/vjsingh1984/victor |
-| **Issue Tracker** | https://github.com/vjsingh1984/victor/issues |
-| **Discussions** | https://github.com/vjsingh1984/victor/discussions |
+| **Issue Tracker** | https://github.com/anvai-labs/victor/issues |
+| **Discussions** | https://github.com/anvai-labs/victor/discussions |
 
 ---
 

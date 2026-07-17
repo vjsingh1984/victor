@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "victor-contracts"
-version = "0.7.2"
+version = "0.7.3"
 description = "Victor Contracts - Protocol definitions for vertical development"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -56,10 +56,10 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/vjsingh1984/victor"
-Repository = "https://github.com/vjsingh1984/victor"
+Homepage = "https://github.com/anvai-labs/victor"
+Repository = "https://github.com/anvai-labs/victor"
 Documentation = "https://docs.victor.dev/contracts"
-Issues = "https://github.com/vjsingh1984/victor/issues"
+Issues = "https://github.com/anvai-labs/victor/issues"
 
 [project.scripts]
 victor-contracts = "victor_contracts.cli:main"

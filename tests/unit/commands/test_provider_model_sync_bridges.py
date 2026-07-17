@@ -2306,12 +2306,18 @@ class TestBenchmarkSyncBridge:
         assert [spec.section_name for spec in specs] == [
             "GROUNDING_RULES",
             "GROUNDING_RULES",
+            "GROUNDING_RULES",
         ]
         assert [spec.prompt_candidate_hash for spec in specs] == [
+            "__baseline__",
             "cand-123",
             "cand-456",
         ]
-        assert [spec.provider for spec in specs] == ["anthropic", "anthropic"]
+        assert [spec.provider for spec in specs] == [
+            "anthropic",
+            "anthropic",
+            "anthropic",
+        ]
         mock_run_sync.assert_called_once_with(coro)
 
     def test_run_benchmark_uses_shared_sync_bridge(self) -> None:

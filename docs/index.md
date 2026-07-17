@@ -174,9 +174,7 @@ flowchart TB
 | **Canonical** | `docs/roadmap.md` | Roadmap and tech debt |
 | **Canonical** | `docs/tech-stack.md` | Technology stack |
 | **Canonical** | `VISION.md` | Product vision |
-| **Redirect** | `ARCHITECTURE.md` | Points to `docs/architecture.md` |
-| **Redirect** | `roadmap.md` | Points to `docs/roadmap.md` |
-| **Superseded** | `docs/diagrams/` | Inline diagrams in master docs preferred |
+| **Reference** | `docs/diagrams/` | Editable `.mmd` sources; canonical diagrams live inline in the master docs |
 
 ---
 

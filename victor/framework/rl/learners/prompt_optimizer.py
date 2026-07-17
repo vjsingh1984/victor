@@ -733,6 +733,45 @@ class GEPAStrategy:
 MIN_TRACES_FOR_EVOLUTION = 5
 MIN_SAMPLES_FOR_CONFIDENCE = 3
 
+# Confidence floor + non-baseline requirement that historically gated live
+# serving of an evolved candidate. Exposed as a constant so the serve decision
+# and its tests share one source of truth.
+SERVE_CONFIDENCE_FLOOR = 0.6
+
+
+def should_serve_candidate(
+    rec: Optional["RLRecommendation"],
+    *,
+    exploration_enabled: bool,
+    exploration_epsilon: float,
+    rng: Optional[random.Random] = None,
+) -> bool:
+    """Decide whether to serve an evolved recommendation this turn.
+
+    Serve when the candidate is:
+      - **proven** (live confidence above the floor with enough samples), or
+      - **benchmark-approved** (validated by a suite, even at sample_count=0), or
+      - **explored** — with probability ``exploration_epsilon`` when exploration
+        is enabled, so a fresh candidate can bootstrap its Thompson posterior.
+
+    The exploration path is bounded upstream by the persist structural gate
+    (growth_exceeded/repeated_trigrams), so explored candidates are never
+    corrupt — at worst mediocre, which the reward signal then corrects.
+    """
+    if rec is None:
+        return False
+    proven = rec.confidence > SERVE_CONFIDENCE_FLOOR and not rec.is_baseline
+    approved = bool((getattr(rec, "metadata", None) or {}).get("benchmark_passed"))
+    if proven or approved:
+        return True
+    if exploration_enabled and exploration_epsilon > 0.0:
+        draw = rng if rng is not None else _SERVE_RNG
+        return draw.random() < exploration_epsilon
+    return False
+
+
+_SERVE_RNG = random.Random()
+
 _DEFAULT_EVOLVABLE_SECTIONS = [
     "ASI_TOOL_EFFECTIVENESS_GUIDANCE",
     "GROUNDING_RULES",
@@ -793,6 +832,11 @@ class PromptOptimizerLearner(BaseLearner):
         self._extra_strategies: Dict[str, List["PromptOptimizationStrategy"]] = {}
         # Section-specific strategy overrides (e.g., FEW_SHOT_EXAMPLES → MIPROv2)
         self._candidates: Dict[str, List[PromptCandidate]] = {}
+        # Last candidate actually injected into the live prompt per
+        # (section, provider) — lets record_outcome attribute an outcome to a
+        # brand-new candidate (is_active=False, sample_count=0) so it can earn
+        # its first reward. Set by record_served() at injection time.
+        self._last_served: Dict[str, str] = {}
         self._use_pareto = use_pareto
         self._max_prompt_chars = max_prompt_chars
         self._pareto_frontiers: Dict[str, Any] = {}  # section → ParetoFrontier
@@ -938,6 +982,11 @@ class PromptOptimizerLearner(BaseLearner):
         conv_traces = self._collect_traces_from_conversations(limit=limit)
         traces = self._merge_traces(jsonl_traces, conv_traces)
 
+        # Ground the synthetic completion_score/task_type in real linked outcomes
+        # (quality_weights response-quality, prompt_optimizer completion) so
+        # reflection and the live reward share one signal.
+        self._apply_real_outcomes(traces)
+
         if conv_traces:
             logger.info(
                 "Unified traces: %d from JSONL + %d from conversations = %d unique",
@@ -949,6 +998,55 @@ class PromptOptimizerLearner(BaseLearner):
         if ttl > 0:
             self._traces_cache = (limit, traces, time.monotonic() + ttl)
         return traces
+
+    def _apply_real_outcomes(self, traces: List[ExecutionTrace]) -> None:
+        """Override synthetic completion_score/success/task_type with real outcomes.
+
+        A trace's ``completion_score`` is otherwise the ``1 - 1.5*failure_rate``
+        proxy and ``task_type`` is ``'default'``. Where the RL correlation spine
+        linked genuine outcomes to the session — ``quality_weights``
+        response-quality scores and ``prompt_optimizer`` completion scores, both
+        carrying a real ``quality_score`` + ``task_type`` + ``session_id`` — use
+        them so reflection sees the same signal the live reward trains on.
+        Silently falls back to the proxy when no outcome is linked.
+        """
+        if not traces:
+            return
+        try:
+            from collections import Counter
+
+            from victor.core.schema import Tables
+
+            table = Tables.RL_OUTCOME
+        except Exception:
+            return
+        for trace in traces:
+            # Traces may be bare session-ID strings (from _merge_traces when
+            # JSONL/conversation sources only yield IDs); skip those — they
+            # can't be enriched (no .session_id/.completion_score to mutate).
+            if not hasattr(trace, "session_id"):
+                continue
+            if not trace.session_id:
+                continue
+            try:
+                rows = self.db.execute(
+                    f"SELECT quality_score, task_type FROM {table} "
+                    f"WHERE session_id = ? "
+                    f"AND learner_id IN ('quality_weights', 'prompt_optimizer') "
+                    f"AND quality_score IS NOT NULL",
+                    (trace.session_id,),
+                ).fetchall()
+            except Exception:
+                continue
+            if not rows:
+                continue
+            scores = [row[0] for row in rows if row[0] is not None]
+            if scores:
+                trace.completion_score = sum(scores) / len(scores)
+                trace.success = trace.completion_score >= 0.5
+            tasks = [row[1] for row in rows if row[1]]
+            if tasks:
+                trace.task_type = Counter(tasks).most_common(1)[0][0]
 
     def _apply_section_strategies(
         self,
@@ -1160,36 +1258,88 @@ class PromptOptimizerLearner(BaseLearner):
         ]
 
     def record_outcome(self, outcome: RLOutcome) -> None:
-        """Update posteriors for the active candidate."""
+        """Update posteriors for the candidate that was served.
+
+        A freshly-evolved candidate has ``is_active=False`` and
+        ``sample_count=0``, so a pure active/sample_count lookup could never
+        find it (chicken-and-egg: unrewardable until already rewarded). We
+        therefore resolve the served candidate by hash first — from the
+        outcome metadata, then the last-served ledger — before falling back to
+        active / sample_count>0.
+        """
         section = outcome.metadata.get("prompt_section")
         if not section:
             return
 
         provider = outcome.provider or "default"
+        served_hash = outcome.metadata.get("prompt_candidate_hash")
+
         # Try provider-specific first, then default
         for key in [
             self._candidate_key(section, provider),
             self._candidate_key(section, "default"),
         ]:
-            candidates = self._candidates.get(key, [])
-            active = [c for c in candidates if c.is_active] or [
-                c for c in candidates if c.sample_count > 0
-            ]
-            if active:
-                candidate = active[-1]
-                success = outcome.success and outcome.quality_score >= 0.5
-                candidate.update(success)
-                candidate.scores["completion_score"] = (
-                    candidate.scores.get("completion_score", 0.0) * 0.9
-                    + outcome.quality_score * 0.1
-                )
-                self._record_pareto_outcome(
-                    key=key,
-                    candidate=candidate,
-                    outcome=outcome,
-                )
-                self._save_candidate(candidate)
-                return
+            candidate = self._resolve_reward_candidate(key, served_hash)
+            if candidate is None:
+                continue
+            success = outcome.success and outcome.quality_score >= 0.5
+            candidate.update(success)
+            candidate.scores["completion_score"] = (
+                candidate.scores.get("completion_score", 0.0) * 0.9 + outcome.quality_score * 0.1
+            )
+            self._record_pareto_outcome(
+                key=key,
+                candidate=candidate,
+                outcome=outcome,
+            )
+            self._save_candidate(candidate)
+            return
+
+    def _resolve_reward_candidate(
+        self,
+        key: str,
+        served_hash: Optional[str],
+    ) -> Optional[PromptCandidate]:
+        """Find the candidate to reward for a (section, provider) key.
+
+        Preference order:
+          1. exact hash match — from the outcome metadata or the last-served
+             ledger; this unblocks a brand-new ``sample_count=0`` candidate;
+          2. the active candidate;
+          3. the most-recently rewarded candidate (``sample_count > 0``).
+        """
+        candidates = self._candidates.get(key, [])
+        if not candidates:
+            return None
+        wanted = served_hash or self._last_served.get(key)
+        if wanted:
+            for candidate in candidates:
+                if candidate.text_hash == wanted:
+                    return candidate
+        active = [c for c in candidates if c.is_active]
+        if active:
+            return active[-1]
+        sampled = [c for c in candidates if c.sample_count > 0]
+        if sampled:
+            return sampled[-1]
+        return None
+
+    def record_served(
+        self,
+        section_name: str,
+        provider: str,
+        text_hash: str,
+    ) -> None:
+        """Record the candidate most recently served for a (section, provider).
+
+        Called by the optimization injector when a candidate is actually
+        injected into the live prompt, so a subsequent ``record_outcome`` can
+        attribute the turn's outcome to it even before it has any rewards
+        (``sample_count=0``).
+        """
+        if not text_hash:
+            return
+        self._last_served[self._candidate_key(section_name, provider or "default")] = text_hash
 
     def get_recommendation(
         self,
@@ -1282,6 +1432,7 @@ class PromptOptimizerLearner(BaseLearner):
                 "prompt_candidate_hash": best.text_hash,
                 "section_name": best.section_name,
                 "prompt_section_name": best.section_name,
+                "benchmark_passed": bool(best.benchmark_passed),
             },
         )
 
@@ -1384,16 +1535,27 @@ class PromptOptimizerLearner(BaseLearner):
             )
             return None
 
-        # Final hygiene gate (fence-wrap, duplicate-lines, similarity) applied
-        # uniformly to every strategy path so degraded candidates are never stored.
+        # Persist hygiene gate: enforce only STRUCTURAL degradation signals
+        # (runaway growth, repetitive trigrams) — mirroring the GEPA-service
+        # strategy gate (gepa_service.py). Seed-similarity and unsupported-
+        # addition violations are intentionally NOT enforced here: a mutation
+        # is by definition a rewrite, which legitimately rephrases seed lines
+        # (→ unsupported_additions) and, for few-shot / distillation strategies,
+        # has low seed overlap (→ seed_similarity_too_low). Strategy layers that
+        # care about additive constraints (PrefPO) apply their own
+        # allowed_additions gate (prefpo_strategy.py); this net catches only
+        # corruption. Garbage collapses (e.g. 44-char output) are already
+        # rejected upstream in gepa_service.mutate() before reaching here.
         from victor.framework.rl.prompt_hygiene import evaluate_prompt_candidate
 
         report = evaluate_prompt_candidate(current_text, new_text)
-        if not report.accepted:
+        structural = {"growth_exceeded", "repeated_trigrams"}
+        triggered = structural & set(report.violations)
+        if triggered:
             logger.info(
                 "GEPA rejected '%s' candidate at persist gate: %s",
                 section_name,
-                ",".join(report.violations),
+                ",".join(sorted(triggered)),
             )
             return None
 
@@ -1543,6 +1705,27 @@ class PromptOptimizerLearner(BaseLearner):
     ) -> Optional[PromptCandidate]:
         """Return one exact prompt candidate for targeted evaluation/runtime binding."""
         return self._find_candidate(section_name, provider, text_hash)
+
+    def find_candidate_any_provider(
+        self,
+        *,
+        section_name: str,
+        text_hash: str,
+    ) -> Optional[PromptCandidate]:
+        """Find a candidate by section+hash across ALL providers.
+
+        Fallback for binding lookups where the requested provider doesn't match
+        the candidate's stored provider (e.g. a default-profile run binding a
+        zai-scoped candidate). Used only after the provider-specific lookup misses.
+        """
+        prefix = f"{section_name}::"
+        for key, candidates in self._candidates.items():
+            if not key.startswith(prefix):
+                continue
+            for candidate in candidates:
+                if candidate.text_hash == text_hash:
+                    return candidate
+        return None
 
     def get_candidates(
         self,
@@ -2301,9 +2484,12 @@ class PromptOptimizerLearner(BaseLearner):
                                     "tokens": 0,
                                 }
 
-                            if etype == "tool_call":
+                            if etype == "tool_result":
+                                # tool_result is the event actually emitted per
+                                # tool invocation (a paired tool_call event is
+                                # rarely/never logged); count the call here so
+                                # sessions aren't all dropped by the <2-calls filter.
                                 sessions[sid]["tool_calls"] += 1
-                            elif etype == "tool_result":
                                 if not data.get("success", True):
                                     error = str(
                                         data.get("error") or data.get("result", {}).get("error", "")
@@ -2469,8 +2655,9 @@ class PromptOptimizerLearner(BaseLearner):
                                 }
 
                             if etype == "tool_call":
-                                sessions[sid]["tool_calls"] += 1
-                                # v2: capture detail
+                                # Create a pending detail (reasoning enrichment).
+                                # Counting happens on tool_result (the reliably-
+                                # emitted event) to avoid double-counting.
                                 detail = ToolCallTrace(
                                     tool_name=data.get("tool_name", ""),
                                     arguments_summary=str(data.get("arguments_sanitized", ""))[
@@ -2484,14 +2671,33 @@ class PromptOptimizerLearner(BaseLearner):
 
                             elif etype == "tool_result":
                                 success = data.get("success", True)
-                                # Update the last detail entry
+                                sessions[sid]["tool_calls"] += 1
+                                # Fill a pending tool_call detail if one is open;
+                                # otherwise build one from the result (the emitter
+                                # logs tool_result directly, with no paired tool_call).
                                 details = sessions[sid]["details"]
-                                if details:
+                                if details and not (
+                                    getattr(details[-1], "result_summary", "")
+                                    or getattr(details[-1], "error_detail", "")
+                                ):
                                     last = details[-1]
-                                    last.success = success
-                                    last.duration_ms = data.get("duration_ms", 0)
-                                    last.result_summary = str(data.get("result_summary", ""))[:500]
-                                    last.error_detail = str(data.get("error_detail", ""))[:500]
+                                else:
+                                    last = ToolCallTrace(
+                                        tool_name=data.get("tool_name", ""),
+                                        arguments_summary="",
+                                        reasoning_before="",
+                                    )
+                                    details.append(last)
+                                last.success = success
+                                last.duration_ms = data.get("duration_ms", 0)
+                                last.result_summary = str(
+                                    data.get("result_summary") or data.get("result") or ""
+                                )[:500]
+                                last.error_detail = str(
+                                    data.get("error_detail") or data.get("error") or ""
+                                )[:500]
+                                if not last.tool_name and data.get("tool_name"):
+                                    last.tool_name = data.get("tool_name", "")
 
                                 if not success:
                                     error = str(

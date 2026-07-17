@@ -1252,6 +1252,20 @@ def run_prompt_suite(
         "--candidate-hash",
         help="Prompt candidate hash to evaluate. Repeat once per candidate.",
     ),
+    include_baseline: bool = typer.Option(
+        False,
+        "--include-baseline",
+        help="Also run the section's SEED (baseline) prompt so the suite measures "
+        "evolved-vs-seed. Auto-enabled when --create-rollout is set.",
+    ),
+    max_verify_retries: Optional[int] = typer.Option(
+        None,
+        "--max-verify-retries",
+        help="Closed-loop verify-and-retry: after the agent claims done, verify its "
+        "patch in-container and re-enter on failure (≤N times). Default 2 when "
+        "--docker is set, else 0 (off). Essential for C-extension repos the host "
+        "can't build (e.g. astropy).",
+    ),
     max_tasks: Optional[int] = typer.Option(
         None, "--max-tasks", "-n", help="Maximum number of tasks to run"
     ),
@@ -1405,6 +1419,8 @@ def run_prompt_suite(
 
     from victor.evaluation import EvaluationConfig, PromptCandidateEvaluationSpec
 
+    from victor.agent.optimization_injector import BASELINE_CANDIDATE_HASH
+
     _metadata, bench_type, runner = _resolve_benchmark_target(benchmark, dataset_path)
     provider, model, resolved_account = _resolve_account_selection(account, provider, model)
     effective_model = _resolve_effective_model(profile, model)
@@ -1415,6 +1431,13 @@ def run_prompt_suite(
     if start_task > 0 and max_tasks is not None:
         effective_max_tasks = max_tasks + start_task
 
+    # Verify-and-retry: default ON for docker SWE-bench (the agent can't verify
+    # C-extension repos on the host; the closed-loop container verify lets it
+    # iterate against the real env). Explicit --max-verify-retries overrides.
+    effective_verify_retries = (
+        max_verify_retries if max_verify_retries is not None else (2 if use_docker else 0)
+    )
+
     base_config = EvaluationConfig(
         benchmark=bench_type,
         model=effective_model,
@@ -1423,6 +1446,9 @@ def run_prompt_suite(
         timeout_per_task=timeout,
         max_turns=max_turns,
         parallel_tasks=parallel,
+        use_docker=use_docker,
+        eval_backend=("docker" if use_docker else "local"),
+        max_verify_retries=effective_verify_retries,
     )
     _attach_manifest_metadata(base_config, runner)
 
@@ -1440,14 +1466,27 @@ def run_prompt_suite(
         console.print(f"  - {candidate_hash}")
     console.print()
 
-    candidate_specs = [
+    candidate_specs = []
+    # Baseline (seed) arm: auto-included with --create-rollout (a rollout without
+    # a measured baseline is meaningless) or when --include-baseline is set.
+    # Resolved by the injector to the section's seed text (no stored candidate).
+    if include_baseline or create_rollout:
+        candidate_specs.append(
+            PromptCandidateEvaluationSpec(
+                section_name=prompt_section,
+                prompt_candidate_hash=BASELINE_CANDIDATE_HASH,
+                provider=provider,
+                label=f"{prompt_section}:baseline (seed)",
+            )
+        )
+    candidate_specs.extend(
         PromptCandidateEvaluationSpec(
             section_name=prompt_section,
             prompt_candidate_hash=candidate_hash,
             provider=provider,
         )
         for candidate_hash in candidate_hashes
-    ]
+    )
 
     suite = run_sync(
         _run_prompt_candidate_suite_async(
@@ -1857,56 +1896,79 @@ async def _run_benchmark_async(
                 original_cwd = os.getcwd()
                 os.chdir(work_dir)
                 try:
-                    # Closed-loop verify_fn (PR2): for docker SWE-bench tasks,
-                    # let the agent loop verify its in-progress edits against the
-                    # real FAIL_TO_PASS tests and re-enter on failure. The
-                    # closure captures this task's repo + config; the adapter
-                    # calls it only after the agent claims done (≤max_verify_retries
-                    # times). Each call runs a full container lifecycle.
-                    verify_fn = None
+                    # FEP-0018 Phase 2: the framework verification hook on the
+                    # agentic loop replaces the adapter's eval-specific verify_fn.
+                    # The loop's DECIDE gate now handles verify-and-retry.
+                    _persistent_container = None
                     if (
                         getattr(config, "max_verify_retries", 0) > 0
                         and getattr(config, "eval_backend", None) == "docker"
                         and getattr(benchmark_task, "repo", None)
                     ):
                         from victor.evaluation.benchmarks.swe_bench import (
+                            ContainerTestVerifier,
                             SWEBenchRunner,
                         )
+                        from victor.evaluation.container_eval import (
+                            EvalContainer,
+                            cleanup_stale_eval_containers,
+                            resolve_swebench_image_exact,
+                        )
 
-                        _verify_runner = SWEBenchRunner()
-
-                        async def verify_fn(_task=benchmark_task, _work=work_dir, _cfg=config):
-                            # Snapshot the agent's current edits as a patch.
-                            proc = await asyncio.create_subprocess_exec(
-                                "git",
-                                "-C",
-                                str(_work),
-                                "diff",
-                                "HEAD",
-                                stdout=asyncio.subprocess.PIPE,
-                                stderr=asyncio.subprocess.PIPE,
-                            )
+                        # Sweep orphaned eval containers from prior crashed runs
+                        # BEFORE starting the persistent one.
+                        if not getattr(SWEBenchRunner, "_stale_containers_cleaned", False):
+                            SWEBenchRunner._stale_containers_cleaned = True
                             try:
-                                out, _err = await asyncio.wait_for(proc.communicate(), timeout=30)
-                            except asyncio.TimeoutError:
-                                proc.kill()
-                                await proc.wait()
-                                return (0, 0, "verify: git diff timed out")
-                            patch = out.decode("utf-8", "replace")
-                            if not patch.strip():
-                                return (
-                                    0,
-                                    0,
-                                    "verify: no edits to verify (git diff HEAD is empty)",
-                                )
-                            vr = await _verify_runner._verify_patch_in_container(
-                                _task, patch, _work, _cfg
+                                await cleanup_stale_eval_containers()
+                            except Exception:
+                                pass
+
+                        # Start ONE persistent container for this task.
+                        try:
+                            _image = await resolve_swebench_image_exact(benchmark_task, config)
+                            logger.info(
+                                "Starting persistent verify container: image=%s",
+                                _image,
                             )
-                            return (vr.passed, vr.total, vr.raw_output)
+                            _persistent_container = EvalContainer(
+                                image=_image, workspace_host_path=str(work_dir)
+                            )
+                            await _persistent_container.start()
+                            logger.info(
+                                "Persistent verify container started: %s",
+                                _persistent_container.name,
+                            )
+                        except Exception as exc:
+                            logger.warning(
+                                "Persistent verify container unavailable "
+                                "(falling back to per-call creation): %s",
+                                exc,
+                            )
+                            _persistent_container = None
+
+                        # FEP-0018: set the verifier on the turn_executor —
+                        # the loop's DECIDE gate handles verify-and-retry.
+                        _turn_exec = getattr(adapter.orchestrator, "turn_executor", None)
+                        if _turn_exec is not None:
+                            _turn_exec._verifier = ContainerTestVerifier(
+                                benchmark_task,
+                                work_dir,
+                                config,
+                                container=_persistent_container,
+                            )
+                            _turn_exec._max_verify_retries = getattr(
+                                config, "max_verify_retries", 0
+                            )
 
                     trace = await adapter.execute_task(
-                        benchmark_task, work_dir, verify_fn=verify_fn
+                        benchmark_task, work_dir  # loop handles verification (FEP-0018)
                     )
+
+                    # Unset the verifier after the task (avoid leaking to next task)
+                    _turn_exec = getattr(adapter.orchestrator, "turn_executor", None)
+                    if _turn_exec is not None:
+                        _turn_exec._verifier = None
                 except asyncio.CancelledError:
                     partial = adapter.get_partial_trace()
                     logger.info(
@@ -1927,6 +1989,8 @@ async def _run_benchmark_async(
                     }
                     raise
                 finally:
+                    if _persistent_container is not None:
+                        await _persistent_container.stop()
                     os.chdir(original_cwd)
                     if temp_work_dir is not None:
                         import shutil

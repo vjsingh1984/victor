@@ -123,7 +123,7 @@ For contributors:
 
 ```bash
 # Clone repository
-git clone https://github.com/vjsingh1984/victor.git
+git clone https://github.com/anvai-labs/victor.git
 cd victor
 
 # Create virtual environment
@@ -507,7 +507,7 @@ rm -rf ~/.victor
 ## Additional Resources
 
 - [PyPI Package](https://pypi.org/project/victor-ai/)
-- [GitHub Repository](https://github.com/vjsingh1984/victor)
+- [GitHub Repository](https://github.com/anvai-labs/victor)
 - [Documentation](https://victor-ai.readthedocs.io)
 
 **Need help?** Run `victor doctor` for diagnostics or see [Quick Start](quickstart.md#troubleshooting).

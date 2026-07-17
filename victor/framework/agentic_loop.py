@@ -61,6 +61,7 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
+from pathlib import Path
 from typing import (
     Any,
     AsyncIterator,
@@ -182,6 +183,7 @@ if TYPE_CHECKING:
     from victor.storage.memory.unified import UnifiedMemoryCoordinator
     from victor.agent.services.planning_runtime import PlanningCoordinator
     from victor.framework.agent import Agent
+    from victor.framework.verification import VerificationResult
 
 
 @dataclass
@@ -575,6 +577,8 @@ class AgenticLoop:
         config: "Union[AgenticLoopConfig, Dict[str, Any], None]" = None,
         streaming_act_port: Optional["StreamingActProvider"] = None,
         rubric_complete_fn: Optional[Callable[[str], Awaitable[str]]] = None,
+        verifier: Optional[Any] = None,
+        max_verify_retries: int = 0,
     ):
         """Initialize agentic loop.
 
@@ -600,6 +604,16 @@ class AgenticLoop:
         # FEP-0007 Addendum A: the streaming ACT seam run_streaming() drives. None until
         # wired at cutover, at which point run_streaming becomes the live UI loop body.
         self.streaming_act_port = streaming_act_port
+        # FEP-0018: framework verification hook. When set, the loop verifies the
+        # agent's work after COMPLETE and re-enters on failure (bounded retries).
+        self._verifier = verifier
+        self._max_verify_retries = max_verify_retries
+        self._verify_retries = 0
+        # FEP-0019 Phase 3: proactive LSP context injection. The flag is read off
+        # the turn_executor (set by Agent.create from SessionConfig.lsp_perception)
+        # so neither AgenticLoop construction site needs a new param.
+        self._lsp_context_enabled = bool(getattr(turn_executor, "_lsp_context_enabled", False))
+        self._last_lsp_signature: Optional[str] = None
         self.max_iterations = max_iterations
         self.enable_fulfillment_check = enable_fulfillment_check
         self.enable_adaptive_iterations = enable_adaptive_iterations
@@ -781,6 +795,8 @@ class AgenticLoop:
         iterations: List[LoopIteration] = []
         state: Dict[str, Any] = {"query": query, **(context or {})}
         self._progress_scores = []
+        self._verify_retries = 0  # FEP-0018: reset per run
+        self._last_lsp_signature = None  # FEP-0019 Phase 3: reset per run
         self.turn_evaluation_controller.reset()  # resets spin_detector + content-repetition + plateau
         self.criteria_builder.reset()
         effective_max = self.max_iterations
@@ -979,6 +995,10 @@ class AgenticLoop:
                 state["iteration"] = i
                 if hasattr(perception, "task_analysis") and perception.task_analysis:
                     state["task_type"] = getattr(perception.task_analysis, "task_type", "unknown")
+
+                # FEP-0019 Phase 3: proactively inject live LSP symbols + errors for
+                # the files being edited, so generation matches the codebase first try.
+                await self._maybe_inject_lsp_context(state)
 
                 # RESEARCH TASK PROGRESS REPORTING
                 # Report progress every 10 iterations for research tasks
@@ -1254,6 +1274,27 @@ class AgenticLoop:
                 # be considered done yet.
                 if evaluation.decision == EvaluationDecision.COMPLETE:
                     evaluation = self._apply_backslide_guard(evaluation)
+                    # FEP-0018: framework verification hook — verify before accepting.
+                    if (
+                        evaluation.decision == EvaluationDecision.COMPLETE
+                        and getattr(self, "_verifier", None) is not None
+                        and getattr(self, "_verify_retries", 0)
+                        < getattr(self, "_max_verify_retries", 0)
+                    ):
+                        vr = await self._run_verification(state)
+                        logger.info(
+                            "Turn %d verify: %d/%d (%s) retries=%d/%d",
+                            i,
+                            vr.passed,
+                            vr.total,
+                            "VERIFIED" if vr.is_verified else "failed",
+                            self._verify_retries + 1,
+                            self._max_verify_retries,
+                        )
+                        if not vr.is_verified:
+                            self._inject_verify_feedback(vr)
+                            self._verify_retries += 1
+                            continue  # re-enter the loop (skip break)
                 if evaluation.decision == EvaluationDecision.COMPLETE:
                     logger.info("Task complete - exiting loop")
                     break
@@ -1269,6 +1310,16 @@ class AgenticLoop:
 
             # Determine success
             success = self._determine_success(iterations)
+
+            # Attribute this turn's outcome to the served prompt candidates so
+            # their Thompson posteriors update (closes the prompt-optimization
+            # reward loop — FEP-0017). Shared with run_streaming() so buffered
+            # and streaming chat train the learner identically; success is
+            # derived from the completion SCORE, not the COMPLETE flag.
+            self._emit_prompt_reward_outcome(
+                iterations[-1].evaluation if iterations else None, state
+            )
+
             self._record_provider_degradation_event(
                 state,
                 total_iterations=len(iterations),
@@ -1406,6 +1457,136 @@ class AgenticLoop:
                 ),
             )
 
+    async def _run_verification(self, state: Dict[str, Any]) -> "VerificationResult":
+        """Run the framework verification hook (FEP-0018).
+
+        Called after the agent claims COMPLETE. If the verifier is set, it
+        checks the agent's work (tests, lint, etc.) and returns a result. The
+        caller (the DECIDE gate) injects the feedback and re-enters on failure.
+        """
+        from victor.framework.verification import VerificationResult
+
+        try:
+            workspace = state.get("workspace") or state.get("working_dir")
+            return await self._verifier.verify(workspace=workspace, state=state)
+        except Exception as exc:
+            logger.warning("Verification raised: %s", exc)
+            return VerificationResult(
+                passed=-1,
+                total=-1,
+                raw_output=str(exc),
+                feedback=f"Verification error: {exc}",
+            )
+
+    def _inject_verify_feedback(self, result: "VerificationResult") -> None:
+        """Inject the verifier's feedback as a user message for the retry turn."""
+        feedback = result.feedback or (
+            f"Verification: {result.passed}/{result.total} checks passed.\n"
+            f"{result.raw_output[:2000]}"
+        )
+        try:
+            chat_ctx = getattr(self.turn_executor, "_chat_context", None)
+            if chat_ctx and hasattr(chat_ctx, "add_message"):
+                chat_ctx.add_message(
+                    role="user",
+                    content=feedback,
+                    metadata={"source": "verification"},
+                )
+        except Exception:
+            logger.debug("Failed to inject verify feedback", exc_info=True)
+
+    def _resolve_workspace(self, state: Dict[str, Any]) -> Optional[Path]:
+        """Resolve the workspace root via a 3-level fallback (FEP-0019 Phase 3).
+
+        The loop itself has no reliable workspace; check the state, then the
+        orchestrator's project context, then the configured project paths.
+        """
+        ws = state.get("workspace") or state.get("working_dir")
+        if ws:
+            return Path(ws)
+        pc = getattr(self.orchestrator, "project_context", None)
+        root = getattr(pc, "root_path", None) if pc is not None else None
+        if root:
+            return root if isinstance(root, Path) else Path(root)
+        try:
+            from victor.config.settings import get_project_paths
+
+            return get_project_paths().project_root
+        except Exception:
+            return None
+
+    async def _maybe_inject_lsp_context(self, state: Dict[str, Any]) -> None:
+        """Inject live LSP symbols + errors for the files being edited (FEP-0019 Phase 3).
+
+        Position-free: pulls document symbols + diagnostics for the most-recently
+        modified source files and adds them as a per-turn user message, so the
+        agent's next generation matches the codebase. Throttled by a content
+        signature so identical context is not re-injected. No-op unless
+        ``SessionConfig.lsp_perception`` opted in and an LSP capability is set.
+        """
+        if not getattr(self, "_lsp_context_enabled", False):
+            return
+        lsp = getattr(self.orchestrator, "lsp", None) if self.orchestrator else None
+        workspace = self._resolve_workspace(state)
+        if lsp is None or workspace is None:
+            return
+        try:
+            from victor.agent.conversation.history_metadata import build_internal_history_metadata
+            from victor.agent.conversation.types import MessageSource
+            from victor.framework.lsp_context import build_context
+
+            block, signature = await build_context(
+                lsp, workspace, last_signature=self._last_lsp_signature
+            )
+            if block is None:
+                # Nothing new to inject; still remember the signature so a later
+                # change re-triggers injection.
+                if signature is not None:
+                    self._last_lsp_signature = signature
+                return
+            chat_ctx = getattr(self.turn_executor, "_chat_context", None)
+            if chat_ctx and hasattr(chat_ctx, "add_message"):
+                chat_ctx.add_message(
+                    role="user",
+                    content=block,
+                    metadata=build_internal_history_metadata(
+                        "lsp_context", source=MessageSource.AGENT_GROUNDING
+                    ),
+                )
+                self._last_lsp_signature = signature
+        except Exception:
+            logger.debug("LSP context injection skipped", exc_info=True)
+
+    def _emit_prompt_reward_outcome(
+        self,
+        evaluation: Optional[EvaluationResult],
+        state: Dict[str, Any],
+    ) -> None:
+        """Attribute a turn's outcome to the prompt candidates served this turn.
+
+        Shared by ``run()`` and ``run_streaming()`` so buffered and streaming
+        chat update the ``prompt_optimizer`` learner identically (FEP-0017
+        streaming parity). Non-blocking; no-op when no candidate was served or
+        no evaluation exists. Success is derived from the completion score
+        inside the emitter, not the COMPLETE flag — a mid-task CONTINUE turn with
+        good progress should reward (not penalize) the served candidate.
+        """
+        if evaluation is None:
+            return
+        try:
+            from victor.agent.services.prompt_optimization_reward import (
+                emit_prompt_candidate_outcome,
+            )
+
+            emit_prompt_candidate_outcome(
+                getattr(self.runtime_intelligence, "_last_served_prompt_identities", []) or [],
+                completion_score=float(getattr(evaluation, "score", 0.0) or 0.0),
+                task_type=str(state.get("task_type") or "default"),
+                session_id=state.get("session_id"),
+            )
+        except Exception as exc:
+            logger.debug("Prompt candidate outcome attribution skipped: %s", exc)
+
     async def run_streaming(
         self,
         query: str,
@@ -1449,10 +1630,13 @@ class AgenticLoop:
 
         state: Dict[str, Any] = {"query": query, **(context or {})}
         self._progress_scores = []
+        self._verify_retries = 0  # FEP-0018: reset per run
+        self._last_lsp_signature = None  # FEP-0019 Phase 3: reset per run
         # Resets the shared spin detector + content-repetition + plateau (same as run()).
         self.turn_evaluation_controller.reset()
         self.criteria_builder.reset()
         effective_max = self.max_iterations
+        evaluation: Optional[EvaluationResult] = None  # bound per turn; None if loop never runs
 
         for i in range(1, effective_max + 1):
             # PERCEIVE (shared, non-yielding)
@@ -1464,6 +1648,10 @@ class AgenticLoop:
             state["perception"] = (
                 perception.to_dict() if hasattr(perception, "to_dict") else perception
             )
+
+            # FEP-0019 Phase 3: proactively inject live LSP symbols + errors for the
+            # files being edited (mirrors run()'s perceive→plan injection point).
+            await self._maybe_inject_lsp_context(state)
 
             # PLAN (shared, non-yielding) — planned once, reused across turns like run().
             plan = state.get("plan")
@@ -1497,12 +1685,40 @@ class AgenticLoop:
             # DECIDE — terminal decisions end the stream; non-terminal nudge + continue.
             if evaluation.decision == EvaluationDecision.COMPLETE:
                 evaluation = self._apply_backslide_guard(evaluation)
+                # FEP-0018: framework verification hook — verify before accepting.
+                if (
+                    evaluation.decision == EvaluationDecision.COMPLETE
+                    and getattr(self, "_verifier", None) is not None
+                    and getattr(self, "_verify_retries", 0)
+                    < getattr(self, "_max_verify_retries", 0)
+                ):
+                    vr = await self._run_verification(state)
+                    logger.info(
+                        "Turn %d verify (streaming): %d/%d (%s) retries=%d/%d",
+                        i,
+                        vr.passed,
+                        vr.total,
+                        "VERIFIED" if vr.is_verified else "failed",
+                        self._verify_retries + 1,
+                        self._max_verify_retries,
+                    )
+                    if not vr.is_verified:
+                        self._inject_verify_feedback(vr)
+                        self._verify_retries += 1
+                        continue  # re-enter (skip return)
             if evaluation.decision in (
                 EvaluationDecision.COMPLETE,
                 EvaluationDecision.FAIL,
             ):
+                # Streaming parity: attribute the turn outcome to served prompt
+                # candidates before ending the stream (FEP-0017; mirrors run()).
+                self._emit_prompt_reward_outcome(evaluation, state)
                 return
             self._inject_decide_nudges(evaluation, i, effective_max)
+
+        # Loop exhausted without a terminal decision — attribute the final turn's
+        # evaluation too (FEP-0017 streaming parity; mirrors run()'s epilogue).
+        self._emit_prompt_reward_outcome(evaluation, state)
 
     async def stream(
         self,

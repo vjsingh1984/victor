@@ -1,0 +1,26 @@
+%% High-level vs low-level API altitude.
+flowchart TB
+  classDef high fill:#f0fdf4,stroke:#16a34a,color:#052e16
+  classDef low fill:#eff6ff,stroke:#1d4ed8,color:#0f172a
+  classDef esc fill:#fff7ed,stroke:#f97316,color:#431407
+
+  subgraph H["High-level — the golden path (most users)"]
+    H1["Agent.create(provider=, tools=)"]:::high
+    H2["agent.run() / stream() / chat()"]:::high
+    H3["VictorClient  (UI layers)"]:::high
+    H4["SessionConfig  (immutable CLI/runtime overrides)"]:::high
+  end
+
+  subgraph L["Low-level — full control"]
+    L1["StateGraph  (typed state, nodes, edges, cycles, checkpoint, HITL)"]:::low
+    L2["Tool registry + ToolSet presets  (BaseTool / @tool)"]:::low
+    L3["WorkflowEngine  (YAML -> StateGraph)"]:::low
+    L4["Events  (THINKING / TOOL_CALL / TOOL_RESULT / CONTENT)"]:::low
+  end
+
+  subgraph E["Escape hatch"]
+    E1["agent.get_orchestrator()\n6 services - coordinators - runtime"]:::esc
+  end
+
+  H -->|"need more control"| L
+  L -->|"advanced only"| E

@@ -94,7 +94,7 @@ def list_experiments(
     log_level: Optional[str] = typer.Option(None, "--log-level", hidden=True),
 ):
     """List all experiments with optional filtering."""
-    setup_logging(log_level)
+    setup_logging(command="experiments", cli_log_level=log_level)
 
     storage = get_default_storage()
     tracker = ExperimentTracker(storage=storage)
@@ -156,7 +156,7 @@ def show_experiment(
     log_level: Optional[str] = typer.Option(None, "--log-level", hidden=True),
 ):
     """Show detailed information about an experiment."""
-    setup_logging(log_level)
+    setup_logging(command="experiments", cli_log_level=log_level)
 
     storage = get_default_storage()
     tracker = ExperimentTracker(storage=storage)
@@ -247,7 +247,7 @@ def create_experiment(
     log_level: Optional[str] = typer.Option(None, "--log-level", hidden=True),
 ):
     """Create a new experiment."""
-    setup_logging(log_level)
+    setup_logging(command="experiments", cli_log_level=log_level)
 
     tracker = ExperimentTracker()
 
@@ -284,7 +284,7 @@ def delete_experiment(
     log_level: Optional[str] = typer.Option(None, "--log-level", hidden=True),
 ):
     """Delete an experiment and all its runs."""
-    setup_logging(log_level)
+    setup_logging(command="experiments", cli_log_level=log_level)
 
     storage = get_default_storage()
     tracker = ExperimentTracker(storage=storage)
@@ -329,7 +329,7 @@ def list_runs(
     log_level: Optional[str] = typer.Option(None, "--log-level", hidden=True),
 ):
     """List runs for an experiment."""
-    setup_logging(log_level)
+    setup_logging(command="experiments", cli_log_level=log_level)
 
     storage = get_default_storage()
     tracker = ExperimentTracker(storage=storage)
@@ -392,7 +392,7 @@ def show_run(
     log_level: Optional[str] = typer.Option(None, "--log-level", hidden=True),
 ):
     """Show detailed information about a run."""
-    setup_logging(log_level)
+    setup_logging(command="experiments", cli_log_level=log_level)
 
     storage = get_default_storage()
     tracker = ExperimentTracker(storage=storage)

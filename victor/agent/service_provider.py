@@ -820,7 +820,7 @@ class OrchestratorServiceProvider:
     def _create_context_temperature_classifier(
         self,
     ) -> "ContextTemperatureClassifierProtocol":
-        """Create ContextTemperatureClassifier — active when USE_CONTEXT_TEMPERATURE is enabled."""
+        """Create the ContextTemperatureClassifier service."""
         from victor.agent.context_temperature import ContextTemperatureClassifier
 
         return ContextTemperatureClassifier()
@@ -1132,7 +1132,7 @@ class OrchestratorServiceProvider:
         )
 
     def _create_confidence_monitor(self) -> "StreamingConfidenceMonitorProtocol":
-        """Create StreamingConfidenceMonitor — active when USE_CONFIDENCE_MONITOR is enabled."""
+        """Create the StreamingConfidenceMonitor service."""
         from victor.agent.streaming.confidence_monitor import StreamingConfidenceMonitor
 
         return StreamingConfidenceMonitor()
