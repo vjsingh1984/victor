@@ -560,11 +560,18 @@ def test_uppercase_roadmap_markdown_link_is_flagged(tmp_path: Path) -> None:
     assert any("non-canonical roadmap link target" in finding.message for finding in findings)
 
 
-def test_archived_doc_requires_banner(tmp_path: Path) -> None:
+def test_archived_doc_requires_banner(tmp_path: Path, monkeypatch) -> None:
     write_file(tmp_path, ".github/workflows/test.yml", "name: OK\non: push\n")
     write_file(tmp_path, "Makefile", "lint:\n\tmypy victor\n")
     write_file(tmp_path, "docs/COMPREHENSIVE_IMPROVEMENT_ROADMAP.md", "# Missing banner\n")
 
+    # ARCHIVED_DOC_BANNERS is empty after #518's doc consolidation; patch to
+    # test the banner-check logic still fires when a listed doc lacks its banner.
+    monkeypatch.setattr(
+        repo_hygiene_check,
+        "ARCHIVED_DOC_BANNERS",
+        {"docs/COMPREHENSIVE_IMPROVEMENT_ROADMAP.md": "> **Archived**"},
+    )
     findings = repo_hygiene_check.run_checks(tmp_path)
 
     assert any("required banner text" in finding.message for finding in findings)
@@ -1096,10 +1103,12 @@ def test_canonical_doc_pointers_flag_missing_doc_and_broken_link(
 ) -> None:
     _write_canonical_pointer_docs(tmp_path)
     (tmp_path / "docs" / "roadmap.md").unlink()
+    # Break a link INSIDE a canonical pointer doc (not ARCHITECTURE.md, which
+    # isn't a canonical pointer doc after #518's doc consolidation).
     write_file(
         tmp_path,
-        "ARCHITECTURE.md",
-        "See [arch](docs/architecture.md) and [gone](docs/does-not-exist.md).\n",
+        "docs/architecture/adr/README.md",
+        "See [gone](does-not-exist.md).\n",
     )
 
     findings = repo_hygiene_check.check_canonical_doc_pointers(tmp_path)
@@ -1107,13 +1116,8 @@ def test_canonical_doc_pointers_flag_missing_doc_and_broken_link(
     messages = {(str(f.path), f.message) for f in findings}
     assert ("docs/roadmap.md", "canonical doc is missing") in messages
     assert (
-        "ARCHITECTURE.md",
-        "broken canonical link target: docs/does-not-exist.md",
-    ) in messages
-    # roadmap.md's link to docs/roadmap.md is now dangling too.
-    assert (
-        "roadmap.md",
-        "broken canonical link target: docs/roadmap.md",
+        "docs/architecture/adr/README.md",
+        "broken canonical link target: does-not-exist.md",
     ) in messages
 
 

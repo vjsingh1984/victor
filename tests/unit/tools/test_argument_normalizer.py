@@ -1114,7 +1114,7 @@ class TestLogStatsExtended:
         """Test log_stats logs correct information after operations."""
         import logging
 
-        caplog.set_level(logging.INFO)
+        caplog.set_level(logging.DEBUG)
 
         normalizer = ArgumentNormalizer(provider_name="test_provider")
         normalizer.normalize_arguments({"path": "test.py"}, "read")

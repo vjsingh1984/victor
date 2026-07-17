@@ -1021,6 +1021,11 @@ class PromptOptimizerLearner(BaseLearner):
         except Exception:
             return
         for trace in traces:
+            # Traces may be bare session-ID strings (from _merge_traces when
+            # JSONL/conversation sources only yield IDs); skip those — they
+            # can't be enriched (no .session_id/.completion_score to mutate).
+            if not hasattr(trace, "session_id"):
+                continue
             if not trace.session_id:
                 continue
             try:
