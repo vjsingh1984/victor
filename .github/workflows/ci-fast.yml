@@ -538,7 +538,7 @@ jobs:
   # ~1.4s (it counts file lines); the job also installs victor so pytest can
   # collect tests/unit/conftest.py.
   hotspot-size-guard:
-    name: Hotspot Size Guard
+    name: Guard + Hygiene Tests
     runs-on: ubuntu-latest
     # 10 min, not 2: the test is ~1.4s but the job does a full editable
     # `pip install -e ".[dev]"` (needed so pytest can collect conftest, which
@@ -562,8 +562,20 @@ jobs:
           pip install -e ./victor-contracts
           pip install -e ".[dev]"
 
-      - name: Run hotspot size guard
-        run: pytest tests/unit/runtime/test_hotspot_size_guard.py -q
+      - name: Run guard + hygiene tests (always, not changed-files)
+        # These invariant/regression-guard tests must run on EVERY PR, not just
+        # changed-files. They catch accumulated breakage that develop's
+        # changed-file CI otherwise misses (surfacing only at develop→main,
+        # where the full suite runs — a 2.5+ hour CI cycle).
+        run: |
+          python -m pytest \
+            tests/unit/runtime/test_hotspot_size_guard.py \
+            tests/unit/runtime/test_singleton_guard.py \
+            tests/unit/contracts/test_feature_flag_references.py \
+            tests/unit/scripts/test_repo_hygiene_check.py \
+            tests/unit/scripts/test_version_stamp_hook.py \
+            tests/unit/framework/rl/test_trace_cache_l2.py \
+            -q --tb=short --timeout=60
 
   # Aggregate merge gate — mirrors ProximaDB's `CI Success` pattern (see
   # ../proximaDB/.github/workflows/ci.yml `ci-success`). A single required
