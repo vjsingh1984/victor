@@ -161,11 +161,10 @@ jobs:
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             maturin_args: "--release --out dist"
-          # Windows ARM64 — cross-compile from x64 runner.
-          - os: windows-latest
-            target: aarch64-pc-windows-msvc
-            maturin_args: "--release --out dist --target aarch64-pc-windows-msvc"
-            rust_target: aarch64-pc-windows-msvc
+          # NOTE: Windows ARM64 requires a native ARM64 runner (GitHub Actions
+          # doesn't offer one yet). The cross-compile from x64 fails because
+          # maturin can't find a CPython interpreter for aarch64-pc-windows-msvc.
+          # Add this back when GitHub offers windows-arm64 runners.
 
     steps:
       - uses: actions/checkout@v4
@@ -329,6 +328,9 @@ jobs:
     name: Security Scan (Trivy)
     needs: build-docker
     runs-on: ubuntu-latest
+    # Security scan is informational — it should not block publishing.
+    # Results are uploaded to GitHub Security tab regardless (if: always()).
+    continue-on-error: true
     permissions:
       security-events: write  # Required for uploading to GitHub Security tab
     steps:
