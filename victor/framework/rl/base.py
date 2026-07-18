@@ -14,7 +14,7 @@
 
 """Base classes and data models for RL framework."""
 
-import json
+from victor.core.json_utils import json_dumps, json_loads
 import logging
 import os
 import random
@@ -87,7 +87,7 @@ class RLOutcome:
             "success": self.success,
             "quality_score": self.quality_score,
             "timestamp": self.timestamp,
-            "metadata": json.dumps(self.metadata),
+            "metadata": json_dumps(self.metadata),
             "vertical": self.vertical,
         }
 
@@ -96,7 +96,7 @@ class RLOutcome:
         """Create from dictionary."""
         metadata = data.get("metadata", "{}")
         if isinstance(metadata, str):
-            metadata = json.loads(metadata)
+            metadata = json_loads(metadata)
 
         return cls(
             provider=data["provider"],

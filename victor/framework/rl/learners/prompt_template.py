@@ -38,7 +38,7 @@ Enrichment Learning:
 Sprint 5: Advanced RL Patterns
 """
 
-import json
+from victor.core.json_utils import json_dumps
 import logging
 import math
 import random
@@ -521,9 +521,9 @@ class PromptTemplateLearner(BaseLearner):
             (
                 self.name,
                 task_type.lower(),
-                json.dumps(template.to_dict()),
+                json_dumps(template.to_dict()),
                 success,
-                json.dumps({"provider": provider.lower(), "model": model}),
+                json_dumps({"provider": provider.lower(), "model": model}),
                 timestamp,
             ),
         )
@@ -858,7 +858,7 @@ class PromptTemplateLearner(BaseLearner):
                 f"{vertical.lower()}:{task_type.lower()}",
                 enrichment_type.lower(),
                 quality_improvement,
-                json.dumps({"enrichment_count": enrichment_count, "task_success": task_success}),
+                json_dumps({"enrichment_count": enrichment_count, "task_success": task_success}),
                 timestamp,
             ),
         )

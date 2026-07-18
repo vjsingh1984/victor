@@ -18,6 +18,8 @@ This tool provides transaction-based file editing with diff preview and
 rollback capability to the agent.
 """
 
+from victor.core.json_utils import json_loads
+from json import JSONDecodeError
 import logging
 from typing import Any, Dict, List, Optional, Set
 from pathlib import Path
@@ -579,17 +581,17 @@ async def edit(
 
         # Try to parse the JSON, with recovery for common issues
         try:
-            ops = json.loads(ops)
-        except json.JSONDecodeError as exc:
+            ops = json_loads(ops)
+        except JSONDecodeError as exc:
             # Detect control character issues (common with embedded newlines)
             if "control character" in str(exc).lower():
                 # Try to fix by escaping control characters in strings
                 try:
                     fixed = _fix_json_control_chars(ops)
-                    ops = json.loads(fixed)
+                    ops = json_loads(fixed)
                     # If fixed, log and continue
                     logger.info("Auto-fixed JSON control characters in edit ops")
-                except json.JSONDecodeError as fix_exc:
+                except JSONDecodeError as fix_exc:
                     logger.debug(f"JSON fix attempt failed: {fix_exc}")
                     pass  # Recovery failed, use original error
 

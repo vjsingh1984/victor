@@ -18,7 +18,7 @@ Provides export capabilities for conversations in various formats
 including Markdown, JSON, and HTML.
 """
 
-import json
+from victor.core.json_utils import json_dumps, json_loads
 import logging
 from dataclasses import dataclass
 from datetime import datetime
@@ -199,7 +199,7 @@ class ConversationExporter:
                     lines.append(f"**{tool_call.get('name', 'Unknown')}**")
                     lines.append("```json")
                     args = tool_call.get("arguments", {})
-                    lines.append(json.dumps(args, indent=2))
+                    lines.append(json_dumps(args, indent=2))
                     lines.append("```")
                     if "result" in tool_call:
                         lines.append("Result:")
@@ -258,7 +258,7 @@ class ConversationExporter:
 
             data["messages"].append(msg_data)
 
-        return json.dumps(data, indent=2, ensure_ascii=False)
+        return json_dumps(data, indent=2, ensure_ascii=False)
 
     def _export_html(
         self,
@@ -559,7 +559,7 @@ class ConversationPersistence:
             return None
 
         try:
-            data = json.loads(file_path.read_text(encoding="utf-8"))
+            data = json_loads(file_path.read_text(encoding="utf-8"))
             return self._from_json(data)
         except Exception as e:
             logger.error(f"Failed to load conversation: {e}")
@@ -618,7 +618,7 @@ class ConversationPersistence:
 
         for file_path in sorted(self._base_dir.glob("*.json"), reverse=True)[:limit]:
             try:
-                data = json.loads(file_path.read_text(encoding="utf-8"))
+                data = json_loads(file_path.read_text(encoding="utf-8"))
                 metadata = data.get("metadata", {})
                 message_count = len(data.get("messages", []))
 

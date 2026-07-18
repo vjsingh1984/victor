@@ -29,7 +29,7 @@ Usage:
 
 from __future__ import annotations
 
-import json
+from victor.core.json_utils import json_dumps
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
@@ -187,7 +187,7 @@ class PlainFormatStrategy:
         # For structured data, wrap in minimal JSON
         try:
             if isinstance(output, (dict, list)):
-                return json.dumps(output, ensure_ascii=False, default=str)
+                return json_dumps(output, ensure_ascii=False, default=str)
             return str(output)
         except Exception as e:
             logger.debug(f"Plain formatting failed for {tool_name}: {e}")
@@ -262,7 +262,7 @@ class XmlFormatStrategy:
 
         try:
             if isinstance(output, (dict, list)):
-                return json.dumps(output, ensure_ascii=False, indent=2, default=str)
+                return json_dumps(output, ensure_ascii=False, indent=2, default=str)
             return str(output)
         except Exception as e:
             logger.debug(f"XML serialization failed: {e}")

@@ -34,7 +34,7 @@ Sprint 5: Advanced RL Patterns
 """
 
 import hashlib
-import json
+from victor.core.json_utils import json_dumps, json_loads
 import logging
 import math
 from dataclasses import dataclass, field
@@ -315,7 +315,7 @@ class ExperimentCoordinator:
             cursor.execute("SELECT * FROM experiments")
             for row in cursor.fetchall():
                 row_dict = dict(row)
-                config = json.loads(row_dict["config"])
+                config = json_loads(row_dict["config"])
 
                 # Reconstruct config
                 experiment_config = ExperimentConfig(
@@ -357,7 +357,7 @@ class ExperimentCoordinator:
                     success_count=row_dict["success_count"],
                     total_quality=row_dict["total_quality"],
                     total_latency_ms=row_dict["total_latency_ms"],
-                    metric_sums=json.loads(row_dict["metric_sums"]),
+                    metric_sums=json_loads(row_dict["metric_sums"]),
                 )
 
             if self._experiments:
@@ -748,7 +748,7 @@ class ExperimentCoordinator:
         cursor = self.db.cursor()
         timestamp = datetime.now().isoformat()
 
-        config_json = json.dumps(
+        config_json = json_dumps(
             {
                 "control": {
                     "name": config.control.name,
@@ -882,7 +882,7 @@ class ExperimentCoordinator:
                 metrics.success_count,
                 metrics.total_quality,
                 metrics.total_latency_ms,
-                json.dumps(metrics.metric_sums),
+                json_dumps(metrics.metric_sums),
                 timestamp,
             ),
         )

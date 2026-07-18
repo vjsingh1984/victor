@@ -37,6 +37,7 @@ Usage:
 
 from __future__ import annotations
 
+from victor.core.json_utils import json_loads
 import asyncio
 import logging
 import subprocess
@@ -291,7 +292,7 @@ class ResourceAvailabilityDetector:
             # Parse JSON output
             import json
 
-            data = json.loads(stdout.decode())
+            data = json_loads(stdout.decode())
             displays = data.get("SPDisplaysDataType", [])
 
             if not displays:

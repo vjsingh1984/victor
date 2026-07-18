@@ -8,7 +8,8 @@ being used instead of JSON (double quotes).
 """
 
 import ast
-import json
+from victor.core.json_utils import json_dumps, json_loads
+from json import JSONDecodeError
 import logging
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
@@ -303,8 +304,8 @@ class ArgumentNormalizer:
 
         # Fast path: Try standard JSON first (99%+ of valid cases)
         try:
-            return json.loads(value)
-        except json.JSONDecodeError as exc:
+            return json_loads(value)
+        except JSONDecodeError as exc:
             # Log the specific error for debugging large payload failures
             logger.debug(
                 "JSON parse failed at line %s, column %s: %s",
@@ -317,8 +318,8 @@ class ArgumentNormalizer:
             if "control character" in str(exc).lower():
                 try:
                     repaired = self._escape_control_chars_in_json_strings(value)
-                    return json.loads(repaired)
-                except json.JSONDecodeError as repair_exc:
+                    return json_loads(repaired)
+                except JSONDecodeError as repair_exc:
                     logger.debug(
                         "Control char escape failed at line %s: %s",
                         repair_exc.lineno,
@@ -339,8 +340,8 @@ class ArgumentNormalizer:
             try:
                 repaired = native_repair_json(value)
                 if repaired:
-                    return json.loads(repaired)
-            except (TypeError, ValueError, json.JSONDecodeError) as exc:
+                    return json_loads(repaired)
+            except (TypeError, ValueError, JSONDecodeError) as exc:
                 logger.debug("Native repair failed: %s", str(exc)[:100])
 
         # Layer 4: Try to extract parameters from malformed JSON using regex
@@ -902,7 +903,7 @@ class ArgumentNormalizer:
         via ``_extract_by_schema``.
         """
         try:
-            parsed = json.loads(raw)
+            parsed = json_loads(raw)
         except Exception:
             try:
                 parsed = ast.literal_eval(raw)
@@ -912,7 +913,7 @@ class ArgumentNormalizer:
                     try:
                         repaired = native_repair_json(raw)
                         if repaired:
-                            parsed = json.loads(repaired)
+                            parsed = json_loads(repaired)
                     except Exception:
                         parsed = None
         else:
@@ -1106,14 +1107,14 @@ class ArgumentNormalizer:
         """
         try:
             # First check if the whole object can be JSON-serialized
-            json.dumps(obj)
-            logger.debug("_is_valid_json_dict: json.dumps() succeeded")
+            json_dumps(obj)
+            logger.debug("_is_valid_json_dict: json_dumps() succeeded")
 
             # Additionally, check string values that look like JSON
-            # NOTE: We intentionally do NOT validate with json.loads() here because
+            # NOTE: We intentionally do NOT validate with json_loads() here because
             # some providers output literal control characters (actual newlines),
             # which are invalid JSON but still work fine with tools that handle
-            # raw content (like edit_files). Validating with json.loads() would
+            # raw content (like edit_files). Validating with json_loads() would
             # cause false failures.
             #
             # The edit_files tool will handle any necessary escaping internally.
@@ -1127,7 +1128,7 @@ class ArgumentNormalizer:
                                 key,
                             )
                             # Just verify it starts with JSON-like syntax
-                            # Don't use json.loads() as it rejects literal control chars
+                            # Don't use json_loads() as it rejects literal control chars
                             logger.debug(
                                 "_is_valid_json_dict: '%s' value looks like JSON (syntax check only)",
                                 key,
@@ -1172,7 +1173,7 @@ class ArgumentNormalizer:
                 # First, check if the string LOOKS like JSON but may need normalization
                 stripped = value.strip()
                 if stripped.startswith(("[", "{")):
-                    # Aggressively normalize: try Python AST first, then verify with json.loads
+                    # Aggressively normalize: try Python AST first, then verify with json_loads
                     try:
                         # Use ast.literal_eval (SAFE - no code execution)
                         python_obj = ast.literal_eval(value)
@@ -1187,7 +1188,7 @@ class ArgumentNormalizer:
                                 # Complex structure - keep as Python object, don't convert to string
                                 # Verify it's JSON-serializable for provider compatibility
                                 try:
-                                    json.dumps(
+                                    json_dumps(
                                         python_obj
                                     )  # Verify serializable (will raise if not)
                                     normalized[key] = python_obj  # Keep as dict/list
@@ -1196,11 +1197,11 @@ class ArgumentNormalizer:
                                     logger.warning(
                                         f"Parameter {key} contains non-serializable value: {e}"
                                     )
-                                    normalized[key] = json.dumps(python_obj, default=str)
+                                    normalized[key] = json_dumps(python_obj, default=str)
                         else:
                             # Primitive value - keep as-is
                             normalized[key] = value
-                    except (ValueError, SyntaxError, json.JSONDecodeError):
+                    except (ValueError, SyntaxError, JSONDecodeError):
                         # AST failed - keep original and let other layers handle it
                         normalized[key] = value
                 else:
@@ -1362,7 +1363,7 @@ class ArgumentNormalizer:
                 # while letting canonical edit/ops use the native Python object.
                 python_obj = ast.literal_eval(ops)
                 if field == "operations":
-                    arguments[field] = json.dumps(python_obj)
+                    arguments[field] = json_dumps(python_obj)
                 else:
                     arguments[field] = python_obj
             except Exception:

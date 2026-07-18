@@ -22,6 +22,7 @@ Based on: "Position: agentic AI orchestration should be Bayes-consistent"
 (arXiv:2605.00742, ICML 2026)
 """
 
+from victor.core.json_utils import json_dumps
 import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional
@@ -226,7 +227,7 @@ class VoIController(BaseLearner):
         """
         import json
 
-        metadata_json = json.dumps(metadata) if metadata else None
+        metadata_json = json_dumps(metadata) if metadata else None
 
         self.db.execute(
             """INSERT INTO rl_voi_history

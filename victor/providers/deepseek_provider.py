@@ -26,7 +26,7 @@ References:
 - https://api-docs.deepseek.com/guides/reasoning_model
 """
 
-import json
+from victor.core.json_utils import json_loads
 import logging
 import re
 import uuid
@@ -356,7 +356,7 @@ class DeepSeekProvider(HttpxOpenAICompatProvider):
                     arguments[param_name] = raw_value
                 else:
                     try:
-                        arguments[param_name] = json.loads(raw_value)
+                        arguments[param_name] = json_loads(raw_value)
                     except Exception:
                         arguments[param_name] = raw_value
             tool_calls.append(

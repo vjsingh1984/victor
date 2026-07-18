@@ -34,7 +34,8 @@ References:
 - https://docs.together.ai/docs/function-calling
 """
 
-import json
+from victor.core.json_utils import json_dumps, json_loads
+from json import JSONDecodeError
 from typing import Any, AsyncIterator, Dict, List, Optional
 
 import httpx
@@ -317,9 +318,9 @@ class TogetherProvider(BaseProvider):
                         break
 
                     try:
-                        chunk_data = json.loads(data_str)
+                        chunk_data = json_loads(data_str)
                         yield self._parse_stream_chunk(chunk_data, accumulated_tool_calls)
-                    except json.JSONDecodeError:
+                    except JSONDecodeError:
                         pass
 
         except httpx.TimeoutException as e:
@@ -350,7 +351,7 @@ class TogetherProvider(BaseProvider):
                         "function": {
                             "name": tc.get("name", ""),
                             "arguments": (
-                                json.dumps(tc.get("arguments", {}))
+                                json_dumps(tc.get("arguments", {}))
                                 if isinstance(tc.get("arguments"), dict)
                                 else tc.get("arguments", "{}")
                             ),
@@ -423,8 +424,8 @@ class TogetherProvider(BaseProvider):
                 args = func.get("arguments", "{}")
                 if isinstance(args, str):
                     try:
-                        args = json.loads(args)
-                    except json.JSONDecodeError:
+                        args = json_loads(args)
+                    except JSONDecodeError:
                         args = {}
                 normalized.append(
                     {
@@ -465,8 +466,8 @@ class TogetherProvider(BaseProvider):
                 if tc.get("name"):
                     args = tc.get("arguments", "{}")
                     try:
-                        args = json.loads(args) if isinstance(args, str) else args
-                    except json.JSONDecodeError:
+                        args = json_loads(args) if isinstance(args, str) else args
+                    except JSONDecodeError:
                         args = {}
                     final_tool_calls.append(
                         {

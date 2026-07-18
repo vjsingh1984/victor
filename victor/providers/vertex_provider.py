@@ -34,7 +34,8 @@ References:
 - https://cloud.google.com/vertex-ai/generative-ai/docs/model-reference/inference
 """
 
-import json
+from victor.core.json_utils import json_loads
+from json import JSONDecodeError
 import os
 from typing import Any, AsyncIterator, Dict, List, Optional
 
@@ -378,9 +379,9 @@ class VertexAIProvider(BaseProvider):
                         break
 
                     try:
-                        chunk_data = json.loads(data_str)
+                        chunk_data = json_loads(data_str)
                         yield self._parse_stream_chunk(chunk_data, accumulated_tool_calls)
-                    except json.JSONDecodeError:
+                    except JSONDecodeError:
                         self._provider_logger.logger.warning(
                             f"Vertex AI JSON decode error on line: {line[:100]}"
                         )

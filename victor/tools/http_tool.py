@@ -23,7 +23,7 @@ Features:
 - Performance metrics
 """
 
-import json
+from victor.core.json_utils import json_dumps
 import time
 from typing import Any, Dict, Optional
 
@@ -71,7 +71,7 @@ def _normalize_response_json(payload: Any) -> Any:
     try to serialize it.
     """
     try:
-        json.dumps(payload)
+        json_dumps(payload)
     except (TypeError, ValueError):
         return None
     return payload

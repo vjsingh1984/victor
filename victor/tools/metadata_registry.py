@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from victor.core.json_utils import json_dumps
+
 # Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -569,7 +571,7 @@ class ToolMetadataRegistry:
                 }
             )
 
-        payload = json.dumps(snapshots, sort_keys=True, default=str)
+        payload = json_dumps(snapshots, sort_keys=True, default=str)
         return hashlib.sha256(payload.encode()).hexdigest()
 
     def _reset_registered_state(self) -> None:

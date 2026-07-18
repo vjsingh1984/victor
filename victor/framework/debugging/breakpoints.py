@@ -50,6 +50,7 @@ Example:
 
 from __future__ import annotations
 
+from victor.core.json_utils import json_dumps, json_loads
 import logging
 import uuid
 from dataclasses import dataclass, field
@@ -340,7 +341,7 @@ class BreakpointStorage:
             ]
         }
 
-        Path(self._persist_path).write_text(json.dumps(data, indent=2))
+        Path(self._persist_path).write_text(json_dumps(data, indent=2))
 
     async def load(self) -> None:
         """Load persisted breakpoints from disk.
@@ -358,7 +359,7 @@ class BreakpointStorage:
         if not path.exists():
             return
 
-        data = json.loads(path.read_text())
+        data = json_loads(path.read_text())
         # Reconstruct breakpoints (conditions are lost on persistence)
         for bp_data in data.get("breakpoints", []):
             bp = WorkflowBreakpoint(

@@ -23,7 +23,7 @@ This module provides robust tool execution with:
 """
 
 import asyncio
-import json
+from victor.core.json_utils import json_loads
 import logging
 import time
 from enum import Enum
@@ -498,7 +498,7 @@ class ToolExecutor:
                 elif expected == "string" and not isinstance(value, str):
                     arguments[key] = str(value)
                 elif expected in ("array", "object") and isinstance(value, str):
-                    parsed = json.loads(value)
+                    parsed = json_loads(value)
                     want_list = expected == "array"
                     if isinstance(parsed, (list, dict)) and isinstance(parsed, list) == want_list:
                         arguments[key] = parsed

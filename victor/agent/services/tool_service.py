@@ -27,7 +27,7 @@ from __future__ import annotations
 
 import asyncio
 import ast
-import json
+from victor.core.json_utils import json_dumps, json_loads
 import logging
 from dataclasses import dataclass
 from typing import (
@@ -92,7 +92,7 @@ def normalize_tool_result_arguments(arguments: Any) -> Dict[str, Any]:
         return arguments
     if isinstance(arguments, str):
         try:
-            parsed = json.loads(arguments)
+            parsed = json_loads(arguments)
         except Exception:
             return {}
         if isinstance(parsed, dict):
@@ -1604,7 +1604,7 @@ class ToolService:
         try:
             signature = (
                 tool_name,
-                json.dumps(normalized_args, sort_keys=True, default=str),
+                json_dumps(normalized_args, sort_keys=True, default=str),
             )
         except Exception:
             signature = (tool_name, str(normalized_args))
@@ -1938,7 +1938,7 @@ class ToolService:
             try:
                 json_match = re.search(r"\[.*\]", response_content, re.DOTALL)
                 if json_match:
-                    json_data = json.loads(json_match.group(0))
+                    json_data = json_loads(json_match.group(0))
                     if isinstance(json_data, list):
                         for item in json_data:
                             if isinstance(item, dict) and "name" in item:
@@ -1949,7 +1949,7 @@ class ToolService:
                                 if tool_call_id:
                                     tool_call["id"] = tool_call_id
                                 tool_calls.append(tool_call)
-            except json.JSONDecodeError:
+            except ValueError:
                 pass
 
         return tool_calls

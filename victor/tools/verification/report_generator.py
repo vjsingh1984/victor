@@ -20,7 +20,7 @@ filtering, documentation cross-reference, and severity weighting.
 
 from __future__ import annotations
 
-import json
+from victor.core.json_utils import json_dumps
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -346,7 +346,7 @@ class VerificationReportGenerator:
         output_path = Path(output_path)
 
         if format == ReportFormat.JSON:
-            output_path.write_text(json.dumps(report.to_dict(), indent=2))
+            output_path.write_text(json_dumps(report.to_dict(), indent=2))
 
         elif format == ReportFormat.MARKDOWN:
             md = self._format_markdown(report)

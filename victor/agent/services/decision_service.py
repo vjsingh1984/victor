@@ -16,7 +16,8 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
-import json
+from victor.core.json_utils import json_dumps, json_loads
+from json import JSONDecodeError
 import logging
 import time
 from dataclasses import dataclass
@@ -535,9 +536,9 @@ class LLMDecisionService:
 
         # First try: direct parse
         try:
-            data = json.loads(text)
+            data = json_loads(text)
             return schema.model_validate(data)
-        except json.JSONDecodeError:
+        except JSONDecodeError:
             pass
 
         # Second try: extract embedded JSON object from mixed text
@@ -547,9 +548,9 @@ class LLMDecisionService:
             last_brace = text.rfind("}")
             if last_brace > brace_pos:
                 try:
-                    data = json.loads(text[brace_pos : last_brace + 1])
+                    data = json_loads(text[brace_pos : last_brace + 1])
                     return schema.model_validate(data)
-                except (json.JSONDecodeError, Exception):
+                except (JSONDecodeError, Exception):
                     pass
 
         self._metrics.parse_failures += 1
@@ -558,7 +559,7 @@ class LLMDecisionService:
 
     def _cache_key(self, decision_type: DecisionType, context: Dict[str, Any]) -> str:
         """Generate a cache key from decision type and context."""
-        key_data = f"{decision_type.value}:{json.dumps(context, sort_keys=True, default=str)}"
+        key_data = f"{decision_type.value}:{json_dumps(context, sort_keys=True, default=str)}"
         return hashlib.md5(key_data.encode()).hexdigest()  # noqa: S324
 
     def _get_cached(self, cache_key: str) -> Optional[DecisionResult]:
