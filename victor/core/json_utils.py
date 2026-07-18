@@ -46,10 +46,16 @@ def json_dumps(
     indent: bool = False,
     ensure_ascii: bool = False,
     default: Optional[Any] = None,
+    separators: Any = None,
+    **_extra: Any,
 ) -> str:
     """Serialize *obj* to a JSON ``str``.
 
     Drop-in replacement for ``json.dumps()`` using orjson.
+
+    ``separators`` and other stdlib-only kwargs are accepted but ignored —
+    orjson always produces compact, non-ASCII-safe output (equivalent to
+    ``separators=(",", ":")`` + ``ensure_ascii=False`` in stdlib json).
     """
     opts = 0
     if sort_keys:
