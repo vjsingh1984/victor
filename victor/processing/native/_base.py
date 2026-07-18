@@ -42,6 +42,16 @@ try:
         logger.info("Native extensions loaded")
 except ImportError:
     logger.debug("Native extensions not available, using pure Python fallback")
+    # One-time hint: suggest installing pre-built wheels for 2-50x speedups.
+    # Only shown at INFO level (visible in console), not on every import.
+    import sys
+
+    if not getattr(sys, "_victor_native_hint_shown", False):
+        sys._victor_native_hint_shown = True
+        logger.info(
+            "Tip: install Rust native extensions for 2-50x faster tokenization, "
+            "similarity, and pattern matching — pip install 'victor-ai[native]'"
+        )
 
 
 # Operations where Python is faster than Rust based on benchmarks.

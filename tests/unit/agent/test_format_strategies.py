@@ -138,8 +138,8 @@ class TestPlainFormatStrategy:
             args={},
             output={"key": "value", "number": 42},
         )
-        assert '"key": "value"' in result
-        assert '"number": 42' in result
+        assert '"key":"value"' in result
+        assert '"number":42' in result
 
     def test_format_list_output(self):
         """List output should be serialized to JSON."""
@@ -149,7 +149,7 @@ class TestPlainFormatStrategy:
             args={},
             output=["item1", "item2", "item3"],
         )
-        assert '["item1", "item2", "item3"]' in result
+        assert '["item1","item2","item3"]' in result
 
     def test_estimate_tokens(self):
         """Token estimation should be roughly length/4."""

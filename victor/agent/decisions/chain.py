@@ -21,6 +21,7 @@ Usage:
         tools = edge_model_filter(tools)
 """
 
+from victor.core.json_utils import json_dumps
 import logging
 from typing import List, Optional
 
@@ -166,6 +167,6 @@ def log_decision(
             entry["feature_digest"] = feature_digest
 
         with open(log_path, "a") as f:
-            f.write(json.dumps(entry, default=str) + "\n")
+            f.write(json_dumps(entry, default=str) + "\n")
     except Exception:
         pass  # Never fail on logging

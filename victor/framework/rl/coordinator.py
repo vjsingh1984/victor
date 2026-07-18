@@ -26,6 +26,7 @@ Database:
     All RL tables are consolidated in this single database for easier management.
 """
 
+from victor.core.json_utils import json_dumps
 import asyncio
 import logging
 import sqlite3
@@ -1217,7 +1218,7 @@ class RLCoordinator:
                     learner_id,
                     metric_type,
                     metric_value,
-                    json.dumps(metadata) if metadata else None,
+                    json_dumps(metadata) if metadata else None,
                 ),
             )
             self.db.commit()

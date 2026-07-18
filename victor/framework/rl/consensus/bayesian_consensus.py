@@ -22,6 +22,7 @@ Based on: "Position: agentic AI orchestration should be Bayes-consistent"
 (arXiv:2605.00742, ICML 2026)
 """
 
+from victor.core.json_utils import json_dumps
 import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional
@@ -423,7 +424,7 @@ class BayesianConsensusBuilder:
                 consensus["recommended_outcome"],
                 consensus["confidence"],
                 consensus["agreement_level"],
-                json.dumps(consensus.get("agent_contributions", {})),
+                json_dumps(consensus.get("agent_contributions", {})),
                 datetime.now().isoformat(),
                 actual_outcome,
                 was_correct,

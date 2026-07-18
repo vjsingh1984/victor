@@ -18,7 +18,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "victor-ai"
-version = "0.7.6"
+version = "0.7.7"
 description = "Open-source agentic AI framework with multi-provider support, workflow orchestration, and extensible tool system"
 readme = "README.md"
 license = {text = "Apache-2.0"}
@@ -536,10 +536,13 @@ apple-silicon = [
     "mlx-lm>=0.21.0",  # Apple's ML framework for LLMs
 ]
 
-# Native Rust extensions for performance (optional)
-# Build with: cd rust && maturin develop --release
+# Rust native extensions: 2-50x speedup for tokenization, similarity, JSON repair,
+# pattern matching, context fitting. Pre-built wheels for Linux x64/ARM64, macOS
+# ARM64, Windows x64. Gracefully degrades to pure Python when absent.
+#   pip install victor-ai[native]
+# Build from source: cd rust && maturin develop --release
 native = [
-    "maturin>=1.4",
+    "victor-native>=0.1.0",
 ]
 
 # Extracted vertical packages (optional meta-extras for cross-repo installs)

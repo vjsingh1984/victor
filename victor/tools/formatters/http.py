@@ -1,6 +1,6 @@
 """HTTP response formatter with Rich markup."""
 
-import json
+from victor.core.json_utils import json_dumps
 from typing import Dict, Any
 
 from .base import ToolFormatter, FormattedOutput
@@ -77,13 +77,13 @@ class HTTPFormatter(ToolFormatter):
 
             if isinstance(body, dict):
                 # Format JSON with syntax highlighting
-                body_str = json.dumps(body, indent=2)
+                body_str = json_dumps(body, indent=2)
                 if len(body_str) > max_body_length:
                     body_str = body_str[:max_body_length] + "..."
                 lines.append(f"  [yellow]{body_str}[/]")
             elif isinstance(body, list):
                 # Format list as JSON
-                body_str = json.dumps(body, indent=2)
+                body_str = json_dumps(body, indent=2)
                 if len(body_str) > max_body_length:
                     body_str = body_str[:max_body_length] + "..."
                 lines.append(f"  [yellow]{body_str}[/]")

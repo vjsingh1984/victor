@@ -34,7 +34,8 @@ Usage:
 
 from __future__ import annotations
 
-import json
+from victor.core.json_utils import json_dumps, json_loads
+from json import JSONDecodeError
 import logging
 import re
 from enum import Enum
@@ -133,10 +134,10 @@ def detect_document_type(source: str, content: str) -> DocumentType:
     # JSON detection
     if content_sample.startswith(("{", "[")):
         try:
-            json.loads(content[:10000])
+            json_loads(content[:10000])
             logger.debug("Detected doc_type=json from content")
             return DocumentType.JSON
-        except json.JSONDecodeError:
+        except JSONDecodeError:
             pass
 
     # XML detection
@@ -459,8 +460,8 @@ class BaseChunker:
             List of (chunk_text, start_char, end_char) tuples
         """
         try:
-            data = json.loads(content)
-        except json.JSONDecodeError:
+            data = json_loads(content)
+        except JSONDecodeError:
             logger.warning("Invalid JSON, falling back to text chunking")
             return self._chunk_text(content)
 
@@ -470,10 +471,10 @@ class BaseChunker:
         if isinstance(data, dict):
             for key, value in data.items():
                 chunk_data = {key: value}
-                chunk_text = json.dumps(chunk_data, indent=2)
+                chunk_text = json_dumps(chunk_data, indent=2)
 
                 if len(chunk_text) > self._config.max_chunk_size:
-                    sub_chunks = self._chunk_text(json.dumps(value, indent=2))
+                    sub_chunks = self._chunk_text(json_dumps(value, indent=2))
                     for sub_text, _, _ in sub_chunks:
                         header = f"Key: {key}\n"
                         chunks.append((header + sub_text, pos, pos + len(header + sub_text)))
@@ -487,11 +488,11 @@ class BaseChunker:
             current_size = 0
 
             for item in data:
-                item_text = json.dumps(item, indent=2)
+                item_text = json_dumps(item, indent=2)
 
                 if len(item_text) > self._config.max_chunk_size:
                     if current_batch:
-                        batch_text = json.dumps(current_batch, indent=2)
+                        batch_text = json_dumps(current_batch, indent=2)
                         chunks.append((batch_text, pos, pos + len(batch_text)))
                         pos += len(batch_text)
                         current_batch = []
@@ -503,7 +504,7 @@ class BaseChunker:
                         pos += len(sub_text)
                 elif current_size + len(item_text) > self._config.chunk_size:
                     if current_batch:
-                        batch_text = json.dumps(current_batch, indent=2)
+                        batch_text = json_dumps(current_batch, indent=2)
                         chunks.append((batch_text, pos, pos + len(batch_text)))
                         pos += len(batch_text)
                     current_batch = [item]
@@ -513,7 +514,7 @@ class BaseChunker:
                     current_size += len(item_text)
 
             if current_batch:
-                batch_text = json.dumps(current_batch, indent=2)
+                batch_text = json_dumps(current_batch, indent=2)
                 if len(batch_text) >= self._config.min_chunk_size:
                     chunks.append((batch_text, pos, pos + len(batch_text)))
 

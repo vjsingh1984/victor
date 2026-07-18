@@ -15,7 +15,8 @@
 """Ollama provider implementation for local model inference."""
 
 import asyncio
-import json
+from victor.core.json_utils import json_loads
+from json import JSONDecodeError
 import logging
 import re
 from typing import Any, AsyncIterator, Dict, List, Optional, Union
@@ -775,7 +776,7 @@ class OllamaProvider(BaseProvider):
                         continue
 
                     try:
-                        chunk_data = json.loads(line)
+                        chunk_data = json_loads(line)
                         chunk = self._parse_stream_chunk(chunk_data)
                         yield chunk
 
@@ -784,7 +785,7 @@ class OllamaProvider(BaseProvider):
                                 f"Received final chunk after {line_count} lines"
                             )
                             break
-                    except json.JSONDecodeError:
+                    except JSONDecodeError:
                         self._provider_logger.logger.warning(
                             f"JSON decode error on line: {line[:100]}"
                         )
@@ -1050,7 +1051,7 @@ class OllamaProvider(BaseProvider):
 
         # Try to parse as JSON
         try:
-            data = json.loads(content.strip())
+            data = json_loads(content.strip())
 
             # Check if it looks like a tool call
             # Must have "name" AND ("arguments" OR "parameters")
@@ -1069,7 +1070,7 @@ class OllamaProvider(BaseProvider):
                     if not any(key in arguments for key in planning_keywords):
                         # Convert to normalized format
                         return [{"name": data.get("name"), "arguments": arguments}]
-        except (json.JSONDecodeError, ValueError):
+        except (JSONDecodeError, ValueError):
             # Not JSON or invalid format
             pass
 
@@ -1231,8 +1232,8 @@ class OllamaProvider(BaseProvider):
                 async for line in response.aiter_lines():
                     if line.strip():
                         try:
-                            yield json.loads(line)
-                        except json.JSONDecodeError:
+                            yield json_loads(line)
+                        except JSONDecodeError:
                             continue
 
         except Exception as e:

@@ -46,7 +46,7 @@ Design:
 
 import hashlib
 import heapq
-import json
+from victor.core.json_utils import json_dumps
 import logging
 import threading
 import time
@@ -237,7 +237,7 @@ class ToolResultCache:
 
     def _hash_args(self, tool_name: str, arguments: Dict[str, Any]) -> str:
         """Generate hash for tool+arguments."""
-        normalized = json.dumps(
+        normalized = json_dumps(
             {"tool": tool_name, "args": arguments},
             sort_keys=True,
             default=str,
@@ -514,7 +514,7 @@ class ToolResultCache:
     def _estimate_tokens(self, result: Any) -> int:
         """Estimate tokens saved by cache hit."""
         try:
-            result_str = json.dumps(result, default=str)
+            result_str = json_dumps(result, default=str)
             return len(result_str) // 4  # Rough estimate
         except Exception:
             return 100  # Default estimate

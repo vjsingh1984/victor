@@ -31,6 +31,7 @@ Addresses GAP-6: Missing output consolidation
 Addresses GAP-8: Missing task completion signal
 """
 
+from victor.core.json_utils import json_dumps
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Protocol, List, Dict, Any, Optional, Set
 from dataclasses import dataclass, field
@@ -76,7 +77,7 @@ class ToolOutput:
         import json
 
         try:
-            args_str = json.dumps(args, sort_keys=True, default=str)
+            args_str = json_dumps(args, sort_keys=True, default=str)
             return hashlib.md5(args_str.encode()).hexdigest()[:12]
         except Exception:
             return ""

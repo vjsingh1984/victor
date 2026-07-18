@@ -27,7 +27,7 @@ The cache is:
 """
 
 import hashlib
-import json
+from victor.core.json_utils import json_dumps
 import logging
 import subprocess
 import threading
@@ -121,7 +121,7 @@ class ShellCommandCache:
             "env": relevant_env,
         }
 
-        key_str = json.dumps(key_data, sort_keys=True)
+        key_str = json_dumps(key_data, sort_keys=True)
         return hashlib.sha256(key_str.encode()).hexdigest()
 
     def get(self, command: str, cwd: Optional[str] = None) -> Optional[Tuple[int, str, str]]:

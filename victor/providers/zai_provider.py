@@ -26,7 +26,8 @@ References:
 - https://docs.z.ai/guides/develop/http/introduction
 """
 
-import json
+from victor.core.json_utils import json_loads
+from json import JSONDecodeError
 from typing import Any, Dict, List, Optional
 
 from victor.providers.base import CacheCostModel, CompletionResponse, ProviderError
@@ -382,8 +383,8 @@ class ZAIProvider(HttpxOpenAICompatProvider):
 
                 if isinstance(arguments, str):
                     try:
-                        arguments = json.loads(arguments)
-                    except json.JSONDecodeError:
+                        arguments = json_loads(arguments)
+                    except JSONDecodeError:
                         arguments = {}
 
                 if name:

@@ -29,7 +29,8 @@ Strategy:
 Migrated from: victor/agent/rl_model_selector.py
 """
 
-import json
+from victor.core.json_utils import json_dumps, json_loads
+from json import JSONDecodeError
 import logging
 import math
 import random
@@ -175,10 +176,10 @@ class ModelSelectorLearner(BaseLearner):
                 elif key.startswith("threshold:") and row_dict["value_text"]:
                     decision_type = key[len("threshold:") :]
                     try:
-                        self._threshold_observations[decision_type] = json.loads(
+                        self._threshold_observations[decision_type] = json_loads(
                             row_dict["value_text"]
                         )
-                    except (json.JSONDecodeError, TypeError):
+                    except (JSONDecodeError, TypeError):
                         pass
 
         except Exception as e:
@@ -349,8 +350,8 @@ class ModelSelectorLearner(BaseLearner):
         """
         # Parse available providers from provider param
         try:
-            available_providers = json.loads(provider) if isinstance(provider, str) else [provider]
-        except (json.JSONDecodeError, TypeError):
+            available_providers = json_loads(provider) if isinstance(provider, str) else [provider]
+        except (JSONDecodeError, TypeError):
             available_providers = [provider]
 
         if not available_providers:
@@ -621,7 +622,7 @@ class ModelSelectorLearner(BaseLearner):
                 (
                     self.name,
                     f"threshold:{decision_type}",
-                    json.dumps(observations[-50:]),
+                    json_dumps(observations[-50:]),
                 ),
             )
             self.db.commit()

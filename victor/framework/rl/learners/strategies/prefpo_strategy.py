@@ -14,7 +14,7 @@ challenger wins.
 
 from __future__ import annotations
 
-import json
+from victor.core.json_utils import json_dumps, json_loads
 import logging
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
@@ -94,7 +94,7 @@ class PrefPOStrategy:
             )
             return ""
 
-        return json.dumps(
+        return json_dumps(
             {
                 "winner": winner,
                 "feedback": feedback,
@@ -108,7 +108,7 @@ class PrefPOStrategy:
         if not reflection:
             return current_text
         try:
-            payload = json.loads(reflection)
+            payload = json_loads(reflection)
         except Exception:
             logger.debug("PrefPO: invalid reflection payload")
             return current_text

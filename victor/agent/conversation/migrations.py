@@ -18,7 +18,7 @@ This module provides schema migration support to handle database schema
 changes over time without losing data.
 """
 
-import json
+from victor.core.json_utils import json_loads
 import sqlite3
 import logging
 from typing import Optional, List, Callable
@@ -307,7 +307,7 @@ def _backfill_agent_lineage_from_metadata(cursor: sqlite3.Cursor) -> int:
     updated = 0
     for message_id, metadata_raw in rows:
         try:
-            metadata = json.loads(metadata_raw or "{}")
+            metadata = json_loads(metadata_raw or "{}")
         except Exception:
             continue
         if not isinstance(metadata, dict):

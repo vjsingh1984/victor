@@ -39,7 +39,8 @@ Top tool-enabled coding models for vLLM (fp16/q8):
     5. mistralai/Codestral-22B-v0.1 (44GB fp16)
 """
 
-import json
+from victor.core.json_utils import json_loads
+from json import JSONDecodeError
 import logging
 import re
 from typing import Any, AsyncIterator, Dict, List, Optional, Tuple
@@ -521,7 +522,7 @@ class VLLMProvider(BaseProvider):
 
                     if line.startswith("data: "):
                         try:
-                            data = json.loads(line[6:])
+                            data = json_loads(line[6:])
                             choices = data.get("choices", [])
                             if not choices:
                                 continue
@@ -573,11 +574,11 @@ class VLLMProvider(BaseProvider):
                                     for tc in accumulated_tool_calls:
                                         try:
                                             args = (
-                                                json.loads(tc["arguments"])
+                                                json_loads(tc["arguments"])
                                                 if tc["arguments"]
                                                 else {}
                                             )
-                                        except json.JSONDecodeError:
+                                        except JSONDecodeError:
                                             args = {"raw": tc["arguments"]}
                                         parsed_tool_calls.append(
                                             {
@@ -609,7 +610,7 @@ class VLLMProvider(BaseProvider):
                                     stop_reason=finish_reason,
                                 )
 
-                        except json.JSONDecodeError:
+                        except JSONDecodeError:
                             self._provider_logger.logger.debug(
                                 f"Failed to parse streaming chunk: {line}"
                             )

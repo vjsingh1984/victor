@@ -38,7 +38,8 @@ References:
 - https://console.groq.com/docs/tool-use
 """
 
-import json
+from victor.core.json_utils import json_loads
+from json import JSONDecodeError
 from typing import Any, AsyncIterator, Dict, List, Optional
 
 import httpx
@@ -422,13 +423,13 @@ class GroqProvider(BaseProvider):
                             break
 
                         try:
-                            chunk_data = json.loads(data_str)
+                            chunk_data = json_loads(data_str)
                             chunk = self._parse_stream_chunk(chunk_data, accumulated_tool_calls)
                             if chunk.content:
                                 accumulated_content += chunk.content
                             yield chunk
 
-                        except json.JSONDecodeError:
+                        except JSONDecodeError:
                             self._provider_logger.logger.warning(
                                 f"Groq JSON decode error on line: {line[:100]}"
                             )
@@ -525,8 +526,8 @@ class GroqProvider(BaseProvider):
 
                 if isinstance(arguments, str):
                     try:
-                        arguments = json.loads(arguments)
-                    except json.JSONDecodeError:
+                        arguments = json_loads(arguments)
+                    except JSONDecodeError:
                         arguments = {}
 
                 if name:
@@ -646,8 +647,8 @@ class GroqProvider(BaseProvider):
                 if tc.get("name"):
                     args = tc.get("arguments", "{}")
                     try:
-                        parsed_args = json.loads(args) if isinstance(args, str) else args
-                    except json.JSONDecodeError:
+                        parsed_args = json_loads(args) if isinstance(args, str) else args
+                    except JSONDecodeError:
                         parsed_args = {}
                     final_tool_calls.append(
                         {

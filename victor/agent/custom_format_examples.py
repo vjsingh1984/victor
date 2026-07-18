@@ -45,7 +45,7 @@ from __future__ import annotations
 
 import csv
 import io
-import json
+from victor.core.json_utils import json_dumps
 import logging
 from typing import Any, Dict, List, Optional
 
@@ -120,11 +120,11 @@ class MarkdownFormatStrategy:
                 lines.append(output)
         elif isinstance(output, dict):
             lines.append("```json")
-            lines.append(json.dumps(output, indent=2, default=str))
+            lines.append(json_dumps(output, indent=2, default=str))
             lines.append("```")
         elif isinstance(output, list):
             lines.append("```json")
-            lines.append(json.dumps(output, indent=2, default=str))
+            lines.append(json_dumps(output, indent=2, default=str))
             lines.append("```")
         else:
             lines.append(f"``{output}```")

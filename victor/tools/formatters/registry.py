@@ -1,7 +1,7 @@
 """Formatter registry and centralized formatting logic."""
 
 import hashlib
-import json
+from victor.core.json_utils import json_dumps
 import logging
 import time
 from typing import Any, Dict, Optional
@@ -136,7 +136,7 @@ class _FormatCache:
 
         # Sort dict keys for consistency
         if isinstance(data, dict):
-            sorted_data = json.dumps(data, sort_keys=True)
+            sorted_data = json_dumps(data, sort_keys=True)
         else:
             sorted_data = str(data)
 
@@ -147,7 +147,7 @@ class _FormatCache:
             k: v for k, v in kwargs.items() if k not in ("ttl", "max_size", "max_time_ms")
         }
         if cacheable_kwargs:
-            sorted_kwargs = json.dumps(cacheable_kwargs, sort_keys=True)
+            sorted_kwargs = json_dumps(cacheable_kwargs, sort_keys=True)
             key_parts.append(sorted_kwargs)
 
         key_string = ":".join(key_parts)

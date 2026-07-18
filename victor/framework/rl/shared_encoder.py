@@ -40,7 +40,7 @@ Sprint 5: Advanced RL Patterns
 """
 
 import hashlib
-import json
+from victor.core.json_utils import json_loads
 import logging
 import math
 from dataclasses import dataclass, field
@@ -223,7 +223,7 @@ class SharedEncoder:
         try:
             cursor.execute("SELECT task_type, vector FROM learned_task_embeddings")
             for row in cursor.fetchall():
-                self._task_embeddings[row[0]] = json.loads(row[1])
+                self._task_embeddings[row[0]] = json_loads(row[1])
 
             logger.debug(f"SharedEncoder: Loaded {len(self._task_embeddings)} task embeddings")
         except Exception as e:

@@ -25,6 +25,7 @@ Provides:
 from __future__ import annotations
 
 import json
+from victor.core.json_utils import json_dumps
 import logging
 from dataclasses import asdict
 from datetime import datetime
@@ -188,7 +189,7 @@ class CreditAssignmentDB:
                     sum(s.credit for s in signals),
                     1 if success else 0,
                     duration,
-                    json.dumps(metadata) if metadata else None,
+                    json_dumps(metadata) if metadata else None,
                     len(set(s.metadata.agent_id for s in signals if s.metadata)),
                     team_id,
                 ),
@@ -221,7 +222,7 @@ class CreditAssignmentDB:
                         signal_dict.get("metadata", {}).get("method_name"),
                         signal_dict.get("metadata", {}).get("turn_index", 0),
                         signal_dict.get("metadata", {}).get("step_index", 0),
-                        json.dumps(signal.attribution) if signal.attribution else None,
+                        json_dumps(signal.attribution) if signal.attribution else None,
                     ),
                 )
 

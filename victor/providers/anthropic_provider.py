@@ -14,7 +14,7 @@
 
 """Anthropic Claude provider implementation."""
 
-import json
+from victor.core.json_utils import json_dumps, json_loads
 from typing import Any, AsyncIterator, Dict, List, Optional
 
 from anthropic import AsyncAnthropic
@@ -507,7 +507,7 @@ class AnthropicProvider(BaseProvider):
                                     tool_calls[tc_id]["arguments"] = existing_args + partial
                                 else:
                                     tool_calls[tc_id]["arguments"] = (
-                                        json.dumps(existing_args) + partial
+                                        json_dumps(existing_args) + partial
                                     )
 
                     elif event_type == "content_block_stop":
@@ -649,7 +649,7 @@ class AnthropicProvider(BaseProvider):
             return raw_args
         if isinstance(raw_args, str):
             try:
-                return json.loads(raw_args)
+                return json_loads(raw_args)
             except Exception:
                 return raw_args
         return raw_args

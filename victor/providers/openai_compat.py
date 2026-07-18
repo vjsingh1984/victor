@@ -21,7 +21,8 @@ These utilities help reduce code duplication across provider implementations.
 """
 
 import hashlib
-import json
+from victor.core.json_utils import json_dumps, json_loads
+from json import JSONDecodeError
 import logging
 import re
 import uuid
@@ -52,7 +53,7 @@ def _serialized_tools_fingerprint(converted: List[Dict[str, Any]]) -> str:
     fingerprint is stable across turns, the provider can cache the tools
     prefix; if it churns, the prefix cache misses every turn.
     """
-    payload = json.dumps(converted, sort_keys=True, separators=(",", ":"))
+    payload = json_dumps(converted, sort_keys=True, separators=(",", ":"))
     return hashlib.md5(payload.encode("utf-8")).hexdigest()[:12]
 
 
@@ -193,7 +194,7 @@ def convert_messages_to_openai_format(messages: List[Message]) -> List[Dict[str,
                     "function": {
                         "name": tc.get("name", ""),
                         "arguments": (
-                            json.dumps(tc.get("arguments", {}))
+                            json_dumps(tc.get("arguments", {}))
                             if isinstance(tc.get("arguments"), dict)
                             else tc.get("arguments", "{}")
                         ),
@@ -236,8 +237,8 @@ def parse_openai_tool_calls(
 
         # Parse arguments
         try:
-            arguments = json.loads(args_str) if isinstance(args_str, str) else args_str
-        except json.JSONDecodeError:
+            arguments = json_loads(args_str) if isinstance(args_str, str) else args_str
+        except JSONDecodeError:
             arguments = {"raw": args_str}
 
         tool_calls.append(
@@ -443,7 +444,7 @@ def _normalize_tool_call(tool_call: Any) -> Dict[str, Any]:
         tool_call_type = getattr(tool_call, "type", "function")
 
     if isinstance(arguments, dict):
-        arguments = json.dumps(arguments)
+        arguments = json_dumps(arguments)
     elif arguments is None:
         arguments = "{}"
 
@@ -619,7 +620,7 @@ def handle_httpx_status_error(
     if status == 400:
         msg = raw
         try:
-            body = json.loads(raw)
+            body = json_loads(raw)
             msg = body.get("error", {}).get("message", raw)
         except Exception:
             pass
@@ -719,7 +720,7 @@ def extract_tool_calls_from_content(
     matches = re.findall(json_block_pattern, content, re.DOTALL)
     for match in matches:
         try:
-            data = json.loads(match)
+            data = json_loads(match)
             if "name" in data:
                 arguments = data.get("arguments", {})
                 if isinstance(arguments, dict) and not any(
@@ -734,7 +735,7 @@ def extract_tool_calls_from_content(
                     )
                     remaining = remaining.replace(f"```json\n{match}\n```", "").strip()
                     remaining = remaining.replace(f"```json{match}```", "").strip()
-        except json.JSONDecodeError:
+        except JSONDecodeError:
             pass
 
     # Pattern 2: <TOOL_OUTPUT> tags
@@ -742,7 +743,7 @@ def extract_tool_calls_from_content(
     matches = re.findall(tool_output_pattern, content, re.DOTALL)
     for match in matches:
         try:
-            data = json.loads(match)
+            data = json_loads(match)
             if "name" in data:
                 arguments = data.get("arguments", {})
                 if isinstance(arguments, dict) and not any(
@@ -760,13 +761,13 @@ def extract_tool_calls_from_content(
                         "",
                         remaining,
                     )
-        except json.JSONDecodeError:
+        except JSONDecodeError:
             pass
 
     # Pattern 3: Inline JSON (for simple cases)
     if not tool_calls and content.strip().startswith("{") and "name" in content:
         try:
-            data = json.loads(content.strip())
+            data = json_loads(content.strip())
             if "name" in data:
                 arguments = data.get("arguments", {})
                 if isinstance(arguments, dict) and not any(
@@ -780,7 +781,7 @@ def extract_tool_calls_from_content(
                         }
                     )
                     remaining = ""
-        except json.JSONDecodeError:
+        except JSONDecodeError:
             pass
 
     return tool_calls, remaining.strip()

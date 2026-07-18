@@ -28,7 +28,7 @@ Strategy:
 HIGH PRIORITY: Sprint 1 of RL Enhancement Plan
 """
 
-import json
+from victor.core.json_utils import json_dumps
 import logging
 import math
 from datetime import datetime
@@ -281,7 +281,7 @@ class ToolSelectorLearner(BaseLearner):
                 task_type,
                 tool_name,
                 reward,
-                json.dumps({"success": outcome.success, "quality_score": outcome.quality_score}),
+                json_dumps({"success": outcome.success, "quality_score": outcome.quality_score}),
                 timestamp,
             ),
         )

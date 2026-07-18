@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+from victor.core.json_utils import json_loads
 import logging
 from typing import Any, Callable, NamedTuple
 
@@ -92,7 +93,7 @@ def _warm_start_experience_store(store: Any, limit: int = 2000) -> None:
         for row in reversed(rows or []):  # oldest -> newest for faithful running stats
             task_type, success, quality_score, metadata = row[0], row[1], row[2], row[3]
             try:
-                meta = json.loads(metadata) if metadata else {}
+                meta = json_loads(metadata) if metadata else {}
             except (TypeError, ValueError):
                 meta = {}
             tool = meta.get("tool_name")

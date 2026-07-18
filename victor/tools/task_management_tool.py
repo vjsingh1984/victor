@@ -20,7 +20,8 @@ Provides structured task tracking with status progression
 
 from __future__ import annotations
 
-import json
+from victor.core.json_utils import json_dumps, json_loads
+from json import JSONDecodeError
 import logging
 import time
 from dataclasses import asdict, dataclass, field
@@ -241,7 +242,7 @@ class TaskStore:
         try:
             self._persist_path.parent.mkdir(parents=True, exist_ok=True)
             self._persist_path.write_text(
-                json.dumps(data, indent=2, ensure_ascii=False) + "\n",
+                json_dumps(data, indent=2, ensure_ascii=False) + "\n",
                 encoding="utf-8",
             )
         except OSError as exc:
@@ -254,8 +255,8 @@ class TaskStore:
 
         try:
             text = self._persist_path.read_text(encoding="utf-8")
-            data = json.loads(text)
-        except (OSError, json.JSONDecodeError) as exc:
+            data = json_loads(text)
+        except (OSError, JSONDecodeError) as exc:
             logger.error("Failed to load task store from %s: %s", self._persist_path, exc)
             return
 

@@ -59,7 +59,7 @@ Usage:
 
 import asyncio
 import hashlib
-import json
+from victor.core.json_utils import json_dumps, json_loads
 import logging
 import sqlite3
 import time
@@ -314,7 +314,7 @@ class ProfileLearningStore:
                     metrics.profile_name,
                     metrics.provider,
                     metrics.model,
-                    json.dumps(metrics_dict, default=str),
+                    json_dumps(metrics_dict, default=str),
                     datetime.now().isoformat(),
                 ),
             )
@@ -334,7 +334,7 @@ class ProfileLearningStore:
             ).fetchone()
 
             if row:
-                metrics_dict = json.loads(row["metrics_json"])
+                metrics_dict = json_loads(row["metrics_json"])
                 return ProfileMetrics(
                     profile_name=profile_name,
                     provider=provider,

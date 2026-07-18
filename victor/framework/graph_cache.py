@@ -38,7 +38,7 @@ from __future__ import annotations
 
 import hashlib
 import inspect
-import json
+from victor.core.json_utils import json_dumps
 import logging
 import threading
 import time
@@ -176,7 +176,7 @@ class CompiledGraphCache:
             "defaults": repr(getattr(func, "__defaults__", None)),
             "kwdefaults": repr(getattr(func, "__kwdefaults__", None)),
         }
-        payload = json.dumps(code_payload, sort_keys=True, default=str)
+        payload = json_dumps(code_payload, sort_keys=True, default=str)
         return hashlib.sha256(payload.encode()).hexdigest()[:16]
 
     def _compute_graph_hash(self, graph: "StateGraph") -> str:
@@ -242,7 +242,7 @@ class CompiledGraphCache:
             }
 
         # Generate hash
-        hash_str = json.dumps(hash_data, sort_keys=True, default=str)
+        hash_str = json_dumps(hash_data, sort_keys=True, default=str)
         return hashlib.sha256(hash_str.encode()).hexdigest()
 
     def get(self, graph: "StateGraph") -> Optional["CompiledGraph"]:

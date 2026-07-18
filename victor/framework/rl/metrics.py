@@ -42,7 +42,7 @@ Usage:
 
 from __future__ import annotations
 
-import json
+from victor.core.json_utils import json_dumps
 import logging
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timedelta
@@ -277,7 +277,7 @@ class RLMetricsExporter:
             "learners": learners,
         }
 
-        return json.dumps(data, indent=2, default=str)
+        return json_dumps(data, indent=2, default=str)
 
     def export_prometheus(self) -> str:
         """Export metrics in Prometheus text exposition format.

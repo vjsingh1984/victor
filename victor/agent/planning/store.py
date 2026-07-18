@@ -39,7 +39,7 @@ Usage:
 
 from __future__ import annotations
 
-import json
+from victor.core.json_utils import json_dumps, json_loads
 import logging
 import os
 import re
@@ -210,7 +210,7 @@ class PlanStore:
         }
 
         lines.append("---")
-        lines.append(json.dumps(frontmatter, indent=2))
+        lines.append(json_dumps(frontmatter, indent=2))
         lines.append("---")
         lines.append("")
 
@@ -229,7 +229,7 @@ class PlanStore:
                 parts = content.split("---", 2)
                 if len(parts) >= 3:
                     frontmatter_json = parts[1].strip()
-                    data = json.loads(frontmatter_json)
+                    data = json_loads(frontmatter_json)
                     return ExecutionPlan.from_dict(data)
 
             return None

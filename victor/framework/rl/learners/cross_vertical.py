@@ -51,7 +51,8 @@ Usage:
 
 from __future__ import annotations
 
-import json
+from victor.core.json_utils import json_dumps, json_loads
+from json import JSONDecodeError
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -297,7 +298,7 @@ class CrossVerticalLearner(BaseLearner):
             try:
                 import json
 
-                metadata = json.loads(row[0])
+                metadata = json_loads(row[0])
                 return metadata.get("mode")
             except Exception:
                 pass
@@ -542,7 +543,7 @@ class CrossVerticalLearner(BaseLearner):
             min_confidence: Minimum pattern confidence to include
 
         Returns:
-            Dict ready for json.dumps, importable via import_patterns()
+            Dict ready for json_dumps, importable via import_patterns()
         """
         # Source 1: dynamically discovered patterns from rl_outcome
         try:
@@ -567,8 +568,8 @@ class CrossVerticalLearner(BaseLearner):
             for row in cursor.fetchall():
                 rd = dict(row)
                 try:
-                    src_verts = json.loads(rd.get("source_verticals") or "[]")
-                except (json.JSONDecodeError, TypeError):
+                    src_verts = json_loads(rd.get("source_verticals") or "[]")
+                except (JSONDecodeError, TypeError):
                     src_verts = []
                 stored.append(
                     SharedPattern(
@@ -670,7 +671,7 @@ class CrossVerticalLearner(BaseLearner):
                         p.get("pattern_name", "imported"),
                         p["avg_quality"],
                         decayed_confidence,
-                        json.dumps(source_verticals),
+                        json_dumps(source_verticals),
                         p.get("recommended_mode"),
                         p.get("recommendation", ""),
                         int(p.get("sample_count", 0) * confidence_decay),

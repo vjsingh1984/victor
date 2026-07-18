@@ -28,7 +28,7 @@ Database:
 
 from __future__ import annotations
 
-import json
+from victor.core.json_utils import json_dumps, json_loads
 import logging
 import random
 import sqlite3
@@ -404,7 +404,7 @@ class TeamCompositionLearner:
             successes,
         ) = row
 
-        role_counts = json.loads(role_counts)
+        role_counts = json_loads(role_counts)
         # Estimate budget based on execution count and typical team size
         avg_budget = 40  # Default budget
 
@@ -541,7 +541,7 @@ class TeamCompositionLearner:
                     team_name,
                     category.value,
                     formation_str,
-                    json.dumps({"executor": member_count}),
+                    json_dumps({"executor": member_count}),
                     member_count,
                     tool_calls,  # Approximate budget as tool calls
                     tool_calls,
@@ -590,7 +590,7 @@ class TeamCompositionLearner:
                 (
                     comp_key,
                     formation_str,
-                    json.dumps({"executor": member_count}),
+                    json_dumps({"executor": member_count}),
                     category.value,
                     1,
                     1 if outcome.success else 0,
@@ -668,7 +668,7 @@ class TeamCompositionLearner:
                 metrics.team_id,
                 metrics.task_category.value,
                 metrics.formation.value,
-                json.dumps(metrics.role_distribution),
+                json_dumps(metrics.role_distribution),
                 metrics.member_count,
                 metrics.total_tool_budget,
                 metrics.tools_used,
@@ -760,7 +760,7 @@ class TeamCompositionLearner:
             (
                 comp_key,
                 metrics.formation.value,
-                json.dumps(metrics.role_distribution),
+                json_dumps(metrics.role_distribution),
                 metrics.task_category.value,
                 new_total_exec,
                 new_successes,
