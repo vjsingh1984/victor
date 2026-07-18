@@ -126,7 +126,6 @@ import hashlib
 import inspect
 import logging
 from victor.core.json_utils import json_dumps, json_loads
-from json import JSONDecodeError
 import threading
 import time
 import warnings
@@ -1291,7 +1290,7 @@ class VerticalIntegrationPipeline:
                 logger.debug(f"Loaded cached integration: {cache_key}")
                 return result
 
-            except (JSONDecodeError, TypeError, KeyError) as e:
+            except (ValueError, TypeError, KeyError) as e:
                 logger.warning(f"Failed to load from cache: {e}")
                 # Clear corrupted cache entry
                 self._cache.pop(cache_key, None)

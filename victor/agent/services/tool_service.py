@@ -28,7 +28,6 @@ from __future__ import annotations
 import asyncio
 import ast
 from victor.core.json_utils import json_dumps, json_loads
-from json import JSONDecodeError
 import logging
 from dataclasses import dataclass
 from typing import (
@@ -1950,7 +1949,7 @@ class ToolService:
                                 if tool_call_id:
                                     tool_call["id"] = tool_call_id
                                 tool_calls.append(tool_call)
-            except JSONDecodeError:
+            except ValueError:
                 pass
 
         return tool_calls
