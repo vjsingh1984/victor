@@ -84,6 +84,7 @@ class TurnMetrics:
     duration_ms: float = 0.0
     start_time: float = 0.0
     end_time: float = 0.0
+    tool_durations_ms: Dict[str, float] = field(default_factory=dict)
 
 
 @dataclass
@@ -238,11 +239,24 @@ class TurnTracker:
             self._current_turn.tool_categories.append(category)
 
     def record_tool_result(self, tool_name: str, duration_ms: float) -> None:
-        """Record the result of a tool execution.
+        """Record the result of a tool execution with its duration.
 
-        Currently a no-op but reserved for future per-tool timing data.
+        Accumulates per-tool timing data for the current turn, enabling
+        data-driven identification of slow tools. Logged at INFO so the
+        timing is visible in victor.log for offline analysis.
         """
-        pass
+        if self._current_turn is None:
+            return
+        # Track per-tool cumulative duration for this turn.
+        prev = self._current_turn.tool_durations_ms.get(tool_name, 0.0)
+        self._current_turn.tool_durations_ms[tool_name] = prev + duration_ms
+        if duration_ms > 100:
+            logger.info(
+                "tool_timing: %s took %.0fms (turn %d)",
+                tool_name,
+                duration_ms,
+                self._current_turn.turn_number,
+            )
 
     @staticmethod
     def _categorize_tool(tool_name: str) -> Optional[str]:
