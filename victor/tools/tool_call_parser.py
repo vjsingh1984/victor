@@ -5,7 +5,8 @@ Parses raw model output into structured tool calls and normalizes arguments.
 
 from __future__ import annotations
 
-import json
+from victor.core.json_utils import json_dumps, json_loads
+from json import JSONDecodeError
 import logging
 import re
 from dataclasses import dataclass, field
@@ -49,7 +50,7 @@ class ToolCallParser:
 
         # Try JSON-based extraction first
         try:
-            data = json.loads(raw_output)
+            data = json_loads(raw_output)
             if isinstance(data, dict) and "tool_calls" in data:
                 for tc in data["tool_calls"]:
                     calls.append(
@@ -57,11 +58,11 @@ class ToolCallParser:
                             tool_name=tc.get("name", ""),
                             arguments=tc.get("arguments", {}),
                             call_id=tc.get("id"),
-                            raw_text=json.dumps(tc),
+                            raw_text=json_dumps(tc),
                         )
                     )
                 return calls
-        except (json.JSONDecodeError, TypeError):
+        except (JSONDecodeError, TypeError):
             pass
 
         return calls
@@ -93,9 +94,9 @@ class ToolCallParser:
                 # Try to parse nested JSON
                 if value.startswith(("{", "[")):
                     try:
-                        normalized[key] = json.loads(value)
+                        normalized[key] = json_loads(value)
                         continue
-                    except json.JSONDecodeError:
+                    except JSONDecodeError:
                         pass
 
             normalized[key] = value

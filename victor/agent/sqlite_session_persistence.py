@@ -42,7 +42,8 @@ The ConversationStore provides feature parity and additional capabilities:
 
 from __future__ import annotations
 
-import json
+from victor.core.json_utils import json_dumps, json_loads
+from json import JSONDecodeError
 import logging
 import warnings
 from datetime import datetime, timedelta
@@ -292,7 +293,7 @@ class SQLiteSessionPersistence:
                     provider,
                     model,
                     profile,
-                    json.dumps(session_data),
+                    json_dumps(session_data),
                 ),
             )
 
@@ -327,7 +328,7 @@ class SQLiteSessionPersistence:
                         0,
                         tool_name,
                         tool_call_id,
-                        json.dumps(metadata) if metadata else None,
+                        json_dumps(metadata) if metadata else None,
                     ),
                 )
 
@@ -366,8 +367,8 @@ class SQLiteSessionPersistence:
             metadata_payload = {}
             if row[6]:
                 try:
-                    metadata_payload = json.loads(row[6])
-                except json.JSONDecodeError:
+                    metadata_payload = json_loads(row[6])
+                except JSONDecodeError:
                     logger.warning("Failed to parse session metadata for %s", session_id)
 
             if self._is_serialized_session_payload(metadata_payload):
@@ -434,8 +435,8 @@ class SQLiteSessionPersistence:
                     metadata_payload: Dict[str, Any] = {}
                     if row[6]:
                         try:
-                            metadata_payload = json.loads(row[6])
-                        except json.JSONDecodeError:
+                            metadata_payload = json_loads(row[6])
+                        except JSONDecodeError:
                             metadata_payload = {}
 
                     if self._is_serialized_session_payload(metadata_payload):
@@ -574,7 +575,7 @@ class SQLiteSessionPersistence:
                         msg["tool_call_id"] = row[3]
                     if row[4]:
                         try:
-                            metadata = json.loads(row[4])
+                            metadata = json_loads(row[4])
                             if isinstance(metadata, dict):
                                 msg.update(metadata)
                         except Exception:

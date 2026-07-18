@@ -25,7 +25,7 @@ Provides:
 from __future__ import annotations
 
 import io
-import json
+from victor.core.json_utils import json_dumps
 import logging
 from dataclasses import dataclass
 from datetime import datetime
@@ -383,7 +383,7 @@ class CreditAssignmentExporter:
         if self.config.include_attribution and attribution:
             data["attribution"] = attribution
 
-        return json.dumps(data, indent=2)
+        return json_dumps(data, indent=2)
 
     def _export_csv(
         self,

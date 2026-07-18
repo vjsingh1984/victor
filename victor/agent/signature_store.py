@@ -24,7 +24,7 @@ Database:
 from __future__ import annotations
 
 import hashlib
-import json
+from victor.core.json_utils import json_dumps
 import logging
 import sqlite3
 import threading
@@ -179,7 +179,7 @@ class SignatureStore:
         """
         try:
             # Normalize by sorting keys
-            normalized = json.dumps(args, sort_keys=True, default=str)
+            normalized = json_dumps(args, sort_keys=True, default=str)
         except Exception:
             normalized = str(args)
 
@@ -284,7 +284,7 @@ class SignatureStore:
                     (
                         tool_name,
                         args_hash,
-                        json.dumps(args, default=str),
+                        json_dumps(args, default=str),
                         error_message[:500],  # Limit error message length
                         now,
                         now,

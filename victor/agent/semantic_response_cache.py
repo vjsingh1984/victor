@@ -28,7 +28,7 @@ Features:
 from __future__ import annotations
 
 import hashlib
-import json
+from victor.core.json_utils import json_dumps
 import logging
 import re
 import threading
@@ -144,7 +144,7 @@ class SemanticResponseCache:
 
     def _hash_query(self, query: str, context: Optional[Dict[str, Any]] = None) -> str:
         """Generate hash for query + context."""
-        context_str = json.dumps(context, sort_keys=True, default=str) if context else ""
+        context_str = json_dumps(context, sort_keys=True, default=str) if context else ""
         combined = f"{query}||{context_str}"
         return hashlib.md5(combined.encode()).hexdigest()
 

@@ -41,7 +41,8 @@ Recommended GGUF models for coding (Q4_K_M quantization):
 Download models from: https://huggingface.co/models?sort=trending&search=gguf
 """
 
-import json
+from victor.core.json_utils import json_loads
+from json import JSONDecodeError
 import re
 from typing import Any, AsyncIterator, Dict, List, Optional, Tuple
 
@@ -579,7 +580,7 @@ class LlamaCppProvider(BaseProvider):
 
                     if line.startswith("data: "):
                         try:
-                            data = json.loads(line[6:])
+                            data = json_loads(line[6:])
                             choices = data.get("choices", [])
                             if not choices:
                                 continue
@@ -633,11 +634,11 @@ class LlamaCppProvider(BaseProvider):
                                     for tc in accumulated_tool_calls:
                                         try:
                                             args = (
-                                                json.loads(tc["arguments"])
+                                                json_loads(tc["arguments"])
                                                 if tc["arguments"]
                                                 else {}
                                             )
-                                        except json.JSONDecodeError:
+                                        except JSONDecodeError:
                                             args = {"raw": tc["arguments"]}
                                         parsed_tool_calls.append(
                                             {
@@ -669,7 +670,7 @@ class LlamaCppProvider(BaseProvider):
                                     stop_reason=finish_reason,
                                 )
 
-                        except json.JSONDecodeError:
+                        except JSONDecodeError:
                             self._provider_logger.logger.debug(
                                 f"Failed to parse streaming chunk: {line}"
                             )

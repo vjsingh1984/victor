@@ -20,7 +20,8 @@ within .ipynb files, preserving notebook metadata and kernel specs.
 
 from __future__ import annotations
 
-import json
+from victor.core.json_utils import json_dumps, json_loads
+from json import JSONDecodeError
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
@@ -157,8 +158,8 @@ def _read_notebook(path: Path) -> Dict[str, Any]:
 
     text = path.read_text(encoding="utf-8")
     try:
-        notebook = json.loads(text)
-    except json.JSONDecodeError as exc:
+        notebook = json_loads(text)
+    except JSONDecodeError as exc:
         raise ValueError(f"Invalid JSON in notebook: {exc}") from exc
 
     if not isinstance(notebook.get("cells"), list):
@@ -177,7 +178,7 @@ def _write_notebook(path: Path, notebook: Dict[str, Any]) -> None:
         path: Filesystem path to write.
         notebook: The notebook dictionary to serialize.
     """
-    text = json.dumps(notebook, indent=1, ensure_ascii=False) + "\n"
+    text = json_dumps(notebook, indent=1, ensure_ascii=False) + "\n"
     path.write_text(text, encoding="utf-8")
 
 

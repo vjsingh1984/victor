@@ -19,7 +19,8 @@ Provides a unified interface for handling tool calling across different
 LLM providers, abstracting away provider-specific formats and behaviors.
 """
 
-import json
+from victor.core.json_utils import json_dumps, json_loads
+from json import JSONDecodeError
 import logging
 import re
 from abc import ABC, abstractmethod
@@ -234,11 +235,11 @@ class FallbackParsingMixin:
 
         if isinstance(args, str):
             try:
-                parsed = json.loads(args)
+                parsed = json_loads(args)
                 if isinstance(parsed, dict):
                     return parsed, None
                 return {}, f"Parsed JSON is not a dict: {type(parsed).__name__}"
-            except json.JSONDecodeError:
+            except JSONDecodeError:
                 return {}, "Failed to parse JSON arguments"
 
         return {}, f"Unexpected argument type: {type(args).__name__}"
@@ -343,7 +344,7 @@ class FallbackParsingMixin:
 
         for json_str in json_candidates:
             try:
-                data = json.loads(json_str)
+                data = json_loads(json_str)
                 if isinstance(data, dict) and "name" in data:
                     name = data.get("name", "")
 
@@ -360,7 +361,7 @@ class FallbackParsingMixin:
                         parse_method="json_fallback",
                         confidence=0.9,
                     )
-            except json.JSONDecodeError:
+            except JSONDecodeError:
                 continue  # Try next candidate
 
         return ToolCallParseResult(remaining_content=content)
@@ -423,7 +424,7 @@ class FallbackParsingMixin:
                     param_pattern = r"<parameter=([^>]+)>\s*(.*?)\s*</parameter>"
                     param_matches = re.findall(param_pattern, params_content, re.DOTALL)
                     args = {p.strip(): v.strip() for p, v in param_matches}
-                    matches.append((name, json.dumps(args)))
+                    matches.append((name, json_dumps(args)))
 
         # Pattern 4: Attribute-style XML tags used by some models (e.g. glm-5.1):
         #   <code_search query="..." path="..." mode="semantic"/>
@@ -444,7 +445,7 @@ class FallbackParsingMixin:
                 body = (m.group(3) or "").strip()
                 if body and not attrs:
                     attrs = {"content": body}
-                matches.append((tag_name, json.dumps(attrs)))
+                matches.append((tag_name, json_dumps(attrs)))
                 attr_pattern_used = True
             if attr_pattern_used:
                 matched_patterns.append(attr_tag_re.pattern)

@@ -24,7 +24,7 @@ this implementation for compatibility.
 from __future__ import annotations
 
 import asyncio
-import json
+from victor.core.json_utils import json_dumps
 import logging
 from typing import (
     Any,
@@ -324,7 +324,7 @@ class ToolObservabilityHandler:
             text = result.strip()
         elif isinstance(result, (dict, list)):
             try:
-                text = json.dumps(result, ensure_ascii=False)
+                text = json_dumps(result, ensure_ascii=False)
             except Exception:
                 text = str(result)
         else:

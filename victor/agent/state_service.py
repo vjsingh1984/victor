@@ -39,7 +39,7 @@ Benefits:
 
 from __future__ import annotations
 
-import json
+from victor.core.json_utils import json_dumps, json_loads
 import logging
 import uuid
 from dataclasses import asdict
@@ -143,26 +143,26 @@ class StateService:
             "project_path": project_path,
             "session_id": session_id,
             "state_data": state_data,
-            "config_json": json.dumps(context.config) if context.config else None,
-            "stages_json": json.dumps(context.stages) if context.stages else None,
+            "config_json": json_dumps(context.config) if context.config else None,
+            "stages_json": json_dumps(context.stages) if context.stages else None,
             "middleware_json": (
-                json.dumps([self._serialize_middleware(m) for m in context.middleware])
+                json_dumps([self._serialize_middleware(m) for m in context.middleware])
                 if context.middleware
                 else None
             ),
             "safety_patterns_json": (
-                json.dumps([self._serialize_safety_pattern(p) for p in context.safety_patterns])
+                json_dumps([self._serialize_safety_pattern(p) for p in context.safety_patterns])
                 if context.safety_patterns
                 else None
             ),
             "enabled_tools_json": (
-                json.dumps(list(context.enabled_tools)) if context.enabled_tools else None
+                json_dumps(list(context.enabled_tools)) if context.enabled_tools else None
             ),
             "mode_configs_json": (
-                json.dumps(context.mode_configs) if context.mode_configs else None
+                json_dumps(context.mode_configs) if context.mode_configs else None
             ),
             "negotiation_results_json": (
-                json.dumps(context.capability_negotiation_results)
+                json_dumps(context.capability_negotiation_results)
                 if context.capability_negotiation_results
                 else None
             ),
@@ -270,24 +270,24 @@ class StateService:
                 f"WHERE id = ?",
                 (
                     state_data,
-                    json.dumps(context.config) if context.config else None,
-                    json.dumps(context.stages) if context.stages else None,
+                    json_dumps(context.config) if context.config else None,
+                    json_dumps(context.stages) if context.stages else None,
                     (
-                        json.dumps([self._serialize_middleware(m) for m in context.middleware])
+                        json_dumps([self._serialize_middleware(m) for m in context.middleware])
                         if context.middleware
                         else None
                     ),
                     (
-                        json.dumps(
+                        json_dumps(
                             [self._serialize_safety_pattern(p) for p in context.safety_patterns]
                         )
                         if context.safety_patterns
                         else None
                     ),
-                    (json.dumps(list(context.enabled_tools)) if context.enabled_tools else None),
-                    json.dumps(context.mode_configs) if context.mode_configs else None,
+                    (json_dumps(list(context.enabled_tools)) if context.enabled_tools else None),
+                    json_dumps(context.mode_configs) if context.mode_configs else None,
                     (
-                        json.dumps(context.capability_negotiation_results)
+                        json_dumps(context.capability_negotiation_results)
                         if context.capability_negotiation_results
                         else None
                     ),
@@ -421,9 +421,9 @@ class StateService:
                         capability_name,
                         result_dict.get("status"),
                         result_dict.get("agreed_version"),
-                        json.dumps(result_dict.get("supported_features", [])),
-                        json.dumps(result_dict.get("unsupported_features", [])),
-                        json.dumps(result_dict.get("missing_required_features", [])),
+                        json_dumps(result_dict.get("supported_features", [])),
+                        json_dumps(result_dict.get("unsupported_features", [])),
+                        json_dumps(result_dict.get("missing_required_features", [])),
                         result_dict.get("fallback_version"),
                         result_dict.get("error"),
                     ),
@@ -460,9 +460,9 @@ class StateService:
                 results[row[0]] = {
                     "status": row[1],
                     "agreed_version": row[2],
-                    "supported_features": json.loads(row[3]) if row[3] else [],
-                    "unsupported_features": json.loads(row[4]) if row[4] else [],
-                    "missing_required_features": json.loads(row[5]) if row[5] else [],
+                    "supported_features": json_loads(row[3]) if row[3] else [],
+                    "unsupported_features": json_loads(row[4]) if row[4] else [],
+                    "missing_required_features": json_loads(row[5]) if row[5] else [],
                     "fallback_version": row[6],
                     "error": row[7],
                 }
@@ -498,7 +498,7 @@ class StateService:
             "tool_sequences": context.tool_sequences,
             "enabled_tools": list(context.enabled_tools),
         }
-        return json.dumps(data)
+        return json_dumps(data)
 
     def _deserialize_context(
         self,
@@ -522,28 +522,28 @@ class StateService:
         # Parse state_data
         state_data_str = row[5]
         if state_data_str:
-            state_data = json.loads(state_data_str)
+            state_data = json_loads(state_data_str)
         else:
             state_data = {}
 
         # Parse stages
         stages_str = row[7]
         if stages_str:
-            stages = json.loads(stages_str)
+            stages = json_loads(stages_str)
         else:
             stages = {}
 
         # Parse enabled_tools
         tools_str = row[10]
         if tools_str:
-            enabled_tools = set(json.loads(tools_str))
+            enabled_tools = set(json_loads(tools_str))
         else:
             enabled_tools = set()
 
         # Parse mode_configs
         mode_str = row[11]
         if mode_str:
-            mode_configs = json.loads(mode_str)
+            mode_configs = json_loads(mode_str)
         else:
             mode_configs = {}
 

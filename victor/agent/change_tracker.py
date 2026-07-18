@@ -19,7 +19,7 @@ Victor, enabling undo/redo operations similar to OpenCode's /undo and /redo.
 """
 
 import hashlib
-import json
+from victor.core.json_utils import json_dumps, json_loads
 import logging
 import os
 import shutil
@@ -301,7 +301,7 @@ class FileChangeHistory:
         rows = cursor.fetchall()
         for (data,) in reversed(rows):  # Reverse to maintain order
             try:
-                group = ChangeGroup.from_dict(json.loads(data))
+                group = ChangeGroup.from_dict(json_loads(data))
                 self._undo_stack.append(group)
             except Exception as e:
                 logger.warning(f"Failed to load change group: {e}")
@@ -433,7 +433,7 @@ class FileChangeHistory:
                 group.description,
                 group.tool_name,
                 1 if group.undone else 0,
-                json.dumps(group.to_dict()),
+                json_dumps(group.to_dict()),
             ),
         )
 

@@ -28,7 +28,7 @@ Data can be exported to:
 
 from __future__ import annotations
 
-import json
+from victor.core.json_utils import json_dumps
 import logging
 import sqlite3
 import threading
@@ -449,7 +449,7 @@ class RecoveryTelemetryCollector:
             "strategy_effectiveness": self.get_strategy_effectiveness(),
             "model_failure_patterns": self.get_model_failure_patterns(),
         }
-        return json.dumps(report, indent=2, default=str)
+        return json_dumps(report, indent=2, default=str)
 
     def clear_old_events(self, max_age_hours: int = 168) -> int:
         """Clear events older than max_age_hours. Returns count of cleared events."""

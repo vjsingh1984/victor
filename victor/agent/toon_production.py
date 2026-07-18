@@ -39,7 +39,7 @@ Usage:
 
 from __future__ import annotations
 
-import json
+from victor.core.json_utils import json_dumps
 import logging
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Union
@@ -299,7 +299,7 @@ class ToonFormatter:
             JSON-formatted string
         """
         try:
-            return json.dumps(data, ensure_ascii=False, default=str)
+            return json_dumps(data, ensure_ascii=False, default=str)
         except Exception:
             return str(data)
 

@@ -46,7 +46,7 @@ Usage:
 """
 
 import asyncio
-import json
+from victor.core.json_utils import json_dumps
 import logging
 import pickle
 import threading
@@ -793,7 +793,7 @@ class UsageAnalytics:
                 quality_score=None,
                 metadata={
                     "feedback_source": "auto",
-                    "session_summary": json.dumps(summary),
+                    "session_summary": json_dumps(summary),
                     "total_sessions": summary.get("total_sessions", 0),
                     "avg_turns_per_session": summary.get("avg_turns_per_session", 0.0),
                     "avg_tool_calls_per_session": summary.get("avg_tool_calls_per_session", 0.0),
@@ -933,7 +933,7 @@ class UsageAnalytics:
                 "recommendations": self.get_optimization_recommendations(),
             }
 
-        return json.dumps(data, indent=2, default=str)
+        return json_dumps(data, indent=2, default=str)
 
     # ========================================================================
     # Persistence

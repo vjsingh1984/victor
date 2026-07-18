@@ -22,7 +22,8 @@ Capabilities are resolved from model_capabilities.yaml when available,
 falling back to hardcoded defaults for robustness.
 """
 
-import json
+from victor.core.json_utils import json_loads
+from json import JSONDecodeError
 import logging
 import re
 from typing import Any, Callable, Dict, List, Optional
@@ -283,8 +284,8 @@ class OpenAIToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
                 args = tc.get("arguments", {})
                 if isinstance(args, str):
                     try:
-                        args = json.loads(args)
-                    except json.JSONDecodeError:
+                        args = json_loads(args)
+                    except JSONDecodeError:
                         native_warnings.append(f"Failed to parse arguments for {name}")
                         args = {}
 
@@ -845,8 +846,8 @@ class GoogleToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
                 args = tc.get("args", {}) or tc.get("arguments", {})
                 if isinstance(args, str):
                     try:
-                        args = json.loads(args)
-                    except json.JSONDecodeError:
+                        args = json_loads(args)
+                    except JSONDecodeError:
                         warnings.append(f"Failed to parse arguments for {name}")
                         args = {}
 
@@ -894,7 +895,7 @@ class GoogleToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
             json_str = match.group(2).strip()
             if tool_name and self.is_valid_tool_name(tool_name):
                 try:
-                    args = json.loads(json_str) if json_str else {}
+                    args = json_loads(json_str) if json_str else {}
                     canonical_tool_name = get_canonical_name(tool_name)
                     tool_calls.append(
                         ToolCall(
@@ -904,7 +905,7 @@ class GoogleToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
                     )
                     remaining = remaining.replace(match.group(0), "")
                     logger.debug(f"Parsed ctrl42 call: {tool_name}({args})")
-                except json.JSONDecodeError:
+                except JSONDecodeError:
                     warnings.append(f"Failed to parse JSON for {tool_name}: {json_str[:50]}")
 
         # Parse simpler call: patterns
@@ -913,7 +914,7 @@ class GoogleToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
             json_str = match.group(2).strip()
             if tool_name and self.is_valid_tool_name(tool_name):
                 try:
-                    args = json.loads(json_str) if json_str else {}
+                    args = json_loads(json_str) if json_str else {}
                     canonical_tool_name = get_canonical_name(tool_name)
                     tool_calls.append(
                         ToolCall(
@@ -923,7 +924,7 @@ class GoogleToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
                     )
                     remaining = remaining.replace(match.group(0), "")
                     logger.debug(f"Parsed simple call: {tool_name}({args})")
-                except json.JSONDecodeError:
+                except JSONDecodeError:
                     warnings.append(f"Failed to parse JSON for {tool_name}")
 
         # Strip hallucinated tool output (Gemini likes to make up results)
@@ -1180,14 +1181,14 @@ class LMStudioToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
 
         for match in matches:
             try:
-                data = json.loads(match.strip())
+                data = json_loads(match.strip())
                 name = data.get("name", "")
                 if self.is_valid_tool_name(name):
                     args = data.get("arguments") or data.get("parameters", {})
                     tool_calls.append(ToolCall(name=name, arguments=args))
                 else:
                     warnings.append(f"Skipped invalid tool name: {name}")
-            except json.JSONDecodeError:
+            except JSONDecodeError:
                 warnings.append(f"Failed to parse TOOL_REQUEST JSON: {match[:50]}...")
 
         remaining = re.sub(pattern, "", content, flags=re.DOTALL).strip()
@@ -1390,8 +1391,8 @@ class OpenAICompatToolCallingAdapter(BaseToolCallingAdapter):
                 args = tc.get("arguments", {})
                 if isinstance(args, str):
                     try:
-                        args = json.loads(args)
-                    except json.JSONDecodeError:
+                        args = json_loads(args)
+                    except JSONDecodeError:
                         warnings.append(f"Failed to parse arguments for {name}")
                         args = {}
 
@@ -1426,7 +1427,7 @@ class OpenAICompatToolCallingAdapter(BaseToolCallingAdapter):
             return ToolCallParseResult()
 
         try:
-            data = json.loads(content)
+            data = json_loads(content)
             if isinstance(data, dict) and "name" in data:
                 name = data.get("name", "")
                 if self.is_valid_tool_name(name):
@@ -1437,7 +1438,7 @@ class OpenAICompatToolCallingAdapter(BaseToolCallingAdapter):
                         parse_method="json_fallback",
                         confidence=0.9,
                     )
-        except json.JSONDecodeError:
+        except JSONDecodeError:
             pass
 
         return ToolCallParseResult(remaining_content=content)
@@ -1455,12 +1456,12 @@ class OpenAICompatToolCallingAdapter(BaseToolCallingAdapter):
 
         for match in matches:
             try:
-                data = json.loads(match.strip())
+                data = json_loads(match.strip())
                 name = data.get("name", "")
                 if self.is_valid_tool_name(name):
                     args = data.get("arguments") or data.get("parameters", {})
                     tool_calls.append(ToolCall(name=name, arguments=args))
-            except json.JSONDecodeError:
+            except JSONDecodeError:
                 warnings.append("Failed to parse TOOL_REQUEST content")
 
         remaining = re.sub(pattern, "", content, flags=re.DOTALL).strip()
@@ -1661,8 +1662,8 @@ class DeepSeekToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
                 # Parse arguments (may be string or dict)
                 if isinstance(args, str):
                     try:
-                        args = json.loads(args)
-                    except json.JSONDecodeError:
+                        args = json_loads(args)
+                    except JSONDecodeError:
                         warnings.append(f"Failed to parse arguments for {name}")
                         args = {}
 
@@ -1842,8 +1843,8 @@ class BedrockToolCallingAdapter(BaseToolCallingAdapter):
             arguments = tc.get("arguments", {})
             if isinstance(arguments, str):
                 try:
-                    arguments = json.loads(arguments)
-                except json.JSONDecodeError:
+                    arguments = json_loads(arguments)
+                except JSONDecodeError:
                     warnings.append(f"Failed to parse arguments for {name}")
                     arguments = {}
 
@@ -2002,8 +2003,8 @@ class AzureOpenAIToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter
                 # Parse arguments (may be string or dict)
                 if isinstance(args, str):
                     try:
-                        args = json.loads(args)
-                    except json.JSONDecodeError:
+                        args = json_loads(args)
+                    except JSONDecodeError:
                         warnings.append(f"Failed to parse arguments for {name}")
                         args = {}
 

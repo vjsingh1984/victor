@@ -63,7 +63,7 @@ def test_tool_service_parse_and_validate_tool_calls_matches_runtime_contract():
     service.bind_runtime_components(tool_call_parser=parser)
     service.set_enabled_tools({"read"})
 
-    tool_call = SimpleNamespace(to_dict=lambda: {"name": "read", "arguments": '{"path": "a.py"}'})
+    tool_call = SimpleNamespace(to_dict=lambda: {"name": "read", "arguments": '{"path":"a.py"}'})
     parse_result = SimpleNamespace(
         tool_calls=[tool_call],
         warnings=[],
@@ -447,7 +447,7 @@ def test_tool_service_normalize_arguments_full_matches_legacy_contract():
     normalized = service.normalize_arguments_full(
         "read",
         "read",
-        '{"path": "a.py"}',
+        '{"path":"a.py"}',
         argument_normalizer,
         tool_adapter,
         failed_signatures={("read", '{"path": "b.py"}')},
@@ -455,7 +455,7 @@ def test_tool_service_normalize_arguments_full_matches_legacy_contract():
 
     assert normalized.args == {"path": "a.py"}
     assert normalized.strategy == "direct"
-    assert normalized.signature == ("read", '{"path": "a.py"}')
+    assert normalized.signature == ("read", '{"path":"a.py"}')
     assert normalized.is_repeated_failure is False
 
 

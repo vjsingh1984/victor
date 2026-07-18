@@ -32,7 +32,7 @@ Algorithm: Online gradient descent with momentum
 Sprint 4: Implicit Feedback Enhancement
 """
 
-import json
+from victor.core.json_utils import json_dumps
 import logging
 import math
 from datetime import datetime
@@ -353,7 +353,7 @@ class QualityWeightLearner(BaseLearner):
                 self.name,
                 task_type,
                 success,
-                json.dumps(
+                json_dumps(
                     {
                         "dimension_scores": dimension_scores,
                         "weights_used": self._weights[task_type],

@@ -33,6 +33,7 @@ Sprint 6: Observability & Polish
 import gzip
 import hashlib
 import json
+from victor.core.json_utils import json_dumps, json_loads
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -69,7 +70,7 @@ class PolicyCheckpoint:
     @property
     def state_hash(self) -> str:
         """Compute hash of the state for comparison."""
-        state_json = json.dumps(self.state, sort_keys=True)
+        state_json = json_dumps(self.state, sort_keys=True)
         return hashlib.sha256(state_json.encode()).hexdigest()[:16]
 
     def to_dict(self) -> Dict[str, Any]:
@@ -244,11 +245,11 @@ class CheckpointStore:
                     checkpoint_id=row_dict["checkpoint_id"],
                     learner_name=row_dict["learner_name"],
                     version=row_dict["version"],
-                    state=json.loads(row_dict["state"]),
-                    metadata=json.loads(row_dict["metadata"]),
+                    state=json_loads(row_dict["state"]),
+                    metadata=json_loads(row_dict["metadata"]),
                     timestamp=row_dict["timestamp"],
                     parent_id=row_dict["parent_id"],
-                    tags=json.loads(row_dict["tags"]),
+                    tags=json_loads(row_dict["tags"]),
                 )
 
                 if checkpoint.learner_name not in self._cache:
@@ -372,11 +373,11 @@ class CheckpointStore:
                 checkpoint.checkpoint_id,
                 checkpoint.learner_name,
                 checkpoint.version,
-                json.dumps(checkpoint.state),
-                json.dumps(checkpoint.metadata),
+                json_dumps(checkpoint.state),
+                json_dumps(checkpoint.metadata),
                 checkpoint.timestamp,
                 checkpoint.parent_id,
-                json.dumps(checkpoint.tags),
+                json_dumps(checkpoint.tags),
                 checkpoint.state_hash,
             ),
         )

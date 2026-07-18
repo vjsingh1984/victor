@@ -125,7 +125,7 @@ import copy
 import hashlib
 import inspect
 import logging
-import json
+from victor.core.json_utils import json_dumps, json_loads
 import threading
 import time
 import warnings
@@ -1284,13 +1284,13 @@ class VerticalIntegrationPipeline:
                 return None
 
             try:
-                result = IntegrationResult.from_dict(json.loads(cached_data))
+                result = IntegrationResult.from_dict(json_loads(cached_data))
 
                 # Log metrics
                 logger.debug(f"Loaded cached integration: {cache_key}")
                 return result
 
-            except (json.JSONDecodeError, TypeError, KeyError) as e:
+            except (ValueError, TypeError, KeyError) as e:
                 logger.warning(f"Failed to load from cache: {e}")
                 # Clear corrupted cache entry
                 self._cache.pop(cache_key, None)
@@ -1310,7 +1310,7 @@ class VerticalIntegrationPipeline:
         """
         try:
             # Serialize result using JSON (avoids pickle issues)
-            data = json.dumps(result.to_dict())
+            data = json_dumps(result.to_dict())
 
             with self._cache_lock:
                 self._cache_policy.save(
@@ -1352,7 +1352,7 @@ class VerticalIntegrationPipeline:
     def _hash_plan_payload(self, payload: Any) -> str:
         """Create a deterministic fingerprint for plan payloads."""
         try:
-            raw = json.dumps(payload, sort_keys=True, default=str)
+            raw = json_dumps(payload, sort_keys=True, default=str)
         except TypeError:
             raw = repr(payload)
         return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]

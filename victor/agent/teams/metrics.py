@@ -20,7 +20,7 @@ team execution performance, which feeds into the Q-learning system.
 
 from __future__ import annotations
 
-import json
+from victor.core.json_utils import json_dumps, json_loads
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -150,13 +150,13 @@ class TeamMetrics:
             "task_category": self.task_category.value,
             "formation": self.formation.value,
             "member_count": self.member_count,
-            "role_distribution": json.dumps(self.role_distribution),
+            "role_distribution": json_dumps(self.role_distribution),
             "total_tool_budget": self.total_tool_budget,
             "tools_used": self.tools_used,
             "success": self.success,
             "quality_score": self.quality_score,
             "duration_seconds": self.duration_seconds,
-            "member_results": json.dumps(self.member_results),
+            "member_results": json_dumps(self.member_results),
             "discoveries_count": self.discoveries_count,
             "timestamp": self.timestamp,
         }
@@ -166,11 +166,11 @@ class TeamMetrics:
         """Create from dictionary."""
         role_dist = data.get("role_distribution", "{}")
         if isinstance(role_dist, str):
-            role_dist = json.loads(role_dist)
+            role_dist = json_loads(role_dist)
 
         member_results = data.get("member_results", "{}")
         if isinstance(member_results, str):
-            member_results = json.loads(member_results)
+            member_results = json_loads(member_results)
 
         return cls(
             team_id=data["team_id"],
@@ -341,7 +341,7 @@ class CompositionStats:
         """Serialize to dictionary."""
         return {
             "formation": self.formation.value,
-            "role_counts": json.dumps(self.role_counts),
+            "role_counts": json_dumps(self.role_counts),
             "task_category": self.task_category.value,
             "total_executions": self.total_executions,
             "successes": self.successes,
@@ -357,7 +357,7 @@ class CompositionStats:
         """Create from dictionary."""
         role_counts = data.get("role_counts", "{}")
         if isinstance(role_counts, str):
-            role_counts = json.loads(role_counts)
+            role_counts = json_loads(role_counts)
 
         return cls(
             formation=TeamFormation(data["formation"]),

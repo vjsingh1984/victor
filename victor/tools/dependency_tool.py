@@ -30,7 +30,8 @@ Consolidates all dependency operations into a single tool for better token effic
 Supports: list, outdated, security, generate, update, tree, check.
 """
 
-import json
+from victor.core.json_utils import json_loads
+from json import JSONDecodeError
 import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -73,8 +74,8 @@ async def _do_list() -> Dict[str, Any]:
         return {"success": False, "error": f"Failed to list packages: {stderr}"}
 
     try:
-        packages = json.loads(stdout)
-    except json.JSONDecodeError as e:
+        packages = json_loads(stdout)
+    except JSONDecodeError as e:
         return {"success": False, "error": f"Failed to parse package list: {e}"}
 
     report = []
@@ -116,8 +117,8 @@ async def _do_outdated() -> Dict[str, Any]:
         }
 
     try:
-        outdated = json.loads(stdout)
-    except json.JSONDecodeError as e:
+        outdated = json_loads(stdout)
+    except JSONDecodeError as e:
         return {"success": False, "error": f"Failed to parse outdated list: {e}"}
 
     if not outdated:
@@ -190,8 +191,8 @@ async def _do_security() -> Dict[str, Any]:
         return {"success": False, "error": f"Security audit failed: {stderr}"}
 
     try:
-        packages = json.loads(stdout)
-    except json.JSONDecodeError as e:
+        packages = json_loads(stdout)
+    except JSONDecodeError as e:
         return {"success": False, "error": f"Failed to parse package list: {e}"}
 
     vulnerabilities = []
@@ -327,8 +328,8 @@ async def _do_check(requirements_file: str) -> Dict[str, Any]:
         return {"success": False, "error": f"Failed to check requirements: {stderr}"}
 
     try:
-        installed = {pkg["name"].lower(): pkg["version"] for pkg in json.loads(stdout)}
-    except json.JSONDecodeError as e:
+        installed = {pkg["name"].lower(): pkg["version"] for pkg in json_loads(stdout)}
+    except JSONDecodeError as e:
         return {"success": False, "error": f"Failed to parse package list: {e}"}
 
     try:

@@ -34,7 +34,8 @@ References:
 """
 
 import asyncio
-import json
+from victor.core.json_utils import json_dumps, json_loads
+from json import JSONDecodeError
 import os
 import re
 import ssl
@@ -700,7 +701,7 @@ class CerebrasProvider(BaseProvider):
                     break
 
                 try:
-                    chunk_data = json.loads(data_str)
+                    chunk_data = json_loads(data_str)
                     raw_chunk = self._parse_stream_chunk(chunk_data, accumulated_tool_calls)
 
                     # Filter thinking content
@@ -724,7 +725,7 @@ class CerebrasProvider(BaseProvider):
                         # Yield tool calls or final markers
                         yield raw_chunk
 
-                except json.JSONDecodeError:
+                except JSONDecodeError:
                     pass
 
     def _build_request_payload(
@@ -743,7 +744,7 @@ class CerebrasProvider(BaseProvider):
                         "function": {
                             "name": tc.get("name", ""),
                             "arguments": (
-                                json.dumps(tc.get("arguments", {}))
+                                json_dumps(tc.get("arguments", {}))
                                 if isinstance(tc.get("arguments"), dict)
                                 else tc.get("arguments", "{}")
                             ),
@@ -830,8 +831,8 @@ class CerebrasProvider(BaseProvider):
                 args = func.get("arguments", "{}")
                 if isinstance(args, str):
                     try:
-                        args = json.loads(args)
-                    except json.JSONDecodeError:
+                        args = json_loads(args)
+                    except JSONDecodeError:
                         args = {}
                 normalized.append(
                     {
@@ -872,8 +873,8 @@ class CerebrasProvider(BaseProvider):
                 if tc.get("name"):
                     args = tc.get("arguments", "{}")
                     try:
-                        args = json.loads(args) if isinstance(args, str) else args
-                    except json.JSONDecodeError:
+                        args = json_loads(args) if isinstance(args, str) else args
+                    except JSONDecodeError:
                         args = {}
                     final_tool_calls.append(
                         {

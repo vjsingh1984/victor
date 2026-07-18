@@ -42,7 +42,8 @@ Example Usage:
 
 from __future__ import annotations
 
-import json
+from victor.core.json_utils import json_dumps, json_loads
+from json import JSONDecodeError
 import logging
 import time
 import uuid
@@ -388,7 +389,7 @@ class AutonomousPlanner:
             elif "```" in json_str:
                 json_str = json_str.split("```")[1].split("```")[0]
 
-            steps_data = json.loads(json_str)
+            steps_data = json_loads(json_str)
 
             if not isinstance(steps_data, list):
                 raise ValueError("Plan must be a JSON array")
@@ -419,7 +420,7 @@ class AutonomousPlanner:
                 steps=steps,
             )
 
-        except (json.JSONDecodeError, KeyError, TypeError) as e:
+        except (JSONDecodeError, KeyError, TypeError) as e:
             logger.warning(f"Failed to parse plan JSON: {e}. Creating simple plan.")
             # Fallback: create a simple single-step plan
             return ExecutionPlan(
@@ -743,7 +744,7 @@ class AutonomousPlanner:
             parts.extend(
                 [
                     "Context from previous steps:",
-                    json.dumps(step.context, indent=2),
+                    json_dumps(step.context, indent=2),
                     "",
                 ]
             )
