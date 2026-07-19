@@ -147,6 +147,15 @@ sandhi = [
     "sandhi-gateway>=0.1,<0.2",
 ]
 
+# Reverse-proxy serve mode (FEP-0020 Phase 3): `victor gateway serve` — share one
+# upstream key across a team with per-user virtual keys + budgets + metering.
+# Bundles the sandhi metering core with the serve deps (fastapi + uvicorn).
+gateway = [
+    "sandhi-gateway>=0.1,<0.2",
+    "fastapi>=0.109",
+    "uvicorn>=0.27",
+]
+
 # Interactive examples and playground (typer, rich already in main deps)
 examples = []
 

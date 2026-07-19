@@ -46,6 +46,7 @@ from victor.ui.commands.chat import (
 from victor.ui.commands.config import config_app
 from victor.ui.commands.doctor import run_doctor
 from victor.ui.commands.dashboard import dashboard_app
+from victor.ui.commands.gateway import gateway_app
 from victor.ui.commands.docs import docs_app
 from victor.ui.commands.observability import app as observability_app
 from victor.ui.commands.embeddings import embeddings_app
@@ -443,6 +444,7 @@ app.add_typer(embeddings_app, rich_help_panel="Data & Sessions")
 app.add_typer(dashboard_app, rich_help_panel="Observability")
 app.add_typer(bayesian_app, rich_help_panel="Observability")
 app.add_typer(observability_app, name="observability", rich_help_panel="Observability")
+app.add_typer(gateway_app, name="gateway", rich_help_panel="Observability")
 
 # --- Documentation ---
 app.add_typer(docs_app, rich_help_panel="Documentation")
