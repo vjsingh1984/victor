@@ -310,16 +310,25 @@ usage_gateway:
 
 ## Implementation Plan
 
-Code is **out of scope for this FEP** (decision doc only, per AnvaiOps ADR-0047).
-The phased build, when it starts:
+This FEP is the decision doc; the phased build lands in follow-up PRs.
+**Phases 1 & 2 are shipped** (PR #567); Phases 3 & 4 remain.
 
-### Phase 1: Attribution join (Victor-local, non-breaking)
+### Phase 1: Attribution join (Victor-local, non-breaking) — ✅ Shipped (#567)
 - Carry `subject_id`/`group_id` from the API-server auth seam into the cost
   records; add optional fields to `SessionCostTracker`/`UsageAnalytics`.
+- **Landed:** `SessionCostTracker` gained optional `subject_id`/`group_id`
+  fields (default `None` ⇒ unchanged session-scoped behavior).
 
-### Phase 2: `sandhi` middleware adoption
+### Phase 2: `sandhi` middleware adoption — ✅ Shipped (#567)
 - Depend on `sandhi`; wrap `BaseProvider` with the metering middleware; emit the
   neutral event to a local sink; render per-subject display.
+- **Landed:** the `victor[sandhi]` optional extra (`sandhi-gateway>=0.1,<0.2`)
+  plus `victor/observability/sandhi_meter.py` — an in-process bridge that maps
+  each subject to a virtual key and emits one neutral usage event per provider
+  call (full prompt-cache split); `SessionCostTracker.record_request` mirrors
+  each request into the gateway when a meter is attached. Default-off, no-op
+  when the extra is absent, best-effort (never fails the request path).
+  `events()` backs the per-subject display.
 
 ### Phase 3: Reverse-proxy serve mode
 - Virtual keys + budgets + rate limits for shared-key teams; the internal-network
