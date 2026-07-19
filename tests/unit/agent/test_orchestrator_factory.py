@@ -37,7 +37,6 @@ from victor.agent.coordinators.system_prompt_state_passed import (
     SystemPromptStatePassedCoordinator,
 )
 from victor.agent.services import ServiceStreamingRuntime
-from victor.agent.services.exploration_runtime import ExplorationCoordinator
 
 
 @pytest.fixture
@@ -213,21 +212,6 @@ class TestCreateStreamingChatAdapter:
         assert adapter._orchestrator is runtime_owner
 
 
-class TestCreateStreamingChatExecutor:
-    """Tests for create_streaming_chat_executor method."""
-
-    def test_create_streaming_chat_executor_returns_executor(self, factory):
-        """create_streaming_chat_executor returns the canonical executor."""
-        from victor.agent.services.chat_stream_executor import StreamingChatExecutor
-
-        runtime_owner = MagicMock()
-
-        executor = factory.create_streaming_chat_executor(runtime_owner)
-
-        assert isinstance(executor, StreamingChatExecutor)
-        assert executor._runtime_owner is runtime_owner
-
-
 class TestCreateComplexityClassifier:
     """Tests for create_complexity_classifier method."""
 
@@ -367,11 +351,6 @@ class TestCanonicalCoordinatorBuilders:
     def test_create_mode_workflow_team_coordinator_removed(self, factory):
         """The deprecated mode-workflow wrapper factory should stay removed."""
         assert hasattr(factory, "create_mode_workflow_team_coordinator") is False
-
-    def test_create_exploration_coordinator_returns_runtime(self, factory):
-        coordinator = factory.create_exploration_coordinator()
-
-        assert isinstance(coordinator, ExplorationCoordinator)
 
     def test_create_exploration_state_passed_coordinator_uses_settings_root(
         self, factory, mock_settings

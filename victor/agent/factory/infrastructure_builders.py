@@ -77,32 +77,6 @@ class InfrastructureBuildersMixin:
         logger.debug("Observability integration created")
         return observability
 
-    def create_tracers(
-        self,
-    ) -> tuple[Optional["ExecutionTracer"], Optional["ToolCallTracer"]]:
-        """Create execution and tool call tracers for debugging.
-
-        Returns:
-            Tuple of (ExecutionTracer, ToolCallTracer) or (None, None) if disabled
-        """
-        if not getattr(self.settings, "enable_tracing", True):
-            self._execution_tracer = None
-            self._tool_call_tracer = None
-            return (None, None)
-
-        from victor.core.events import ObservabilityBus, get_observability_bus
-        from victor.observability.tracing import ExecutionTracer, ToolCallTracer
-
-        observability_bus = get_observability_bus()
-        execution_tracer = ExecutionTracer(observability_bus)
-        tool_call_tracer = ToolCallTracer(observability_bus)
-
-        self._execution_tracer = execution_tracer
-        self._tool_call_tracer = tool_call_tracer
-
-        logger.debug("ExecutionTracer and ToolCallTracer created")
-        return (execution_tracer, tool_call_tracer)
-
     def create_debug_logger_configured(self) -> "DebugLogger":
         """Create and configure debug logger for conversation tracking.
 

@@ -54,7 +54,6 @@ if TYPE_CHECKING:
     from victor.agent.conversation.state_machine import ConversationStateMachine
     from victor.agent.unified_task_tracker import UnifiedTaskTracker
     from victor.agent.parallel_executor import ParallelToolExecutor
-    from victor.agent.tool_result_deduplicator import ToolResultDeduplicator
     from victor.tools.plugin_registry import ToolPluginRegistry
     from victor.tools.semantic_selector import SemanticToolSelector
     from victor.storage.cache.tool_cache import ToolCache
@@ -662,13 +661,6 @@ class ToolBuildersMixin:
             logger.debug("No plugins loaded")
 
         return plugin_manager
-
-    def create_tool_result_deduplicator(self) -> "ToolResultDeduplicator":
-        """Create ToolResultDeduplicator for file read deduplication."""
-        from victor.agent.tool_result_deduplicator import ToolResultDeduplicator
-
-        logger.debug("ToolResultDeduplicator created")
-        return ToolResultDeduplicator()
 
     def create_tool_planner(self) -> "ToolPlannerProtocol":
         """Create ToolPlanner via DI container.
