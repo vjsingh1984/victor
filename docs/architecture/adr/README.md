@@ -38,6 +38,8 @@ Status is the governance state of the *decision*. Implementation is the observed
 | [ADR-014](014-shared-codegraph-chunker-package.md) | Extract the code→CPG chunker into a shared `victor-codegraph` package | Accepted | Shipped (`victor-codegraph` 0.1.x released; `victor-coding` delegates) | 2026-06-26 |
 | [ADR-015](015-victor-core-adopts-codegraph.md) | Victor Core adopts victor-codegraph as the foundational code parser (phased) | Accepted | Partial (Phase 1: guarded import in `victor/core/graph_rag/indexing.py`; later phases pending) | 2026-06-26 |
 | [ADR-016](016-distribution-packaging-strategy.md) | Distribution & Packaging: Docker image primary, pip dev; reject native single-binary | Proposed | Not started | 2026-07-02 |
+| [ADR-017](017-rl-budget-calibration.md) | RL-Driven Tool-Budget Calibration | Proposed | Partial (3 modules shipped; wiring gated on FEP-0002 review) | 2026-07-08 |
+| [ADR-018](018-adopt-sandhi-usage-gateway.md) | Adopt the `sandhi` OSS usage gateway (per-user/team attribution + shared-key metering) | Proposed | Not started (decision doc; see FEP-0020, AnvaiOps ADR-0047) | 2026-07-18 |
 
 ## External ADR series (cross-repo)
 
@@ -48,7 +50,7 @@ belong to those series — they are **not** missing Victor ADRs.
 | Series | Repo / path | Numbering style | Referenced decisions |
 |--------|-------------|-----------------|----------------------|
 | ProximaDB | `proximaDB/docs/12-design/adr/` | `ADR-0NN` (2-digit, high numbers) | **ADR-029** shared codegraph chunker package (authoritative for the cross-repo chunker decision; pairs with Victor ADR-014/015) · **ADR-044** stable, line-independent symbol oid — the correlated-CPG join key (implemented in `victor-codegraph` 0.1.2) · ADR-028 index policy routing (unrelated to the chunker) |
-| AnvaiOps | `anvaiops/docs/adr/` | `NNNN` (4-digit) | **0017** code-graph-as-a-service · **0018** consume shared codegraph chunker (SaaS consumer of `victor-codegraph`) |
+| AnvaiOps | `anvaiops/docs/adr/` | `NNNN` (4-digit) | **0017** code-graph-as-a-service · **0018** consume shared codegraph chunker (SaaS consumer of `victor-codegraph`) · **0047** AI usage gateway open-core split (authoritative for the `sandhi` homing decision; pairs with Victor ADR-018/FEP-0020) |
 
 Rules for cross-repo decisions:
 
@@ -76,7 +78,7 @@ When making a significant architectural decision:
 
 1. Copy the [template](000-template.md)
 2. Fill in all sections
-3. Use the next sequential number (next free: **ADR-016**)
+3. Use the next sequential number (next free: **ADR-019**)
 4. Update this index (both tables if cross-repo)
 5. Submit for review
 
