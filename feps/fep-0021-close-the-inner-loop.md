@@ -70,11 +70,27 @@ the dead modules *are* imported; they are simply never called. Two viable engine
 already-present assets:
 
 - **Dynamic resolution census.** Add a lightweight "resolved" witness to `ServiceDescriptor`
-  (`victor/core/container.py`); after an eval run, diff `get_registered_types()` against the
-  observed resolved-set and flag zero-resolution registrations. This rides the EVR-5
-  acceptance-oracle trajectory run (`victor/evaluation/trajectory_eval.py`,
-  `agent_adapter.run_agentic_task`) — the same run that grades agent quality doubles as the
-  liveness oracle (outer + inner loop, one instrument).
+  (`victor/core/container.py`); diff `get_registered_types()` against the observed resolved-set
+  and flag zero-resolution registrations.
+
+  **Measured (2026-07-19 spike):** why this must ride *diverse* runs, not a single bootstrap or
+  the unit suite. Instrumenting the real container and bootstrapping an agent
+  (`Agent.create`) resolves only **28/139 registrations (20%)** at construction time. The other
+  **111 unresolved** decompose as **47 `*Settings`** (config, resolved on demand) + **50
+  `*Protocol`** (lazy service interfaces) + **13 conditional services** — and all 13 are
+  legitimately conditional (`ToolPipeline`/`ToolCacheManager` resolve during tool execution,
+  `WorkflowCompilerImpl`/`WorkflowValidator`/`CompiledWorkflowExecutor` only on workflow runs,
+  `OrchestratorPool` on teams, `IBudgetManager`/`IToolAccessController`/`IPathResolver` per turn).
+  **Zero clean dead candidates from a single run** → a per-PR census gate on one bootstrap would
+  be ~110 false positives / 0 true positives. The unit suite is no better a driver: it mostly
+  *mocks* the container. Only a set of runs that exercises the conditional paths (turns, tools,
+  workflows, teams, errors, compaction, recovery) shrinks the "legitimately never resolved" set
+  to where zero-resolution is a real signal — which is exactly the **EVR-5** acceptance-oracle
+  trajectory suite (`victor/evaluation/trajectory_eval.py`, `agent_adapter.run_agentic_task`).
+  So the census **gate** is genuinely EVR-5-gated (now measured, not asserted); the same
+  instrument that grades agent quality doubles as the liveness oracle (outer + inner loop, one
+  instrument). An offline audit via the same technique is possible today but yields a noisy
+  candidate list requiring per-service triage — a manual lens, not a gate.
 - **Call-graph.** Promote the manual method to CI: reuse the `.victor/project.db` code graph
   (279k edges) + `scripts/comprehensive_graph_analysis.py::analyze_dead_code` +
   `scripts/dead_code_triage.py`'s DI-aware false-positive heuristics, wrapped as a guard-family
