@@ -311,7 +311,7 @@ usage_gateway:
 ## Implementation Plan
 
 This FEP is the decision doc; the phased build lands in follow-up PRs.
-**Phases 1 & 2 are shipped** (PR #567); Phases 3 & 4 remain.
+**Phases 1–3 are shipped** (Phase 1+2 in #567, Phase 3 in #568); Phase 4 remains.
 
 ### Phase 1: Attribution join (Victor-local, non-breaking) — ✅ Shipped (#567)
 - Carry `subject_id`/`group_id` from the API-server auth seam into the cost
@@ -330,9 +330,18 @@ This FEP is the decision doc; the phased build lands in follow-up PRs.
   when the extra is absent, best-effort (never fails the request path).
   `events()` backs the per-subject display.
 
-### Phase 3: Reverse-proxy serve mode
+### Phase 3: Reverse-proxy serve mode — ✅ Shipped (#568)
 - Virtual keys + budgets + rate limits for shared-key teams; the internal-network
   deployment story.
+- **Landed:** `victor gateway serve` (`victor/observability/gateway_proxy.py` +
+  the `victor[gateway]` extra) — a transparent OpenAI-compatible reverse proxy.
+  Each user presents a per-user virtual key (bearer token); the proxy resolves it
+  to a subject/team, enforces a token budget (`group:{g}` / `vk:{id}` scope, 429
+  on exceed), forwards the raw request to the real upstream holding the shared
+  key, streams the response back byte-for-byte (O(1) SSE usage tee), and meters
+  per subject via `sandhi`. `GET /gateway/usage` + `/gateway/keys` expose the
+  per-subject/team view. The metering mechanism is reused from `sandhi` (its
+  `meter*` auto-records the budget); Victor owns only the ingress + forwarding.
 
 ### Phase 4: Provider transport migration (ADR-0047 D10)
 - Migrate Victor's Python adapters onto `sandhi-providers` provider-by-provider behind a
