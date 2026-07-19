@@ -357,7 +357,7 @@ Two independent caching capabilities per provider:
 
 ## Tool System
 
-34 tool modules across 9 categories with semantic selection and budget enforcement.
+34 tool modules across 12 categories with semantic selection and budget enforcement.
 
 ```mermaid
 flowchart TB
@@ -533,6 +533,22 @@ Cross-cutting runtime subsystems layered over tool execution and the provider pa
   acted on: per-turn cost trace (**C0**, surfaced in the chat UI footer), reference-aware
   tool-result pruning (**L1**), per-task prompt-recompute caching (**L2**), and cost/latency-aware
   routing (**L4**, with `USE_SMART_ROUTING`).
+
+## Additional Subsystems
+
+Live packages under `victor/` that support the runtime but sit outside the core layer diagram
+above:
+
+| Package | Purpose |
+|---------|---------|
+| `victor/coordination/` | Multi-agent coordination — formation strategies for team execution. |
+| `victor/classification/` | Unified task-type + complexity detection (consolidated pattern matching). |
+| `victor/optimization/` | Workflow optimization algorithms (automated workflow tuning). |
+| `victor/experiments/` | MLflow-like experiment tracking for workflow optimization. |
+| `victor/analytics/` | Backward-compat namespace routing to `victor/observability/analytics/`. |
+| `victor/benchmark/` | Benchmark vertical — high-level API for AI coding evaluations. |
+| `victor/iac/` | IaC security scanner (Infrastructure-as-Code file scanning). |
+| `victor/native/` | Re-exports of Rust/native processing hot paths (`victor/processing/native/`), with Python fallback. |
 
 ## Database Architecture
 
