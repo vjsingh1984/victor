@@ -93,7 +93,6 @@ if TYPE_CHECKING:
     from victor.agent.tool_result_deduplicator import ToolResultDeduplicator
     from victor.agent.conversation.assembler import TurnBoundaryContextAssembler
     from victor.agent.referential_intent_resolver import ReferentialIntentResolver
-    from victor.agent.response_processor import ResponseProcessor
     from victor.agent.streaming.streaming_coordinator import StreamingCoordinator
     from victor.agent.streaming.handler import StreamingChatHandler
     from victor.agent.services.chat_stream_executor import StreamingChatExecutor

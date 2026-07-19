@@ -190,10 +190,3 @@ def test_internal_modules_use_sdk_tool_dependency_types_directly():
         source = module_path.read_text()
         assert "from victor.core.tool_dependency_base import" not in source
         assert "victor_contracts.verticals.tool_dependencies" in source
-
-
-def test_response_processor_uses_canonical_tool_registry_module():
-    source = (_repo_root() / "victor/agent/response_processor.py").read_text()
-
-    assert "from victor.tools import ToolRegistry" not in source
-    assert "from victor.tools.registry import ToolRegistry" in source
