@@ -571,6 +571,7 @@ jobs:
           python -m pytest \
             tests/unit/runtime/test_hotspot_size_guard.py \
             tests/unit/runtime/test_singleton_guard.py \
+            tests/unit/runtime/test_feature_flag_manifest_guard.py \
             tests/unit/contracts/test_feature_flag_references.py \
             tests/unit/scripts/test_repo_hygiene_check.py \
             tests/unit/scripts/test_version_stamp_hook.py \

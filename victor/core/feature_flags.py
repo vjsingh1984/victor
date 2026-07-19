@@ -59,7 +59,7 @@ import threading
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from victor.core.yaml_utils import safe_load as yaml_safe_load
 
@@ -222,6 +222,34 @@ class FeatureFlag(Enum):
         if self.is_opt_in_by_default():
             return False
         return fallback
+
+
+def get_flag_manifest() -> List[Dict[str, object]]:
+    """Return the code-level default state of every ``FeatureFlag``, sorted by name.
+
+    This is the single source of truth for the generated flag inventory
+    (``docs/architecture/feature-flags.md``) and the ``feature_flags`` block of
+    ``victor capabilities --json``. A flag's **code default** is OFF iff it is in
+    ``is_opt_in_by_default()`` — computed here with ``fallback=True`` (the default
+    ``FeatureFlagConfig.default_enabled``), i.e. assuming no YAML/env override.
+
+    Prose in docs should cite this manifest rather than restating per-flag defaults
+    (which drift — see F-016/TD-17); the regen guard test fails if this drifts from
+    the enum.
+
+    Returns:
+        A list of ``{"name": str, "opt_in": bool, "default": bool}`` entries.
+    """
+    manifest = [
+        {
+            "name": flag.value,
+            "opt_in": flag.is_opt_in_by_default(),
+            "default": flag.get_default_enabled(True),
+        }
+        for flag in FeatureFlag
+    ]
+    manifest.sort(key=lambda entry: str(entry["name"]))
+    return manifest
 
 
 @dataclass
