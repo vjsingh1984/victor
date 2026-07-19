@@ -114,6 +114,12 @@ class SessionCostTracker:
     model: str = "unknown"
     start_time: float = field(default_factory=time.time)
 
+    # Attribution (FEP-0020 Phase 1) — carried from the API-server auth seam so
+    # cost/usage records answer "which user / which team". Default None keeps the
+    # historical session-scoped, unattributed behavior.
+    subject_id: Optional[str] = None
+    group_id: Optional[str] = None
+
     # Per-request tracking
     requests: List[RequestCost] = field(default_factory=list)
 
@@ -132,6 +138,12 @@ class SessionCostTracker:
 
     # Capabilities reference
     _capabilities: Optional[Any] = field(default=None, repr=False)
+
+    # Sandhi usage-gateway bridge (FEP-0020 Phase 2). Optional; when attached, each
+    # recorded request also emits one neutral usage event (per-subject attribution)
+    # to sandhi's local sink. None ⇒ no gateway metering (default). Best-effort —
+    # never fails the request path.
+    _sandhi: Optional[Any] = field(default=None, repr=False)
 
     def __post_init__(self) -> None:
         """Initialize capabilities from config."""
@@ -221,6 +233,21 @@ class SessionCostTracker:
             f"Recorded request: {prompt_tokens} in, {completion_tokens} out, "
             f"${total_request_cost:.6f} (session total: ${self.total_cost:.4f})"
         )
+
+        # FEP-0020 Phase 2 — mirror this request into the sandhi usage gateway with
+        # per-subject/team attribution. Best-effort; SandhiMeter.record never raises.
+        if self._sandhi is not None:
+            self._sandhi.record(
+                provider=self.provider,
+                model=request_model,
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                cache_read_tokens=cache_read_tokens,
+                cache_write_tokens=cache_write_tokens,
+                subject_id=self.subject_id,
+                group_id=self.group_id,
+                session_id=self.session_id,
+            )
 
         return request_cost
 

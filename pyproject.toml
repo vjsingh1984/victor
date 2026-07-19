@@ -138,6 +138,15 @@ langchain = [
     "langchain-core>=0.2.0",
 ]
 
+# Sandhi usage gateway (FEP-0020): per-user / per-team usage attribution over the
+# neutral usage-event contract. Imported lazily with graceful fallback in
+# victor.observability.sandhi_meter — absent ⇒ no gateway metering, base install
+# unaffected. The bare name `sandhi` on PyPI is an unrelated linguistics library;
+# the gateway binding is `sandhi-gateway` (anvai-labs/sandhi, Apache-2.0).
+sandhi = [
+    "sandhi-gateway>=0.1,<0.2",
+]
+
 # Interactive examples and playground (typer, rich already in main deps)
 examples = []
 
