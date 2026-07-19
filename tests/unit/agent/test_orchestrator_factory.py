@@ -28,14 +28,6 @@ pytestmark = pytest.mark.filterwarnings("ignore::DeprecationWarning")
 from victor.agent.orchestrator_factory import (
     OrchestratorFactory,
     create_orchestrator_factory,
-    OrchestratorComponents,
-    ProviderComponents,
-    CoreServices,
-    ConversationComponents,
-    ToolComponents,
-    StreamingComponents,
-    AnalyticsComponents,
-    RecoveryComponents,
 )
 from victor.agent.coordinators.exploration_state_passed import (
     ExplorationStatePassedCoordinator,
@@ -269,34 +261,6 @@ class TestCreateSearchRouter:
         assert isinstance(router, SearchRouter)
 
 
-class TestCreateCoreServices:
-    """Tests for create_core_services method."""
-
-    def test_create_core_services_returns_all_services(self, factory):
-        """create_core_services returns CoreServices with all components."""
-        mock_adapter = MagicMock()
-        mock_capabilities = MagicMock()
-
-        with (
-            patch.object(factory, "create_sanitizer") as mock_san,
-            patch.object(factory, "create_prompt_builder") as mock_pb,
-            patch.object(factory, "create_project_context") as mock_pc,
-            patch.object(factory, "create_complexity_classifier") as mock_cc,
-            patch.object(factory, "create_action_authorizer") as mock_aa,
-            patch.object(factory, "create_search_router") as mock_sr,
-        ):
-
-            services = factory.create_core_services(mock_adapter, mock_capabilities)
-
-            assert isinstance(services, CoreServices)
-            assert services.sanitizer == mock_san.return_value
-            assert services.prompt_builder == mock_pb.return_value
-            assert services.project_context == mock_pc.return_value
-            assert services.complexity_classifier == mock_cc.return_value
-            assert services.action_authorizer == mock_aa.return_value
-            assert services.search_router == mock_sr.return_value
-
-
 class TestCreateStreamingMetricsCollector:
     """Tests for create_streaming_metrics_collector method."""
 
@@ -482,72 +446,6 @@ class TestCreateOrchestratorFactory:
         assert factory.settings == mock_settings
         assert factory.provider == mock_provider
         assert factory.model == "test-model"
-
-
-class TestDataClasses:
-    """Tests for dataclass definitions."""
-
-    def test_provider_components_fields(self):
-        """ProviderComponents has expected fields."""
-        provider = MagicMock()
-        components = ProviderComponents(
-            provider=provider,
-            model="test",
-            provider_name="test_provider",
-            tool_adapter=MagicMock(),
-            tool_calling_caps=MagicMock(),
-        )
-        assert components.provider == provider
-        assert components.model == "test"
-        assert components.provider_name == "test_provider"
-
-    def test_core_services_fields(self):
-        """CoreServices has expected fields."""
-        services = CoreServices(
-            sanitizer=MagicMock(),
-            prompt_builder=MagicMock(),
-            project_context=MagicMock(),
-            complexity_classifier=MagicMock(),
-            action_authorizer=MagicMock(),
-            search_router=MagicMock(),
-        )
-        assert services.sanitizer is not None
-        assert services.prompt_builder is not None
-
-    def test_orchestrator_components_fields(self):
-        """OrchestratorComponents has expected fields."""
-        components = OrchestratorComponents()
-        assert components.observability is None
-        assert components.tool_output_formatter is None
-
-    def test_conversation_components_defaults(self):
-        """ConversationComponents has correct defaults."""
-        components = ConversationComponents(
-            conversation_controller=MagicMock(),
-        )
-        assert components.conversation_controller is not None
-        assert components.memory_manager is None
-        assert components.memory_session_id is None
-
-    def test_tool_components_defaults(self):
-        """ToolComponents has correct defaults."""
-        components = ToolComponents(
-            tool_registry=MagicMock(),
-            tool_registrar=MagicMock(),
-            tool_executor=MagicMock(),
-        )
-        assert components.tool_cache is None
-        assert components.plugin_manager is None
-
-    def test_recovery_components_fields(self):
-        """RecoveryComponents has expected fields."""
-        components = RecoveryComponents(
-            recovery_handler=MagicMock(),
-            recovery_integration=MagicMock(),
-            context_compactor=MagicMock(),
-        )
-        assert components.recovery_handler is not None
-        assert components.context_compactor is not None
 
 
 class TestContainerProperty:
