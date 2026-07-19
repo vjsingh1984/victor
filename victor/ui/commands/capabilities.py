@@ -48,6 +48,9 @@ class CapabilityManifest:
     task_types: List[str] = field(default_factory=list)
     providers: List[str] = field(default_factory=list)
     events: List[str] = field(default_factory=list)
+    # Code-level default state of every FeatureFlag: {name, opt_in, default}.
+    # Same source as docs/architecture/feature-flags.md (get_flag_manifest()).
+    feature_flags: List[Dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON export."""
@@ -63,6 +66,7 @@ class CapabilityManifest:
             "task_types": self.task_types,
             "providers": self.providers,
             "events": self.events,
+            "feature_flags": self.feature_flags,
             "summary": {
                 "total_tools": len(self.tools),
                 "total_verticals": len(self.verticals),
@@ -71,6 +75,8 @@ class CapabilityManifest:
                 "total_chains": len(self.chains),
                 "total_workflows": len(self.workflows),
                 "total_providers": len(self.providers),
+                "total_flags": len(self.feature_flags),
+                "opt_in_flags": sum(1 for f in self.feature_flags if f.get("opt_in")),
             },
         }
 
@@ -121,6 +127,9 @@ class CapabilityDiscovery:
 
         # Discover event types
         manifest.events = self._discover_events()
+
+        # Discover feature flags + their code-level defaults
+        manifest.feature_flags = self._discover_feature_flags()
 
         return manifest
 
@@ -324,6 +333,20 @@ class CapabilityDiscovery:
             registry = get_event_registry()
             event_types = registry.list_supported_types()
             return [et.value if hasattr(et, "value") else str(et) for et in event_types]
+        except Exception:
+            return []
+
+    def _discover_feature_flags(self) -> List[Dict[str, Any]]:
+        """Discover every feature flag and its code-level default.
+
+        Single source of truth is ``get_flag_manifest()`` — the same data backing
+        ``docs/architecture/feature-flags.md`` — so the JSON manifest and the doc
+        never disagree.
+        """
+        try:
+            from victor.core.feature_flags import get_flag_manifest
+
+            return get_flag_manifest()
         except Exception:
             return []
 
