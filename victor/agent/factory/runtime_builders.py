@@ -51,7 +51,6 @@ if TYPE_CHECKING:
     from victor.agent.response_completer import ResponseCompleter
     from victor.agent.message_history import MessageHistory
     from victor.agent.conversation.state_machine import ConversationStateMachine
-    from victor.agent.response_processor import ResponseProcessor
     from victor.agent.streaming.streaming_coordinator import StreamingCoordinator
     from victor.agent.streaming.handler import StreamingChatHandler
     from victor.agent.services.chat_stream_executor import StreamingChatExecutor
