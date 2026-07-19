@@ -9,6 +9,7 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/ci-test.yml'
+      - '.github/workflows/release.yml'
       - 'victor/**'
       - 'victor-contracts/**'
       - 'tests/**'
@@ -23,6 +24,7 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/ci-test.yml'
+      - '.github/workflows/release.yml'
       - 'victor/**'
       - 'victor-contracts/**'
       - 'tests/**'
