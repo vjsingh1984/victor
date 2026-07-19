@@ -1275,26 +1275,8 @@ class AgenticLoop:
                 if evaluation.decision == EvaluationDecision.COMPLETE:
                     evaluation = self._apply_backslide_guard(evaluation)
                     # FEP-0018: framework verification hook — verify before accepting.
-                    if (
-                        evaluation.decision == EvaluationDecision.COMPLETE
-                        and getattr(self, "_verifier", None) is not None
-                        and getattr(self, "_verify_retries", 0)
-                        < getattr(self, "_max_verify_retries", 0)
-                    ):
-                        vr = await self._run_verification(state)
-                        logger.info(
-                            "Turn %d verify: %d/%d (%s) retries=%d/%d",
-                            i,
-                            vr.passed,
-                            vr.total,
-                            "VERIFIED" if vr.is_verified else "failed",
-                            self._verify_retries + 1,
-                            self._max_verify_retries,
-                        )
-                        if not vr.is_verified:
-                            self._inject_verify_feedback(vr)
-                            self._verify_retries += 1
-                            continue  # re-enter the loop (skip break)
+                    if await self._maybe_verify_and_retry(i, evaluation, state, streaming=False):
+                        continue  # re-enter the loop (skip break)
                 if evaluation.decision == EvaluationDecision.COMPLETE:
                     logger.info("Task complete - exiting loop")
                     break
@@ -1495,6 +1477,40 @@ class AgenticLoop:
         except Exception:
             logger.debug("Failed to inject verify feedback", exc_info=True)
 
+    async def _maybe_verify_and_retry(
+        self, turn: int, evaluation: Any, state: Dict[str, Any], *, streaming: bool
+    ) -> bool:
+        """FEP-0018 verify gate, shared by ``run()`` and ``run_streaming()``.
+
+        After the agent claims COMPLETE (post backslide-guard), run the verifier if
+        one is set and retries remain. On failure, inject the feedback, bump the retry
+        counter, and return ``True`` so the caller re-enters the loop; otherwise return
+        ``False`` and let the caller accept COMPLETE. Extracted so the gate lives in one
+        place instead of two byte-drifting copies (FEP-0021 / FP-3 residue).
+        """
+        if not (
+            evaluation.decision == EvaluationDecision.COMPLETE
+            and getattr(self, "_verifier", None) is not None
+            and getattr(self, "_verify_retries", 0) < getattr(self, "_max_verify_retries", 0)
+        ):
+            return False
+        vr = await self._run_verification(state)
+        logger.info(
+            "Turn %d verify%s: %d/%d (%s) retries=%d/%d",
+            turn,
+            " (streaming)" if streaming else "",
+            vr.passed,
+            vr.total,
+            "VERIFIED" if vr.is_verified else "failed",
+            self._verify_retries + 1,
+            self._max_verify_retries,
+        )
+        if not vr.is_verified:
+            self._inject_verify_feedback(vr)
+            self._verify_retries += 1
+            return True
+        return False
+
     def _resolve_workspace(self, state: Dict[str, Any]) -> Optional[Path]:
         """Resolve the workspace root via a 3-level fallback (FEP-0019 Phase 3).
 
@@ -1686,26 +1702,8 @@ class AgenticLoop:
             if evaluation.decision == EvaluationDecision.COMPLETE:
                 evaluation = self._apply_backslide_guard(evaluation)
                 # FEP-0018: framework verification hook — verify before accepting.
-                if (
-                    evaluation.decision == EvaluationDecision.COMPLETE
-                    and getattr(self, "_verifier", None) is not None
-                    and getattr(self, "_verify_retries", 0)
-                    < getattr(self, "_max_verify_retries", 0)
-                ):
-                    vr = await self._run_verification(state)
-                    logger.info(
-                        "Turn %d verify (streaming): %d/%d (%s) retries=%d/%d",
-                        i,
-                        vr.passed,
-                        vr.total,
-                        "VERIFIED" if vr.is_verified else "failed",
-                        self._verify_retries + 1,
-                        self._max_verify_retries,
-                    )
-                    if not vr.is_verified:
-                        self._inject_verify_feedback(vr)
-                        self._verify_retries += 1
-                        continue  # re-enter (skip return)
+                if await self._maybe_verify_and_retry(i, evaluation, state, streaming=True):
+                    continue  # re-enter (skip return)
             if evaluation.decision in (
                 EvaluationDecision.COMPLETE,
                 EvaluationDecision.FAIL,
