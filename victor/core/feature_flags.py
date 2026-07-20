@@ -202,8 +202,14 @@ class FeatureFlag(Enum):
     # operates on the assembler's throwaway copy and NEVER mutates the
     # source-of-truth history. When OFF the assembler passes context through
     # unchanged.
-    # Default: False (opt-in until token-savings measured, enable with
-    # VICTOR_USE_TOOL_RESULT_DEDUP=true)
+    #
+    # Default: ON. Graduated from opt-in on the FEP-0023 P2 measurement: across 9
+    # real victor sessions ~3% of large (>=500 char) tool outputs recurred
+    # identically (~460+ chars saved per stub; ~7k tokens in-sample), and this is
+    # complementary to — not redundant with — the cross-turn idempotent-call cache
+    # (a different layer: execution vs context tokens, and those duplicates reached
+    # history despite it). Zero accuracy risk: exact-content dups only, newest copy
+    # retained, view-only. Disable with VICTOR_USE_TOOL_RESULT_DEDUP=false.
     USE_TOOL_RESULT_DEDUP = "use_tool_result_dedup"
 
     # Phase 20 - Context Management Subsystem Activation (FEP-0023, Phase 3)
@@ -254,8 +260,6 @@ class FeatureFlag(Enum):
             FeatureFlag.USE_POLICY_ENGINE,
             # Phase 19: E3-TIR experience-replay tool exploration (opt-in, off by default)
             FeatureFlag.USE_E3_TIR_EXPLORATION,
-            # Phase 20: Tool-result dedup view-stage (FEP-0023 P2, opt-in until measured)
-            FeatureFlag.USE_TOOL_RESULT_DEDUP,
             # Phase 20: Referential-intent enrichment (FEP-0023 P3, opt-in; EVR-gated)
             FeatureFlag.USE_REFERENTIAL_INTENT,
         }
