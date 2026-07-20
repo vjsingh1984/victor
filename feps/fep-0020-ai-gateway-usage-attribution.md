@@ -221,6 +221,32 @@ hand-rolling most of the APIs").
   resilience path (circuit breaker, OAuth FEP-0004, health, capability detection) is not
   hard-cut in one step.
 
+#### Grounded sequencing (AnvaiOps ADR-0047 **D10a**, added 2026-07-20)
+
+A four-repo provider-layer deep-dive sharpened *how* this migration sequences for Victor
+(Python), so it is not mistaken for a "just import the crate" move:
+
+- **"Just import" is false cross-language.** `sandhi-providers` is Rust; Victor imports a
+  **wheel**, and that wheel must expose the transport as an **async Python API** — which the
+  PyO3 binding does **not** do today (it exposes *metering only*). So Victor's transport
+  migration is **gated on building an async-streaming PyO3 binding first** (Rust `Stream` →
+  `asyncio`); it is an engineering project, not layering. (ProximaDB, being Rust, is the clean
+  same-language first mover — ADR-0047 D10a step 1.)
+- **The moved slice is small; the value is already mostly captured.** Transport is ~10–15 % of
+  Victor's ~29 k-line provider layer; the ~85–90 % under "What stays in Victor" above is not
+  duplicated across repos and stays regardless. Victor's streaming is on the **TTFT-critical
+  interactive loop**, and its vendor-SDK providers (Anthropic/OpenAI/Google/Bedrock) currently
+  get OAuth refresh + SDK retries for free — the async binding must clear that bar before a cut.
+- **The cheap, high-value win is available now, decoupled from transport:** route Victor's
+  usage-**parsing** through the shared core (the binding's `parse_usage`) so metering trust is
+  single-sourced and the "three parsers = three chances to mis-meter" bug class dies — no
+  transport move required. Metering (Phase 2, shipped) + this parser-sharing capture most of
+  D10's value.
+
+**Net:** the transport migration stays the **deferred tail** (a Phase-4b, behind the async
+binding + a flag + native fallback); it is the endorsed direction, not a near-term step. New
+provider work should still prefer the native path until the binding ships.
+
 ### API Changes
 
 - **New (in `sandhi`, consumed by Victor):** the metering middleware, the virtual-key
