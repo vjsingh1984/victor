@@ -1114,6 +1114,14 @@ class TestLogStatsExtended:
         """Test log_stats logs correct information after operations."""
         import logging
 
+        # Defend against cross-test logging pollution: a sibling test in the same
+        # shard may leave a global logging.disable() set, or raise this logger's
+        # level / turn off propagation, which would suppress the DEBUG record and
+        # make caplog empty (deterministic full-suite flake). Reset all three.
+        logging.disable(logging.NOTSET)
+        _norm_logger = logging.getLogger("victor.agent.argument_normalizer")
+        _norm_logger.setLevel(logging.DEBUG)
+        _norm_logger.propagate = True
         caplog.set_level(logging.DEBUG)
 
         normalizer = ArgumentNormalizer(provider_name="test_provider")
