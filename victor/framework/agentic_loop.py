@@ -1405,17 +1405,20 @@ class AgenticLoop:
         both the buffered (:meth:`run`) and streaming (:meth:`run_streaming`) loops at
         the same post-ACT point so the two paths cannot drift.
 
-        Gated OFF by default behind ``USE_SESSION_LEDGER``: a no-op when the flag is
-        off, when the orchestrator exposes no ledger, or when extraction raises
-        (population must never break the loop). Tool-result keys mirror the
-        ``TurnResult.tool_results`` element shape produced by
+        A no-op when the ``USE_SESSION_LEDGER`` gate is off, when the loop has no
+        orchestrator/ledger (e.g. a bare ``__new__``-constructed loop in tests), or
+        when extraction raises (population must never break the loop). Tool-result
+        keys mirror the ``TurnResult.tool_results`` element shape produced by
         ``tool_execution_runtime`` (``name``/``args``/``result``/``full_result``).
         """
         from victor.core.feature_flags import FeatureFlag, is_feature_enabled
 
         if not is_feature_enabled(FeatureFlag.USE_SESSION_LEDGER):
             return
-        ledger = getattr(self.orchestrator, "_session_ledger", None)
+        # Double getattr: ``self.orchestrator`` may not even be set on a loop built
+        # via ``AgenticLoop.__new__`` (streaming unit tests), so guard the attribute
+        # access itself, not just its value.
+        ledger = getattr(getattr(self, "orchestrator", None), "_session_ledger", None)
         if ledger is None:
             return
         try:

@@ -16,8 +16,9 @@
 
 Exercises ``AgenticLoop._populate_session_ledger`` — the single shared seam that
 both the buffered (``run``) and streaming (``run_streaming``) loops call once per
-turn — verifying it is flag-gated OFF by default, populates the live ledger from
-tool results + assistant text when enabled, and degrades safely.
+turn — verifying the ``USE_SESSION_LEDGER`` gate, that it populates the live
+ledger from tool results + assistant text when enabled, and that it degrades
+safely (no ledger / malformed entries).
 """
 
 from types import SimpleNamespace
@@ -58,11 +59,16 @@ def _enable():
     get_feature_flag_manager().enable(FeatureFlag.USE_SESSION_LEDGER)
 
 
+def _disable():
+    get_feature_flag_manager().disable(FeatureFlag.USE_SESSION_LEDGER)
+
+
 class TestSessionLedgerPopulation:
     def test_flag_off_is_a_noop(self):
-        """Default (flag OFF): the ledger stays empty and <SESSION_STATE> inert."""
+        """With the flag explicitly OFF: the ledger stays empty and <SESSION_STATE> inert."""
         ledger = SessionLedger()
         loop = _make_loop(ledger)
+        _disable()
 
         action = _turn_result(
             content="I recommend refactoring the config module.",
@@ -96,9 +102,7 @@ class TestSessionLedgerPopulation:
         _enable()
 
         action = _turn_result(
-            tool_results=[
-                {"tool_name": "edit", "args": {"path": "/src/main.py"}, "result": "ok"}
-            ]
+            tool_results=[{"tool_name": "edit", "args": {"path": "/src/main.py"}, "result": "ok"}]
         )
         loop._populate_session_ledger(action, turn_index=3)
 
@@ -140,6 +144,19 @@ class TestSessionLedgerPopulation:
 
         # Must not raise.
         loop._populate_session_ledger(_turn_result(content="do something"), turn_index=1)
+
+    def test_loop_without_orchestrator_attribute_does_not_raise(self):
+        """A bare __new__-constructed loop (no ``orchestrator`` attr) is a safe no-op.
+
+        Mirrors how the streaming unit tests build the loop; the flag defaults ON,
+        so the helper must guard the attribute access itself, not just its value.
+        """
+        loop = AgenticLoop.__new__(AgenticLoop)  # __init__ bypassed: no self.orchestrator
+        _enable()
+        assert not hasattr(loop, "orchestrator")
+
+        # Must not raise.
+        loop._populate_session_ledger(_turn_result(content="do it"), turn_index=1)
 
     def test_malformed_entries_are_skipped(self):
         ledger = SessionLedger()
