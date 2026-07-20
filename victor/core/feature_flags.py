@@ -206,6 +206,19 @@ class FeatureFlag(Enum):
     # VICTOR_USE_TOOL_RESULT_DEDUP=true)
     USE_TOOL_RESULT_DEDUP = "use_tool_result_dedup"
 
+    # Phase 20 - Context Management Subsystem Activation (FEP-0023, Phase 3)
+    # Gates the ReferentialIntentResolver: enriches vague anaphoric user messages
+    # ("do it", "apply the changes") with recent actionable items from the session
+    # ledger before they enter history. Wired at a single shared pre-add seam that
+    # both the streaming and non-streaming user-message paths call, so enrichment
+    # cannot drift between them.
+    # Default: False (opt-in). Graduation is EVR-gated: an accuracy A/B must show
+    # explicit enrichment beats the (now populated, FEP-0023 P1) <SESSION_STATE>
+    # block alone — otherwise the resolver is redundant double-injection and
+    # should be deleted rather than graduated. Enable with
+    # VICTOR_USE_REFERENTIAL_INTENT=true.
+    USE_REFERENTIAL_INTENT = "use_referential_intent"
+
     def get_env_var_name(self) -> str:
         """Get the environment variable name for this flag.
 
@@ -243,6 +256,8 @@ class FeatureFlag(Enum):
             FeatureFlag.USE_E3_TIR_EXPLORATION,
             # Phase 20: Tool-result dedup view-stage (FEP-0023 P2, opt-in until measured)
             FeatureFlag.USE_TOOL_RESULT_DEDUP,
+            # Phase 20: Referential-intent enrichment (FEP-0023 P3, opt-in; EVR-gated)
+            FeatureFlag.USE_REFERENTIAL_INTENT,
         }
 
     def get_default_enabled(self, fallback: bool) -> bool:
