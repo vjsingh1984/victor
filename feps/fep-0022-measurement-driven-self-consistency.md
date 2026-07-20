@@ -158,26 +158,38 @@ Probe D needs for graduation — so one instrument serves the inner loop
 
 ## Implementation Plan
 
-### Phase 1 — Witness + recorder (foundation, DI-only)
+> **Status (2026-07-19):** Phase 1 shipped; Phase 2 tooling shipped (offline
+> oracle usable now). Baseline seeding, triage, and the CI gate (Phase 2 tail +
+> Phase 3) await the EVR-5 trajectory corpus.
 
-- [ ] `ReachabilityRecorder` (contextvars-scoped, armed by env/eval context).
-- [ ] DI `resolved` witness on `ServiceDescriptor` in the container's
+### Phase 1 — Witness + recorder (foundation, DI-only) — ✅ SHIPPED
+
+- [x] `ReachabilityRecorder` (contextvars-scoped, armed by env/eval context).
+- [x] DI `resolved` witness on `ServiceDescriptor` in the container's
       type-resolution path.
-- [ ] Run-local sidecar flush; inert when disarmed.
+- [x] Run-local sidecar flush; inert when disarmed.
 
 **Deliverable:** the substrate, with unit tests proving zero hot-path cost when
-disarmed.
+disarmed. Shipped in `b9e823192` — `victor/runtime/reachability.py`,
+`victor/core/container.py`, `tests/unit/runtime/test_reachability_recorder.py`
+(13 tests incl. the disarm-overhead microbenchmark).
 
-### Phase 2 — Accumulator + exempt-list
+### Phase 2 — Accumulator + exempt-list — ✅ TOOLING SHIPPED
 
-- [ ] `scripts/reachability_accumulate.py` (merge sidecars → baseline JSON).
-- [ ] Seed `reachability-baseline.json` + `reachability-exempt.txt` from one
-      full corpus run.
+- [x] `scripts/reachability_accumulate.py` (`accumulate` + `report`) and the
+      pure oracle in `victor/runtime/reachability.py` (`merge_sidecar_paths`,
+      `write/load_baseline`, `load_exempt`, `candidate_dead`).
+- [x] `reachability-exempt.txt` template seeded (`tests/fixtures/`).
+- [ ] Seed `reachability-baseline.json` from a full corpus run — **awaits the
+      EVR-5 trajectory corpus** (a bootstrap resolves only 28/139; the corpus is
+      what makes the candidate list meaningful).
 - [ ] Triage the residual candidate list against `dead_code_triage.py`
       heuristics and `comprehensive_graph_analysis.py:241 analyze_dead_code`.
 
 **Deliverable:** an offline oracle producing a (noisy, triage-required)
-candidate-dead list — useful immediately, no gate.
+candidate-dead list — useful immediately, no gate. Tooling shipped in
+`667519b57` and verified end-to-end; baseline seeding + triage follow the first
+corpus run.
 
 ### Phase 3 — CI gate (advisory → blocking)
 
