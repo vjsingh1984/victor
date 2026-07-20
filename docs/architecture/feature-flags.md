@@ -4,7 +4,7 @@
 >
 > A flag's **code default** is OFF iff it is in `is_opt_in_by_default()` (assuming no YAML/env override). This table is the single source of truth for flag defaults — cite it instead of restating defaults in prose, which drifts (see F-016 / TD-17).
 
-Total flags: 24 · Opt-in (default OFF): 11 · Default ON: 13
+Total flags: 25 · Opt-in (default OFF): 12 · Default ON: 13
 
 | Flag | Code default | Opt-in |
 |------|--------------|--------|
@@ -32,3 +32,4 @@ Total flags: 24 · Opt-in (default OFF): 11 · Default ON: 13
 | `use_stategraph_agentic_loop` | OFF | yes |
 | `use_strategy_based_tool_registration` | ON | no |
 | `use_tiered_classification` | OFF | yes |
+| `use_tool_result_dedup` | OFF | yes |

@@ -195,6 +195,17 @@ class FeatureFlag(Enum):
     # yet measured is task-accuracy A/B (EVR-gated); this flag retro-gates it.
     USE_SESSION_LEDGER = "use_session_ledger"
 
+    # Phase 20 - Context Management Subsystem Activation (FEP-0023, Phase 2)
+    # Gates the ToolResultDeduplicator as a *view stage* inside the context
+    # assembler: older duplicate tool outputs (identical file re-reads) in the
+    # assembled context copy are replaced with compact stubs to cut tokens. It
+    # operates on the assembler's throwaway copy and NEVER mutates the
+    # source-of-truth history. When OFF the assembler passes context through
+    # unchanged.
+    # Default: False (opt-in until token-savings measured, enable with
+    # VICTOR_USE_TOOL_RESULT_DEDUP=true)
+    USE_TOOL_RESULT_DEDUP = "use_tool_result_dedup"
+
     def get_env_var_name(self) -> str:
         """Get the environment variable name for this flag.
 
@@ -230,6 +241,8 @@ class FeatureFlag(Enum):
             FeatureFlag.USE_POLICY_ENGINE,
             # Phase 19: E3-TIR experience-replay tool exploration (opt-in, off by default)
             FeatureFlag.USE_E3_TIR_EXPLORATION,
+            # Phase 20: Tool-result dedup view-stage (FEP-0023 P2, opt-in until measured)
+            FeatureFlag.USE_TOOL_RESULT_DEDUP,
         }
 
     def get_default_enabled(self, fallback: bool) -> bool:
