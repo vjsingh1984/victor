@@ -73,6 +73,38 @@ from victor.providers.logging import ProviderLogger
 
 logger = logging.getLogger(__name__)
 
+# Single-sourced cache-split parsing (AnvaiOps ADR-0047 D10a step 2 / Sandhi ADR-0003). The
+# OpenAI-compat usage dict drops the prompt-cache split; when the optional `sandhi-gateway`
+# binding is present we populate it from sandhi's fixture-proven parser — the metering-critical
+# extraction that varies per provider. **Scoped adoption:** `prompt_tokens` is left as the full
+# count (victor's context-window / budget logic depends on it); only the cache split is added.
+try:  # optional dependency (victor[sandhi])
+    import json as _json
+    import sandhi_gateway as _sg  # type: ignore[import-untyped]
+except Exception:  # pragma: no cover — absent without the extra
+    _sg = None
+
+
+def _augment_cache_split(usage: dict, usage_data: dict) -> None:
+    """Populate ``usage`` with the prompt-cache split from sandhi's single-sourced parser.
+
+    ``usage_data`` is the provider's raw ``usage`` block. No-op when ``sandhi-gateway`` is absent
+    or the response carries no cache split. Best-effort; never raises. Does **not** touch
+    ``prompt_tokens`` (ADR-0047 D10a step 2, safe scope).
+    """
+    if _sg is None:
+        return
+    try:
+        d = _sg.parse_usage("openai", _json.dumps({"usage": usage_data or {}}))
+    except Exception:  # pragma: no cover — defensive; never fail a call on metering
+        return
+    creation = int(d.get("cache_creation_tokens", 0) or 0)
+    read = int(d.get("cache_read_tokens", 0) or 0)
+    if creation:
+        usage["cache_creation_input_tokens"] = creation
+    if read:
+        usage["cache_read_input_tokens"] = read
+
 
 class HttpxOpenAICompatProvider(BaseProvider):
     """Abstract base for httpx-based OpenAI-API-compatible providers.
@@ -372,6 +404,7 @@ class HttpxOpenAICompatProvider(BaseProvider):
                 "completion_tokens": usage_data.get("completion_tokens", 0),
                 "total_tokens": usage_data.get("total_tokens", 0),
             }
+            _augment_cache_split(usage, usage_data)
 
         metadata = self._extract_response_metadata(message)
 
@@ -436,6 +469,7 @@ class HttpxOpenAICompatProvider(BaseProvider):
                 "completion_tokens": usage_data.get("completion_tokens", 0),
                 "total_tokens": usage_data.get("total_tokens", 0),
             }
+            _augment_cache_split(usage, usage_data)
 
         return StreamChunk(
             content=content,
