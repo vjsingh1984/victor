@@ -1,0 +1,17 @@
+# FEP-0022 reachability exempt list (Phase 2).
+#
+# One service key per line, format:  module:QualName
+# Blank lines and '#' comments (whole-line or trailing) are ignored.
+#
+# List ONLY legitimately-conditional registrations — types that are registered
+# but intentionally resolved on a rare / conditional path (lazy protocols,
+# plugin/registry extension points, settings resolved on demand). Everything
+# here is human-curated with a stated reason; the list only ever GROWS
+# (ratcheting — removing an entry re-exposes it to the gate).
+#
+# Seed this from the triage of the first full trajectory corpus run
+# (FEP-0022 Phase 2). The spike in FEP-0021 found ~111 legitimately-unresolved
+# registrations (47 *Settings, 50 *Protocol, 13 conditional) — those land here.
+#
+# Example (uncomment a real entry to exempt it):
+# victor.some.module:SomeLazyProtocol   # lazy service interface; resolved only when a vertical opts in

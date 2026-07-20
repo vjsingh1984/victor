@@ -35,15 +35,20 @@ import time
 import uuid
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Dict, Generator, List, Optional
+from typing import Dict, Generator, Iterable, Iterator, List, Mapping, Optional
 
 __all__ = [
     "ReachabilityRecorder",
     "activate",
+    "candidate_dead",
     "current_recorder",
     "is_env_armed",
+    "load_baseline",
+    "load_exempt",
+    "merge_sidecar_paths",
     "record",
     "record_service_resolution",
+    "write_baseline",
 ]
 
 # Contextvar: the recorder active for this async task / thread, or None (disarmed).
@@ -176,3 +181,76 @@ def activate(
         _CURRENT.reset(token)
         if flush_on_exit:
             rec.close()
+
+
+# ---------------------------------------------------------------------------
+# Phase 2: accumulation + offline oracle (pure; no container import).
+#
+# These analyze the sidecars produced by Phase 1 runs. They are pure
+# (paths / sets / strings only) so the future CI gate (Phase 3) and this offline
+# tooling share one oracle. The "registered" set is supplied by the caller —
+# obtaining it requires a container bootstrap, which is environment-specific and
+# therefore lives in the CLI script (scripts/reachability_accumulate.py), not
+# here (this module must stay stdlib-only to avoid an import cycle with core).
+# ---------------------------------------------------------------------------
+
+
+def _iter_sidecar(path: Path) -> Iterator[tuple[str, str]]:
+    """Yield ``(kind, key)`` for each witness record in a sidecar JSONL.
+
+    Robust to the header line (no ``kind``/``key``) and to blank lines.
+    """
+    with Path(path).open(encoding="utf-8") as fh:
+        for line in fh:
+            line = line.strip()
+            if not line:
+                continue
+            obj = json.loads(line)
+            if "kind" in obj and "key" in obj:
+                yield obj["kind"], obj["key"]
+
+
+def merge_sidecar_paths(sidecar_paths: Iterable[Path]) -> Dict[str, set[str]]:
+    """Merge sidecar JSONL files into ``{kind: set(key)}`` (the ever-observed set)."""
+    merged: Dict[str, set[str]] = {}
+    for p in sidecar_paths:
+        for kind, key in _iter_sidecar(p):
+            merged.setdefault(kind, set()).add(key)
+    return merged
+
+
+def write_baseline(merged: Mapping[str, Iterable[str]], path: Path) -> Path:
+    """Write ``baseline.json`` — deterministic (sorted keys and values)."""
+    out = {kind: sorted(set(keys)) for kind, keys in merged.items()}
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(out, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return path
+
+
+def load_baseline(path: Path) -> Dict[str, set[str]]:
+    """Load a baseline written by :func:`write_baseline`."""
+    data = json.loads(Path(path).read_text(encoding="utf-8"))
+    return {kind: set(keys) for kind, keys in data.items()}
+
+
+def load_exempt(path: Path) -> set[str]:
+    """Load exempt keys — one per line; ``#`` comments and blank lines ignored."""
+    keys: set[str] = set()
+    for raw in Path(path).read_text(encoding="utf-8").splitlines():
+        entry = raw.split("#", 1)[0].strip()
+        if entry:
+            keys.add(entry)
+    return keys
+
+
+def candidate_dead(
+    registered: Iterable[str],
+    observed: Iterable[str],
+    exempt: Iterable[str] = (),
+) -> List[str]:
+    """Offline oracle: ``registered ⊖ observed − exempt``, sorted.
+
+    The candidate-dead set — registered types never observed across the corpus,
+    minus the human-curated exempt list. Not a gate (Phase 3); triage-required.
+    """
+    return sorted(set(registered) - set(observed) - set(exempt))
