@@ -1114,6 +1114,11 @@ class AgenticLoop:
                 iteration.action_result = action_result
                 state["action_result"] = action_result
 
+                # FEP-0023 Phase 1: record the turn onto the live SessionLedger
+                # (populates the assembler's <SESSION_STATE>). No-op unless
+                # USE_SESSION_LEDGER is enabled.
+                self._populate_session_ledger(action_result, i)
+
                 # EVALUATE
                 logger.info(f"[Iteration {i}/{effective_max}] EVALUATE")
                 evaluation = await self._evaluate(perception, action_result, state)
@@ -1390,6 +1395,52 @@ class AgenticLoop:
         resp = getattr(action_result, "response", "")
         content = resp if isinstance(resp, str) else getattr(resp, "content", "")
         return content if isinstance(content, str) else ""
+
+    def _populate_session_ledger(self, action_result: Any, turn_index: int) -> None:
+        """Record a completed turn onto the live SessionLedger (FEP-0023 Phase 1).
+
+        Feeds ``orchestrator._session_ledger`` from the turn's tool results (files
+        read/modified) and assistant text (decisions/recommendations), which is what
+        the assembler's already-wired ``<SESSION_STATE>`` block renders. Called from
+        both the buffered (:meth:`run`) and streaming (:meth:`run_streaming`) loops at
+        the same post-ACT point so the two paths cannot drift.
+
+        Gated OFF by default behind ``USE_SESSION_LEDGER``: a no-op when the flag is
+        off, when the orchestrator exposes no ledger, or when extraction raises
+        (population must never break the loop). Tool-result keys mirror the
+        ``TurnResult.tool_results`` element shape produced by
+        ``tool_execution_runtime`` (``name``/``args``/``result``/``full_result``).
+        """
+        from victor.core.feature_flags import FeatureFlag, is_feature_enabled
+
+        if not is_feature_enabled(FeatureFlag.USE_SESSION_LEDGER):
+            return
+        ledger = getattr(self.orchestrator, "_session_ledger", None)
+        if ledger is None:
+            return
+        try:
+            for result_entry in getattr(action_result, "tool_results", None) or []:
+                if not isinstance(result_entry, dict):
+                    continue
+                tool_name = str(result_entry.get("tool_name") or result_entry.get("name") or "")
+                if not tool_name:
+                    continue
+                args = result_entry.get("args")
+                if not isinstance(args, dict):
+                    args = {}
+                result_text = str(
+                    result_entry.get("full_result")
+                    or result_entry.get("result")
+                    or result_entry.get("content")
+                    or ""
+                )
+                ledger.update_from_tool_result(tool_name, args, result_text, turn_index)
+
+            content = self._extract_turn_content(action_result)
+            if content:
+                ledger.update_from_assistant_response(content, turn_index)
+        except Exception:  # pragma: no cover - defensive; population must not break the loop
+            logger.debug("SessionLedger population failed", exc_info=True)
 
     def _inject_decide_nudges(
         self,
@@ -1688,6 +1739,11 @@ class AgenticLoop:
                 yield chunk
             action_result = act_outcome.turn_result
             state["action_result"] = action_result
+
+            # FEP-0023 Phase 1: record the turn onto the live SessionLedger
+            # (streaming parity with run(); populates <SESSION_STATE>). No-op
+            # unless USE_SESSION_LEDGER is enabled.
+            self._populate_session_ledger(action_result, i)
 
             # Update shared spin detector + advance the temperature ratchet — the same per-turn step
             # the buffered _act path runs, so streaming detects spin and escalates temperature

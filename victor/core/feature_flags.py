@@ -180,6 +180,16 @@ class FeatureFlag(Enum):
     # Default: False (opt-in, enable with VICTOR_USE_E3_TIR_EXPLORATION=true)
     USE_E3_TIR_EXPLORATION = "use_e3_tir_exploration"
 
+    # Phase 20 - Context Management Subsystem Activation (FEP-0023, Phase 1)
+    # Gates population of the live SessionLedger (orchestrator._session_ledger)
+    # from tool results and assistant responses at the per-turn boundary. When
+    # OFF the ledger stays empty and its <SESSION_STATE> context injection is
+    # inert (current behavior). When ON, the assembler's already-wired
+    # <SESSION_STATE> block is populated with files read/modified, decisions,
+    # and recommendations. Keystone for FEP-0023 Phases 2-3.
+    # Default: False (opt-in, enable with VICTOR_USE_SESSION_LEDGER=true)
+    USE_SESSION_LEDGER = "use_session_ledger"
+
     def get_env_var_name(self) -> str:
         """Get the environment variable name for this flag.
 
@@ -215,6 +225,8 @@ class FeatureFlag(Enum):
             FeatureFlag.USE_POLICY_ENGINE,
             # Phase 19: E3-TIR experience-replay tool exploration (opt-in, off by default)
             FeatureFlag.USE_E3_TIR_EXPLORATION,
+            # Phase 20: Context-management subsystem activation (FEP-0023, opt-in)
+            FeatureFlag.USE_SESSION_LEDGER,
         }
 
     def get_default_enabled(self, fallback: bool) -> bool:
