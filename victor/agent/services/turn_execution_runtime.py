@@ -499,6 +499,15 @@ class TurnExecutor:
                 )
             user_message = gate_result.content
 
+        # FEP-0023 P3: shared referential-intent enrichment seam (mirrors the
+        # streaming path so the two cannot drift). No-op unless a resolver is
+        # wired (USE_REFERENTIAL_INTENT on).
+        _orchestrator = self._resolve_orchestrator()
+        if _orchestrator is not None:
+            from victor.agent.referential_intent_resolver import resolve_referential_intent
+
+            user_message = resolve_referential_intent(_orchestrator, user_message)
+
         # Ensure system prompt is included once at start of conversation
         self._chat_context.conversation.ensure_system_prompt()
         self._chat_context._system_added = True

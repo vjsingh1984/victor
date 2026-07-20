@@ -115,3 +115,26 @@ class ReferentialIntentResolver:
             context_block = context_block[: self._config.max_enrichment_chars - 3] + "...]"
 
         return f"{message}\n\n{context_block}"
+
+
+def resolve_referential_intent(orchestrator: object, user_message: str) -> str:
+    """Shared pre-add referential-enrichment seam (FEP-0023 P3).
+
+    The single transform that BOTH the non-streaming and streaming user-message
+    add paths call just before appending the user turn, so enrichment can never
+    drift between them. A no-op unless a ``ReferentialIntentResolver`` is wired on
+    the orchestrator (``_referential_intent_resolver``) — which happens only when
+    ``USE_REFERENTIAL_INTENT`` is enabled, so presence == active. Never raises:
+    enrichment must not break the turn.
+    """
+    resolver = getattr(orchestrator, "_referential_intent_resolver", None)
+    if resolver is None:
+        return user_message
+    try:
+        enriched = resolver.enrich(user_message)
+        if enriched != user_message:
+            logger.debug("Referential intent enriched user message (%d chars)", len(enriched))
+        return enriched
+    except Exception:  # pragma: no cover - defensive; enrichment must not break the turn
+        logger.debug("Referential intent enrichment skipped", exc_info=True)
+        return user_message
