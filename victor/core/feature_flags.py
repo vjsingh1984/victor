@@ -180,6 +180,21 @@ class FeatureFlag(Enum):
     # Default: False (opt-in, enable with VICTOR_USE_E3_TIR_EXPLORATION=true)
     USE_E3_TIR_EXPLORATION = "use_e3_tir_exploration"
 
+    # Phase 20 - Context Management Subsystem Activation (FEP-0023, Phase 1)
+    # Gates population of the live SessionLedger (orchestrator._session_ledger)
+    # from tool results and assistant responses at the per-turn boundary. When
+    # ON, the assembler's already-wired <SESSION_STATE> block is populated with
+    # files read/modified, decisions, and recommendations (persistent session
+    # memory that survives compaction). When OFF the ledger stays empty and the
+    # block is inert. Keystone for FEP-0023 Phases 2-3.
+    #
+    # Default: ON. Graduated from opt-in on the FEP-0023 P1 measurement: over
+    # 12.7k real assistant messages the (hardened) extractor holds ~100% labeled
+    # precision, and <SESSION_STATE> costs ~400 tokens/turn (hard-capped at
+    # ~750). Disable with VICTOR_USE_SESSION_LEDGER=false. The one dimension not
+    # yet measured is task-accuracy A/B (EVR-gated); this flag retro-gates it.
+    USE_SESSION_LEDGER = "use_session_ledger"
+
     def get_env_var_name(self) -> str:
         """Get the environment variable name for this flag.
 

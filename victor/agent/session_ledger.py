@@ -43,9 +43,18 @@ DECISION_PATTERNS = [
     re.compile(r"(?:conclusion|decision)\s*:\s*(.+?)(?:\.|$)", re.IGNORECASE),
 ]
 
-# Patterns for extracting recommendations from assistant responses
+# Patterns for extracting recommendations from assistant responses.
+#
+# NOTE: a bare ``should`` alternative was removed here (FEP-0023 P1 measurement):
+# on 12.7k real assistant messages it matched technical prose ("the function
+# should return None", "the cache should be invalidated on switch", "you should
+# see the output") far more often than genuine recommendations, dropping labeled
+# precision to ~62%. Genuine recommendations in the corpus carry explicit
+# "recommend/suggest" framing, so we require it. ``we should`` is kept (a real
+# recommendation lead-in) but anchored to the pronoun to avoid the FP flood.
 RECOMMENDATION_PATTERNS = [
-    re.compile(r"(?:I recommend|I suggest|should)\s+(.+?)(?:\.|$)", re.IGNORECASE),
+    re.compile(r"(?:I(?:'d| would)?\s+recommend|I suggest)\s+(.+?)(?:\.|$)", re.IGNORECASE),
+    re.compile(r"\bwe should\s+(.+?)(?:\.|$)", re.IGNORECASE),
     re.compile(r"(?:recommendation|suggestion)\s*:\s*(.+?)(?:\.|$)", re.IGNORECASE),
 ]
 
