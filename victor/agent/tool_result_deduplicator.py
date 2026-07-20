@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from victor.config.orchestrator_constants import (
     DeduplicationConfig,
@@ -81,6 +81,27 @@ class ToolResultDeduplicator:
         stubbed = self._dedup_by_path(messages, new_tool_name, new_args)
         stubbed += self._dedup_by_content_hash(messages)
         return stubbed
+
+    def deduplicate_history_view(self, messages: List[Message]) -> Tuple[List[Message], int]:
+        """Non-mutating view-stage dedup (FEP-0023 P2).
+
+        Returns a NEW message list in which older duplicate tool outputs
+        (identical re-reads) are replaced with compact stubs, together with the
+        number stubbed. The input ``messages`` list and its ``Message`` objects
+        are never modified — stubs are freshly-constructed ``Message`` instances
+        that replace entries in the *copy* only. This is the safe variant of
+        :meth:`deduplicate_in_place` for running over an assembled context view
+        without touching source-of-truth history.
+
+        Uses the content-hash strategy (identical content, any path); the
+        path-based strategy is not applicable here because a view has no notion
+        of a single "just-executed" tool call.
+        """
+        if not self._config.enabled:
+            return list(messages), 0
+        working = list(messages)  # shallow copy; entries are replaced, not mutated
+        stubbed = self._dedup_by_content_hash(working)
+        return working, stubbed
 
     def _dedup_by_path(
         self, messages: List[Message], new_tool_name: str, new_args: Dict[str, Any]

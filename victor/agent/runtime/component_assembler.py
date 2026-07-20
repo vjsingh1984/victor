@@ -304,9 +304,19 @@ class ComponentAssembler:
         # Context assembler (turn-boundary assembly for provider calls)
         try:
             session_ledger = getattr(orchestrator, "_session_ledger", None)
+            # FEP-0023 P2: wire the tool-result dedup view-stage only when the
+            # flag is on, so the assembler stays flag-agnostic (presence==active).
+            from victor.core.feature_flags import FeatureFlag, is_feature_enabled
+
+            tool_result_deduplicator = None
+            if is_feature_enabled(FeatureFlag.USE_TOOL_RESULT_DEDUP):
+                create_dedup = getattr(factory, "create_tool_result_deduplicator", None)
+                if callable(create_dedup):
+                    tool_result_deduplicator = create_dedup()
             orchestrator._context_assembler = factory.create_context_assembler(
                 ledger=session_ledger,
                 controller=orchestrator._conversation_controller,
+                tool_result_deduplicator=tool_result_deduplicator,
             )
         except Exception as e:
             logger.debug("Context assembler creation failed (graceful): %s", e)

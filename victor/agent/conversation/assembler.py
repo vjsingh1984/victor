@@ -51,12 +51,17 @@ class TurnBoundaryContextAssembler:
         score_fn: Optional[Callable] = None,
         conversation_controller: Optional[object] = None,
         temperature_classifier: Optional[object] = None,
+        tool_result_deduplicator: Optional[object] = None,
     ):
         self._config = config or CONTEXT_ASSEMBLER_CONFIG
         self._session_ledger = session_ledger
         self._score_fn = score_fn
         self._conversation_controller = conversation_controller
         self._temperature_classifier = temperature_classifier
+        # FEP-0023 P2: when present, dedups the assembled *view* (never source
+        # history). Wired only when USE_TOOL_RESULT_DEDUP is enabled, so the
+        # assembler itself stays flag-agnostic: presence == active.
+        self._tool_result_deduplicator = tool_result_deduplicator
 
     @property
     def config(self) -> ContextAssemblerConfig:
@@ -222,6 +227,11 @@ class TurnBoundaryContextAssembler:
     ) -> List[Message]:
         """Assemble messages for an LLM call within token budget.
 
+        Thin wrapper over :meth:`_assemble_impl` that applies the FEP-0023 P2
+        tool-result dedup *view stage* as the final step. Both operate only on
+        freshly-built lists, so the caller's source-of-truth history is never
+        modified.
+
         Args:
             messages: Full conversation history
             max_context_chars: Maximum context size in characters
@@ -230,6 +240,27 @@ class TurnBoundaryContextAssembler:
         Returns:
             New list of messages fitting within budget
         """
+        result = self._assemble_impl(messages, max_context_chars, current_query)
+        if self._tool_result_deduplicator is not None:
+            dedup_fn = getattr(self._tool_result_deduplicator, "deduplicate_history_view", None)
+            if dedup_fn is not None:
+                try:
+                    result, stubbed = dedup_fn(result)
+                    if stubbed:
+                        logger.debug(
+                            "Tool-result dedup stubbed %d message(s) in assembled view", stubbed
+                        )
+                except Exception as exc:  # pragma: no cover - never break assembly
+                    logger.debug("Tool-result dedup view stage skipped: %s", exc)
+        return result
+
+    def _assemble_impl(
+        self,
+        messages: List[Message],
+        max_context_chars: int,
+        current_query: Optional[str] = None,
+    ) -> List[Message]:
+        """Core assembly (budgeting, ledger injection, scoring). Returns a new list."""
         if not messages:
             return []
 
