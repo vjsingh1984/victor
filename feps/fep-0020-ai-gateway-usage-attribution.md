@@ -311,7 +311,8 @@ usage_gateway:
 ## Implementation Plan
 
 This FEP is the decision doc; the phased build lands in follow-up PRs.
-**Phases 1–3 are shipped** (Phase 1+2 in #567, Phase 3 in #568); Phase 4 remains.
+**Phases 1–4 are shipped** (Phase 1+2 in #567, Phase 3 in #568, Phase 4 in #569),
+minus the deferred in-process Rust-transport tail of Phase 4 (see below).
 
 ### Phase 1: Attribution join (Victor-local, non-breaking) — ✅ Shipped (#567)
 - Carry `subject_id`/`group_id` from the API-server auth seam into the cost
@@ -343,11 +344,20 @@ This FEP is the decision doc; the phased build lands in follow-up PRs.
   per-subject/team view. The metering mechanism is reused from `sandhi` (its
   `meter*` auto-records the budget); Victor owns only the ingress + forwarding.
 
-### Phase 4: Provider transport migration (ADR-0047 D10)
+### Phase 4: Provider transport migration (ADR-0047 D10) — ✅ Shipped, OpenAI-compat (#569)
 - Migrate Victor's Python adapters onto `sandhi-providers` provider-by-provider behind a
   flag (OpenAI-compat first → Anthropic → rest), Python adapters as fallback, the Python
   escape hatch for custom providers. Victor retains prompt assembly / FEP-0011 hints /
   tool translation / agent-aware selection. Runs in parallel with / after Phase 2.
+- **Landed (OpenAI-compat):** `victor/observability/gateway_client.py` — `GatewayRoute`
+  + `build_gateway_routed_provider()` point Victor's existing OpenAI-compatible provider
+  at a running gateway (Phase 3) with a per-user virtual key. Only the egress endpoint
+  changes; the Python adapter (prompt assembly, tool translation, **streaming**) is
+  unchanged. Opt-in (`enabled=False` default ⇒ direct, non-breaking). Covers OpenAI proper
+  + the ~20 Chat Completions providers.
+- **Deferred tail:** migrating the in-process adapters onto the Rust `sandhi-providers`
+  transport directly (a PyO3 async binding) — marginal value over Phases 2+3, and bridging
+  streaming Rust futures across PyO3 is costly. Named-trigger deferral.
 
 ## Migration Path
 
