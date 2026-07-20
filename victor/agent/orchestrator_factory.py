@@ -26,19 +26,13 @@ Part of CRITICAL-001: Monolithic Orchestrator decomposition.
 
 Usage:
     factory = OrchestratorFactory(settings, provider, model)
-    components = factory.create_all_components()
-    orchestrator = AgentOrchestrator._from_components(components)
-
-Or use individual creation methods for testing:
-    factory = OrchestratorFactory(settings, provider, model)
     sanitizer = factory.create_sanitizer()
-    prompt_builder = factory.create_prompt_builder()
+    prompt_builder = factory.create_prompt_builder(tool_adapter, capabilities)
 """
 
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 # Mode-aware mixin for consistent mode controller access
@@ -99,7 +93,6 @@ if TYPE_CHECKING:
     from victor.agent.tool_result_deduplicator import ToolResultDeduplicator
     from victor.agent.conversation.assembler import TurnBoundaryContextAssembler
     from victor.agent.referential_intent_resolver import ReferentialIntentResolver
-    from victor.agent.response_processor import ResponseProcessor
     from victor.agent.streaming.streaming_coordinator import StreamingCoordinator
     from victor.agent.streaming.handler import StreamingChatHandler
     from victor.agent.services.chat_stream_executor import StreamingChatExecutor
@@ -147,121 +140,6 @@ if TYPE_CHECKING:
     )
 
 logger = logging.getLogger(__name__)
-
-
-# =========================================================================
-# Component dataclasses (transfer objects)
-# =========================================================================
-
-
-@dataclass
-class ProviderComponents:
-    """Components related to provider and tool calling."""
-
-    provider: "BaseProvider"
-    model: str
-    provider_name: str
-    tool_adapter: "BaseToolCallingAdapter"
-    tool_calling_caps: "ToolCallingCapabilities"
-
-
-@dataclass
-class CoreServices:
-    """Core service components resolved via DI or fallback."""
-
-    sanitizer: "ResponseSanitizer"
-    prompt_builder: "SystemPromptBuilder"
-    project_context: "ProjectContext"
-    complexity_classifier: "ComplexityClassifier"
-    action_authorizer: "ActionAuthorizer"
-    search_router: "SearchRouter"
-
-
-@dataclass
-class ConversationComponents:
-    """Components for conversation management."""
-
-    conversation_controller: "ConversationController"
-    memory_manager: Optional["ConversationStore"] = None
-    memory_session_id: Optional[str] = None
-    conversation_state: Optional["ConversationStateMachine"] = None
-
-
-@dataclass
-class ToolComponents:
-    """Components for tool management and execution."""
-
-    tool_registry: "ToolRegistry"
-    tool_registrar: "ToolRegistrar"
-    tool_executor: "ToolExecutor"
-    tool_cache: Optional["ToolCache"] = None
-    tool_graph: Optional["ToolDependencyGraphProtocol"] = None
-    plugin_manager: Optional["ToolPluginRegistry"] = None
-
-
-@dataclass
-class StreamingComponents:
-    """Components for streaming and metrics."""
-
-    streaming_controller: "StreamingController"
-    streaming_handler: "StreamingChatHandler"
-    metrics_collector: "MetricsCollector"
-    streaming_metrics_collector: Optional["StreamingMetricsCollector"] = None
-
-
-@dataclass
-class AnalyticsComponents:
-    """Components for analytics and tracking."""
-
-    usage_analytics: "UsageAnalytics"
-    sequence_tracker: "ToolSequenceTracker"
-    unified_tracker: "UnifiedTaskTracker"
-
-
-@dataclass
-class RecoveryComponents:
-    """Components for error recovery and resilience."""
-
-    recovery_handler: Optional["RecoveryHandler"]
-    recovery_integration: "OrchestratorRecoveryIntegration"
-    context_compactor: "ContextCompactor"
-
-
-@dataclass
-class OrchestratorComponents:
-    """All components needed to construct an AgentOrchestrator.
-
-    This dataclass serves as a transfer object containing all initialized
-    components, allowing the orchestrator's __init__ to be simplified to
-    just assigning these pre-constructed components.
-    """
-
-    # Provider
-    provider: ProviderComponents = field(default_factory=lambda: None)  # type: ignore
-
-    # Core services
-    services: CoreServices = field(default_factory=lambda: None)  # type: ignore
-
-    # Conversation
-    conversation: ConversationComponents = field(default_factory=lambda: None)  # type: ignore
-
-    # Tools
-    tools: ToolComponents = field(default_factory=lambda: None)  # type: ignore
-
-    # Streaming
-    streaming: StreamingComponents = field(default_factory=lambda: None)  # type: ignore
-
-    # Analytics
-    analytics: AnalyticsComponents = field(default_factory=lambda: None)  # type: ignore
-
-    # Recovery
-    recovery: RecoveryComponents = field(default_factory=lambda: None)  # type: ignore
-
-    # Observability
-    observability: Optional["ObservabilityIntegration"] = None
-
-    # Tool output formatter
-    tool_output_formatter: Optional["ToolOutputFormatter"] = None
 
 
 # =========================================================================
@@ -430,29 +308,6 @@ class OrchestratorFactory(
         from victor.agent.protocols import SearchRouterProtocol
 
         return self.container.get(SearchRouterProtocol)
-
-    def create_core_services(
-        self,
-        tool_adapter: "BaseToolCallingAdapter",
-        capabilities: "ToolCallingCapabilities",
-    ) -> CoreServices:
-        """Create all core service components.
-
-        Args:
-            tool_adapter: Tool calling adapter
-            capabilities: Tool calling capabilities
-
-        Returns:
-            CoreServices containing all service components
-        """
-        return CoreServices(
-            sanitizer=self.create_sanitizer(),
-            prompt_builder=self.create_prompt_builder(tool_adapter, capabilities),
-            project_context=self.create_project_context(),
-            complexity_classifier=self.create_complexity_classifier(),
-            action_authorizer=self.create_action_authorizer(),
-            search_router=self.create_search_router(),
-        )
 
     def create_system_prompt_builder(
         self,

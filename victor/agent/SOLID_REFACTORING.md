@@ -7,6 +7,13 @@ This document describes the successful SOLID principle-based refactoring of mana
 **Date**: January 2025
 **Status**: ✅ Complete
 
+> **Note (2026-07-19, F-017):** the `factory.create_all_components()` →
+> `OrchestratorComponents` / `CoreServices` transfer-object build path shown in the
+> examples below was **never wired into the live orchestrator** and has been removed as
+> vestigial (the real build path uses the individual `create_*` builder methods). Those
+> code snippets are retained for historical context only. See
+> `docs/architecture/CODEBASE_REVIEW_BACKLOG.md` (F-017).
+
 ## Problems Solved
 
 ### God Class Anti-Pattern

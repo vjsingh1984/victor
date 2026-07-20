@@ -38,7 +38,64 @@ class ProviderManagementRuntime:
         state_host.provider = provider_service.get_current_provider()
         state_host.provider_name = info.provider_name
         state_host.model = info.model_name
+        self._resync_model_derived_state(state_host, provider_service)
         return info
+
+    @staticmethod
+    def _resync_model_derived_state(state_host: Any, provider_service: Any) -> None:
+        """Re-derive model-scoped state after a provider/model switch (F-016m).
+
+        ``tool_calling_caps`` is a construction-time snapshot: a mid-session switch
+        refreshes ``provider_manager.capabilities`` but not the orchestrator's cached
+        copy, so ``tool_budget``, the tracker's exploration settings, and the live
+        ``thinking_disable_prefix`` read would all keep reflecting the *old* model.
+        This is the missing invalidation seam — it re-reads the already-refreshed
+        live caps and re-pushes the derived state via the existing setters (no
+        re-run of capability discovery).
+
+        Best-effort and duck-typed: a bare/partial runtime host (e.g. one without a
+        tracker or factory) is left untouched rather than raising into the switch
+        path. ``set_tool_budget`` itself honours a sticky user override, so re-pushing
+        the model default here never clobbers a user-set budget.
+        """
+        manager = getattr(provider_service, "_provider_manager", None)
+        fresh = getattr(manager, "capabilities", None) if manager is not None else None
+        if fresh is None:
+            return
+
+        state_host.tool_calling_caps = fresh
+
+        factory = getattr(state_host, "_factory", None)
+        if factory is not None and hasattr(factory, "initialize_tool_budget"):
+            try:
+                state_host.tool_budget = factory.initialize_tool_budget(fresh)
+            except Exception as exc:  # pragma: no cover - defensive
+                logger.debug("tool_budget re-derive on switch skipped: %s", exc)
+
+        budget = getattr(state_host, "tool_budget", None)
+
+        tracker = getattr(state_host, "unified_tracker", None)
+        if tracker is not None:
+            if hasattr(tracker, "set_model_exploration_settings"):
+                try:
+                    tracker.set_model_exploration_settings(
+                        exploration_multiplier=getattr(fresh, "exploration_multiplier", 1.0),
+                        continuation_patience=getattr(fresh, "continuation_patience", 10),
+                    )
+                except Exception as exc:  # pragma: no cover - defensive
+                    logger.debug("tracker exploration re-sync on switch skipped: %s", exc)
+            if budget is not None and hasattr(tracker, "set_tool_budget"):
+                try:
+                    tracker.set_tool_budget(budget)
+                except Exception as exc:  # pragma: no cover - defensive
+                    logger.debug("tracker budget re-sync on switch skipped: %s", exc)
+
+        pipeline = getattr(state_host, "_tool_pipeline", None)
+        if pipeline is not None and budget is not None and hasattr(pipeline, "set_tool_budget"):
+            try:
+                pipeline.set_tool_budget(budget)
+            except Exception as exc:  # pragma: no cover - defensive
+                logger.debug("pipeline budget re-sync on switch skipped: %s", exc)
 
     async def switch_provider(
         self,

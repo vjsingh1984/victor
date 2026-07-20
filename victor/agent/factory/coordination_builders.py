@@ -237,12 +237,6 @@ class CoordinationBuildersMixin:
         - self.container: DI container
     """
 
-    def create_exploration_coordinator(self) -> Any:
-        """Create the canonical read-only exploration runtime."""
-        coordinator = build_exploration_coordinator()
-        logger.debug("ExplorationCoordinator created")
-        return coordinator
-
     def _get_runtime_intelligence_service(self) -> Any:
         """Get or create the canonical runtime-intelligence service for factory-built components."""
         runtime_intelligence = getattr(self, "_runtime_intelligence_service", None)
@@ -846,23 +840,3 @@ class CoordinationBuildersMixin:
         resolver = ReferentialIntentResolver(session_ledger=ledger)
         logger.debug("ReferentialIntentResolver created")
         return resolver
-
-    def create_streaming_loop_coordinator(
-        self,
-        termination_handler: Any,
-        tool_call_handler: Any,
-        recovery_handler: Any,
-        chunk_generator: Any,
-        intent_classifier: Any,
-        continuation_strategy: Any,
-    ) -> None:
-        """ARCHIVED: StreamingLoopCoordinator was extracted but never integrated.
-
-        Raises:
-            NotImplementedError: This component was never integrated.
-        """
-        raise NotImplementedError(
-            "StreamingLoopCoordinator was archived. "
-            "Streaming loop remains in AgentOrchestrator. "
-            "See: archive/obsolete/2024_12_cleanup/streaming_loop_coordinator.py"
-        )

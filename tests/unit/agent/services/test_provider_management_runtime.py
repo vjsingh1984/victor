@@ -167,3 +167,117 @@ def test_provider_management_runtime_warns_once_for_unsupported_tool_model():
     console.print.reset_mock()
     assert runtime.model_supports_tool_calls() is False
     console.print.assert_not_called()
+
+
+# --- F-016m: model-derived state is re-synced on a mid-session switch ----------
+
+
+class _RecordingTracker:
+    def __init__(self):
+        self.exploration = None
+        self.budget = None
+
+    def set_model_exploration_settings(self, exploration_multiplier=1.0, continuation_patience=10):
+        self.exploration = (exploration_multiplier, continuation_patience)
+
+    def set_tool_budget(self, budget, user_override=False):
+        self.budget = budget
+
+
+class _RecordingPipeline:
+    def __init__(self):
+        self.budget = None
+
+    def set_tool_budget(self, budget):
+        self.budget = budget
+
+
+def _fresh_caps(**overrides):
+    values = {
+        "exploration_multiplier": 2.0,
+        "continuation_patience": 7,
+        "recommended_tool_budget": 30,
+        "thinking_disable_prefix": "/no_think",
+        "native_tool_calls": True,
+    }
+    values.update(overrides)
+    return SimpleNamespace(**values)
+
+
+def _host_with_derived_state(**overrides):
+    values = {
+        "tool_calling_caps": SimpleNamespace(
+            exploration_multiplier=1.0,
+            continuation_patience=10,
+            recommended_tool_budget=12,
+        ),
+        "tool_budget": 12,
+        "_factory": SimpleNamespace(
+            initialize_tool_budget=lambda caps: caps.recommended_tool_budget
+        ),
+        "unified_tracker": _RecordingTracker(),
+        "_tool_pipeline": _RecordingPipeline(),
+    }
+    values.update(overrides)
+    return SimpleNamespace(**values)
+
+
+def test_resync_refreshes_caps_budget_and_exploration():
+    fresh = _fresh_caps()
+    provider_service = SimpleNamespace(_provider_manager=SimpleNamespace(capabilities=fresh))
+    host = _host_with_derived_state()
+
+    ProviderManagementRuntime._resync_model_derived_state(host, provider_service)
+
+    assert host.tool_calling_caps is fresh
+    assert host.tool_budget == 30
+    assert host.unified_tracker.exploration == (2.0, 7)
+    assert host.unified_tracker.budget == 30
+    assert host._tool_pipeline.budget == 30
+
+
+def test_resync_noops_without_live_caps():
+    # A provider_service without a manager -> no fresh caps -> host untouched.
+    provider_service = SimpleNamespace(_provider_manager=None)
+    old = SimpleNamespace(exploration_multiplier=1.0, continuation_patience=10)
+    host = SimpleNamespace(tool_calling_caps=old, tool_budget=12)
+
+    ProviderManagementRuntime._resync_model_derived_state(host, provider_service)
+
+    assert host.tool_calling_caps is old
+    assert host.tool_budget == 12
+
+
+def test_resync_tolerates_bare_host():
+    # A host missing factory/tracker/pipeline must not raise from the switch path.
+    fresh = _fresh_caps()
+    provider_service = SimpleNamespace(_provider_manager=SimpleNamespace(capabilities=fresh))
+    host = SimpleNamespace(tool_calling_caps=None)
+
+    ProviderManagementRuntime._resync_model_derived_state(host, provider_service)
+
+    assert host.tool_calling_caps is fresh
+
+
+@pytest.mark.asyncio
+async def test_switch_provider_resyncs_model_derived_state_end_to_end():
+    fresh = _fresh_caps()
+    provider_service = MagicMock()
+    provider_service._provider_manager = SimpleNamespace(capabilities=fresh)
+    provider_service.switch_provider = AsyncMock()
+    provider_service.get_current_provider = MagicMock(return_value=MagicMock())
+    provider_service.get_current_provider_info.return_value = _make_provider_info(
+        provider_name="openai", model_name="gpt-4.1"
+    )
+    host = _host_with_derived_state(_provider_service=provider_service)
+    runtime = ProviderManagementRuntime(OrchestratorProtocolAdapter(host))
+
+    result = await runtime.switch_provider("openai", "gpt-4.1")
+
+    assert result is True
+    # Provider/model synced AND the model-derived state refreshed for the new model.
+    assert host.provider_name == "openai"
+    assert host.tool_calling_caps is fresh
+    assert host.tool_budget == 30
+    assert host.unified_tracker.exploration == (2.0, 7)
+    assert host._tool_pipeline.budget == 30

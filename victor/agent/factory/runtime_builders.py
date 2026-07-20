@@ -51,7 +51,6 @@ if TYPE_CHECKING:
     from victor.agent.response_completer import ResponseCompleter
     from victor.agent.message_history import MessageHistory
     from victor.agent.conversation.state_machine import ConversationStateMachine
-    from victor.agent.response_processor import ResponseProcessor
     from victor.agent.streaming.streaming_coordinator import StreamingCoordinator
     from victor.agent.streaming.handler import StreamingChatHandler
     from victor.agent.services.chat_stream_executor import StreamingChatExecutor
@@ -154,14 +153,6 @@ class RuntimeBuildersMixin:
         logger.debug(f"StreamingChatHandler created (idle_timeout={session_idle_timeout})")
         return handler
 
-    def create_streaming_chat_executor(self, runtime_owner: Any) -> "StreamingChatExecutor":
-        """Create the canonical streaming executor bound to a runtime owner."""
-        from victor.agent.services import create_streaming_chat_executor
-
-        executor = create_streaming_chat_executor(runtime_owner)
-        logger.debug("StreamingChatExecutor created and bound to runtime owner")
-        return executor
-
     def create_streaming_chat_adapter(self, runtime_owner: Any) -> Any:
         """Create the canonical service-owned chat-stream adapter."""
         from victor.agent.services.chat_stream_runtime import ServiceStreamingRuntime
@@ -183,23 +174,6 @@ class RuntimeBuildersMixin:
 
         history_size = getattr(self.settings, "streaming_metrics_history_size", 1000)
         return StreamingMetricsCollector(max_history=history_size)
-
-    def create_streaming_tool_adapter(
-        self,
-        tool_pipeline: "ToolPipeline",
-        on_chunk: Optional[Callable] = None,
-    ) -> None:
-        """OBSOLETE - NOT IN USE - DEAD CODE.
-
-        This factory method is NO LONGER CALLED in the codebase.
-        Tool execution now uses: ToolExecutionHandler -> ToolExecutor.
-        Kept for backwards compatibility only.
-        """
-        logger.warning(
-            "create_streaming_tool_adapter() called but is obsolete. "
-            "Returning None. Tool execution uses ToolExecutionHandler instead."
-        )
-        return None
 
     def create_conversation_controller(
         self,
@@ -520,36 +494,3 @@ class RuntimeBuildersMixin:
         )
         logger.debug("ResponseCompleter created")
         return response_completer
-
-    def create_response_processor(
-        self,
-        tool_adapter: "BaseToolCallingAdapter",
-        tool_registry: "ToolRegistry",
-        sanitizer: "ResponseSanitizer",
-        shell_resolver: Optional[Any] = None,
-        output_formatter: Optional["ToolOutputFormatter"] = None,
-    ) -> "ResponseProcessor":
-        """Create ResponseProcessor for tool call parsing and response handling.
-
-        Args:
-            tool_adapter: Tool calling adapter for parsing
-            tool_registry: Registry for checking enabled tools
-            sanitizer: Validator for tool names and content
-            shell_resolver: Optional resolver for shell variants
-            output_formatter: Optional formatter for tool output
-
-        Returns:
-            ResponseProcessor instance
-        """
-        from victor.agent.response_processor import ResponseProcessor
-
-        processor = ResponseProcessor(
-            tool_adapter=tool_adapter,
-            tool_registry=tool_registry,
-            sanitizer=sanitizer,
-            shell_resolver=shell_resolver,
-            output_formatter=output_formatter,
-        )
-
-        logger.debug("ResponseProcessor created")
-        return processor

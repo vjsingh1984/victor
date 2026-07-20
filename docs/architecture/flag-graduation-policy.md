@@ -6,11 +6,14 @@
 
 ## Problem
 
-Victor's quality/safety loop is almost entirely opt-in: `USE_POLICY_ENGINE`,
-`sandbox_enabled`, `USE_SMART_ROUTING`, `completion_strategy=rubric`, and L1
-reference-aware pruning all default OFF, with no written criteria for when a flag
-graduates to default-on — or gets deleted. Opt-in flags that never graduate are dead
-weight; flags that graduate without evidence are risk.
+Victor's quality/safety loop is largely opt-in: `USE_POLICY_ENGINE`,
+`sandbox_enabled`, `completion_strategy=rubric`, and L1 reference-aware pruning all
+default OFF, with no written criteria for when a flag graduates to default-on — or
+gets deleted. Opt-in flags that never graduate are dead weight; flags that graduate
+without evidence are risk. (Correction 2026-07: `USE_SMART_ROUTING` already defaults
+**ON** — it is not in `is_opt_in_by_default()` — so it belongs to the inverse case: a
+default-on flag with no gate yet. It needs a *retro-gate* on the current default, not
+graduation-to-on. See its row below.)
 
 ## The policy
 
@@ -38,7 +41,7 @@ an opt-out before removal of the old path.
 | `completion_strategy=rubric` | Rubric+LLM completion verdicts agree with ground truth better than `EnhancedCompletionEvaluator` | ADR-011: Krippendorff α ≥ 0.7 overall **and per family** vs programmatic verifier gold, n ≥ 16/family, integrity-clean, **judge identity pinned**; must hold on scripted AND real-agent trajectories | Judge unavailable/uncalibrated → revert to `enhanced`; heuristic fallback (measured α=−0.092) must never gate alone | **Candidate found**: gemma4:31b (local Ollama) passed at α=0.929, run 7 of [FINDINGS](../../benchmarks/judge_calibration/FINDINGS.md); pending variants-16 confirmation + real-trajectory validation |
 | `USE_POLICY_ENGINE` | ALLOW/DENY/ASK verdicts enforce governance without blocking legitimate tool use | Zero false-DENY on a recorded corpus of accepted-tool-call traces; 100% DENY on the builtin policy violation suite; latency overhead < 5 ms/call | Engine error → fail per `governance.enabled` posture (deny-closed when governance on) | No gate corpus yet — build from HTIR traces (ADR-012 machinery) |
 | `sandbox_enabled` | Subprocess/code tools run isolated with no capability loss for allowed operations | Full tool test suite green under bwrap (Linux CI) and seatbelt (macOS CI); documented escape-hatch list reviewed | Sandbox init failure → currently fail-open by design; graduation requires making fail-open an explicit, logged decision | MVP hardening gaps (seccomp/egress) noted in code; not gateable until CI runs the suite sandboxed |
-| `USE_SMART_ROUTING` | Cost/latency-aware routing cuts spend without quality loss | C0 cost-trace shows ≥ 20% cost or latency reduction on the benchmark suite with no drop in task success rate (same harness, A/B) | Router error → static profile routing | No measurement yet; benchmark harness exists (`victor/evaluation/`) |
+| `USE_SMART_ROUTING` (already ON) | Cost/latency-aware routing cuts spend without quality loss | **Retro-gate** (flag already default-on): C0 cost-trace shows ≥ 20% cost or latency reduction on the benchmark suite with no drop in task success rate (same harness, A/B). If unmet → flip default OFF, don't graduate. | Router error → static profile routing | Ships ON today (not in opt-in set); no measurement yet; benchmark harness exists (`victor/evaluation/`) |
 | L1 reference-aware pruning (`enable_reference_aware_pruning`) | Prunes tool results without losing referenced context | No answer-quality regression on the evaluation suite with ≥ 30% context reduction on long-trajectory tasks | Pruning error → unpruned context (fail-open, safe) | No measurement yet |
 
 ## Precedent
