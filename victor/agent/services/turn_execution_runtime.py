@@ -50,6 +50,8 @@ from typing import Any, Dict, List, Optional, Set, TYPE_CHECKING
 
 from dataclasses import dataclass, field, replace
 
+from victor.agent.conversation.types import MESSAGE_SOURCE_METADATA_KEY, MessageSource
+from victor.agent.referential_intent_resolver import resolve_referential_intent
 from victor.agent.runtime.context import AgentRuntimeContext
 from victor.agent.response_completer import ToolFailureContext
 from victor.agent.services.context_service import compact_context_if_recommended
@@ -499,25 +501,15 @@ class TurnExecutor:
                 )
             user_message = gate_result.content
 
-        # FEP-0023 P3: shared referential-intent enrichment seam (mirrors the
-        # streaming path so the two cannot drift). No-op unless a resolver is
-        # wired (USE_REFERENTIAL_INTENT on).
-        _orchestrator = self._resolve_orchestrator()
-        if _orchestrator is not None:
-            from victor.agent.referential_intent_resolver import resolve_referential_intent
-
-            user_message = resolve_referential_intent(_orchestrator, user_message)
+        # FEP-0023 P3: shared referential-intent enrichment seam (parity with the
+        # streaming path). No-op unless USE_REFERENTIAL_INTENT wires a resolver.
+        user_message = resolve_referential_intent(self._resolve_orchestrator(), user_message)
 
         # Ensure system prompt is included once at start of conversation
         self._chat_context.conversation.ensure_system_prompt()
         self._chat_context._system_added = True
 
         # Add user message to history
-        from victor.agent.conversation.types import (
-            MESSAGE_SOURCE_METADATA_KEY,
-            MessageSource,
-        )
-
         self._chat_context.add_message(
             "user",
             user_message,
@@ -730,11 +722,6 @@ class TurnExecutor:
             # to be paired with the assistant message that declared its
             # tool_calls. Tool-only assistant turns often have empty content.
             if response.content or response.tool_calls:
-                from victor.agent.conversation.types import (
-                    MESSAGE_SOURCE_METADATA_KEY,
-                    MessageSource,
-                )
-
                 self._chat_context.add_message(
                     "assistant",
                     response.content or "",
@@ -867,11 +854,6 @@ class TurnExecutor:
         tool_calls = self._deterministic_tool_calls(user_message)
         if not tool_calls:
             return None
-
-        from victor.agent.conversation.types import (
-            MESSAGE_SOURCE_METADATA_KEY,
-            MessageSource,
-        )
 
         self._chat_context.add_message(
             "assistant",
