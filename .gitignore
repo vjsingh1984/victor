@@ -283,3 +283,9 @@ log/proximadb.log.*
 nohup.out
 benchmarks/judge_calibration/reports/
 
+# Generated doc-guide build artifacts (the AsciiDoc+Mermaid recipe commits
+# .adoc/.mmd/.svg only; html/pdf/png are regenerable build outputs).
+VICTOR_AGENT_GUIDE.html
+VICTOR_AGENT_GUIDE.pdf
+docs/diagrams/**/*.png
+
