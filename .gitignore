@@ -52,6 +52,10 @@ htmlcov_lang/
 nosetests.xml
 coverage.xml
 *.coveragerc
+# LLVM/Rust coverage & profiling artifacts (emitted by the native extensions
+# during test/coverage runs; land in the repo root and must not be committed)
+*.profraw
+*.profdata
 
 # Environment variables (use victor keys --keyring for API keys)
 .env*
