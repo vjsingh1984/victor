@@ -518,6 +518,12 @@ class BedrockProvider(BaseProvider):
                     }
                 )
 
+        # NOT routed through victor.providers.usage_parsing (ADR-0047 D10a wave 2):
+        # victor holds the Converse API's camelCase inputTokens/outputTokens block,
+        # while sandhi's "bedrock" parser expects the invoke-model shapes
+        # (Anthropic-on-Bedrock snake_case usage / Titan). Routing this block parses
+        # "successfully" to all-zero counts — a silent mis-meter, not a clean
+        # fallback — so the native parse stays until sandhi learns the Converse shape.
         usage = None
         if usage_data := response.get("usage"):
             usage = {

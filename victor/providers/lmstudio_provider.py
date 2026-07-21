@@ -53,6 +53,7 @@ from victor.providers.base import (
     ToolDefinition,
 )
 from victor.providers.logging import ProviderLogger
+from victor.providers.usage_parsing import parse_usage_dict
 from victor.providers.runtime_capabilities import ProviderRuntimeCapabilities
 
 logger = logging.getLogger(__name__)
@@ -1153,10 +1154,12 @@ class LMStudioProvider(BaseProvider):
                 content = ""  # Clear content since it was a tool call
 
         # Parse usage stats
+        # Parse usage — routed through sandhi's single-sourced parser (also recovers
+        # prompt_tokens_details.cached_tokens); native dict is the fallback.
         usage = None
         usage_data = result.get("usage")
         if usage_data:
-            usage = {
+            usage = parse_usage_dict("openai", usage_data) or {
                 "prompt_tokens": usage_data.get("prompt_tokens", 0),
                 "completion_tokens": usage_data.get("completion_tokens", 0),
                 "total_tokens": usage_data.get("total_tokens", 0),
