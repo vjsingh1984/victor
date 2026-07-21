@@ -529,6 +529,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
             tool_cost_lookup=lambda name: (
                 self.tools.get_tool_cost(name) if hasattr(self, "tools") else CostTier.FREE
             ),
+            settings=self.settings,
         )
         self.usage_logger = self._metrics_runtime.usage_logger
 

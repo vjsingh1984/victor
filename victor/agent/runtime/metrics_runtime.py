@@ -16,10 +16,13 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, Optional
 
 from victor.agent.runtime.provider_runtime import LazyRuntimeProxy
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -33,6 +36,42 @@ class MetricsRuntimeComponents:
     metrics_coordinator: LazyRuntimeProxy[Any]
 
 
+def _maybe_attach_sandhi_meter(tracker: Any, settings: Optional[Any]) -> None:
+    """Attach a SandhiMeter to a freshly built cost tracker (FEP-0020 Phase 2).
+
+    Default-off and byte-identical when disabled: with no settings or
+    ``usage_gateway.enabled`` False, this returns before importing sandhi or
+    constructing anything. Identity (subject/group) is filled only-when-None so
+    the API-server auth seam keeps precedence.
+    """
+    ug = getattr(settings, "usage_gateway", None) if settings is not None else None
+    if ug is None or not getattr(ug, "enabled", False):
+        return  # default-off: no sandhi import, no construction
+
+    from victor.observability.sandhi_meter import SandhiMeter, sandhi_available
+
+    if not sandhi_available():
+        logger.info(
+            "usage_gateway.enabled but sandhi-gateway is not installed "
+            "(pip install 'victor-ai[sandhi]'); attribution disabled"
+        )
+        return
+
+    try:
+        sink = getattr(ug, "sink_path", None)
+        if not sink:
+            from victor.config.settings import get_project_paths
+
+            sink = get_project_paths().global_logs_dir / "usage_events.jsonl"
+        tracker._sandhi = SandhiMeter(sink_path=str(sink))
+        if tracker.subject_id is None:
+            tracker.subject_id = getattr(ug, "subject_id", None)
+        if tracker.group_id is None:
+            tracker.group_id = getattr(ug, "group_id", None)
+    except Exception as exc:
+        logger.debug("sandhi meter attach failed (ignored): %s", exc)
+
+
 def create_metrics_runtime_components(
     *,
     factory: Any,
@@ -41,6 +80,7 @@ def create_metrics_runtime_components(
     debug_logger: Any,
     cumulative_token_usage: Dict[str, int],
     tool_cost_lookup: Callable[[str], Any],
+    settings: Optional[Any] = None,
 ) -> MetricsRuntimeComponents:
     """Create metrics runtime components with lazy collector/coordinator wiring."""
     usage_logger = factory.create_usage_logger()
@@ -62,10 +102,12 @@ def create_metrics_runtime_components(
     def _build_session_cost_tracker() -> Any:
         from victor.agent.session_cost_tracker import SessionCostTracker
 
-        return SessionCostTracker(
+        tracker = SessionCostTracker(
             provider=provider.name,
             model=model,
         )
+        _maybe_attach_sandhi_meter(tracker, settings)
+        return tracker
 
     session_cost_tracker = LazyRuntimeProxy(
         factory=_build_session_cost_tracker,

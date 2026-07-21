@@ -515,6 +515,7 @@ from victor.config.groups import (
     ServerSettings,
     CodebaseSettings,
     UsageSettings,
+    UsageGatewaySettings,
     SubprocessSettings,
     HeadlessSettings,
     WorkflowSettings,
@@ -622,6 +623,7 @@ _NESTED_GROUPS = {
     "server": ServerSettings,
     "codebase": CodebaseSettings,
     "usage": UsageSettings,
+    "usage_gateway": UsageGatewaySettings,
     "subprocess": SubprocessSettings,
     "headless": HeadlessSettings,
     "workflow": WorkflowSettings,
@@ -1127,6 +1129,7 @@ class Settings(BaseSettings):
     server: Optional[ServerSettings] = Field(default=None, exclude=True, repr=False)
     codebase: Optional[CodebaseSettings] = Field(default=None, exclude=True, repr=False)
     usage: Optional[UsageSettings] = Field(default=None, exclude=True, repr=False)
+    usage_gateway: Optional[UsageGatewaySettings] = Field(default=None, exclude=True, repr=False)
     subprocess: Optional[SubprocessSettings] = Field(default=None, exclude=True, repr=False)
     headless: Optional[HeadlessSettings] = Field(default=None, exclude=True, repr=False)
     workflow: Optional[WorkflowSettings] = Field(default=None, exclude=True, repr=False)
