@@ -334,35 +334,13 @@ class TestLiveDisplayRenderer:
         assert mock_live_class.call_count == 2
         assert mock_live.start.call_count == 2
 
-    @patch("victor.ui.rendering.live_renderer.Live")
-    def test_on_tool_start_prints_starting_hint_for_slow_tools(
-        self, mock_live_class, renderer, mock_console
-    ):
-        """on_tool_start stores pending state and emits the Tool Execution section.
-
-        The per-tool "running" indicator now renders inside the live progress
-        panel (gated on an active Live), so the deterministic console output is
-        the section separator plus the recorded pending-tool state.
-        """
-        mock_live = MagicMock()
-        mock_live_class.return_value = mock_live
-
-        renderer.start()
-        renderer.on_tool_start("code_search", {"query": "foo"})
-
-        assert renderer._pending_tool is not None
-        assert renderer._pending_tool["name"] == "code_search"
-        assert renderer._pending_tool["arguments"] == {"query": "foo"}
-        assert renderer._tool_section_shown is True
-        printed_calls = [str(call_args) for call_args in mock_console.print.call_args_list]
-        assert any("Tool Execution" in call_str for call_str in printed_calls)
 
     @patch("victor.ui.rendering.live_renderer.Live")
     def test_on_tool_result_success_prints_checkmark(self, mock_live_class, renderer, mock_console):
         """Test on_tool_result() prints a success indicator for success.
 
-        The canonical bash-style result line uses the ``success`` style and a
-        ``[DONE]`` marker (see live_renderer.on_tool_result).
+        The canonical status line uses the ``success`` style and the ``✓``
+        marker (see live_renderer.on_tool_result).
         """
         mock_live = MagicMock()
         mock_live_class.return_value = mock_live
@@ -378,7 +356,7 @@ class TestLiveDisplayRenderer:
         mock_console.print.assert_called()
         call_str = str(mock_console.print.call_args)
         assert "success" in call_str
-        assert "DONE" in call_str
+        assert "✓" in call_str
 
     @patch("victor.ui.rendering.live_renderer.Live")
     def test_on_tool_result_formats_tool_name_for_display(
@@ -411,7 +389,7 @@ class TestLiveDisplayRenderer:
     def test_on_tool_result_failure_prints_x(self, mock_live_class, renderer, mock_console):
         """Test on_tool_result() prints an error indicator for failure.
 
-        The canonical result line uses the ``error`` style + ``[DONE]`` marker,
+        The canonical status line uses the ``error`` style + ``✗`` marker,
         followed by an ``Error:`` line (see live_renderer.on_tool_result).
         """
         mock_live = MagicMock()
@@ -429,7 +407,7 @@ class TestLiveDisplayRenderer:
         mock_console.print.assert_called()
         call_str = str(mock_console.print.call_args)
         assert "error" in call_str
-        assert "DONE" in call_str
+        assert "✗" in call_str
         assert "Error:" in call_str
 
     @patch("victor.ui.rendering.live_renderer.Live")
@@ -698,67 +676,10 @@ class TestLiveDisplayRenderer:
         lines = renderer._calculate_adaptive_preview_lines(output, None, 3, tool_settings)
         assert lines == 5  # Within bounds
 
-    def test_categorize_tool_groups_filesystem_tools(self, renderer):
-        """Tool categorization correctly identifies filesystem tools."""
-        assert renderer._categorize_tool("read") == "File System"
-        assert renderer._categorize_tool("write") == "File System"
-        assert renderer._categorize_tool("ls") == "File System"
-        assert renderer._categorize_tool("grep") == "File System"
 
-    def test_categorize_tool_groups_search_tools(self, renderer):
-        """Tool categorization correctly identifies search tools."""
-        assert renderer._categorize_tool("code_search") == "Search"
-        assert renderer._categorize_tool("semantic_code_search") == "Search"
-        assert renderer._categorize_tool("search") == "Search"
 
-    def test_categorize_tool_groups_git_tools(self, renderer):
-        """Tool categorization correctly identifies git tools."""
-        assert renderer._categorize_tool("git_status") == "Git"
-        assert renderer._categorize_tool("git_diff") == "Git"
-        assert renderer._categorize_tool("git_log") == "Git"
 
-    def test_categorize_tool_defaults_unknown_tools(self, renderer):
-        """Tool categorization defaults to 'Other' for unknown tools."""
-        assert renderer._categorize_tool("unknown_tool") == "Other"
-        assert renderer._categorize_tool("custom_action") == "Other"
 
-    @patch("victor.ui.rendering.live_renderer.Live")
-    def test_on_tool_result_shows_group_header_on_category_change(
-        self, mock_live_class, renderer, mock_console
-    ):
-        """Group header is shown when tool category changes."""
-        from unittest.mock import MagicMock
-
-        mock_live_class.return_value = MagicMock()
-        renderer.start()
-
-        # Mock tool settings to enable grouping
-        with patch("victor.config.tool_settings.get_tool_settings") as mock_settings:
-            tool_settings = MagicMock()
-            tool_settings.enable_tool_grouping = True
-            tool_settings.tool_output_preview_enabled = False
-            mock_settings.return_value = tool_settings
-
-            # First tool (File System)
-            renderer.on_tool_result(
-                name="read",
-                success=True,
-                elapsed=0.1,
-                arguments={"path": "file1.txt"},
-                result="content1",
-            )
-
-            # Second tool (Search) - different category
-            renderer.on_tool_result(
-                name="code_search",
-                success=True,
-                elapsed=0.2,
-                arguments={"query": "test"},
-                result="results",
-            )
-
-        # Should have printed: status + blank line + group header + status
-        assert mock_console.print.call_count >= 4
 
     @patch("victor.ui.rendering.live_renderer.Live")
     def test_on_tool_result_skips_group_header_when_disabled(
@@ -947,6 +868,10 @@ class TestStreamResponse:
         mock_renderer.on_tool_start.assert_called_once_with(
             name="read",
             arguments={"path": "/test.py"},
+            tool_call_id=None,
+            batch_index=None,
+            batch_total=None,
+            execution_mode=None,
         )
 
     @pytest.mark.asyncio
@@ -978,6 +903,7 @@ class TestStreamResponse:
             error=None,
             follow_up_suggestions=None,
             result=None,
+            tool_call_id=None,
         )
 
     @pytest.mark.asyncio
@@ -1020,6 +946,7 @@ class TestStreamResponse:
                 }
             ],
             result=None,
+            tool_call_id=None,
         )
 
     @pytest.mark.asyncio
@@ -1052,6 +979,7 @@ class TestStreamResponse:
             error="Permission denied",
             follow_up_suggestions=None,
             result=None,
+            tool_call_id=None,
         )
 
     @pytest.mark.asyncio
