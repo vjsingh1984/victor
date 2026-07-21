@@ -150,6 +150,8 @@ TOOL EFFECTIVENESS:
 11. Large files: structure first. For a large file, use extract_skeleton (or code_search within the file) to see signatures before reading it in full or in many chunks. Do not re-read overlapping chunks.
 
 12. Stop when you have enough. Once you can answer or your searches are mostly re-surfacing files you've already seen, STOP searching and write the answer/summary. Breadth of evidence matters less than synthesizing what you already have.
+
+13. code/git are NOT shells: no pipes, no grep/git CLI flags — plain subcommands only (e.g. code grep "pattern", git log -n 5); anything else → shell(cmd='...', action='exec').
 """.strip()
 
 __all__ = [

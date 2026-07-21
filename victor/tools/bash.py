@@ -1453,6 +1453,9 @@ async def shell(
 ) -> Dict[str, Any]:
     """Execute a shell command from a working directory.
 
+    Mutating/network commands: pass action='exec' (or 'write'/'network') — on
+    read-intent turns plain calls are pinned readonly and will be blocked.
+
     The `cmd` parameter is required. The `cwd` parameter sets the working
     directory the command runs from — its canonical path. Default is `"."`
     (the current/present working directory). Prefer passing `cwd` over
@@ -1626,7 +1629,8 @@ async def shell(
             return {
                 "success": False,
                 "error": (
-                    f"Command '{failing_cmd}' is not allowed in readonly mode. "
+                    f"Command '{failing_cmd}' is not allowed in readonly mode "
+                    "(the turn may have been classified read-only). "
                     f"Allowed commands: {', '.join(sorted(get_allowed_readonly_commands())[:15])}... "
                     "Re-run with readonly=False (or action='network'/'write'/'exec') "
                     "to run mutating or network commands."
