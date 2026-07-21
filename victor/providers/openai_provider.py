@@ -40,6 +40,7 @@ from victor.providers.resolution import (
 )
 from victor.providers.logging import ProviderLogger
 from victor.providers.oauth_manager import OAuthTokenManager
+from victor.providers.usage_parsing import parse_usage_dict
 
 
 class OpenAIProvider(BaseProvider):
@@ -496,10 +497,11 @@ class OpenAIProvider(BaseProvider):
                 for tc in message.tool_calls
             ]
 
-        # Parse usage
+        # Parse usage — routed through sandhi's single-sourced parser (also recovers
+        # prompt_tokens_details.cached_tokens the native dict dropped); native fallback.
         usage = None
         if response.usage:
-            usage = {
+            usage = parse_usage_dict("openai", response.usage) or {
                 "prompt_tokens": response.usage.prompt_tokens,
                 "completion_tokens": response.usage.completion_tokens,
                 "total_tokens": response.usage.total_tokens,
@@ -532,9 +534,10 @@ class OpenAIProvider(BaseProvider):
             StreamChunk or None
         """
         # Parse usage from final chunk (sent when stream_options.include_usage=True)
+        # — routed through sandhi's single-sourced parser; native dict is the fallback.
         usage: Optional[Dict[str, int]] = None
         if hasattr(chunk, "usage") and chunk.usage:
-            usage = {
+            usage = parse_usage_dict("openai", chunk.usage) or {
                 "prompt_tokens": chunk.usage.prompt_tokens or 0,
                 "completion_tokens": chunk.usage.completion_tokens or 0,
                 "total_tokens": chunk.usage.total_tokens or 0,
