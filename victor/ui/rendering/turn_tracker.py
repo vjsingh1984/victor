@@ -1,8 +1,8 @@
 """Conversation turn tracking for UX display.
 
 Tracks conversation turns with metadata including tool usage, token counts,
-cost estimates, and context window awareness. Integrates with LiveManager
-for visual turn boundaries in the streaming display.
+cost estimates, and context window awareness, for visual turn boundaries in
+the streaming display.
 
 Features:
 - **Turn numbering**: Sequential turn tracking with start/end lifecycle

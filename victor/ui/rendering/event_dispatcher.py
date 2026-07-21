@@ -118,6 +118,10 @@ class EventDispatcher:
         self.renderer.on_tool_start(
             name=str(tool_start.get("name", event_tool_name or "unknown")),
             arguments=tool_start.get("arguments", {}),
+            tool_call_id=tool_start.get("tool_call_id"),
+            batch_index=tool_start.get("batch_index"),
+            batch_total=tool_start.get("batch_total"),
+            execution_mode=tool_start.get("execution_mode"),
         )
 
     def _handle_tool_result_metadata(
@@ -151,6 +155,7 @@ class EventDispatcher:
             "error": result_data.get("error"),
             "follow_up_suggestions": result_data.get("follow_up_suggestions"),
             "result": result_data.get("result"),
+            "tool_call_id": result_data.get("tool_call_id"),
         }
         if "original_result" in result_data:
             kwargs["original_result"] = result_data.get("original_result")

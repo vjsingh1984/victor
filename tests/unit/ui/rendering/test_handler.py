@@ -23,7 +23,7 @@ class _RecorderRenderer:
     def resume(self) -> None:
         pass
 
-    def on_tool_start(self, name: str, arguments: dict[str, Any]) -> None:
+    def on_tool_start(self, name: str, arguments: dict[str, Any], **kwargs: Any) -> None:
         self.tool_calls.append((name, arguments))
 
     def on_tool_result(
@@ -37,6 +37,7 @@ class _RecorderRenderer:
         was_pruned: bool = False,
         original_result: Any = None,
         result: Any = None,
+        **kwargs: Any,
     ) -> None:
         self.tool_results.append(
             {

@@ -77,13 +77,16 @@ class LiveDisplayRenderer:
         self._pause_count = 0  # Depth counter for nested pause/resume
         self._pause_start_ms: float | None = None
         self._metrics = StreamingMetrics()
-        self._pending_tool: dict | None = None
         self._last_tool_result: dict | None = None
         self._thinking_indicator_shown = False
         self._in_thinking_mode = False
         self._content_shown_before_pause = ""
         self._tool_section_shown = False  # Track if tool section separator shown
-        self._current_tool_start_time: float | None = None  # Track tool execution start time
+        # In-flight tools keyed by tool_call_id (or a synthetic key), so N
+        # concurrent tools in a parallel batch each get their own row instead
+        # of clobbering a single scalar slot.
+        self._active_tools: dict[str, dict[str, Any]] = {}
+        self._tool_seq = 0
         # Live tool-output streaming (progressive terminal block)
         self._tool_progress_lines: deque[str] = deque(maxlen=12)
         self._tool_progress_active = False
@@ -172,15 +175,29 @@ class LiveDisplayRenderer:
         "vector_",
     )
 
-    def on_tool_start(self, name: str, arguments: dict[str, Any]) -> None:
+    def on_tool_start(
+        self,
+        name: str,
+        arguments: dict[str, Any],
+        tool_call_id: str | None = None,
+        batch_index: int | None = None,
+        batch_total: int | None = None,
+        execution_mode: str | None = None,
+    ) -> None:
         """Handle tool execution start - store info for result display.
 
         Args:
             name: Tool name
             arguments: Tool arguments
+            tool_call_id: Provider tool_calls[].id for correlating concurrent
+                start/result pairs (parallel batches)
+            batch_index: 1-based position within the batch
+            batch_total: Number of calls dispatched together
+            execution_mode: "single" or "parallel_batch"
         """
-        self._pending_tool = {"name": name, "arguments": arguments}
-        self._current_tool_start_time = time.monotonic()
+        self._tool_seq += 1
+        key = tool_call_id or f"{name}#{self._tool_seq}"
+        self._active_tools[key] = {"name": name, "started": time.monotonic()}
 
         # Tool chrome (the section separator + the bash-style invocation line) is
         # styled with Rich markup, so it must go through the Rich-markup console
@@ -199,7 +216,8 @@ class LiveDisplayRenderer:
         if self._live and not self._is_paused:
             self._tool_progress_name = name
             self._tool_progress_active = True
-            self._tool_progress_lines.clear()
+            if len(self._active_tools) == 1:
+                self._tool_progress_lines.clear()
             self._render_tool_progress()
 
     def _visible_content(self) -> str:
@@ -238,24 +256,39 @@ class LiveDisplayRenderer:
             logger.debug("on_tool_progress render failed", exc_info=True)
 
     def _render_tool_progress(self) -> None:
-        """Update the Live renderable to content + a live tool-output panel."""
+        """Update the Live renderable to content + a live tool-output panel.
+
+        One row per in-flight tool (parallel batches render as a small table
+        of spinners), plus any streamed output lines from the most recently
+        emitting tool.
+        """
         if not self._live or not self._tool_progress_active:
             return
 
         from rich.spinner import Spinner
 
-        body_text = "\n".join(self._tool_progress_lines)
-        tool_label = format_tool_display_name(self._tool_progress_name)
-        # Show [RUNNING] status with bash-style format
-        running_text = f"[dim]• [/][bold yellow][RUNNING][/] [bold cyan]{tool_label}[/]"
-        if body_text:
-            body = Text(body_text, style="dim")
-            content = Group(
-                Spinner("dots", text=running_text),
-                body,
+        now = time.monotonic()
+        rows: list[Any] = []
+        for info in self._active_tools.values():
+            tool_label = format_tool_display_name(str(info.get("name", "tool")))
+            running_text = f"[dim]• [/][bold yellow][RUNNING][/] [bold cyan]{tool_label}[/]"
+            elapsed = now - float(info.get("started", now))
+            if elapsed >= 3.0:
+                running_text += f" [dim]{elapsed:.0f}s[/]"
+            rows.append(Spinner("dots", text=running_text))
+        if not rows:
+            # Result arrived before any start event — fall back to one row.
+            tool_label = format_tool_display_name(self._tool_progress_name)
+            rows.append(
+                Spinner(
+                    "dots", text=f"[dim]• [/][bold yellow][RUNNING][/] [bold cyan]{tool_label}[/]"
+                )
             )
-        else:
-            content = Spinner("dots", text=running_text)
+
+        body_text = "\n".join(self._tool_progress_lines)
+        if body_text:
+            rows.append(Text(body_text, style="dim"))
+        content = Group(*rows) if len(rows) > 1 else rows[0]
 
         panel = Panel(
             content,
@@ -289,6 +322,7 @@ class LiveDisplayRenderer:
         preview_lines: int = 3,
         was_pruned: bool = False,
         result: Any = None,  # Alias for original_result (for compatibility)
+        tool_call_id: str | None = None,
     ) -> None:
         """Handle tool execution result - print consolidated single line with preview.
 
@@ -305,6 +339,19 @@ class LiveDisplayRenderer:
         """
         from victor.config.tool_settings import get_tool_settings
 
+        # Resolve this result's in-flight entry (by id, else first name match)
+        # so concurrent tools retire their own row rather than clobbering a
+        # shared slot.
+        entry_key: str | None = None
+        if tool_call_id and tool_call_id in self._active_tools:
+            entry_key = tool_call_id
+        else:
+            for key, info in self._active_tools.items():
+                if info.get("name") == name:
+                    entry_key = key
+                    break
+        entry = self._active_tools.pop(entry_key, None) if entry_key else None
+
         # Tear down any live progress panel before the result line is committed
         # to scrollback, so the streamed block does not freeze permanently.
         if self._tool_progress_active:
@@ -316,8 +363,8 @@ class LiveDisplayRenderer:
             self._tool_section_shown = True
 
         # Check if tool took a long time and show progress (if applicable)
-        if self._current_tool_start_time:
-            tool_elapsed = time.monotonic() - self._current_tool_start_time
+        if entry is not None:
+            tool_elapsed = time.monotonic() - float(entry.get("started", time.monotonic()))
             if tool_elapsed > 3.0:
                 self._update_tool_progress(name, tool_elapsed)
 
@@ -425,10 +472,13 @@ class LiveDisplayRenderer:
                     continue
                 self.console.print(f"[dim]  next: {command}[/]")
 
-        self._pending_tool = None
-        self._current_tool_start_time = None  # Reset tool start time
         self._metrics.record_tool_result()
         self.resume()
+
+        # Other tools from the batch are still running — bring their rows back.
+        if self._active_tools and self._live and not self._is_paused:
+            self._tool_progress_active = True
+            self._render_tool_progress()
 
     def on_status(self, message: str) -> None:
         """Handle status message.
@@ -839,7 +889,7 @@ class LiveDisplayRenderer:
             self._live = None
         self._is_paused = False
         self._pause_count = 0
-        self._pending_tool = None
+        self._active_tools.clear()
         self._thinking_indicator_shown = False
         self._in_thinking_mode = False
         self._content_shown_before_pause = ""
