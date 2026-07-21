@@ -146,3 +146,53 @@ async def test_stall_timeout_raises_and_closes_generator():
         await helper._stream_provider_response_inner({}, {}, _ctx())
 
     assert record["aclose_count"] == 1
+
+
+# ---------------------------------------------------------------------------
+# P5: intra-turn repetition guard at the stream choke point
+# ---------------------------------------------------------------------------
+
+
+async def test_repetition_break_closes_generator_once():
+    record: dict = {}
+    loop_sentence = "Let me check the remote tracking state of the branch. "
+    # 200 chunks of the same sentence; guard should break long before the end.
+    chunks = [StreamChunk(content=loop_sentence) for _ in range(200)]
+    helper = _Helper(_make_orch(_instrumented_stream(chunks, record, hang_forever=True)))
+
+    content, tool_calls, _tokens, _garbage = await helper._stream_provider_response_inner(
+        {}, {}, _ctx()
+    )
+
+    assert record["aclose_count"] == 1
+    assert tool_calls is None
+    # Truncated: far fewer instances than the 200 streamed
+    assert content.count("remote tracking state") < 10
+    assert content.count("remote tracking state") >= 1
+
+
+async def test_varied_content_streams_fully():
+    record: dict = {}
+    chunks = [
+        StreamChunk(content=f"Sentence {i} covers a different topic entirely, value {i * 13}. ")
+        for i in range(120)
+    ]
+    helper = _Helper(_make_orch(_instrumented_stream(chunks, record)))
+
+    content, _tc, _tokens, _garbage = await helper._stream_provider_response_inner({}, {}, _ctx())
+
+    assert "Sentence 119" in content  # nothing cut
+    assert record["aclose_count"] == 1
+
+
+async def test_repetition_guard_disabled_via_settings():
+    record: dict = {}
+    loop_sentence = "Let me check the remote tracking state of the branch. "
+    chunks = [StreamChunk(content=loop_sentence) for _ in range(60)]
+    orch = _make_orch(_instrumented_stream(chunks, record))
+    orch.settings.stream_repetition_enabled = False
+    helper = _Helper(orch)
+
+    content, _tc, _tokens, _garbage = await helper._stream_provider_response_inner({}, {}, _ctx())
+
+    assert content.count("remote tracking state") == 60  # untouched when disabled
