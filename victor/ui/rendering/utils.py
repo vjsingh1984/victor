@@ -832,15 +832,20 @@ def format_tool_metadata_badges(
     return " ".join(badges) if badges else ""
 
 
-def get_tool_metadata_for_display(tool_name: str) -> dict:
+def get_tool_metadata_for_display(tool_name: str, arguments: dict | None = None) -> dict:
     """Get tool metadata from unified registry for display.
 
     Args:
         tool_name: Name of the tool
+        arguments: This invocation's arguments. When provided, the static
+            access mode is narrowed to the invocation's effective mode (e.g.
+            a ``code grep`` renders READ ONLY instead of the tool's static
+            MIXED envelope).
 
     Returns:
         Dict with category, access_mode, cost_tier, execution_category
     """
+    display: dict
     try:
         from victor.tools.metadata_registry import ToolMetadataRegistry
 
@@ -848,7 +853,7 @@ def get_tool_metadata_for_display(tool_name: str) -> dict:
         metadata = registry.get_metadata(tool_name)
 
         if metadata:
-            return {
+            display = {
                 "category": metadata.category or "",
                 "access_mode": (metadata.access_mode.value if metadata.access_mode else "readonly"),
                 "cost_tier": (
@@ -862,13 +867,29 @@ def get_tool_metadata_for_display(tool_name: str) -> dict:
                     else "read_only"
                 ),
             }
+        else:
+            display = None  # type: ignore[assignment]
     except Exception:
-        pass
+        display = None  # type: ignore[assignment]
 
-    # Fallback defaults
-    return {
-        "category": "",
-        "access_mode": "readonly",
-        "cost_tier": "free",
-        "execution_category": "read_only",
-    }
+    if display is None:
+        # Fallback defaults
+        display = {
+            "category": "",
+            "access_mode": "readonly",
+            "cost_tier": "free",
+            "execution_category": "read_only",
+        }
+
+    if arguments is not None:
+        try:
+            from victor.tools.base import AccessMode
+            from victor.tools.effective_access import resolve_effective_access
+
+            if resolve_effective_access(tool_name, arguments) is AccessMode.READONLY:
+                display["access_mode"] = AccessMode.READONLY.value
+                display["execution_category"] = "read_only"
+        except Exception:
+            pass
+
+    return display
