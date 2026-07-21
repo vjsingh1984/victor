@@ -11,6 +11,8 @@ import json
 
 import pytest
 
+pytest.importorskip("sandhi_gateway", reason="requires the victor[sandhi] extra")
+
 from victor.providers.base import (
     Message,
     ProviderAuthError,

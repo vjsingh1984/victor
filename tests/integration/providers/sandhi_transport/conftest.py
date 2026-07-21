@@ -15,8 +15,6 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import pytest
 
-pytest.importorskip("sandhi_gateway", reason="requires the victor[sandhi] extra")
-
 
 @dataclass
 class Recorded:
