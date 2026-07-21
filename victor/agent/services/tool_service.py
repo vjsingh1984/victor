@@ -86,6 +86,21 @@ class ToolResultContext:
     task_type: str = "unknown"
 
 
+def _live_display_active() -> bool:
+    """True when an interactive live renderer owns console output.
+
+    The renderer prints its own ✗ error line from the tool_result chunk, so
+    service-level console error prints would be duplicates. Lazy import keeps
+    headless/API paths free of any UI dependency.
+    """
+    try:
+        from victor.ui.rendering.log_handler import get_live_console
+
+        return get_live_console() is not None
+    except Exception:
+        return False
+
+
 def normalize_tool_result_arguments(arguments: Any) -> Dict[str, Any]:
     """Normalize tool arguments for formatting/pruning decisions."""
     if isinstance(arguments, dict):
@@ -484,7 +499,10 @@ def process_tool_results_with_context(
             if not (_shown_key and _shown_key in ctx.shown_tool_errors):
                 if _shown_key and len(ctx.shown_tool_errors) < 500:
                     ctx.shown_tool_errors.add(_shown_key)
-                if ctx.console and ctx.presentation:
+                if ctx.console and ctx.presentation and not _live_display_active():
+                    # With a live renderer active this would be a duplicate —
+                    # the renderer prints its own ✗ error line from the
+                    # tool_result chunk.
                     prefix = "Tool call skipped" if skipped else "Tool execution failed"
                     ctx.console.print(
                         f"[red]{ctx.presentation.icon('error', with_color=False)} "

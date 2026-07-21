@@ -889,7 +889,9 @@ class ErrorHandler:
         if error_info.details:
             msg += f" | details: {error_info.details}"
 
-        self.logger.log(log_level, msg)
+        # victor_category lets the Live-aware console handler drop records the
+        # renderer already surfaces as error cards (file logging unaffected).
+        self.logger.log(log_level, msg, extra={"victor_category": error_info.category.value})
 
         # Log traceback at debug level
         if error_info.traceback:

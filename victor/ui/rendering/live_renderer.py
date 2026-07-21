@@ -96,6 +96,8 @@ class LiveDisplayRenderer:
 
     def start(self) -> None:
         """Start the Live display."""
+        from victor.ui.rendering.log_handler import register_live_console
+
         self._live = Live(
             render_markdown_with_hooks(""), console=self.console, refresh_per_second=10
         )
@@ -103,6 +105,9 @@ class LiveDisplayRenderer:
         self._is_paused = False
         self._pause_count = 0
         self._invalidate_head_cache()
+        # Route console log records through this console while the display is
+        # live (they print above the region instead of tearing it).
+        register_live_console(self.console)
 
     def get_metrics(self) -> StreamingMetrics:
         """Return accumulated streaming metrics for this session."""
@@ -826,6 +831,9 @@ class LiveDisplayRenderer:
 
     def cleanup(self) -> None:
         """Clean up the Live display."""
+        from victor.ui.rendering.log_handler import unregister_live_console
+
+        unregister_live_console()
         if self._live:
             self._live.stop()
             self._live = None
