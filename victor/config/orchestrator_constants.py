@@ -450,23 +450,9 @@ class ContextAssemblerConfig:
     ledger_budget_pct: float = 0.05
 
 
-@dataclass(frozen=True)
-class ReferentialIntentConfig:
-    """Configuration for referential intent resolution.
-
-    Attributes:
-        enabled: Whether referential intent resolution is active
-        max_enrichment_chars: Max chars appended as context enrichment
-    """
-
-    enabled: bool = True
-    max_enrichment_chars: int = 1500
-
-
 SESSION_LEDGER_CONFIG = SessionLedgerConfig()
 DEDUPLICATION_CONFIG = DeduplicationConfig()
 CONTEXT_ASSEMBLER_CONFIG = ContextAssemblerConfig()
-REFERENTIAL_INTENT_CONFIG = ReferentialIntentConfig()
 
 
 # ============================================================================

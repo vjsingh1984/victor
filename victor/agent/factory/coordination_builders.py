@@ -51,7 +51,6 @@ if TYPE_CHECKING:
     from victor.agent.middleware_chain import MiddlewareChain
     from victor.agent.conversation.state_machine import ConversationStateMachine
     from victor.agent.conversation.assembler import TurnBoundaryContextAssembler
-    from victor.agent.referential_intent_resolver import ReferentialIntentResolver
     from victor.agent.session_ledger import SessionLedger
     from victor.observability.integration import ObservabilityIntegration
     from victor.storage.embeddings.intent_classifier import IntentClassifier
@@ -834,13 +833,3 @@ class CoordinationBuildersMixin:
         )
         logger.debug("TurnBoundaryContextAssembler created")
         return assembler
-
-    def create_referential_intent_resolver(
-        self, ledger: Optional["SessionLedger"] = None
-    ) -> "ReferentialIntentResolver":
-        """Create ReferentialIntentResolver for anaphoric reference resolution."""
-        from victor.agent.referential_intent_resolver import ReferentialIntentResolver
-
-        resolver = ReferentialIntentResolver(session_ledger=ledger)
-        logger.debug("ReferentialIntentResolver created")
-        return resolver

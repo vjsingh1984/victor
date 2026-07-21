@@ -4,7 +4,7 @@
 >
 > A flag's **code default** is OFF iff it is in `is_opt_in_by_default()` (assuming no YAML/env override). This table is the single source of truth for flag defaults — cite it instead of restating defaults in prose, which drifts (see F-016 / TD-17).
 
-Total flags: 26 · Opt-in (default OFF): 12 · Default ON: 14
+Total flags: 25 · Opt-in (default OFF): 11 · Default ON: 14
 
 | Flag | Code default | Opt-in |
 |------|--------------|--------|
@@ -24,7 +24,6 @@ Total flags: 26 · Opt-in (default OFF): 12 · Default ON: 14
 | `use_prime_memory_evolution` | OFF | yes |
 | `use_prompt_completeness_guard` | OFF | yes |
 | `use_prompt_dictionary_compression` | OFF | yes |
-| `use_referential_intent` | OFF | yes |
 | `use_rich_formatting` | ON | no |
 | `use_semantic_response_cache` | OFF | yes |
 | `use_session_ledger` | ON | no |

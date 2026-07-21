@@ -51,7 +51,6 @@ from typing import Any, Dict, List, Optional, Set, TYPE_CHECKING
 from dataclasses import dataclass, field, replace
 
 from victor.agent.conversation.types import MESSAGE_SOURCE_METADATA_KEY, MessageSource
-from victor.agent.referential_intent_resolver import resolve_referential_intent
 from victor.agent.runtime.context import AgentRuntimeContext
 from victor.agent.response_completer import ToolFailureContext
 from victor.agent.services.context_service import compact_context_if_recommended
@@ -500,10 +499,6 @@ class TurnExecutor:
                     tool_calls=None,
                 )
             user_message = gate_result.content
-
-        # FEP-0023 P3: shared referential-intent enrichment seam (parity with the
-        # streaming path). No-op unless USE_REFERENTIAL_INTENT wires a resolver.
-        user_message = resolve_referential_intent(self._resolve_orchestrator(), user_message)
 
         # Ensure system prompt is included once at start of conversation
         self._chat_context.conversation.ensure_system_prompt()
