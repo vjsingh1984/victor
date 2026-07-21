@@ -577,16 +577,28 @@ flowchart LR
 | Database | Path | Contents |
 |----------|------|----------|
 | **Global** | `~/.victor/victor.db` | Settings, API keys, RL data, team stats, TUI sessions |
-| **Project** | `./.victor/project.db` | Graph, conversations, sessions, cache, change tracking |
+| **Project** | `./.victor/project.db` | Graph, conversations, sessions, cache |
+| **Undo** | `./.victor/undo.db` | File-edit undo/redo history (change groups + file changes) |
 
 **Access pattern:**
 
 ```python
 from victor.core.database import get_database, get_project_database
+from victor.core.undo_database import get_undo_database
 
 global_db = get_database()    # ~/.victor/victor.db
 project_db = get_project_database()  # ./.victor/project.db
+undo_db = get_undo_database()  # ./.victor/undo.db
 ```
+
+**Why undo.db is separate:** `project.db` is written continuously by the graph
+indexer (reindex-on-save). SQLite serializes writers even under WAL, so the
+tiny per-edit undo write kept losing the write-lock and failing with
+`database is locked` — silently dropping undo history. A dedicated `undo.db`
+gives the undo writer its own lock (never contends with the indexer) and lets
+multiple sessions editing the same project record history concurrently. Undo
+history is rebuildable/ephemeral; durable rollback is covered by file backups
+in `.victor/backups/`.
 
 **Direction — correlated graph + vector backend:** the Code Context Graph (SQLite `graph_*`) and the
 LanceDB embedding index are hand-joined today (`graph_node.embedding_ref` is unpopulated). The planned

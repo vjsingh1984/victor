@@ -150,6 +150,16 @@ class ProjectPaths:
         return self.project_victor_dir / "project.db"
 
     @property
+    def undo_db(self) -> Path:
+        """Get project-local undo/redo history database path.
+
+        A dedicated SQLite file (sibling of ``project.db``) so the per-edit undo
+        write has its own write-lock and never contends with the graph indexer's
+        continuous reindex stream on ``project.db``. Rebuildable/ephemeral.
+        """
+        return self.project_victor_dir / "undo.db"
+
+    @property
     def embeddings_dir(self) -> Path:
         """Get project-local embeddings directory."""
         return self.project_victor_dir / "embeddings"

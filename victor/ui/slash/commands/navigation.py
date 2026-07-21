@@ -164,15 +164,14 @@ class UndoCommand(BaseSlashCommand):
         if not self._require_agent(ctx):
             return
 
-        tracker = getattr(ctx.agent, "_file_tracker", None)
-        if not tracker:
-            ctx.console.print("[yellow]File change tracking not available[/]")
-            return
+        from victor.agent.change_tracker import get_change_tracker
 
-        if tracker.undo():
-            ctx.console.print("[green]Undone last change[/]")
-        else:
-            ctx.console.print("[yellow]Nothing to undo[/]")
+        tracker = get_change_tracker()
+        success, message, files = tracker.undo()
+        style = "green" if success else "yellow"
+        ctx.console.print(f"[{style}]{message}[/]")
+        for f in files:
+            ctx.console.print(f"  [dim]•[/] {f}")
 
 
 @register_command
@@ -193,15 +192,14 @@ class RedoCommand(BaseSlashCommand):
         if not self._require_agent(ctx):
             return
 
-        tracker = getattr(ctx.agent, "_file_tracker", None)
-        if not tracker:
-            ctx.console.print("[yellow]File change tracking not available[/]")
-            return
+        from victor.agent.change_tracker import get_change_tracker
 
-        if tracker.redo():
-            ctx.console.print("[green]Redone last undone change[/]")
-        else:
-            ctx.console.print("[yellow]Nothing to redo[/]")
+        tracker = get_change_tracker()
+        success, message, files = tracker.redo()
+        style = "green" if success else "yellow"
+        ctx.console.print(f"[{style}]{message}[/]")
+        for f in files:
+            ctx.console.print(f"  [dim]•[/] {f}")
 
 
 @register_command
@@ -225,11 +223,9 @@ class HistoryCommand(BaseSlashCommand):
 
         limit = self._parse_int_arg(ctx, 0, default=20)
 
-        tracker = getattr(ctx.agent, "_file_tracker", None)
-        if not tracker:
-            ctx.console.print("[yellow]File change tracking not available[/]")
-            return
+        from victor.agent.change_tracker import get_change_tracker
 
+        tracker = get_change_tracker()
         history = tracker.get_history(limit=limit)
         if not history:
             ctx.console.print("[dim]No file change history[/]")
@@ -237,16 +233,20 @@ class HistoryCommand(BaseSlashCommand):
 
         table = Table(title=f"File Change History (last {len(history)})")
         table.add_column("Time", style="dim")
-        table.add_column("File", style="cyan")
-        table.add_column("Action", style="green")
-        table.add_column("Lines", justify="right")
+        table.add_column("Files", justify="right")
+        table.add_column("Tool", style="cyan")
+        table.add_column("Description", style="green")
+        table.add_column("Status", justify="center")
 
         for entry in history:
+            files = entry.get("files", [])
+            file_count = entry.get("file_count", len(files) if isinstance(files, list) else 0)
             table.add_row(
-                entry.get("timestamp", "")[:19],
-                str(entry.get("file", "?"))[-40:],
-                entry.get("action", "?"),
-                str(entry.get("lines_changed", "")),
+                str(entry.get("timestamp", ""))[:19],
+                str(file_count),
+                str(entry.get("tool_name", "?")),
+                str(entry.get("description", ""))[:50],
+                "undone" if entry.get("undone") else "applied",
             )
 
         ctx.console.print(table)
