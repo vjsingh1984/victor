@@ -49,6 +49,7 @@ from victor.agent.services.tool_budget_runtime import BudgetManager, ToolBudgetR
 from victor.agent.services.tool_access_policy import ToolAccessPolicy
 from victor.agent.services.tool_error_display import print_tool_error_once
 from victor.agent.services.tool_usage_stats import ToolUsageStats
+from victor.tools.unified.parser import classify_tool_outcome
 from victor.tools.core_tool_aliases import (
     canonicalize_core_tool_name,
     normalize_model_tool_name,
@@ -415,18 +416,10 @@ def process_tool_results_with_context(
             else:
                 error_display = user_message or error_msg or skip_reason or "Unknown error"
 
-            # Telemetry truth (P2): unified tools report errors as `### ❌` markdown
-            # strings with invocation-level success=True. The EVENT must reflect the
-            # real outcome; the LLM-visible path (semantic_success branches below)
-            # stays untouched so corrective hint text keeps flowing to the model.
-            from victor.tools.unified.parser import classify_result_marker
-
-            marker_kind = classify_result_marker(output)
+            # Telemetry truth: the EVENT reflects `### ❌` string errors; the
+            # LLM-visible path (semantic_success branches) stays untouched.
+            marker_kind, error_detail = classify_tool_outcome(output)
             telemetry_success = semantic_success and marker_kind != "tool_error"
-            error_detail = None
-            if marker_kind == "tool_error" and isinstance(output, str):
-                body_lines = output.lstrip().splitlines()
-                error_detail = (body_lines[1] if len(body_lines) > 1 else body_lines[0])[:200]
 
             if ctx.usage_logger and hasattr(ctx.usage_logger, "set_duration_context"):
                 ctx.usage_logger.set_duration_context(elapsed_ms)

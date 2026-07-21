@@ -148,6 +148,21 @@ TOOL_ERROR_MARKER = "### ❌"
 TOOL_WARNING_MARKER = "### ⚠️"
 
 
+def classify_tool_outcome(result: object) -> "tuple[Optional[str], Optional[str]]":
+    """Return ``(marker_kind, error_detail)`` for a tool result.
+
+    ``error_detail`` is the first body line (200 chars) of an error-marker
+    string, else None. Lives here (not in tool_service) so the telemetry
+    hotspot stays within its size ratchet.
+    """
+    kind = classify_result_marker(result)
+    detail = None
+    if kind == "tool_error" and isinstance(result, str):
+        body = result.lstrip().splitlines()
+        detail = (body[1] if len(body) > 1 else body[0])[:200]
+    return kind, detail
+
+
 def classify_result_marker(result: object) -> Optional[str]:
     """Classify a unified-tool string result by its leading marker.
 
