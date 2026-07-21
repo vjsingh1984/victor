@@ -415,8 +415,33 @@ class FileChangeHistory:
         logger.info(f"Committed change group: {group.id} with {len(group.changes)} changes")
         return group
 
+    # Bounded retry for transient "database is locked" errors: 2 retries, 100ms
+    # apart. After that the error propagates (callers such as the edit tool treat
+    # a failed undo-log write as non-fatal bookkeeping, not an edit failure).
+    _SAVE_LOCK_RETRIES = 2
+    _SAVE_LOCK_RETRY_DELAY_S = 0.1
+
     def _save_group(self, group: ChangeGroup) -> None:
-        """Save a change group to the database."""
+        """Save a change group to the database, retrying transient lock errors."""
+        attempts = 0
+        while True:
+            try:
+                self._save_group_once(group)
+                return
+            except sqlite3.OperationalError as exc:
+                if "locked" not in str(exc).lower() or attempts >= self._SAVE_LOCK_RETRIES:
+                    raise
+                attempts += 1
+                logger.debug(
+                    "change_tracker save hit a locked database (attempt %d/%d): %s",
+                    attempts,
+                    self._SAVE_LOCK_RETRIES,
+                    exc,
+                )
+                time.sleep(self._SAVE_LOCK_RETRY_DELAY_S)
+
+    def _save_group_once(self, group: ChangeGroup) -> None:
+        """Single attempt at persisting a change group to the database."""
         conn = self._db.get_connection()
         cursor = conn.cursor()
 

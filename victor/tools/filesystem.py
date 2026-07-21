@@ -2058,6 +2058,9 @@ async def write(
 ) -> Union[str, Dict[str, Any]]:
     """Write a file — thin facade over ``edit(create)``.
 
+    Requires `path` AND `content`; overwriting an existing file requires
+    reading it first in this session.
+
     Consolidating write() onto edit() gives ONE write path and ONE
     read-before-overwrite gate (see ``enforce_read_before_write``). Behavior is
     preserved from the previous standalone implementation:

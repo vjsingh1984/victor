@@ -600,3 +600,70 @@ class TestEditTextBasedBehavior:
 
         assert result["success"] is True
         assert "127.0.0.1" in test_file.read_text()
+
+
+class TestEditUndoLogResilience:
+    """P6: an applied edit must never be reported as failed on undo-log db errors.
+
+    FileEditor.commit() writes files to disk BEFORE the ChangeTracker persists
+    the undo history to project.db. A "database is locked" error in that
+    bookkeeping step must not turn an applied edit into a tool error (the
+    model's retry would then hit 'old_str not found' on the mutated file).
+    """
+
+    @pytest.mark.asyncio
+    async def test_db_lock_after_file_commit_returns_success_with_warning(
+        self, tmp_path, monkeypatch
+    ):
+        """Edit succeeds (with a warning note) when the undo-log db write fails."""
+        import sqlite3
+
+        from victor.agent.change_tracker import FileChangeHistory, reset_change_tracker
+
+        test_file = tmp_path / "test.txt"
+        test_file.write_text("hello world")
+
+        def _raise_locked(self):
+            raise sqlite3.OperationalError("database is locked")
+
+        monkeypatch.setattr(FileChangeHistory, "commit_change_group", _raise_locked)
+        try:
+            result = await edit(
+                ops=[
+                    {
+                        "type": "replace",
+                        "path": str(test_file),
+                        "old_str": "hello",
+                        "new_str": "goodbye",
+                    }
+                ]
+            )
+        finally:
+            # The patched commit never clears the singleton's current group.
+            reset_change_tracker()
+
+        # The file WAS modified on disk — the tool must report success.
+        assert test_file.read_text() == "goodbye world"
+        assert result["success"] is True
+        assert "undo history not recorded" in result["message"]
+        assert "⚠️" in result["message"]
+
+    @pytest.mark.asyncio
+    async def test_undo_note_absent_on_clean_commit(self, tmp_path):
+        """No undo-history warning note when the undo-log write succeeds."""
+        test_file = tmp_path / "test.txt"
+        test_file.write_text("hello world")
+
+        result = await edit(
+            ops=[
+                {
+                    "type": "replace",
+                    "path": str(test_file),
+                    "old_str": "hello",
+                    "new_str": "goodbye",
+                }
+            ]
+        )
+
+        assert result["success"] is True
+        assert "undo history not recorded" not in result["message"]
