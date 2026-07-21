@@ -1395,11 +1395,9 @@ class TestGenerateToolResultChunks:
 
         assert len(chunks) == 1
         tool_metadata = chunks[0].metadata["tool_result"]
-        # Now shows brief metadata-only message instead of pruned preview
-        assert (
-            tool_metadata["result"]
-            == "Tool completed successfully. Use /expand or Ctrl+O at prompt to see full output."
-        )
+        # The real (pruned) preview passes through — how much to show and the
+        # /expand affordance are the rendering layer's decisions.
+        assert tool_metadata["result"] == result["result"]
         assert tool_metadata["original_result"] == result["full_result"]
         assert tool_metadata["was_pruned"] is True
 
