@@ -20,13 +20,13 @@ import logging
 import os
 import warnings
 from pathlib import Path
-from typing import Any, Callable, ClassVar, Dict, Optional, Union, List
+from typing import Annotated, Any, Callable, ClassVar, Dict, Optional, Union, List
 
 logger = logging.getLogger(__name__)
 
 import yaml
 from pydantic import Field, SecretStr, computed_field, field_validator, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 from victor.config.model_capabilities import _load_tool_capable_patterns_from_yaml
 from victor.config.orchestrator_constants import BUDGET_LIMITS, TOOL_SELECTION_PRESETS
 from victor.core.constants import DEFAULT_VERTICAL
@@ -1791,6 +1791,27 @@ class Settings(BaseSettings):
     # Debug Settings (from VictorSettings merge)
     # ==========================================================================
     debug_logging: bool = Field(default=False, description="Enable verbose debug logging")
+
+    # ==========================================================================
+    # Sandhi in-process transport pilot (FEP-0020 Phase 4b / ADR-0047 D10 step 4)
+    # ==========================================================================
+    sandhi_transport_providers: Annotated[List[str], NoDecode] = Field(
+        default_factory=list,
+        description=(
+            "Provider names whose wire transport is piloted through the in-process sandhi "
+            "binding (default OFF: empty = native transport everywhere). Accepts a list or a "
+            "comma-separated string (env: VICTOR_SANDHI_TRANSPORT_PROVIDERS=deepseek,xai). "
+            "Consumed at provider-creation time by victor/providers/sandhi_transport.py."
+        ),
+    )
+
+    @field_validator("sandhi_transport_providers", mode="before")
+    @classmethod
+    def _parse_sandhi_transport_providers(cls, value: Any) -> Any:
+        """Accept a comma-separated string (env-friendly) as well as a list."""
+        if isinstance(value, str):
+            return [part.strip().lower() for part in value.split(",") if part.strip()]
+        return value
 
     # ==========================================================================
     # System Prompt Policy (from VictorSettings merge)
