@@ -14,12 +14,16 @@ def _assert_project_connection_pragmas(db: ProjectDatabaseManager) -> None:
     synchronous = conn.execute("PRAGMA synchronous").fetchone()
     foreign_keys = conn.execute("PRAGMA foreign_keys").fetchone()
     wal_autocheckpoint = conn.execute("PRAGMA wal_autocheckpoint").fetchone()
+    busy_timeout = conn.execute("PRAGMA busy_timeout").fetchone()
 
     assert journal_mode is not None and journal_mode[0] == "wal"
     assert synchronous is not None and synchronous[0] == 1
     assert foreign_keys is not None and foreign_keys[0] == 1
     assert wal_autocheckpoint is not None
     assert wal_autocheckpoint[0] == ProjectDatabaseManager._WAL_AUTOCHECKPOINT_PAGES
+    # P6: deliberately 5000ms (NOT the 30s connect timeout) — with the undo-log
+    # write made non-fatal, a short bounded wait beats a long stall.
+    assert busy_timeout is not None and busy_timeout[0] == 5000
 
 
 def test_project_database_reapplies_connection_pragmas_after_reopen(

@@ -493,3 +493,90 @@ class TestHistory:
 
         history = tracker.get_history(limit=3)
         assert len(history) == 3
+
+
+class TestSaveGroupLockRetry:
+    """P6: _save_group retries transient 'database is locked' errors."""
+
+    def _record_one(self, tracker):
+        tracker.begin_change_group("edit", "Test lock retry")
+        tracker.record_change(
+            file_path="/tmp/test.py",
+            change_type=ChangeType.MODIFY,
+            original_content="a",
+            new_content="b",
+            tool_name="edit",
+        )
+
+    def test_save_group_retries_transient_lock_then_succeeds(self, tracker, monkeypatch):
+        """Two 'locked' failures then success -> commit succeeds after 2 retries."""
+        import sqlite3
+
+        import victor.agent.change_tracker as ct_mod
+
+        sleeps = []
+        monkeypatch.setattr(ct_mod.time, "sleep", lambda s: sleeps.append(s))
+
+        calls = {"n": 0}
+
+        def _flaky(group):
+            calls["n"] += 1
+            if calls["n"] <= 2:
+                raise sqlite3.OperationalError("database is locked")
+
+        monkeypatch.setattr(tracker, "_save_group_once", _flaky)
+
+        self._record_one(tracker)
+        group = tracker.commit_change_group()
+
+        assert group is not None
+        assert calls["n"] == 3
+        assert sleeps == [0.1, 0.1]
+
+    def test_save_group_reraises_after_bounded_retries(self, tracker, monkeypatch):
+        """Three consecutive 'locked' failures -> the error propagates."""
+        import sqlite3
+
+        import victor.agent.change_tracker as ct_mod
+
+        sleeps = []
+        monkeypatch.setattr(ct_mod.time, "sleep", lambda s: sleeps.append(s))
+
+        calls = {"n": 0}
+
+        def _always_locked(group):
+            calls["n"] += 1
+            raise sqlite3.OperationalError("database is locked")
+
+        monkeypatch.setattr(tracker, "_save_group_once", _always_locked)
+
+        self._record_one(tracker)
+        with pytest.raises(sqlite3.OperationalError, match="locked"):
+            tracker.commit_change_group()
+
+        assert calls["n"] == 3  # 1 initial attempt + 2 retries
+        assert sleeps == [0.1, 0.1]
+
+    def test_save_group_non_lock_error_not_retried(self, tracker, monkeypatch):
+        """A non-lock OperationalError propagates immediately (no retries)."""
+        import sqlite3
+
+        import victor.agent.change_tracker as ct_mod
+
+        sleeps = []
+        monkeypatch.setattr(ct_mod.time, "sleep", lambda s: sleeps.append(s))
+
+        calls = {"n": 0}
+
+        def _broken(group):
+            calls["n"] += 1
+            raise sqlite3.OperationalError("no such table: change_groups")
+
+        monkeypatch.setattr(tracker, "_save_group_once", _broken)
+
+        self._record_one(tracker)
+        with pytest.raises(sqlite3.OperationalError, match="no such table"):
+            tracker.commit_change_group()
+
+        assert calls["n"] == 1
+        assert sleeps == []
