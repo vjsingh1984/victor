@@ -35,34 +35,24 @@ import logging
 import sys
 from typing import IO, Optional
 
-from rich.console import Console
 from rich.text import Text
+
+# The registry itself lives in victor.runtime so agent-layer consumers can
+# read it without importing UI modules; re-exported here for UI callers.
+from victor.runtime.live_console import (  # noqa: F401
+    get_live_console,
+    live_display_active,
+    register_live_console,
+    unregister_live_console,
+)
 
 __all__ = [
     "LiveAwareLogHandler",
     "register_live_console",
     "unregister_live_console",
     "get_live_console",
+    "live_display_active",
 ]
-
-_live_console: Optional[Console] = None
-
-
-def register_live_console(console: Console) -> None:
-    """Mark ``console`` as owning the screen (a Live display is running)."""
-    global _live_console
-    _live_console = console
-
-
-def unregister_live_console() -> None:
-    """Clear the live-console registration (display stopped)."""
-    global _live_console
-    _live_console = None
-
-
-def get_live_console() -> Optional[Console]:
-    """Return the console owning an active live display, if any."""
-    return _live_console
 
 
 class LiveAwareLogHandler(logging.Handler):

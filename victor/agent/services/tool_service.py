@@ -47,6 +47,7 @@ from typing import (
 from victor.agent.services.tool_batch_executor import execute_tool_call_batch
 from victor.agent.services.tool_budget_runtime import BudgetManager, ToolBudgetRuntime
 from victor.agent.services.tool_access_policy import ToolAccessPolicy
+from victor.agent.services.tool_error_display import print_tool_error_once
 from victor.agent.services.tool_usage_stats import ToolUsageStats
 from victor.tools.core_tool_aliases import (
     canonicalize_core_tool_name,
@@ -84,21 +85,6 @@ class ToolResultContext:
     presentation: Optional[Any] = None
     stream_context: Optional[Any] = None
     task_type: str = "unknown"
-
-
-def _live_display_active() -> bool:
-    """True when an interactive live renderer owns console output.
-
-    The renderer prints its own ✗ error line from the tool_result chunk, so
-    service-level console error prints would be duplicates. Lazy import keeps
-    headless/API paths free of any UI dependency.
-    """
-    try:
-        from victor.ui.rendering.log_handler import get_live_console
-
-        return get_live_console() is not None
-    except Exception:
-        return False
 
 
 def normalize_tool_result_arguments(arguments: Any) -> Dict[str, Any]:
@@ -494,21 +480,9 @@ def process_tool_results_with_context(
                 sig = f"{tool_name}:{hash(str(sorted(normalized_args.items())))}"
                 ctx.failed_tool_signatures.add(sig)
 
-            _not_found = "not found" in str(error_display).lower()
-            _shown_key = f"notfound:{tool_name}" if _not_found else None
-            if not (_shown_key and _shown_key in ctx.shown_tool_errors):
-                if _shown_key and len(ctx.shown_tool_errors) < 500:
-                    ctx.shown_tool_errors.add(_shown_key)
-                if ctx.console and ctx.presentation and not _live_display_active():
-                    # With a live renderer active this would be a duplicate —
-                    # the renderer prints its own ✗ error line from the
-                    # tool_result chunk.
-                    prefix = "Tool call skipped" if skipped else "Tool execution failed"
-                    ctx.console.print(
-                        f"[red]{ctx.presentation.icon('error', with_color=False)} "
-                        f"{prefix}: {error_display}[/] "
-                        f"[dim]({elapsed_ms:.0f}ms)[/dim]"
-                    )
+            print_tool_error_once(
+                ctx, tool_name, error_display, skipped=skipped, elapsed_ms=elapsed_ms
+            )
 
             if isinstance(output, dict):
                 error_output = dict(output)

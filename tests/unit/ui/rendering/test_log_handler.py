@@ -123,8 +123,34 @@ class TestErrorHandlerTagging:
 
 class TestServiceDuplicateSuppression:
     def test_live_display_active_reflects_registry(self):
-        from victor.agent.services.tool_service import _live_display_active
+        from victor.runtime.live_console import live_display_active
 
-        assert _live_display_active() is False
+        assert live_display_active() is False
         register_live_console(Console(width=80))
-        assert _live_display_active() is True
+        assert live_display_active() is True
+
+    def test_print_tool_error_suppressed_while_live(self):
+        from unittest.mock import MagicMock
+
+        from victor.agent.services.tool_error_display import print_tool_error_once
+
+        ctx = MagicMock()
+        ctx.shown_tool_errors = set()
+        register_live_console(Console(width=80))
+        print_tool_error_once(ctx, "shell", "boom", skipped=False, elapsed_ms=2.0)
+        ctx.console.print.assert_not_called()
+
+        unregister_live_console()
+        print_tool_error_once(ctx, "shell", "boom", skipped=False, elapsed_ms=2.0)
+        ctx.console.print.assert_called_once()
+
+    def test_not_found_errors_deduplicated(self):
+        from unittest.mock import MagicMock
+
+        from victor.agent.services.tool_error_display import print_tool_error_once
+
+        ctx = MagicMock()
+        ctx.shown_tool_errors = set()
+        print_tool_error_once(ctx, "ghost", "tool not found", skipped=True, elapsed_ms=1.0)
+        print_tool_error_once(ctx, "ghost", "tool not found", skipped=True, elapsed_ms=1.0)
+        assert ctx.console.print.call_count == 1
