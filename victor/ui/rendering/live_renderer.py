@@ -33,9 +33,9 @@ from victor.ui.rendering.utils import (
     expand_tool_output,
     format_bash_command_invocation,
     format_duration,
+    format_access_mode_badge,
     format_tool_args,
     format_tool_display_name,
-    format_tool_metadata_badges,
     get_tool_metadata_for_display,
     render_content_badge,
     render_edit_preview,
@@ -84,7 +84,6 @@ class LiveDisplayRenderer:
         self._content_shown_before_pause = ""
         self._tool_section_shown = False  # Track if tool section separator shown
         self._current_tool_start_time: float | None = None  # Track tool execution start time
-        self._current_tool_category: str | None = None  # Track current tool category for grouping
         # Live tool-output streaming (progressive terminal block)
         self._tool_progress_lines: deque[str] = deque(maxlen=12)
         self._tool_progress_active = False
@@ -320,54 +319,37 @@ class LiveDisplayRenderer:
         tool_settings = get_tool_settings()
         show_preview = tool_settings.tool_output_preview_enabled
 
-        # Check for tool category changes and show group headers (if enabled)
-        if tool_settings.enable_tool_grouping:
-            tool_category = self._categorize_tool(name)
-            if tool_category != self._current_tool_category:
-                # Add spacing before new group (but not before first tool)
-                if self._current_tool_category is not None:
-                    self.console.print("")  # Blank line between groups
-                # Show group header
-                self.console.print(f"[dim bold]▸ {tool_category}[/]")
-                self._current_tool_category = tool_category
-
         preview_output = str(result) if result is not None else original_result
         full_output = original_result or (str(result) if result is not None else None)
 
         self.pause()
 
-        # Bash-style result line: [DONE] tool_name • result • duration
+        # Compact one-line status: ✓ tool_name [WRITE] · summary · duration.
+        # One colored access badge, and only when this invocation isn't a pure
+        # read — success/failure is the ✓/✗ color, not a token.
         color = "success" if success else "error"
         duration_str = format_duration(elapsed)
+        icon = "✓" if success else "✗"
 
-        # Get tool metadata from unified registry, narrowed to this
-        # invocation's effective access (a code grep shows READ ONLY, not the
-        # tool's static MIXED envelope).
+        # Access mode narrowed to this invocation (a code grep shows no write
+        # badge; a real write still does).
         metadata = get_tool_metadata_for_display(name, arguments)
-        metadata_badges = format_tool_metadata_badges(
-            category=metadata.get("category", ""),
-            access_mode=metadata.get("access_mode", ""),
-            cost_tier=metadata.get("cost_tier", ""),
-            execution_category=metadata.get("execution_category", ""),
-        )
+        access_mode = str(metadata.get("access_mode", ""))
+        access_badge = ""
+        if access_mode and access_mode != "readonly":
+            access_badge = f" {format_access_mode_badge(access_mode)}"
 
-        # Build bash-style result line with metadata badges
         status_line = (
-            f"[dim]• [/][bold {color}][DONE][/] [bold cyan]{format_tool_display_name(name)}[/]"
+            f"[bold {color}]{icon}[/] [bold cyan]{format_tool_display_name(name)}[/]{access_badge}"
         )
-
-        # Add metadata badges if available
-        if metadata_badges:
-            status_line += f" {metadata_badges}"
 
         # Add result summary (file count, match count, etc.)
         if success:
-            # Try to extract result summary from output
             result_summary = self._extract_result_summary(name, preview_output)
             if result_summary:
-                status_line += f" [dim]•[/] [green]{result_summary}[/]"
+                status_line += f" [dim]·[/] [green]{result_summary}[/]"
 
-        status_line += f" [dim]•[/] [tool.time]{duration_str}[/]"
+        status_line += f" [dim]·[/] [tool.time]{duration_str}[/]"
 
         if error:
             # Show more context for errors - up to 150 chars with better formatting
@@ -824,36 +806,6 @@ class LiveDisplayRenderer:
         adaptive = min(2, max_lines)
         return max(min_lines, adaptive)
 
-    def _categorize_tool(self, tool_name: str) -> str:
-        """Categorize a tool name into a logical group.
-
-        Args:
-            tool_name: Name of the tool to categorize
-
-        Returns:
-            Category name for the tool
-        """
-        # Define tool categories based on name patterns
-        categories = {
-            "File System": ["read", "write", "ls", "grep", "file_info"],
-            "Search": ["code_search", "semantic_code_search", "search"],
-            "Git": ["git_status", "git_diff", "git_log", "git_blame"],
-            "Analysis": ["overview", "analyze", "inspect"],
-            "Build": ["build", "compile", "test"],
-            "Execution": ["bash", "shell", "run"],
-            "Web": ["web_search", "fetch", "http"],
-            "Database": ["db_query", "db_execute", "sql"],
-        }
-
-        # Find matching category
-        tool_lower = tool_name.lower()
-        for category, patterns in categories.items():
-            if any(pattern in tool_lower for pattern in patterns):
-                return category
-
-        # Default: use "Other" category
-        return "Other"
-
     def expand_last_output(self) -> None:
         """Expand the last tool output to show full content."""
         if not self._last_tool_result:
@@ -885,4 +837,3 @@ class LiveDisplayRenderer:
         self._content_shown_before_pause = ""
         self._last_tool_result = None
         self._tool_section_shown = False  # Reset tool section flag
-        self._current_tool_category = None  # Reset tool category tracker
