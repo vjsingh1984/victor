@@ -129,3 +129,33 @@ def test_shell_operator_rejection_message_is_actionable():
     assert "`fs`" in msg
     assert "`shell` tool" in msg
     assert "`||`" in msg
+
+
+class TestClassifyResultMarker:
+    """P2: shared classifier for string-marker tool outcomes."""
+
+    def test_error_marker(self):
+        from victor.tools.unified.parser import classify_result_marker
+
+        assert classify_result_marker("### ❌ ERROR\nboom") == "tool_error"
+
+    def test_warning_marker(self):
+        from victor.tools.unified.parser import classify_result_marker
+
+        assert classify_result_marker("### ⚠️ CAREFUL\nhint") == "warning"
+
+    def test_leading_whitespace_tolerated(self):
+        from victor.tools.unified.parser import classify_result_marker
+
+        assert classify_result_marker("\n  ### ❌ ERROR\nboom") == "tool_error"
+
+    def test_plain_string_none(self):
+        from victor.tools.unified.parser import classify_result_marker
+
+        assert classify_result_marker("all good") is None
+
+    def test_non_string_none(self):
+        from victor.tools.unified.parser import classify_result_marker
+
+        assert classify_result_marker({"success": False}) is None
+        assert classify_result_marker(None) is None

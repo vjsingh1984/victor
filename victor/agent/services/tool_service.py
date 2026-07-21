@@ -415,6 +415,19 @@ def process_tool_results_with_context(
             else:
                 error_display = user_message or error_msg or skip_reason or "Unknown error"
 
+            # Telemetry truth (P2): unified tools report errors as `### ❌` markdown
+            # strings with invocation-level success=True. The EVENT must reflect the
+            # real outcome; the LLM-visible path (semantic_success branches below)
+            # stays untouched so corrective hint text keeps flowing to the model.
+            from victor.tools.unified.parser import classify_result_marker
+
+            marker_kind = classify_result_marker(output)
+            telemetry_success = semantic_success and marker_kind != "tool_error"
+            error_detail = None
+            if marker_kind == "tool_error" and isinstance(output, str):
+                body_lines = output.lstrip().splitlines()
+                error_detail = (body_lines[1] if len(body_lines) > 1 else body_lines[0])[:200]
+
             if ctx.usage_logger and hasattr(ctx.usage_logger, "set_duration_context"):
                 ctx.usage_logger.set_duration_context(elapsed_ms)
             if ctx.usage_logger:
@@ -422,13 +435,14 @@ def process_tool_results_with_context(
                     "tool_result",
                     {
                         "tool_name": tool_name,
-                        "success": semantic_success,
+                        "success": telemetry_success,
                         "skipped": skipped,
-                        "outcome_kind": outcome_kind,
+                        "outcome_kind": outcome_kind or marker_kind,
                         "block_source": block_source,
                         "retryable": retryable,
                         "result": output,
-                        "error": error_display,
+                        "error": error_display or error_detail,
+                        "error_detail": error_detail,
                     },
                 )
 
