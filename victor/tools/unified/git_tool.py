@@ -31,9 +31,10 @@ Example commands:
     git commit --ai
     git branch feature/auth
     git push origin main
+    git push -u origin feature/auth
     git conflicts
     git commit_msg
-    git pr --title "Add auth"
+    git pr --title "Add auth" --base develop
 """
 
 from __future__ import annotations
@@ -128,6 +129,14 @@ def create_git_parser() -> UnifiedGitParser:
     push_parser = subparsers.add_parser("push", help="Push commits to remote")
     push_parser.add_argument("remote", nargs="?", default=None, help="Remote name (default origin)")
     push_parser.add_argument("branch", nargs="?", default=None, help="Branch to push")
+    push_parser.add_argument(
+        "-u",
+        "--set-upstream",
+        action="store_true",
+        dest="set_upstream",
+        help="Set the pushed branch as its upstream (git push -u) — the standard "
+        "first push for a new branch",
+    )
     push_parser.add_argument("--force", action="store_true", help="Use --force-with-lease")
     push_parser.add_argument("--tags", action="store_true", help="Push tags")
     push_parser.add_argument("--dry-run", action="store_true", dest="dry_run", help="Dry run")
@@ -136,7 +145,20 @@ def create_git_parser() -> UnifiedGitParser:
 
     pr_parser = subparsers.add_parser("pr", help="Create a pull request (gh CLI)")
     pr_parser.add_argument("--title", default=None, help="PR title")
-    pr_parser.add_argument("--base", default="main", help="Base branch")
+    pr_parser.add_argument(
+        "--base",
+        default=None,
+        help="Base branch (default: repo default / gh-merge-base)",
+    )
+    pr_parser.add_argument("--head", default=None, help="Head branch (default: current)")
+    pr_parser.add_argument("--body", default=None, help="PR body text")
+    pr_parser.add_argument("--draft", action="store_true", help="Create the PR as a draft")
+    pr_parser.add_argument(
+        "--web", action="store_true", help="Open the PR create page in a browser"
+    )
+    pr_parser.add_argument(
+        "--fill", action="store_true", help="Autofill title/body from commit messages"
+    )
 
     return parser
 
@@ -199,6 +221,8 @@ def _git_kwarg_map(args: argparse.Namespace) -> Tuple[str, Dict[str, Any]]:
         opts: Dict[str, Any] = {}
         if args.remote:
             opts["remote"] = args.remote
+        if getattr(args, "set_upstream", False):
+            opts["set_upstream"] = True
         if args.force:
             opts["force"] = True
         if args.tags:
@@ -240,7 +264,9 @@ def _fallback_command(args: argparse.Namespace) -> Tuple[str, List[str], bool]:
             return "checkout", [args.name], False
         return "branch", ["-a"], True
     if sub == "push":
-        cmd_args = ["--force-with-lease"] if getattr(args, "force", False) else []
+        cmd_args = ["-u"] if getattr(args, "set_upstream", False) else []
+        if getattr(args, "force", False):
+            cmd_args.append("--force-with-lease")
         if getattr(args, "dry_run", False):
             cmd_args.append("--dry-run")
         remote = args.remote or "origin"
@@ -279,9 +305,11 @@ def _fallback_command(args: argparse.Namespace) -> Tuple[str, List[str], bool]:
 async def git_tool(cmd: str) -> str:
     """Git tool (bash-style). Subcommands: status [--short] · diff [--staged|--cached] [--stat] [paths]
     · log [-n N] [--oneline] [--stat] · stage/add [paths] · commit -m "msg" | --ai · commit_msg
-    · branch [name | --show-current] · push [remote] [branch] [--force] [--tags] [--dry-run]
-    · conflicts · pr --title "t" [--base b].
-    Delegates to victor-devops git when installed; falls back to shell git.
+    · branch [name | --show-current] · push [remote] [branch] [-u/--set-upstream] [--force]
+    [--tags] [--dry-run] · conflicts · pr --title "t" [--base b] [--head h] [--body ...]
+    [--draft] [--web] [--fill].
+    Delegates to victor-devops git when installed; falls back to shell git (and to the
+    `gh` CLI for `pr`), so push -u and PR creation work without victor-devops.
     Anything else (fetch, pull, rebase, stash, worktree, ...): use shell(cmd='git ...', action='exec').
     """
     parser = create_git_parser()
@@ -300,7 +328,8 @@ async def git_tool(cmd: str) -> str:
             "\n"
             "This tool supports: status [--short], diff [--staged|--cached] [--stat], "
             "log [-n N] [--oneline] [--stat], stage/add, commit (-m | --ai), commit_msg, "
-            "branch [name | --show-current], push, conflicts, pr.\n"
+            "branch [name | --show-current], push [-u] [--force] [--tags] [--dry-run], "
+            "conflicts, pr [--title] [--base] [--body] [--draft] [--web].\n"
             "For anything else use shell(cmd='git ...', action='exec')."
         )
     except Exception as e:
@@ -345,7 +374,10 @@ async def git_tool(cmd: str) -> str:
         try:
             operation, kwargs = _git_kwarg_map(parsed)
             result = await git_fn(operation=operation, **kwargs)
-            return _format_result(result)
+            out = _format_result(result)
+            if parsed.subcommand == "push":
+                out = _augment_push_hint(out, parsed)
+            return out
         except Exception as e:
             return f"### ❌ ERROR\ngit {parsed.subcommand} failed: {e}"
 
@@ -355,9 +387,34 @@ async def git_tool(cmd: str) -> str:
     except ValueError as e:
         return f"### ❌ ERROR\n{e}"
     try:
-        return await _shell_git(subcommand, argv, readonly=readonly)
+        out = await _shell_git(subcommand, argv, readonly=readonly)
+        if parsed.subcommand == "push":
+            out = _augment_push_hint(out, parsed)
+        return out
     except Exception as e:
         return f"### ❌ ERROR\ngit {parsed.subcommand} failed: {e}"
+
+
+def _augment_push_hint(output: str, parsed: argparse.Namespace) -> str:
+    """Append a corrective hint when a push failed for lack of an upstream.
+
+    A plain ``git push`` on a fresh branch fails with "no upstream". Rather than
+    leave the agent to rediscover the fix, surface the exact ``push -u`` command.
+    No-op on success, and skipped when ``-u`` was already used.
+    """
+    if not isinstance(output, str) or "❌" not in output:
+        return output
+    if getattr(parsed, "set_upstream", False):
+        return output
+    low = output.lower()
+    if "upstream" in low or "set-upstream" in low or "no configured push destination" in low:
+        remote = parsed.remote or "origin"
+        branch = parsed.branch or "<branch>"
+        return (
+            f"{output}\n\n### 💡 HINT\nThis branch has no upstream. Set one while pushing:\n"
+            f"`git push -u {remote} {branch}`"
+        )
+    return output
 
 
 async def _handle_ai_commit(parsed: argparse.Namespace) -> str:
@@ -428,20 +485,77 @@ def _attributed_commit_message(message: Optional[str]) -> Optional[str]:
 
 
 async def _handle_pr(parsed: argparse.Namespace) -> str:
-    """Create a pull request via the victor-devops ``pr`` callable."""
+    """Create a pull request.
+
+    Prefers the richer ``victor-devops`` ``pr`` callable when installed; otherwise
+    falls back to the GitHub CLI (``gh pr create``) directly. The ``gh`` fallback
+    means PR creation works out-of-the-box on any machine with an authenticated
+    ``gh`` — no ``victor-devops`` required — instead of hard-failing.
+    """
     pr_fn, _src = resolve_vertical_callable(
         "pr", fallback_module="victor_devops.tools.git_tool", fallback_attr="pr"
     )
-    if pr_fn is None:
-        return (
-            "### ❌ ERROR\nPR creation requires the victor-devops package and the GitHub CLI "
-            "(gh). Install victor-devops and ensure `gh` is authenticated."
-        )
+    if pr_fn is not None:
+        try:
+            result = await pr_fn(pr_title=parsed.title, base_branch=parsed.base or "main")
+            return _format_result(result)
+        except Exception as e:
+            return f"### ❌ ERROR\nPR creation failed: {e}"
+
+    # Fallback: create the PR via the GitHub CLI (no victor-devops needed).
+    return await _gh_pr_create(parsed)
+
+
+def _build_gh_pr_argv(parsed: argparse.Namespace) -> List[str]:
+    """Build the ``gh pr create`` argv from parsed PR options.
+
+    ``gh`` needs a non-interactive body, so ``--fill`` is added whenever a body
+    is not explicitly supplied (and the browser flow is not requested); ``gh``
+    lets an explicit ``--title`` take precedence over autofilled content.
+    """
+    argv: List[str] = ["gh", "pr", "create"]
+    if parsed.title:
+        argv += ["--title", parsed.title]
+    if parsed.body is not None:
+        argv += ["--body", parsed.body]
+    if getattr(parsed, "web", False):
+        argv.append("--web")
+    elif getattr(parsed, "fill", False) or parsed.body is None:
+        # Autofill the body from commits so the command is non-interactive.
+        argv.append("--fill")
+    if parsed.base:
+        argv += ["--base", parsed.base]
+    if getattr(parsed, "head", None):
+        argv += ["--head", parsed.head]
+    if getattr(parsed, "draft", False):
+        argv.append("--draft")
+    return argv
+
+
+async def _gh_pr_create(parsed: argparse.Namespace) -> str:
+    """Create a PR through the ``gh`` CLI via the shell surface."""
+    from victor.tools.bash import shell
+
+    argv = _build_gh_pr_argv(parsed)
+    cmd = " ".join(shlex.quote(p) for p in argv)
     try:
-        result = await pr_fn(pr_title=parsed.title, base_branch=parsed.base)
-        return _format_result(result)
+        result = await shell(cmd=cmd, readonly=False)
     except Exception as e:
-        return f"### ❌ ERROR\nPR creation failed: {e}"
+        return f"### ❌ ERROR\ngh pr create failed: {e}"
+
+    if isinstance(result, dict):
+        stdout = (result.get("stdout") or result.get("output") or "").strip()
+        stderr = (result.get("stderr") or result.get("error") or "").strip()
+        if result.get("success") is False:
+            blob = f"{stderr}\n{stdout}".lower()
+            if "not found" in blob or "no such file" in blob or "command not found" in blob:
+                return (
+                    "### ❌ ERROR\nPR creation needs either the victor-devops package or the "
+                    "GitHub CLI (`gh`). Install one — e.g. `brew install gh && gh auth login`."
+                )
+            return f"### ❌ ERROR\ngh pr create failed: {stderr or stdout or 'unknown error'}"
+        return stdout or stderr or "Pull request created."
+    return str(result)
 
 
 __all__ = ["git_tool", "create_git_parser"]

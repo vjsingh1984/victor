@@ -25,6 +25,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from victor.tools.unified.git_tool import (
+    _augment_push_hint,
+    _build_gh_pr_argv,
     _fallback_command,
     _git_kwarg_map,
     create_git_parser,
@@ -303,13 +305,20 @@ class TestPrAndEdgeCases:
         assert "PR #42 created" in result
 
     @pytest.mark.asyncio
-    async def test_pr_without_devops_returns_error(self):
-        with patch(
-            "victor.tools.unified.git_tool.resolve_vertical_callable",
-            return_value=(None, None),
+    async def test_pr_without_devops_falls_back_to_gh(self):
+        # Behavior change: without victor-devops, PR creation now falls back to the
+        # gh CLI instead of hard-failing. (shell is mocked so no real PR is created.)
+        mock_shell = AsyncMock(return_value={"success": True, "stdout": "pull/1 created"})
+        with (
+            patch(
+                "victor.tools.unified.git_tool.resolve_vertical_callable",
+                return_value=(None, None),
+            ),
+            patch("victor.tools.bash.shell", mock_shell),
         ):
             result = await git_tool("git pr --title T")
-        assert "### ❌ ERROR" in result
+        assert mock_shell.call_args.kwargs["cmd"].startswith("gh pr create")
+        assert "pull/1 created" in result
 
     @pytest.mark.asyncio
     async def test_no_subcommand_returns_help(self):
@@ -416,3 +425,155 @@ class TestPorcelainFlags:
         assert "### ❌ ERROR" in result
         assert "This tool supports:" in result
         assert "shell(cmd='git ...', action='exec')" in result
+
+
+class TestPushSetUpstream:
+    """`git push -u` (set-upstream) — the standard first push of a new branch.
+
+    Live-failure: ``git push -u origin <branch>`` errored with "unrecognized
+    arguments: -u", forcing a raw shell fallback. ``-u``/``--set-upstream`` is
+    now a first-class push flag on both the devops and shell paths.
+    """
+
+    def test_push_u_short_flag_parses(self):
+        ns = _parse("git push -u origin feat/x")
+        assert ns.subcommand == "push"
+        assert ns.set_upstream is True
+        assert ns.remote == "origin"
+        assert ns.branch == "feat/x"
+
+    def test_push_set_upstream_long_flag_parses(self):
+        assert _parse("git push --set-upstream origin main").set_upstream is True
+
+    def test_push_without_u_defaults_false(self):
+        assert _parse("git push origin main").set_upstream is False
+
+    def test_kwarg_map_includes_set_upstream(self):
+        op, kwargs = _git_kwarg_map(_parse("git push -u origin feat/x"))
+        assert op == "push"
+        assert kwargs["options"]["set_upstream"] is True
+        assert kwargs["options"]["remote"] == "origin"
+
+    def test_fallback_push_emits_u_flag(self):
+        sub, argv, ro = _fallback_command(_parse("git push -u origin feat/x"))
+        assert sub == "push" and ro is False
+        assert argv == ["-u", "origin", "feat/x"]
+
+    def test_fallback_push_u_with_force_order(self):
+        sub, argv, _ = _fallback_command(_parse("git push -u origin feat/x --force"))
+        assert argv[0] == "-u"
+        assert "--force-with-lease" in argv
+
+    @pytest.mark.asyncio
+    async def test_push_u_shell_fallback_end_to_end(self):
+        mock_shell = AsyncMock(return_value={"success": True, "stdout": "branch pushed"})
+        with (
+            patch(
+                "victor.tools.unified.git_tool.resolve_vertical_callable",
+                return_value=(None, None),
+            ),
+            patch("victor.tools.bash.shell", mock_shell),
+        ):
+            result = await git_tool("git push -u origin feat/x")
+        called = mock_shell.call_args.kwargs["cmd"]
+        assert "git push -u origin feat/x" in called
+        assert "branch pushed" in result
+
+
+class TestPushUpstreamHint:
+    """A plain push that fails for lack of an upstream teaches ``push -u``."""
+
+    def test_hint_appended_on_upstream_error(self):
+        out = _augment_push_hint(
+            "### ❌ ERROR\nfatal: The current branch feat/x has no upstream branch.",
+            _parse("git push"),
+        )
+        assert "### 💡 HINT" in out
+        assert "git push -u origin" in out
+
+    def test_no_hint_on_success(self):
+        out = _augment_push_hint("Everything up-to-date", _parse("git push"))
+        assert "HINT" not in out
+
+    def test_no_hint_when_u_already_used(self):
+        out = _augment_push_hint(
+            "### ❌ ERROR\nfatal: ... no upstream ...", _parse("git push -u origin feat/x")
+        )
+        assert "HINT" not in out
+
+
+class TestPrGhFallback:
+    """PR creation falls back to ``gh pr create`` when victor-devops is absent."""
+
+    def test_pr_new_flags_parse(self):
+        ns = _parse('git pr --title T --head feat/x --body "b" --draft --web --fill')
+        assert ns.title == "T"
+        assert ns.head == "feat/x"
+        assert ns.body == "b"
+        assert ns.draft is True
+        assert ns.web is True
+        assert ns.fill is True
+
+    def test_pr_base_defaults_to_none(self):
+        # None lets gh use the repo default / gh-merge-base rather than hardcoding main.
+        assert _parse("git pr --title T").base is None
+
+    def test_build_gh_argv_autofills_body_when_absent(self):
+        argv = _build_gh_pr_argv(_parse("git pr --title T --base develop"))
+        assert argv[:3] == ["gh", "pr", "create"]
+        assert "--title" in argv and "T" in argv
+        assert "--fill" in argv  # body autofilled → non-interactive
+        assert "--base" in argv and "develop" in argv
+
+    def test_build_gh_argv_uses_explicit_body_without_fill(self):
+        argv = _build_gh_pr_argv(_parse('git pr --title T --body "hello"'))
+        assert "--body" in argv and "hello" in argv
+        assert "--fill" not in argv
+
+    def test_build_gh_argv_web_skips_fill(self):
+        argv = _build_gh_pr_argv(_parse("git pr --web"))
+        assert "--web" in argv
+        assert "--fill" not in argv
+
+    @pytest.mark.asyncio
+    async def test_pr_uses_gh_when_devops_absent(self):
+        mock_shell = AsyncMock(
+            return_value={"success": True, "stdout": "https://github.com/o/r/pull/7"}
+        )
+        with (
+            patch(
+                "victor.tools.unified.git_tool.resolve_vertical_callable",
+                return_value=(None, None),
+            ),
+            patch("victor.tools.bash.shell", mock_shell),
+        ):
+            result = await git_tool('git pr --title "Add x" --base develop')
+        called = mock_shell.call_args.kwargs["cmd"]
+        assert called.startswith("gh pr create")
+        assert "--title" in called
+        assert "pull/7" in result
+
+    @pytest.mark.asyncio
+    async def test_pr_gh_missing_teaches_install(self):
+        mock_shell = AsyncMock(return_value={"success": False, "stderr": "gh: command not found"})
+        with (
+            patch(
+                "victor.tools.unified.git_tool.resolve_vertical_callable",
+                return_value=(None, None),
+            ),
+            patch("victor.tools.bash.shell", mock_shell),
+        ):
+            result = await git_tool("git pr --title T")
+        assert "### ❌ ERROR" in result
+        assert "gh auth login" in result
+
+    @pytest.mark.asyncio
+    async def test_pr_still_prefers_devops_when_present(self):
+        mock_pr = AsyncMock(return_value={"success": True, "output": "PR #9 created"})
+        with patch(
+            "victor.tools.unified.git_tool.resolve_vertical_callable",
+            return_value=(mock_pr, "victor_devops.tools.git_tool"),
+        ):
+            result = await git_tool('git pr --title "Add auth" --base develop')
+        mock_pr.assert_awaited_once_with(pr_title="Add auth", base_branch="develop")
+        assert "PR #9 created" in result
